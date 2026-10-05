@@ -7,10 +7,12 @@ The app checks for updates using your personal GitHub token and installs APKs di
 ## Development and publishing workflow
 
 ```text
-PR → CI checks pass → Review & Approve → Merge to main → main CI green → /nightly or /release
+PR → CI checks pass → Review & Approve → Merge to main → /nightly or /release
 ```
 
-After your PR is merged and **main CI succeeds**, publish by commenting on the merged PR:
+`/release` and `/nightly` wait if main CI is still running. Publishing still requires `unit-test` and `static-analysis` to succeed.
+
+After your PR is merged, publish by commenting on the merged PR:
 
 ### 1. Test build (Nightly)
 Comment on the merged PR:

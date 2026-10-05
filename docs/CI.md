@@ -15,7 +15,7 @@ Masroof uses GitHub Actions for continuous integration and automated slash-comma
 1. **Feature branch**: Create branch and commit code changes. No manual version bumping in `app/build.gradle.kts`.
 2. **Open PR**: Open a PR targeting `main`. **CI** runs tests and lint checks automatically.
 3. **Review & Merge**: Review changes and merge the PR into `main`. **CI runs again on `main`** after merge.
-4. **Publish**: After **main CI is green**, comment `/nightly` or `/release` on the merged PR.
+4. **Publish**: Comment `/nightly` or `/release` on the merged PR. If main CI is still running, the release job waits for it. A failed check still blocks publishing.
 
 ---
 
@@ -49,7 +49,7 @@ Comment:
 
 - **Zero-code bumps**: Version names and version codes are dynamically resolved and passed via Gradle CLI (`-PappVersionName` and `-PappVersionCode`). No version commits are pushed back to the repo.
 - **Unmerged PR protection**: `/release` and `/nightly` commands on open/unmerged PRs are rejected.
-- **CI gate before publish**: Release verifies the target commit has successful `unit-test` and `static-analysis` checks from the **CI** workflow (within 7 days). If main CI is still running or failed, publish is blocked.
+- **CI gate before publish**: Release verifies the target commit has successful `unit-test` and `static-analysis` checks from the **CI** workflow (within 7 days). If those checks are still running, publish waits for them. If a check failed, publish is blocked.
 - **Serialized publishing**: All publishing jobs run under the `masroof-publish` concurrency group with `cancel-in-progress: false` to ensure no two concurrent builds can generate conflicting versions or version codes.
 - **Tagging safety**: Git tags are created and pushed only **after** the APK is signed and verification succeeds.
 - **Authorization**: Only repository owners, members, and write collaborators can trigger release workflows.
