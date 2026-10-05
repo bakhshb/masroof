@@ -7,7 +7,11 @@ import com.baraa.masroof.domain.model.Bank
 /**
  * Fleet view across [OwnedAccount] instances for the salary period.
  *
- * Hero totals use [totalRemaining] (all in − all out per account, summed).
+ * [totalInflow] and [totalOutflow] are external movement only. A transfer
+ * between owned accounts is not income and not spending, even when the
+ * destination account is at the same bank.
+ * [totalRemaining] is all in − all out per account, summed. Those internal
+ * legs cancel across the fleet, so remaining still matches external remaining.
  * Per-account cards use [OwnedAccount.remaining] (external movement only).
  */
 data class AccountsSummary(
@@ -23,11 +27,13 @@ data class AccountsSummary(
     val totalRemaining: SignedMoneyAmount?
         get() = fleet.accountSummary()?.remaining
 
+    /** Salary, other income, and external transfers in. Excludes transfers between owned accounts. */
     val totalInflow: Money?
-        get() = fleet.accountSummary()?.inflow
+        get() = fleet.externalSummary()?.inflow
 
+    /** Money that left the owned fleet. Excludes transfers between owned accounts. */
     val totalOutflow: Money?
-        get() = fleet.accountSummary()?.outflow
+        get() = fleet.externalSummary()?.outflow
 
     /** Fleet external movement (internal transfers excluded from totals). */
     val externalRemaining: SignedMoneyAmount?

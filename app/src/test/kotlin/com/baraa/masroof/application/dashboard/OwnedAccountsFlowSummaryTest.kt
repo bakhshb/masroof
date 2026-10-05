@@ -103,6 +103,34 @@ class OwnedAccountsFlowSummaryTest {
   }
 
   @Test
+  fun totalIncome_doesNotCountTransferToAnotherOwnedAccount() {
+    val account1 = "account:bank_aljazira:3001"
+    val account2 = "account:bank_aljazira:3002"
+    val transactions = listOf(
+      tx("received", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "10000", dest = account1),
+      tx("moved", FinancialTransactionType.SELF_TRANSFER, "10000", source = account1, dest = account2),
+    )
+
+    val fleet = AccountsSummary.fromSummaries(
+      accounts = listOf(
+        Bank.BANK_ALJAZIRA to "3001",
+        Bank.BANK_ALJAZIRA to "3002",
+      ),
+      summaries = listOf(
+        summarizeAccount(account1, "3001", transactions),
+        summarizeAccount(account2, "3002", transactions),
+      ),
+    )
+
+    assertEquals(Money.of("10000.00", Currency.SAR), fleet.totalInflow)
+    assertEquals(Money.zero(Currency.SAR), fleet.totalOutflow)
+    assertEquals(
+      SignedMoneyAmount.of(Money.of("10000.00", Currency.SAR)),
+      fleet.totalRemaining,
+    )
+  }
+
+  @Test
   fun externalMovement_excludesSelfTransferFromAccountRemaining_likeV019() {
     val summary = CurrentAccountSummary.of(
       currency = Currency.SAR,
