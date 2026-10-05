@@ -7,6 +7,9 @@ SKIP_CI_CHECK="${SKIP_CI_CHECK:-false}"
 REPO="${GITHUB_REPOSITORY:-}"
 MAX_AGE_DAYS="${CI_CHECK_MAX_AGE_DAYS:-7}"
 CI_JOB_NAMES="${CI_JOB_NAMES:-unit-test static-analysis}"
+# /release often lands while main CI is still running. Wait instead of failing immediately.
+CI_CHECK_WAIT_SECONDS="${CI_CHECK_WAIT_SECONDS:-720}"
+CI_CHECK_POLL_SECONDS="${CI_CHECK_POLL_SECONDS:-20}"
 
 if [[ "$SKIP_CI_CHECK" == "true" ]]; then
   echo "SKIP_CI_CHECK=true — skipping CI verification."
@@ -43,9 +46,8 @@ verify_job() {
   matching_count=$(echo "$check_runs_json" | jq --arg name "$job_name" '[.check_runs[] | select(.name == $name)] | length')
 
   if [[ "$matching_count" -eq 0 ]]; then
-    echo "No '${job_name}' check run found for commit ${target_sha}." >&2
-    echo "Wait for CI on main to finish after merge, then retry /nightly or /release." >&2
-    return 1
+    echo "No '${job_name}' check run yet for commit ${target_sha}." >&2
+    return 2
   fi
 
   local latest status conclusion completed_at html_url
@@ -56,9 +58,8 @@ verify_job() {
   html_url=$(echo "$latest" | jq -r '.html_url // empty')
 
   if [[ "$status" != "completed" ]]; then
-    echo "CI check '${job_name}' is still ${status}." >&2
-    echo "Wait for CI to complete: ${html_url}" >&2
-    return 1
+    echo "CI check '${job_name}' is still ${status}: ${html_url}" >&2
+    return 2
   fi
 
   if [[ "$conclusion" != "success" ]]; then
@@ -85,8 +86,36 @@ verify_job() {
 }
 
 TARGET_SHA="$(resolve_sha "$TARGET_REF")"
-CHECK_RUNS_JSON=$(gh api "repos/${REPO}/commits/${TARGET_SHA}/check-runs?per_page=100")
+deadline=$(( $(date +%s) + CI_CHECK_WAIT_SECONDS ))
 
-for job_name in $CI_JOB_NAMES; do
-  verify_job "$job_name" "$TARGET_SHA" "$CHECK_RUNS_JSON"
+while true; do
+  CHECK_RUNS_JSON=$(gh api "repos/${REPO}/commits/${TARGET_SHA}/check-runs?per_page=100")
+  pending=false
+  for job_name in $CI_JOB_NAMES; do
+    set +e
+    verify_job "$job_name" "$TARGET_SHA" "$CHECK_RUNS_JSON"
+    rc=$?
+    set -e
+    if [[ "$rc" -eq 2 ]]; then
+      pending=true
+    elif [[ "$rc" -ne 0 ]]; then
+      exit 1
+    fi
+  done
+
+  if [[ "$pending" == "false" ]]; then
+    exit 0
+  fi
+
+  now=$(date +%s)
+  if [[ "$now" -ge "$deadline" ]]; then
+    echo "Timed out after ${CI_CHECK_WAIT_SECONDS}s waiting for CI on ${TARGET_SHA}." >&2
+    echo "Retry /nightly or /release after main CI finishes." >&2
+    exit 1
+  fi
+
+  echo "CI still running on ${TARGET_SHA:0:7}. Checking again in ${CI_CHECK_POLL_SECONDS}s."
+  if [[ "$CI_CHECK_POLL_SECONDS" -gt 0 ]]; then
+    sleep "$CI_CHECK_POLL_SECONDS"
+  fi
 done
