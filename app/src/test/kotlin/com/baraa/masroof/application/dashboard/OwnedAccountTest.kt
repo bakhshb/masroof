@@ -44,6 +44,24 @@ class OwnedAccountTest {
         assertEquals(Money.of("0.00", Currency.SAR), fleet.totalCreditCardPayments())
     }
 
+    @Test
+    fun totalInflow_excludesTransferToAnotherOwnedAccount() {
+        val source = ownedAccount(
+            id = "3001",
+            externalIn = "10000",
+            selfOut = "10000",
+        )
+        val destination = ownedAccount(
+            id = "3002",
+            selfIn = "10000",
+        )
+        val fleet = AccountsSummary(listOf(source, destination))
+
+        assertEquals(Money.of("10000.00", Currency.SAR), fleet.totalInflow)
+        assertEquals(Money.of("0.00", Currency.SAR), fleet.totalOutflow)
+        assertEquals(SignedMoneyAmount.of(Money.of("10000.00", Currency.SAR)), fleet.totalRemaining)
+    }
+
     private fun ownedAccount(
         id: String = "3001",
         salary: String = "0",
