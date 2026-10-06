@@ -73,13 +73,15 @@ class HistoricalSmsBatchProcessor(
                 throw e
             } catch (_: Exception) {
                 null
-            } ?: return null
-            try {
-                reviewQueueUpdater?.applyReport(report)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // Review persistence must not fail imported evidence; the next refresh retries.
+            }
+            if (report != null) {
+                try {
+                    reviewQueueUpdater?.applyReport(report)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Review persistence must not fail imported evidence; the next refresh retries.
+                }
             }
             try {
                 exchangeRateEnrichment?.enrichPending()
@@ -88,7 +90,7 @@ class HistoricalSmsBatchProcessor(
             } catch (_: Exception) {
                 // Enrichment is best-effort; pending rows are retried by the next run.
             }
-            return report.summary
+            return report?.summary
         }
 
         private suspend fun discoverOwnership(stored: StoredEvent) {
