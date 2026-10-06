@@ -22,7 +22,7 @@
 
 **Room changes:** Migration + mapper + parser population + migration test. If existing users need the new column filled, wire backfill (see `ParsedEventFactsBackfillCoordinator`). Declare the new schema version in `SchemaFactsBackfillPolicy`: `BLOCKING` only if existing rows display incorrectly until re-parse, otherwise `BACKGROUND`. Device-test after schema/backfill merges.
 
-**Maintenance:** Startup waits only for `BLOCKING` maintenance (`StartupMaintenance`); background-safe work runs in WorkManager and must be idempotent, keep failed rows retryable, and emit `MaintenanceCompletionSignal` so screens refresh.
+**Maintenance:** Startup waits for `BLOCKING` maintenance (`StartupMaintenance`) and fails closed if it is incomplete: never expose financial screens until a blocking retry succeeds. Only `BACKGROUND` work may run while the app is open; it must be idempotent, keep failed rows retryable, and emit `MaintenanceCompletionSignal` so screens refresh.
 
 **Parse-status gate:** Only `ParseStatus.SUCCESS`, an explicit automation-confirming correction (message family/amount), or an explicit `USER_FINANCIAL_TYPE` resolution may create/pair/post a `FinancialTransaction` (`TransactionAssembler.isAutomationEligible`). Merchant/counterparty-only edits never lift the gate. Never bypass it in reconciliation passes.
 

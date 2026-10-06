@@ -11,6 +11,7 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
 import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillWorker
+import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
 import com.baraa.masroof.data.room.MasroofDatabase
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -69,7 +70,10 @@ class AppContainerStartupMaintenanceTest {
         }
 
         container.runStartupMaintenance()
-        withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() }
+        assertEquals(
+            StartupMaintenanceOutcome.READY,
+            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() },
+        )
 
         assertEquals(WorkInfo.State.SUCCEEDED, finishedBackfillWork().single().state)
         assertEquals(MasroofDatabase.VERSION, lastReparsedVersion())
@@ -81,7 +85,10 @@ class AppContainerStartupMaintenanceTest {
         recordLastReparsedVersion(9)
 
         container.runStartupMaintenance()
-        withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() }
+        assertEquals(
+            StartupMaintenanceOutcome.READY,
+            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() },
+        )
 
         assertEquals(MasroofDatabase.VERSION, lastReparsedVersion())
         assertTrue(backfillWork().isEmpty())
@@ -92,7 +99,10 @@ class AppContainerStartupMaintenanceTest {
         recordLastReparsedVersion(MasroofDatabase.VERSION)
 
         container.runStartupMaintenance()
-        withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() }
+        assertEquals(
+            StartupMaintenanceOutcome.READY,
+            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() },
+        )
 
         assertTrue(backfillWork().isEmpty())
     }

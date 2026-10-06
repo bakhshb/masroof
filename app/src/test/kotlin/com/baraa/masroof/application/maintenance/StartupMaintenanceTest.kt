@@ -33,7 +33,7 @@ class StartupMaintenanceTest {
     fun upToDate_neitherReparsesNorSchedules() = runBlocking<Unit> {
         recordLastReparsedVersion(CURRENT_VERSION)
 
-        startup().runBlockingPhase()
+        assertEquals(StartupMaintenanceOutcome.READY, startup().runBlockingPhase())
 
         assertEquals(0, reparseCount)
         assertEquals(0, scheduleCount)
@@ -43,7 +43,7 @@ class StartupMaintenanceTest {
     fun backgroundSafeBacklog_doesNotHoldStartup() = runBlocking<Unit> {
         recordLastReparsedVersion(11)
 
-        startup().runBlockingPhase()
+        assertEquals(StartupMaintenanceOutcome.READY, startup().runBlockingPhase())
 
         assertEquals(0, reparseCount)
         assertEquals(1, scheduleCount)
@@ -54,7 +54,7 @@ class StartupMaintenanceTest {
     fun correctnessBlockingBacklog_finishesBeforeStartupReturns() = runBlocking<Unit> {
         recordLastReparsedVersion(9)
 
-        startup().runBlockingPhase()
+        assertEquals(StartupMaintenanceOutcome.READY, startup().runBlockingPhase())
 
         assertEquals(1, reparseCount)
         assertEquals(0, scheduleCount)
@@ -63,27 +63,30 @@ class StartupMaintenanceTest {
 
     @Test
     fun freshInstall_isBlockingAndCompletesInline() = runBlocking<Unit> {
-        startup().runBlockingPhase()
+        assertEquals(StartupMaintenanceOutcome.READY, startup().runBlockingPhase())
 
         assertEquals(1, reparseCount)
         assertEquals(0, scheduleCount)
     }
 
     @Test
-    fun blockingBacklogWithFailedRows_isRetriedInBackground() = runBlocking<Unit> {
+    fun blockingBacklogWithFailedRows_staysBlockedUntilRetrySucceeds() = runBlocking<Unit> {
         recordLastReparsedVersion(9)
         failedRows = 2
         val coordinator = coordinator()
 
-        StartupMaintenance(coordinator, CURRENT_VERSION) { scheduleCount++ }.runBlockingPhase()
+        val maintenance = StartupMaintenance(coordinator, CURRENT_VERSION) { scheduleCount++ }
+        assertEquals(StartupMaintenanceOutcome.BLOCKED, maintenance.runBlockingPhase())
 
         assertEquals(1, reparseCount)
-        assertEquals(1, scheduleCount)
+        assertEquals(0, scheduleCount)
         assertEquals(9, lastReparsedVersion())
         assertEquals(MaintenanceRequirement.BLOCKING, coordinator.pendingRequirement(CURRENT_VERSION))
 
         failedRows = 0
-        assertEquals(BackfillOutcome.COMPLETED, coordinator.runIfNeeded(CURRENT_VERSION))
+        assertEquals(StartupMaintenanceOutcome.READY, maintenance.runBlockingPhase())
+        assertEquals(2, reparseCount)
+        assertEquals(0, scheduleCount)
         assertNull(coordinator.pendingRequirement(CURRENT_VERSION))
     }
 

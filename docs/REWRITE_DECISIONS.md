@@ -405,10 +405,10 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   versions default to blocking, so a new migration must choose.
 - Fresh installs still run the backfill inline (range 0..current includes v10/v11); the
   backlog is empty then, so it does not delay launch.
-- A blocking backfill that ends with failed rows or throws no longer keeps the spinner up or
-  crashes startup: the version stays unrecorded, the UI opens, and the worker retries.
-  Previously, failed rows also left the version unrecorded but were retried only on the next
-  launch, and a thrown backfill escaped the startup job.
+- A blocking backfill that ends with failed rows or throws fails closed: the version stays
+  unrecorded and financial UI remains gated behind an explicit retry state. It is not
+  downgraded to background because the policy says displayed data is unsafe until re-parse.
+  Background-safe backfills still release startup immediately and retry through WorkManager.
 - Startup and the worker share one coordinator mutex, so the backlog is never re-parsed
   twice concurrently.
 

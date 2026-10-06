@@ -831,8 +831,9 @@ Each task is classified, not moved wholesale to the background:
   `BLOCKING` if any version in it is (v10, v11: parse-fact columns dashboard and
   reconciliation rules read) or is undeclared; otherwise `BACKGROUND`. Every schema version
   must be declared (`SchemaFactsBackfillPolicyTest`).
-- `StartupMaintenance.runBlockingPhase` runs a `BLOCKING` backfill inline. If rows fail it
-  still releases the UI (waiting longer cannot fix them) and schedules the worker.
+- `StartupMaintenance.runBlockingPhase` runs a `BLOCKING` backfill inline. If rows fail,
+  financial UI stays gated and the startup screen offers retry; blocking work is never
+  downgraded to background merely to release the UI.
 - `ParsedEventFactsBackfillWorker` runs the same `ParsedEventFactsBackfillCoordinator`
   (unique work, `KEEP`, exponential backoff, `MAX_ATTEMPTS`). The coordinator serializes
   runs, records the schema version only after a run with no failed rows, and turns a thrown
