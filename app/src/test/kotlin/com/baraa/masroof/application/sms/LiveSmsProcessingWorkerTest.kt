@@ -246,6 +246,7 @@ class LiveSmsProcessingWorkerTest {
         val scheduled = mutableListOf<String>()
         assertEquals(1, harness.intake { scheduled += it }.schedulePendingProcessing())
         assertEquals(listOf(raw.id), scheduled)
+        assertEquals(listOf(raw.id), harness.processingRetryRepo.listRetryableRawSmsIds())
     }
 
     @Test
@@ -270,6 +271,7 @@ class LiveSmsProcessingWorkerTest {
         assertEquals(ReviewResolutionKind.AUTO_NO_LONGER_REQUIRED, review.resolutionKind)
         assertEquals(1, harness.db.financialTransactionDao().count())
         assertEquals(0, harness.intake { }.schedulePendingProcessing())
+        assertTrue(harness.processingRetryRepo.listRetryableRawSmsIds().isEmpty())
     }
 
     @Test
@@ -293,7 +295,36 @@ class LiveSmsProcessingWorkerTest {
         val stored = harness.reviewRepo.findByRawSmsId(raw.id)!!
         assertEquals(ReviewStatus.RESOLVED, stored.status)
         assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, stored.resolutionKind)
+        assertTrue(harness.processingRetryRepo.listRetryableRawSmsIds().isEmpty())
         assertEquals(0, harness.intake { }.schedulePendingProcessing())
+    }
+
+    @Test
+    fun finalAttempt_retriesWhenProcessingErrorCannotBePersisted() = runBlocking {
+        val raw = captured()
+        val processStored = harness.processStored(
+            derivedFailures = DerivedFailureInjection(
+                reconciliationFailuresRemaining = AtomicInteger(Int.MAX_VALUE),
+                processingErrorUpsertFailuresRemaining = AtomicInteger(1),
+            ),
+        )
+        val finalAttempt = LiveSmsProcessingWorker.MAX_ATTEMPTS - 1
+
+        assertEquals(
+            ListenableWorker.Result.retry(),
+            worker(raw.id, attempt = finalAttempt, processStored = processStored).doWork(),
+        )
+        assertNull(harness.reviewRepo.findByRawSmsId(raw.id))
+        assertTrue(harness.processingRetryRepo.listRetryableRawSmsIds().isEmpty())
+
+        assertEquals(
+            ListenableWorker.Result.failure(),
+            worker(raw.id, attempt = finalAttempt + 1, processStored = processStored).doWork(),
+        )
+        val review = harness.reviewRepo.findByRawSmsId(raw.id)!!
+        assertEquals(ReviewStatus.REQUIRED, review.status)
+        assertEquals(listOf(IngestionReviewService.REASON_PROCESSING_ERROR), review.reasons)
+        assertEquals(listOf(raw.id), harness.processingRetryRepo.listRetryableRawSmsIds())
     }
 
     @Test

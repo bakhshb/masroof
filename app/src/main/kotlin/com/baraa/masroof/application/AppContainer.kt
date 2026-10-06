@@ -75,6 +75,7 @@ import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
+import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
@@ -90,6 +91,7 @@ import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.ManualReviewResolutionRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
+import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
@@ -98,6 +100,7 @@ import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
+import com.baraa.masroof.application.ingestion.ProcessingRecovery
 import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
@@ -173,6 +176,9 @@ class AppContainer(
 
     val reviewRepository: ReviewRepository =
         RoomReviewRepository(database.reviewItemDao())
+
+    val processingRetryRepository: ProcessingRetryRepository =
+        RoomProcessingRetryRepository(database.processingRetryDao())
 
     val userCorrectionRepository: UserCorrectionRepository =
         RoomUserCorrectionRepository(database.userCorrectionDao())
@@ -278,6 +284,14 @@ class AppContainer(
     val ingestionReviewService: IngestionReviewService =
         IngestionReviewService(
             reviewRepository = reviewRepository,
+            clock = clock,
+        )
+
+    val processingRecovery: ProcessingRecovery =
+        ProcessingRecovery(
+            processingRetryRepository = processingRetryRepository,
+            reviewRepository = reviewRepository,
+            ingestionReviewService = ingestionReviewService,
             clock = clock,
         )
 
@@ -446,6 +460,7 @@ class AppContainer(
             ingestionReviewService = ingestionReviewService,
             appLogService = appLogService,
             exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
+            processingRecovery = processingRecovery,
         )
 
     val processRawSmsUseCase: ProcessRawSmsUseCase =
@@ -460,6 +475,7 @@ class AppContainer(
             scheduler = WorkManagerLiveSmsWorkScheduler { WorkManager.getInstance(appContext) },
             rawSmsRepository = rawSmsRepository,
             reviewRepository = reviewRepository,
+            processingRetryRepository = processingRetryRepository,
             appLogService = appLogService,
         )
 
@@ -482,6 +498,8 @@ class AppContainer(
                 reconciliation = transactionReconciliationService,
                 reviewQueueUpdater = reviewQueueUpdater,
                 exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
+                processingRecovery = processingRecovery,
+                workScheduler = WorkManagerLiveSmsWorkScheduler { WorkManager.getInstance(appContext) },
             ),
             appLogService = appLogService,
         )

@@ -49,13 +49,19 @@ class LiveSmsProcessingWorker(
     }
 
     /**
-     * Intermediate derived failures stay retryable without a review row.
-     * The final attempt records `processing_error` so startup can reschedule the evidence.
+     * Intermediate derived failures stay retryable without a recovery marker.
+     * The final attempt may stop only after the recovery marker has been saved.
      */
     private suspend fun retryDerivedOrGiveUp(rawSmsId: String): Result {
         if (runAttemptCount + 1 < MAX_ATTEMPTS) return Result.retry()
-        processStoredSms.recordExhaustedDerivedProcessing(rawSmsId)
-        return Result.failure()
+        return try {
+            processStoredSms.recordExhaustedDerivedProcessing(rawSmsId)
+            Result.failure()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            Result.retry()
+        }
     }
 
     /** After [MAX_ATTEMPTS], parse failures keep their processing_error review for reparse. */

@@ -10,6 +10,7 @@ import com.baraa.masroof.data.room.dao.CommitmentDao
 import com.baraa.masroof.data.room.dao.FinancialTransactionDao
 import com.baraa.masroof.data.room.dao.LoanRegistryDao
 import com.baraa.masroof.data.room.dao.ParsedEventDao
+import com.baraa.masroof.data.room.dao.ProcessingRetryDao
 import com.baraa.masroof.data.room.dao.RawSmsDao
 import com.baraa.masroof.data.room.dao.ReviewItemDao
 import com.baraa.masroof.data.room.dao.UserCorrectionDao
@@ -22,6 +23,7 @@ import com.baraa.masroof.data.room.entity.CommitmentEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 import com.baraa.masroof.data.room.entity.ParsedEventEntity
+import com.baraa.masroof.data.room.entity.ProcessingRetryEntity
 import com.baraa.masroof.data.room.entity.RawSmsEntity
 import com.baraa.masroof.data.room.entity.ReviewItemEntity
 import com.baraa.masroof.data.room.entity.UserCorrectionEntity
@@ -37,6 +39,7 @@ import com.baraa.masroof.data.room.migration.MIGRATION_10_11
 import com.baraa.masroof.data.room.migration.MIGRATION_11_12
 import com.baraa.masroof.data.room.migration.MIGRATION_12_13
 import com.baraa.masroof.data.room.migration.MIGRATION_13_14
+import com.baraa.masroof.data.room.migration.MIGRATION_14_15
 import com.baraa.masroof.data.room.migration.MIGRATION_7_8
 
 /**
@@ -49,7 +52,8 @@ import com.baraa.masroof.data.room.migration.MIGRATION_7_8
  * 10→11 bank-neutral parse facts (loan type, debit source account, salary wording);
  * 11→12 user commitments;
  * 12→13 commitment pause history intervals;
- * 13→14 backfill open pause intervals for legacy inactive commitments.
+ * 13→14 backfill open pause intervals for legacy inactive commitments;
+ * 14→15 processing-retry markers.
  * Does not use destructive migration.
  */
 @Database(
@@ -66,8 +70,9 @@ import com.baraa.masroof.data.room.migration.MIGRATION_7_8
         CommitmentEntity::class,
         ReviewItemEntity::class,
         UserCorrectionEntity::class,
+        ProcessingRetryEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 abstract class MasroofDatabase : RoomDatabase() {
@@ -91,20 +96,27 @@ abstract class MasroofDatabase : RoomDatabase() {
 
     abstract fun reviewItemDao(): ReviewItemDao
 
+    abstract fun processingRetryDao(): ProcessingRetryDao
+
     abstract fun userCorrectionDao(): UserCorrectionDao
 
     companion object {
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 14
+        const val VERSION: Int = 15
 
-        /** Must match app/schemas/.../14.json identityHash — updated after schema export. */
-        const val IDENTITY_HASH: String = "91c2c7a8f0b96cf4a9dc6088ba92e085"
+        /** Must match app/schemas/.../15.json identityHash. */
+        const val IDENTITY_HASH: String = "913836eaca3ed118258e97c68e991890"
 
-        /** Previous production schema (v13 commitment pause intervals). */
-        const val PREVIOUS_VERSION: Int = 13
+        /** Previous production schema (v14). */
+        const val PREVIOUS_VERSION: Int = 14
 
-        /** Must match app/schemas/.../13.json identityHash. */
+        /** Must match app/schemas/.../14.json identityHash. */
         const val PREVIOUS_IDENTITY_HASH: String = "91c2c7a8f0b96cf4a9dc6088ba92e085"
+
+        /** v13 backups share the v14 identity hash; the migration only backfilled rows. */
+        const val LEGACY_VERSION_13: Int = 13
+
+        const val LEGACY_IDENTITY_HASH_13: String = "91c2c7a8f0b96cf4a9dc6088ba92e085"
 
         /** Legacy v12 backups (user commitments). */
         const val LEGACY_VERSION_12: Int = 12
@@ -168,6 +180,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_11_12,
             MIGRATION_12_13,
             MIGRATION_13_14,
+            MIGRATION_14_15,
         )
 
         /** Room versions accepted by [com.baraa.masroof.application.backup.DatabaseBackupService]. */
@@ -180,6 +193,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             LEGACY_VERSION_10 to LEGACY_IDENTITY_HASH_10,
             LEGACY_VERSION_11 to LEGACY_IDENTITY_HASH_11,
             LEGACY_VERSION_12 to LEGACY_IDENTITY_HASH_12,
+            LEGACY_VERSION_13 to LEGACY_IDENTITY_HASH_13,
             PREVIOUS_VERSION to PREVIOUS_IDENTITY_HASH,
             VERSION to IDENTITY_HASH,
         )

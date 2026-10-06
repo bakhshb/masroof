@@ -46,6 +46,7 @@ class ProcessStoredSmsUseCase(
     private val ingestionReviewService: IngestionReviewService? = null,
     private val appLogService: AppLogService? = null,
     private val exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
+    private val processingRecovery: ProcessingRecovery? = null,
 ) {
     /** Processes evidence captured in this same attempt, reusing the capture's [route]. */
     suspend fun process(
@@ -329,6 +330,9 @@ class ProcessStoredSmsUseCase(
         } else {
             null
         }
+        if (incomplete == null && deriveImmediately) {
+            processingRecovery?.clear(event.rawSmsId)
+        }
         if (logOutcome) {
             logParsedOutcome(rawSms, event.messageFamily, outcome)
         }
@@ -480,11 +484,17 @@ class ProcessStoredSmsUseCase(
     }
 
     /**
-     * Records a REQUIRED `processing_error` review after live retries are exhausted.
-     * Does not reopen a resolved user review.
+     * Persists the recovery marker after live retries are exhausted.
+     * Throws when that marker cannot be saved. Does not reopen a non-financial resolution.
      */
     suspend fun recordExhaustedDerivedProcessing(rawSmsId: String) {
-        recordIngestionReview(rawSmsId, IngestionReviewService.REASON_PROCESSING_ERROR)
+        val recovery = processingRecovery
+        if (recovery != null) {
+            recovery.markExhausted(rawSmsId)
+            return
+        }
+        val service = ingestionReviewService ?: return
+        service.requireReview(rawSmsId, IngestionReviewService.REASON_PROCESSING_ERROR)
     }
 
     companion object {

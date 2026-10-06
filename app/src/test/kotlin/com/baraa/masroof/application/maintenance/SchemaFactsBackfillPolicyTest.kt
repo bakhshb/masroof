@@ -26,8 +26,8 @@ class SchemaFactsBackfillPolicyTest {
 
     @Test
     fun upToDate_hasNoRequirement() {
-        assertNull(SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 14, currentVersion = 14))
-        assertNull(SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 15, currentVersion = 14))
+        assertNull(SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 15, currentVersion = 15))
+        assertNull(SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 16, currentVersion = 15))
     }
 
     @Test
@@ -39,6 +39,10 @@ class SchemaFactsBackfillPolicyTest {
         assertEquals(
             MaintenanceRequirement.BACKGROUND,
             SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 13, currentVersion = 14),
+        )
+        assertEquals(
+            MaintenanceRequirement.BACKGROUND,
+            SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 14, currentVersion = 15),
         )
     }
 
@@ -62,7 +66,7 @@ class SchemaFactsBackfillPolicyTest {
     fun undeclaredFutureVersion_isBlocking() {
         assertEquals(
             MaintenanceRequirement.BLOCKING,
-            SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 14, currentVersion = 15),
+            SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 15, currentVersion = 16),
         )
     }
 }
