@@ -9,8 +9,9 @@ import com.baraa.masroof.data.room.MasroofDatabase
  * One-time maintenance after schema upgrades that add nullable parse-fact columns.
  *
  * Migrations only alter the table shape; existing rows keep NULL facts until the
- * parser runs again. This coordinator re-parses the stored backlog once per schema
- * version so dashboard and reconciliation see populated facts.
+ * parser runs again. This coordinator re-parses the stored RawSms backlog once per
+ * schema version (including evidence that never produced a ParsedEvent) so
+ * dashboard and reconciliation see populated facts.
  */
 class ParsedEventFactsBackfillCoordinator(
     private val prefs: SharedPreferences,
@@ -29,7 +30,7 @@ class ParsedEventFactsBackfillCoordinator(
         if (!result.succeeded) {
             appLogService.warn(
                 AppLogCategories.PARSE,
-                "Schema facts backfill incomplete: ${result.failedCount} events failed; will retry on next launch",
+                "Schema facts backfill incomplete: ${result.failedCount} messages failed; will retry on next launch",
             )
             return
         }
@@ -38,7 +39,7 @@ class ParsedEventFactsBackfillCoordinator(
             .apply()
         appLogService.info(
             AppLogCategories.PARSE,
-            "Schema facts backfill finished: ${result.refreshedCount} events refreshed",
+            "Schema facts backfill finished: ${result.refreshedCount} messages refreshed",
         )
     }
 }

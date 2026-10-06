@@ -258,6 +258,7 @@ class DashboardServiceTest {
         override suspend fun getById(id: String): RawSms? = byId[id]
         override suspend fun existsById(id: String): Boolean = byId.containsKey(id)
         override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? = null
+        override suspend fun listIdsByReceivedAt(): List<String> = byId.keys.toList()
         override suspend fun findCrossSourceNearDuplicate(
             sender: String,
             bodyHash: String,

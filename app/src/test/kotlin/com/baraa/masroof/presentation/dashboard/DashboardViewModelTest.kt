@@ -660,6 +660,7 @@ class DashboardViewModelTest {
                 override suspend fun getById(id: String) = null
                 override suspend fun existsById(id: String) = false
                 override suspend fun findByDeviceMessageId(deviceMessageId: String) = null
+                override suspend fun listIdsByReceivedAt(): List<String> = emptyList()
                 override suspend fun findCrossSourceNearDuplicate(
                     sender: String,
                     bodyHash: String,

@@ -256,6 +256,20 @@ class ProcessRawSmsUseCaseTest {
     }
 
     @Test
+    fun reparseStored_recoversRawSmsThatNeverHadParsedEvent() = runBlocking {
+        val raw = aljaziraPurchase(id = "android-sms:recover", deviceId = "recover")
+        rawRepo.insertIfAbsent(raw)
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+        val result = useCase.reparseStored(raw)
+        assertTrue(result is SmsIngestionResult.Parsed)
+        assertEquals(ParseStatus.SUCCESS, parsedRepo.findByRawSmsId(raw.id)!!.event.parseStatus)
+        assertEquals(1, db.rawSmsDao().count())
+        assertEquals(1, db.parsedEventDao().count())
+        useCase.reparseStored(raw)
+        assertEquals(1, db.parsedEventDao().count())
+    }
+
+    @Test
     fun parserFailure_keepsRawSmsAndReturnsFailed() = runBlocking {
         val exploding = SmsParseGateway { throw IllegalStateException("boom") }
         val svc = ProcessRawSmsUseCase(

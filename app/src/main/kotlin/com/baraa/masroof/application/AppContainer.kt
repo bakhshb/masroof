@@ -28,7 +28,6 @@ import com.baraa.masroof.application.notification.NotificationCenterMetricsWorkf
 import com.baraa.masroof.application.notification.NotificationCenterService
 import com.baraa.masroof.application.notification.NotificationPreferencesRepository
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
-import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.update.ApkInstaller
 import com.baraa.masroof.application.update.AppUpdateService
@@ -43,6 +42,7 @@ import com.baraa.masroof.application.locale.AppLocaleContextFactory
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
 import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillCoordinator
 import com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult
+import com.baraa.masroof.application.maintenance.StoredSmsReprocessor
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -87,7 +87,6 @@ import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.datasource.AndroidSmsDataSource
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
-import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
 import com.baraa.masroof.sms.time.InstantClock
@@ -451,39 +450,30 @@ class AppContainer(
     suspend fun refreshReviewQueue() =
         reviewWorkflowService.refreshReviewQueue()
 
-    /**
-     * Re-parses every stored RawSms that already has a ParsedEvent row.
-     * Parser upgrades apply to the existing backlog without duplicating SMS evidence.
-     */
-    suspend fun reparseAllStoredEvents(): ReparseAllStoredEventsResult {
-        appLogService.info(AppLogCategories.PARSE, "Reparse started")
-        var refreshedCount = 0
-        var failedCount = 0
-        for (record in parsedEventRepository.listAll()) {
-            val raw = rawSmsRepository.getById(record.event.rawSmsId) ?: continue
-            when (processRawSmsUseCase.reparseStored(raw)) {
-                is SmsIngestionResult.Duplicate -> Unit
-                is SmsIngestionResult.Failed -> failedCount++
-                else -> refreshedCount++
-            }
-        }
-        discoverFromStoredEvents()
-        reconcileStoredEvents()
-        FinancialTransactionEvidenceSyncer.syncMerchants(
-            transactions = financialTransactionRepository.listAll(),
-            parsedRecords = parsedEventRepository.listAll(),
-            repository = financialTransactionRepository,
-        )
-        refreshReviewQueue()
-        appLogService.info(
-            AppLogCategories.PARSE,
-            "Reparse finished: $refreshedCount refreshed, $failedCount failed",
-        )
-        return ReparseAllStoredEventsResult(
-            refreshedCount = refreshedCount,
-            failedCount = failedCount,
+    private val storedSmsReprocessor: StoredSmsReprocessor by lazy {
+        StoredSmsReprocessor(
+            rawSmsRepository = rawSmsRepository,
+            processRawSms = processRawSmsUseCase,
+            refreshDerivedState = {
+                discoverFromStoredEvents()
+                reconcileStoredEvents()
+                FinancialTransactionEvidenceSyncer.syncMerchants(
+                    transactions = financialTransactionRepository.listAll(),
+                    parsedRecords = parsedEventRepository.listAll(),
+                    repository = financialTransactionRepository,
+                )
+                refreshReviewQueue()
+            },
+            appLogService = appLogService,
         )
     }
+
+    /**
+     * Re-parses every stored RawSms (including rows that never produced a
+     * ParsedEvent). Parser upgrades apply to the backlog without duplicating evidence.
+     */
+    suspend fun reparseAllStoredEvents(): ReparseAllStoredEventsResult =
+        storedSmsReprocessor.reprocessAll()
 
     fun close() {
         startupMaintenanceJob?.cancel()

@@ -31,6 +31,8 @@ class RoomRawSmsRepository(
     override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? =
         dao.findByDeviceMessageId(deviceMessageId)?.let(RawSmsMapper::toDomain)
 
+    override suspend fun listIdsByReceivedAt(): List<String> = dao.listIdsByReceivedAt()
+
     override suspend fun findCrossSourceNearDuplicate(
         sender: String,
         bodyHash: String,

@@ -19,6 +19,12 @@ interface RawSmsRepository {
     suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms?
 
     /**
+     * Every stored RawSms id, oldest receipt first. Used by bulk reprocessing so
+     * evidence without a ParsedEvent (Unsupported / Invalid / failed) is retried.
+     */
+    suspend fun listIdsByReceivedAt(): List<String>
+
+    /**
      * Live↔historical near-duplicate: same sender + bodyHash within
      * [fromInclusive]…[toInclusive], opposite deviceMessageId nullness.
      *

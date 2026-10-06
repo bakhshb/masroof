@@ -84,6 +84,55 @@ class ParsedEventFactsBackfillCoordinatorTest {
         assertEquals(0, prefs.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0))
     }
 
+    @Test
+    fun runIfNeeded_retriesStoredRawSmsWithoutParsedEvent() = runBlocking {
+        val db = androidx.room.Room.inMemoryDatabaseBuilder(
+            context,
+            com.baraa.masroof.data.room.MasroofDatabase::class.java,
+        ).allowMainThreadQueries().build()
+        try {
+            val rawRepo = com.baraa.masroof.data.repository.RoomRawSmsRepository(db.rawSmsDao())
+            val parsedRepo = com.baraa.masroof.data.repository.RoomParsedEventRepository(db.parsedEventDao())
+            val body = "شراء عبر الانترنت\nبطاقة: 7271\nلدى: Keeta\nبمبلغ: 51.99 SAR\nفي: 14:32 03-08-2026"
+            rawRepo.insertIfAbsent(
+                com.baraa.masroof.domain.model.RawSms(
+                    id = "android-sms:backlog",
+                    sender = "AlJazira",
+                    body = body,
+                    receivedAt = java.time.Instant.parse("2026-08-03T14:32:00Z"),
+                    deviceMessageId = "backlog",
+                    bodyHash = com.baraa.masroof.sms.hash.SmsBodyHasher.sha256Hex(body),
+                ),
+            )
+            val reprocessor = StoredSmsReprocessor(
+                rawSmsRepository = rawRepo,
+                processRawSms = com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase(
+                    rawSmsRepository = rawRepo,
+                    parsedEventRepository = parsedRepo,
+                    bankSmsRegistry = com.baraa.masroof.bank.BankSmsRegistry(
+                        listOf(com.baraa.masroof.bank.aljazira.AlJaziraSmsAdapter()),
+                    ),
+                ),
+                refreshDerivedState = {},
+            )
+            val prefs = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+            ParsedEventFactsBackfillCoordinator(
+                prefs = prefs,
+                appLogService = appLogService,
+                reparseAllStoredEvents = { reprocessor.reprocessAll() },
+            ).runIfNeeded(currentSchemaVersion = 14)
+
+            assertEquals(
+                com.baraa.masroof.domain.model.MessageFamily.PURCHASE,
+                parsedRepo.findByRawSmsId("android-sms:backlog")!!.event.messageFamily,
+            )
+            assertEquals(1, db.rawSmsDao().count())
+            assertEquals(14, prefs.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0))
+        } finally {
+            db.close()
+        }
+    }
+
     private fun coordinator(reparse: suspend () -> Unit): ParsedEventFactsBackfillCoordinator {
         val prefs = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
         return ParsedEventFactsBackfillCoordinator(

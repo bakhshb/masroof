@@ -106,6 +106,7 @@ class TransactionSmsEvidenceLoaderTest {
         override suspend fun getById(id: String) = rows[id]
         override suspend fun existsById(id: String) = rows.containsKey(id)
         override suspend fun findByDeviceMessageId(deviceMessageId: String) = null
+        override suspend fun listIdsByReceivedAt(): List<String> = rows.keys.toList()
         override suspend fun findCrossSourceNearDuplicate(
             sender: String,
             bodyHash: String,

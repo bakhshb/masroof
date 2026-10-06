@@ -198,3 +198,13 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - These rows are keyed by rawSmsId, never reopen RESOLVED history, and are only
   auto-resolved when reconciliation later settles the same RawSms.
 - Non-bank SMS is still not persisted and never reviewed.
+
+### M0.3 — Reprocessing starts from RawSms evidence
+
+- Bulk reparse (`StoredSmsReprocessor`, used by `AppContainer.reparseAllStoredEvents`
+  and `ParsedEventFactsBackfillCoordinator`) iterates
+  `RawSmsRepository.listIdsByReceivedAt()`, not stored ParsedEvents, so
+  Unsupported / Invalid / failed evidence is retried after parser upgrades.
+- Reparse replaces the ParsedEvent keyed by rawSmsId, never duplicates RawSms,
+  keeps user corrections (keyed by rawSmsId) and existing transaction links, and
+  runs derived discovery / reconciliation / review refresh once at the end.

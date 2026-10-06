@@ -24,6 +24,9 @@ interface RawSmsDao {
     @Query("SELECT * FROM raw_sms WHERE deviceMessageId = :deviceMessageId LIMIT 1")
     suspend fun findByDeviceMessageId(deviceMessageId: String): RawSmsEntity?
 
+    @Query("SELECT id FROM raw_sms ORDER BY receivedAtEpochMillis ASC, id ASC")
+    suspend fun listIdsByReceivedAt(): List<String>
+
     @Query("SELECT * FROM raw_sms WHERE dedupeKey = :dedupeKey LIMIT 1")
     suspend fun findByDedupeKey(dedupeKey: String): RawSmsEntity?
 

@@ -162,6 +162,7 @@ class HistoricalSmsScannerTest {
             override suspend fun getById(id: String): RawSms? = null
             override suspend fun existsById(id: String): Boolean = false
             override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? = null
+            override suspend fun listIdsByReceivedAt(): List<String> = emptyList()
             override suspend fun findCrossSourceNearDuplicate(
                 sender: String,
                 bodyHash: String,
