@@ -105,7 +105,7 @@ abstract class MasroofDatabase : RoomDatabase() {
         const val VERSION: Int = 15
 
         /** Must match app/schemas/.../15.json identityHash. */
-        const val IDENTITY_HASH: String = "913836eaca3ed118258e97c68e991890"
+        const val IDENTITY_HASH: String = "50ee81de5b142c23e1fe6afe86cae53d"
 
         /** Previous production schema (v14). */
         const val PREVIOUS_VERSION: Int = 14

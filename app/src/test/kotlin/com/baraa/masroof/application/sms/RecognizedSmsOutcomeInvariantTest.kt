@@ -12,10 +12,12 @@ import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ParseStatus
+import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
+import com.baraa.masroof.domain.repository.ReviewRepository
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import org.junit.After
@@ -108,7 +110,13 @@ class RecognizedSmsOutcomeInvariantTest {
         assertNull(harness.ftRepo.findByRawSmsId(purchase.id))
         assertEquals(TerminalOutcome.RETRYABLE_PROCESSING_ERROR, outcomeOf(purchase.id))
         assertEquals(TerminalOutcome.NON_FINANCIAL, outcomeOf(otp.id))
-        assertEquals(listOf(purchase.id), harness.processingRetryRepo.listUnreviewedRetryableRawSmsIds())
+        assertEquals(
+            listOf(purchase.id),
+            harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH),
+        )
+        assertTrue(
+            harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty(),
+        )
         assertEquals(1, scheduled.get())
         assertNull(harness.reviewRepo.findByRawSmsId(purchase.id))
     }
@@ -119,10 +127,14 @@ class RecognizedSmsOutcomeInvariantTest {
         val marked = mutableListOf<List<String>>()
         val scheduled = AtomicInteger(0)
         val retryRepository = object : ProcessingRetryRepository by harness.processingRetryRepo {
-            override suspend fun markRequired(rawSmsIds: List<String>, createdAt: Instant) {
+            override suspend fun markRequired(
+                rawSmsIds: List<String>,
+                createdAt: Instant,
+                mode: ProcessingRetryMode,
+            ) {
                 marked += rawSmsIds
                 harness.db.withTransaction {
-                    harness.processingRetryRepo.markRequired(rawSmsIds, createdAt)
+                    harness.processingRetryRepo.markRequired(rawSmsIds, createdAt, mode)
                     if (failWrite) throw IOException("batch write failed")
                 }
             }
@@ -153,10 +165,80 @@ class RecognizedSmsOutcomeInvariantTest {
         )
         assertEquals(
             listOf(first.id, second.id),
-            harness.processingRetryRepo.listUnreviewedRetryableRawSmsIds(),
+            harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH),
         )
         assertEquals(1, scheduled.get())
         assertEquals(listOf(first.id, second.id), marked.last())
+    }
+
+    @Test
+    fun historicalReviewUpdateFailure_keepsTheWholeSetHistoricalDespitePartialReviews() = runBlocking {
+        var reviewsWritten = 0
+        val failingReviews = object : ReviewRepository by harness.reviewRepo {
+            override suspend fun upsertRequired(
+                rawSmsId: String,
+                kind: ReviewKind,
+                reasons: List<String>,
+                now: Instant,
+            ) = harness.reviewRepo.upsertRequired(rawSmsId, kind, reasons, now).also {
+                reviewsWritten += 1
+                if (reviewsWritten >= 1) throw IOException("review update failed")
+            }
+        }
+        val liveScheduled = mutableListOf<String>()
+        val batchScheduled = AtomicInteger(0)
+        val startupScheduled = AtomicInteger(0)
+        val batch = harness.historicalBatch(
+            batchRecoveryScheduler = { batchScheduled.incrementAndGet() },
+            reviewRepository = failingReviews,
+        ).startBatch()
+        val first = LiveSmsProcessingHarness.liveSms(
+            body = COLLIDING_TRANSFER_BODY,
+            at = "2026-08-12T10:00:00Z",
+        )
+        val second = LiveSmsProcessingHarness.liveSms(
+            body = COLLIDING_TRANSFER_BODY,
+            at = "2026-08-12T11:00:00Z",
+        )
+        assertTrue(batch.ingest(first) is SmsIngestionResult.ReviewRequired)
+        assertTrue(batch.ingest(second) is SmsIngestionResult.ReviewRequired)
+
+        val finished = batch.finish()
+        assertEquals(
+            DerivedProcessingStage.REVIEW_UPDATE,
+            (finished as HistoricalBatchDerivedResult.Incomplete).stage,
+        )
+        val affected = listOf(first.id, second.id)
+        assertEquals(
+            affected,
+            harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH),
+        )
+        assertTrue(
+            harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty(),
+        )
+        assertEquals(1, reviewsWritten)
+        val reviewed = affected.count { harness.reviewRepo.findByRawSmsId(it) != null }
+        assertTrue(reviewed in 1 until affected.size)
+
+        val intake = LiveSmsIntake(
+            captureBankSms = harness.capture,
+            scheduler = { liveScheduled += it },
+            rawSmsRepository = harness.rawRepo,
+            reviewRepository = harness.reviewRepo,
+            processingRetryRepository = harness.processingRetryRepo,
+            appLogService = harness.appLog,
+            batchRecoveryScheduler = { startupScheduled.incrementAndGet() },
+        )
+        assertEquals(0, intake.schedulePendingProcessing())
+        assertTrue(liveScheduled.isEmpty())
+        assertEquals(1, batchScheduled.get())
+        assertEquals(1, startupScheduled.get())
+
+        harness.derivedRecovery().recoverPending()
+        assertTrue(
+            harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).isEmpty(),
+        )
+        assertTrue(harness.processingRetryRepo.listRetryableRawSmsIds().isEmpty())
     }
 
     @Test
@@ -199,7 +281,7 @@ class RecognizedSmsOutcomeInvariantTest {
         assertEquals(ListenableWorker.Result.retry(), failing.doWork())
         assertEquals(
             listOf(first.id, second.id),
-            harness.processingRetryRepo.listUnreviewedRetryableRawSmsIds(),
+            harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH),
         )
 
         val recovering = TestListenableWorkerBuilder<HistoricalDerivedRecoveryWorker>(context)

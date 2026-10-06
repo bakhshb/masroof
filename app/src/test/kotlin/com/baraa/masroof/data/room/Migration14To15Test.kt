@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
+import com.baraa.masroof.domain.model.ProcessingRetryMode
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -73,8 +74,13 @@ class Migration14To15Test {
 
             val repo = RoomProcessingRetryRepository(room.processingRetryDao())
             assertTrue(repo.listRetryableRawSmsIds().isEmpty())
-            repo.markRequired("sms-legacy", Instant.parse("2026-08-11T12:00:00Z"))
-            assertEquals(listOf("sms-legacy"), repo.listRetryableRawSmsIds())
+            repo.markRequired(
+                "sms-legacy",
+                Instant.parse("2026-08-11T12:00:00Z"),
+                ProcessingRetryMode.LIVE,
+            )
+            assertEquals(listOf("sms-legacy"), repo.listRetryableRawSmsIds(ProcessingRetryMode.LIVE))
+            assertTrue(repo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).isEmpty())
             repo.clear("sms-legacy")
             assertTrue(repo.listRetryableRawSmsIds().isEmpty())
         } finally {

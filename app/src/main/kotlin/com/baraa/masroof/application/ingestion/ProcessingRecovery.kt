@@ -1,6 +1,7 @@
 package com.baraa.masroof.application.ingestion
 
 import com.baraa.masroof.application.review.IngestionReviewService
+import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
@@ -33,7 +34,7 @@ class ProcessingRecovery(
                 IngestionReviewService.REASON_PROCESSING_ERROR,
             )
         }
-        processingRetryRepository.markRequired(rawSmsId, clock.now())
+        processingRetryRepository.markRequired(rawSmsId, clock.now(), ProcessingRetryMode.LIVE)
     }
 
     /**
@@ -49,7 +50,11 @@ class ProcessingRecovery(
                 review.resolutionKind != ReviewResolutionKind.USER_NON_FINANCIAL
         }
         if (affected.isEmpty()) return false
-        processingRetryRepository.markRequired(affected, clock.now())
+        processingRetryRepository.markRequired(
+            affected,
+            clock.now(),
+            ProcessingRetryMode.HISTORICAL_BATCH,
+        )
         return true
     }
 

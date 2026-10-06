@@ -493,23 +493,29 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 
 - `HistoricalSmsBatchProcessor.finish` returns `HistoricalBatchDerivedResult`. Ownership,
   reconciliation, and review refresh still run once for the batch. A failure of those
-  steps writes the affected financial RawSms ids with `markRequired(rawSmsIds, createdAt)`
-  in one Room transaction, then enqueues one `HistoricalDerivedRecoveryWorker`. Parsing
-  stays per row. The historical path does not enqueue a live worker per SMS.
+  steps writes the affected financial RawSms ids with
+  `markRequired(rawSmsIds, createdAt, HISTORICAL_BATCH)` in one Room transaction, then
+  enqueues one `HistoricalDerivedRecoveryWorker`. Parsing stays per row. The historical
+  path does not enqueue a live worker per SMS.
 - If that transaction fails, none of the batch is accepted and `finish` throws without
   marking the batch finished, so the same batch can be retried. `Incomplete` is returned
   only after the full set is saved.
-- The recovery worker loads the unreviewed retry set, reruns ownership discovery,
-  reconciliation, and review refresh once, and does not reparse SMS text. Success clears
-  that set in one transaction. Failure leaves the rows and `Result.retry()`s the same
-  worker. A second successful pass is a no-op.
+- Recovery ownership is the persisted `processing_retry.mode` (`LIVE` or
+  `HISTORICAL_BATCH`). It is not inferred from `review_item`. A review update that writes
+  some reviews and then throws still marks the full affected set `HISTORICAL_BATCH`.
+- The recovery worker loads every `HISTORICAL_BATCH` row, including rows that already
+  have reviews. It reruns ownership discovery, reconciliation, and review refresh once,
+  and does not reparse SMS text. Success clears that set in one transaction. Failure
+  leaves the rows and `Result.retry()`s the same worker. A second successful pass is a no-op.
 - The retry marker is a `processing_retry` row (schema 15, background maintenance). It is
   not a review decision. `USER_NON_FINANCIAL` writes neither a retry row nor a reopened
   review. `USER_FINANCIAL_TYPE`, `USER_CORRECTION`, `USER_EXTERNAL_TRANSFER`, and
   `USER_SELF_TRANSFER_PAIR` stay resolved; the retry row is what keeps them recoverable.
-- On the live worker's final attempt, `ProcessingRecovery.markExhausted` still writes one
-  row and throws when that write cannot be saved. The worker then returns `Result.retry()`.
-  It returns `Result.failure()` only after that write succeeds. Live scheduling stays per message.
-- Startup scheduling still unions awaiting rows, REQUIRED `processing_error` reviews, and
-  reviewed retry rows for the live worker. Unreviewed historical retry rows schedule the
-  one batch worker. `USER_NON_FINANCIAL` stays excluded.
+- On the live worker's final attempt, `ProcessingRecovery.markExhausted` writes one row
+  with `mode = LIVE` and throws when that write cannot be saved. The worker then returns
+  `Result.retry()`. It returns `Result.failure()` only after that write succeeds. Live
+  scheduling stays per message.
+- Startup scheduling uses the mode. `LIVE` rows, awaiting rows, and REQUIRED
+  `processing_error` reviews schedule `LiveSmsProcessingWorker` per RawSms. Any id in the
+  `HISTORICAL_BATCH` set is left off that live list. That set schedules exactly one batch
+  worker. `USER_NON_FINANCIAL` stays excluded.

@@ -203,6 +203,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         reconciliationFails: Boolean = false,
         batchRecoveryScheduler: HistoricalBatchRecoveryScheduler? = null,
         processingRetryRepository: ProcessingRetryRepository = processingRetryRepo,
+        reviewRepository: ReviewRepository = reviewRepo,
     ): HistoricalSmsBatchProcessor {
         val parsedForBatch = object : ParsedEventRepository by parsedRepo {
             override suspend fun listAll(): List<ParsedEventRecord> {
@@ -228,7 +229,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                     NoOpLoanRegistryRepository,
                 ),
             ),
-            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
+            reviewQueueUpdater = ReviewQueueUpdater(reviewRepository, ftRepo, clock),
             processingRecovery = ProcessingRecovery(
                 processingRetryRepository = processingRetryRepository,
                 reviewRepository = reviewRepo,
@@ -239,7 +240,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         )
     }
 
-    /** One batch derived pass over unreviewed retry rows. Does not reparse SMS text. */
+    /** One batch derived pass over historical retry rows. Does not reparse SMS text. */
     fun derivedRecovery(reconciliationFails: Boolean = false): HistoricalDerivedRecovery {
         val parsedForBatch = object : ParsedEventRepository by parsedRepo {
             override suspend fun listAll(): List<ParsedEventRecord> {

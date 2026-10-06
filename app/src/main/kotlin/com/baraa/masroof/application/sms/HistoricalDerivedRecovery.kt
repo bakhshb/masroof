@@ -3,6 +3,7 @@ package com.baraa.masroof.application.sms
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.domain.model.ParseStatus
+import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
@@ -22,7 +23,7 @@ class HistoricalDerivedRecovery(
     private val reviewQueueUpdater: ReviewQueueUpdater? = null,
 ) {
     suspend fun recoverPending() {
-        val ids = processingRetryRepository.listUnreviewedRetryableRawSmsIds()
+        val ids = processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH)
         if (ids.isEmpty()) return
         val discovery = ownershipDiscovery
         if (discovery != null) {
@@ -36,7 +37,7 @@ class HistoricalDerivedRecovery(
             reviewQueueUpdater.applyReport(report)
         }
         processingRetryRepository.clear(ids)
-        if (processingRetryRepository.listUnreviewedRetryableRawSmsIds().isNotEmpty()) {
+        if (processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).isNotEmpty()) {
             throw IllegalStateException("historical recovery still has retry rows")
         }
     }

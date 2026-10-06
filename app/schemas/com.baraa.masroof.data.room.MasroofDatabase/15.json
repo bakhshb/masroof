@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 15,
-    "identityHash": "913836eaca3ed118258e97c68e991890",
+    "identityHash": "50ee81de5b142c23e1fe6afe86cae53d",
     "entities": [
       {
         "tableName": "raw_sms",
@@ -1154,7 +1154,7 @@
       },
       {
         "tableName": "processing_retry",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rawSmsId` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`rawSmsId`), FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rawSmsId` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `mode` TEXT NOT NULL, PRIMARY KEY(`rawSmsId`), FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "rawSmsId",
@@ -1166,6 +1166,12 @@
             "fieldPath": "createdAtEpochMillis",
             "columnName": "createdAtEpochMillis",
             "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mode",
+            "columnName": "mode",
+            "affinity": "TEXT",
             "notNull": true
           }
         ],
@@ -1194,7 +1200,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '913836eaca3ed118258e97c68e991890')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '50ee81de5b142c23e1fe6afe86cae53d')"
     ]
   }
 }

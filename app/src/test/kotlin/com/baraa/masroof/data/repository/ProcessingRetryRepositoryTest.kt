@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.room.entity.RawSmsEntity
+import com.baraa.masroof.domain.model.ProcessingRetryMode
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -31,14 +32,26 @@ class ProcessingRetryRepositoryTest {
             val createdAt = Instant.parse("2026-08-11T12:00:00Z")
 
             val failure = runCatching {
-                repo.markRequired(listOf("sms-a", "missing-sms", "sms-b"), createdAt)
+                repo.markRequired(
+                    listOf("sms-a", "missing-sms", "sms-b"),
+                    createdAt,
+                    ProcessingRetryMode.HISTORICAL_BATCH,
+                )
             }.exceptionOrNull()
 
             assertNotNull(failure)
             assertTrue(repo.listRetryableRawSmsIds().isEmpty())
 
-            repo.markRequired(listOf("sms-a", "sms-b"), createdAt)
-            assertEquals(listOf("sms-a", "sms-b"), repo.listRetryableRawSmsIds())
+            repo.markRequired(
+                listOf("sms-a", "sms-b"),
+                createdAt,
+                ProcessingRetryMode.HISTORICAL_BATCH,
+            )
+            assertEquals(
+                listOf("sms-a", "sms-b"),
+                repo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH),
+            )
+            assertTrue(repo.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty())
         } finally {
             db.close()
         }

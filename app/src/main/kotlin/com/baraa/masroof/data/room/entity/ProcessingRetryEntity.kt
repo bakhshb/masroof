@@ -24,4 +24,6 @@ import androidx.room.PrimaryKey
 data class ProcessingRetryEntity(
     @PrimaryKey val rawSmsId: String,
     val createdAtEpochMillis: Long,
+    /** [com.baraa.masroof.domain.model.ProcessingRetryMode] name. */
+    val mode: String,
 )

@@ -1,5 +1,6 @@
 package com.baraa.masroof.domain.repository
 
+import com.baraa.masroof.domain.model.ProcessingRetryMode
 import java.time.Instant
 
 /**
@@ -10,12 +11,13 @@ import java.time.Instant
  * is excluded by [listRetryableRawSmsIds].
  */
 interface ProcessingRetryRepository {
-    suspend fun markRequired(rawSmsId: String, createdAt: Instant)
+    suspend fun markRequired(rawSmsId: String, createdAt: Instant, mode: ProcessingRetryMode)
 
     /**
-     * Inserts every id in one transaction. A failure leaves none of [rawSmsIds] newly accepted.
+     * Inserts every id in one transaction with the same [mode].
+     * A failure leaves none of [rawSmsIds] newly accepted.
      */
-    suspend fun markRequired(rawSmsIds: List<String>, createdAt: Instant)
+    suspend fun markRequired(rawSmsIds: List<String>, createdAt: Instant, mode: ProcessingRetryMode)
 
     suspend fun clear(rawSmsId: String)
 
@@ -25,9 +27,9 @@ interface ProcessingRetryRepository {
     /** Oldest RawSms receipt first. Excludes a non-financial resolution. */
     suspend fun listRetryableRawSmsIds(): List<String> = emptyList()
 
-    /** Retry rows that already have a review. Live startup schedules these per message. */
-    suspend fun listReviewedRetryableRawSmsIds(): List<String> = emptyList()
-
-    /** Retry rows with no review. Historical recovery processes these as one batch. */
-    suspend fun listUnreviewedRetryableRawSmsIds(): List<String> = emptyList()
+    /**
+     * Retry rows of [mode], oldest receipt first.
+     * A non-financial resolution is excluded. Review rows do not change the mode.
+     */
+    suspend fun listRetryableRawSmsIds(mode: ProcessingRetryMode): List<String> = emptyList()
 }

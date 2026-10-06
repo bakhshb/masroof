@@ -5,6 +5,7 @@ import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
@@ -43,17 +44,23 @@ class LiveSmsIntake(
      * Reschedules captured evidence that still needs processing.
      *
      * Per message: rows with no outcome yet, REQUIRED `processing_error` reviews, and
-     * processing-retry rows that already have a review. A non-financial resolution is not
-     * rescheduled. Historical retry rows with no review enqueue one batch recovery instead.
+     * processing-retry rows whose mode is [ProcessingRetryMode.LIVE]. Historical retry rows
+     * stay [ProcessingRetryMode.HISTORICAL_BATCH] even when a review row exists, and enqueue
+     * one batch recovery. A non-financial resolution is not rescheduled.
      * Returns how many per-message ids were scheduled.
      */
     suspend fun schedulePendingProcessing(): Int {
-        val pending = try {
-            (
+        val listed = try {
+            val historical = processingRetryRepository.listRetryableRawSmsIds(
+                ProcessingRetryMode.HISTORICAL_BATCH,
+            )
+            val historicalIds = historical.toSet()
+            val live = (
                 rawSmsRepository.listIdsAwaitingProcessing() +
                     reviewRepository.listRetryableProcessingErrorRawSmsIds() +
-                    processingRetryRepository.listReviewedRetryableRawSmsIds()
-                ).distinct()
+                    processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE)
+                ).filter { it !in historicalIds }.distinct()
+            live to historical
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -63,6 +70,7 @@ class LiveSmsIntake(
             )
             return 0
         }
+        val (pending, historical) = listed
         val scheduled = pending.count(::schedule)
         if (pending.isNotEmpty()) {
             appLogService.info(
@@ -70,23 +78,12 @@ class LiveSmsIntake(
                 "Rescheduled $scheduled of ${pending.size} captured SMS awaiting processing",
             )
         }
-        scheduleHistoricalBatchRecovery()
+        scheduleHistoricalBatchRecovery(historical)
         return scheduled
     }
 
-    private suspend fun scheduleHistoricalBatchRecovery() {
+    private fun scheduleHistoricalBatchRecovery(pending: List<String>) {
         val scheduler = batchRecoveryScheduler ?: return
-        val pending = try {
-            processingRetryRepository.listUnreviewedRetryableRawSmsIds()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            appLogService.error(
-                AppLogCategories.SMS,
-                "Listing historical retry SMS failed (${e::class.java.simpleName})",
-            )
-            return
-        }
         if (pending.isEmpty()) return
         try {
             scheduler.schedule()

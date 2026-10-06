@@ -52,31 +52,18 @@ interface ProcessingRetryDao {
     suspend fun listRetryableRawSmsIds(): List<String>
 
     /**
-     * Retry rows that already have a review. Live recovery schedules these one message at a time.
+     * Retry rows of one [mode]. A review row does not change this set.
      * [com.baraa.masroof.domain.model.ReviewResolutionKind.USER_NON_FINANCIAL] stays excluded.
      */
     @Query(
         """
         SELECT p.rawSmsId FROM processing_retry p
         INNER JOIN raw_sms r ON r.id = p.rawSmsId
-        INNER JOIN review_item v ON v.rawSmsId = p.rawSmsId
-        WHERE v.resolutionKind IS NULL OR v.resolutionKind != 'USER_NON_FINANCIAL'
-        ORDER BY r.receivedAtEpochMillis ASC, r.id ASC
-        """,
-    )
-    suspend fun listReviewedRetryableRawSmsIds(): List<String>
-
-    /**
-     * Retry rows with no review. Historical batch recovery processes this set once.
-     */
-    @Query(
-        """
-        SELECT p.rawSmsId FROM processing_retry p
-        INNER JOIN raw_sms r ON r.id = p.rawSmsId
         LEFT JOIN review_item v ON v.rawSmsId = p.rawSmsId
-        WHERE v.rawSmsId IS NULL
+        WHERE p.mode = :mode
+          AND (v.resolutionKind IS NULL OR v.resolutionKind != 'USER_NON_FINANCIAL')
         ORDER BY r.receivedAtEpochMillis ASC, r.id ASC
         """,
     )
-    suspend fun listUnreviewedRetryableRawSmsIds(): List<String>
+    suspend fun listRetryableRawSmsIdsByMode(mode: String): List<String>
 }
