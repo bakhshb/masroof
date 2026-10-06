@@ -66,7 +66,15 @@ class EffectiveParsedEventProvider(
         for (correction in ordered) {
             event = overlay(event, correction)
         }
-        return ParsedEventRecord(event = event, details = record.details, userCorrected = true)
+        val automationConfirmed = ordered.any { correction ->
+            correction.correctedType != null || correction.correctedAmount != null
+        }
+        return ParsedEventRecord(
+            event = event,
+            details = record.details,
+            userCorrected = true,
+            automationConfirmed = automationConfirmed,
+        )
     }
 
     private fun overlay(event: ParsedEvent, correction: UserCorrection): ParsedEvent =

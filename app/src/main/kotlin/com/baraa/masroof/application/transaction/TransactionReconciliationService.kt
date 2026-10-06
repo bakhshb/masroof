@@ -166,7 +166,7 @@ class TransactionReconciliationService(
 
         for (record in records) {
             val event = record.event
-            var userConfirmed = record.userCorrected
+            var userConfirmed = record.automationConfirmed
             if (reviewRepository != null) {
                 val review = reviewRepository.findByRawSmsId(event.rawSmsId)
                 if (review?.status == ReviewStatus.RESOLVED &&
@@ -513,7 +513,7 @@ class TransactionReconciliationService(
                     ?: return@mapNotNull null
                 if (event.bankNetworkType != BankNetworkType.INTRA_BANK) return@mapNotNull null
                 val record = parsedById[event.id]
-                if (!TransactionAssembler.isAutomationEligible(event, record?.userCorrected == true)) {
+                if (!TransactionAssembler.isAutomationEligible(event, record?.automationConfirmed == true)) {
                     return@mapNotNull null
                 }
                 StaleLeg(
@@ -529,7 +529,7 @@ class TransactionReconciliationService(
             val event = record.event
             if (!event.messageFamily.isTransferFamily()) continue
             if (event.bankNetworkType != BankNetworkType.INTRA_BANK) continue
-            if (!TransactionAssembler.isAutomationEligible(event, record.userCorrected)) continue
+            if (!TransactionAssembler.isAutomationEligible(event, record.automationConfirmed)) continue
             if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) continue
             val leg = StaleLeg(transaction = null, event = event, record = record)
             when (event.messageFamily) {
@@ -663,7 +663,7 @@ class TransactionReconciliationService(
                 .firstOrNull { it.event.messageFamily == MessageFamily.FINANCING_INSTALLMENT }
                 ?: continue
             val event = record.event
-            if (!TransactionAssembler.isAutomationEligible(event, record.userCorrected)) continue
+            if (!TransactionAssembler.isAutomationEligible(event, record.automationConfirmed)) continue
             val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: existing.occurredAt
             val sourceOwn = event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
                 ?: OwnershipStatus.UNKNOWN
@@ -692,7 +692,7 @@ class TransactionReconciliationService(
                     loanOwnership = loanOwn,
                     loanType = loanType,
                     transactionOccurredAt = transactionOccurredAt,
-                    userConfirmed = record.userCorrected,
+                    userConfirmed = record.automationConfirmed,
                 )
             ) {
                 is TransactionAssembler.Outcome.Assembled -> {

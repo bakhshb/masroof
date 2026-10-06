@@ -1392,7 +1392,7 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
-    fun userCorrectedReviewRequiredPurchase_isAssembled() = runBlocking {
+    fun amountCorrection_reviewRequiredPurchase_isAssembled() = runBlocking {
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
         val correctionRepo = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())
         val withCorrections = TransactionReconciliationService(
@@ -1434,6 +1434,52 @@ class TransactionReconciliationServiceTest {
         val tx = ftRepo.listAll().single()
         assertEquals(FinancialTransactionType.EXPENSE, tx.type)
         assertEquals(money("42.00"), tx.amount)
+    }
+
+    @Test
+    fun merchantOnlyCorrection_doesNotLiftParseStatusGate() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        val correctionRepo = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())
+        val withCorrections = TransactionReconciliationService(
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
+            financialTransactionRepository = ftRepo,
+            ownershipResolver = OwnershipResolver(accounts, cards, loans),
+            ownershipConfirmationService = confirmation,
+            effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
+                parsedRepo,
+                correctionRepo,
+            ),
+        )
+        persistEvent(
+            smsId = "sms-rr-merchant-only",
+            event = event(
+                id = "pe-rr-merchant-only",
+                rawSmsId = "sms-rr-merchant-only",
+                family = MessageFamily.PURCHASE,
+                amount = money("42.00"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                merchant = "Original",
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+        )
+        correctionRepo.save(
+            com.baraa.masroof.domain.model.UserCorrection(
+                id = "corr-rr-merchant-only",
+                targetRawSmsId = "sms-rr-merchant-only",
+                correctedType = null,
+                correctedAmount = null,
+                correctedMerchant = "Corrected Merchant",
+                correctedCounterparty = null,
+                createdAt = Instant.parse("2026-08-02T12:00:00Z"),
+            ),
+        )
+
+        val report = withCorrections.reconcileStoredEventsDetailed()
+
+        assertTrue(ftRepo.listAll().isEmpty())
+        assertEquals(1, report.summary.needsReview)
+        assertTrue(report.reviewCandidates.single().reasons.contains("parse_review_required"))
     }
 
     @Test

@@ -184,9 +184,11 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   candidates with durable reasons (`parse_review_required`, `parse_partial`,
   `invalid_parsed_event`, `unsupported_bank_message_format`); transfers in those
   states are never paired, upgraded, or posted as external.
-- An explicit user correction (`ParsedEventRecord.userCorrected`, set only by
-  `EffectiveParsedEventProvider`) lifts the gate for that RawSms, as does a review
-  resolved `USER_FINANCIAL_TYPE` (restore from ignored, manual single resolution).
+- A correction lifts the gate only when it explicitly changes financial interpretation:
+  `ParsedEventRecord.automationConfirmed` is true for corrected message family or amount.
+  Merchant/counterparty-only edits remain `userCorrected` for projection purposes but do
+  not authorize automation. A review resolved `USER_FINANCIAL_TYPE` also lifts the gate
+  (restore from ignored, manual single resolution).
 - Existing transaction links are preserved; the gate governs creation, not deletion.
 
 ### M0.2 — Every recognized-bank RawSms has a durable outcome
