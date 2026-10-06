@@ -110,6 +110,7 @@ class HistoricalSmsBatchProcessor(
     private fun SmsIngestionResult.storedEvent(): StoredEvent? =
         when (this) {
             is SmsIngestionResult.Parsed -> StoredEvent(event, details.loanType)
+            is SmsIngestionResult.DerivedIncomplete -> StoredEvent(event, details.loanType)
             is SmsIngestionResult.ReviewRequired -> event?.let { StoredEvent(it, details.loanType) }
             is SmsIngestionResult.NonFinancial -> event?.let { StoredEvent(it, details.loanType) }
             else -> null

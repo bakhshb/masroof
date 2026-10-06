@@ -811,7 +811,7 @@ Live processing runs in WorkManager:
 |---|---|
 | Work input | `rawSmsId` only (`LiveSmsProcessingWorker.KEY_RAW_SMS_ID`); never body or OTP text |
 | Duplicates | unique work per rawSmsId with `ExistingWorkPolicy.KEEP`; capture dedupe returns `Duplicate` without scheduling |
-| Retry | exponential backoff; `Result.retry()` for processing failures/exceptions until `MAX_ATTEMPTS`, then the evidence keeps its `processing_error` review |
+| Retry | exponential backoff; `Result.retry()` for processing failures, exceptions, and `DerivedIncomplete` (ownership, reconciliation, review refresh) until `MAX_ATTEMPTS`. Parse failures keep their `processing_error` review. Exchange-rate enrichment failure stays `Result.success()` |
 | Permanent failure | missing input or `raw_sms_not_found` → `Result.failure()` |
 | Cancellation | `CancellationException` propagates; captured evidence stays and is processed by the next run |
 | Process death | startup sweep `LiveSmsIntake.schedulePendingProcessing()` reschedules `RawSmsRepository.listIdsAwaitingProcessing()` (no ParsedEvent and no review row) |

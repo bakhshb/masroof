@@ -11,7 +11,6 @@ import com.baraa.masroof.application.transaction.TransactionReconciliationServic
 import com.baraa.masroof.bank.BankRoutingResult
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.bank.BankSmsRegistry
-import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
@@ -30,6 +29,9 @@ import kotlinx.coroutines.CancellationException
  * Idempotent: re-processing a rawSmsId replaces its ParsedEvent (user corrections are
  * overlays and survive), re-runs idempotent reconciliation, and upserts review rows by
  * rawSmsId. Failures in derived steps never roll back RawSms/ParsedEvent evidence.
+ * Ownership, reconciliation, and review-refresh failures are reported as
+ * [SmsIngestionResult.DerivedIncomplete] so live work can retry. Exchange-rate
+ * enrichment stays best-effort and does not change that outcome.
  *
  * Every recognized-bank RawSms ends in a durable outcome: a ParsedEvent or, when no
  * usable ParsedEvent exists, a direct [IngestionReviewService] review row.
@@ -79,6 +81,7 @@ class ProcessStoredSmsUseCase(
      * Loads stored evidence by id and processes it (e.g. from a background worker), then
      * persists pending exchange-rate enrichment. A missing row is
      * [SmsIngestionResult.Failed] with [REASON_RAW_SMS_NOT_FOUND].
+     * Enrichment failure does not change the returned outcome.
      */
     suspend fun process(rawSmsId: String, logOutcome: Boolean = true): SmsIngestionResult {
         val rawSms = rawSmsRepository.getById(rawSmsId)
@@ -215,21 +218,21 @@ class ProcessStoredSmsUseCase(
         return when (parseResult) {
             is ParseResult.Success -> {
                 save(parseResult.event, parseResult.details, "parsed")
-                SmsIngestionResult.Parsed(
-                    rawSmsId = rawSms.id,
-                    event = parseResult.event,
-                    details = parseResult.details,
-                )
+                    ?: SmsIngestionResult.Parsed(
+                        rawSmsId = rawSms.id,
+                        event = parseResult.event,
+                        details = parseResult.details,
+                    )
             }
 
             is ParseResult.Partial -> {
                 if (parseResult.event != null) {
                     save(parseResult.event, parseResult.details, "parsed_partial")
-                    SmsIngestionResult.Parsed(
-                        rawSmsId = rawSms.id,
-                        event = parseResult.event,
-                        details = parseResult.details,
-                    )
+                        ?: SmsIngestionResult.Parsed(
+                            rawSmsId = rawSms.id,
+                            event = parseResult.event,
+                            details = parseResult.details,
+                        )
                 } else {
                     if (logOutcome) {
                         appLogService?.warn(
@@ -247,7 +250,7 @@ class ProcessStoredSmsUseCase(
 
             is ParseResult.ReviewRequired -> {
                 if (parseResult.event != null) {
-                    save(parseResult.event, parseResult.details, "review_required")
+                    save(parseResult.event, parseResult.details, "review_required")?.let { return it }
                 } else {
                     if (logOutcome) {
                         appLogService?.info(
@@ -267,7 +270,7 @@ class ProcessStoredSmsUseCase(
 
             is ParseResult.NonFinancial -> {
                 if (parseResult.event != null) {
-                    save(parseResult.event, parseResult.details, "non_financial")
+                    save(parseResult.event, parseResult.details, "non_financial")?.let { return it }
                 } else if (logOutcome) {
                     appLogService?.info(
                         AppLogCategories.INGEST,
@@ -319,14 +322,17 @@ class ProcessStoredSmsUseCase(
         outcome: String,
         logOutcome: Boolean,
         deriveImmediately: Boolean,
-    ) {
+    ): SmsIngestionResult.DerivedIncomplete? {
         parsedEventRepository.save(event, details)
-        if (deriveImmediately) {
-            afterParsedEvent(event, details.loanType)
+        val incomplete = if (deriveImmediately) {
+            afterParsedEvent(event, details, logOutcome)
+        } else {
+            null
         }
         if (logOutcome) {
             logParsedOutcome(rawSms, event.messageFamily, outcome)
         }
+        return incomplete
     }
 
     private fun ParseResult.eventOrNull(): ParsedEvent? =
@@ -369,35 +375,50 @@ class ProcessStoredSmsUseCase(
         )
     }
 
-    private suspend fun afterParsedEvent(event: ParsedEvent, loanType: LoanType?) {
-        discoverOwnership(event, loanType)
-        val report = reconcileDerived(event) ?: return
-        refreshReviewQueue(report)
+    private suspend fun afterParsedEvent(
+        event: ParsedEvent,
+        details: ParsedEventDetails,
+        logOutcome: Boolean,
+    ): SmsIngestionResult.DerivedIncomplete? {
+        discoverOwnership(event, details, logOutcome)?.let { return it }
+        return when (val reconciled = reconcileDerived(event, details, logOutcome)) {
+            ReconcileDerivedResult.NotConfigured -> null
+            is ReconcileDerivedResult.Incomplete -> reconciled.result
+            is ReconcileDerivedResult.Ready -> refreshReviewQueue(event, details, reconciled.report, logOutcome)
+        }
     }
 
     private suspend fun discoverOwnership(
         event: ParsedEvent,
-        loanType: LoanType?,
-    ) {
-        val discovery = ownershipDiscovery ?: return
-        try {
-            discovery.observe(event, loanType)
+        details: ParsedEventDetails,
+        logOutcome: Boolean,
+    ): SmsIngestionResult.DerivedIncomplete? {
+        val discovery = ownershipDiscovery ?: return null
+        return try {
+            discovery.observe(event, details.loanType)
+            null
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            // Discovery is best-effort; RawSms/ParsedEvent evidence stays.
+        } catch (e: Exception) {
+            derivedIncomplete(event, details, DerivedProcessingStage.OWNERSHIP_DISCOVERY, e, logOutcome)
         }
     }
 
-    private suspend fun reconcileDerived(event: ParsedEvent): ReconciliationReport? {
-        val svc = reconciliation ?: return null
+    private suspend fun reconcileDerived(
+        event: ParsedEvent,
+        details: ParsedEventDetails,
+        logOutcome: Boolean,
+    ): ReconcileDerivedResult {
+        val svc = reconciliation ?: return ReconcileDerivedResult.NotConfigured
         return try {
-            svc.reconcileAfterParsedEventDetailed(event)
+            ReconcileDerivedResult.Ready(svc.reconcileAfterParsedEventDetailed(event))
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            // P8 derived processing must not destroy RawSms/ParsedEvent evidence.
-            null
+        } catch (e: Exception) {
+            // Evidence stays. The live worker retries this stage.
+            ReconcileDerivedResult.Incomplete(
+                derivedIncomplete(event, details, DerivedProcessingStage.RECONCILIATION, e, logOutcome),
+            )
         }
     }
 
@@ -412,15 +433,50 @@ class ProcessStoredSmsUseCase(
         }
     }
 
-    private suspend fun refreshReviewQueue(report: ReconciliationReport) {
-        val updater = reviewQueueUpdater ?: return
-        try {
+    private suspend fun refreshReviewQueue(
+        event: ParsedEvent,
+        details: ParsedEventDetails,
+        report: ReconciliationReport,
+        logOutcome: Boolean,
+    ): SmsIngestionResult.DerivedIncomplete? {
+        val updater = reviewQueueUpdater ?: return null
+        return try {
             updater.applyReport(report)
+            null
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            // P9 review persistence must not fail successful evidence ingestion.
+        } catch (e: Exception) {
+            // Posted transactions stay. The live worker retries without rolling them back.
+            derivedIncomplete(event, details, DerivedProcessingStage.REVIEW_UPDATE, e, logOutcome)
         }
+    }
+
+    private fun derivedIncomplete(
+        event: ParsedEvent,
+        details: ParsedEventDetails,
+        stage: DerivedProcessingStage,
+        cause: Throwable,
+        logOutcome: Boolean,
+    ): SmsIngestionResult.DerivedIncomplete {
+        if (logOutcome) {
+            appLogService?.error(
+                AppLogCategories.INGEST,
+                "Derived ${stage.name.lowercase()} incomplete (${cause.javaClass.simpleName}); evidence kept for retry",
+            )
+        }
+        return SmsIngestionResult.DerivedIncomplete(
+            rawSmsId = event.rawSmsId,
+            event = event,
+            details = details,
+            stage = stage,
+            cause = cause,
+        )
+    }
+
+    private sealed interface ReconcileDerivedResult {
+        data object NotConfigured : ReconcileDerivedResult
+        data class Ready(val report: ReconciliationReport) : ReconcileDerivedResult
+        data class Incomplete(val result: SmsIngestionResult.DerivedIncomplete) : ReconcileDerivedResult
     }
 
     companion object {

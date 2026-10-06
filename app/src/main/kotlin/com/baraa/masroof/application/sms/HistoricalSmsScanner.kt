@@ -144,6 +144,11 @@ class HistoricalSmsScanner(
                                 }
                                 failed++
                             }
+                            is SmsIngestionResult.DerivedIncomplete -> {
+                                // Historical ingest does not run derived work; a leak is still stored evidence.
+                                inserted++
+                                failed++
+                            }
                         }
                     }
                 }

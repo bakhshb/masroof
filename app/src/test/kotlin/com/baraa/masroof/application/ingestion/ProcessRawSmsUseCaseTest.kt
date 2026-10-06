@@ -28,6 +28,7 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
+import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
@@ -396,7 +397,7 @@ class ProcessRawSmsUseCaseTest {
     }
 
     @Test
-    fun p8DerivedSaveException_keepsSuccessfulEvidenceAndDoesNotFailIngest() = runBlocking {
+    fun p8DerivedSaveException_keepsEvidenceAndReportsReconciliationIncomplete() = runBlocking {
         val throwingFtRepo = object : FinancialTransactionRepository {
             override suspend fun save(
                 transaction: FinancialTransaction,
@@ -441,14 +442,18 @@ class ProcessRawSmsUseCaseTest {
         )
         val raw = aljaziraPurchase(id = "android-sms:p8-fail", deviceId = "p8-fail")
         val result = svc.ingest(raw)
-        assertTrue(result is SmsIngestionResult.Parsed)
+        assertTrue(result is SmsIngestionResult.DerivedIncomplete)
+        assertEquals(
+            DerivedProcessingStage.RECONCILIATION,
+            (result as SmsIngestionResult.DerivedIncomplete).stage,
+        )
         assertNotNull(rawRepo.getById(raw.id))
         assertNotNull(parsedRepo.findByRawSmsId(raw.id))
         assertEquals(MessageFamily.PURCHASE, parsedRepo.findByRawSmsId(raw.id)!!.event.messageFamily)
     }
 
     @Test
-    fun p9ReviewQueueException_keepsEvidenceAndDoesNotFailIngest() = runBlocking {
+    fun p9ReviewQueueException_keepsPostedTransactionAndReportsReviewIncomplete() = runBlocking {
         val accounts = RoomAccountRegistryRepository.from(db)
         val cards = RoomCardRegistryRepository.from(db)
         val ftRepo = RoomFinancialTransactionRepository(
@@ -463,7 +468,19 @@ class ProcessRawSmsUseCaseTest {
         )
         val throwingReviews = object : ReviewRepository {
             override suspend fun getById(id: String): ReviewItem? = null
-            override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? = null
+            override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? =
+                ReviewItem(
+                    id = "review:$rawSmsId",
+                    rawSmsId = rawSmsId,
+                    kind = ReviewKind.NEEDS_REVIEW,
+                    status = ReviewStatus.REQUIRED,
+                    reasons = listOf("seed"),
+                    createdAt = Instant.parse("2026-08-01T00:00:00Z"),
+                    updatedAt = Instant.parse("2026-08-01T00:00:00Z"),
+                    resolvedAt = null,
+                    resolutionKind = null,
+                    resolvedTransactionId = null,
+                )
             override suspend fun listRequired(): List<ReviewItem> = emptyList()
             override suspend fun listIgnored(): List<ReviewItem> = emptyList()
             override suspend fun listAll(): List<ReviewItem> = emptyList()
@@ -481,7 +498,9 @@ class ProcessRawSmsUseCaseTest {
                 resolutionKind: ReviewResolutionKind,
                 resolvedAt: Instant,
                 resolvedTransactionId: String?,
-            ): ReviewItem? = null
+            ): ReviewItem? {
+                throw IllegalStateException("p9-review-boom")
+            }
         }
         val updater = ReviewQueueUpdater(
             reviewRepository = throwingReviews,
@@ -497,7 +516,11 @@ class ProcessRawSmsUseCaseTest {
         )
         val raw = aljaziraBillPayment(id = "android-sms:p9-fail", deviceId = "p9-fail")
         val result = svc.ingest(raw)
-        assertTrue(result is SmsIngestionResult.Parsed)
+        assertTrue(result is SmsIngestionResult.DerivedIncomplete)
+        assertEquals(
+            DerivedProcessingStage.REVIEW_UPDATE,
+            (result as SmsIngestionResult.DerivedIncomplete).stage,
+        )
         assertNotNull(rawRepo.getById(raw.id))
         assertNotNull(parsedRepo.findByRawSmsId(raw.id))
         assertEquals(MessageFamily.BILL_PAYMENT, parsedRepo.findByRawSmsId(raw.id)!!.event.messageFamily)
