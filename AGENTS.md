@@ -16,7 +16,7 @@
 
 **ViewModels:** Call `application/*Workflow` facades only. No direct use of `domain.repository`, `domain.ownership`, or `domain.period` from presentation.
 
-**SMS:** Live intake = `IncomingSmsReceiver` → `LiveSmsIntake` → `ProcessRawSmsUseCase`. Historical scan = `application/sms/HistoricalSmsScanner`. Do not add orchestration under `sms/`.
+**SMS:** Live intake = `IncomingSmsReceiver` → `LiveSmsIntake` → `CaptureBankSmsUseCase` (durable `RawSms`) → `ProcessStoredSmsUseCase`. Historical scan = `application/sms/HistoricalSmsScanner`. `ProcessRawSmsUseCase` is only a capture-then-process facade. Do not add orchestration under `sms/`.
 
 **Parsing vs dashboard:** Bank-specific logic stays in `bank/*` parsers. Populate `ParsedEventDetails` at parse time (`cardSmsChannel`, balances, due dates, etc.). Dashboard code in `application/dashboard/*` reads persisted facts only — never re-parse SMS text and never import `bank.*`.
 

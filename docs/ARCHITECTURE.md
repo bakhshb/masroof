@@ -207,6 +207,16 @@ RawSmsRepository
 
 Both flows must converge into the same processing pipeline.
 
+Capture and processing are separate application boundaries:
+
+| Use case | Responsibility | Never does |
+|---|---|---|
+| `CaptureBankSmsUseCase` | route bank → dedupe → persist `RawSms`; returns `BankSmsCaptureResult` (rawSmsId + route) | parse, ownership, reconciliation, dashboard |
+| `ProcessStoredSmsUseCase` | load stored `RawSms` (by row or id) → parse → persist `ParsedEvent` → ownership discovery → reconciliation → review | route-time dedupe, provider I/O |
+| `ProcessRawSmsUseCase` | compatibility facade: capture, then process in the same call | — |
+
+`RawSms` is durable before any long derived processing begins; both use cases are idempotent.
+
 ---
 
 ## 7. Raw SMS Deduplication

@@ -86,7 +86,9 @@ import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.datasource.AndroidSmsDataSource
 import com.baraa.masroof.sms.datasource.SmsDataSource
+import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
+import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
 import com.baraa.masroof.sms.time.InstantClock
@@ -400,8 +402,15 @@ class AppContainer(
             adapters = listOf(alJaziraSmsAdapter),
         )
 
-    val processRawSmsUseCase: ProcessRawSmsUseCase =
-        ProcessRawSmsUseCase(
+    private val captureBankSmsUseCase: CaptureBankSmsUseCase =
+        CaptureBankSmsUseCase(
+            rawSmsRepository = rawSmsRepository,
+            bankSmsRegistry = bankSmsRegistry,
+            appLogService = appLogService,
+        )
+
+    val processStoredSmsUseCase: ProcessStoredSmsUseCase =
+        ProcessStoredSmsUseCase(
             rawSmsRepository = rawSmsRepository,
             parsedEventRepository = parsedEventRepository,
             bankSmsRegistry = bankSmsRegistry,
@@ -412,9 +421,16 @@ class AppContainer(
             appLogService = appLogService,
         )
 
+    val processRawSmsUseCase: ProcessRawSmsUseCase =
+        ProcessRawSmsUseCase(
+            capture = captureBankSmsUseCase,
+            processStored = processStoredSmsUseCase,
+        )
+
     val liveSmsIntake: LiveSmsIntake =
         LiveSmsIntake(
-            processRawSms = processRawSmsUseCase,
+            captureBankSms = captureBankSmsUseCase,
+            processStoredSms = processStoredSmsUseCase,
             appLogService = appLogService,
         )
 

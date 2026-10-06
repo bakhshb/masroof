@@ -286,3 +286,15 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Card payments accept OUTGOING or INCOMING because direction is relative to the
   referenced account or card. Instrument presence (card/account) is not required:
   existing SUCCESS parses include instrument-less SMS, so requiring it would change output.
+
+### M3.1 — Capture is separate from processing
+
+- `CaptureBankSmsUseCase` routes, dedupes (including the cross-source near-duplicate
+  window) and persists `RawSms`, returning `BankSmsCaptureResult` (`Captured` carries
+  the row and its `Matched`/`Ambiguous` route). It never parses or reconciles.
+- `ProcessStoredSmsUseCase` owns parse → ParsedEvent → discovery → reconciliation →
+  review. `process(rawSms, route)` reuses the capture's route in the same attempt;
+  `process(rawSmsId)` loads stored evidence (adapter: stored event bank → sole adapter
+  → route) and is safe to retry; `reparseStored` is the backlog entry point.
+- `ProcessRawSmsUseCase` remains as a capture-then-process facade (historical scan,
+  reprocessing, tests). `LiveSmsIntake` calls the two use cases directly.
