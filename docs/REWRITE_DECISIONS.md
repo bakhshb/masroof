@@ -409,3 +409,26 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   launch, and a thrown backfill escaped the startup job.
 - Startup and the worker share one coordinator mutex, so the backlog is never re-parsed
   twice concurrently.
+
+### M5.2 — Presentation consumes prepared application facts
+
+- `DashboardViewModel.toPreview` no longer converts foreign amounts, parses card containers,
+  resolves the primary card key, or maps loan involvement to `LOAN_REPAYMENT`. The projection
+  carries `transactionFacts` (`DashboardTransactionFactsBuilder`, same rules and inputs) and
+  the ViewModel renders them.
+- `MasroofRoot` no longer builds account container ids from owned registry accounts; it
+  passes `DashboardUiState.ownedAccountContainerIds`, which comes from the projection's owned
+  account set (same registry filter as `DashboardRegistryWorkflow.listOwnedAccounts`).
+- No UI behavior change: characterization over the fixture corpus plus the synthetic ledger
+  (25 periods) compares every projected row's facts and the owned-id set with the former
+  presentation derivation.
+- `DashboardOverview.transactionFacts` defaults to facts derived from the overview's own
+  transactions and involvement maps, so a constructed overview is never missing facts. A data
+  class `copy` keeps the existing facts; pass new facts when copying with other transactions.
+- Architecture rules: presentation `*ViewModel.kt` files must not reference
+  `domain.ids` container helpers or the dashboard conversion/classification helpers, and
+  `presentation/navigation` must not reference `domain.ids`.
+- Not in this phase's scope: summary-screen helpers (`DashboardSummaryTransactionFilter`,
+  `TransactionListFilter`, `DashboardRegistryLabels`, card/loan/account summary screens)
+  still build or parse container ids to filter rows and label registry entries. Moving them
+  needs per-account/card row facts from the projection and is a follow-up.

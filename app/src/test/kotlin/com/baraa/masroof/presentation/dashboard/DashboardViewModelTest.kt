@@ -15,6 +15,8 @@ import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.DashboardSectionId
+import com.baraa.masroof.application.dashboard.DashboardTransactionFacts
+import com.baraa.masroof.application.dashboard.DashboardTransactionFactsBuilder
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SpendingSplitSummary
@@ -113,6 +115,69 @@ class DashboardViewModelTest {
 
         assertEquals(listOf(currentPeriod, currentPeriod), loader.calls)
         assertEquals(Money.of("140.00", Currency.SAR), vm.uiState.value.summary!!.spendingGross)
+    }
+
+    @Test
+    fun previews_renderApplicationFactsWithoutReinterpreting() = runTest {
+        val tx = foreignTransaction()
+        val loader = FakeLoader()
+        loader.put(
+            currentPeriod,
+            overview(currentPeriod, spending = "100.00").copy(
+                transactions = listOf(tx),
+                transactionCardInvolvement = mapOf(tx.id to setOf("${Bank.BANK_ALJAZIRA.id}:2210")),
+                transactionFacts = mapOf(
+                    tx.id to DashboardTransactionFacts(
+                        primaryCardLast4 = "9999",
+                        effectiveType = FinancialTransactionType.LOAN_REPAYMENT,
+                        sarEquivalent = Money.of("1.00", Currency.SAR),
+                    ),
+                ),
+                ownedAccountContainerIds = setOf("account:aljazira:3001"),
+            ),
+        )
+        val vm = viewModel(loader)
+        vm.refresh()
+        advanceUntilIdle()
+
+        val preview = vm.uiState.value.allTransactions.single()
+        assertEquals("9999", preview.cardLast4)
+        assertEquals(FinancialTransactionType.EXPENSE, preview.type)
+        assertEquals(FinancialTransactionType.LOAN_REPAYMENT, preview.typeLabelResHint)
+        assertEquals(TransactionTypePresentation.direction(FinancialTransactionType.LOAN_REPAYMENT), preview.direction)
+        assertEquals(Money.of("1.00", Currency.SAR), preview.sarEquivalent)
+        assertEquals(setOf("account:aljazira:3001"), vm.uiState.value.ownedAccountContainerIds)
+    }
+
+    @Test
+    fun previews_fromOverviewInvolvement_keepFormerRowFacts() = runTest {
+        val tx = foreignTransaction()
+        val loader = FakeLoader()
+        loader.put(
+            currentPeriod,
+            overview(currentPeriod, spending = "100.00").copy(
+                transactions = listOf(tx),
+                transactionCardInvolvement = mapOf(tx.id to setOf("${Bank.BANK_ALJAZIRA.id}:2210")),
+                transactionLoanInvolvement = mapOf(tx.id to setOf("loan:aljazira:PERSONAL")),
+            ).let {
+                it.copy(
+                    transactionFacts = DashboardTransactionFactsBuilder.build(
+                        transactions = it.transactions,
+                        cardInvolvement = it.transactionCardInvolvement,
+                        loanInvolvement = it.transactionLoanInvolvement,
+                    ),
+                )
+            },
+        )
+        val vm = viewModel(loader)
+        vm.refresh()
+        advanceUntilIdle()
+
+        val preview = vm.uiState.value.allTransactions.single()
+        assertEquals("2210", preview.cardLast4)
+        assertEquals(FinancialTransactionType.LOAN_REPAYMENT, preview.typeLabelResHint)
+        assertEquals(Money.of("37.50", Currency.SAR), preview.sarEquivalent)
+        assertEquals(java.math.BigDecimal("3.75"), preview.appliedExchangeRate)
     }
 
     @Test
@@ -545,6 +610,21 @@ class DashboardViewModelTest {
             isCurrentPeriod = period == currentPeriod,
         )
     }
+
+    private fun foreignTransaction() = FinancialTransaction(
+        id = "tx-usd",
+        type = FinancialTransactionType.EXPENSE,
+        amount = Money.of("10.00", Currency.USD),
+        occurredAt = Instant.parse("2026-08-10T09:00:00Z"),
+        sourceContainerId = "account:aljazira:3001",
+        destinationContainerId = null,
+        merchant = "SPOTIFY",
+        counterparty = null,
+        categoryId = null,
+        linkedParsedEventIds = emptyList(),
+        appliedExchangeRate = java.math.BigDecimal("3.75"),
+        exchangeRateSource = com.baraa.masroof.domain.model.ExchangeRateSource.SMS,
+    )
 
     private fun emptyCreditFacilities(): CreditFacilitiesOverview =
         CreditFacilitiesOverview(

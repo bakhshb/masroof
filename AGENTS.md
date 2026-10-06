@@ -47,6 +47,7 @@
 - All money totals live in `application/dashboard/*Builder` and `*Calculator`.
 - Compose screens in `presentation/dashboard` must display pre-computed values only.
 - Do not sum transactions, classify Mada vs credit, or aggregate spending inside Composables.
+- Row-level facts (card last4, effective type, SAR equivalent) and owned account container ids come from `DashboardOverview.transactionFacts` / `ownedAccountContainerIds`; ViewModels and navigation never build container ids or call conversion helpers (enforced in `PackageDependencyRulesTest`).
 - Classify card type via `ParsedEventDetails.cardSmsChannel` — not SMS body text in dashboard code.
 - Use helpers such as `CreditFacilitiesOverview.aggregateCreditSalaryPeriodSpending()`, `DebitCardOverview.salaryPeriodSpendingNet`, and `AccountsSummary.totalInflow`.
 - Credit facility due is one value per facility (primary + supplementaries share the statement due).

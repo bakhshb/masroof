@@ -729,6 +729,21 @@ ViewModels should not contain:
 - bank identification logic
 - financial calculation rules
 
+Presentation consumes prepared application facts. `DashboardOverview` (from
+`DashboardProjection`) carries, besides section totals and involvement indexes:
+
+| Fact | Field | Rule owner |
+|---|---|---|
+| Row card last4 (card container, else primary SMS card ref) | `transactionFacts[id].primaryCardLast4` | `DashboardTransactionFactsBuilder` |
+| Effective type (loan-attributed rows → `LOAN_REPAYMENT`) | `transactionFacts[id].effectiveType` | `DashboardTransactionFactsBuilder` over `LoanRepaymentAttribution` involvement |
+| SAR equivalent (foreign amount × applied rate) | `transactionFacts[id].sarEquivalent` | `DashboardTransactionFactsBuilder` / `ForeignPurchaseSarConverter` |
+| Owned account container ids for list filtering | `ownedAccountContainerIds` | projection context |
+
+`DashboardViewModel` maps these to UI models (labels, locale formatting, direction styling)
+and `MasroofRoot` only passes them on. Neither constructs or parses financial container ids
+nor calls conversion/classification helpers; `PackageDependencyRulesTest` enforces this for
+every presentation `*ViewModel.kt` and for `presentation/navigation`.
+
 ### 22.1 Dashboard read model
 
 `DashboardProjectionBuilder` is composition only: it loads one `DashboardProjectionContext`

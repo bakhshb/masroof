@@ -39,6 +39,14 @@ data class DashboardOverview(
     /** Transaction id → loan container ids for SMS-attributed loan repayments. */
     val transactionLoanInvolvement: Map<String, Set<String>> = emptyMap(),
     val transactionDebitSpendInvolvement: Map<String, Set<String>> = emptyMap(),
+    /** Transaction id → display facts (card last4, effective type, SAR equivalent). */
+    val transactionFacts: Map<String, DashboardTransactionFacts> = DashboardTransactionFactsBuilder.build(
+        transactions = transactions,
+        cardInvolvement = transactionCardInvolvement,
+        loanInvolvement = transactionLoanInvolvement,
+    ),
+    /** Container ids of owned registry accounts, for account filtering. */
+    val ownedAccountContainerIds: Set<String> = emptySet(),
     val isCurrentPeriod: Boolean,
 )
 

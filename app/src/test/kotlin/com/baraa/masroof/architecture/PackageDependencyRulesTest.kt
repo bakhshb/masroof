@@ -108,6 +108,34 @@ class PackageDependencyRulesTest {
     }
 
     @Test
+    fun presentation_navigation_doesNotConstructFinancialContainerIds() {
+        assertPackagesDoNotImport(
+            packages = listOf("presentation/navigation"),
+            forbiddenImports = listOf("com.baraa.masroof.domain.ids.", "FinancialContainerIdFactory"),
+        )
+    }
+
+    @Test
+    fun presentation_viewModels_consumePreparedFinancialFacts() {
+        assertFilesDoNotImport(
+            files = kotlinFilesIn("presentation").filter { it.name.endsWith("ViewModel.kt") },
+            forbiddenImports = listOf(
+                "com.baraa.masroof.domain.ids.",
+                "FinancialContainerIdFactory",
+                "FinancialContainerIdParser",
+                "ForeignPurchaseSarConverter",
+                "TransactionSarEquivalentResolver",
+                "AppliedExchangeRateSyncer",
+                "CardTransactionInvolvementResolver",
+                "LoanRepaymentAttribution",
+                "DebitCardSpendClassifier",
+                "DashboardTransactionFactsBuilder",
+                ".convertsToSar(",
+            ),
+        )
+    }
+
+    @Test
     fun parsing_validationFirewall_doesNotResolveOwnershipOrTransactionMeaning() {
         listOf("parsing/validator", "parsing/finalize").forEach { pkg ->
             assertTrue("$pkg must exist", kotlinFilesIn(pkg).isNotEmpty())

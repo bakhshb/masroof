@@ -87,6 +87,12 @@ class DashboardProjectionBuilder(
             transactionLoanInvolvement = commitments.transactionLoanInvolvement,
             transactionDebitSpendInvolvement = cards.transactionDebitSpendInvolvement,
             transactions = context.transactions,
+            transactionFacts = DashboardTransactionFactsBuilder.build(
+                transactions = context.transactions,
+                cardInvolvement = cards.transactionCardInvolvement,
+                loanInvolvement = commitments.transactionLoanInvolvement,
+            ),
+            ownedAccountContainerIds = context.ownedAccountContainerIds,
             meta = DashboardMeta(
                 transactionCount = analysis.summary.transactionCount,
                 reviewRequiredCount = context.reviewRequiredCount,
