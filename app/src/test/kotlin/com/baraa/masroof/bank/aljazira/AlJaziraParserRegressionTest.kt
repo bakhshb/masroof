@@ -704,6 +704,22 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun typographyVariantLabels_doNotDegradeMerchantDisplayText() {
+        val result = parse(
+            """
+            شـراء عبر الإنترنت
+            بطاقة: 7271
+            لـدي: مطعم الأصيل
+            بِمبلغ: 51.99 SAR
+            في: 14:32 03-08-2026
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
+        assertEquals(Money.of("51.99", Currency.SAR), result.event.amount)
+        assertEquals("مطعم الأصيل", result.event.merchant)
+    }
+
+    @Test
     fun unrecognizedSender_isNotRoutedToAlJazira() {
         val route = registry.route("OtherBank", "شراء عبر الانترنت بمبلغ: 10.00 SAR")
         assertTrue(route is BankRoutingResult.NotMatched)

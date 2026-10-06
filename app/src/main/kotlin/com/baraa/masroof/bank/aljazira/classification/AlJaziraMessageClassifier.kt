@@ -6,6 +6,8 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.parsing.model.NormalizedSms
+import com.baraa.masroof.parsing.normalizer.comparisonRegex
+import com.baraa.masroof.parsing.normalizer.containsComparison
 
 data class AlJaziraClassification(
     val family: MessageFamily,
@@ -26,68 +28,68 @@ class AlJaziraMessageClassifier {
         when {
             OtpMessageHeuristics.isOtpMessage(text) ->
                 return AlJaziraClassification(
-                    family = if (text.contains("رمز التفعيل") || text.contains("لإضافة المستفيد")) {
+                    family = if (text.containsComparison("رمز التفعيل") || text.containsComparison("لإضافة المستفيد")) {
                         MessageFamily.NON_FINANCIAL
                     } else {
                         MessageFamily.OTP
                     },
                     evidence = listOf(
                         when {
-                            text.contains("رمز التفعيل") -> "activation_code"
-                            text.contains("one time password") || text.contains("one-time password") ->
+                            text.containsComparison("رمز التفعيل") -> "activation_code"
+                            text.containsComparison("one time password") || text.containsComparison("one-time password") ->
                                 "english_otp"
-                            text.contains("كلمة مرور") || text.contains("كلمة المرور") ||
-                                text.contains("صالحة لمرة واحدة") -> "password_ar"
+                            text.containsComparison("كلمة مرور") || text.containsComparison("كلمة المرور") ||
+                                text.containsComparison("صالحة لمرة واحدة") -> "password_ar"
                             else -> "otp_indicator"
                         },
                     ),
                     confidence = 1.0,
                 )
 
-            text.contains("تم تسجيل الدخول") ->
+            text.containsComparison("تم تسجيل الدخول") ->
                 return AlJaziraClassification(
                     family = MessageFamily.NON_FINANCIAL,
                     evidence = listOf("login_notice"),
                     confidence = 1.0,
                 )
 
-            text.contains("مكافآتي") ||
-                text.contains("رصيد نقاطك") ||
-                text.contains("برنامج مكاف") ->
+            text.containsComparison("مكافآتي") ||
+                text.containsComparison("رصيد نقاطك") ||
+                text.containsComparison("برنامج مكاف") ->
                 return AlJaziraClassification(
                     family = MessageFamily.NON_FINANCIAL,
                     evidence = listOf("loyalty_points_notice"),
                     confidence = 1.0,
                 )
 
-            text.contains("اسم المستفيد") ||
-                text.contains("الاسم المختصر") ||
-                text.contains("تم إضافة المستفيد") ||
-                text.contains("إضافة مستفيد") ||
-                (text.contains("حالة") && text.contains("غير نشط")) ->
+            text.containsComparison("اسم المستفيد") ||
+                text.containsComparison("الاسم المختصر") ||
+                text.containsComparison("تم إضافة المستفيد") ||
+                text.containsComparison("إضافة مستفيد") ||
+                (text.containsComparison("حالة") && text.containsComparison("غير نشط")) ->
                 return AlJaziraClassification(
                     family = MessageFamily.NON_FINANCIAL,
                     evidence = listOf("beneficiary_notice"),
                     confidence = 1.0,
                 )
 
-            text.contains("إشعار رصيد") || text.contains("اشعار رصيد") ->
+            text.containsComparison("إشعار رصيد") || text.containsComparison("اشعار رصيد") ->
                 return AlJaziraClassification(
                     family = MessageFamily.BALANCE_NOTICE,
                     evidence = listOf("balance_notice"),
                     confidence = 1.0,
                 )
 
-            text.contains("إصدار كشف حساب") ||
-                text.contains("كشف حساب") ||
-                (text.contains("تاريخ الاستحقاق") && text.contains("المبلغ المستحق")) ->
+            text.containsComparison("إصدار كشف حساب") ||
+                text.containsComparison("كشف حساب") ||
+                (text.containsComparison("تاريخ الاستحقاق") && text.containsComparison("المبلغ المستحق")) ->
                 return AlJaziraClassification(
                     family = MessageFamily.NON_FINANCIAL,
                     evidence = listOf("statement_notice"),
                     confidence = 1.0,
                 )
 
-            text.contains("قسط تمويل") || text.contains("خصم: قسط") ->
+            text.containsComparison("قسط تمويل") || text.containsComparison("خصم: قسط") ->
                 return AlJaziraClassification(
                     family = MessageFamily.FINANCING_INSTALLMENT,
                     direction = MoneyDirection.OUTGOING,
@@ -95,17 +97,17 @@ class AlJaziraMessageClassifier {
                     confidence = 0.95,
                 )
 
-            text.contains("سداد بطاقة") || isCreditCardSettlement(text) ->
+            text.containsComparison("سداد بطاقة") || isCreditCardSettlement(text) ->
                 return AlJaziraClassification(
                     family = MessageFamily.CARD_PAYMENT,
                     direction = MoneyDirection.OUTGOING,
                     evidence = listOf(
-                        if (text.contains("سداد بطاقة")) "card_payment" else "card_settlement",
+                        if (text.containsComparison("سداد بطاقة")) "card_payment" else "card_settlement",
                     ),
                     confidence = 0.95,
                 )
 
-            text.contains("سداد فاتورة") || text.contains("المفوتر") ->
+            text.containsComparison("سداد فاتورة") || text.containsComparison("المفوتر") ->
                 return AlJaziraClassification(
                     family = MessageFamily.BILL_PAYMENT,
                     direction = MoneyDirection.OUTGOING,
@@ -139,7 +141,7 @@ class AlJaziraMessageClassifier {
                     confidence = 0.95,
                 )
 
-            text.contains("رسوم") ->
+            text.containsComparison("رسوم") ->
                 return AlJaziraClassification(
                     family = MessageFamily.FEE,
                     direction = MoneyDirection.OUTGOING,
@@ -147,7 +149,7 @@ class AlJaziraMessageClassifier {
                     confidence = 0.95,
                 )
 
-            text.contains("سحب نقدي") || text.contains("withdrawal") ->
+            text.containsComparison("سحب نقدي") || text.containsComparison("withdrawal") ->
                 return AlJaziraClassification(
                     family = MessageFamily.WITHDRAWAL,
                     direction = MoneyDirection.OUTGOING,
@@ -155,9 +157,9 @@ class AlJaziraMessageClassifier {
                     confidence = 0.95,
                 )
 
-            text.contains("حوالة واردة") ||
-                text.contains("حوالة مالية واردة") ||
-                text.contains("incoming transfer") ->
+            text.containsComparison("حوالة واردة") ||
+                text.containsComparison("حوالة مالية واردة") ||
+                text.containsComparison("incoming transfer") ->
                 return AlJaziraClassification(
                     family = MessageFamily.TRANSFER_IN,
                     direction = MoneyDirection.INCOMING,
@@ -166,9 +168,9 @@ class AlJaziraMessageClassifier {
                     confidence = 0.95,
                 )
 
-            text.contains("حوالة صادرة") ||
-                text.contains("حوالة مالية صادرة") ||
-                text.contains("outgoing transfer") ->
+            text.containsComparison("حوالة صادرة") ||
+                text.containsComparison("حوالة مالية صادرة") ||
+                text.containsComparison("outgoing transfer") ->
                 return AlJaziraClassification(
                     family = MessageFamily.TRANSFER_OUT,
                     direction = MoneyDirection.OUTGOING,
@@ -187,45 +189,45 @@ class AlJaziraMessageClassifier {
     }
 
     private fun isRefund(text: String): Boolean =
-        text.contains("refund") || REFUND_AR_PATTERN.containsMatchIn(text)
+        text.containsComparison("refund") || REFUND_AR_PATTERN.containsMatchIn(text)
 
     private fun isPosPurchase(text: String): Boolean {
-        val hasPos = text.contains("نقاط البيع") ||
-            text.contains("pos purchase") ||
+        val hasPos = text.containsComparison("نقاط البيع") ||
+            text.containsComparison("pos purchase") ||
             Regex("""(?<![\p{L}])pos(?![\p{L}])""").containsMatchIn(text)
-        val hasPurchase = text.contains("شراء") || text.contains("purchase")
-        return hasPos && (hasPurchase || text.contains("pos purchase"))
+        val hasPurchase = text.containsComparison("شراء") || text.containsComparison("purchase")
+        return hasPos && (hasPurchase || text.containsComparison("pos purchase"))
     }
 
     private fun isOnlinePurchase(text: String): Boolean {
         if (OtpMessageHeuristics.isOtpMessage(text)) return false
-        return text.contains("شراء عبر الانترنت") ||
-            text.contains("شراء من الانترنت") ||
-            text.contains("online purchase") ||
-            text.contains("internet purchase")
+        return text.containsComparison("شراء عبر الانترنت") ||
+            text.containsComparison("شراء من الانترنت") ||
+            text.containsComparison("online purchase") ||
+            text.containsComparison("internet purchase")
     }
 
     private fun detectNetwork(text: String, incoming: Boolean): BankNetworkType {
-        if (text.contains("داخلية") || text.contains("حسابك الجاري")) {
+        if (text.containsComparison("داخلية") || text.containsComparison("حسابك الجاري")) {
             return BankNetworkType.INTRA_BANK
         }
-        if (text.contains("البنك المرسل: بنك الجزيرة") || text.contains("البنك المرسل:بنك الجزيرة")) {
+        if (text.containsComparison("البنك المرسل: بنك الجزيرة") || text.containsComparison("البنك المرسل:بنك الجزيرة")) {
             return BankNetworkType.INTRA_BANK
         }
         // External bank markers in brackets or named other banks
         if (Regex("""\[[^\]]+\]""").containsMatchIn(text)) {
             return BankNetworkType.INTER_BANK
         }
-        if (text.contains("عبر:") && !text.contains("بنك الجزيرة")) {
+        if (text.containsComparison("عبر:") && !text.containsComparison("بنك الجزيرة")) {
             // e.g. عبر: بنك الرياض
-            if (text.contains("بنك") && !text.contains("عبر: بنك الجزيرة")) {
+            if (text.containsComparison("بنك") && !text.containsComparison("عبر: بنك الجزيرة")) {
                 return BankNetworkType.INTER_BANK
             }
         }
-        if (text.contains("البنك المرسل:") && !text.contains("البنك المرسل: بنك الجزيرة")) {
+        if (text.containsComparison("البنك المرسل:") && !text.containsComparison("البنك المرسل: بنك الجزيرة")) {
             return BankNetworkType.INTER_BANK
         }
-        if (incoming && text.contains("محلية") && text.contains("بنك الرياض")) {
+        if (incoming && text.containsComparison("محلية") && text.containsComparison("بنك الرياض")) {
             return BankNetworkType.INTER_BANK
         }
         return BankNetworkType.UNKNOWN
@@ -233,14 +235,14 @@ class AlJaziraMessageClassifier {
 
     /** e.g. «بطاقة إئتمانية: تسديد» — settlement from account to credit card. */
     private fun isCreditCardSettlement(text: String): Boolean {
-        if (!text.contains("تسديد")) return false
-        return text.contains("بطاقة ائتمان", ignoreCase = true) ||
-            text.contains("بطاقة إئتمان", ignoreCase = true) ||
-            text.contains("credit card", ignoreCase = true)
+        if (!text.containsComparison("تسديد")) return false
+        return text.containsComparison("بطاقة ائتمان", ignoreCase = true) ||
+            text.containsComparison("بطاقة إئتمان", ignoreCase = true) ||
+            text.containsComparison("credit card", ignoreCase = true)
     }
 
     companion object {
         /** Bank SMS uses both ا and إ spellings (e.g. استرداد vs إسترداد). */
-        private val REFUND_AR_PATTERN = Regex("""[اأإآ]سترداد""")
+        private val REFUND_AR_PATTERN = comparisonRegex("""[اأإآ]سترداد""")
     }
 }

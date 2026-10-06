@@ -1,5 +1,7 @@
 package com.baraa.masroof.bank.aljazira
 
+import com.baraa.masroof.parsing.normalizer.containsComparison
+
 /**
  * Distinguishes credit-card SMS from debit (mada) and current-account purchase SMS.
  *
@@ -29,8 +31,8 @@ object CreditCardMessageHeuristics {
     fun isCreditCardSms(body: String): Boolean {
         val text = body.replace('\n', ' ')
         if (containsDebitMarkers(text)) return false
-        if (CREDIT_MARKERS.any { text.contains(it, ignoreCase = true) }) return true
-        if (DUE_MARKERS.any { text.contains(it, ignoreCase = true) }) return true
+        if (CREDIT_MARKERS.any { text.containsComparison(it, ignoreCase = true) }) return true
+        if (DUE_MARKERS.any { text.containsComparison(it, ignoreCase = true) }) return true
         return false
     }
 
@@ -40,9 +42,9 @@ object CreditCardMessageHeuristics {
     }
 
     private fun containsDebitMarkers(text: String): Boolean {
-        if (text.contains("خصمت من حساب", ignoreCase = true)) return true
-        if (ARABIC_DEBIT_MARKERS.any { text.contains(it, ignoreCase = true) }) return true
-        if (text.contains("debit card", ignoreCase = true)) return true
+        if (text.containsComparison("خصمت من حساب", ignoreCase = true)) return true
+        if (ARABIC_DEBIT_MARKERS.any { text.containsComparison(it, ignoreCase = true) }) return true
+        if (text.containsComparison("debit card", ignoreCase = true)) return true
         return STANDALONE_MADA.containsMatchIn(text)
     }
 }

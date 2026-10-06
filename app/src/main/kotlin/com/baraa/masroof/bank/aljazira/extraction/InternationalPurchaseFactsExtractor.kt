@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira.extraction
 
+import com.baraa.masroof.parsing.normalizer.comparisonRegex
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import java.math.BigDecimal
@@ -15,10 +16,10 @@ data class InternationalPurchaseFacts(
 
 object InternationalPurchaseFactsExtractor {
     private val EXCHANGE_RATE =
-        Regex("""سعر\s*الصرف\s*:\s*(\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE)
+        comparisonRegex("""سعر\s*الصرف\s*:\s*(\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE)
 
     private val INTERNATIONAL_FEE =
-        Regex("""رسوم\s*العمليات\s*الدولية\s*:\s*(\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE)
+        comparisonRegex("""رسوم\s*العمليات\s*الدولية\s*:\s*(\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE)
 
     fun extract(body: String): InternationalPurchaseFacts? {
         val rate = EXCHANGE_RATE.find(body)?.groupValues?.getOrNull(1)?.toBigDecimalOrNull()

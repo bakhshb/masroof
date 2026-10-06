@@ -3,6 +3,7 @@ package com.baraa.masroof.parsing.normalizer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageNormalizerTest {
@@ -44,6 +45,41 @@ class MessageNormalizerTest {
     fun comparisonBodyIsLowercase() {
         val result = normalizer.normalize("Internet Purchase Amount: 10.00 SAR")
         assertEquals(result.normalizedBody.lowercase(java.util.Locale.ROOT), result.comparisonBody)
+    }
+
+    @Test
+    fun comparisonBody_foldsAlefAndYehVariants_normalizedBodyKeepsThem() {
+        val result = normalizer.normalize("أودعت إلى حساب: 3001\nلدى: آل الأصيل")
+        assertEquals("أودعت إلى حساب: 3001\nلدى: آل الأصيل", result.normalizedBody)
+        assertEquals("اودعت الي حساب: 3001\nلدي: ال الاصيل", result.comparisonBody)
+    }
+
+    @Test
+    fun comparisonBody_dropsTatweelDiacriticsAndFormatMarks() {
+        val original = "\u200Fشـراء عبر الإنترنت\nبِمَبْلَغ: 10.00 SAR\u200E"
+        val result = normalizer.normalize(original)
+        assertEquals(original, result.originalBody)
+        assertTrue(result.normalizedBody.contains('ـ'))
+        assertEquals("شراء عبر الانترنت\nبمبلغ: 10.00 sar", result.comparisonBody)
+    }
+
+    @Test
+    fun comparisonBody_normalizesColonAndArabicSeparatorVariants() {
+        val result = normalizer.normalize("بمبلغ﹕ ١٣٬٢٥٨٫٠٠ SAR")
+        assertEquals("بمبلغ: 13,258.00 sar", result.comparisonBody)
+    }
+
+    @Test
+    fun normalizedSlice_mapsComparisonRangeBackAcrossDroppedCharacters() {
+        val result = normalizer.normalize("لـدى: مطعم الأصـيل\nبمبلغ: 5.00 SAR")
+        val match = Regex("""لدي: ([^\n]+)""").find(result.comparisonBody)!!
+        assertEquals("مطعم الأصـيل", result.normalizedSlice(match.groups[1]!!.range))
+    }
+
+    @Test
+    fun folding_isIdempotent() {
+        val once = normalizer.normalize("إشعار رصيد ـ أُرسل").comparisonBody
+        assertEquals(once, com.baraa.masroof.core.text.ArabicTextFolding.foldForComparison(once))
     }
 
     @Test

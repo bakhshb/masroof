@@ -26,6 +26,8 @@
 
 **Bank routing:** `BankSmsRegistry` evaluates every adapter; `BankRoutingResult.Ambiguous` is persisted and reviewed (`ambiguous_bank_route`), never parsed by a guessed adapter. Never resolve collisions by registration order. The router owns detection: adapter parse pipelines must not re-check the sender.
 
+**SMS text matching:** Match on `NormalizedSms.comparisonBody` with `comparisonRegex(...)` / `containsComparison(...)` (Arabic-folded patterns); never display `comparisonBody` — slice display values with `normalizedSlice(range)`.
+
 **New bank:** Implement `BankSmsAdapter`, add fixture tests under `testdata/`, and register a `BankSmsAdapterContractCase` (real financial + non-financial fixtures, positive/negative senders) in `BankSmsAdapterContractTest`; no sample may be claimed by more than one adapter.
 
 **PRs:** Target `main` only. Partial architecture merges may show broken UI until backfill lands — that is expected.

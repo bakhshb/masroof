@@ -241,3 +241,16 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - `ProcessRawSmsUseCase` treats an event whose bank differs from the routed adapter
   as a processing error (direct review), so parser and router cannot disagree.
 - Sender near-miss coverage moved from parser assertions to routing assertions.
+
+### M2.1 — Comparison-only Arabic normalization
+
+- `core/text/ArabicTextFolding` defines the equivalence (alef/yeh folding, tatweel,
+  diacritics, bidi/zero-width marks, colon and Arabic separator variants). It is
+  applied only to `comparisonBody`; `originalBody` and `normalizedBody` keep the
+  bank's letters, so merchant/counterparty display text is not degraded.
+- Every AlJazira classifier keyword, heuristic, and extractor regex is folded the same
+  way (`comparisonRegex` / `containsComparison`); display values are sliced from
+  `normalizedBody` through `NormalizedSms.normalizedSlice`, which maps offsets across
+  dropped characters. `OtpMessageHeuristics` folds its own input.
+- Fixture variants (bare alef, ي for ى, tatweel, diacritics, RLM marks, colon variant)
+  must parse to the same facts as the canonical fixture.

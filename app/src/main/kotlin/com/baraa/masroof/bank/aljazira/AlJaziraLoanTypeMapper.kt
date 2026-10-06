@@ -1,6 +1,7 @@
 package com.baraa.masroof.bank.aljazira
 
 import com.baraa.masroof.domain.model.LoanType
+import com.baraa.masroof.parsing.normalizer.containsComparison
 
 /**
  * Maps Bank AlJazira financing SMS labels (لـ: …) to [LoanType] at parse time.
@@ -10,14 +11,14 @@ object AlJaziraLoanTypeMapper {
         val normalized = label?.trim().orEmpty()
         if (normalized.isEmpty()) return null
         return when {
-            normalized.contains("تمويل شخصي") || normalized.contains("شخصي") ->
+            normalized.containsComparison("تمويل شخصي") || normalized.containsComparison("شخصي") ->
                 LoanType.PERSONAL
-            normalized.contains("سيارة") || normalized.contains("مركبة") || normalized.contains("أوتو") ->
+            normalized.containsComparison("سيارة") || normalized.containsComparison("مركبة") || normalized.containsComparison("أوتو") ->
                 LoanType.AUTO
-            normalized.contains("عقار") || normalized.contains("مسكن") || normalized.contains("رهن") ||
-                normalized.contains("عقاري") ->
+            normalized.containsComparison("عقار") || normalized.containsComparison("مسكن") || normalized.containsComparison("رهن") ||
+                normalized.containsComparison("عقاري") ->
                 LoanType.MORTGAGE
-            normalized.contains("تمويل") -> LoanType.PERSONAL
+            normalized.containsComparison("تمويل") -> LoanType.PERSONAL
             else -> null
         }
     }

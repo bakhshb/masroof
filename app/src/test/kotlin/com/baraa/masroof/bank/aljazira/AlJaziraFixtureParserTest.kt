@@ -184,6 +184,63 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
         }
     }
 
+    @Test
+    fun typographyVariants_parseLikeCanonicalFixture() {
+        val (canonical, canonicalDetails) = unpack(parseBody(fixture.body))
+        val expected = requireNotNull(canonical) { "canonical ${fixture.id} produced no event" }
+        val expectedDetails = canonicalDetails ?: ParsedEventDetails()
+        for ((variantName, body) in typographyVariants(fixture.body)) {
+            if (body == fixture.body) continue
+            val label = "${fixture.id}[$variantName]"
+            val (event, details) = unpack(parseBody(body))
+            assertNotNull("$label produced no event", event)
+            val e = event!!
+            val d = details ?: ParsedEventDetails()
+            assertEquals(label, expected.messageFamily, e.messageFamily)
+            assertEquals(label, expected.parseStatus, e.parseStatus)
+            assertEquals(label, expected.direction, e.direction)
+            assertEquals(label, expected.purchaseChannel, e.purchaseChannel)
+            assertEquals(label, expected.bankNetworkType, e.bankNetworkType)
+            assertEquals(label, expected.amount, e.amount)
+            assertEquals(label, expected.sourceAccountRef, e.sourceAccountRef)
+            assertEquals(label, expected.destinationAccountRef, e.destinationAccountRef)
+            assertEquals(label, expected.cardRef, e.cardRef)
+            assertEquals(label, folded(expected.merchant), folded(e.merchant))
+            assertEquals(label, folded(expected.counterparty), folded(e.counterparty))
+            assertEquals(label, folded(expectedDetails.biller), folded(d.biller))
+            assertEquals(label, folded(expectedDetails.transactionReference), folded(d.transactionReference))
+            assertEquals(label, expectedDetails.availableBalance, d.availableBalance)
+            assertEquals(label, expectedDetails.outstandingBalance, d.outstandingBalance)
+            assertEquals(label, expectedDetails.occurredAtLocal, d.occurredAtLocal)
+            assertEquals(label, expectedDetails.cardSmsChannel, d.cardSmsChannel)
+            assertEquals(label, expectedDetails.paymentDueDate, d.paymentDueDate)
+            assertEquals(label, expectedDetails.loanType, d.loanType)
+            assertEquals(label, expectedDetails.salaryIncomeWording, d.salaryIncomeWording)
+        }
+    }
+
+    private fun parseBody(body: String): ParseResult =
+        pipeline.parse(
+            SmsParseInput(
+                rawSmsId = fixture.id,
+                sender = fixture.sender,
+                body = body,
+                receivedAt = Instant.parse("2026-08-10T00:00:00Z"),
+            ),
+        )
+
+    private fun folded(value: String?): String? =
+        value?.let(com.baraa.masroof.core.text.ArabicTextFolding::foldForComparison)
+
+    private fun typographyVariants(body: String): List<Pair<String, String>> = listOf(
+        "bare_alef" to body.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا'),
+        "yeh_for_alef_maqsura" to body.replace('ى', 'ي'),
+        "tatweel" to ARABIC_WORD.replace(body) { m -> m.value.take(1) + "\u0640" + m.value.drop(1) },
+        "diacritics" to ARABIC_WORD.replace(body) { m -> m.value.take(1) + "\u064E" + m.value.drop(1) },
+        "bidi_marks" to body.lines().joinToString("\n") { "\u200F$it" },
+        "colon_variant" to body.replace(':', '\uFE55'),
+    )
+
     private fun unpack(result: ParseResult): Pair<ParsedEvent?, ParsedEventDetails?> = when (result) {
         is ParseResult.Success -> result.event to result.details
         is ParseResult.Partial -> result.event to result.details
@@ -196,6 +253,9 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
     }
 
     companion object {
+        /** Arabic letter runs of 3+ (hamza..yeh), where tatweel / harakat are typographically plausible. */
+        private val ARABIC_WORD = Regex("[\u0621-\u064A]{3,}")
+
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun fixtures(): Collection<Array<Any>> =

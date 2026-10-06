@@ -290,6 +290,20 @@ Keep:
 
 Do not overwrite raw data.
 
+Three representations, each with one job:
+
+| Field | Content | Use |
+|---|---|---|
+| `originalBody` | bytes as received | evidence / traceability |
+| `normalizedBody` | NFC, Latin digits, trimmed lines, collapsed spaces; letters untouched | display-safe extraction (merchant, counterparty, biller, reference) |
+| `comparisonBody` | `ArabicTextFolding.foldForComparison(normalizedBody)`: lowercase, أ/إ/آ/ٱ→ا, ى→ي, no tatweel / diacritics / bidi marks, colon and Arabic separator variants unified | matching only — never displayed |
+
+Patterns and keywords matched against `comparisonBody` must be folded the same way:
+build regexes with `comparisonRegex(...)` and keyword checks with
+`containsComparison(...)` (`parsing/normalizer/ComparisonMatching.kt`). Turn a
+comparison match range into display text with `NormalizedSms.normalizedSlice(range)`,
+which maps offsets across dropped characters.
+
 ---
 
 ## 10. Bank Detection

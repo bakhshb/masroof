@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira.extraction
 
+import com.baraa.masroof.parsing.normalizer.comparisonRegex
 import com.baraa.masroof.parsing.model.NormalizedSms
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -19,7 +20,7 @@ class DueDateExtractor {
 
     companion object {
         private val DMY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-        private val DUE_DATE_PATTERN = Regex(
+        private val DUE_DATE_PATTERN = comparisonRegex(
             """تاريخ\s*الاستحقاق\s*:\s*(\d{2}/\d{2}/\d{4})""",
             RegexOption.IGNORE_CASE,
         )

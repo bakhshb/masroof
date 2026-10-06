@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira.extraction
 
+import com.baraa.masroof.parsing.normalizer.comparisonRegex
 import com.baraa.masroof.parsing.model.AmountCandidate
 import com.baraa.masroof.parsing.model.AmountSourceKind
 import com.baraa.masroof.parsing.model.NormalizedSms
@@ -30,18 +31,18 @@ class AmountExtractor {
 
     companion object {
         private val LABEL_PATTERNS: List<Pair<String, Regex>> = listOf(
-            "بمبلغ" to Regex("""بمبلغ""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
-            "مبلغ العملية" to Regex("""مبلغ\s*العملية""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
-            "القيمة" to Regex("""القيمة""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
-            "القسط" to Regex("""القسط""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            "بمبلغ" to comparisonRegex("""بمبلغ""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            "مبلغ العملية" to comparisonRegex("""مبلغ\s*العملية""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            "القيمة" to comparisonRegex("""القيمة""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            "القسط" to comparisonRegex("""القسط""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
             // "مبلغ" after more-specific labels; avoid matching داخل "مبلغ العملية" / balances via word boundary-ish
-            "مبلغ" to Regex("""(?<![\p{L}])مبلغ(?!\s*العملية)(?!\s*المتبقي)""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            "مبلغ" to comparisonRegex("""(?<![\p{L}])مبلغ(?!\s*العملية)(?!\s*المتبقي)""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
             // Avoid "Due Amount" / "Available Balance" lines.
-            "amount" to Regex(
+            "amount" to comparisonRegex(
                 """(?<!due\s)(?<![\p{L}])amount""" + MoneyTokens.moneyAfterLabel.pattern,
                 RegexOption.IGNORE_CASE,
             ),
-            "of" to Regex("""(?<![\p{L}])of""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            "of" to comparisonRegex("""(?<![\p{L}])of""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
         )
     }
 }
