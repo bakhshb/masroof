@@ -619,6 +619,7 @@
     <string name="review_reason_parse_review_required">تعذّر تأكيد تفاصيل الرسالة تلقائياً</string>
     <string name="review_reason_invalid_parsed_event">تفاصيل الرسالة لم تجتز التحقق</string>
     <string name="review_reason_unsupported_format">صيغة رسالة بنكية غير مدعومة</string>
+    <string name="review_reason_processing_error">تعذّرت معالجة الرسالة — محفوظة لإعادة المحاولة</string>
     <string name="review_reason_purchase_ownership_unknown">شراء — ملكية البطاقة غير محددة</string>
     <string name="review_reason_purchase_unresolved">شراء — لم يُحدد حساب الدفع</string>
     <string name="review_reason_card_payment_missing">سداد بطاقة — بيانات ناقصة</string>

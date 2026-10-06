@@ -12,6 +12,7 @@ import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
 import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewOwnershipWorkflow
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
@@ -260,6 +261,12 @@ class AppContainer(
             clock = clock,
         )
 
+    val ingestionReviewService: IngestionReviewService =
+        IngestionReviewService(
+            reviewRepository = reviewRepository,
+            clock = clock,
+        )
+
     val manualReviewResolutionRepository: ManualReviewResolutionRepository =
         RoomManualReviewResolutionRepository(
             database = database,
@@ -402,6 +409,7 @@ class AppContainer(
             ownershipDiscovery = ownershipDiscoveryService,
             reconciliation = transactionReconciliationService,
             reviewQueueUpdater = reviewQueueUpdater,
+            ingestionReviewService = ingestionReviewService,
             appLogService = appLogService,
         )
 

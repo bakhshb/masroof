@@ -187,3 +187,14 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - An explicit user correction (`ParsedEventRecord.userCorrected`, set only by
   `EffectiveParsedEventProvider`) lifts the gate for that RawSms.
 - Existing transaction links are preserved; the gate governs creation, not deletion.
+
+### M0.2 — Every recognized-bank RawSms has a durable outcome
+
+- `ProcessRawSmsUseCase` writes a direct REQUIRED `NEEDS_REVIEW` row through
+  `IngestionReviewService` when a persisted recognized-bank RawSms has no
+  automatically usable ParsedEvent: `unsupported_bank_message_format`,
+  `invalid_parsed_event`, `parse_review_required` (event == null), or
+  `processing_error` (parse/persist failure after RawSms insert).
+- These rows are keyed by rawSmsId, never reopen RESOLVED history, and are only
+  auto-resolved when reconciliation later settles the same RawSms.
+- Non-bank SMS is still not persisted and never reviewed.

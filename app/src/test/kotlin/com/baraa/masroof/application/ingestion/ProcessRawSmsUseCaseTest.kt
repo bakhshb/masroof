@@ -694,6 +694,131 @@ class ProcessRawSmsUseCaseTest {
         assertEquals(FinancialTransactionType.EXPENSE, ftRepo.findByRawSmsId(raw.id)!!.type)
     }
 
+    private fun reviewingUseCase(
+        pipeline: SmsParseGateway,
+        reviewRepo: com.baraa.masroof.data.repository.RoomReviewRepository,
+    ) = ProcessRawSmsUseCase(
+        rawSmsRepository = rawRepo,
+        parsedEventRepository = parsedRepo,
+        bankSmsRegistry = alJaziraSmsRegistry(pipeline = pipeline),
+        ingestionReviewService = com.baraa.masroof.application.review.IngestionReviewService(
+            reviewRepo,
+            InstantClock { Instant.parse("2026-08-03T15:00:00Z") },
+        ),
+    )
+
+    private fun assertDirectReview(
+        reviewRepo: com.baraa.masroof.data.repository.RoomReviewRepository,
+        rawSmsId: String,
+        reason: String,
+    ) = runBlocking {
+        val review = reviewRepo.findByRawSmsId(rawSmsId)
+        assertNotNull("expected review for $rawSmsId", review)
+        assertEquals(com.baraa.masroof.domain.model.ReviewStatus.REQUIRED, review!!.status)
+        assertEquals(ReviewKind.NEEDS_REVIEW, review.kind)
+        assertEquals(listOf(reason), review.reasons)
+    }
+
+    @Test
+    fun recognizedBankUnsupported_retainsRawSmsAndCreatesRequiredReview() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val svc = reviewingUseCase(
+            SmsParseGateway { com.baraa.masroof.parsing.model.ParseResult.Unsupported("unsupported_test") },
+            reviewRepo,
+        )
+        val raw = aljaziraPurchase(id = "android-sms:unsupported", deviceId = "unsupported")
+        val result = svc.ingest(raw)
+        assertTrue(result is SmsIngestionResult.Unsupported)
+        assertEquals(raw, rawRepo.getById(raw.id))
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+        assertDirectReview(reviewRepo, raw.id, "unsupported_bank_message_format")
+    }
+
+    @Test
+    fun recognizedBankInvalid_retainsRawSmsAndCreatesRequiredReview() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val svc = reviewingUseCase(
+            SmsParseGateway { com.baraa.masroof.parsing.model.ParseResult.Invalid(findings = emptyList()) },
+            reviewRepo,
+        )
+        val raw = aljaziraPurchase(id = "android-sms:invalid", deviceId = "invalid")
+        assertTrue(svc.ingest(raw) is SmsIngestionResult.Invalid)
+        assertEquals(raw, rawRepo.getById(raw.id))
+        assertDirectReview(reviewRepo, raw.id, "invalid_parsed_event")
+    }
+
+    @Test
+    fun reviewRequiredWithoutEvent_createsRequiredReview() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val svc = reviewingUseCase(
+            SmsParseGateway {
+                com.baraa.masroof.parsing.model.ParseResult.ReviewRequired(
+                    draft = null,
+                    event = null,
+                    findings = emptyList(),
+                    reasons = listOf("no_event"),
+                )
+            },
+            reviewRepo,
+        )
+        val raw = aljaziraPurchase(id = "android-sms:rr-null", deviceId = "rr-null")
+        val result = svc.ingest(raw)
+        assertTrue(result is SmsIngestionResult.ReviewRequired)
+        assertNull((result as SmsIngestionResult.ReviewRequired).event)
+        assertDirectReview(reviewRepo, raw.id, "parse_review_required")
+    }
+
+    @Test
+    fun parserException_afterPersist_createsProcessingErrorReview() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val svc = reviewingUseCase(SmsParseGateway { throw IllegalStateException("boom") }, reviewRepo)
+        val raw = aljaziraPurchase(id = "android-sms:boom", deviceId = "boom")
+        assertTrue(svc.ingest(raw) is SmsIngestionResult.Failed)
+        assertEquals(raw, rawRepo.getById(raw.id))
+        assertDirectReview(reviewRepo, raw.id, "processing_error")
+    }
+
+    @Test
+    fun nonBankSms_isNotPersistedAndCreatesNoReview() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val svc = reviewingUseCase(AlJaziraParsingPipeline(), reviewRepo)
+        val body = "شراء عبر الانترنت بمبلغ: 10.00 SAR"
+        val raw = RawSms(
+            id = "android-sms-live:OtherBank",
+            sender = "OtherBank",
+            body = body,
+            receivedAt = Instant.parse("2026-08-03T08:00:00Z"),
+            deviceMessageId = null,
+            bodyHash = SmsBodyHasher.sha256Hex(body),
+        )
+        assertTrue(svc.ingest(raw) is SmsIngestionResult.NotRelevant)
+        assertEquals(0, db.rawSmsDao().count())
+        assertTrue(reviewRepo.listAll().isEmpty())
+    }
+
+    @Test
+    fun directIngestionReview_survivesFullReconcileRefresh() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val svc = reviewingUseCase(
+            SmsParseGateway { com.baraa.masroof.parsing.model.ParseResult.Unsupported("unsupported_test") },
+            reviewRepo,
+        )
+        val raw = aljaziraPurchase(id = "android-sms:survive", deviceId = "survive")
+        svc.ingest(raw)
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val cards = RoomCardRegistryRepository.from(db)
+        val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
+        val reconciliation = TransactionReconciliationService(
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
+            financialTransactionRepository = ftRepo,
+            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
+        )
+        ReviewQueueUpdater(reviewRepo, ftRepo, InstantClock.System)
+            .applyReport(reconciliation.reconcileStoredEventsDetailed())
+        assertDirectReview(reviewRepo, raw.id, "unsupported_bank_message_format")
+    }
+
     private fun aljaziraPurchase(id: String, deviceId: String): RawSms {
         val body = """
             شراء عبر الانترنت

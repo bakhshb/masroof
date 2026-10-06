@@ -3,6 +3,7 @@ package com.baraa.masroof.application.ingestion
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.ReconciliationReport
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
@@ -31,6 +32,10 @@ import java.time.Duration
  * Optional [ownershipDiscovery], [reconciliation], and [reviewQueueUpdater] run
  * after a ParsedEvent is saved. Failures in those derived steps do not roll back
  * RawSms/ParsedEvent (or already-persisted FinancialTransactions).
+ *
+ * Every persisted recognized-bank RawSms ends in a durable outcome: a ParsedEvent
+ * (processed / non-financial / review via reconciliation) or, when no usable
+ * ParsedEvent exists, a direct [IngestionReviewService] review row.
  */
 class ProcessRawSmsUseCase(
     private val rawSmsRepository: RawSmsRepository,
@@ -39,6 +44,7 @@ class ProcessRawSmsUseCase(
     private val ownershipDiscovery: OwnershipDiscoveryService? = null,
     private val reconciliation: TransactionReconciliationService? = null,
     private val reviewQueueUpdater: ReviewQueueUpdater? = null,
+    private val ingestionReviewService: IngestionReviewService? = null,
     private val appLogService: AppLogService? = null,
 ) {
     private val insertMutex = Mutex()
@@ -156,6 +162,7 @@ class ProcessRawSmsUseCase(
             if (logOutcome) {
                 logIngestFailure(rawSms, message)
             }
+            recordIngestionReview(rawSms.id, IngestionReviewService.REASON_PROCESSING_ERROR)
             return SmsIngestionResult.Failed(
                 rawSmsId = rawSms.id,
                 message = message,
@@ -172,6 +179,7 @@ class ProcessRawSmsUseCase(
             if (logOutcome) {
                 logIngestFailure(rawSms, message)
             }
+            recordIngestionReview(rawSms.id, IngestionReviewService.REASON_PROCESSING_ERROR)
             SmsIngestionResult.Failed(
                 rawSmsId = rawSms.id,
                 message = message,
@@ -218,6 +226,7 @@ class ProcessRawSmsUseCase(
                             "Invalid parse from ${AppLogFormatting.maskSender(rawSms.sender)}",
                         )
                     }
+                    recordIngestionReview(rawSms.id, IngestionReviewService.REASON_INVALID_PARSED_EVENT)
                     SmsIngestionResult.Invalid(
                         rawSmsId = rawSms.id,
                         findings = parseResult.findings,
@@ -232,11 +241,14 @@ class ProcessRawSmsUseCase(
                     if (logOutcome) {
                         logParsedOutcome(rawSms, parseResult.event.messageFamily, "review_required")
                     }
-                } else if (logOutcome) {
-                    appLogService?.info(
-                        AppLogCategories.INGEST,
-                        "Review required from ${AppLogFormatting.maskSender(rawSms.sender)}",
-                    )
+                } else {
+                    if (logOutcome) {
+                        appLogService?.info(
+                            AppLogCategories.INGEST,
+                            "Review required from ${AppLogFormatting.maskSender(rawSms.sender)}",
+                        )
+                    }
+                    recordIngestionReview(rawSms.id, IngestionReviewService.REASON_PARSE_REVIEW_REQUIRED)
                 }
                 SmsIngestionResult.ReviewRequired(
                     rawSmsId = rawSms.id,
@@ -274,6 +286,7 @@ class ProcessRawSmsUseCase(
                         "Unsupported message from ${AppLogFormatting.maskSender(rawSms.sender)} (${parseResult.reason})",
                     )
                 }
+                recordIngestionReview(rawSms.id, IngestionReviewService.REASON_UNSUPPORTED_FORMAT)
                 SmsIngestionResult.Unsupported(
                     rawSmsId = rawSms.id,
                     reason = parseResult.reason,
@@ -287,12 +300,24 @@ class ProcessRawSmsUseCase(
                         "Invalid parse from ${AppLogFormatting.maskSender(rawSms.sender)}",
                     )
                 }
+                recordIngestionReview(rawSms.id, IngestionReviewService.REASON_INVALID_PARSED_EVENT)
                 SmsIngestionResult.Invalid(
                     rawSmsId = rawSms.id,
                     findings = parseResult.findings,
                 )
             }
         }
+
+    private suspend fun recordIngestionReview(rawSmsId: String, reason: String) {
+        val service = ingestionReviewService ?: return
+        try {
+            service.requireReview(rawSmsId, reason)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Review persistence must not fail evidence ingestion; RawSms stays for reparse.
+        }
+    }
 
     private fun logParsedOutcome(
         rawSms: RawSms,

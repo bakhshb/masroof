@@ -531,6 +531,10 @@ This prevents financial logic from being embedded in parsing code.
 
 Only an explicit user correction lifts the gate for one RawSms.
 
+Every persisted recognized-bank RawSms ends in a durable outcome: processed,
+non-financial, review-required, or processing-error. When no usable ParsedEvent
+exists, ingestion writes the review row directly (`IngestionReviewService`).
+
 ---
 
 ## 18. Review Queue
