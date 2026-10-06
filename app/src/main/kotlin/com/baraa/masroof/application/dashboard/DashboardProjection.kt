@@ -34,6 +34,10 @@ data class DashboardProjection(
     val transactionLoanInvolvement: Map<String, Set<String>> = emptyMap(),
     val transactionDebitSpendInvolvement: Map<String, Set<String>> = emptyMap(),
     val transactions: List<FinancialTransaction>,
+    /** Transaction id → display facts for [transactions]. */
+    val transactionFacts: Map<String, DashboardTransactionFacts> = emptyMap(),
+    /** Container ids of owned registry accounts, for account filtering. */
+    val ownedAccountContainerIds: Set<String> = emptySet(),
     val meta: DashboardMeta,
     val accountRegistry: List<AccountRegistryEntry>,
     val cardRegistry: List<CardRegistryEntry>,
@@ -58,6 +62,8 @@ data class DashboardProjection(
             transactionCardInvolvement = transactionCardInvolvement,
             transactionLoanInvolvement = transactionLoanInvolvement,
             transactionDebitSpendInvolvement = transactionDebitSpendInvolvement,
+            transactionFacts = transactionFacts,
+            ownedAccountContainerIds = ownedAccountContainerIds,
             isCurrentPeriod = isCurrentPeriod,
         )
 }

@@ -616,6 +616,11 @@
     <string name="review_reason_unknown_family">نوع الرسالة غير معروف</string>
     <string name="review_reason_missing_amount">المبلغ غير موجود</string>
     <string name="review_reason_needs_review">يحتاج مراجعة يدوية</string>
+    <string name="review_reason_parse_review_required">تعذّر تأكيد تفاصيل الرسالة تلقائياً</string>
+    <string name="review_reason_invalid_parsed_event">تفاصيل الرسالة لم تجتز التحقق</string>
+    <string name="review_reason_unsupported_format">صيغة رسالة بنكية غير مدعومة</string>
+    <string name="review_reason_processing_error">تعذّرت معالجة الرسالة — محفوظة لإعادة المحاولة</string>
+    <string name="review_reason_ambiguous_bank_route">المرسل يطابق أكثر من بنك — لم تُحلَّل الرسالة</string>
     <string name="review_reason_purchase_ownership_unknown">شراء — ملكية البطاقة غير محددة</string>
     <string name="review_reason_purchase_unresolved">شراء — لم يُحدد حساب الدفع</string>
     <string name="review_reason_card_payment_missing">سداد بطاقة — بيانات ناقصة</string>
@@ -628,4 +633,5 @@
     <string name="review_error_already_finalized">تمت معالجة الرسالة مسبقاً</string>
     <string name="review_error_parsed_missing">بيانات التحليل غير متوفرة — جرّب إعادة الاستيراد</string>
     <string name="review_error_not_transfer">هذه العملية ليست حوالة</string>
+    <string name="startup_maintenance_blocked">تعذر تجهيز البيانات المالية بأمان. أعد المحاولة قبل عرض الملخص المالي.</string>
 </resources>

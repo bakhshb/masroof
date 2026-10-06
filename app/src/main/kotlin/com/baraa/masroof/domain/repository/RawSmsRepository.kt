@@ -14,9 +14,26 @@ interface RawSmsRepository {
 
     suspend fun getById(id: String): RawSms?
 
+    /** Batch lookup; missing ids are skipped. Result order is unspecified. */
+    suspend fun getByIds(ids: Collection<String>): List<RawSms> =
+        ids.distinct().mapNotNull { getById(it) }
+
     suspend fun existsById(id: String): Boolean
 
     suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms?
+
+    /**
+     * Every stored RawSms id, oldest receipt first. Used by bulk reprocessing so
+     * evidence without a ParsedEvent (Unsupported / Invalid / failed) is retried.
+     */
+    suspend fun listIdsByReceivedAt(): List<String>
+
+    /**
+     * Stored RawSms ids with no durable processing outcome yet (neither a ParsedEvent nor
+     * a review row), oldest receipt first. Captured evidence whose processing was lost to
+     * process death is found here and rescheduled.
+     */
+    suspend fun listIdsAwaitingProcessing(): List<String> = emptyList()
 
     /**
      * Live↔historical near-duplicate: same sender + bodyHash within

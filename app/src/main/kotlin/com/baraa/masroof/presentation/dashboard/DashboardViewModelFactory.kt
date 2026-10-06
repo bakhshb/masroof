@@ -33,6 +33,7 @@ class DashboardViewModelFactory(
             appLocaleRepository = container.appLocaleRepository,
             appLogService = container.appLogService,
             zoneId = zoneId,
+            maintenanceCompletions = container.maintenanceCompletionSignal.completions,
         ) as T
     }
 }

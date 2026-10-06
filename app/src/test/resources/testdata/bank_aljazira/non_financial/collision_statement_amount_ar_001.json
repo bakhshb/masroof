@@ -1,0 +1,12 @@
+{
+  "id": "collision_statement_amount_ar_001",
+  "sender": "AlJazira",
+  "body": "إصدار كشف حساب بطاقة ائتمانية\nبطاقة: **7271\nالمبلغ المستحق: 1,250.00 SAR\nالحد الأدنى: 125.00 SAR\nتاريخ الاستحقاق: 2026-08-25",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "NON_FINANCIAL",
+    "parseStatus": "NON_FINANCIAL",
+    "cardSmsChannel": "STATEMENT"
+  },
+  "notes": "Collision: statement + amount wording. Quoted due amounts do not make a statement a money movement."
+}

@@ -108,6 +108,104 @@ class PackageDependencyRulesTest {
     }
 
     @Test
+    fun presentation_navigation_doesNotConstructFinancialContainerIds() {
+        assertPackagesDoNotImport(
+            packages = listOf("presentation/navigation"),
+            forbiddenImports = listOf("com.baraa.masroof.domain.ids.", "FinancialContainerIdFactory"),
+        )
+    }
+
+    @Test
+    fun presentation_viewModels_consumePreparedFinancialFacts() {
+        assertFilesDoNotImport(
+            files = kotlinFilesIn("presentation").filter { it.name.endsWith("ViewModel.kt") },
+            forbiddenImports = listOf(
+                "com.baraa.masroof.domain.ids.",
+                "FinancialContainerIdFactory",
+                "FinancialContainerIdParser",
+                "ForeignPurchaseSarConverter",
+                "TransactionSarEquivalentResolver",
+                "AppliedExchangeRateSyncer",
+                "CardTransactionInvolvementResolver",
+                "LoanRepaymentAttribution",
+                "DebitCardSpendClassifier",
+                "DashboardTransactionFactsBuilder",
+                ".convertsToSar(",
+            ),
+        )
+    }
+
+    @Test
+    fun parsing_validationFirewall_doesNotResolveOwnershipOrTransactionMeaning() {
+        listOf("parsing/validator", "parsing/finalize").forEach { pkg ->
+            assertTrue("$pkg must exist", kotlinFilesIn(pkg).isNotEmpty())
+        }
+        assertPackagesDoNotImport(
+            packages = listOf("parsing/validator", "parsing/finalize"),
+            forbiddenImports = listOf(
+                "import com.baraa.masroof.domain.ownership.",
+                "import com.baraa.masroof.domain.assembly.",
+                "import com.baraa.masroof.domain.matching.",
+                "import com.baraa.masroof.domain.repository.",
+                "import com.baraa.masroof.domain.model.FinancialTransactionType",
+                "import com.baraa.masroof.domain.model.TransferOwnershipType",
+            ),
+        )
+    }
+
+    @Test
+    fun liveSmsWork_isExecutionAdapterOnly() {
+        val files = listOf("LiveSmsProcessingWorker.kt", "LiveSmsWorkScheduler.kt")
+            .map { File(sourceRoot, "application/sms/$it") }
+        files.forEach { assertTrue("${it.path} must exist", it.isFile) }
+        assertFilesDoNotImport(
+            files = files,
+            forbiddenImports = listOf(
+                "import com.baraa.masroof.bank.",
+                "import com.baraa.masroof.parsing.",
+                "import com.baraa.masroof.data.",
+                "import com.baraa.masroof.domain.ownership.",
+                "import com.baraa.masroof.domain.assembly.",
+                "import com.baraa.masroof.domain.matching.",
+                "import com.baraa.masroof.application.transaction.",
+            ),
+        )
+    }
+
+    @Test
+    fun dashboardProjection_isReadOnly() {
+        val files = listOf(
+            "DashboardService.kt",
+            "DashboardProjectionBuilder.kt",
+            "DashboardEvidenceScope.kt",
+            "AppliedExchangeRateSyncer.kt",
+            "AnalysisDashboardProjection.kt",
+            "AccountsDashboardProjection.kt",
+            "CardsDashboardProjection.kt",
+            "CommitmentsDashboardProjection.kt",
+        ).map { File(sourceRoot, "application/dashboard/$it") }
+        val writeCalls = listOf(
+            ".save(",
+            ".update(",
+            ".updateAppliedExchangeRate(",
+            ".replaceExclusiveStaleLinks(",
+            ".deleteIfExclusiveRawSmsLink(",
+            ".unlinkRawSms(",
+            ".linkRawSmsIfAbsent(",
+        )
+        files.forEach { file ->
+            assertTrue("${file.path} must exist", file.isFile)
+            val source = file.readText()
+            writeCalls.forEach { call ->
+                assertFalse(
+                    "${file.path} must not call '$call'; persist enrichment in an application workflow",
+                    source.contains(call),
+                )
+            }
+        }
+    }
+
+    @Test
     fun domain_loan_hasNoProductionSources() {
         val productionSources = kotlinFilesIn("domain/loan")
         assertTrue(

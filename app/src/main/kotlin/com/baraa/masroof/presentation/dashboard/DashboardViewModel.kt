@@ -12,21 +12,18 @@ import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
 import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
 import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
 import com.baraa.masroof.application.dashboard.DashboardSalaryPeriod
-import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
 import com.baraa.masroof.application.dashboard.CommitmentsOverview
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.DashboardSectionId
 import com.baraa.masroof.application.dashboard.DashboardSectionSize
-import com.baraa.masroof.application.dashboard.ForeignPurchaseSarConverter
+import com.baraa.masroof.application.dashboard.DashboardTransactionFacts
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.transaction.IgnoreResult
 import com.baraa.masroof.application.transaction.ReclassificationResult
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -36,9 +33,11 @@ import com.baraa.masroof.application.onboarding.userOutcome
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.baraa.masroof.presentation.locale.AppLocaleContext
@@ -61,6 +60,7 @@ class DashboardViewModel(
     private val appLocaleRepository: AppLocaleRepository,
     private val appLogService: AppLogService? = null,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
+    maintenanceCompletions: Flow<Unit> = emptyFlow(),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
@@ -86,6 +86,11 @@ class DashboardViewModel(
     init {
         val savedLayout = layoutPreferencesRepository.load()
         _uiState.update { it.copy(dashboardLayout = savedLayout) }
+        viewModelScope.launch {
+            maintenanceCompletions.collect {
+                if (_uiState.value.period != null) refresh()
+            }
+        }
     }
 
     fun openCustomizeSheet() {
@@ -512,11 +517,7 @@ class DashboardViewModel(
                     return@launch
                 }
                 val previews = overview.transactions.map { tx ->
-                    toPreview(
-                        tx = tx,
-                        cardInvolvement = overview.transactionCardInvolvement,
-                        loanInvolvement = overview.transactionLoanInvolvement,
-                    )
+                    toPreview(tx = tx, facts = overview.transactionFacts[tx.id])
                 }
                 val (loadedLabel, loadedHint) = periodPresentation(overview.period)
                 _uiState.update {
@@ -548,6 +549,7 @@ class DashboardViewModel(
                         unknownCards = unknownCards,
                         ownedCards = ownedCards,
                         ownedAccounts = ownedAccounts,
+                        ownedAccountContainerIds = overview.ownedAccountContainerIds,
                         committedSourceTransactionIds = committedIds,
                     )
                 }
@@ -598,8 +600,7 @@ class DashboardViewModel(
 
     private fun toPreview(
         tx: FinancialTransaction,
-        cardInvolvement: Map<String, Set<String>>,
-        loanInvolvement: Map<String, Set<String>>,
+        facts: DashboardTransactionFacts?,
     ): TransactionPreviewUi {
         val title = tx.merchant?.takeIf { it.isNotBlank() }
             ?: tx.counterparty?.takeIf { it.isNotBlank() }
@@ -608,29 +609,7 @@ class DashboardViewModel(
             tx.merchant?.trim()?.takeIf { it.isNotEmpty() },
             tx.counterparty?.trim()?.takeIf { it.isNotEmpty() },
         ).joinToString(" ").lowercase(Locale.getDefault())
-        val sarEquivalent = if (tx.amount.currency.convertsToSar() && tx.appliedExchangeRate != null) {
-            ForeignPurchaseSarConverter.foreignToSar(
-                foreignAmount = tx.amount,
-                exchangeRate = tx.appliedExchangeRate,
-                internationalFee = null,
-                targetCurrency = Currency.SAR,
-            )
-        } else {
-            null
-        }
-        val containerCardLast4 = FinancialContainerIdParser.cardLast4FromContainers(
-            sourceContainerId = tx.sourceContainerId,
-            destinationContainerId = tx.destinationContainerId,
-        )
-        val parsedCardLast4 = CardTransactionInvolvementResolver
-            .resolvePrimaryCardKey(tx, cardInvolvement)
-            ?.substringAfter(':', missingDelimiterValue = "")
-            ?.takeIf { it.isNotEmpty() }
-        val effectiveType = if (tx.id in loanInvolvement) {
-            FinancialTransactionType.LOAN_REPAYMENT
-        } else {
-            tx.type
-        }
+        val effectiveType = facts?.effectiveType ?: tx.type
         return TransactionPreviewUi(
             id = tx.id,
             title = title,
@@ -641,11 +620,11 @@ class DashboardViewModel(
             type = tx.type,
             typeLabelResHint = effectiveType,
             direction = TransactionTypePresentation.direction(effectiveType),
-            cardLast4 = containerCardLast4 ?: parsedCardLast4,
+            cardLast4 = facts?.primaryCardLast4,
             sourceContainerId = tx.sourceContainerId,
             destinationContainerId = tx.destinationContainerId,
             searchText = searchText,
-            sarEquivalent = sarEquivalent,
+            sarEquivalent = facts?.sarEquivalent,
             appliedExchangeRate = tx.appliedExchangeRate,
             exchangeRateSource = tx.exchangeRateSource,
         )

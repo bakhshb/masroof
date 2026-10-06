@@ -1,5 +1,7 @@
 package com.baraa.masroof.bank.aljazira
 
+import com.baraa.masroof.bank.BankRoutingResult
+import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.AccountReference
@@ -7,6 +9,7 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.parsing.model.AmountCandidate
 import com.baraa.masroof.parsing.model.AmountSourceKind
@@ -29,6 +32,7 @@ class AlJaziraParserRegressionTest {
     private val pipeline = AlJaziraParsingPipeline()
     private val validator = DefaultParsedEventValidator()
     private val detector = AlJaziraBankDetector()
+    private val registry = BankSmsRegistry(listOf(AlJaziraSmsAdapter()))
 
     @Test
     fun cardLast4BeforeAmount_doesNotBecomeAmount() {
@@ -365,6 +369,7 @@ class AlJaziraParserRegressionTest {
             rawSmsId = "coin-1",
             bank = Bank.BANK_ALJAZIRA,
             messageFamily = MessageFamily.TRANSFER_OUT,
+            direction = MoneyDirection.OUTGOING,
             amount = money,
             sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
             confidence = Confidence(0.9),
@@ -408,6 +413,7 @@ class AlJaziraParserRegressionTest {
             rawSmsId = "same-1",
             bank = Bank.BANK_ALJAZIRA,
             messageFamily = MessageFamily.PURCHASE,
+            direction = MoneyDirection.OUTGOING,
             amount = money,
             merchant = "Shop",
             confidence = Confidence(0.9),
@@ -665,15 +671,8 @@ class AlJaziraParserRegressionTest {
         listOf("JaziraNews", "NotAlJazira", "OtherBank", "MyJaziraService", "jazira").forEach { sender ->
             val detection = detector.detect(sender, "شراء بمبلغ: 10.00 SAR")
             assertTrue("$sender should be Unknown", detection is BankDetectionResult.Unknown)
-            val parse = pipeline.parse(
-                SmsParseInput(
-                    rawSmsId = "near-$sender",
-                    sender = sender,
-                    body = "شراء عبر الانترنت بمبلغ: 10.00 SAR",
-                    receivedAt = Instant.parse("2026-08-10T00:00:00Z"),
-                ),
-            )
-            assertTrue("$sender should be Unsupported", parse is ParseResult.Unsupported)
+            val route = registry.route(sender, "شراء عبر الانترنت بمبلغ: 10.00 SAR")
+            assertTrue("$sender must not route to AlJazira", route is BankRoutingResult.NotMatched)
         }
     }
 
@@ -708,16 +707,29 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
-    fun unrecognizedSender_isUnsupported() {
-        val result = pipeline.parse(
-            SmsParseInput(
-                rawSmsId = "other",
-                sender = "OtherBank",
-                body = "شراء عبر الانترنت بمبلغ: 10.00 SAR",
-                receivedAt = Instant.parse("2026-08-10T00:00:00Z"),
-            ),
+    fun typographyVariantLabels_doNotDegradeMerchantDisplayText() {
+        val result = parse(
+            """
+            شـراء عبر الإنترنت
+            بطاقة: 7271
+            لـدي: مطعم الأصيل
+            بِمبلغ: 51.99 SAR
+            في: 14:32 03-08-2026
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
+        assertEquals(Money.of("51.99", Currency.SAR), result.event.amount)
+        assertEquals("مطعم الأصيل", result.event.merchant)
+    }
+
+    @Test
+    fun unrecognizedSender_isNotRoutedToAlJazira() {
+        val route = registry.route("OtherBank", "شراء عبر الانترنت بمبلغ: 10.00 SAR")
+        assertTrue(route is BankRoutingResult.NotMatched)
+        assertEquals(
+            "sender_not_recognized_as_bank_aljazira",
+            (route as BankRoutingResult.NotMatched).reason,
         )
-        assertTrue(result is ParseResult.Unsupported)
     }
 
     private fun parse(body: String): ParseResult =

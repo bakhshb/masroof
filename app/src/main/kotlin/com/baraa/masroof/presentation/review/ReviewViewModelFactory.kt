@@ -30,6 +30,7 @@ class ReviewViewModelFactory(
                 }
             },
             appLocaleRepository = container.appLocaleRepository,
+            maintenanceCompletions = container.maintenanceCompletionSignal.completions,
         ) as T
     }
 }

@@ -113,6 +113,7 @@ data class DashboardUiState(
     val unknownCards: List<UnknownCardCandidateUi> = emptyList(),
     val ownedCards: List<OwnedCardUi> = emptyList(),
     val ownedAccounts: List<OwnedAccountUi> = emptyList(),
+    val ownedAccountContainerIds: Set<String> = emptySet(),
     val flowDetailGrouping: com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping? = null,
     val transactionAccountInvolvement: Map<String, Set<String>> = emptyMap(),
     val transactionCardInvolvement: Map<String, Set<String>> = emptyMap(),

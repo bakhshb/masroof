@@ -1,35 +1,33 @@
 package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 
 /**
- * Persists resolved exchange rates so dashboard totals stay stable across reloads.
+ * Applies resolved exchange rates to transactions that have no persisted rate yet.
+ *
+ * Pure: the dashboard shows the in-memory SAR equivalent, and persistence belongs to
+ * `ExchangeRateEnrichmentWorkflow`. A transaction that already carries a rate and source
+ * keeps them, so persisted values always win over a fresh resolution.
  */
 object AppliedExchangeRateSyncer {
-    suspend fun sync(
+    fun applyInMemory(
         transactions: List<FinancialTransaction>,
         resolutions: Map<String, SarEquivalentResolution>,
-        repository: FinancialTransactionRepository,
     ): List<FinancialTransaction> {
         if (resolutions.isEmpty()) return transactions
-        val byId = transactions.associateBy { it.id }.toMutableMap()
-        for ((txId, resolution) in resolutions) {
-            val tx = byId[txId] ?: continue
-            if (tx.appliedExchangeRate != null && tx.exchangeRateSource != null) continue
-            val updated = tx.copy(
-                appliedExchangeRate = resolution.exchangeRate,
-                exchangeRateSource = resolution.source,
-            )
-            if (repository.updateAppliedExchangeRate(
-                    id = txId,
-                    exchangeRate = resolution.exchangeRate,
-                    source = resolution.source,
+        return transactions.map { tx ->
+            val resolution = resolutions[tx.id]
+            if (resolution == null || !needsAppliedExchangeRate(tx)) {
+                tx
+            } else {
+                tx.copy(
+                    appliedExchangeRate = resolution.exchangeRate,
+                    exchangeRateSource = resolution.source,
                 )
-            ) {
-                byId[txId] = updated
             }
         }
-        return transactions.map { byId[it.id] ?: it }
     }
+
+    fun needsAppliedExchangeRate(transaction: FinancialTransaction): Boolean =
+        transaction.appliedExchangeRate == null || transaction.exchangeRateSource == null
 }

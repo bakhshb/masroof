@@ -13,20 +13,29 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.presentation.common.MasroofScreenBackground
 import androidx.core.content.ContextCompat
 import com.baraa.masroof.application.backup.BackupPackageFormat
+import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.update.InstallPermissionHelper
 import com.baraa.masroof.presentation.navigation.MasroofRoot
@@ -41,14 +50,17 @@ import com.baraa.masroof.presentation.review.ReviewViewModel
 import com.baraa.masroof.presentation.review.ReviewViewModelFactory
 import com.baraa.masroof.presentation.settings.SettingsViewModel
 import com.baraa.masroof.presentation.settings.SettingsViewModelFactory
+import com.baraa.masroof.presentation.theme.MasroofSpacing
 import com.baraa.masroof.presentation.theme.MasroofTheme
 import com.baraa.masroof.presentation.locale.AppLocaleContext
+import kotlinx.coroutines.launch
 
 /**
  * Launcher: P10 onboarding until complete, then P11 monthly dashboard.
  */
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as MasroofApplication).container }
+    private var startupFinancialReady: Boolean = false
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(
@@ -96,19 +108,52 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            var startupReady by remember { mutableStateOf(false) }
+            var startupOutcome by remember { mutableStateOf<StartupMaintenanceOutcome?>(null) }
+            var startupRetrying by remember { mutableStateOf(false) }
+            val startupScope = rememberCoroutineScope()
             LaunchedEffect(Unit) {
-                container.awaitStartupMaintenance()
-                startupReady = true
+                startupOutcome = container.awaitStartupMaintenance()
+                startupFinancialReady = startupOutcome == StartupMaintenanceOutcome.READY
             }
-            if (!startupReady) {
+            if (startupOutcome != StartupMaintenanceOutcome.READY) {
                 MasroofTheme(darkTheme = isSystemInDarkTheme()) {
                     MasroofScreenBackground(modifier = Modifier.fillMaxSize()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator()
+                        if (startupOutcome == null || startupRetrying) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(MasroofSpacing.screenPaddingLarge),
+                                verticalArrangement = Arrangement.spacedBy(
+                                    MasroofSpacing.sectionGap,
+                                    Alignment.CenterVertically,
+                                ),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.startup_maintenance_blocked),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Button(
+                                    onClick = {
+                                        startupRetrying = true
+                                        startupScope.launch {
+                                            startupOutcome = container.retryStartupMaintenance()
+                                            startupFinancialReady =
+                                                startupOutcome == StartupMaintenanceOutcome.READY
+                                            startupRetrying = false
+                                        }
+                                    },
+                                ) {
+                                    Text(stringResource(R.string.dashboard_retry))
+                                }
+                            }
                         }
                     }
                 }
@@ -219,7 +264,9 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         onboardingViewModel.reloadFromCurrentState()
         settingsViewModel.retryInstallAfterPermissionGranted()
-        if (container.onboardingPreferencesRepository.isOnboardingCompleted()) {
+        if (startupFinancialReady &&
+            container.onboardingPreferencesRepository.isOnboardingCompleted()
+        ) {
             dashboardViewModel.onAppResumed()
             reviewViewModel.refresh()
             settingsViewModel.checkForUpdatesIfStale(silent = true)

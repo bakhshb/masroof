@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira.extraction
 
+import com.baraa.masroof.parsing.normalizer.comparisonRegex
 import com.baraa.masroof.parsing.model.NormalizedSms
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -24,13 +25,13 @@ class DateTimeExtractor {
 
         private val PATTERNS: List<Pair<Regex, DateTimeFormatter>> = listOf(
             // في: 14:32 03-08-2026
-            Regex("""(?:في|on|date)\s*:\s*(\d{2}:\d{2}\s+\d{2}-\d{2}-\d{4})""", RegexOption.IGNORE_CASE) to DMY_HM,
+            comparisonRegex("""(?:في|on|date)\s*:\s*(\d{2}:\d{2}\s+\d{2}-\d{2}-\d{4})""", RegexOption.IGNORE_CASE) to DMY_HM,
             // في: 2026-08-03 16:40 / on: 2026-08-02 12:04 / Date: 2026-08-01 18:20
-            Regex("""(?:في|on|date)\s*:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})""", RegexOption.IGNORE_CASE) to YMD_HM,
+            comparisonRegex("""(?:في|on|date)\s*:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})""", RegexOption.IGNORE_CASE) to YMD_HM,
             // Bare transfer lines sometimes omit the label: 07:36 27-08-2026
-            Regex("""(\d{2}:\d{2}\s+\d{2}-\d{2}-\d{4})""") to DMY_HM,
+            comparisonRegex("""(\d{2}:\d{2}\s+\d{2}-\d{2}-\d{4})""") to DMY_HM,
             // Bare ISO local form: 2026-08-27 07:36
-            Regex("""(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})""") to YMD_HM,
+            comparisonRegex("""(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})""") to YMD_HM,
         )
     }
 }

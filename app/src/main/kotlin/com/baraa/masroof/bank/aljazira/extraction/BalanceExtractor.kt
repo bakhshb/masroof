@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira.extraction
 
+import com.baraa.masroof.parsing.normalizer.comparisonRegex
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.parsing.model.NormalizedSms
 
@@ -29,14 +30,14 @@ class BalanceExtractor {
 
     companion object {
         private val AVAILABLE_PATTERNS = listOf(
-            Regex("""الرصيد\s*المتاح""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
-            Regex("""available\s*balance(?:\s*is)?""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            comparisonRegex("""الرصيد\s*المتاح""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            comparisonRegex("""available\s*balance(?:\s*is)?""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
         )
 
         private val OUTSTANDING_PATTERNS = listOf(
-            Regex("""إجمالي\s*المبلغ\s*المستحق""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
-            Regex("""المبلغ\s*المتبقي""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
-            Regex("""due\s*amount""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            comparisonRegex("""إجمالي\s*المبلغ\s*المستحق""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            comparisonRegex("""المبلغ\s*المتبقي""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
+            comparisonRegex("""due\s*amount""" + MoneyTokens.moneyAfterLabel.pattern, RegexOption.IGNORE_CASE),
         )
     }
 }

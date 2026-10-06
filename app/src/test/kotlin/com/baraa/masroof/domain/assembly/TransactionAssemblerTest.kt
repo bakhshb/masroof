@@ -277,6 +277,113 @@ class TransactionAssemblerTest {
         )
     }
 
+    @Test
+    fun reviewRequiredPurchaseWithAmount_needsReview_notExpense() {
+        val outcome = TransactionAssembler.assembleSingle(
+            event = event(
+                family = MessageFamily.PURCHASE,
+                amount = money("51.99"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+            receivedAt = receivedAt,
+            sourceOwnership = OwnershipStatus.UNKNOWN,
+            destinationOwnership = OwnershipStatus.UNKNOWN,
+            cardOwnership = OwnershipStatus.OWNED,
+        )
+        assertEquals(
+            TransactionAssembler.Outcome.NeedsReview(listOf("parse_review_required")),
+            outcome,
+        )
+    }
+
+    @Test
+    fun nonSuccessStatuses_mapToDurableReasons_andNeverAssemble() {
+        val expected = mapOf(
+            ParseStatus.PARTIAL to listOf("parse_partial"),
+            ParseStatus.INVALID to listOf("invalid_parsed_event"),
+            ParseStatus.UNSUPPORTED to listOf("unsupported_bank_message_format"),
+            ParseStatus.REVIEW_REQUIRED to listOf("parse_review_required", "missing_amount"),
+        )
+        for ((status, reasons) in expected) {
+            val outcome = TransactionAssembler.assembleSingle(
+                event = event(
+                    family = MessageFamily.FEE,
+                    amount = if (status == ParseStatus.REVIEW_REQUIRED) null else money("1.00"),
+                    source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                    status = status,
+                ),
+                receivedAt = receivedAt,
+                sourceOwnership = OwnershipStatus.OWNED,
+                destinationOwnership = OwnershipStatus.UNKNOWN,
+                cardOwnership = OwnershipStatus.UNKNOWN,
+            )
+            assertEquals("status=$status", TransactionAssembler.Outcome.NeedsReview(reasons), outcome)
+        }
+    }
+
+    @Test
+    fun reviewRequiredTransfer_isNotPendingMatch() {
+        val outcome = TransactionAssembler.assembleSingle(
+            event = event(
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("500.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.UNKNOWN, "6810"),
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+            receivedAt = receivedAt,
+            sourceOwnership = OwnershipStatus.OWNED,
+            destinationOwnership = OwnershipStatus.UNKNOWN,
+            cardOwnership = OwnershipStatus.UNKNOWN,
+        )
+        assertTrue(outcome is TransactionAssembler.Outcome.NeedsReview)
+    }
+
+    @Test
+    fun nonFinancialStatus_isIgnored() {
+        val outcome = TransactionAssembler.assembleSingle(
+            event = event(
+                family = MessageFamily.PURCHASE,
+                amount = money("51.99"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                status = ParseStatus.NON_FINANCIAL,
+            ),
+            receivedAt = receivedAt,
+            sourceOwnership = OwnershipStatus.UNKNOWN,
+            destinationOwnership = OwnershipStatus.UNKNOWN,
+            cardOwnership = OwnershipStatus.OWNED,
+        )
+        assertEquals(TransactionAssembler.Outcome.Ignored, outcome)
+    }
+
+    @Test
+    fun userConfirmedReviewRequiredPurchase_assemblesExpense() {
+        val outcome = TransactionAssembler.assembleSingle(
+            event = event(
+                family = MessageFamily.PURCHASE,
+                amount = money("51.99"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+            receivedAt = receivedAt,
+            sourceOwnership = OwnershipStatus.UNKNOWN,
+            destinationOwnership = OwnershipStatus.UNKNOWN,
+            cardOwnership = OwnershipStatus.OWNED,
+            userConfirmed = true,
+        ) as TransactionAssembler.Outcome.Assembled
+        assertEquals(FinancialTransactionType.EXPENSE, outcome.transaction.type)
+    }
+
+    @Test
+    fun automationEligibility_onlySuccessOrUserConfirmed() {
+        for (status in ParseStatus.entries) {
+            val e = event(family = MessageFamily.PURCHASE, amount = money("1.00"), status = status)
+            assertEquals(status == ParseStatus.SUCCESS, TransactionAssembler.isAutomationEligible(e))
+            assertTrue(TransactionAssembler.isAutomationEligible(e, userConfirmed = true))
+        }
+    }
+
     private fun money(v: String) = Money.of(BigDecimal(v), Currency.SAR)
 
     private fun transferCandidate(
@@ -299,6 +406,7 @@ class TransactionAssemblerTest {
         destination: AccountReference? = null,
         card: CardReference? = null,
         channel: PurchaseChannel? = null,
+        status: ParseStatus = ParseStatus.SUCCESS,
     ) = ParsedEvent(
         id = "pe-1",
         rawSmsId = "sms-1",
@@ -315,6 +423,6 @@ class TransactionAssemblerTest {
         occurredAt = receivedAt,
         bankNetworkType = null,
         confidence = Confidence(1.0),
-        parseStatus = ParseStatus.SUCCESS,
+        parseStatus = status,
     )
 }

@@ -1,0 +1,15 @@
+{
+  "id": "collision_titled_fee_transfer_ar_001",
+  "sender": "AlJazira",
+  "body": "رسوم حوالة صادرة\nخصمت من حساب: 3002\nبمبلغ: 5.75 SAR\nفي: 2026-08-02 09:16",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "UNKNOWN",
+    "amount": "5.75",
+    "currency": "SAR",
+    "sourceAccountLast4": "3002",
+    "occurredAt": "2026-08-02T09:16:00",
+    "parseStatus": "REVIEW_REQUIRED"
+  },
+  "notes": "Collision: fee-titled message that also carries transfer wording. Both are movement-tier candidates of different families, so it fails safe to review."
+}

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
@@ -14,6 +15,8 @@ import com.baraa.masroof.application.dashboard.CurrentAccountFlowDetailGrouping
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.DashboardSectionId
+import com.baraa.masroof.application.dashboard.DashboardTransactionFacts
+import com.baraa.masroof.application.dashboard.DashboardTransactionFactsBuilder
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.SpendingSplitSummary
@@ -87,6 +90,94 @@ class DashboardViewModelTest {
         assertTrue(loader.calls.isEmpty())
         assertNull(vm.uiState.value.summary)
         assertNull(vm.uiState.value.period)
+    }
+
+    @Test
+    fun maintenanceCompletion_reloadsLoadedDashboardOnly() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        val signal = MaintenanceCompletionSignal()
+        val vm = viewModel(loader, maintenanceCompletions = signal.completions)
+        advanceUntilIdle()
+
+        signal.notifyCompleted()
+        advanceUntilIdle()
+        assertTrue(loader.calls.isEmpty())
+        assertNull(vm.uiState.value.period)
+
+        vm.refresh()
+        advanceUntilIdle()
+        assertEquals(1, loader.calls.size)
+
+        loader.put(currentPeriod, overview(currentPeriod, spending = "140.00"))
+        signal.notifyCompleted()
+        advanceUntilIdle()
+
+        assertEquals(listOf(currentPeriod, currentPeriod), loader.calls)
+        assertEquals(Money.of("140.00", Currency.SAR), vm.uiState.value.summary!!.spendingGross)
+    }
+
+    @Test
+    fun previews_renderApplicationFactsWithoutReinterpreting() = runTest {
+        val tx = foreignTransaction()
+        val loader = FakeLoader()
+        loader.put(
+            currentPeriod,
+            overview(currentPeriod, spending = "100.00").copy(
+                transactions = listOf(tx),
+                transactionCardInvolvement = mapOf(tx.id to setOf("${Bank.BANK_ALJAZIRA.id}:2210")),
+                transactionFacts = mapOf(
+                    tx.id to DashboardTransactionFacts(
+                        primaryCardLast4 = "9999",
+                        effectiveType = FinancialTransactionType.LOAN_REPAYMENT,
+                        sarEquivalent = Money.of("1.00", Currency.SAR),
+                    ),
+                ),
+                ownedAccountContainerIds = setOf("account:aljazira:3001"),
+            ),
+        )
+        val vm = viewModel(loader)
+        vm.refresh()
+        advanceUntilIdle()
+
+        val preview = vm.uiState.value.allTransactions.single()
+        assertEquals("9999", preview.cardLast4)
+        assertEquals(FinancialTransactionType.EXPENSE, preview.type)
+        assertEquals(FinancialTransactionType.LOAN_REPAYMENT, preview.typeLabelResHint)
+        assertEquals(TransactionTypePresentation.direction(FinancialTransactionType.LOAN_REPAYMENT), preview.direction)
+        assertEquals(Money.of("1.00", Currency.SAR), preview.sarEquivalent)
+        assertEquals(setOf("account:aljazira:3001"), vm.uiState.value.ownedAccountContainerIds)
+    }
+
+    @Test
+    fun previews_fromOverviewInvolvement_keepFormerRowFacts() = runTest {
+        val tx = foreignTransaction()
+        val loader = FakeLoader()
+        loader.put(
+            currentPeriod,
+            overview(currentPeriod, spending = "100.00").copy(
+                transactions = listOf(tx),
+                transactionCardInvolvement = mapOf(tx.id to setOf("${Bank.BANK_ALJAZIRA.id}:2210")),
+                transactionLoanInvolvement = mapOf(tx.id to setOf("loan:aljazira:PERSONAL")),
+            ).let {
+                it.copy(
+                    transactionFacts = DashboardTransactionFactsBuilder.build(
+                        transactions = it.transactions,
+                        cardInvolvement = it.transactionCardInvolvement,
+                        loanInvolvement = it.transactionLoanInvolvement,
+                    ),
+                )
+            },
+        )
+        val vm = viewModel(loader)
+        vm.refresh()
+        advanceUntilIdle()
+
+        val preview = vm.uiState.value.allTransactions.single()
+        assertEquals("2210", preview.cardLast4)
+        assertEquals(FinancialTransactionType.LOAN_REPAYMENT, preview.typeLabelResHint)
+        assertEquals(Money.of("37.50", Currency.SAR), preview.sarEquivalent)
+        assertEquals(java.math.BigDecimal("3.75"), preview.appliedExchangeRate)
     }
 
     @Test
@@ -520,6 +611,21 @@ class DashboardViewModelTest {
         )
     }
 
+    private fun foreignTransaction() = FinancialTransaction(
+        id = "tx-usd",
+        type = FinancialTransactionType.EXPENSE,
+        amount = Money.of("10.00", Currency.USD),
+        occurredAt = Instant.parse("2026-08-10T09:00:00Z"),
+        sourceContainerId = "account:aljazira:3001",
+        destinationContainerId = null,
+        merchant = "SPOTIFY",
+        counterparty = null,
+        categoryId = null,
+        linkedParsedEventIds = emptyList(),
+        appliedExchangeRate = java.math.BigDecimal("3.75"),
+        exchangeRateSource = com.baraa.masroof.domain.model.ExchangeRateSource.SMS,
+    )
+
     private fun emptyCreditFacilities(): CreditFacilitiesOverview =
         CreditFacilitiesOverview(
             facilities = emptyList(),
@@ -625,6 +731,7 @@ class DashboardViewModelTest {
         permissionGranted: Boolean = true,
         permissionStateProvider: () -> Boolean = { permissionGranted },
         rescanService: suspend () -> HistoricalImportResult = { HistoricalImportResult() },
+        maintenanceCompletions: kotlinx.coroutines.flow.Flow<Unit> = kotlinx.coroutines.flow.emptyFlow(),
         smsEvidenceLoader: TransactionSmsEvidenceLoader = TransactionSmsEvidenceLoader(
             financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
                 override suspend fun save(
@@ -660,6 +767,7 @@ class DashboardViewModelTest {
                 override suspend fun getById(id: String) = null
                 override suspend fun existsById(id: String) = false
                 override suspend fun findByDeviceMessageId(deviceMessageId: String) = null
+                override suspend fun listIdsByReceivedAt(): List<String> = emptyList()
                 override suspend fun findCrossSourceNearDuplicate(
                     sender: String,
                     bodyHash: String,
@@ -839,6 +947,7 @@ class DashboardViewModelTest {
             appContext = appContext,
             appLocaleRepository = FakeAppLocaleRepository(),
             zoneId = zone,
+            maintenanceCompletions = maintenanceCompletions,
         )
 
     private class FakeAppLocaleRepository : AppLocaleRepository {

@@ -1,6 +1,5 @@
 package com.baraa.masroof.application.sms
 
-import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
@@ -41,17 +40,18 @@ sealed interface SmsScanFailure {
 }
 
 /**
- * Historical inbox scan → shared [ProcessRawSmsUseCase].
+ * Historical inbox scan → [HistoricalSmsBatchProcessor].
  *
- * Processes rows incrementally (oldest → newest). Catches permission/provider
+ * Captures and parses rows oldest → newest, then runs one derived pass (ownership
+ * discovery, reconciliation, review refresh) for the batch. Catches permission/provider
  * failures from both sequence creation and lazy iteration, preserving partial
- * counters when failure occurs mid-scan.
+ * counters when failure occurs mid-scan; evidence already stored by a failed scan
+ * still gets its derived pass.
  */
 class HistoricalSmsScanner(
     private val dataSource: SmsDataSource,
-    private val processRawSms: ProcessRawSmsUseCase,
+    private val batchProcessor: HistoricalSmsBatchProcessor,
     private val appLogService: AppLogService? = null,
-    private val onScanComplete: (suspend () -> Unit)? = null,
 ) {
     suspend fun scan(receivedAfter: Instant? = null): SmsScanResult {
         appLogService?.info(
@@ -85,6 +85,17 @@ class HistoricalSmsScanner(
             failure = failure,
         )
 
+        val batch = batchProcessor.startBatch()
+
+        suspend fun finishAfterFailure(failure: SmsScanFailure): SmsScanResult {
+            if (batch.storedEventCount > 0) {
+                batch.finish()
+            }
+            val result = snapshot(failure)
+            logScanFinished(result)
+            return result
+        }
+
         try {
             val rows = dataSource.queryInbox(receivedAfter)
             for (row in rows) {
@@ -102,7 +113,7 @@ class HistoricalSmsScanner(
                             continue
                         }
 
-                        when (val outcome = processRawSms.ingest(rawSms, logOutcome = false)) {
+                        when (val outcome = batch.ingest(rawSms)) {
                             is SmsIngestionResult.Duplicate -> duplicates++
                             is SmsIngestionResult.NotRelevant -> notRelevant++
                             is SmsIngestionResult.Parsed -> {
@@ -138,19 +149,13 @@ class HistoricalSmsScanner(
                 }
             }
         } catch (_: SmsPermissionException) {
-            val result = snapshot(SmsScanFailure.PermissionDenied)
-            logScanFinished(result)
-            return result
+            return finishAfterFailure(SmsScanFailure.PermissionDenied)
         } catch (e: SmsProviderException) {
-            val result = snapshot(SmsScanFailure.ProviderError(e.message ?: "provider_error"))
-            logScanFinished(result)
-            return result
+            return finishAfterFailure(SmsScanFailure.ProviderError(e.message ?: "provider_error"))
         }
 
+        batch.finish()
         val result = snapshot(failure = null)
-        if (result.failure == null) {
-            onScanComplete?.invoke()
-        }
         logScanFinished(result)
         return result
     }

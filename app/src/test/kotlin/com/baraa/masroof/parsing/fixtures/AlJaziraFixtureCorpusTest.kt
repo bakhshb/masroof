@@ -106,6 +106,30 @@ class AlJaziraFixtureCorpusTest {
     }
 
     @Test
+    fun classificationCollisionFixtures_arePresent() {
+        val byId = fixtures.associateBy { it.id }
+        val required = mapOf(
+            "collision_transfer_fee_line_ar_001" to "TRANSFER_OUT",
+            "collision_titled_fee_transfer_ar_001" to "UNKNOWN",
+            "collision_transfer_in_and_out_ar_001" to "UNKNOWN",
+            "collision_otp_online_purchase_en_001" to "OTP",
+            "collision_otp_online_purchase_ar_001" to "OTP",
+            "collision_statement_amount_ar_001" to "NON_FINANCIAL",
+            "collision_refund_pos_purchase_ar_001" to "REFUND",
+            "collision_intra_generic_labels_ar_001" to "TRANSFER_OUT",
+            "collision_intra_generic_labels_ar_002" to "TRANSFER_OUT",
+        )
+        required.forEach { (id, family) ->
+            val fixture = byId[id]
+            assertNotNull(id, fixture)
+            assertEquals(id, family, fixture!!.expected.messageFamily)
+        }
+        required.filterValues { it == "UNKNOWN" }.keys.forEach { id ->
+            assertEquals(id, "REVIEW_REQUIRED", byId.getValue(id).expected.parseStatus)
+        }
+    }
+
+    @Test
     fun fixtureSchema_canExpressDashboardParseFacts() {
         val salary = fixtures.first { it.id == "transfer_in_salary_ar_001" }
         assertEquals(true, salary.expected.salaryIncomeWording)

@@ -1,5 +1,7 @@
 package com.baraa.masroof.bank.aljazira
 
+import com.baraa.masroof.bank.BankRoutingResult
+import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
@@ -12,11 +14,16 @@ import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.domain.model.TransferOwnershipType
 import com.baraa.masroof.parsing.fixtures.AlJaziraFixture
 import com.baraa.masroof.parsing.fixtures.AlJaziraFixtureLoader
+import com.baraa.masroof.parsing.detector.BankDetector
+import com.baraa.masroof.parsing.model.BankDetectionResult
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.SmsParseInput
+import com.baraa.masroof.parsing.finalize.ParseFinalizer
+import com.baraa.masroof.parsing.validator.AutomaticUsePolicy
+import com.baraa.masroof.parsing.validator.DefaultParsedEventValidator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -26,14 +33,43 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import java.math.BigDecimal
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(Parameterized::class)
 class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
 
     private val pipeline = AlJaziraParsingPipeline()
+
+    @Test
+    fun routesThroughRegistry_andAdapterParsesIdenticallyWithoutRedetecting() {
+        val detectCalls = AtomicInteger(0)
+        val countingDetector = object : BankDetector {
+            override fun detect(sender: String, body: String): BankDetectionResult {
+                detectCalls.incrementAndGet()
+                return AlJaziraBankDetector().detect(sender, body)
+            }
+        }
+        val adapter = AlJaziraSmsAdapter(detector = countingDetector)
+        val route = BankSmsRegistry(listOf(adapter)).route(fixture.sender, fixture.body)
+        assertTrue("${fixture.id} must route to AlJazira, got $route", route is BankRoutingResult.Matched)
+        assertEquals(1, detectCalls.get())
+
+        val input = SmsParseInput(
+            rawSmsId = fixture.id,
+            sender = fixture.sender,
+            body = fixture.body,
+            receivedAt = Instant.parse("2026-08-10T00:00:00Z"),
+        )
+        val viaAdapter = (route as BankRoutingResult.Matched).adapter.parse(input)
+
+        assertEquals(fixture.id, pipeline.parse(input), viaAdapter)
+        assertEquals("parse must not re-run detection", 1, detectCalls.get())
+    }
 
     @Test
     fun parsesFixtureExpectations() {
@@ -153,6 +189,104 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
         }
     }
 
+    @Test
+    fun validationFirewall_blocksSuccessUnderStricterConfidencePolicy() {
+        val strict = pipelineWith(DefaultParsedEventValidator(AutomaticUsePolicy(minFinancialConfidence = 0.99)))
+        assertFirewall(strict.parse(input()), blockingCode = "V-012")
+    }
+
+    @Test
+    fun validationFirewall_blocksDatedSuccessWhenSmsTimeIsImplausible() {
+        if (fixture.expected.occurredAt == null) return
+        val clockBeforeSms = Clock.fixed(Instant.parse("2020-01-01T00:00:00Z"), ZoneOffset.UTC)
+        val pipeline = pipelineWith(DefaultParsedEventValidator(clock = clockBeforeSms))
+        assertFirewall(pipeline.parse(input()), blockingCode = "V-015")
+    }
+
+    /** SUCCESS fixtures must become REVIEW_REQUIRED (same facts); other outcomes must not change. */
+    private fun assertFirewall(result: ParseResult, blockingCode: String) {
+        val baseline = pipeline.parse(input())
+        if (fixture.expected.parseStatus != "SUCCESS") {
+            assertEquals(fixture.id, baseline::class, result::class)
+            assertEquals(fixture.id, unpack(baseline), unpack(result))
+            return
+        }
+        assertTrue("${fixture.id} must fail safe to review, got $result", result is ParseResult.ReviewRequired)
+        result as ParseResult.ReviewRequired
+        assertTrue(fixture.id, result.findings.any { it.code == blockingCode })
+        val event = requireNotNull(result.event) { "${fixture.id} review must keep its event" }
+        assertEquals(fixture.id, ParseStatus.REVIEW_REQUIRED, event.parseStatus)
+        assertEquals(fixture.id, (baseline as ParseResult.Success).event.copy(parseStatus = ParseStatus.REVIEW_REQUIRED), event)
+    }
+
+    private fun pipelineWith(validator: DefaultParsedEventValidator) = AlJaziraParsingPipeline(
+        parser = AlJaziraMessageParser(finalizer = ParseFinalizer(validator)),
+    )
+
+    private fun input() = SmsParseInput(
+        rawSmsId = fixture.id,
+        sender = fixture.sender,
+        body = fixture.body,
+        receivedAt = Instant.parse("2026-08-10T00:00:00Z"),
+    )
+
+    @Test
+    fun typographyVariants_parseLikeCanonicalFixture() {
+        val (canonical, canonicalDetails) = unpack(parseBody(fixture.body))
+        val expected = requireNotNull(canonical) { "canonical ${fixture.id} produced no event" }
+        val expectedDetails = canonicalDetails ?: ParsedEventDetails()
+        for ((variantName, body) in typographyVariants(fixture.body)) {
+            if (body == fixture.body) continue
+            val label = "${fixture.id}[$variantName]"
+            val (event, details) = unpack(parseBody(body))
+            assertNotNull("$label produced no event", event)
+            val e = event!!
+            val d = details ?: ParsedEventDetails()
+            assertEquals(label, expected.messageFamily, e.messageFamily)
+            assertEquals(label, expected.parseStatus, e.parseStatus)
+            assertEquals(label, expected.direction, e.direction)
+            assertEquals(label, expected.purchaseChannel, e.purchaseChannel)
+            assertEquals(label, expected.bankNetworkType, e.bankNetworkType)
+            assertEquals(label, expected.amount, e.amount)
+            assertEquals(label, expected.sourceAccountRef, e.sourceAccountRef)
+            assertEquals(label, expected.destinationAccountRef, e.destinationAccountRef)
+            assertEquals(label, expected.cardRef, e.cardRef)
+            assertEquals(label, folded(expected.merchant), folded(e.merchant))
+            assertEquals(label, folded(expected.counterparty), folded(e.counterparty))
+            assertEquals(label, folded(expectedDetails.biller), folded(d.biller))
+            assertEquals(label, folded(expectedDetails.transactionReference), folded(d.transactionReference))
+            assertEquals(label, expectedDetails.availableBalance, d.availableBalance)
+            assertEquals(label, expectedDetails.outstandingBalance, d.outstandingBalance)
+            assertEquals(label, expectedDetails.occurredAtLocal, d.occurredAtLocal)
+            assertEquals(label, expectedDetails.cardSmsChannel, d.cardSmsChannel)
+            assertEquals(label, expectedDetails.paymentDueDate, d.paymentDueDate)
+            assertEquals(label, expectedDetails.loanType, d.loanType)
+            assertEquals(label, expectedDetails.salaryIncomeWording, d.salaryIncomeWording)
+        }
+    }
+
+    private fun parseBody(body: String): ParseResult =
+        pipeline.parse(
+            SmsParseInput(
+                rawSmsId = fixture.id,
+                sender = fixture.sender,
+                body = body,
+                receivedAt = Instant.parse("2026-08-10T00:00:00Z"),
+            ),
+        )
+
+    private fun folded(value: String?): String? =
+        value?.let(com.baraa.masroof.core.text.ArabicTextFolding::foldForComparison)
+
+    private fun typographyVariants(body: String): List<Pair<String, String>> = listOf(
+        "bare_alef" to body.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا'),
+        "yeh_for_alef_maqsura" to body.replace('ى', 'ي'),
+        "tatweel" to ARABIC_WORD.replace(body) { m -> m.value.take(1) + "\u0640" + m.value.drop(1) },
+        "diacritics" to ARABIC_WORD.replace(body) { m -> m.value.take(1) + "\u064E" + m.value.drop(1) },
+        "bidi_marks" to body.lines().joinToString("\n") { "\u200F$it" },
+        "colon_variant" to body.replace(':', '\uFE55'),
+    )
+
     private fun unpack(result: ParseResult): Pair<ParsedEvent?, ParsedEventDetails?> = when (result) {
         is ParseResult.Success -> result.event to result.details
         is ParseResult.Partial -> result.event to result.details
@@ -165,6 +299,9 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
     }
 
     companion object {
+        /** Arabic letter runs of 3+ (hamza..yeh), where tatweel / harakat are typographically plausible. */
+        private val ARABIC_WORD = Regex("[\u0621-\u064A]{3,}")
+
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun fixtures(): Collection<Array<Any>> =

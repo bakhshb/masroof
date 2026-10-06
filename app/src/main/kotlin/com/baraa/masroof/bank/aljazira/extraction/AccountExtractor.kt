@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira.extraction
 
+import com.baraa.masroof.parsing.normalizer.comparisonRegex
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
@@ -103,29 +104,29 @@ class AccountExtractor {
 
     companion object {
         private val DEDUCTED_FROM_ACCOUNT_PATTERN =
-            Regex("""خصمت\s*من\s*حساب\s*:\s*(\d{4})""")
+            comparisonRegex("""خصمت\s*من\s*حساب\s*:\s*(\d{4})""")
 
         private val SOURCE_PATTERNS = listOf(
             DEDUCTED_FROM_ACCOUNT_PATTERN,
-            Regex("""من\s*حساب\s*:\s*(\d{4})"""),
-            Regex("""حساب\s*رقم\s*:\s*(\d{4})"""),
-            Regex("""رقم\s*حساب\s*المرسل\s*:\s*(\d{4})"""),
-            Regex("""(?<![\p{L}])حساب\s*:\s*(\d{4})"""),
-            Regex("""(?:^|\n)\s*من\s*:\s*(\d{4})"""),
+            comparisonRegex("""من\s*حساب\s*:\s*(\d{4})"""),
+            comparisonRegex("""حساب\s*رقم\s*:\s*(\d{4})"""),
+            comparisonRegex("""رقم\s*حساب\s*المرسل\s*:\s*(\d{4})"""),
+            comparisonRegex("""(?<![\p{L}])حساب\s*:\s*(\d{4})"""),
+            comparisonRegex("""(?:^|\n)\s*من\s*:\s*(\d{4})"""),
         )
 
         private val TRANSFER_IN_SOURCE_PATTERNS = listOf(
-            Regex("""رقم\s*حساب\s*المرسل\s*:\s*(\d{4})"""),
-            Regex("""(?:^|\n)\s*من\s*:\s*(\d{4})"""),
+            comparisonRegex("""رقم\s*حساب\s*المرسل\s*:\s*(\d{4})"""),
+            comparisonRegex("""(?:^|\n)\s*من\s*:\s*(\d{4})"""),
         )
 
         private val DESTINATION_PATTERNS = listOf(
-            Regex("""أودعت\s*(?:إلى|الى)\s*حساب\s*:\s*(\d{4})"""),
-            Regex("""المعرف\s*البديل\s*\\?\s*الايبان\s*:\s*(\d{4})"""),
-            Regex("""الى\s*حساب(?:ك)?(?:\s*الجاري)?\s*:\s*(\d{4})"""),
-            Regex("""إلى\s*:\s*(\d{4})"""),
-            Regex("""الى\s*:\s*(\d{4})"""),
-            Regex("""إلى\s*حساب\s*:\s*(\d{4})"""),
+            comparisonRegex("""أودعت\s*(?:إلى|الى)\s*حساب\s*:\s*(\d{4})"""),
+            comparisonRegex("""المعرف\s*البديل\s*\\?\s*الايبان\s*:\s*(\d{4})"""),
+            comparisonRegex("""الى\s*حساب(?:ك)?(?:\s*الجاري)?\s*:\s*(\d{4})"""),
+            comparisonRegex("""إلى\s*:\s*(\d{4})"""),
+            comparisonRegex("""الى\s*:\s*(\d{4})"""),
+            comparisonRegex("""إلى\s*حساب\s*:\s*(\d{4})"""),
         )
     }
 }

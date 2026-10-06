@@ -31,7 +31,9 @@ class MasroofApplication : Application(), Configuration.Provider {
     }
 
     override val workManagerConfiguration: Configuration
-        get() = Configuration.Builder().build()
+        get() = Configuration.Builder()
+            .setWorkerFactory(container.workerFactory)
+            .build()
 
     override fun onTerminate() {
         if (::container.isInitialized) {

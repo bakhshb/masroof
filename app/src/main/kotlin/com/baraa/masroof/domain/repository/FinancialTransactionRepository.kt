@@ -1,5 +1,6 @@
 package com.baraa.masroof.domain.repository
 
+import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import java.time.Instant
@@ -62,6 +63,23 @@ interface FinancialTransactionRepository {
             listAll().filter { it.type in types }
         }
 
+    /** [listByTypes] restricted to occurredAt at or after [startInclusive], same order. */
+    suspend fun listByTypesOccurredSince(
+        types: Collection<FinancialTransactionType>,
+        startInclusive: Instant,
+    ): List<FinancialTransaction> =
+        listByTypes(types).filter { !it.occurredAt.isBefore(startInclusive) }
+
+    /**
+     * Transactions not in [primaryCurrency] that have no persisted applied exchange rate
+     * (rate or source missing), oldest first.
+     */
+    suspend fun listAwaitingAppliedExchangeRate(primaryCurrency: Currency): List<FinancialTransaction> =
+        listAll().filter {
+            it.amount.currency != primaryCurrency &&
+                (it.appliedExchangeRate == null || it.exchangeRateSource == null)
+        }
+
     /**
      * Transactions with occurredAt in `[startInclusive, endExclusive)`, newest first.
      */
@@ -73,6 +91,10 @@ interface FinancialTransactionRepository {
     suspend fun isRawSmsLinked(rawSmsId: String): Boolean
 
     suspend fun listRawSmsIds(transactionId: String): List<String>
+
+    /** RawSms evidence ids linked to any of [transactionIds], in one batch lookup. */
+    suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> =
+        transactionIds.distinct().flatMapTo(linkedSetOf()) { listRawSmsIds(it) }
 
     suspend fun update(transaction: FinancialTransaction): Boolean
 

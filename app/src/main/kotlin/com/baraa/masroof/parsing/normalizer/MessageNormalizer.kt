@@ -1,14 +1,16 @@
 package com.baraa.masroof.parsing.normalizer
 
+import com.baraa.masroof.core.text.ArabicTextFolding
 import com.baraa.masroof.parsing.model.NormalizedSms
 import java.text.Normalizer
-import java.util.Locale
 
 /**
  * Bank-agnostic SMS text normalizer.
  *
  * Produces deterministic [NormalizedSms] without classifying families, extracting
- * fields, or applying bank-specific label rewrites.
+ * fields, or applying bank-specific label rewrites. Aggressive Arabic equivalence
+ * ([ArabicTextFolding]) applies to `comparisonBody` only; `normalizedBody` keeps
+ * the letters the bank sent so extracted names are not degraded.
  */
 class MessageNormalizer {
     fun normalize(originalBody: String): NormalizedSms {
@@ -24,7 +26,7 @@ class MessageNormalizer {
             .map { line -> collapseInternalSpaces(line.trim()) }
             .toList()
         val normalizedBody = normalizedLines.joinToString("\n")
-        val comparisonBody = normalizedBody.lowercase(Locale.ROOT)
+        val comparisonBody = ArabicTextFolding.foldForComparison(normalizedBody)
         return NormalizedSms(
             originalBody = originalBody,
             normalizedBody = normalizedBody,

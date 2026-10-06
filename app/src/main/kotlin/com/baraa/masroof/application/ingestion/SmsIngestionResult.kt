@@ -7,6 +7,11 @@ import com.baraa.masroof.parsing.validator.ValidationFinding
 /**
  * Explicit outcome of ingesting one [com.baraa.masroof.domain.model.RawSms] / provider SMS.
  * Expected duplicate / unsupported cases are not exceptions.
+ *
+ * Recognized-bank outcomes without an automatically usable ParsedEvent
+ * ([Unsupported], [Invalid], [ReviewRequired] with `event == null`, and [Failed]
+ * after RawSms persistence) are backed by a durable REQUIRED review row keyed by
+ * rawSmsId (see [com.baraa.masroof.application.review.IngestionReviewService]).
  */
 sealed interface SmsIngestionResult {
     /** Already present as RawSms evidence; parsing not re-run. */
@@ -37,6 +42,7 @@ sealed interface SmsIngestionResult {
         val reason: String,
     ) : SmsIngestionResult
 
+    /** Recognized bank, unsupported format. [rawSmsId] is the persisted evidence row. */
     data class Unsupported(
         val rawSmsId: String?,
         val reason: String,

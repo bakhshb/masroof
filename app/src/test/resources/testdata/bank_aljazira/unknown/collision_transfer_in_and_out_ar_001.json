@@ -1,0 +1,14 @@
+{
+  "id": "collision_transfer_in_and_out_ar_001",
+  "sender": "AlJazira",
+  "body": "حوالة واردة\nحوالة صادرة\nمبلغ: SAR 50.00\nفي: 2026-08-05 11:00",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "UNKNOWN",
+    "amount": "50.00",
+    "currency": "SAR",
+    "occurredAt": "2026-08-05T11:00:00",
+    "parseStatus": "REVIEW_REQUIRED"
+  },
+  "notes": "Collision: incoming and outgoing transfer titles in one message. Competing strong candidates go to review instead of the first registered rule."
+}

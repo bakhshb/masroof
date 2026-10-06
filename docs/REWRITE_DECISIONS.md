@@ -172,3 +172,265 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - No account balance, net worth, budgets, categories, review UI, or full transaction
   list in P11. Room remains version 4 (DAO range query only).
 
+
+## 14. Architecture hardening (SMS → dashboard)
+
+### M0.1 — ParseStatus is a hard automation boundary
+
+- Only `ParseStatus.SUCCESS` evidence may create, pair, heal, or post a
+  `FinancialTransaction` automatically (`TransactionAssembler.isAutomationEligible`).
+- `NON_FINANCIAL` is ignored for transaction creation even when the family looks financial.
+- `REVIEW_REQUIRED`, `PARTIAL`, `INVALID`, `UNSUPPORTED` become `NEEDS_REVIEW`
+  candidates with durable reasons (`parse_review_required`, `parse_partial`,
+  `invalid_parsed_event`, `unsupported_bank_message_format`); transfers in those
+  states are never paired, upgraded, or posted as external.
+- A correction lifts the gate only when it explicitly changes financial interpretation:
+  `ParsedEventRecord.automationConfirmed` is true for corrected message family or amount.
+  Merchant/counterparty-only edits remain `userCorrected` for projection purposes but do
+  not authorize automation. A review resolved `USER_FINANCIAL_TYPE` also lifts the gate
+  (restore from ignored, manual single resolution).
+- Existing transaction links are preserved; the gate governs creation, not deletion.
+
+### M0.2 — Every recognized-bank RawSms has a durable outcome
+
+- `ProcessRawSmsUseCase` writes a direct REQUIRED `NEEDS_REVIEW` row through
+  `IngestionReviewService` when a persisted recognized-bank RawSms has no
+  automatically usable ParsedEvent: `unsupported_bank_message_format`,
+  `invalid_parsed_event`, `parse_review_required` (event == null), or
+  `processing_error` (parse/persist failure after RawSms insert).
+- These rows are keyed by rawSmsId, never reopen RESOLVED history, and are only
+  auto-resolved when reconciliation later settles the same RawSms.
+- Non-bank SMS is still not persisted and never reviewed.
+
+### M0.3 — Reprocessing starts from RawSms evidence
+
+- Bulk reparse (`StoredSmsReprocessor`, used by `AppContainer.reparseAllStoredEvents`
+  and `ParsedEventFactsBackfillCoordinator`) iterates
+  `RawSmsRepository.listIdsByReceivedAt()`, not stored ParsedEvents, so
+  Unsupported / Invalid / failed evidence is retried after parser upgrades.
+- Reparse replaces the ParsedEvent keyed by rawSmsId, never duplicates RawSms,
+  keeps user corrections (keyed by rawSmsId) and existing transaction links, and
+  runs derived discovery / reconciliation / review refresh once at the end.
+
+### M1.3 — Bank-adapter contract requires real evidence
+
+- `BankSmsAdapterContract.verify` runs against per-adapter
+  `BankSmsAdapterContractSamples`; AlJazira samples come from the on-disk fixture
+  corpus, the stub adapter carries its own minimal formats.
+- Asserted: bank ≠ UNKNOWN; positive senders detect as `adapter.bank`; known-negative
+  senders are not claimed; parsed event bank equals `adapter.bank`; financial
+  fixtures parse SUCCESS with an amount; non-financial fixtures stay
+  `NonFinancial`; unsupported/unknown samples never parse SUCCESS.
+- The registry contract requires each sample to be claimed by exactly one adapter
+  and to route identically under any registration order.
+
+### M1.1 — Bank routing includes ambiguity
+
+- `BankSmsRegistry` evaluates all adapters; first-adapter-wins is gone.
+- `BankRoutingResult.Ambiguous` (more than one `Detected`) is bank-like evidence:
+  ingestion persists the RawSms and writes a direct REQUIRED review with reason
+  `ambiguous_bank_route`, and neither candidate adapter parses it. Stored reparse
+  of such a RawSms (no ParsedEvent, more than one adapter) stays in review.
+- Single-bank AlJazira routing is unchanged.
+
+### M1.2 — Router owns bank detection
+
+- Detection runs once, at `BankSmsRegistry.route`. `AlJaziraMessageParser` no longer
+  holds a detector, `BankMessageParser.canHandle` is removed, and
+  `AlJaziraParsingPipeline` parses without a second sender check.
+- Stored reparse that selects the adapter from the stored ParsedEvent bank is no
+  longer silently rejected by a parser-level sender check.
+- `ProcessRawSmsUseCase` treats an event whose bank differs from the routed adapter
+  as a processing error (direct review), so parser and router cannot disagree.
+- Sender near-miss coverage moved from parser assertions to routing assertions.
+
+### M2.1 — Comparison-only Arabic normalization
+
+- `core/text/ArabicTextFolding` defines the equivalence (alef/yeh folding, tatweel,
+  diacritics, bidi/zero-width marks, colon and Arabic separator variants). It is
+  applied only to `comparisonBody`; `originalBody` and `normalizedBody` keep the
+  bank's letters, so merchant/counterparty display text is not degraded.
+- Every AlJazira classifier keyword, heuristic, and extractor regex is folded the same
+  way (`comparisonRegex` / `containsComparison`); display values are sliced from
+  `normalizedBody` through `NormalizedSms.normalizedSlice`, which maps offsets across
+  dropped characters. `OtpMessageHeuristics` folds its own input.
+- Fixture variants (bare alef, ي for ى, tatweel, diacritics, RLM marks, colon variant)
+  must parse to the same facts as the canonical fixture.
+
+### M2.2 — Classification is deterministic evidence resolution
+
+- `AlJaziraMessageClassifier` no longer uses an ordered `when` chain. Every
+  `AlJaziraClassificationRule` is evaluated and `AlJaziraClassificationResolver`
+  keeps the highest `AlJaziraClassificationSpecificity` tier:
+  security (OTP) > account notices > balance notice > statement > named products
+  (installment, card payment, bill, refund) > money movement (purchase, withdrawal,
+  transfer, fee-titled message) > generic (a «رسوم» line outside the title).
+- One family in the top tier wins; its evidence lists `outranked:<rule>` for every
+  other family that matched. Two families in the top tier → `UNKNOWN` with
+  `ambiguous_classification` + `candidate:<rule>` evidence → `REVIEW_REQUIRED`.
+  `rank` only breaks ties inside a family (POS over online wording).
+- Rule list order carries no precedence; tests shuffle the production rules.
+- Every pre-existing fixture, reference body, and test SMS literal classifies exactly
+  as before. Collision fixtures (`collision_*`) pin the new behavior: transfer + fee
+  line → transfer; fee title + transfer wording, or incoming + outgoing titles → review.
+
+### M2.3 — Validator is the final automatic-use firewall
+
+- `DefaultParsedEventValidator` adds V-010 (positive amount), V-011 (family/direction
+  consistency), V-012 (explicit `AutomaticUsePolicy` confidence minimum, 0.8),
+  V-013/V-014 (four-digit card/account suffix shape), V-015 (plausible local time,
+  injectable `Clock`), V-016/V-017 (conflicting strong facts) on top of V-001…V-009.
+- `ParseFinalizer` has one gate: any ERROR finding on a financial family →
+  `REVIEW_REQUIRED` with the event kept (the unreachable INVALID branch was removed).
+  `ValidationResult` exposes `reviewReasons` and `blockingCodes`.
+- Every existing fixture still finalizes as before; fixture tests prove each SUCCESS
+  fixture fails safe to review under a stricter confidence policy or an implausible clock.
+- Card payments accept OUTGOING or INCOMING because direction is relative to the
+  referenced account or card. Instrument presence (card/account) is not required:
+  existing SUCCESS parses include instrument-less SMS, so requiring it would change output.
+
+### M3.1 — Capture is separate from processing
+
+- `CaptureBankSmsUseCase` routes, dedupes (including the cross-source near-duplicate
+  window) and persists `RawSms`, returning `BankSmsCaptureResult` (`Captured` carries
+  the row and its `Matched`/`Ambiguous` route). It never parses or reconciles.
+- `ProcessStoredSmsUseCase` owns parse → ParsedEvent → discovery → reconciliation →
+  review. `process(rawSms, route)` reuses the capture's route in the same attempt;
+  `process(rawSmsId)` loads stored evidence (adapter: stored event bank → sole adapter
+  → route) and is safe to retry; `reparseStored` is the backlog entry point.
+- `ProcessRawSmsUseCase` remains as a capture-then-process facade (historical scan,
+  reprocessing, tests). `LiveSmsIntake` calls the two use cases directly.
+
+### M3.2 — Live processing runs in WorkManager
+
+- `LiveSmsIntake.ingest` captures and schedules by rawSmsId, then returns; the receiver
+  no longer owns parse/reconciliation lifetime. `LiveSmsProcessingWorker` is an execution
+  adapter over `ProcessStoredSmsUseCase.process(rawSmsId)` with no parsing or financial rules.
+- Work data holds only the rawSmsId. Live ids embed sender and body hash (see
+  `AndroidSmsMapper`), the same app-private evidence identity already stored in `raw_sms`.
+- Unique work + `KEEP` and idempotent stored processing make duplicate broadcasts and
+  retries safe. Retries are bounded (`MAX_ATTEMPTS`); `processing_error` reviews keep
+  exhausted evidence visible and eligible for reparse.
+- A startup sweep reschedules evidence with neither a ParsedEvent nor a review row, so a
+  process death between capture and enqueue does not lose a recognized-bank SMS. The
+  sweep runs after startup maintenance and never blocks it.
+- No expedited work: on API < 31 that requires foreground-service info, and plain
+  one-time work without constraints already runs promptly.
+
+### M3.3 — Historical import uses one derived pass per batch
+
+- `HistoricalSmsBatchProcessor.Batch.ingest` captures and calls
+  `ProcessStoredSmsUseCase.parseAndStore` (ParsedEvent or direct review, no derived work).
+  `Batch.finish` observes ownership for the stored events in arrival order, runs one
+  `TransactionReconciliationService.reconcileBatchDetailed` pass, and applies its report to
+  the review queue once. This replaces per-SMS reconciliation plus the two full passes that
+  previously ran at scan end. Live processing is unchanged (per message).
+- `reconcileBatchDetailed` visits stored events in RawSms arrival order (not ParsedEvent id
+  order), so new transaction ids equal those a message-by-message import assigns.
+- Characterization: the full AlJazira fixture corpus imported as one inbox (empty and
+  pre-owned registries) yields identical RawSms, ParsedEvents, transactions, reviews, and
+  registry entries to the per-message flow.
+- Deliberate difference: transfer legs between owned accounts that are bridged only by a
+  shared reference (neither SMS names the other account) used to become two external
+  transfers, because each leg was posted before its counterpart existed. The batch pass sees
+  both legs and pairs them into one SELF_TRANSFER — the order-independent result
+  `reconcileStoredEvents` already gives for the same evidence.
+- A scan that fails mid-way keeps counters/evidence and still finishes the batch for events
+  it stored; a cancelled scan leaves stored evidence for the next scan or reprocess pass.
+
+### M4.1 — Dashboard evidence is scoped
+
+- `DashboardService.loadProjection` no longer calls `ParsedEventRepository.listAll()` or
+  loads RawSms one by one. `DashboardEvidenceScope` loads linked evidence for the
+  transaction sets a projection displays (batched: transaction ids → RawSms ids →
+  ParsedEventRecords → RawSms) and extends it per stage (commitment sources, card
+  statement window, statement-settling payments) only for transactions not yet covered.
+- History rules that do not depend on a displayed transaction get one explicit fact query
+  each (statements, newest credit row per card, latest available balance before the period
+  end, financing installments, merchant FX rates, first debit/source-account row per
+  registry card). They are bounded by kind rather than by a received-at window: the
+  statement, loan, and FX rules take "latest before the period end" with no lower bound,
+  so a time window would change outputs for long histories.
+- Fact queries may over-fetch but never under-fetch; evidence is ordered by event id, so
+  every projection equals the former whole-history load. Characterization compares both
+  loads over the AlJazira fixture corpus and a 23-month synthetic Room ledger, and each
+  fact query/extension is proven necessary by that comparison.
+- Out-of-period credit-card payments are read with
+  `listByTypesOccurredSince(CREDIT_CARD_PAYMENT, earliest due update)` instead of every
+  payment ever recorded.
+
+### M4.2 — Dashboard projection is read-only
+
+- `DashboardProjectionBuilder` no longer persists exchange rates. `AppliedExchangeRateSyncer`
+  is now pure (`applyInMemory`): the displayed period transactions carry the resolved rate
+  in memory, exactly as they did after the old write, so totals and displayed rates are
+  unchanged. The card-window write, whose in-memory result was already discarded, is gone.
+- `ExchangeRateEnrichmentWorkflow` owns persistence: it lists foreign transactions with no
+  persisted rate (`listAwaitingAppliedExchangeRate`), loads their linked evidence plus the
+  merchant-rate facts, resolves with the shared `TransactionSarEquivalentResolver`, and
+  writes only after every resolution succeeded. It is serialized by a mutex, never
+  overwrites a persisted rate, and is idempotent.
+- Callers: `ProcessStoredSmsUseCase.process(rawSmsId)` (live worker path),
+  `HistoricalSmsBatchProcessor.Batch.finish`, the bulk-reparse derived refresh, and startup
+  maintenance (background, after the pending-SMS sweep). Each call is best-effort; neither
+  Compose nor `DashboardViewModel` persists anything.
+- Rates freeze when first persisted. Before, that happened on the first dashboard view;
+  now it happens at ingestion or maintenance time with the same resolver and evidence, so
+  the dashboard shows the same values before and after enrichment (characterized).
+
+### M4.3 — Dashboard projection is composed by read-model concern
+
+- `DashboardProjectionBuilder` loads a `DashboardProjectionContext` once and composes four
+  section projections: Analysis, Accounts, Cards, Commitments (`*DashboardProjection`, all in
+  `application/dashboard`). Bank hierarchy stays a one-call composition of section outputs.
+- Sections own only their extra reads (cards: statement-window transactions; commitments:
+  commitments, out-of-period sources, statement-settling payments). The loan registry, read
+  twice before, is now read once into the context.
+- No rule moved or changed: specialist builders/calculators are called with the same inputs.
+  `DashboardProjection` output for 100 projections (fixture corpus and long synthetic ledger,
+  with and without market rates, 25 periods) is byte-identical to the pre-split builder.
+- Section projections are covered by the read-only architecture rule
+  (`PackageDependencyRulesTest.dashboardProjection_isReadOnly`).
+
+### M5.1 — Startup maintenance is policy-driven
+
+- Startup used to run the whole schema facts backfill before releasing the launch spinner,
+  for every schema bump. Maintenance is now classified as `BLOCKING` or `BACKGROUND`
+  (`MaintenanceRequirement`); only blocking work holds the spinner.
+- The facts backfill's requirement comes from `SchemaFactsBackfillPolicy`: v10 and v11
+  added parse-fact columns that stay NULL until re-parse, so a pending range that includes
+  them blocks. All other versions (registries, transactions, reviews, commitments) only
+  refresh already-correct data, so the backlog runs in `ParsedEventFactsBackfillWorker` and
+  open dashboard/review screens reload on `MaintenanceCompletionSignal`. Undeclared future
+  versions default to blocking, so a new migration must choose.
+- Fresh installs still run the backfill inline (range 0..current includes v10/v11); the
+  backlog is empty then, so it does not delay launch.
+- A blocking backfill that ends with failed rows or throws fails closed: the version stays
+  unrecorded and financial UI remains gated behind an explicit retry state. It is not
+  downgraded to background because the policy says displayed data is unsafe until re-parse.
+  Background-safe backfills still release startup immediately and retry through WorkManager.
+- Startup and the worker share one coordinator mutex, so the backlog is never re-parsed
+  twice concurrently.
+
+### M5.2 — Presentation consumes prepared application facts
+
+- `DashboardViewModel.toPreview` no longer converts foreign amounts, parses card containers,
+  resolves the primary card key, or maps loan involvement to `LOAN_REPAYMENT`. The projection
+  carries `transactionFacts` (`DashboardTransactionFactsBuilder`, same rules and inputs) and
+  the ViewModel renders them.
+- `MasroofRoot` no longer builds account container ids from owned registry accounts; it
+  passes `DashboardUiState.ownedAccountContainerIds`, which comes from the projection's owned
+  account set (same registry filter as `DashboardRegistryWorkflow.listOwnedAccounts`).
+- No UI behavior change: characterization over the fixture corpus plus the synthetic ledger
+  (25 periods) compares every projected row's facts and the owned-id set with the former
+  presentation derivation.
+- `DashboardOverview.transactionFacts` defaults to facts derived from the overview's own
+  transactions and involvement maps, so a constructed overview is never missing facts. A data
+  class `copy` keeps the existing facts; pass new facts when copying with other transactions.
+- Architecture rules: presentation `*ViewModel.kt` files must not reference
+  `domain.ids` container helpers or the dashboard conversion/classification helpers, and
+  `presentation/navigation` must not reference `domain.ids`.
+- Not in this phase's scope: summary-screen helpers (`DashboardSummaryTransactionFilter`,
+  `TransactionListFilter`, `DashboardRegistryLabels`, card/loan/account summary screens)
+  still build or parse container ids to filter rows and label registry entries. Moving them
+  needs per-account/card row facts from the projection and is a follow-up.

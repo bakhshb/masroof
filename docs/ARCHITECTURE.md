@@ -186,26 +186,44 @@ Two paths:
 ```text
 Android SMS Provider
    ↓
-HistoricalSmsScanner
+HistoricalSmsScanner (oldest → newest)
    ↓
-RawSms
+HistoricalSmsBatchProcessor.Batch.ingest
+   (CaptureBankSmsUseCase → ProcessStoredSmsUseCase.parseAndStore, per row)
    ↓
-RawSmsRepository
+Batch.finish (once per scan)
+   ownership discovery for stored events → reconcileBatchDetailed → review refresh
 ```
+
+Historical import never reconciles per SMS. A scan that fails mid-way (permission or
+provider error) keeps its counters and evidence and still runs `finish` for events it stored.
 
 ### New messages
 
 ```text
-BroadcastReceiver
+IncomingSmsReceiver (assemble multipart, Android I/O only)
    ↓
-IncomingSmsHandler
+LiveSmsIntake → CaptureBankSmsUseCase (durable RawSms)
    ↓
-RawSms
+LiveSmsWorkScheduler (unique work "live-sms:<rawSmsId>", input = rawSmsId only)
    ↓
-RawSmsRepository
+LiveSmsProcessingWorker → ProcessStoredSmsUseCase.process(rawSmsId)
 ```
 
+The receiver's `goAsync` window covers only capture + scheduling; parse and
+reconciliation never run within the broadcast lifetime.
+
 Both flows must converge into the same processing pipeline.
+
+Capture and processing are separate application boundaries:
+
+| Use case | Responsibility | Never does |
+|---|---|---|
+| `CaptureBankSmsUseCase` | route bank → dedupe → persist `RawSms`; returns `BankSmsCaptureResult` (rawSmsId + route) | parse, ownership, reconciliation, dashboard |
+| `ProcessStoredSmsUseCase` | load stored `RawSms` (by row or id) → parse → persist `ParsedEvent` → ownership discovery → reconciliation → review | route-time dedupe, provider I/O |
+| `ProcessRawSmsUseCase` | compatibility facade: capture, then process in the same call | — |
+
+`RawSms` is durable before any long derived processing begins; both use cases are idempotent.
 
 ---
 
@@ -290,6 +308,20 @@ Keep:
 
 Do not overwrite raw data.
 
+Three representations, each with one job:
+
+| Field | Content | Use |
+|---|---|---|
+| `originalBody` | bytes as received | evidence / traceability |
+| `normalizedBody` | NFC, Latin digits, trimmed lines, collapsed spaces; letters untouched | display-safe extraction (merchant, counterparty, biller, reference) |
+| `comparisonBody` | `ArabicTextFolding.foldForComparison(normalizedBody)`: lowercase, أ/إ/آ/ٱ→ا, ى→ي, no tatweel / diacritics / bidi marks, colon and Arabic separator variants unified | matching only — never displayed |
+
+Patterns and keywords matched against `comparisonBody` must be folded the same way:
+build regexes with `comparisonRegex(...)` and keyword checks with
+`containsComparison(...)` (`parsing/normalizer/ComparisonMatching.kt`). Turn a
+comparison match range into display text with `NormalizedSms.normalizedSlice(range)`,
+which maps offsets across dropped characters.
+
 ---
 
 ## 10. Bank Detection
@@ -310,6 +342,17 @@ BankAlJaziraDetector
 
 Do not hard-code bank checks throughout the application.
 
+`BankSmsRegistry.route` evaluates every registered adapter and returns a
+`BankRoutingResult`:
+
+| Result | Meaning | Ingestion |
+|---|---|---|
+| `Matched` | exactly one adapter detected the SMS | persist RawSms, parse with that adapter |
+| `Ambiguous` | more than one adapter detected it | persist RawSms, direct `ambiguous_bank_route` review, parse with **neither** |
+| `NotMatched` | no adapter detected it | not persisted |
+
+Registration order never decides the bank; `Ambiguous` candidates are sorted by bank id.
+
 ---
 
 ## 11. Bank Adapter Boundary
@@ -319,14 +362,25 @@ Bank-specific behavior should be grouped behind a bank parser/adapter concept.
 Example:
 
 ```kotlin
+interface BankSmsAdapter {
+    val bank: Bank
+
+    fun detect(sender: String, body: String): BankDetectionResult
+
+    fun parse(input: SmsParseInput): ParseResult
+}
+
 interface BankMessageParser {
     val bank: Bank
 
-    fun canHandle(message: NormalizedSms): Boolean
-
-    fun parse(message: NormalizedSms): ParseResult
+    fun parse(input: SmsParseInput, normalized: NormalizedSms): ParseResult
 }
 ```
+
+The router owns bank detection: `detect` is evaluated once per processing attempt by
+`BankSmsRegistry`. Once an adapter is selected, its parse pipeline trusts the route
+and never re-checks the sender. Ingestion rejects (as `processing_error`) any parse
+result whose event bank differs from the routed adapter's bank.
 
 Initial:
 
@@ -388,6 +442,17 @@ data class ClassificationResult(
 )
 ```
 
+Classification is deterministic evidence resolution, never first-match order
+(AlJazira: `AlJaziraClassificationRule` + `AlJaziraClassificationResolver`):
+
+1. Evaluate every rule; each matching rule yields a candidate with an explicit specificity tier.
+2. Keep the highest tier (security > account notice > balance notice > statement > named product > money movement > generic).
+3. A single family in that tier wins; evidence records `outranked:<rule>` for the other families that matched.
+4. Different families in that tier → `UNKNOWN` (`ambiguous_classification`, `candidate:<rule>`) → review.
+
+Rule registration order must not change the result. Collision fixtures
+(`testdata/bank_aljazira/**/collision_*.json`) pin the tie-breaks.
+
 ---
 
 ## 13. Field Extractors
@@ -437,6 +502,25 @@ interface ParsedEventValidator {
     fun validate(event: ParsedEventDraft): ValidationResult
 }
 ```
+
+The validator is the final automatic-use firewall. `ParseFinalizer` is the only
+producer of `ParseResult.Success`, and only when `ValidationResult.isAcceptableForAutomaticUse`
+(no ERROR findings). A financial draft with any blocking finding is finalized as
+`REVIEW_REQUIRED` with its event kept, never SUCCESS and never dropped.
+
+| Code | Rule (financial families unless noted) |
+|---|---|
+| V-001…V-006 | Amount provenance: never a card/account suffix, balance, reference, date, or unlabeled number |
+| V-007 | Multiple distinct transaction amounts (conflicting strong facts) |
+| V-009 / V-010 | Amount required / must be positive |
+| V-011 | Direction required and consistent with the family |
+| V-012 | Confidence ≥ `AutomaticUsePolicy.minFinancialConfidence` (0.8) |
+| V-013 / V-014 | Card / account suffix, when present, is exactly four ASCII digits (any family) |
+| V-015 | `occurredAtLocal`, when present, is within the `AutomaticUsePolicy` window (any family) |
+| V-016 / V-017 | Same account on both sides; purchase channel on a non-purchase family |
+
+Validators check parse facts only. They never resolve ownership, pair transfers,
+or decide `FinancialTransactionType` (enforced by `PackageDependencyRulesTest`).
 
 ---
 
@@ -516,6 +600,25 @@ interface TransactionAssembler {
 ```
 
 This prevents financial logic from being embedded in parsing code.
+
+---
+
+### 17.1 ParseStatus automation gate
+
+`ParsedEvent.parseStatus` is a hard automation boundary:
+
+| parseStatus | Automatic financial use |
+|---|---|
+| `SUCCESS` | eligible for ownership/matching/assembly |
+| `NON_FINANCIAL` | ignored for transaction creation |
+| `REVIEW_REQUIRED`, `PARTIAL`, `INVALID`, `UNSUPPORTED` | never auto-create, pair, or post; durable review instead |
+
+Only an explicit user decision lifts the gate for one RawSms: a user correction, or a
+review resolved `USER_FINANCIAL_TYPE` (restore from ignored, manual resolution).
+
+Every persisted recognized-bank RawSms ends in a durable outcome: processed,
+non-financial, review-required, or processing-error. When no usable ParsedEvent
+exists, ingestion writes the review row directly (`IngestionReviewService`).
 
 ---
 
@@ -626,6 +729,67 @@ ViewModels should not contain:
 - bank identification logic
 - financial calculation rules
 
+Presentation consumes prepared application facts. `DashboardOverview` (from
+`DashboardProjection`) carries, besides section totals and involvement indexes:
+
+| Fact | Field | Rule owner |
+|---|---|---|
+| Row card last4 (card container, else primary SMS card ref) | `transactionFacts[id].primaryCardLast4` | `DashboardTransactionFactsBuilder` |
+| Effective type (loan-attributed rows → `LOAN_REPAYMENT`) | `transactionFacts[id].effectiveType` | `DashboardTransactionFactsBuilder` over `LoanRepaymentAttribution` involvement |
+| SAR equivalent (foreign amount × applied rate) | `transactionFacts[id].sarEquivalent` | `DashboardTransactionFactsBuilder` / `ForeignPurchaseSarConverter` |
+| Owned account container ids for list filtering | `ownedAccountContainerIds` | projection context |
+
+`DashboardViewModel` maps these to UI models (labels, locale formatting, direction styling)
+and `MasroofRoot` only passes them on. Neither constructs or parses financial container ids
+nor calls conversion/classification helpers; `PackageDependencyRulesTest` enforces this for
+every presentation `*ViewModel.kt` and for `presentation/navigation`.
+
+### 22.1 Dashboard read model
+
+`DashboardProjectionBuilder` is composition only: it loads one `DashboardProjectionContext`
+(registries, scoped evidence, displayed period transactions with in-memory rates, SAR
+equivalents, debit-card scope, locale) and hands it to the section projections —
+`AnalysisDashboardProjection` (summary, merchants, daily trend), `AccountsDashboardProjection`,
+`CardsDashboardProjection` (statement window, facilities, debit spend) and
+`CommitmentsDashboardProjection` (loans, commitments, statement-settling payments). A section
+owns only the extra reads its rules need; shared inputs are never re-read. Specialist
+`*Builder` / `*Calculator` objects stay authoritative for the rules.
+
+The dashboard is a scoped read model over persisted facts. `DashboardService.loadProjection`
+reads the selected salary period's `FinancialTransaction`s and hands them to
+`DashboardProjectionBuilder`, which obtains parsed/raw evidence only through
+`DashboardEvidenceSource` (`DashboardEvidenceScope` in production):
+
+| Evidence | Query |
+|---|---|
+| Linked evidence of displayed transactions (period, statement window, commitment sources, statement-settling payments) | `FinancialTransactionRepository.listRawSmsIdsForTransactions` → `ParsedEventRepository.listByRawSmsIds` → `RawSmsRepository.getByIds` |
+| Statement cycles | `listCardStatementFacts` |
+| Credit-card identity (newest row per card) | `listLatestCreditCardRowFacts` |
+| Available-balance snapshot | `listLatestCreditCardAvailableBalanceFacts(periodEnd)` |
+| Loans | `listFinancingInstallmentFacts` |
+| Historical merchant FX rates | `listExchangeRateFacts` |
+| Debit-card classification / linked account | `listFirstDebitCardFacts(registry last4s)` |
+| Credit-card payments settling an in-period due | `listByTypesOccurredSince(CREDIT_CARD_PAYMENT, earliest due update)` |
+
+Rules:
+
+- No `ParsedEventRepository.listAll()` and no per-row `RawSmsRepository.getById` on the
+  normal load path. Batch queries chunk their `IN (...)` lists (`RoomBatch`).
+- A history-fact query may return a superset of the rows its calculator rule can use,
+  never a subset; records reach calculators distinct and ordered by event id, so
+  "first/last matching row" rules behave as with a whole-history scan.
+- A new calculator rule that needs history not linked to a displayed transaction adds an
+  explicit fact query here; it must not widen the load to whole history.
+- Normal loads are read-only: no repository writes during projection. Resolved exchange
+  rates are applied to the displayed transactions in memory
+  (`AppliedExchangeRateSyncer.applyInMemory`); a rate already persisted always wins.
+- `application/transaction/ExchangeRateEnrichmentWorkflow` is the only writer of
+  `appliedExchangeRate` / `exchangeRateSource`. It resolves pending foreign transactions
+  with the dashboard's resolver and evidence rules, resolves everything before writing,
+  and runs after live stored-SMS processing, after each historical batch, after bulk
+  reparse, and as best-effort startup background maintenance. Unresolved rows (e.g. no
+  network for a market rate) stay pending for the next run.
+
 ---
 
 ## 23. Background Processing
@@ -639,6 +803,47 @@ New SMS processing should be safe even if:
 - the same SMS is delivered twice
 
 The pipeline must be idempotent.
+
+Live processing runs in WorkManager:
+
+| Concern | Contract |
+|---|---|
+| Work input | `rawSmsId` only (`LiveSmsProcessingWorker.KEY_RAW_SMS_ID`); never body or OTP text |
+| Duplicates | unique work per rawSmsId with `ExistingWorkPolicy.KEEP`; capture dedupe returns `Duplicate` without scheduling |
+| Retry | exponential backoff; `Result.retry()` for processing failures/exceptions until `MAX_ATTEMPTS`, then the evidence keeps its `processing_error` review |
+| Permanent failure | missing input or `raw_sms_not_found` → `Result.failure()` |
+| Cancellation | `CancellationException` propagates; captured evidence stays and is processed by the next run |
+| Process death | startup sweep `LiveSmsIntake.schedulePendingProcessing()` reschedules `RawSmsRepository.listIdsAwaitingProcessing()` (no ParsedEvent and no review row) |
+| Wiring | `MasroofApplication.workManagerConfiguration` registers `AppContainer.workerFactory`, a `DelegatingWorkerFactory` over `LiveSmsProcessingWorker.Factory` and `ParsedEventFactsBackfillWorker.Factory`; other workers fall back to the default factory |
+
+### 23.1 Startup maintenance policy
+
+Maintenance has blocking/background policy (`application/maintenance/MaintenanceRequirement`).
+Each task is classified, not moved wholesale to the background:
+
+| Requirement | Meaning | Startup behavior |
+|---|---|---|
+| `BLOCKING` | stored data displays incorrectly until the task finishes | the launch spinner (`AppContainer.awaitStartupMaintenance`) waits for it |
+| `BACKGROUND` | stored data is already correct to display; the task only refreshes it | handed to retryable WorkManager work; the app opens immediately |
+
+- Schema facts backfill (re-parse of the stored RawSms backlog after a schema upgrade) is
+  classified per Room version in `SchemaFactsBackfillPolicy`. A pending range is
+  `BLOCKING` if any version in it is (v10, v11: parse-fact columns dashboard and
+  reconciliation rules read) or is undeclared; otherwise `BACKGROUND`. Every schema version
+  must be declared (`SchemaFactsBackfillPolicyTest`).
+- `StartupMaintenance.runBlockingPhase` runs a `BLOCKING` backfill inline. If rows fail,
+  financial UI stays gated and the startup screen offers retry; blocking work is never
+  downgraded to background merely to release the UI.
+- `ParsedEventFactsBackfillWorker` runs the same `ParsedEventFactsBackfillCoordinator`
+  (unique work, `KEEP`, exponential backoff, `MAX_ATTEMPTS`). The coordinator serializes
+  runs, records the schema version only after a run with no failed rows, and turns a thrown
+  run into `INCOMPLETE`, so failed rows stay eligible for the next attempt or launch.
+  Re-parsing is idempotent.
+- After any backfill run the coordinator emits `MaintenanceCompletionSignal`.
+  `DashboardViewModel` and `ReviewViewModel` reload on it once they have loaded, so a
+  background backfill refreshes open screens.
+- Exchange-rate enrichment and the pending-SMS sweep are `BACKGROUND` and run after the
+  blocking phase; the dashboard already shows resolved rates in memory (§22.1).
 
 ---
 
@@ -738,6 +943,13 @@ Adding another bank should roughly require:
 4. bank field aliases/extractors
 5. tests
 ```
+
+Every adapter must pass the shared contract (`bank/contract/BankSmsAdapterContract`)
+with its own `BankSmsAdapterContractSamples`: positive and known-negative senders,
+at least one fixture-backed financial message (parses `SUCCESS` with an amount) and
+one non-financial message, and unsupported/ambiguous messages that never parse
+`SUCCESS`. The registry contract also requires every sample to be claimed by exactly
+one adapter regardless of registration order.
 
 It must not require changes to:
 

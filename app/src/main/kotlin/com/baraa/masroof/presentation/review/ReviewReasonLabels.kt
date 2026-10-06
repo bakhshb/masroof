@@ -11,6 +11,13 @@ object ReviewReasonLabels {
             "unknown_message_family" -> R.string.review_reason_unknown_family
             "missing_amount" -> R.string.review_reason_missing_amount
             "needs_review" -> R.string.review_reason_needs_review
+            "parse_review_required",
+            "parse_partial",
+            -> R.string.review_reason_parse_review_required
+            "invalid_parsed_event" -> R.string.review_reason_invalid_parsed_event
+            "unsupported_bank_message_format" -> R.string.review_reason_unsupported_format
+            "processing_error" -> R.string.review_reason_processing_error
+            "ambiguous_bank_route" -> R.string.review_reason_ambiguous_bank_route
             "purchase_instrument_ownership_unknown" ->
                 R.string.review_reason_purchase_ownership_unknown
             "purchase_without_resolved_owned_instrument" ->

@@ -608,6 +608,11 @@
     <string name="review_reason_unknown_family">Unknown message type</string>
     <string name="review_reason_missing_amount">Amount missing</string>
     <string name="review_reason_needs_review">Needs manual review</string>
+    <string name="review_reason_parse_review_required">Message details could not be confirmed automatically</string>
+    <string name="review_reason_invalid_parsed_event">Message details failed validation</string>
+    <string name="review_reason_unsupported_format">Unsupported bank message format</string>
+    <string name="review_reason_processing_error">Message could not be processed — kept for retry</string>
+    <string name="review_reason_ambiguous_bank_route">Sender matches more than one bank — message not parsed</string>
     <string name="review_reason_purchase_ownership_unknown">Purchase — card ownership unset</string>
     <string name="review_reason_purchase_unresolved">Purchase — payment account unresolved</string>
     <string name="review_reason_card_payment_missing">Card payment — missing data</string>
@@ -620,4 +625,5 @@
     <string name="review_error_already_finalized">Message already processed</string>
     <string name="review_error_parsed_missing">Parsed data unavailable — try re-import</string>
     <string name="review_error_not_transfer">This transaction is not a transfer</string>
+    <string name="startup_maintenance_blocked">Financial data could not be prepared safely. Retry before opening the financial summary.</string>
 </resources>

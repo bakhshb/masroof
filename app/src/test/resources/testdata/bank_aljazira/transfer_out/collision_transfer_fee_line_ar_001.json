@@ -1,0 +1,19 @@
+{
+  "id": "collision_transfer_fee_line_ar_001",
+  "sender": "AlJazira",
+  "body": "حوالة مالية صادرة\nخصمت من حساب: 3002\nالى: TEST_BENEFICIARY\nمبلغ العملية: 1,000.00 SAR\nرسوم: 5.75 SAR\n[البنك الأهلي السعودي]\nفي: 2026-08-02 09:15\nرقم المعاملة: TEST_REFERENCE_COLLISION_1",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "TRANSFER_OUT",
+    "direction": "OUTGOING",
+    "amount": "1000.00",
+    "currency": "SAR",
+    "bankNetworkType": "INTER_BANK",
+    "sourceAccountLast4": "3002",
+    "counterparty": "TEST_BENEFICIARY",
+    "occurredAt": "2026-08-02T09:15:00",
+    "parseStatus": "SUCCESS",
+    "transactionReference": "TEST_REFERENCE_COLLISION_1"
+  },
+  "notes": "Collision: transfer + fee wording. A fee line in the body must not override the transfer title (the legacy first-match chain returned FEE)."
+}

@@ -8,6 +8,9 @@ import com.baraa.masroof.parsing.parser.SmsParseGateway
 
 /**
  * Convenience entry for normalize → AlJazira parse.
+ *
+ * Trusts the bank route: callers (the registry via [AlJaziraSmsAdapter], or tests
+ * feeding AlJazira fixtures) have already established the SMS is Bank AlJazira.
  */
 class AlJaziraParsingPipeline(
     private val normalizer: MessageNormalizer = MessageNormalizer(),
@@ -15,9 +18,6 @@ class AlJaziraParsingPipeline(
 ) : SmsParseGateway {
     override fun parse(input: SmsParseInput): ParseResult {
         val normalized: NormalizedSms = normalizer.normalize(input.body)
-        if (!parser.canHandle(normalized, input.sender)) {
-            return ParseResult.Unsupported(reason = "not_bank_aljazira")
-        }
         return parser.parse(input, normalized)
     }
 }

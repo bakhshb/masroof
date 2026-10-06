@@ -2,6 +2,9 @@ package com.baraa.masroof.application
 
 import android.content.Context
 import androidx.room.Room
+import androidx.work.DelegatingWorkerFactory
+import androidx.work.WorkManager
+import androidx.work.WorkerFactory
 import com.baraa.masroof.application.backup.DatabaseBackupService
 import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.application.dashboard.DashboardService
@@ -12,11 +15,13 @@ import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
 import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewOwnershipWorkflow
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
 import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
+import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
 import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyncer
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
@@ -39,9 +44,14 @@ import com.baraa.masroof.application.update.UpdateChecker
 import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.application.locale.AppLocaleBootstrap
 import com.baraa.masroof.application.locale.AppLocaleContextFactory
+import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
 import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillCoordinator
+import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillWorker
 import com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult
+import com.baraa.masroof.application.maintenance.StartupMaintenance
+import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
+import com.baraa.masroof.application.maintenance.StoredSmsReprocessor
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -85,11 +95,16 @@ import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.datasource.AndroidSmsDataSource
 import com.baraa.masroof.sms.datasource.SmsDataSource
+import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
-import com.baraa.masroof.application.ingestion.SmsIngestionResult
+import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
+import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
+import com.baraa.masroof.application.sms.LiveSmsProcessingWorker
+import com.baraa.masroof.application.sms.WorkManagerLiveSmsWorkScheduler
 import com.baraa.masroof.sms.time.InstantClock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -260,6 +275,12 @@ class AppContainer(
             clock = clock,
         )
 
+    val ingestionReviewService: IngestionReviewService =
+        IngestionReviewService(
+            reviewRepository = reviewRepository,
+            clock = clock,
+        )
+
     val manualReviewResolutionRepository: ManualReviewResolutionRepository =
         RoomManualReviewResolutionRepository(
             database = database,
@@ -357,6 +378,21 @@ class AppContainer(
 
     private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
 
+    private val sarEquivalentResolver: TransactionSarEquivalentResolver =
+        TransactionSarEquivalentResolver(
+            marketRateProvider = FrankfurterForeignSarRateProvider(updateHttpClient),
+        )
+
+    /** Sole writer of applied exchange rates; dashboard loads stay read-only. */
+    val exchangeRateEnrichmentWorkflow: ExchangeRateEnrichmentWorkflow =
+        ExchangeRateEnrichmentWorkflow(
+            financialTransactionRepository = financialTransactionRepository,
+            parsedEventRepository = parsedEventRepository,
+            rawSmsRepository = rawSmsRepository,
+            sarEquivalentResolver = sarEquivalentResolver,
+            appLogService = appLogService,
+        )
+
     val dashboardService: DashboardService =
         DashboardService(
             financialTransactionRepository = financialTransactionRepository,
@@ -368,9 +404,7 @@ class AppContainer(
             cardRegistryRepository = cardRegistryRepository,
             loanRegistryRepository = loanRegistryRepository,
             commitmentRepository = commitmentRepository,
-            sarEquivalentResolver = TransactionSarEquivalentResolver(
-                marketRateProvider = FrankfurterForeignSarRateProvider(updateHttpClient),
-            ),
+            sarEquivalentResolver = sarEquivalentResolver,
         )
 
     val transactionRestoreService: TransactionRestoreService =
@@ -394,22 +428,45 @@ class AppContainer(
             adapters = listOf(alJaziraSmsAdapter),
         )
 
-    val processRawSmsUseCase: ProcessRawSmsUseCase =
-        ProcessRawSmsUseCase(
+    private val captureBankSmsUseCase: CaptureBankSmsUseCase =
+        CaptureBankSmsUseCase(
+            rawSmsRepository = rawSmsRepository,
+            bankSmsRegistry = bankSmsRegistry,
+            appLogService = appLogService,
+        )
+
+    val processStoredSmsUseCase: ProcessStoredSmsUseCase =
+        ProcessStoredSmsUseCase(
             rawSmsRepository = rawSmsRepository,
             parsedEventRepository = parsedEventRepository,
             bankSmsRegistry = bankSmsRegistry,
             ownershipDiscovery = ownershipDiscoveryService,
             reconciliation = transactionReconciliationService,
             reviewQueueUpdater = reviewQueueUpdater,
+            ingestionReviewService = ingestionReviewService,
             appLogService = appLogService,
+            exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
+        )
+
+    val processRawSmsUseCase: ProcessRawSmsUseCase =
+        ProcessRawSmsUseCase(
+            capture = captureBankSmsUseCase,
+            processStored = processStoredSmsUseCase,
         )
 
     val liveSmsIntake: LiveSmsIntake =
         LiveSmsIntake(
-            processRawSms = processRawSmsUseCase,
+            captureBankSms = captureBankSmsUseCase,
+            scheduler = WorkManagerLiveSmsWorkScheduler { WorkManager.getInstance(appContext) },
+            rawSmsRepository = rawSmsRepository,
             appLogService = appLogService,
         )
+
+    val workerFactory: WorkerFactory =
+        DelegatingWorkerFactory().apply {
+            addFactory(LiveSmsProcessingWorker.Factory { processStoredSmsUseCase })
+            addFactory(ParsedEventFactsBackfillWorker.Factory { parsedEventFactsBackfillCoordinator })
+        }
 
     val smsDataSource: SmsDataSource =
         AndroidSmsDataSource(appContext.contentResolver)
@@ -417,12 +474,15 @@ class AppContainer(
     val historicalSmsScanner: HistoricalSmsScanner =
         HistoricalSmsScanner(
             dataSource = smsDataSource,
-            processRawSms = processRawSmsUseCase,
+            batchProcessor = HistoricalSmsBatchProcessor(
+                capture = captureBankSmsUseCase,
+                processStored = processStoredSmsUseCase,
+                ownershipDiscovery = ownershipDiscoveryService,
+                reconciliation = transactionReconciliationService,
+                reviewQueueUpdater = reviewQueueUpdater,
+                exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
+            ),
             appLogService = appLogService,
-            onScanComplete = {
-                reconcileStoredEvents()
-                refreshReviewQueue()
-            },
         )
 
     /**
@@ -443,39 +503,31 @@ class AppContainer(
     suspend fun refreshReviewQueue() =
         reviewWorkflowService.refreshReviewQueue()
 
-    /**
-     * Re-parses every stored RawSms that already has a ParsedEvent row.
-     * Parser upgrades apply to the existing backlog without duplicating SMS evidence.
-     */
-    suspend fun reparseAllStoredEvents(): ReparseAllStoredEventsResult {
-        appLogService.info(AppLogCategories.PARSE, "Reparse started")
-        var refreshedCount = 0
-        var failedCount = 0
-        for (record in parsedEventRepository.listAll()) {
-            val raw = rawSmsRepository.getById(record.event.rawSmsId) ?: continue
-            when (processRawSmsUseCase.reparseStored(raw)) {
-                is SmsIngestionResult.Duplicate -> Unit
-                is SmsIngestionResult.Failed -> failedCount++
-                else -> refreshedCount++
-            }
-        }
-        discoverFromStoredEvents()
-        reconcileStoredEvents()
-        FinancialTransactionEvidenceSyncer.syncMerchants(
-            transactions = financialTransactionRepository.listAll(),
-            parsedRecords = parsedEventRepository.listAll(),
-            repository = financialTransactionRepository,
-        )
-        refreshReviewQueue()
-        appLogService.info(
-            AppLogCategories.PARSE,
-            "Reparse finished: $refreshedCount refreshed, $failedCount failed",
-        )
-        return ReparseAllStoredEventsResult(
-            refreshedCount = refreshedCount,
-            failedCount = failedCount,
+    private val storedSmsReprocessor: StoredSmsReprocessor by lazy {
+        StoredSmsReprocessor(
+            rawSmsRepository = rawSmsRepository,
+            processRawSms = processRawSmsUseCase,
+            refreshDerivedState = {
+                discoverFromStoredEvents()
+                reconcileStoredEvents()
+                FinancialTransactionEvidenceSyncer.syncMerchants(
+                    transactions = financialTransactionRepository.listAll(),
+                    parsedRecords = parsedEventRepository.listAll(),
+                    repository = financialTransactionRepository,
+                )
+                refreshReviewQueue()
+                enrichExchangeRatesBestEffort()
+            },
+            appLogService = appLogService,
         )
     }
+
+    /**
+     * Re-parses every stored RawSms (including rows that never produced a
+     * ParsedEvent). Parser upgrades apply to the backlog without duplicating evidence.
+     */
+    suspend fun reparseAllStoredEvents(): ReparseAllStoredEventsResult =
+        storedSmsReprocessor.reprocessAll()
 
     fun close() {
         startupMaintenanceJob?.cancel()
@@ -559,25 +611,75 @@ class AppContainer(
             ),
             appLogService = appLogService,
             reparseAllStoredEvents = { reparseAllStoredEvents() },
+            completionSignal = maintenanceCompletionSignal,
         )
     }
 
-    private val startupMaintenanceCompletion = CompletableDeferred<Unit>()
+    /** Emits when background maintenance changed stored data; open screens reload on it. */
+    val maintenanceCompletionSignal: MaintenanceCompletionSignal = MaintenanceCompletionSignal()
+
+    private val startupMaintenance: StartupMaintenance by lazy {
+        StartupMaintenance(factsBackfill = parsedEventFactsBackfillCoordinator) {
+            ParsedEventFactsBackfillWorker.enqueue(WorkManager.getInstance(appContext))
+        }
+    }
+
+    private val startupMaintenanceCompletion = CompletableDeferred<StartupMaintenanceOutcome>()
     private var startupMaintenanceJob: Job? = null
 
+    /**
+     * Startup releases financial UI only after correctness-blocking maintenance succeeds.
+     */
     fun runStartupMaintenance() {
         startupMaintenanceJob = applicationScope.launch {
-            try {
-                parsedEventFactsBackfillCoordinator.runIfNeeded()
-            } finally {
-                if (!startupMaintenanceCompletion.isCompleted) {
-                    startupMaintenanceCompletion.complete(Unit)
-                }
+            val outcome = runStartupMaintenanceAttempt()
+            if (!startupMaintenanceCompletion.isCompleted) {
+                startupMaintenanceCompletion.complete(outcome)
+            }
+            if (outcome == StartupMaintenanceOutcome.READY) {
+                runPostStartupBackgroundWork()
             }
         }
     }
 
-    suspend fun awaitStartupMaintenance() {
-        startupMaintenanceCompletion.await()
+    /** Retry a previously blocked startup maintenance attempt from the gated UI. */
+    suspend fun retryStartupMaintenance(): StartupMaintenanceOutcome {
+        val outcome = runStartupMaintenanceAttempt()
+        if (outcome == StartupMaintenanceOutcome.READY) {
+            runPostStartupBackgroundWork()
+        }
+        return outcome
     }
+
+    private suspend fun runStartupMaintenanceAttempt(): StartupMaintenanceOutcome =
+        try {
+            startupMaintenance.runBlockingPhase()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            appLogService.warn(
+                AppLogCategories.PARSE,
+                "Blocking startup maintenance failed: ${e.javaClass.simpleName}",
+            )
+            StartupMaintenanceOutcome.BLOCKED
+        }
+
+    private suspend fun runPostStartupBackgroundWork() {
+        liveSmsIntake.schedulePendingProcessing()
+        enrichExchangeRatesBestEffort()
+    }
+
+    private suspend fun enrichExchangeRatesBestEffort() {
+        try {
+            exchangeRateEnrichmentWorkflow.enrichPending()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            appLogService.warn(AppLogCategories.TRANSACTION, "Exchange-rate enrichment failed: ${e.javaClass.simpleName}")
+        }
+    }
+
+    /** Returns the safety outcome of the initial startup maintenance attempt. */
+    suspend fun awaitStartupMaintenance(): StartupMaintenanceOutcome =
+        startupMaintenanceCompletion.await()
 }

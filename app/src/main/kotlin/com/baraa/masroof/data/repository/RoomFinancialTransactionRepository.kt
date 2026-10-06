@@ -1,7 +1,9 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.data.room.dao.FinancialTransactionDao
 import com.baraa.masroof.data.room.dao.ParsedEventDao
+import com.baraa.masroof.data.room.dao.RoomBatch
 import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 import com.baraa.masroof.data.room.mapper.FinancialTransactionMapper
 import com.baraa.masroof.domain.model.ExchangeRateSource
@@ -86,6 +88,20 @@ class RoomFinancialTransactionRepository(
         return dao.listByTypes(types.map { it.name }).map { reconstruct(it) }
     }
 
+    override suspend fun listByTypesOccurredSince(
+        types: Collection<FinancialTransactionType>,
+        startInclusive: Instant,
+    ): List<FinancialTransaction> {
+        if (types.isEmpty()) return emptyList()
+        return dao.listByTypesOccurredSince(
+            types = types.map { it.name },
+            startInclusiveEpochMillis = startInclusive.toEpochMilli(),
+        ).map { reconstruct(it) }
+    }
+
+    override suspend fun listAwaitingAppliedExchangeRate(primaryCurrency: Currency): List<FinancialTransaction> =
+        dao.listAwaitingAppliedExchangeRate(primaryCurrency.name).map { reconstruct(it) }
+
     override suspend fun listOccurredBetween(
         startInclusive: Instant,
         endExclusive: Instant,
@@ -100,6 +116,9 @@ class RoomFinancialTransactionRepository(
 
     override suspend fun listRawSmsIds(transactionId: String): List<String> =
         dao.listRawSmsIdsForTransaction(transactionId)
+
+    override suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> =
+        RoomBatch.query(transactionIds) { chunk -> dao.listRawSmsIdsForTransactions(chunk) }.toSortedSet()
 
     override suspend fun update(transaction: FinancialTransaction): Boolean {
         val entity = FinancialTransactionMapper.toEntity(transaction)
