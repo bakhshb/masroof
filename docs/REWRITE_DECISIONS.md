@@ -172,3 +172,18 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - No account balance, net worth, budgets, categories, review UI, or full transaction
   list in P11. Room remains version 4 (DAO range query only).
 
+
+## 14. Architecture hardening (SMS → dashboard)
+
+### M0.1 — ParseStatus is a hard automation boundary
+
+- Only `ParseStatus.SUCCESS` evidence may create, pair, heal, or post a
+  `FinancialTransaction` automatically (`TransactionAssembler.isAutomationEligible`).
+- `NON_FINANCIAL` is ignored for transaction creation even when the family looks financial.
+- `REVIEW_REQUIRED`, `PARTIAL`, `INVALID`, `UNSUPPORTED` become `NEEDS_REVIEW`
+  candidates with durable reasons (`parse_review_required`, `parse_partial`,
+  `invalid_parsed_event`, `unsupported_bank_message_format`); transfers in those
+  states are never paired, upgraded, or posted as external.
+- An explicit user correction (`ParsedEventRecord.userCorrected`, set only by
+  `EffectiveParsedEventProvider`) lifts the gate for that RawSms.
+- Existing transaction links are preserved; the gate governs creation, not deletion.

@@ -14,6 +14,7 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.rules.ClassificationEvidence
 import com.baraa.masroof.domain.rules.ClassificationResult
@@ -48,11 +49,40 @@ object TransactionAssembler {
         data object Ignored : Outcome
     }
 
+    const val REASON_PARSE_REVIEW_REQUIRED = "parse_review_required"
+    const val REASON_PARSE_PARTIAL = "parse_partial"
+    const val REASON_INVALID_PARSED_EVENT = "invalid_parsed_event"
+    const val REASON_UNSUPPORTED_FORMAT = "unsupported_bank_message_format"
+
+    /**
+     * Hard automation boundary on [ParseStatus].
+     *
+     * Only [ParseStatus.SUCCESS] parse output may create or update a
+     * [FinancialTransaction] automatically. [userConfirmed] is true only when a
+     * human correction exists for the evidence; it is never inferred.
+     */
+    fun isAutomationEligible(event: ParsedEvent, userConfirmed: Boolean = false): Boolean =
+        userConfirmed || event.parseStatus == ParseStatus.SUCCESS
+
+    /** Durable review reason for a parse status that blocks automation, or null for SUCCESS / NON_FINANCIAL. */
+    fun parseStatusReviewReason(status: ParseStatus): String? =
+        when (status) {
+            ParseStatus.SUCCESS,
+            ParseStatus.NON_FINANCIAL,
+            -> null
+
+            ParseStatus.REVIEW_REQUIRED -> REASON_PARSE_REVIEW_REQUIRED
+            ParseStatus.PARTIAL -> REASON_PARSE_PARTIAL
+            ParseStatus.INVALID -> REASON_INVALID_PARSED_EVENT
+            ParseStatus.UNSUPPORTED -> REASON_UNSUPPORTED_FORMAT
+        }
+
     /**
      * Assemble a single ParsedEvent when possible.
      *
      * [sourceOwnership]/[destinationOwnership]/[cardOwnership] come from P7.
      * [receivedAt] is the RawSms receipt fallback clock.
+     * [userConfirmed] lifts the [ParseStatus] gate for user-corrected evidence only.
      */
     fun assembleSingle(
         event: ParsedEvent,
@@ -63,6 +93,7 @@ object TransactionAssembler {
         loanOwnership: OwnershipStatus = OwnershipStatus.UNKNOWN,
         loanType: LoanType? = null,
         transactionOccurredAt: Instant = receivedAt,
+        userConfirmed: Boolean = false,
     ): Outcome {
         when (event.messageFamily) {
             MessageFamily.OTP,
@@ -74,6 +105,14 @@ object TransactionAssembler {
                 return Outcome.NeedsReview(listOf("unknown_message_family"))
 
             else -> Unit
+        }
+
+        if (!isAutomationEligible(event, userConfirmed)) {
+            val reason = parseStatusReviewReason(event.parseStatus)
+                ?: return Outcome.Ignored
+            return Outcome.NeedsReview(
+                listOfNotNull(reason, "missing_amount".takeIf { event.amount == null }),
+            )
         }
 
         val amount = event.amount

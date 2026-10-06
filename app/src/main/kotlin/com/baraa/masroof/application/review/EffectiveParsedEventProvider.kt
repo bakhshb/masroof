@@ -66,7 +66,7 @@ class EffectiveParsedEventProvider(
         for (correction in ordered) {
             event = overlay(event, correction)
         }
-        return ParsedEventRecord(event = event, details = record.details)
+        return ParsedEventRecord(event = event, details = record.details, userCorrected = true)
     }
 
     private fun overlay(event: ParsedEvent, correction: UserCorrection): ParsedEvent =

@@ -45,6 +45,10 @@ data class ReconciliationSummary(
  *
  * When [effectiveParsedEventProvider] is present, reconciliation uses corrected
  * projections without mutating stored ParsedEvent rows.
+ *
+ * Only automation-eligible evidence ([TransactionAssembler.isAutomationEligible])
+ * may create, pair, or heal transactions; non-SUCCESS parses become review
+ * candidates. Existing transaction links are preserved.
  */
 class TransactionReconciliationService(
     private val parsedEventRepository: ParsedEventRepository,
@@ -211,6 +215,7 @@ class TransactionReconciliationService(
                             loanOwnership = loanOwn,
                             loanType = loanType,
                             transactionOccurredAt = transactionOccurredAt,
+                            userConfirmed = record.userCorrected,
                         ),
                     )
                     when (single) {
@@ -273,6 +278,7 @@ class TransactionReconciliationService(
                                 loanOwnership = loanOwn,
                                 loanType = loanType,
                                 transactionOccurredAt = transactionOccurredAt,
+                                userConfirmed = record.userCorrected,
                             ),
                         )
                     ) {
@@ -488,10 +494,14 @@ class TransactionReconciliationService(
                     .firstOrNull { it.messageFamily == family }
                     ?: return@mapNotNull null
                 if (event.bankNetworkType != BankNetworkType.INTRA_BANK) return@mapNotNull null
+                val record = parsedById[event.id]
+                if (!TransactionAssembler.isAutomationEligible(event, record?.userCorrected == true)) {
+                    return@mapNotNull null
+                }
                 StaleLeg(
                     transaction = transaction,
                     event = event,
-                    record = records.find { it.event.id == event.id },
+                    record = record,
                 )
             }
 
@@ -501,6 +511,7 @@ class TransactionReconciliationService(
             val event = record.event
             if (!event.messageFamily.isTransferFamily()) continue
             if (event.bankNetworkType != BankNetworkType.INTRA_BANK) continue
+            if (!TransactionAssembler.isAutomationEligible(event, record.userCorrected)) continue
             if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) continue
             val leg = StaleLeg(transaction = null, event = event, record = record)
             when (event.messageFamily) {
@@ -634,6 +645,7 @@ class TransactionReconciliationService(
                 .firstOrNull { it.event.messageFamily == MessageFamily.FINANCING_INSTALLMENT }
                 ?: continue
             val event = record.event
+            if (!TransactionAssembler.isAutomationEligible(event, record.userCorrected)) continue
             val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: existing.occurredAt
             val sourceOwn = event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
                 ?: OwnershipStatus.UNKNOWN
@@ -662,6 +674,7 @@ class TransactionReconciliationService(
                     loanOwnership = loanOwn,
                     loanType = loanType,
                     transactionOccurredAt = transactionOccurredAt,
+                    userConfirmed = record.userCorrected,
                 )
             ) {
                 is TransactionAssembler.Outcome.Assembled -> {

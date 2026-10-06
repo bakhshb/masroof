@@ -519,6 +519,20 @@ This prevents financial logic from being embedded in parsing code.
 
 ---
 
+### 17.1 ParseStatus automation gate
+
+`ParsedEvent.parseStatus` is a hard automation boundary:
+
+| parseStatus | Automatic financial use |
+|---|---|
+| `SUCCESS` | eligible for ownership/matching/assembly |
+| `NON_FINANCIAL` | ignored for transaction creation |
+| `REVIEW_REQUIRED`, `PARTIAL`, `INVALID`, `UNSUPPORTED` | never auto-create, pair, or post; durable review instead |
+
+Only an explicit user correction lifts the gate for one RawSms.
+
+---
+
 ## 18. Review Queue
 
 Any unresolved situation should create a review item.

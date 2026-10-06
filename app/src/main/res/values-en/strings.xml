@@ -608,6 +608,9 @@
     <string name="review_reason_unknown_family">Unknown message type</string>
     <string name="review_reason_missing_amount">Amount missing</string>
     <string name="review_reason_needs_review">Needs manual review</string>
+    <string name="review_reason_parse_review_required">Message details could not be confirmed automatically</string>
+    <string name="review_reason_invalid_parsed_event">Message details failed validation</string>
+    <string name="review_reason_unsupported_format">Unsupported bank message format</string>
     <string name="review_reason_purchase_ownership_unknown">Purchase — card ownership unset</string>
     <string name="review_reason_purchase_unresolved">Purchase — payment account unresolved</string>
     <string name="review_reason_card_payment_missing">Card payment — missing data</string>

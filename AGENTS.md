@@ -22,6 +22,8 @@
 
 **Room changes:** Migration + mapper + parser population + migration test. If existing users need the new column filled, wire backfill (see `ParsedEventFactsBackfillCoordinator`). Device-test after schema/backfill merges.
 
+**Parse-status gate:** Only `ParseStatus.SUCCESS` (or user-corrected) evidence may create/pair/post a `FinancialTransaction` (`TransactionAssembler.isAutomationEligible`). Never bypass it in reconciliation passes.
+
 **New bank:** Implement `BankSmsAdapterContract` + fixture tests under `testdata/`.
 
 **PRs:** Target `main` only. Partial architecture merges may show broken UI until backfill lands — that is expected.

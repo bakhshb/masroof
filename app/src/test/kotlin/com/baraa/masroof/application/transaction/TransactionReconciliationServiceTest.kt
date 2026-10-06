@@ -31,6 +31,7 @@ import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
@@ -1119,6 +1120,218 @@ class TransactionReconciliationServiceTest {
         )
     }
 
+    @Test
+    fun reviewRequiredPurchaseWithAmount_neverBecomesExpense() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        persistEvent(
+            smsId = "sms-rr-buy",
+            event = event(
+                id = "pe-rr-buy",
+                rawSmsId = "sms-rr-buy",
+                family = MessageFamily.PURCHASE,
+                amount = money("51.99"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                channel = PurchaseChannel.ONLINE,
+                merchant = "Keeta",
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+        )
+        val report = reconciliation.reconcileStoredEventsDetailed()
+        assertTrue(ftRepo.listAll().isEmpty())
+        assertEquals(0, report.summary.assembledSingle)
+        assertEquals(1, report.summary.needsReview)
+        val candidate = report.reviewCandidates.single()
+        assertEquals("sms-rr-buy", candidate.rawSmsId)
+        assertEquals(ReviewKind.NEEDS_REVIEW, candidate.kind)
+        assertTrue(candidate.reasons.contains("parse_review_required"))
+        assertFalse("sms-rr-buy" in report.settledRawSmsIds)
+    }
+
+    @Test
+    fun partialPurchase_neverAutoCreatesTransaction() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        persistEvent(
+            smsId = "sms-partial",
+            event = event(
+                id = "pe-partial",
+                rawSmsId = "sms-partial",
+                family = MessageFamily.PURCHASE,
+                amount = money("10.00"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                status = ParseStatus.PARTIAL,
+            ),
+        )
+        val report = reconciliation.reconcileStoredEventsDetailed()
+        assertTrue(ftRepo.listAll().isEmpty())
+        assertTrue(report.reviewCandidates.single().reasons.contains("parse_partial"))
+    }
+
+    @Test
+    fun reviewRequiredTransfers_areNotPairedOrPostedAsExternal() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        persistEvent(
+            smsId = "sms-rr-out",
+            event = event(
+                id = "pe-rr-out",
+                rawSmsId = "sms-rr-out",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("4445.67"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+        )
+        persistEvent(
+            smsId = "sms-rr-in",
+            event = event(
+                id = "pe-rr-in",
+                rawSmsId = "sms-rr-in",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("4445.67"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+        )
+        persistEvent(
+            smsId = "sms-rr-ext",
+            event = event(
+                id = "pe-rr-ext",
+                rawSmsId = "sms-rr-ext",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("500.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.UNKNOWN, "6810"),
+                network = BankNetworkType.INTER_BANK,
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+        )
+        val report = reconciliation.reconcileStoredEventsDetailed()
+        assertTrue(ftRepo.listAll().isEmpty())
+        assertEquals(0, report.summary.matchedPairs)
+        assertEquals(
+            setOf("sms-rr-out", "sms-rr-in", "sms-rr-ext"),
+            report.reviewCandidates.map { it.rawSmsId }.toSet(),
+        )
+        assertTrue(report.reviewCandidates.all { it.kind == ReviewKind.NEEDS_REVIEW })
+        assertTrue(report.reviewCandidates.all { "parse_review_required" in it.reasons })
+    }
+
+    @Test
+    fun reviewRequiredTransfer_doesNotUpgradeStaleExternalToSelfTransfer() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        persistEvent(
+            smsId = "sms-ok-out",
+            event = event(
+                id = "pe-ok-out",
+                rawSmsId = "sms-ok-out",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("700.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        val staleExternal = com.baraa.masroof.domain.model.FinancialTransaction(
+            id = TransactionIdFactory.fromRawSmsIds(listOf("sms-ok-out")),
+            type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
+            amount = money("700.00"),
+            occurredAt = Instant.parse("2026-08-01T12:00:00Z"),
+            sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = listOf("pe-ok-out"),
+        )
+        ftRepo.save(staleExternal, listOf("sms-ok-out"))
+        persistEvent(
+            smsId = "sms-rr-in2",
+            event = event(
+                id = "pe-rr-in2",
+                rawSmsId = "sms-rr-in2",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("700.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, tx.type)
+        assertFalse(ftRepo.isRawSmsLinked("sms-rr-in2"))
+    }
+
+    @Test
+    fun nonFinancialStatus_isIgnoredEvenWithFinancialFamily() = runBlocking {
+        persistEvent(
+            smsId = "sms-nf",
+            event = event(
+                id = "pe-nf",
+                rawSmsId = "sms-nf",
+                family = MessageFamily.FEE,
+                amount = money("1.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                status = ParseStatus.NON_FINANCIAL,
+            ),
+        )
+        val report = reconciliation.reconcileStoredEventsDetailed()
+        assertTrue(ftRepo.listAll().isEmpty())
+        assertTrue(report.reviewCandidates.isEmpty())
+        assertEquals(1, report.summary.ignored)
+    }
+
+    @Test
+    fun userCorrectedReviewRequiredPurchase_isAssembled() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        val correctionRepo = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())
+        val withCorrections = TransactionReconciliationService(
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
+            financialTransactionRepository = ftRepo,
+            ownershipResolver = OwnershipResolver(accounts, cards, loans),
+            ownershipConfirmationService = confirmation,
+            effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
+                parsedRepo,
+                correctionRepo,
+            ),
+        )
+        persistEvent(
+            smsId = "sms-rr-fix",
+            event = event(
+                id = "pe-rr-fix",
+                rawSmsId = "sms-rr-fix",
+                family = MessageFamily.PURCHASE,
+                amount = null,
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+        )
+        withCorrections.reconcileStoredEvents()
+        assertTrue(ftRepo.listAll().isEmpty())
+        correctionRepo.save(
+            com.baraa.masroof.domain.model.UserCorrection(
+                id = "corr-rr-fix",
+                targetRawSmsId = "sms-rr-fix",
+                correctedType = null,
+                correctedAmount = money("42.00"),
+                correctedMerchant = null,
+                correctedCounterparty = null,
+                createdAt = Instant.parse("2026-08-02T12:00:00Z"),
+            ),
+        )
+        withCorrections.reconcileStoredEvents()
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.EXPENSE, tx.type)
+        assertEquals(money("42.00"), tx.amount)
+    }
+
     private suspend fun persistEvent(
         smsId: String,
         event: ParsedEvent,
@@ -1154,6 +1367,7 @@ class TransactionReconciliationServiceTest {
         channel: PurchaseChannel? = null,
         merchant: String? = null,
         counterparty: String? = null,
+        status: ParseStatus = ParseStatus.SUCCESS,
     ) = ParsedEvent(
         id = id,
         rawSmsId = rawSmsId,
@@ -1170,7 +1384,7 @@ class TransactionReconciliationServiceTest {
         occurredAt = null,
         bankNetworkType = network,
         confidence = Confidence(1.0),
-        parseStatus = ParseStatus.SUCCESS,
+        parseStatus = status,
     )
 
     private fun candidate(

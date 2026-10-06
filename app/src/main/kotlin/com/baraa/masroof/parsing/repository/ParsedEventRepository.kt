@@ -51,8 +51,12 @@ interface ParsedEventRepository {
 
 /**
  * Reconstructed parse output: domain [ParsedEvent] plus parse-time [ParsedEventDetails].
+ *
+ * [userCorrected] is true only on effective projections that overlay at least one
+ * explicit user correction; stored rows are always false.
  */
 data class ParsedEventRecord(
     val event: ParsedEvent,
     val details: ParsedEventDetails,
+    val userCorrected: Boolean = false,
 )

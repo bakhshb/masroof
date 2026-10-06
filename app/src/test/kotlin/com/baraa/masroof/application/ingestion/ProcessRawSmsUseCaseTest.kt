@@ -632,6 +632,68 @@ class ProcessRawSmsUseCaseTest {
         assertEquals(1, db.rawSmsDao().count())
     }
 
+    @Test
+    fun reviewRequiredPurchaseWithAmount_persistsEvidenceAndReview_butNoTransaction() = runBlocking {
+        val reviewRequiredGateway = SmsParseGateway { input ->
+            val parsed = AlJaziraParsingPipeline().parse(input) as com.baraa.masroof.parsing.model.ParseResult.Success
+            val gated = parsed.event.copy(parseStatus = ParseStatus.REVIEW_REQUIRED)
+            com.baraa.masroof.parsing.model.ParseResult.ReviewRequired(
+                draft = null,
+                event = gated,
+                findings = emptyList(),
+                reasons = listOf("forced_low_confidence"),
+                details = parsed.details,
+            )
+        }
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val cards = RoomCardRegistryRepository.from(db)
+        cards.setOwnership(com.baraa.masroof.domain.model.CardReference(Bank.BANK_ALJAZIRA, "7271"), com.baraa.masroof.domain.model.OwnershipStatus.OWNED)
+        val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val svc = ProcessRawSmsUseCase(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankSmsRegistry = alJaziraSmsRegistry(pipeline = reviewRequiredGateway),
+            reconciliation = TransactionReconciliationService(
+                parsedEventRepository = parsedRepo,
+                rawSmsRepository = rawRepo,
+                financialTransactionRepository = ftRepo,
+                ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
+            ),
+            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, InstantClock.System),
+        )
+        val raw = aljaziraPurchase(id = "android-sms:rr-amount", deviceId = "rr-amount")
+        val result = svc.ingest(raw)
+        assertTrue(result is SmsIngestionResult.ReviewRequired)
+        assertEquals(Money.of("51.99", Currency.SAR), parsedRepo.findByRawSmsId(raw.id)!!.event.amount)
+        assertNull(ftRepo.findByRawSmsId(raw.id))
+        val review = reviewRepo.findByRawSmsId(raw.id)!!
+        assertEquals(com.baraa.masroof.domain.model.ReviewStatus.REQUIRED, review.status)
+        assertTrue(review.reasons.contains("parse_review_required"))
+    }
+
+    @Test
+    fun successPurchase_stillAssemblesExpense() = runBlocking {
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val cards = RoomCardRegistryRepository.from(db)
+        cards.setOwnership(com.baraa.masroof.domain.model.CardReference(Bank.BANK_ALJAZIRA, "7271"), com.baraa.masroof.domain.model.OwnershipStatus.OWNED)
+        val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
+        val svc = ProcessRawSmsUseCase(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankSmsRegistry = alJaziraSmsRegistry(),
+            reconciliation = TransactionReconciliationService(
+                parsedEventRepository = parsedRepo,
+                rawSmsRepository = rawRepo,
+                financialTransactionRepository = ftRepo,
+                ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
+            ),
+        )
+        val raw = aljaziraPurchase(id = "android-sms:ok-amount", deviceId = "ok-amount")
+        assertTrue(svc.ingest(raw) is SmsIngestionResult.Parsed)
+        assertEquals(FinancialTransactionType.EXPENSE, ftRepo.findByRawSmsId(raw.id)!!.type)
+    }
+
     private fun aljaziraPurchase(id: String, deviceId: String): RawSms {
         val body = """
             شراء عبر الانترنت
