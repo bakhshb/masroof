@@ -60,6 +60,7 @@ import kotlinx.coroutines.launch
  */
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as MasroofApplication).container }
+    private var startupFinancialReady: Boolean = false
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(
@@ -112,6 +113,7 @@ class MainActivity : ComponentActivity() {
             val startupScope = rememberCoroutineScope()
             LaunchedEffect(Unit) {
                 startupOutcome = container.awaitStartupMaintenance()
+                startupFinancialReady = startupOutcome == StartupMaintenanceOutcome.READY
             }
             if (startupOutcome != StartupMaintenanceOutcome.READY) {
                 MasroofTheme(darkTheme = isSystemInDarkTheme()) {
@@ -143,6 +145,8 @@ class MainActivity : ComponentActivity() {
                                         startupRetrying = true
                                         startupScope.launch {
                                             startupOutcome = container.retryStartupMaintenance()
+                                            startupFinancialReady =
+                                                startupOutcome == StartupMaintenanceOutcome.READY
                                             startupRetrying = false
                                         }
                                     },
@@ -260,7 +264,9 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         onboardingViewModel.reloadFromCurrentState()
         settingsViewModel.retryInstallAfterPermissionGranted()
-        if (container.onboardingPreferencesRepository.isOnboardingCompleted()) {
+        if (startupFinancialReady &&
+            container.onboardingPreferencesRepository.isOnboardingCompleted()
+        ) {
             dashboardViewModel.onAppResumed()
             reviewViewModel.refresh()
             settingsViewModel.checkForUpdatesIfStale(silent = true)
