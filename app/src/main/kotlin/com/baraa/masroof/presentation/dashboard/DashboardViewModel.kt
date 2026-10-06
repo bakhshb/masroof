@@ -36,9 +36,11 @@ import com.baraa.masroof.application.onboarding.userOutcome
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.baraa.masroof.presentation.locale.AppLocaleContext
@@ -61,6 +63,7 @@ class DashboardViewModel(
     private val appLocaleRepository: AppLocaleRepository,
     private val appLogService: AppLogService? = null,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
+    maintenanceCompletions: Flow<Unit> = emptyFlow(),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
@@ -86,6 +89,11 @@ class DashboardViewModel(
     init {
         val savedLayout = layoutPreferencesRepository.load()
         _uiState.update { it.copy(dashboardLayout = savedLayout) }
+        viewModelScope.launch {
+            maintenanceCompletions.collect {
+                if (_uiState.value.period != null) refresh()
+            }
+        }
     }
 
     fun openCustomizeSheet() {

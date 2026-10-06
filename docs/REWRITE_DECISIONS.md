@@ -389,3 +389,23 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   with and without market rates, 25 periods) is byte-identical to the pre-split builder.
 - Section projections are covered by the read-only architecture rule
   (`PackageDependencyRulesTest.dashboardProjection_isReadOnly`).
+
+### M5.1 — Startup maintenance is policy-driven
+
+- Startup used to run the whole schema facts backfill before releasing the launch spinner,
+  for every schema bump. Maintenance is now classified as `BLOCKING` or `BACKGROUND`
+  (`MaintenanceRequirement`); only blocking work holds the spinner.
+- The facts backfill's requirement comes from `SchemaFactsBackfillPolicy`: v10 and v11
+  added parse-fact columns that stay NULL until re-parse, so a pending range that includes
+  them blocks. All other versions (registries, transactions, reviews, commitments) only
+  refresh already-correct data, so the backlog runs in `ParsedEventFactsBackfillWorker` and
+  open dashboard/review screens reload on `MaintenanceCompletionSignal`. Undeclared future
+  versions default to blocking, so a new migration must choose.
+- Fresh installs still run the backfill inline (range 0..current includes v10/v11); the
+  backlog is empty then, so it does not delay launch.
+- A blocking backfill that ends with failed rows or throws no longer keeps the spinner up or
+  crashes startup: the version stays unrecorded, the UI opens, and the worker retries.
+  Previously, failed rows also left the version unrecorded but were retried only on the next
+  launch, and a thrown backfill escaped the startup job.
+- Startup and the worker share one coordinator mutex, so the backlog is never re-parsed
+  twice concurrently.

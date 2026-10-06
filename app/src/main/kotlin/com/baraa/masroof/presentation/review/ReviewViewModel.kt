@@ -18,9 +18,11 @@ import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.presentation.dashboard.MoneyUiFormatter
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.ZoneId
@@ -35,9 +37,20 @@ class ReviewViewModel(
     private val reparseStoredSms: suspend (String) -> Unit,
     private val appLocaleRepository: AppLocaleRepository,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
+    maintenanceCompletions: Flow<Unit> = emptyFlow(),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ReviewUiState())
     val uiState: StateFlow<ReviewUiState> = _uiState.asStateFlow()
+
+    private var refreshRequested = false
+
+    init {
+        viewModelScope.launch {
+            maintenanceCompletions.collect {
+                if (refreshRequested) refresh()
+            }
+        }
+    }
 
     private val languageTag: String
         get() = appLocaleRepository.getLanguageTag()
@@ -49,6 +62,7 @@ class ReviewViewModel(
         )
 
     fun refresh() {
+        refreshRequested = true
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
             try {

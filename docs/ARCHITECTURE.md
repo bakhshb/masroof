@@ -799,7 +799,35 @@ Live processing runs in WorkManager:
 | Permanent failure | missing input or `raw_sms_not_found` → `Result.failure()` |
 | Cancellation | `CancellationException` propagates; captured evidence stays and is processed by the next run |
 | Process death | startup sweep `LiveSmsIntake.schedulePendingProcessing()` reschedules `RawSmsRepository.listIdsAwaitingProcessing()` (no ParsedEvent and no review row) |
-| Wiring | `MasroofApplication.workManagerConfiguration` registers `LiveSmsProcessingWorker.Factory`; other workers fall back to the default factory |
+| Wiring | `MasroofApplication.workManagerConfiguration` registers `AppContainer.workerFactory`, a `DelegatingWorkerFactory` over `LiveSmsProcessingWorker.Factory` and `ParsedEventFactsBackfillWorker.Factory`; other workers fall back to the default factory |
+
+### 23.1 Startup maintenance policy
+
+Maintenance has blocking/background policy (`application/maintenance/MaintenanceRequirement`).
+Each task is classified, not moved wholesale to the background:
+
+| Requirement | Meaning | Startup behavior |
+|---|---|---|
+| `BLOCKING` | stored data displays incorrectly until the task finishes | the launch spinner (`AppContainer.awaitStartupMaintenance`) waits for it |
+| `BACKGROUND` | stored data is already correct to display; the task only refreshes it | handed to retryable WorkManager work; the app opens immediately |
+
+- Schema facts backfill (re-parse of the stored RawSms backlog after a schema upgrade) is
+  classified per Room version in `SchemaFactsBackfillPolicy`. A pending range is
+  `BLOCKING` if any version in it is (v10, v11: parse-fact columns dashboard and
+  reconciliation rules read) or is undeclared; otherwise `BACKGROUND`. Every schema version
+  must be declared (`SchemaFactsBackfillPolicyTest`).
+- `StartupMaintenance.runBlockingPhase` runs a `BLOCKING` backfill inline. If rows fail it
+  still releases the UI (waiting longer cannot fix them) and schedules the worker.
+- `ParsedEventFactsBackfillWorker` runs the same `ParsedEventFactsBackfillCoordinator`
+  (unique work, `KEEP`, exponential backoff, `MAX_ATTEMPTS`). The coordinator serializes
+  runs, records the schema version only after a run with no failed rows, and turns a thrown
+  run into `INCOMPLETE`, so failed rows stay eligible for the next attempt or launch.
+  Re-parsing is idempotent.
+- After any backfill run the coordinator emits `MaintenanceCompletionSignal`.
+  `DashboardViewModel` and `ReviewViewModel` reload on it once they have loaded, so a
+  background backfill refreshes open screens.
+- Exchange-rate enrichment and the pending-SMS sweep are `BACKGROUND` and run after the
+  blocking phase; the dashboard already shows resolved rates in memory (§22.1).
 
 ---
 

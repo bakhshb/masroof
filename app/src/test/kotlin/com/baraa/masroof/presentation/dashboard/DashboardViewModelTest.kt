@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
@@ -87,6 +88,31 @@ class DashboardViewModelTest {
         assertTrue(loader.calls.isEmpty())
         assertNull(vm.uiState.value.summary)
         assertNull(vm.uiState.value.period)
+    }
+
+    @Test
+    fun maintenanceCompletion_reloadsLoadedDashboardOnly() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        val signal = MaintenanceCompletionSignal()
+        val vm = viewModel(loader, maintenanceCompletions = signal.completions)
+        advanceUntilIdle()
+
+        signal.notifyCompleted()
+        advanceUntilIdle()
+        assertTrue(loader.calls.isEmpty())
+        assertNull(vm.uiState.value.period)
+
+        vm.refresh()
+        advanceUntilIdle()
+        assertEquals(1, loader.calls.size)
+
+        loader.put(currentPeriod, overview(currentPeriod, spending = "140.00"))
+        signal.notifyCompleted()
+        advanceUntilIdle()
+
+        assertEquals(listOf(currentPeriod, currentPeriod), loader.calls)
+        assertEquals(Money.of("140.00", Currency.SAR), vm.uiState.value.summary!!.spendingGross)
     }
 
     @Test
@@ -625,6 +651,7 @@ class DashboardViewModelTest {
         permissionGranted: Boolean = true,
         permissionStateProvider: () -> Boolean = { permissionGranted },
         rescanService: suspend () -> HistoricalImportResult = { HistoricalImportResult() },
+        maintenanceCompletions: kotlinx.coroutines.flow.Flow<Unit> = kotlinx.coroutines.flow.emptyFlow(),
         smsEvidenceLoader: TransactionSmsEvidenceLoader = TransactionSmsEvidenceLoader(
             financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
                 override suspend fun save(
@@ -840,6 +867,7 @@ class DashboardViewModelTest {
             appContext = appContext,
             appLocaleRepository = FakeAppLocaleRepository(),
             zoneId = zone,
+            maintenanceCompletions = maintenanceCompletions,
         )
 
     private class FakeAppLocaleRepository : AppLocaleRepository {

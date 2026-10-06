@@ -1,0 +1,110 @@
+package com.baraa.masroof.application.maintenance
+
+import android.content.Context
+import android.content.SharedPreferences
+import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.logging.AppLogService
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
+class StartupMaintenanceTest {
+    private lateinit var context: Context
+    private lateinit var prefs: SharedPreferences
+    private var reparseCount = 0
+    private var scheduleCount = 0
+    private var failedRows = 0
+
+    @Before
+    fun setUp() {
+        context = ApplicationProvider.getApplicationContext()
+        prefs = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+    }
+
+    @Test
+    fun upToDate_neitherReparsesNorSchedules() = runBlocking<Unit> {
+        recordLastReparsedVersion(CURRENT_VERSION)
+
+        startup().runBlockingPhase()
+
+        assertEquals(0, reparseCount)
+        assertEquals(0, scheduleCount)
+    }
+
+    @Test
+    fun backgroundSafeBacklog_doesNotHoldStartup() = runBlocking<Unit> {
+        recordLastReparsedVersion(11)
+
+        startup().runBlockingPhase()
+
+        assertEquals(0, reparseCount)
+        assertEquals(1, scheduleCount)
+        assertEquals(11, lastReparsedVersion())
+    }
+
+    @Test
+    fun correctnessBlockingBacklog_finishesBeforeStartupReturns() = runBlocking<Unit> {
+        recordLastReparsedVersion(9)
+
+        startup().runBlockingPhase()
+
+        assertEquals(1, reparseCount)
+        assertEquals(0, scheduleCount)
+        assertEquals(CURRENT_VERSION, lastReparsedVersion())
+    }
+
+    @Test
+    fun freshInstall_isBlockingAndCompletesInline() = runBlocking<Unit> {
+        startup().runBlockingPhase()
+
+        assertEquals(1, reparseCount)
+        assertEquals(0, scheduleCount)
+    }
+
+    @Test
+    fun blockingBacklogWithFailedRows_isRetriedInBackground() = runBlocking<Unit> {
+        recordLastReparsedVersion(9)
+        failedRows = 2
+        val coordinator = coordinator()
+
+        StartupMaintenance(coordinator, CURRENT_VERSION) { scheduleCount++ }.runBlockingPhase()
+
+        assertEquals(1, reparseCount)
+        assertEquals(1, scheduleCount)
+        assertEquals(9, lastReparsedVersion())
+        assertEquals(MaintenanceRequirement.BLOCKING, coordinator.pendingRequirement(CURRENT_VERSION))
+
+        failedRows = 0
+        assertEquals(BackfillOutcome.COMPLETED, coordinator.runIfNeeded(CURRENT_VERSION))
+        assertNull(coordinator.pendingRequirement(CURRENT_VERSION))
+    }
+
+    private fun startup() = StartupMaintenance(coordinator(), CURRENT_VERSION) { scheduleCount++ }
+
+    private fun coordinator() = ParsedEventFactsBackfillCoordinator(
+        prefs = prefs,
+        appLogService = AppLogService(context),
+        reparseAllStoredEvents = {
+            reparseCount++
+            ReparseAllStoredEventsResult(refreshedCount = 1, failedCount = failedRows)
+        },
+    )
+
+    private fun recordLastReparsedVersion(version: Int) {
+        prefs.edit().putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, version).commit()
+    }
+
+    private fun lastReparsedVersion() = prefs.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0)
+
+    private companion object {
+        const val CURRENT_VERSION = 14
+    }
+}

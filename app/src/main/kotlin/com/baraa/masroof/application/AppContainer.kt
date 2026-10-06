@@ -2,7 +2,9 @@ package com.baraa.masroof.application
 
 import android.content.Context
 import androidx.room.Room
+import androidx.work.DelegatingWorkerFactory
 import androidx.work.WorkManager
+import androidx.work.WorkerFactory
 import com.baraa.masroof.application.backup.DatabaseBackupService
 import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.application.dashboard.DashboardService
@@ -42,9 +44,13 @@ import com.baraa.masroof.application.update.UpdateChecker
 import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.application.locale.AppLocaleBootstrap
 import com.baraa.masroof.application.locale.AppLocaleContextFactory
+import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
+import com.baraa.masroof.application.maintenance.MaintenanceRequirement
 import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillCoordinator
+import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillWorker
 import com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult
+import com.baraa.masroof.application.maintenance.StartupMaintenance
 import com.baraa.masroof.application.maintenance.StoredSmsReprocessor
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
@@ -456,8 +462,11 @@ class AppContainer(
             appLogService = appLogService,
         )
 
-    val workerFactory: LiveSmsProcessingWorker.Factory =
-        LiveSmsProcessingWorker.Factory { processStoredSmsUseCase }
+    val workerFactory: WorkerFactory =
+        DelegatingWorkerFactory().apply {
+            addFactory(LiveSmsProcessingWorker.Factory { processStoredSmsUseCase })
+            addFactory(ParsedEventFactsBackfillWorker.Factory { parsedEventFactsBackfillCoordinator })
+        }
 
     val smsDataSource: SmsDataSource =
         AndroidSmsDataSource(appContext.contentResolver)
@@ -602,16 +611,30 @@ class AppContainer(
             ),
             appLogService = appLogService,
             reparseAllStoredEvents = { reparseAllStoredEvents() },
+            completionSignal = maintenanceCompletionSignal,
         )
+    }
+
+    /** Emits when background maintenance changed stored data; open screens reload on it. */
+    val maintenanceCompletionSignal: MaintenanceCompletionSignal = MaintenanceCompletionSignal()
+
+    private val startupMaintenance: StartupMaintenance by lazy {
+        StartupMaintenance(factsBackfill = parsedEventFactsBackfillCoordinator) {
+            ParsedEventFactsBackfillWorker.enqueue(WorkManager.getInstance(appContext))
+        }
     }
 
     private val startupMaintenanceCompletion = CompletableDeferred<Unit>()
     private var startupMaintenanceJob: Job? = null
 
+    /**
+     * Startup only waits for correctness-blocking maintenance; background-safe backfill is
+     * handed to WorkManager and screens refresh via [maintenanceCompletionSignal].
+     */
     fun runStartupMaintenance() {
         startupMaintenanceJob = applicationScope.launch {
             try {
-                parsedEventFactsBackfillCoordinator.runIfNeeded()
+                startupMaintenance.runBlockingPhase()
             } finally {
                 if (!startupMaintenanceCompletion.isCompleted) {
                     startupMaintenanceCompletion.complete(Unit)
@@ -632,6 +655,7 @@ class AppContainer(
         }
     }
 
+    /** Returns once [MaintenanceRequirement.BLOCKING] startup maintenance has finished. */
     suspend fun awaitStartupMaintenance() {
         startupMaintenanceCompletion.await()
     }
