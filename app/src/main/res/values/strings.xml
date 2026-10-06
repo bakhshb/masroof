@@ -633,4 +633,5 @@
     <string name="review_error_already_finalized">تمت معالجة الرسالة مسبقاً</string>
     <string name="review_error_parsed_missing">بيانات التحليل غير متوفرة — جرّب إعادة الاستيراد</string>
     <string name="review_error_not_transfer">هذه العملية ليست حوالة</string>
+    <string name="startup_maintenance_blocked">تعذر تجهيز البيانات المالية بأمان. أعد المحاولة قبل عرض الملخص المالي.</string>
 </resources>

@@ -51,6 +51,7 @@ import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillCoordin
 import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillWorker
 import com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult
 import com.baraa.masroof.application.maintenance.StartupMaintenance
+import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
 import com.baraa.masroof.application.maintenance.StoredSmsReprocessor
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
@@ -624,25 +625,49 @@ class AppContainer(
         }
     }
 
-    private val startupMaintenanceCompletion = CompletableDeferred<Unit>()
+    private val startupMaintenanceCompletion = CompletableDeferred<StartupMaintenanceOutcome>()
     private var startupMaintenanceJob: Job? = null
 
     /**
-     * Startup only waits for correctness-blocking maintenance; background-safe backfill is
-     * handed to WorkManager and screens refresh via [maintenanceCompletionSignal].
+     * Startup releases financial UI only after correctness-blocking maintenance succeeds.
      */
     fun runStartupMaintenance() {
         startupMaintenanceJob = applicationScope.launch {
-            try {
-                startupMaintenance.runBlockingPhase()
-            } finally {
-                if (!startupMaintenanceCompletion.isCompleted) {
-                    startupMaintenanceCompletion.complete(Unit)
-                }
+            val outcome = runStartupMaintenanceAttempt()
+            if (!startupMaintenanceCompletion.isCompleted) {
+                startupMaintenanceCompletion.complete(outcome)
             }
-            liveSmsIntake.schedulePendingProcessing()
-            enrichExchangeRatesBestEffort()
+            if (outcome == StartupMaintenanceOutcome.READY) {
+                runPostStartupBackgroundWork()
+            }
         }
+    }
+
+    /** Retry a previously blocked startup maintenance attempt from the gated UI. */
+    suspend fun retryStartupMaintenance(): StartupMaintenanceOutcome {
+        val outcome = runStartupMaintenanceAttempt()
+        if (outcome == StartupMaintenanceOutcome.READY) {
+            runPostStartupBackgroundWork()
+        }
+        return outcome
+    }
+
+    private suspend fun runStartupMaintenanceAttempt(): StartupMaintenanceOutcome =
+        try {
+            startupMaintenance.runBlockingPhase()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            appLogService.warn(
+                AppLogCategories.PARSE,
+                "Blocking startup maintenance failed: ${e.javaClass.simpleName}",
+            )
+            StartupMaintenanceOutcome.BLOCKED
+        }
+
+    private suspend fun runPostStartupBackgroundWork() {
+        liveSmsIntake.schedulePendingProcessing()
+        enrichExchangeRatesBestEffort()
     }
 
     private suspend fun enrichExchangeRatesBestEffort() {
@@ -655,8 +680,7 @@ class AppContainer(
         }
     }
 
-    /** Returns once [MaintenanceRequirement.BLOCKING] startup maintenance has finished. */
-    suspend fun awaitStartupMaintenance() {
+    /** Returns the safety outcome of the initial startup maintenance attempt. */
+    suspend fun awaitStartupMaintenance(): StartupMaintenanceOutcome =
         startupMaintenanceCompletion.await()
-    }
 }

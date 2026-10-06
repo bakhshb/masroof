@@ -625,4 +625,5 @@
     <string name="review_error_already_finalized">Message already processed</string>
     <string name="review_error_parsed_missing">Parsed data unavailable — try re-import</string>
     <string name="review_error_not_transfer">This transaction is not a transfer</string>
+    <string name="startup_maintenance_blocked">Financial data could not be prepared safely. Retry before opening the financial summary.</string>
 </resources>
