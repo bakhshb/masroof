@@ -185,7 +185,8 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   `invalid_parsed_event`, `unsupported_bank_message_format`); transfers in those
   states are never paired, upgraded, or posted as external.
 - An explicit user correction (`ParsedEventRecord.userCorrected`, set only by
-  `EffectiveParsedEventProvider`) lifts the gate for that RawSms.
+  `EffectiveParsedEventProvider`) lifts the gate for that RawSms, as does a review
+  resolved `USER_FINANCIAL_TYPE` (restore from ignored, manual single resolution).
 - Existing transaction links are preserved; the gate governs creation, not deletion.
 
 ### M0.2 — Every recognized-bank RawSms has a durable outcome

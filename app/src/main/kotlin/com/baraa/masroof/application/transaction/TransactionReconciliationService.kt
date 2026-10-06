@@ -153,6 +153,7 @@ class TransactionReconciliationService(
 
         for (record in records) {
             val event = record.event
+            var userConfirmed = record.userCorrected
             if (reviewRepository != null) {
                 val review = reviewRepository.findByRawSmsId(event.rawSmsId)
                 if (review?.status == ReviewStatus.RESOLVED &&
@@ -161,6 +162,10 @@ class TransactionReconciliationService(
                     ignored++
                     settledRawSmsIds += event.rawSmsId
                     continue
+                }
+                // Explicit "this SMS is financial" decision (e.g. restore from ignored).
+                if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) {
+                    userConfirmed = true
                 }
             }
             if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) {
@@ -215,7 +220,7 @@ class TransactionReconciliationService(
                             loanOwnership = loanOwn,
                             loanType = loanType,
                             transactionOccurredAt = transactionOccurredAt,
-                            userConfirmed = record.userCorrected,
+                            userConfirmed = userConfirmed,
                         ),
                     )
                     when (single) {
@@ -278,7 +283,7 @@ class TransactionReconciliationService(
                                 loanOwnership = loanOwn,
                                 loanType = loanType,
                                 transactionOccurredAt = transactionOccurredAt,
-                                userConfirmed = record.userCorrected,
+                                userConfirmed = userConfirmed,
                             ),
                         )
                     ) {

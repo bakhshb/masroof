@@ -529,7 +529,8 @@ This prevents financial logic from being embedded in parsing code.
 | `NON_FINANCIAL` | ignored for transaction creation |
 | `REVIEW_REQUIRED`, `PARTIAL`, `INVALID`, `UNSUPPORTED` | never auto-create, pair, or post; durable review instead |
 
-Only an explicit user correction lifts the gate for one RawSms.
+Only an explicit user decision lifts the gate for one RawSms: a user correction, or a
+review resolved `USER_FINANCIAL_TYPE` (restore from ignored, manual resolution).
 
 Every persisted recognized-bank RawSms ends in a durable outcome: processed,
 non-financial, review-required, or processing-error. When no usable ParsedEvent

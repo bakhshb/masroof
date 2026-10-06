@@ -1332,6 +1332,65 @@ class TransactionReconciliationServiceTest {
         assertEquals(money("42.00"), tx.amount)
     }
 
+    @Test
+    fun restoreIgnoredReviewRequiredPurchase_assemblesExpense() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val correctionRepo = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())
+        val effective = com.baraa.masroof.application.review.EffectiveParsedEventProvider(parsedRepo, correctionRepo)
+        val resolver = OwnershipResolver(accounts, cards, loans)
+        val withReviews = TransactionReconciliationService(
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
+            financialTransactionRepository = ftRepo,
+            ownershipResolver = resolver,
+            ownershipConfirmationService = confirmation,
+            reviewRepository = reviewRepo,
+            effectiveParsedEventProvider = effective,
+        )
+        val clock = com.baraa.masroof.sms.time.InstantClock { Instant.parse("2026-08-02T12:00:00Z") }
+        persistEvent(
+            smsId = "sms-rr-restore",
+            event = event(
+                id = "pe-rr-restore",
+                rawSmsId = "sms-rr-restore",
+                family = MessageFamily.PURCHASE,
+                amount = money("51.99"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                merchant = "Keeta",
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+        )
+        val review = reviewRepo.upsertRequired(
+            "sms-rr-restore",
+            ReviewKind.NEEDS_REVIEW,
+            listOf("parse_review_required"),
+            clock.now(),
+        )
+        reviewRepo.markResolved(
+            id = review.id,
+            resolutionKind = com.baraa.masroof.domain.model.ReviewResolutionKind.USER_NON_FINANCIAL,
+            resolvedAt = clock.now(),
+            resolvedTransactionId = null,
+        )
+        withReviews.reconcileStoredEvents()
+        assertTrue(ftRepo.listAll().isEmpty())
+
+        val restore = TransactionRestoreService(
+            reviewRepository = reviewRepo,
+            financialTransactionRepository = ftRepo,
+            reconciliation = withReviews,
+            reclassification = TransactionReclassificationService(ftRepo, effective, resolver, confirmation),
+            clock = clock,
+        )
+        val result = restore.restore("sms-rr-restore")
+
+        assertTrue("restore result: $result", result is RestoreResult.Success)
+        val tx = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.EXPENSE, tx.type)
+        assertEquals(money("51.99"), tx.amount)
+    }
+
     private suspend fun persistEvent(
         smsId: String,
         event: ParsedEvent,
