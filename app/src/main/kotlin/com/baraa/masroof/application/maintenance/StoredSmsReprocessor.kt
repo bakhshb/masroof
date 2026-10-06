@@ -11,10 +11,11 @@ import com.baraa.masroof.domain.repository.RawSmsRepository
  * ParsedEvent rows), so messages that previously ended Unsupported / Invalid /
  * failed are retried after parser improvements.
  *
- * Each row goes through [ProcessRawSmsUseCase.reparseStored], which replaces the
- * ParsedEvent keyed by rawSmsId without duplicating RawSms. [refreshDerivedState]
- * then re-runs ownership discovery, reconciliation, and review refresh once for
- * the whole backlog. Re-running is idempotent.
+ * Each row goes through [ProcessRawSmsUseCase.reparseAndStore], which replaces the
+ * ParsedEvent keyed by rawSmsId without duplicating RawSms and deliberately skips
+ * per-message derived processing. [refreshDerivedState] then runs ownership discovery,
+ * reconciliation, review refresh, and enrichment once for the whole backlog.
+ * Re-running is idempotent.
  */
 class StoredSmsReprocessor(
     private val rawSmsRepository: RawSmsRepository,
@@ -28,7 +29,7 @@ class StoredSmsReprocessor(
         var failedCount = 0
         for (rawSmsId in rawSmsRepository.listIdsByReceivedAt()) {
             val raw = rawSmsRepository.getById(rawSmsId) ?: continue
-            when (processRawSms.reparseStored(raw)) {
+            when (processRawSms.reparseAndStore(raw)) {
                 is SmsIngestionResult.Duplicate,
                 is SmsIngestionResult.NotRelevant,
                 -> Unit

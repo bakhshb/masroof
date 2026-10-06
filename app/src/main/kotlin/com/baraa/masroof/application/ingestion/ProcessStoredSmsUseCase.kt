@@ -89,10 +89,19 @@ class ProcessStoredSmsUseCase(
     }
 
     /**
-     * Re-runs parse for an already-stored RawSms and replaces its ParsedEvent.
-     * Used after parser improvements to refresh the review queue without duplicating evidence.
+     * Re-runs parse for an already-stored RawSms and immediately refreshes derived state.
+     * Used by interactive/single-message retry paths.
      */
-    suspend fun reparseStored(rawSms: RawSms): SmsIngestionResult = processStoredEvidence(rawSms, logOutcome = false)
+    suspend fun reparseStored(rawSms: RawSms): SmsIngestionResult =
+        processStoredEvidence(rawSms, logOutcome = false, deriveImmediately = true)
+
+    /**
+     * Re-runs parse for an already-stored RawSms but only persists parse evidence.
+     * Bulk maintenance uses this for every row, then runs ownership/reconciliation/review
+     * once after the whole backlog has been parsed.
+     */
+    suspend fun reparseAndStore(rawSms: RawSms): SmsIngestionResult =
+        processStoredEvidence(rawSms, logOutcome = false, deriveImmediately = false)
 
     /**
      * Does not re-apply ingest-time sender detection. Stored SMS is already accepted
@@ -101,7 +110,11 @@ class ProcessStoredSmsUseCase(
      * Adapter selection: existing ParsedEvent bank, else the sole registered adapter,
      * else routing only when bank identity cannot be determined.
      */
-    private suspend fun processStoredEvidence(rawSms: RawSms, logOutcome: Boolean): SmsIngestionResult {
+    private suspend fun processStoredEvidence(
+        rawSms: RawSms,
+        logOutcome: Boolean,
+        deriveImmediately: Boolean = true,
+    ): SmsIngestionResult {
         val storedBank = parsedEventRepository.findByRawSmsId(rawSms.id)?.event?.bank
         val adapter = storedBank?.let(bankSmsRegistry::adapterFor)
             ?: bankSmsRegistry.singleAdapterOrNull()
@@ -112,7 +125,7 @@ class ProcessStoredSmsUseCase(
                 is BankRoutingResult.Ambiguous ->
                     return holdAmbiguousRoute(rawSms, route, logOutcome)
             }
-        return parseAndPersist(rawSms, adapter, logOutcome, deriveImmediately = true)
+        return parseAndPersist(rawSms, adapter, logOutcome, deriveImmediately = deriveImmediately)
     }
 
     /** Ambiguous bank-like evidence is kept and reviewed, never parsed by a guessed adapter. */

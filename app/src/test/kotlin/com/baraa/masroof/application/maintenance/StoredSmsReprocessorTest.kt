@@ -151,6 +151,31 @@ class StoredSmsReprocessorTest {
     }
 
     @Test
+    fun bulkReprocessing_defersDerivedProcessingUntilSingleRefresh() = runBlocking {
+        rawRepo.insertIfAbsent(purchase("android-sms:batch-a"))
+        rawRepo.insertIfAbsent(
+            purchase("android-sms:batch-b", at = Instant.parse("2026-08-04T10:00:00Z")),
+        )
+        var refreshCalls = 0
+        val processor = StoredSmsReprocessor(
+            rawSmsRepository = rawRepo,
+            processRawSms = useCase(AlJaziraParsingPipeline()),
+            refreshDerivedState = {
+                refreshCalls++
+                // Parsing the backlog must not reconcile each row on the way through.
+                assertTrue(ftRepo.listAll().isEmpty())
+                reviewQueueUpdater.applyReport(reconciliation.reconcileStoredEventsDetailed())
+            },
+        )
+
+        val result = processor.reprocessAll()
+
+        assertEquals(ReparseAllStoredEventsResult(refreshedCount = 2, failedCount = 0), result)
+        assertEquals(1, refreshCalls)
+        assertEquals(2, ftRepo.listAll().size)
+    }
+
+    @Test
     fun reprocessing_preservesCorrectionsAndTransactionLinks() = runBlocking {
         val raw = purchase("android-sms:linked")
         useCase(AlJaziraParsingPipeline()).ingest(raw)
