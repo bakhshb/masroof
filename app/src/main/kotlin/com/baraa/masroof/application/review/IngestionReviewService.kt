@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.bank.BankRoutingResult
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.repository.ReviewRepository
@@ -8,7 +9,8 @@ import com.baraa.masroof.sms.time.InstantClock
 /**
  * Durable review rows for recognized-bank RawSms that ingestion could not turn
  * into an automatically usable ParsedEvent (Unsupported, Invalid, ReviewRequired
- * without an event, or a processing failure after RawSms persistence).
+ * without an event, an ambiguous bank route, or a processing failure after RawSms
+ * persistence).
  *
  * Keyed by rawSmsId like every other review; RESOLVED rows are never reopened.
  * Never parses text or assembles transactions. Reconciliation only
@@ -32,5 +34,6 @@ class IngestionReviewService(
         const val REASON_INVALID_PARSED_EVENT = "invalid_parsed_event"
         const val REASON_PARSE_REVIEW_REQUIRED = "parse_review_required"
         const val REASON_PROCESSING_ERROR = "processing_error"
+        const val REASON_AMBIGUOUS_BANK_ROUTE = BankRoutingResult.REASON_AMBIGUOUS_BANK_ROUTE
     }
 }

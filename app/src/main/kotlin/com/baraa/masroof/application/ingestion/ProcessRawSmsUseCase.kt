@@ -18,6 +18,7 @@ import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.model.ParseResult
+import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import kotlinx.coroutines.CancellationException
@@ -50,17 +51,15 @@ class ProcessRawSmsUseCase(
     private val insertMutex = Mutex()
 
     suspend fun ingest(rawSms: RawSms, logOutcome: Boolean = true): SmsIngestionResult {
-        val adapter = when (val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)) {
-            is BankRoutingResult.NotMatched -> {
-                if (logOutcome) {
-                    appLogService?.info(
-                        AppLogCategories.INGEST,
-                        "Ignored non-bank SMS from ${AppLogFormatting.maskSender(rawSms.sender)} (${route.reason})",
-                    )
-                }
-                return SmsIngestionResult.NotRelevant(reason = route.reason)
+        val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)
+        if (route is BankRoutingResult.NotMatched) {
+            if (logOutcome) {
+                appLogService?.info(
+                    AppLogCategories.INGEST,
+                    "Ignored non-bank SMS from ${AppLogFormatting.maskSender(rawSms.sender)} (${route.reason})",
+                )
             }
-            is BankRoutingResult.Matched -> route.adapter
+            return SmsIngestionResult.NotRelevant(reason = route.reason)
         }
         val insertOutcome = try {
             insertMutex.withLock {
@@ -100,9 +99,35 @@ class ProcessRawSmsUseCase(
                         "Inserted SMS from ${AppLogFormatting.maskSender(rawSms.sender)}",
                     )
                 }
-                parseAndPersist(rawSms, adapter, logOutcome)
+                when (route) {
+                    is BankRoutingResult.Matched -> parseAndPersist(rawSms, route.adapter, logOutcome)
+                    is BankRoutingResult.Ambiguous -> holdAmbiguousRoute(rawSms, route, logOutcome)
+                    is BankRoutingResult.NotMatched -> SmsIngestionResult.NotRelevant(reason = route.reason)
+                }
             }
         }
+    }
+
+    /** Ambiguous bank-like evidence is kept and reviewed, never parsed by a guessed adapter. */
+    private suspend fun holdAmbiguousRoute(
+        rawSms: RawSms,
+        route: BankRoutingResult.Ambiguous,
+        logOutcome: Boolean,
+    ): SmsIngestionResult {
+        if (logOutcome) {
+            appLogService?.warn(
+                AppLogCategories.INGEST,
+                "Ambiguous bank route for SMS from ${AppLogFormatting.maskSender(rawSms.sender)} " +
+                    "(${route.banks.joinToString { it.id }}); held for review",
+            )
+        }
+        recordIngestionReview(rawSms.id, IngestionReviewService.REASON_AMBIGUOUS_BANK_ROUTE)
+        return SmsIngestionResult.ReviewRequired(
+            rawSmsId = rawSms.id,
+            event = null,
+            details = ParsedEventDetails(),
+            reasons = listOf(route.reason),
+        )
     }
 
     /**
@@ -123,6 +148,8 @@ class ProcessRawSmsUseCase(
                 is BankRoutingResult.Matched -> route.adapter
                 is BankRoutingResult.NotMatched ->
                     return SmsIngestionResult.NotRelevant(reason = route.reason)
+                is BankRoutingResult.Ambiguous ->
+                    return holdAmbiguousRoute(rawSms, route, logOutcome = false)
             }
         return parseAndPersist(rawSms, adapter, logOutcome = false)
     }

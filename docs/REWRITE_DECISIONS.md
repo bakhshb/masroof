@@ -221,3 +221,12 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   `NonFinancial`; unsupported/unknown samples never parse SUCCESS.
 - The registry contract requires each sample to be claimed by exactly one adapter
   and to route identically under any registration order.
+
+### M1.1 — Bank routing includes ambiguity
+
+- `BankSmsRegistry` evaluates all adapters; first-adapter-wins is gone.
+- `BankRoutingResult.Ambiguous` (more than one `Detected`) is bank-like evidence:
+  ingestion persists the RawSms and writes a direct REQUIRED review with reason
+  `ambiguous_bank_route`, and neither candidate adapter parses it. Stored reparse
+  of such a RawSms (no ParsedEvent, more than one adapter) stays in review.
+- Single-bank AlJazira routing is unchanged.

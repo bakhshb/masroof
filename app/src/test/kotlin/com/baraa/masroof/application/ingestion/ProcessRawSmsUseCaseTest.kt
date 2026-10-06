@@ -833,6 +833,104 @@ class ProcessRawSmsUseCaseTest {
         assertDirectReview(reviewRepo, raw.id, "unsupported_bank_message_format")
     }
 
+    @Test
+    fun ambiguousRoute_persistsRawSmsAndReviews_withoutParsingEitherAdapter() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val alJaziraParses = AtomicInteger(0)
+        val lookalike = CountingLookalikeAdapter()
+        val svc = ambiguousUseCase(alJaziraParses, lookalike, reviewRepo)
+        val raw = aljaziraPurchase(id = "android-sms:ambiguous", deviceId = "ambiguous")
+
+        val result = svc.ingest(raw)
+
+        assertTrue(result is SmsIngestionResult.ReviewRequired)
+        val review = result as SmsIngestionResult.ReviewRequired
+        assertEquals(raw.id, review.rawSmsId)
+        assertNull(review.event)
+        assertEquals(listOf("ambiguous_bank_route"), review.reasons)
+        assertEquals(raw, rawRepo.getById(raw.id))
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+        assertEquals(0, alJaziraParses.get())
+        assertEquals(0, lookalike.parseCalls.get())
+        assertDirectReview(reviewRepo, raw.id, "ambiguous_bank_route")
+
+        assertEquals(SmsIngestionResult.Duplicate, svc.ingest(raw))
+        assertEquals(1, db.rawSmsDao().count())
+        assertEquals(1, reviewRepo.listAll().size)
+    }
+
+    @Test
+    fun ambiguousRoute_reparseStoredWithoutParsedEvent_staysReviewed() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val alJaziraParses = AtomicInteger(0)
+        val lookalike = CountingLookalikeAdapter()
+        val raw = aljaziraPurchase(id = "android-sms:ambiguous-reparse", deviceId = "ambiguous-reparse")
+        rawRepo.insertIfAbsent(raw)
+
+        val result = ambiguousUseCase(alJaziraParses, lookalike, reviewRepo).reparseStored(raw)
+
+        assertTrue(result is SmsIngestionResult.ReviewRequired)
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+        assertEquals(0, alJaziraParses.get())
+        assertEquals(0, lookalike.parseCalls.get())
+        assertDirectReview(reviewRepo, raw.id, "ambiguous_bank_route")
+    }
+
+    @Test
+    fun secondBankRegistered_alJaziraSenderStillRoutesToAlJazira() = runBlocking {
+        val stub = com.baraa.masroof.bank.contract.StubBankSmsAdapter()
+        val svc = ProcessRawSmsUseCase(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankSmsRegistry = BankSmsRegistry(listOf(stub, AlJaziraSmsAdapter())),
+        )
+        val raw = aljaziraPurchase(id = "android-sms:two-banks", deviceId = "two-banks")
+        val result = svc.ingest(raw)
+        assertTrue(result is SmsIngestionResult.Parsed)
+        assertEquals(Bank.BANK_ALJAZIRA, (result as SmsIngestionResult.Parsed).event.bank)
+    }
+
+    private fun ambiguousUseCase(
+        alJaziraParses: AtomicInteger,
+        lookalike: CountingLookalikeAdapter,
+        reviewRepo: com.baraa.masroof.data.repository.RoomReviewRepository,
+    ) = ProcessRawSmsUseCase(
+        rawSmsRepository = rawRepo,
+        parsedEventRepository = parsedRepo,
+        bankSmsRegistry = BankSmsRegistry(
+            listOf(
+                AlJaziraSmsAdapter(
+                    pipeline = SmsParseGateway { input ->
+                        alJaziraParses.incrementAndGet()
+                        AlJaziraParsingPipeline().parse(input)
+                    },
+                ),
+                lookalike,
+            ),
+        ),
+        ingestionReviewService = com.baraa.masroof.application.review.IngestionReviewService(
+            reviewRepo,
+            InstantClock { Instant.parse("2026-08-03T15:00:00Z") },
+        ),
+    )
+
+    private class CountingLookalikeAdapter : com.baraa.masroof.bank.BankSmsAdapter {
+        val parseCalls = AtomicInteger(0)
+        override val bank: Bank = Bank("LOOKALIKE_BANK")
+
+        override fun detect(sender: String, body: String): com.baraa.masroof.parsing.model.BankDetectionResult =
+            com.baraa.masroof.parsing.model.BankDetectionResult.Detected(
+                bank = bank,
+                confidence = Confidence(score = 1.0),
+                evidence = listOf("sender:$sender"),
+            )
+
+        override fun parse(input: com.baraa.masroof.parsing.model.SmsParseInput): com.baraa.masroof.parsing.model.ParseResult {
+            parseCalls.incrementAndGet()
+            return com.baraa.masroof.parsing.model.ParseResult.Unsupported("lookalike")
+        }
+    }
+
     private fun aljaziraPurchase(id: String, deviceId: String): RawSms {
         val body = """
             شراء عبر الانترنت

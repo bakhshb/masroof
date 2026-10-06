@@ -1,8 +1,13 @@
 package com.baraa.masroof.bank.contract
 
 import com.baraa.masroof.bank.BankRoutingResult
+import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.bank.BankSmsRegistry
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.parsing.model.BankDetectionResult
+import com.baraa.masroof.parsing.model.ParseResult
+import com.baraa.masroof.parsing.model.SmsParseInput
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -67,6 +72,45 @@ class BankSmsRegistryMultiAdapterContractTest {
                     else -> Unit
                 }
             }
+        }
+    }
+
+    @Test
+    fun overlappingAdapters_routeAmbiguous_inEveryRegistrationOrder() {
+        val alJazira = cases.first { it.adapter.bank == Bank.BANK_ALJAZIRA }
+        val lookalike = OverlappingAdapter(claimedSender = "AlJazira")
+        val adapters = cases.map { it.adapter } + lookalike
+        val orders = listOf(adapters, adapters.reversed(), listOf(lookalike) + cases.map { it.adapter })
+        val sms = alJazira.samples.financial.first()
+
+        val routes = orders.map { BankSmsRegistry(it).route(sms.sender, sms.body) }
+
+        routes.forEach { route ->
+            assertTrue("expected Ambiguous, got $route", route is BankRoutingResult.Ambiguous)
+            assertEquals(
+                listOf(Bank.BANK_ALJAZIRA, lookalike.bank).sortedBy { it.id },
+                (route as BankRoutingResult.Ambiguous).banks,
+            )
+        }
+        assertEquals(1, routes.toSet().size)
+        assertEquals(0, lookalike.parseCalls)
+    }
+
+    private class OverlappingAdapter(private val claimedSender: String) : BankSmsAdapter {
+        override val bank: Bank = Bank("LOOKALIKE_BANK")
+        var parseCalls = 0
+            private set
+
+        override fun detect(sender: String, body: String): BankDetectionResult =
+            if (sender == claimedSender) {
+                BankDetectionResult.Detected(bank, Confidence(score = 1.0), listOf("sender:$sender"))
+            } else {
+                BankDetectionResult.Unknown(listOf("sender_not_recognized_as_lookalike"))
+            }
+
+        override fun parse(input: SmsParseInput): ParseResult {
+            parseCalls++
+            return ParseResult.Unsupported("lookalike")
         }
     }
 

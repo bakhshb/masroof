@@ -17,6 +17,7 @@ object ReviewReasonLabels {
             "invalid_parsed_event" -> R.string.review_reason_invalid_parsed_event
             "unsupported_bank_message_format" -> R.string.review_reason_unsupported_format
             "processing_error" -> R.string.review_reason_processing_error
+            "ambiguous_bank_route" -> R.string.review_reason_ambiguous_bank_route
             "purchase_instrument_ownership_unknown" ->
                 R.string.review_reason_purchase_ownership_unknown
             "purchase_without_resolved_owned_instrument" ->

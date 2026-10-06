@@ -84,30 +84,57 @@ class BankSmsRegistryTest {
     }
 
     @Test
-    fun detectedThenDetected_selectsFirstAdapter() {
-        val first = FakeBankSmsAdapter(
+    fun detectedThenDetected_isAmbiguousRegardlessOfOrder() {
+        val first = detectingAdapter("FIRST")
+        val second = detectingAdapter("SECOND")
+
+        val forward = BankSmsRegistry(listOf(first, second)).route("sender", "body")
+        val reversed = BankSmsRegistry(listOf(second, first)).route("sender", "body")
+
+        assertTrue(forward is BankRoutingResult.Ambiguous)
+        assertEquals(forward, reversed)
+        val ambiguous = forward as BankRoutingResult.Ambiguous
+        assertEquals(listOf(Bank("FIRST"), Bank("SECOND")), ambiguous.banks)
+        assertEquals("ambiguous_bank_route", ambiguous.reason)
+    }
+
+    @Test
+    fun singleCredibleAdapter_winsRegardlessOfRegistrationOrder() {
+        val unknown = FakeBankSmsAdapter(
             bank = Bank("FIRST"),
-            detection = BankDetectionResult.Detected(
-                bank = Bank("FIRST"),
-                confidence = Confidence(score = 1.0),
-                evidence = emptyList(),
-            ),
+            detection = BankDetectionResult.Unknown(reasons = listOf("first_unknown")),
         )
-        val second = FakeBankSmsAdapter(
-            bank = Bank("SECOND"),
-            detection = BankDetectionResult.Detected(
-                bank = Bank("SECOND"),
-                confidence = Confidence(score = 1.0),
-                evidence = emptyList(),
-            ),
+        val detected = detectingAdapter("SECOND")
+
+        for (order in listOf(listOf(unknown, detected), listOf(detected, unknown))) {
+            val result = BankSmsRegistry(order).route("sender", "body")
+            assertTrue(result is BankRoutingResult.Matched)
+            assertEquals(detected, (result as BankRoutingResult.Matched).adapter)
+        }
+    }
+
+    @Test
+    fun threeAdaptersTwoDetected_isAmbiguousWithOnlyClaimants() {
+        val unknown = FakeBankSmsAdapter(
+            bank = Bank("A_UNKNOWN"),
+            detection = BankDetectionResult.Unknown(reasons = listOf("nope")),
         )
-        val registry = BankSmsRegistry(listOf(first, second))
+        val registry = BankSmsRegistry(listOf(detectingAdapter("Z_BANK"), unknown, detectingAdapter("M_BANK")))
 
         val result = registry.route("sender", "body")
 
-        assertTrue(result is BankRoutingResult.Matched)
-        assertEquals(first, (result as BankRoutingResult.Matched).adapter)
+        assertTrue(result is BankRoutingResult.Ambiguous)
+        assertEquals(listOf(Bank("M_BANK"), Bank("Z_BANK")), (result as BankRoutingResult.Ambiguous).banks)
     }
+
+    private fun detectingAdapter(id: String) = FakeBankSmsAdapter(
+        bank = Bank(id),
+        detection = BankDetectionResult.Detected(
+            bank = Bank(id),
+            confidence = Confidence(score = 1.0),
+            evidence = emptyList(),
+        ),
+    )
 
     @Test
     fun adapterFor_returnsRegisteredAdapterByBank() {
