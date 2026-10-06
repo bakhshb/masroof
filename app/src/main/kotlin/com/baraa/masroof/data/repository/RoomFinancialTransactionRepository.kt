@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.data.room.dao.FinancialTransactionDao
 import com.baraa.masroof.data.room.dao.ParsedEventDao
 import com.baraa.masroof.data.room.dao.RoomBatch
@@ -97,6 +98,9 @@ class RoomFinancialTransactionRepository(
             startInclusiveEpochMillis = startInclusive.toEpochMilli(),
         ).map { reconstruct(it) }
     }
+
+    override suspend fun listAwaitingAppliedExchangeRate(primaryCurrency: Currency): List<FinancialTransaction> =
+        dao.listAwaitingAppliedExchangeRate(primaryCurrency.name).map { reconstruct(it) }
 
     override suspend fun listOccurredBetween(
         startInclusive: Instant,

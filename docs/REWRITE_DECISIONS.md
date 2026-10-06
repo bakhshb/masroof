@@ -356,3 +356,22 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Out-of-period credit-card payments are read with
   `listByTypesOccurredSince(CREDIT_CARD_PAYMENT, earliest due update)` instead of every
   payment ever recorded.
+
+### M4.2 — Dashboard projection is read-only
+
+- `DashboardProjectionBuilder` no longer persists exchange rates. `AppliedExchangeRateSyncer`
+  is now pure (`applyInMemory`): the displayed period transactions carry the resolved rate
+  in memory, exactly as they did after the old write, so totals and displayed rates are
+  unchanged. The card-window write, whose in-memory result was already discarded, is gone.
+- `ExchangeRateEnrichmentWorkflow` owns persistence: it lists foreign transactions with no
+  persisted rate (`listAwaitingAppliedExchangeRate`), loads their linked evidence plus the
+  merchant-rate facts, resolves with the shared `TransactionSarEquivalentResolver`, and
+  writes only after every resolution succeeded. It is serialized by a mutex, never
+  overwrites a persisted rate, and is idempotent.
+- Callers: `ProcessStoredSmsUseCase.process(rawSmsId)` (live worker path),
+  `HistoricalSmsBatchProcessor.Batch.finish`, the bulk-reparse derived refresh, and startup
+  maintenance (background, after the pending-SMS sweep). Each call is best-effort; neither
+  Compose nor `DashboardViewModel` persists anything.
+- Rates freeze when first persisted. Before, that happened on the first dashboard view;
+  now it happens at ingestion or maintenance time with the same resolver and evidence, so
+  the dashboard shows the same values before and after enrichment (characterized).

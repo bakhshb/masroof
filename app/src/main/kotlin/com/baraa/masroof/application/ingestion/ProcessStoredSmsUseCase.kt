@@ -5,6 +5,7 @@ import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
 import com.baraa.masroof.application.transaction.ReconciliationReport
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankRoutingResult
@@ -42,6 +43,7 @@ class ProcessStoredSmsUseCase(
     private val reviewQueueUpdater: ReviewQueueUpdater? = null,
     private val ingestionReviewService: IngestionReviewService? = null,
     private val appLogService: AppLogService? = null,
+    private val exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
 ) {
     /** Processes evidence captured in this same attempt, reusing the capture's [route]. */
     suspend fun process(
@@ -74,13 +76,16 @@ class ProcessStoredSmsUseCase(
     }
 
     /**
-     * Loads stored evidence by id and processes it (e.g. from a background worker).
-     * A missing row is [SmsIngestionResult.Failed] with [REASON_RAW_SMS_NOT_FOUND].
+     * Loads stored evidence by id and processes it (e.g. from a background worker), then
+     * persists pending exchange-rate enrichment. A missing row is
+     * [SmsIngestionResult.Failed] with [REASON_RAW_SMS_NOT_FOUND].
      */
     suspend fun process(rawSmsId: String, logOutcome: Boolean = true): SmsIngestionResult {
         val rawSms = rawSmsRepository.getById(rawSmsId)
             ?: return SmsIngestionResult.Failed(rawSmsId = rawSmsId, message = REASON_RAW_SMS_NOT_FOUND)
-        return processStoredEvidence(rawSms, logOutcome)
+        val result = processStoredEvidence(rawSms, logOutcome)
+        enrichExchangeRates()
+        return result
     }
 
     /**
@@ -380,6 +385,17 @@ class ProcessStoredSmsUseCase(
         } catch (_: Exception) {
             // P8 derived processing must not destroy RawSms/ParsedEvent evidence.
             null
+        }
+    }
+
+    private suspend fun enrichExchangeRates() {
+        val workflow = exchangeRateEnrichment ?: return
+        try {
+            workflow.enrichPending()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Enrichment is best-effort; pending rows are retried by the next run.
         }
     }
 

@@ -22,6 +22,8 @@ import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCommitmentRepository
+import com.baraa.masroof.testsupport.WriteRejectingFinancialTransactionRepository
+import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
@@ -184,7 +186,7 @@ class DashboardServiceTest {
     }
 
     @Test
-    fun loadProjection_usesBatchScopedEvidence_neverWholeHistoryOrPerRowLookups() = runBlocking {
+    fun loadProjection_usesBatchScopedEvidence_andIsReadOnly() = runBlocking {
         val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val foreign = tx("usd", FinancialTransactionType.EXPENSE, "10", start.plusSeconds(60)).copy(
@@ -195,10 +197,12 @@ class DashboardServiceTest {
             event = parsedEvent("evt-usd", "sms-usd", merchant = "AMAZON", amount = foreign.amount),
             details = ParsedEventDetails(exchangeRate = java.math.BigDecimal("3.75")),
         )
-        val ftRepo = object : FinancialTransactionRepository by FakeFtRepo(listOf(foreign)) {
-            override suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> =
-                if ("usd" in transactionIds) setOf("sms-usd") else emptySet()
-        }
+        val ftRepo = WriteRejectingFinancialTransactionRepository(
+            object : FinancialTransactionRepository by FakeFtRepo(listOf(foreign)) {
+                override suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> =
+                    if ("usd" in transactionIds) setOf("sms-usd") else emptySet()
+            },
+        )
         val parsedRepo = object : ParsedEventRepository by FakeParsedRepo() {
             override suspend fun listAll(): List<ParsedEventRecord> = error("whole-history scan")
             override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>) =
@@ -222,6 +226,8 @@ class DashboardServiceTest {
 
         val shown = projection.transactions.single()
         assertEquals("AMAZON", shown.merchant)
+        assertEquals(java.math.BigDecimal("3.75"), shown.appliedExchangeRate)
+        assertEquals(ExchangeRateSource.SMS, shown.exchangeRateSource)
         assertEquals(Money.of("37.50", Currency.SAR), projection.summary.spendingGross)
         assertEquals(0, projection.summary.excludedOtherCurrencyCount)
     }

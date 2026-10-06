@@ -60,10 +60,9 @@ class DashboardProjectionBuilder(
             rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
         )
-        val syncedTransactions = AppliedExchangeRateSyncer.sync(
+        val syncedTransactions = AppliedExchangeRateSyncer.applyInMemory(
             transactions = enrichedTransactions,
             resolutions = sarResolutions,
-            repository = financialTransactionRepository,
         )
         val dedupedTransactions = SelfTransferDeduplicator.filter(
             transactions = syncedTransactions,
@@ -193,11 +192,6 @@ class DashboardProjectionBuilder(
             parsedRecords = cardEvidence.parsedRecords,
             rawSmsById = cardEvidence.rawSmsById,
             primaryCurrency = primaryCurrency,
-        )
-        AppliedExchangeRateSyncer.sync(
-            transactions = enrichedCardTransactions,
-            resolutions = cardSarResolutions,
-            repository = financialTransactionRepository,
         )
         val cardSarEquivalents = cardSarResolutions.sarAmounts()
         val displayLocale = AppLocale.displayLocale(appLocaleRepository.getLanguageTag())

@@ -93,6 +93,16 @@ interface FinancialTransactionDao {
     @Query(
         """
         SELECT * FROM financial_transaction
+        WHERE amountCurrency != :primaryCurrency
+          AND (appliedExchangeRate IS NULL OR exchangeRateSource IS NULL)
+        ORDER BY occurredAtEpochMillis, id
+        """,
+    )
+    suspend fun listAwaitingAppliedExchangeRate(primaryCurrency: String): List<FinancialTransactionEntity>
+
+    @Query(
+        """
+        SELECT * FROM financial_transaction
         WHERE occurredAtEpochMillis >= :startInclusiveEpochMillis
           AND occurredAtEpochMillis < :endExclusiveEpochMillis
         ORDER BY occurredAtEpochMillis DESC, id DESC

@@ -18,7 +18,7 @@ import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.testsupport.CountingParsedEventRepository
 import com.baraa.masroof.testsupport.CountingRawSmsRepository
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
-import com.baraa.masroof.testsupport.ReadOnlyFinancialTransactionRepository
+import com.baraa.masroof.testsupport.WriteRejectingFinancialTransactionRepository
 import com.baraa.masroof.testsupport.WholeHistoryDashboardEvidenceSource
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -95,7 +95,7 @@ class DashboardFixtureCharacterizationTest {
             val raw = CountingRawSmsRepository(world.rawRepo)
             val recorder = RecordingEvidenceSource(
                 DashboardEvidenceScope(
-                    financialTransactionRepository = ReadOnlyFinancialTransactionRepository(world.ftRepo),
+                    financialTransactionRepository = WriteRejectingFinancialTransactionRepository(world.ftRepo),
                     parsedEventRepository = parsed,
                     rawSmsRepository = raw,
                 ),

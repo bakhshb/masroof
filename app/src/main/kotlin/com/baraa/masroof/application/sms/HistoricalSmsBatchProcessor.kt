@@ -5,6 +5,7 @@ import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
 import com.baraa.masroof.application.transaction.ReconciliationSummary
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.domain.model.LoanType
@@ -18,7 +19,8 @@ import kotlinx.coroutines.CancellationException
  *
  * Each row is captured, parsed, and persisted on its own ([Batch.ingest]); derived work runs
  * once per batch ([Batch.finish]): ownership discovery for the events the batch stored, one
- * reconciliation pass, and one review refresh. Live processing stays per message.
+ * reconciliation pass, one review refresh, and one exchange-rate enrichment pass. Live
+ * processing stays per message.
  *
  * Derived steps are best-effort: a failure never removes captured RawSms/ParsedEvent evidence,
  * and the next batch (or reprocessing) reconciles it.
@@ -29,6 +31,7 @@ class HistoricalSmsBatchProcessor(
     private val ownershipDiscovery: OwnershipDiscoveryService? = null,
     private val reconciliation: TransactionReconciliationService? = null,
     private val reviewQueueUpdater: ReviewQueueUpdater? = null,
+    private val exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
 ) {
     fun startBatch(): Batch = Batch()
 
@@ -77,6 +80,13 @@ class HistoricalSmsBatchProcessor(
                 throw e
             } catch (_: Exception) {
                 // Review persistence must not fail imported evidence; the next refresh retries.
+            }
+            try {
+                exchangeRateEnrichment?.enrichPending()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Enrichment is best-effort; pending rows are retried by the next run.
             }
             return report.summary
         }

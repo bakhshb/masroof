@@ -1,5 +1,6 @@
 package com.baraa.masroof.domain.repository
 
+import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import java.time.Instant
@@ -68,6 +69,16 @@ interface FinancialTransactionRepository {
         startInclusive: Instant,
     ): List<FinancialTransaction> =
         listByTypes(types).filter { !it.occurredAt.isBefore(startInclusive) }
+
+    /**
+     * Transactions not in [primaryCurrency] that have no persisted applied exchange rate
+     * (rate or source missing), oldest first.
+     */
+    suspend fun listAwaitingAppliedExchangeRate(primaryCurrency: Currency): List<FinancialTransaction> =
+        listAll().filter {
+            it.amount.currency != primaryCurrency &&
+                (it.appliedExchangeRate == null || it.exchangeRateSource == null)
+        }
 
     /**
      * Transactions with occurredAt in `[startInclusive, endExclusive)`, newest first.

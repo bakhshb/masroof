@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.baraa.masroof.application.dashboard.DashboardEvidence
 import com.baraa.masroof.application.dashboard.DashboardEvidenceScope
 import com.baraa.masroof.application.dashboard.DashboardEvidenceSource
+import com.baraa.masroof.application.dashboard.DashboardProjectionBuilder
 import com.baraa.masroof.application.dashboard.DashboardService
 import com.baraa.masroof.application.dashboard.ForeignSarMarketRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
@@ -16,6 +17,7 @@ import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
+import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.aljazira.AlJaziraSmsAdapter
@@ -56,6 +58,7 @@ import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
+import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
@@ -97,43 +100,63 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
     private val bank = Bank.BANK_ALJAZIRA
     private var sequence = 0
 
-    suspend fun importFixtureCorpus(rows: List<ProviderSmsRecord> = AlJaziraFixtureInbox.rows()) {
+    val localeRepository = object : AppLocaleRepository {
+        override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
+        override fun setLanguageTag(languageTag: String) = Unit
+    }
+
+    private val importClock = InstantClock { Instant.parse("2026-09-01T00:00:00Z") }
+    private val registry = BankSmsRegistry(listOf(AlJaziraSmsAdapter()))
+    private val discovery = OwnershipDiscoveryService(accounts, cards, loans)
+    private val reconciliation = TransactionReconciliationService(
+        parsedEventRepository = parsedRepo,
+        rawSmsRepository = rawRepo,
+        financialTransactionRepository = ftRepo,
+        ownershipResolver = OwnershipResolver(accounts, cards, loans),
+        ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
+        effectiveParsedEventProvider = EffectiveParsedEventProvider(
+            parsedRepo,
+            RoomUserCorrectionRepository(db.userCorrectionDao()),
+        ),
+        reviewRepository = reviewRepo,
+    )
+    private val reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, importClock)
+
+    val captureBankSms = CaptureBankSmsUseCase(rawRepo, registry)
+
+    fun processStoredSms(exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null) =
+        ProcessStoredSmsUseCase(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankSmsRegistry = registry,
+            ownershipDiscovery = discovery,
+            reconciliation = reconciliation,
+            reviewQueueUpdater = reviewQueueUpdater,
+            ingestionReviewService = IngestionReviewService(reviewRepo, importClock),
+            exchangeRateEnrichment = exchangeRateEnrichment,
+        )
+
+    suspend fun ownFixtureInstruments() {
         listOf("3001", "3002", "3003").forEach {
             accounts.setOwnership(AccountReference(bank, it), OwnershipStatus.OWNED)
         }
         listOf("7271", "2210", "8219").forEach {
             cards.setOwnership(CardReference(bank, it), OwnershipStatus.OWNED)
         }
-        val importClock = InstantClock { Instant.parse("2026-09-01T00:00:00Z") }
-        val registry = BankSmsRegistry(listOf(AlJaziraSmsAdapter()))
-        val discovery = OwnershipDiscoveryService(accounts, cards, loans)
-        val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = ftRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards, loans),
-            ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
-            effectiveParsedEventProvider = EffectiveParsedEventProvider(
-                parsedRepo,
-                RoomUserCorrectionRepository(db.userCorrectionDao()),
-            ),
-            reviewRepository = reviewRepo,
-        )
-        val reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, importClock)
+    }
+
+    suspend fun importFixtureCorpus(
+        rows: List<ProviderSmsRecord> = AlJaziraFixtureInbox.rows(),
+        exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
+    ) {
+        ownFixtureInstruments()
         val batch = HistoricalSmsBatchProcessor(
-            capture = CaptureBankSmsUseCase(rawRepo, registry),
-            processStored = ProcessStoredSmsUseCase(
-                rawSmsRepository = rawRepo,
-                parsedEventRepository = parsedRepo,
-                bankSmsRegistry = registry,
-                ownershipDiscovery = discovery,
-                reconciliation = reconciliation,
-                reviewQueueUpdater = reviewQueueUpdater,
-                ingestionReviewService = IngestionReviewService(reviewRepo, importClock),
-            ),
+            capture = captureBankSms,
+            processStored = processStoredSms(),
             ownershipDiscovery = discovery,
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
+            exchangeRateEnrichment = exchangeRateEnrichment,
         ).startBatch()
         rows.forEach { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
         batch.finish()
@@ -174,19 +197,16 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
         evidenceSource: DashboardEvidenceSource? = null,
         parsedEventRepository: ParsedEventRepository = parsedRepo,
         rawSmsRepository: RawSmsRepository = rawRepo,
-        financialTransactionRepository: FinancialTransactionRepository = ReadOnlyFinancialTransactionRepository(ftRepo),
+        financialTransactionRepository: FinancialTransactionRepository = WriteRejectingFinancialTransactionRepository(ftRepo),
+        marketRateProvider: ForeignSarMarketRateProvider = NO_MARKET_RATE,
     ): DashboardService {
-        val resolver = TransactionSarEquivalentResolver(ForeignSarMarketRateProvider { _, _ -> null })
-        val locale = object : AppLocaleRepository {
-            override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
-            override fun setLanguageTag(languageTag: String) = Unit
-        }
+        val resolver = TransactionSarEquivalentResolver(marketRateProvider, zone)
         return DashboardService(
             financialTransactionRepository = financialTransactionRepository,
             reviewRepository = reviewRepo,
             parsedEventRepository = parsedEventRepository,
             rawSmsRepository = rawSmsRepository,
-            appLocaleRepository = locale,
+            appLocaleRepository = localeRepository,
             accountRegistryRepository = accounts,
             cardRegistryRepository = cards,
             loanRegistryRepository = loans,
@@ -201,6 +221,35 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
             ),
         )
     }
+
+    fun projectionBuilder(
+        marketRateProvider: ForeignSarMarketRateProvider = NO_MARKET_RATE,
+        financialTransactionRepository: FinancialTransactionRepository = WriteRejectingFinancialTransactionRepository(ftRepo),
+    ): DashboardProjectionBuilder =
+        DashboardProjectionBuilder(
+            financialTransactionRepository = financialTransactionRepository,
+            reviewRepository = reviewRepo,
+            accountRegistryRepository = accounts,
+            cardRegistryRepository = cards,
+            loanRegistryRepository = loans,
+            commitmentRepository = commitments,
+            appLocaleRepository = localeRepository,
+            sarEquivalentResolver = TransactionSarEquivalentResolver(marketRateProvider, zone),
+            evidenceSource = DashboardEvidenceScope(financialTransactionRepository, parsedRepo, rawRepo),
+            zoneId = zone,
+            clock = clock,
+        )
+
+    fun exchangeRateEnrichmentWorkflow(
+        marketRateProvider: ForeignSarMarketRateProvider = NO_MARKET_RATE,
+        financialTransactionRepository: FinancialTransactionRepository = ftRepo,
+    ): ExchangeRateEnrichmentWorkflow =
+        ExchangeRateEnrichmentWorkflow(
+            financialTransactionRepository = financialTransactionRepository,
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
+            sarEquivalentResolver = TransactionSarEquivalentResolver(marketRateProvider, zone),
+        )
 
     override fun close() {
         db.close()
@@ -478,6 +527,8 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
     companion object {
         private const val STATEMENT_MONTHS = 19
 
+        val NO_MARKET_RATE = ForeignSarMarketRateProvider { _, _ -> null }
+
         /** Months of synthetic history used by dashboard read-path tests. */
         val SYNTHETIC_MONTHS: List<YearMonth> =
             generateSequence(YearMonth.of(2025, 1)) { it.plusMonths(1) }
@@ -511,18 +562,39 @@ class WholeHistoryDashboardEvidenceSource(
     ): DashboardEvidence = evidence
 }
 
-/**
- * Suppresses the dashboard's applied-exchange-rate write so repeated projections over one
- * database see identical stored state.
- */
-class ReadOnlyFinancialTransactionRepository(
+/** Fails the test on any FinancialTransaction write; dashboard loads must be read-only. */
+class WriteRejectingFinancialTransactionRepository(
     private val delegate: FinancialTransactionRepository,
 ) : FinancialTransactionRepository by delegate {
+    override suspend fun save(
+        transaction: FinancialTransaction,
+        rawSmsIds: Collection<String>,
+    ): FinancialTransactionSaveResult = rejected("save")
+
+    override suspend fun replaceExclusiveStaleLinks(
+        transaction: FinancialTransaction,
+        rawSmsIds: Collection<String>,
+        staleRawSmsIds: Collection<String>,
+    ): FinancialTransactionSaveResult = rejected("replaceExclusiveStaleLinks")
+
+    override suspend fun update(transaction: FinancialTransaction): Boolean = rejected("update")
+
     override suspend fun updateAppliedExchangeRate(
         id: String,
         exchangeRate: BigDecimal,
         source: ExchangeRateSource,
-    ): Boolean = true
+    ): Boolean = rejected("updateAppliedExchangeRate")
+
+    override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean =
+        rejected("deleteIfExclusiveRawSmsLink")
+
+    override suspend fun unlinkRawSms(rawSmsId: String): Boolean = rejected("unlinkRawSms")
+
+    override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean =
+        rejected("linkRawSmsIfAbsent")
+
+    private fun rejected(operation: String): Nothing =
+        throw AssertionError("FinancialTransactionRepository.$operation called during a read-only load")
 }
 
 /** Counts whole-history and per-row reads made through the wrapped repositories. */

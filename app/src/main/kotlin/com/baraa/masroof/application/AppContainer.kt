@@ -19,6 +19,7 @@ import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
 import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
+import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
 import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyncer
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
@@ -29,6 +30,7 @@ import com.baraa.masroof.application.notification.NotificationCenterMetricsWorkf
 import com.baraa.masroof.application.notification.NotificationCenterService
 import com.baraa.masroof.application.notification.NotificationPreferencesRepository
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
+import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.update.ApkInstaller
 import com.baraa.masroof.application.update.AppUpdateService
@@ -96,6 +98,7 @@ import com.baraa.masroof.application.sms.LiveSmsIntake
 import com.baraa.masroof.application.sms.LiveSmsProcessingWorker
 import com.baraa.masroof.application.sms.WorkManagerLiveSmsWorkScheduler
 import com.baraa.masroof.sms.time.InstantClock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -369,6 +372,21 @@ class AppContainer(
 
     private val updateHttpClient: OkHttpClient = GitHubReleaseClient.defaultHttpClient()
 
+    private val sarEquivalentResolver: TransactionSarEquivalentResolver =
+        TransactionSarEquivalentResolver(
+            marketRateProvider = FrankfurterForeignSarRateProvider(updateHttpClient),
+        )
+
+    /** Sole writer of applied exchange rates; dashboard loads stay read-only. */
+    val exchangeRateEnrichmentWorkflow: ExchangeRateEnrichmentWorkflow =
+        ExchangeRateEnrichmentWorkflow(
+            financialTransactionRepository = financialTransactionRepository,
+            parsedEventRepository = parsedEventRepository,
+            rawSmsRepository = rawSmsRepository,
+            sarEquivalentResolver = sarEquivalentResolver,
+            appLogService = appLogService,
+        )
+
     val dashboardService: DashboardService =
         DashboardService(
             financialTransactionRepository = financialTransactionRepository,
@@ -380,9 +398,7 @@ class AppContainer(
             cardRegistryRepository = cardRegistryRepository,
             loanRegistryRepository = loanRegistryRepository,
             commitmentRepository = commitmentRepository,
-            sarEquivalentResolver = TransactionSarEquivalentResolver(
-                marketRateProvider = FrankfurterForeignSarRateProvider(updateHttpClient),
-            ),
+            sarEquivalentResolver = sarEquivalentResolver,
         )
 
     val transactionRestoreService: TransactionRestoreService =
@@ -423,6 +439,7 @@ class AppContainer(
             reviewQueueUpdater = reviewQueueUpdater,
             ingestionReviewService = ingestionReviewService,
             appLogService = appLogService,
+            exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
         )
 
     val processRawSmsUseCase: ProcessRawSmsUseCase =
@@ -454,6 +471,7 @@ class AppContainer(
                 ownershipDiscovery = ownershipDiscoveryService,
                 reconciliation = transactionReconciliationService,
                 reviewQueueUpdater = reviewQueueUpdater,
+                exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
             ),
             appLogService = appLogService,
         )
@@ -489,6 +507,7 @@ class AppContainer(
                     repository = financialTransactionRepository,
                 )
                 refreshReviewQueue()
+                enrichExchangeRatesBestEffort()
             },
             appLogService = appLogService,
         )
@@ -599,6 +618,17 @@ class AppContainer(
                 }
             }
             liveSmsIntake.schedulePendingProcessing()
+            enrichExchangeRatesBestEffort()
+        }
+    }
+
+    private suspend fun enrichExchangeRatesBestEffort() {
+        try {
+            exchangeRateEnrichmentWorkflow.enrichPending()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            appLogService.warn(AppLogCategories.TRANSACTION, "Exchange-rate enrichment failed: ${e.javaClass.simpleName}")
         }
     }
 

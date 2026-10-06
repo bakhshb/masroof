@@ -756,6 +756,15 @@ Rules:
   "first/last matching row" rules behave as with a whole-history scan.
 - A new calculator rule that needs history not linked to a displayed transaction adds an
   explicit fact query here; it must not widen the load to whole history.
+- Normal loads are read-only: no repository writes during projection. Resolved exchange
+  rates are applied to the displayed transactions in memory
+  (`AppliedExchangeRateSyncer.applyInMemory`); a rate already persisted always wins.
+- `application/transaction/ExchangeRateEnrichmentWorkflow` is the only writer of
+  `appliedExchangeRate` / `exchangeRateSource`. It resolves pending foreign transactions
+  with the dashboard's resolver and evidence rules, resolves everything before writing,
+  and runs after live stored-SMS processing, after each historical batch, after bulk
+  reparse, and as best-effort startup background maintenance. Unresolved rows (e.g. no
+  network for a market rate) stay pending for the next run.
 
 ---
 

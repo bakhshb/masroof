@@ -46,7 +46,8 @@ data class DashboardOverview(
  * Application service that loads period transactions and builds a dashboard projection.
  *
  * SMS evidence comes from [evidenceSource] — by default the bounded [DashboardEvidenceScope],
- * never a whole-history ParsedEvent scan.
+ * never a whole-history ParsedEvent scan. Loading is read-only; exchange-rate persistence
+ * belongs to `ExchangeRateEnrichmentWorkflow`.
  */
 class DashboardService(
     private val financialTransactionRepository: FinancialTransactionRepository,

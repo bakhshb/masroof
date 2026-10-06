@@ -145,6 +145,35 @@ class PackageDependencyRulesTest {
     }
 
     @Test
+    fun dashboardProjection_isReadOnly() {
+        val files = listOf(
+            "DashboardService.kt",
+            "DashboardProjectionBuilder.kt",
+            "DashboardEvidenceScope.kt",
+            "AppliedExchangeRateSyncer.kt",
+        ).map { File(sourceRoot, "application/dashboard/$it") }
+        val writeCalls = listOf(
+            ".save(",
+            ".update(",
+            ".updateAppliedExchangeRate(",
+            ".replaceExclusiveStaleLinks(",
+            ".deleteIfExclusiveRawSmsLink(",
+            ".unlinkRawSms(",
+            ".linkRawSmsIfAbsent(",
+        )
+        files.forEach { file ->
+            assertTrue("${file.path} must exist", file.isFile)
+            val source = file.readText()
+            writeCalls.forEach { call ->
+                assertFalse(
+                    "${file.path} must not call '$call'; persist enrichment in an application workflow",
+                    source.contains(call),
+                )
+            }
+        }
+    }
+
+    @Test
     fun domain_loan_hasNoProductionSources() {
         val productionSources = kotlinFilesIn("domain/loan")
         assertTrue(
