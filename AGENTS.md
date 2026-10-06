@@ -28,6 +28,8 @@
 
 **SMS text matching:** Match on `NormalizedSms.comparisonBody` with `comparisonRegex(...)` / `containsComparison(...)` (Arabic-folded patterns); never display `comparisonBody` — slice display values with `normalizedSlice(range)`.
 
+**Classification:** Add AlJazira family wording as an `AlJaziraClassificationRule` with an explicit `AlJaziraClassificationSpecificity` tier — never rely on rule order. Competing families in the top tier must resolve to `UNKNOWN` (review); add a `collision_*` fixture for every new tie-break.
+
 **New bank:** Implement `BankSmsAdapter`, add fixture tests under `testdata/`, and register a `BankSmsAdapterContractCase` (real financial + non-financial fixtures, positive/negative senders) in `BankSmsAdapterContractTest`; no sample may be claimed by more than one adapter.
 
 **PRs:** Target `main` only. Partial architecture merges may show broken UI until backfill lands — that is expected.

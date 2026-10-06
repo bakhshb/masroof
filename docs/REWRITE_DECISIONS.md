@@ -254,3 +254,20 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   dropped characters. `OtpMessageHeuristics` folds its own input.
 - Fixture variants (bare alef, ي for ى, tatweel, diacritics, RLM marks, colon variant)
   must parse to the same facts as the canonical fixture.
+
+### M2.2 — Classification is deterministic evidence resolution
+
+- `AlJaziraMessageClassifier` no longer uses an ordered `when` chain. Every
+  `AlJaziraClassificationRule` is evaluated and `AlJaziraClassificationResolver`
+  keeps the highest `AlJaziraClassificationSpecificity` tier:
+  security (OTP) > account notices > balance notice > statement > named products
+  (installment, card payment, bill, refund) > money movement (purchase, withdrawal,
+  transfer, fee-titled message) > generic (a «رسوم» line outside the title).
+- One family in the top tier wins; its evidence lists `outranked:<rule>` for every
+  other family that matched. Two families in the top tier → `UNKNOWN` with
+  `ambiguous_classification` + `candidate:<rule>` evidence → `REVIEW_REQUIRED`.
+  `rank` only breaks ties inside a family (POS over online wording).
+- Rule list order carries no precedence; tests shuffle the production rules.
+- Every pre-existing fixture, reference body, and test SMS literal classifies exactly
+  as before. Collision fixtures (`collision_*`) pin the new behavior: transfer + fee
+  line → transfer; fee title + transfer wording, or incoming + outgoing titles → review.

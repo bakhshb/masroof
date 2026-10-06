@@ -424,6 +424,17 @@ data class ClassificationResult(
 )
 ```
 
+Classification is deterministic evidence resolution, never first-match order
+(AlJazira: `AlJaziraClassificationRule` + `AlJaziraClassificationResolver`):
+
+1. Evaluate every rule; each matching rule yields a candidate with an explicit specificity tier.
+2. Keep the highest tier (security > account notice > balance notice > statement > named product > money movement > generic).
+3. A single family in that tier wins; evidence records `outranked:<rule>` for the other families that matched.
+4. Different families in that tier → `UNKNOWN` (`ambiguous_classification`, `candidate:<rule>`) → review.
+
+Rule registration order must not change the result. Collision fixtures
+(`testdata/bank_aljazira/**/collision_*.json`) pin the tie-breaks.
+
 ---
 
 ## 13. Field Extractors

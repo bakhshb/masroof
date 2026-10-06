@@ -1,0 +1,11 @@
+{
+  "id": "collision_otp_online_purchase_en_001",
+  "sender": "AlJazira",
+  "body": "One Time Password for Online Purchase: 482913\nAmount: 250.00 SAR\nMerchant: TEST_STORE\nCard: **7271\nDo not share this code",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "OTP",
+    "parseStatus": "NON_FINANCIAL"
+  },
+  "notes": "Collision: purchase + OTP wording. Verification codes outrank purchase wording and quoted amounts."
+}

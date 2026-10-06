@@ -1,0 +1,18 @@
+{
+  "id": "collision_intra_generic_labels_ar_001",
+  "sender": "AlJazira",
+  "body": "حوالة صادرة داخلية\nمن حساب: 3001\nإلى حساب: 3003\nمبلغ: SAR 700.00\nفي: 2026-08-05 11:00",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "TRANSFER_OUT",
+    "direction": "OUTGOING",
+    "amount": "700.00",
+    "currency": "SAR",
+    "bankNetworkType": "INTRA_BANK",
+    "sourceAccountLast4": "3001",
+    "destinationAccountLast4": "3003",
+    "occurredAt": "2026-08-05T11:00:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Collision: intra-bank transfer with generic account labels (من حساب / إلى حساب)."
+}

@@ -1,0 +1,17 @@
+{
+  "id": "collision_refund_pos_purchase_ar_001",
+  "sender": "AlJazira",
+  "body": "استرداد مبلغ عملية شراء عبر نقاط البيع\nبطاقة: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 89.50 SAR\nفي: 2026-08-04 18:20",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "REFUND",
+    "direction": "INCOMING",
+    "amount": "89.50",
+    "currency": "SAR",
+    "cardLast4": "7271",
+    "merchant": "TEST_SHOP_C",
+    "occurredAt": "2026-08-04T18:20:00",
+    "parseStatus": "SUCCESS"
+  },
+  "notes": "Collision: refund + POS purchase wording. The refund product outranks the purchase it reverses."
+}
