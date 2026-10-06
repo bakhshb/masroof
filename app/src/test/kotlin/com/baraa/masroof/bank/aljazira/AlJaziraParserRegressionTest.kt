@@ -9,6 +9,7 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.parsing.model.AmountCandidate
 import com.baraa.masroof.parsing.model.AmountSourceKind
@@ -368,6 +369,7 @@ class AlJaziraParserRegressionTest {
             rawSmsId = "coin-1",
             bank = Bank.BANK_ALJAZIRA,
             messageFamily = MessageFamily.TRANSFER_OUT,
+            direction = MoneyDirection.OUTGOING,
             amount = money,
             sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
             confidence = Confidence(0.9),
@@ -411,6 +413,7 @@ class AlJaziraParserRegressionTest {
             rawSmsId = "same-1",
             bank = Bank.BANK_ALJAZIRA,
             messageFamily = MessageFamily.PURCHASE,
+            direction = MoneyDirection.OUTGOING,
             amount = money,
             merchant = "Shop",
             confidence = Confidence(0.9),

@@ -13,6 +13,9 @@ import com.baraa.masroof.parsing.validator.ValidationSeverity
  * [ParseResult.Success].
  *
  * extract → draft → validate → finalize
+ *
+ * A financial draft becomes SUCCESS only when [ParsedEventValidator] reports no ERROR
+ * findings; a parser's regex match or provisional status is never enough on its own.
  */
 class ParseFinalizer(
     private val validator: ParsedEventValidator,
@@ -62,27 +65,7 @@ class ParseFinalizer(
             }
 
             else -> {
-                if (validation.errors.isNotEmpty()) {
-                    val hasAmbiguousAmount = validation.errors.any { it.code == "V-007" }
-                    val status = if (hasAmbiguousAmount || family.isFinancial) {
-                        ParseStatus.REVIEW_REQUIRED
-                    } else {
-                        ParseStatus.INVALID
-                    }
-                    val withStatus = draft.copy(parseStatus = status)
-                    return if (status == ParseStatus.REVIEW_REQUIRED) {
-                        ParseResult.ReviewRequired(
-                            draft = withStatus,
-                            event = runCatching { withStatus.toParsedEvent(eventId) }.getOrNull(),
-                            details = details,
-                            findings = validation.findings,
-                            reasons = validation.errors.map { it.message },
-                        )
-                    } else {
-                        ParseResult.Invalid(findings = validation.findings, draft = withStatus)
-                    }
-                }
-
+                // Financial-looking drafts stay visible: any blocking finding is review, not INVALID.
                 if (!validation.isAcceptableForAutomaticUse) {
                     val withStatus = draft.copy(parseStatus = ParseStatus.REVIEW_REQUIRED)
                     return ParseResult.ReviewRequired(
@@ -90,7 +73,7 @@ class ParseFinalizer(
                         event = runCatching { withStatus.toParsedEvent(eventId) }.getOrNull(),
                         details = details,
                         findings = validation.findings,
-                        reasons = validation.findings.map { it.message },
+                        reasons = validation.reviewReasons,
                     )
                 }
 
@@ -100,24 +83,4 @@ class ParseFinalizer(
             }
         }
     }
-
-    private val MessageFamily.isFinancial: Boolean
-        get() = when (this) {
-            MessageFamily.PURCHASE,
-            MessageFamily.TRANSFER_IN,
-            MessageFamily.TRANSFER_OUT,
-            MessageFamily.CARD_PAYMENT,
-            MessageFamily.BILL_PAYMENT,
-            MessageFamily.FINANCING_INSTALLMENT,
-            MessageFamily.WITHDRAWAL,
-            MessageFamily.REFUND,
-            MessageFamily.FEE,
-            -> true
-
-            MessageFamily.BALANCE_NOTICE,
-            MessageFamily.OTP,
-            MessageFamily.NON_FINANCIAL,
-            MessageFamily.UNKNOWN,
-            -> false
-        }
 }

@@ -485,6 +485,25 @@ interface ParsedEventValidator {
 }
 ```
 
+The validator is the final automatic-use firewall. `ParseFinalizer` is the only
+producer of `ParseResult.Success`, and only when `ValidationResult.isAcceptableForAutomaticUse`
+(no ERROR findings). A financial draft with any blocking finding is finalized as
+`REVIEW_REQUIRED` with its event kept, never SUCCESS and never dropped.
+
+| Code | Rule (financial families unless noted) |
+|---|---|
+| V-001…V-006 | Amount provenance: never a card/account suffix, balance, reference, date, or unlabeled number |
+| V-007 | Multiple distinct transaction amounts (conflicting strong facts) |
+| V-009 / V-010 | Amount required / must be positive |
+| V-011 | Direction required and consistent with the family |
+| V-012 | Confidence ≥ `AutomaticUsePolicy.minFinancialConfidence` (0.8) |
+| V-013 / V-014 | Card / account suffix, when present, is exactly four ASCII digits (any family) |
+| V-015 | `occurredAtLocal`, when present, is within the `AutomaticUsePolicy` window (any family) |
+| V-016 / V-017 | Same account on both sides; purchase channel on a non-purchase family |
+
+Validators check parse facts only. They never resolve ownership, pair transfers,
+or decide `FinancialTransactionType` (enforced by `PackageDependencyRulesTest`).
+
 ---
 
 ## 15. Ownership Resolver

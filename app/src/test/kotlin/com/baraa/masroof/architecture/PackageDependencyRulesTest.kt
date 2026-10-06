@@ -108,6 +108,24 @@ class PackageDependencyRulesTest {
     }
 
     @Test
+    fun parsing_validationFirewall_doesNotResolveOwnershipOrTransactionMeaning() {
+        listOf("parsing/validator", "parsing/finalize").forEach { pkg ->
+            assertTrue("$pkg must exist", kotlinFilesIn(pkg).isNotEmpty())
+        }
+        assertPackagesDoNotImport(
+            packages = listOf("parsing/validator", "parsing/finalize"),
+            forbiddenImports = listOf(
+                "import com.baraa.masroof.domain.ownership.",
+                "import com.baraa.masroof.domain.assembly.",
+                "import com.baraa.masroof.domain.matching.",
+                "import com.baraa.masroof.domain.repository.",
+                "import com.baraa.masroof.domain.model.FinancialTransactionType",
+                "import com.baraa.masroof.domain.model.TransferOwnershipType",
+            ),
+        )
+    }
+
+    @Test
     fun domain_loan_hasNoProductionSources() {
         val productionSources = kotlinFilesIn("domain/loan")
         assertTrue(

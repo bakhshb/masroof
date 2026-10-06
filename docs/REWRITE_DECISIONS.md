@@ -271,3 +271,18 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Every pre-existing fixture, reference body, and test SMS literal classifies exactly
   as before. Collision fixtures (`collision_*`) pin the new behavior: transfer + fee
   line → transfer; fee title + transfer wording, or incoming + outgoing titles → review.
+
+### M2.3 — Validator is the final automatic-use firewall
+
+- `DefaultParsedEventValidator` adds V-010 (positive amount), V-011 (family/direction
+  consistency), V-012 (explicit `AutomaticUsePolicy` confidence minimum, 0.8),
+  V-013/V-014 (four-digit card/account suffix shape), V-015 (plausible local time,
+  injectable `Clock`), V-016/V-017 (conflicting strong facts) on top of V-001…V-009.
+- `ParseFinalizer` has one gate: any ERROR finding on a financial family →
+  `REVIEW_REQUIRED` with the event kept (the unreachable INVALID branch was removed).
+  `ValidationResult` exposes `reviewReasons` and `blockingCodes`.
+- Every existing fixture still finalizes as before; fixture tests prove each SUCCESS
+  fixture fails safe to review under a stricter confidence policy or an implausible clock.
+- Card payments accept OUTGOING or INCOMING because direction is relative to the
+  referenced account or card. Instrument presence (card/account) is not required:
+  existing SUCCESS parses include instrument-less SMS, so requiring it would change output.

@@ -21,6 +21,9 @@ import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.SmsParseInput
+import com.baraa.masroof.parsing.finalize.ParseFinalizer
+import com.baraa.masroof.parsing.validator.AutomaticUsePolicy
+import com.baraa.masroof.parsing.validator.DefaultParsedEventValidator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -30,9 +33,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import java.math.BigDecimal
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(Parameterized::class)
@@ -183,6 +188,47 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
             }
         }
     }
+
+    @Test
+    fun validationFirewall_blocksSuccessUnderStricterConfidencePolicy() {
+        val strict = pipelineWith(DefaultParsedEventValidator(AutomaticUsePolicy(minFinancialConfidence = 0.99)))
+        assertFirewall(strict.parse(input()), blockingCode = "V-012")
+    }
+
+    @Test
+    fun validationFirewall_blocksDatedSuccessWhenSmsTimeIsImplausible() {
+        if (fixture.expected.occurredAt == null) return
+        val clockBeforeSms = Clock.fixed(Instant.parse("2020-01-01T00:00:00Z"), ZoneOffset.UTC)
+        val pipeline = pipelineWith(DefaultParsedEventValidator(clock = clockBeforeSms))
+        assertFirewall(pipeline.parse(input()), blockingCode = "V-015")
+    }
+
+    /** SUCCESS fixtures must become REVIEW_REQUIRED (same facts); other outcomes must not change. */
+    private fun assertFirewall(result: ParseResult, blockingCode: String) {
+        val baseline = pipeline.parse(input())
+        if (fixture.expected.parseStatus != "SUCCESS") {
+            assertEquals(fixture.id, baseline::class, result::class)
+            assertEquals(fixture.id, unpack(baseline), unpack(result))
+            return
+        }
+        assertTrue("${fixture.id} must fail safe to review, got $result", result is ParseResult.ReviewRequired)
+        result as ParseResult.ReviewRequired
+        assertTrue(fixture.id, result.findings.any { it.code == blockingCode })
+        val event = requireNotNull(result.event) { "${fixture.id} review must keep its event" }
+        assertEquals(fixture.id, ParseStatus.REVIEW_REQUIRED, event.parseStatus)
+        assertEquals(fixture.id, (baseline as ParseResult.Success).event.copy(parseStatus = ParseStatus.REVIEW_REQUIRED), event)
+    }
+
+    private fun pipelineWith(validator: DefaultParsedEventValidator) = AlJaziraParsingPipeline(
+        parser = AlJaziraMessageParser(finalizer = ParseFinalizer(validator)),
+    )
+
+    private fun input() = SmsParseInput(
+        rawSmsId = fixture.id,
+        sender = fixture.sender,
+        body = fixture.body,
+        receivedAt = Instant.parse("2026-08-10T00:00:00Z"),
+    )
 
     @Test
     fun typographyVariants_parseLikeCanonicalFixture() {
