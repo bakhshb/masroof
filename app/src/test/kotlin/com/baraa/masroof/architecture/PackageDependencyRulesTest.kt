@@ -126,6 +126,25 @@ class PackageDependencyRulesTest {
     }
 
     @Test
+    fun liveSmsWork_isExecutionAdapterOnly() {
+        val files = listOf("LiveSmsProcessingWorker.kt", "LiveSmsWorkScheduler.kt")
+            .map { File(sourceRoot, "application/sms/$it") }
+        files.forEach { assertTrue("${it.path} must exist", it.isFile) }
+        assertFilesDoNotImport(
+            files = files,
+            forbiddenImports = listOf(
+                "import com.baraa.masroof.bank.",
+                "import com.baraa.masroof.parsing.",
+                "import com.baraa.masroof.data.",
+                "import com.baraa.masroof.domain.ownership.",
+                "import com.baraa.masroof.domain.assembly.",
+                "import com.baraa.masroof.domain.matching.",
+                "import com.baraa.masroof.application.transaction.",
+            ),
+        )
+    }
+
+    @Test
     fun domain_loan_hasNoProductionSources() {
         val productionSources = kotlinFilesIn("domain/loan")
         assertTrue(

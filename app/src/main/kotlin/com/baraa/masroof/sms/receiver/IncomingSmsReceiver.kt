@@ -17,7 +17,9 @@ import kotlinx.coroutines.launch
  * [com.baraa.masroof.domain.model.RawSms.receivedAt] uses the application
  * [com.baraa.masroof.sms.time.InstantClock] (device receipt), not SMSC timestamps.
  *
- * Work runs off the main broadcast path via [goAsync] + application scope.
+ * Android I/O only: assembles the message, then [goAsync] covers just the short
+ * capture of durable RawSms evidence and scheduling of its processing by rawSmsId.
+ * Parse and reconciliation run in WorkManager, not within the broadcast lifetime.
  * Does not log SMS bodies, OTPs, or financial fields.
  *
  * No-arg constructor required for manifest instantiation.

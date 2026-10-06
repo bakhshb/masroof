@@ -27,6 +27,16 @@ interface RawSmsDao {
     @Query("SELECT id FROM raw_sms ORDER BY receivedAtEpochMillis ASC, id ASC")
     suspend fun listIdsByReceivedAt(): List<String>
 
+    @Query(
+        """
+        SELECT r.id FROM raw_sms r
+        WHERE NOT EXISTS (SELECT 1 FROM parsed_event p WHERE p.rawSmsId = r.id)
+          AND NOT EXISTS (SELECT 1 FROM review_item v WHERE v.rawSmsId = r.id)
+        ORDER BY r.receivedAtEpochMillis ASC, r.id ASC
+        """,
+    )
+    suspend fun listIdsAwaitingProcessing(): List<String>
+
     @Query("SELECT * FROM raw_sms WHERE dedupeKey = :dedupeKey LIMIT 1")
     suspend fun findByDedupeKey(dedupeKey: String): RawSmsEntity?
 

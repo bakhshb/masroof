@@ -2,6 +2,7 @@ package com.baraa.masroof.application
 
 import android.content.Context
 import androidx.room.Room
+import androidx.work.WorkManager
 import com.baraa.masroof.application.backup.DatabaseBackupService
 import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.application.dashboard.DashboardService
@@ -91,6 +92,8 @@ import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
+import com.baraa.masroof.application.sms.LiveSmsProcessingWorker
+import com.baraa.masroof.application.sms.WorkManagerLiveSmsWorkScheduler
 import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -430,9 +433,13 @@ class AppContainer(
     val liveSmsIntake: LiveSmsIntake =
         LiveSmsIntake(
             captureBankSms = captureBankSmsUseCase,
-            processStoredSms = processStoredSmsUseCase,
+            scheduler = WorkManagerLiveSmsWorkScheduler { WorkManager.getInstance(appContext) },
+            rawSmsRepository = rawSmsRepository,
             appLogService = appLogService,
         )
+
+    val workerFactory: LiveSmsProcessingWorker.Factory =
+        LiveSmsProcessingWorker.Factory { processStoredSmsUseCase }
 
     val smsDataSource: SmsDataSource =
         AndroidSmsDataSource(appContext.contentResolver)
@@ -588,6 +595,7 @@ class AppContainer(
                     startupMaintenanceCompletion.complete(Unit)
                 }
             }
+            liveSmsIntake.schedulePendingProcessing()
         }
     }
 

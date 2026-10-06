@@ -25,6 +25,13 @@ interface RawSmsRepository {
     suspend fun listIdsByReceivedAt(): List<String>
 
     /**
+     * Stored RawSms ids with no durable processing outcome yet (neither a ParsedEvent nor
+     * a review row), oldest receipt first. Captured evidence whose processing was lost to
+     * process death is found here and rescheduled.
+     */
+    suspend fun listIdsAwaitingProcessing(): List<String> = emptyList()
+
+    /**
      * Live↔historical near-duplicate: same sender + bodyHash within
      * [fromInclusive]…[toInclusive], opposite deviceMessageId nullness.
      *

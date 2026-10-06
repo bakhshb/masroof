@@ -2,28 +2,75 @@ package com.baraa.masroof.application.sms
 
 import com.baraa.masroof.application.ingestion.BankSmsCaptureResult
 import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
-import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.repository.RawSmsRepository
+import kotlinx.coroutines.CancellationException
 
 /**
  * Application boundary for live SMS received from [com.baraa.masroof.sms.receiver.IncomingSmsReceiver].
  *
- * Captures durable RawSms evidence first, then processes it by the captured row.
+ * Captures durable RawSms evidence, then schedules processing by rawSmsId and returns.
+ * Parse, ownership, reconciliation, and review work run later in [LiveSmsProcessingWorker],
+ * outside the broadcast lifetime.
  */
 class LiveSmsIntake(
     private val captureBankSms: CaptureBankSmsUseCase,
-    private val processStoredSms: ProcessStoredSmsUseCase,
+    private val scheduler: LiveSmsWorkScheduler,
+    private val rawSmsRepository: RawSmsRepository,
     private val appLogService: AppLogService,
 ) {
-    suspend fun ingest(rawSms: RawSms) {
+    suspend fun ingest(rawSms: RawSms): BankSmsCaptureResult {
         appLogService.info(
             AppLogCategories.SMS,
             "Live SMS received from ${AppLogFormatting.maskSender(rawSms.sender)}",
         )
-        val captured = captureBankSms.capture(rawSms) as? BankSmsCaptureResult.Captured ?: return
-        processStoredSms.process(captured.rawSms, captured.route)
+        val result = captureBankSms.capture(rawSms)
+        if (result is BankSmsCaptureResult.Captured) {
+            schedule(result.rawSmsId)
+        }
+        return result
     }
+
+    /**
+     * Reschedules captured evidence that has no durable processing outcome, e.g. when the
+     * process died between capture and scheduling. Returns how many ids were scheduled.
+     */
+    suspend fun schedulePendingProcessing(): Int {
+        val pending = try {
+            rawSmsRepository.listIdsAwaitingProcessing()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            appLogService.error(
+                AppLogCategories.SMS,
+                "Listing SMS awaiting processing failed (${e::class.java.simpleName})",
+            )
+            return 0
+        }
+        val scheduled = pending.count(::schedule)
+        if (pending.isNotEmpty()) {
+            appLogService.info(
+                AppLogCategories.SMS,
+                "Rescheduled $scheduled of ${pending.size} captured SMS awaiting processing",
+            )
+        }
+        return scheduled
+    }
+
+    private fun schedule(rawSmsId: String): Boolean =
+        try {
+            scheduler.schedule(rawSmsId)
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            appLogService.error(
+                AppLogCategories.SMS,
+                "Scheduling SMS processing failed (${e::class.java.simpleName}); kept for startup recovery",
+            )
+            false
+        }
 }

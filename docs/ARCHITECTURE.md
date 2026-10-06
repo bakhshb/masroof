@@ -196,14 +196,17 @@ RawSmsRepository
 ### New messages
 
 ```text
-BroadcastReceiver
+IncomingSmsReceiver (assemble multipart, Android I/O only)
    ↓
-IncomingSmsHandler
+LiveSmsIntake → CaptureBankSmsUseCase (durable RawSms)
    ↓
-RawSms
+LiveSmsWorkScheduler (unique work "live-sms:<rawSmsId>", input = rawSmsId only)
    ↓
-RawSmsRepository
+LiveSmsProcessingWorker → ProcessStoredSmsUseCase.process(rawSmsId)
 ```
+
+The receiver's `goAsync` window covers only capture + scheduling; parse and
+reconciliation never run within the broadcast lifetime.
 
 Both flows must converge into the same processing pipeline.
 
@@ -734,6 +737,18 @@ New SMS processing should be safe even if:
 - the same SMS is delivered twice
 
 The pipeline must be idempotent.
+
+Live processing runs in WorkManager:
+
+| Concern | Contract |
+|---|---|
+| Work input | `rawSmsId` only (`LiveSmsProcessingWorker.KEY_RAW_SMS_ID`); never body or OTP text |
+| Duplicates | unique work per rawSmsId with `ExistingWorkPolicy.KEEP`; capture dedupe returns `Duplicate` without scheduling |
+| Retry | exponential backoff; `Result.retry()` for processing failures/exceptions until `MAX_ATTEMPTS`, then the evidence keeps its `processing_error` review |
+| Permanent failure | missing input or `raw_sms_not_found` → `Result.failure()` |
+| Cancellation | `CancellationException` propagates; captured evidence stays and is processed by the next run |
+| Process death | startup sweep `LiveSmsIntake.schedulePendingProcessing()` reschedules `RawSmsRepository.listIdsAwaitingProcessing()` (no ParsedEvent and no review row) |
+| Wiring | `MasroofApplication.workManagerConfiguration` registers `LiveSmsProcessingWorker.Factory`; other workers fall back to the default factory |
 
 ---
 

@@ -298,3 +298,19 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   → route) and is safe to retry; `reparseStored` is the backlog entry point.
 - `ProcessRawSmsUseCase` remains as a capture-then-process facade (historical scan,
   reprocessing, tests). `LiveSmsIntake` calls the two use cases directly.
+
+### M3.2 — Live processing runs in WorkManager
+
+- `LiveSmsIntake.ingest` captures and schedules by rawSmsId, then returns; the receiver
+  no longer owns parse/reconciliation lifetime. `LiveSmsProcessingWorker` is an execution
+  adapter over `ProcessStoredSmsUseCase.process(rawSmsId)` with no parsing or financial rules.
+- Work data holds only the rawSmsId. Live ids embed sender and body hash (see
+  `AndroidSmsMapper`), the same app-private evidence identity already stored in `raw_sms`.
+- Unique work + `KEEP` and idempotent stored processing make duplicate broadcasts and
+  retries safe. Retries are bounded (`MAX_ATTEMPTS`); `processing_error` reviews keep
+  exhausted evidence visible and eligible for reparse.
+- A startup sweep reschedules evidence with neither a ParsedEvent nor a review row, so a
+  process death between capture and enqueue does not lose a recognized-bank SMS. The
+  sweep runs after startup maintenance and never blocks it.
+- No expedited work: on API < 31 that requires foreground-service info, and plain
+  one-time work without constraints already runs promptly.

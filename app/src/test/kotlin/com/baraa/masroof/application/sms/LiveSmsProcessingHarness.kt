@@ -1,0 +1,126 @@
+package com.baraa.masroof.application.sms
+
+import android.content.Context
+import androidx.room.Room
+import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
+import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
+import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.review.IngestionReviewService
+import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.transaction.TransactionReconciliationService
+import com.baraa.masroof.bank.BankSmsRegistry
+import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
+import com.baraa.masroof.bank.aljazira.AlJaziraSmsAdapter
+import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
+import com.baraa.masroof.data.repository.RoomCardRegistryRepository
+import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
+import com.baraa.masroof.data.repository.RoomParsedEventRepository
+import com.baraa.masroof.data.repository.RoomRawSmsRepository
+import com.baraa.masroof.data.repository.RoomReviewRepository
+import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
+import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.CardReference
+import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
+import com.baraa.masroof.domain.repository.RawSmsRepository
+import com.baraa.masroof.parsing.parser.SmsParseGateway
+import com.baraa.masroof.sms.mapper.AndroidSmsMapper
+import com.baraa.masroof.sms.model.ProviderSmsRecord
+import com.baraa.masroof.sms.time.InstantClock
+import kotlinx.coroutines.runBlocking
+import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
+
+/** In-memory Room wiring of the live capture → stored processing path for worker tests. */
+internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
+    val db: MasroofDatabase = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java)
+        .allowMainThreadQueries()
+        .build()
+    val rawRepo = RoomRawSmsRepository(db.rawSmsDao())
+    val parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
+    val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
+    val reviewRepo = RoomReviewRepository(db.reviewItemDao())
+    val appLog = AppLogService(context)
+    val parseCalls = AtomicInteger(0)
+    private val clock = InstantClock { Instant.parse("2026-08-11T12:00:00Z") }
+    private val cards = RoomCardRegistryRepository.from(db)
+
+    /** Throws from the parser while > 0, decrementing per call. */
+    val parserFailuresRemaining = AtomicInteger(0)
+
+    val registry = BankSmsRegistry(
+        listOf(
+            AlJaziraSmsAdapter(
+                pipeline = SmsParseGateway { input ->
+                    parseCalls.incrementAndGet()
+                    check(parserFailuresRemaining.getAndDecrement() <= 0) { "injected parser failure" }
+                    AlJaziraParsingPipeline().parse(input)
+                },
+            ),
+        ),
+    )
+
+    val capture = CaptureBankSmsUseCase(rawRepo, registry)
+
+    init {
+        runBlocking { cards.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "7271"), OwnershipStatus.OWNED) }
+    }
+
+    fun processStored(rawSmsRepository: RawSmsRepository = rawRepo): ProcessStoredSmsUseCase =
+        ProcessStoredSmsUseCase(
+            rawSmsRepository = rawSmsRepository,
+            parsedEventRepository = parsedRepo,
+            bankSmsRegistry = registry,
+            reconciliation = TransactionReconciliationService(
+                parsedEventRepository = parsedRepo,
+                rawSmsRepository = rawRepo,
+                financialTransactionRepository = ftRepo,
+                ownershipResolver = OwnershipResolver(
+                    RoomAccountRegistryRepository.from(db),
+                    cards,
+                    NoOpLoanRegistryRepository,
+                ),
+                effectiveParsedEventProvider = EffectiveParsedEventProvider(
+                    parsedRepo,
+                    RoomUserCorrectionRepository(db.userCorrectionDao()),
+                ),
+                reviewRepository = reviewRepo,
+            ),
+            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
+            ingestionReviewService = IngestionReviewService(reviewRepo, clock),
+        )
+
+    fun intake(scheduler: LiveSmsWorkScheduler): LiveSmsIntake =
+        LiveSmsIntake(
+            captureBankSms = capture,
+            scheduler = scheduler,
+            rawSmsRepository = rawRepo,
+            appLogService = appLog,
+        )
+
+    override fun close() {
+        db.close()
+    }
+
+    companion object {
+        const val OTP_CODE = "482913"
+
+        val PURCHASE_BODY = """
+            شراء عبر الانترنت
+            بطاقة: 7271
+            لدى: Keeta
+            بمبلغ: 51.99 SAR
+            في: 14:32 03-08-2026
+        """.trimIndent()
+
+        const val OTP_BODY =
+            "رمز التحقق لعملية شراء عبر الانترنت: $OTP_CODE\nبمبلغ: 250.00 SAR\nلدى: TEST_STORE\nلا تشارك الرمز مع أحد"
+
+        fun liveSms(body: String = PURCHASE_BODY, at: String = "2026-08-03T14:32:00Z"): RawSms =
+            AndroidSmsMapper.toRawSms(ProviderSmsRecord(null, "AlJazira", body, Instant.parse(at)))
+    }
+}

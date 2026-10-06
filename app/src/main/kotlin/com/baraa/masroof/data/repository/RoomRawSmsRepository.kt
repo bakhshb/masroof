@@ -33,6 +33,8 @@ class RoomRawSmsRepository(
 
     override suspend fun listIdsByReceivedAt(): List<String> = dao.listIdsByReceivedAt()
 
+    override suspend fun listIdsAwaitingProcessing(): List<String> = dao.listIdsAwaitingProcessing()
+
     override suspend fun findCrossSourceNearDuplicate(
         sender: String,
         bodyHash: String,
