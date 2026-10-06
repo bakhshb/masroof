@@ -209,3 +209,15 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Reparse replaces the ParsedEvent keyed by rawSmsId, never duplicates RawSms,
   keeps user corrections (keyed by rawSmsId) and existing transaction links, and
   runs derived discovery / reconciliation / review refresh once at the end.
+
+### M1.3 — Bank-adapter contract requires real evidence
+
+- `BankSmsAdapterContract.verify` runs against per-adapter
+  `BankSmsAdapterContractSamples`; AlJazira samples come from the on-disk fixture
+  corpus, the stub adapter carries its own minimal formats.
+- Asserted: bank ≠ UNKNOWN; positive senders detect as `adapter.bank`; known-negative
+  senders are not claimed; parsed event bank equals `adapter.bank`; financial
+  fixtures parse SUCCESS with an amount; non-financial fixtures stay
+  `NonFinancial`; unsupported/unknown samples never parse SUCCESS.
+- The registry contract requires each sample to be claimed by exactly one adapter
+  and to route identically under any registration order.

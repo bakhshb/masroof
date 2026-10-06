@@ -24,7 +24,7 @@
 
 **Parse-status gate:** Only `ParseStatus.SUCCESS` (or user-corrected) evidence may create/pair/post a `FinancialTransaction` (`TransactionAssembler.isAutomationEligible`). Never bypass it in reconciliation passes.
 
-**New bank:** Implement `BankSmsAdapterContract` + fixture tests under `testdata/`.
+**New bank:** Implement `BankSmsAdapter`, add fixture tests under `testdata/`, and register a `BankSmsAdapterContractCase` (real financial + non-financial fixtures, positive/negative senders) in `BankSmsAdapterContractTest`; no sample may be claimed by more than one adapter.
 
 **PRs:** Target `main` only. Partial architecture merges may show broken UI until backfill lands — that is expected.
 

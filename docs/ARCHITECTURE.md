@@ -758,6 +758,13 @@ Adding another bank should roughly require:
 5. tests
 ```
 
+Every adapter must pass the shared contract (`bank/contract/BankSmsAdapterContract`)
+with its own `BankSmsAdapterContractSamples`: positive and known-negative senders,
+at least one fixture-backed financial message (parses `SUCCESS` with an amount) and
+one non-financial message, and unsupported/ambiguous messages that never parse
+`SUCCESS`. The registry contract also requires every sample to be claimed by exactly
+one adapter regardless of registration order.
+
 It must not require changes to:
 
 - ownership concepts
