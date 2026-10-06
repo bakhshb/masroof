@@ -731,6 +731,15 @@ ViewModels should not contain:
 
 ### 22.1 Dashboard read model
 
+`DashboardProjectionBuilder` is composition only: it loads one `DashboardProjectionContext`
+(registries, scoped evidence, displayed period transactions with in-memory rates, SAR
+equivalents, debit-card scope, locale) and hands it to the section projections —
+`AnalysisDashboardProjection` (summary, merchants, daily trend), `AccountsDashboardProjection`,
+`CardsDashboardProjection` (statement window, facilities, debit spend) and
+`CommitmentsDashboardProjection` (loans, commitments, statement-settling payments). A section
+owns only the extra reads its rules need; shared inputs are never re-read. Specialist
+`*Builder` / `*Calculator` objects stay authoritative for the rules.
+
 The dashboard is a scoped read model over persisted facts. `DashboardService.loadProjection`
 reads the selected salary period's `FinancialTransaction`s and hands them to
 `DashboardProjectionBuilder`, which obtains parsed/raw evidence only through

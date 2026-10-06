@@ -4,7 +4,6 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
@@ -20,6 +19,11 @@ import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
 
+/**
+ * Composes the dashboard read model: loads the shared [DashboardProjectionContext] once,
+ * then delegates to the section projections (analysis, accounts, cards, commitments).
+ * Business rules live in the section projections' specialist builders/calculators.
+ */
 class DashboardProjectionBuilder(
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val reviewRepository: ReviewRepository,
@@ -34,13 +38,69 @@ class DashboardProjectionBuilder(
     private val clock: Clock = Clock.systemDefaultZone(),
     private val primaryCurrency: Currency = Currency.SAR,
 ) {
+    private val cardsProjection = CardsDashboardProjection(
+        financialTransactionRepository = financialTransactionRepository,
+        evidenceSource = evidenceSource,
+        sarEquivalentResolver = sarEquivalentResolver,
+    )
+    private val commitmentsProjection = CommitmentsDashboardProjection(
+        financialTransactionRepository = financialTransactionRepository,
+        commitmentRepository = commitmentRepository,
+        evidenceSource = evidenceSource,
+        sarEquivalentResolver = sarEquivalentResolver,
+    )
+
     /** [transactions] are the selected period's stored transactions. */
     suspend fun build(
         period: FinancialPeriod,
         transactions: List<FinancialTransaction>,
     ): DashboardProjection {
-        val reviewRequiredCount = reviewRepository.listRequired().size
-        val commitments = commitmentRepository.listAll()
+        val context = loadContext(period, transactions)
+        val analysis = AnalysisDashboardProjection.build(context)
+        val accounts = AccountsDashboardProjection.build(context)
+        val cards = cardsProjection.build(context)
+        val commitments = commitmentsProjection.build(context, cards.creditFacilities)
+        val bankHierarchy = BankHierarchyBuilder.build(
+            ownedAccounts = context.ownedAccounts,
+            accountsFleet = accounts.accountsFleet,
+            creditFacilities = cards.creditFacilities,
+            loans = context.loans,
+        )
+
+        return DashboardProjection(
+            period = period,
+            isCurrentPeriod = period == FinancialPeriodPolicy.periodContaining(context.today),
+            summary = analysis.summary,
+            fleet = accounts.fleet,
+            spendingSplit = accounts.spendingSplit,
+            accountsFleet = accounts.accountsFleet,
+            perAccount = accounts.perAccount,
+            creditFacilities = cards.creditFacilities,
+            loansOverview = commitments.loansOverview,
+            commitmentsOverview = commitments.commitmentsOverview,
+            merchantSpending = analysis.merchantSpending,
+            dailySpendingTrend = analysis.dailySpendingTrend,
+            bankHierarchy = bankHierarchy,
+            flowDetail = accounts.flowDetail,
+            transactionAccountInvolvement = accounts.transactionAccountInvolvement,
+            transactionCardInvolvement = cards.transactionCardInvolvement,
+            transactionLoanInvolvement = commitments.transactionLoanInvolvement,
+            transactionDebitSpendInvolvement = cards.transactionDebitSpendInvolvement,
+            transactions = context.transactions,
+            meta = DashboardMeta(
+                transactionCount = analysis.summary.transactionCount,
+                reviewRequiredCount = context.reviewRequiredCount,
+                excludedOtherCurrencyCount = analysis.summary.excludedOtherCurrencyCount,
+            ),
+            accountRegistry = context.ownedAccounts,
+            cardRegistry = context.cardRegistry,
+        )
+    }
+
+    private suspend fun loadContext(
+        period: FinancialPeriod,
+        transactions: List<FinancialTransaction>,
+    ): DashboardProjectionContext {
         val cardRegistry = cardRegistryRepository.listAll()
         val periodEndExclusive = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zoneId)
         val evidence = evidenceSource.load(
@@ -48,303 +108,48 @@ class DashboardProjectionBuilder(
             registryCards = cardRegistry,
             periodEndExclusive = periodEndExclusive,
         )
-        val parsedRecords = evidence.parsedRecords
-        val rawSmsById = evidence.rawSmsById
         val enrichedTransactions = TransactionDisplayEnricher.enrichMerchants(
             transactions = transactions,
-            parsedRecords = parsedRecords,
+            parsedRecords = evidence.parsedRecords,
         )
         val sarResolutions = sarEquivalentResolver.resolve(
             transactions = enrichedTransactions,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
+            parsedRecords = evidence.parsedRecords,
+            rawSmsById = evidence.rawSmsById,
             primaryCurrency = primaryCurrency,
         )
-        val syncedTransactions = AppliedExchangeRateSyncer.applyInMemory(
-            transactions = enrichedTransactions,
-            resolutions = sarResolutions,
+        val displayedTransactions = SelfTransferDeduplicator.filter(
+            transactions = AppliedExchangeRateSyncer.applyInMemory(enrichedTransactions, sarResolutions),
+            parsedRecords = evidence.parsedRecords,
         )
-        val dedupedTransactions = SelfTransferDeduplicator.filter(
-            transactions = syncedTransactions,
-            parsedRecords = parsedRecords,
-        )
-        val sarEquivalents = sarResolutions.sarAmounts()
-        val periodTransactionIds = dedupedTransactions.mapTo(mutableSetOf()) { it.id }
-        val commitmentSourceTransactions = commitments.mapNotNull { commitment ->
-            if (commitment.sourceTransactionId in periodTransactionIds) {
-                null
-            } else {
-                financialTransactionRepository.getById(commitment.sourceTransactionId)
-            }
-        }
-        val commitmentEvidence = evidenceSource.extend(evidence, commitmentSourceTransactions)
-        val commitmentSarEquivalents = sarEquivalentResolver.resolve(
-            transactions = commitmentSourceTransactions,
-            parsedRecords = commitmentEvidence.parsedRecords,
-            rawSmsById = commitmentEvidence.rawSmsById,
-            primaryCurrency = primaryCurrency,
-        ).sarAmounts()
-        val commitmentSarEquivalentAmounts = sarEquivalents + commitmentSarEquivalents
-
         val ownedAccounts = accountRegistryRepository.listAll()
             .filter { it.bank != Bank.UNKNOWN && it.ownership == OwnershipStatus.OWNED }
-        val ownedAccountContainerIds = ownedAccounts
-            .mapNotNull { FinancialContainerIdFactory.accountId(it.bank, it.maskedNumber) }
-            .toSet()
-        val ownedAccountLast4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
-            ownedAccounts.map { it.maskedNumber },
-        )
-        val debitCardScope = DebitCardScopeFactory.fromRegistry(
-            cards = cardRegistry,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-            registryAccounts = ownedAccounts,
-        )
-
-        val summary = MonthlyFinancialSummaryCalculator.summarize(
+        return DashboardProjectionContext(
             period = period,
-            transactions = dedupedTransactions,
-            reviewRequiredCount = reviewRequiredCount,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-            parsedRecords = parsedRecords,
-        )
-        val fleet = CurrentAccountSummaryCalculator.summarize(
-            transactions = dedupedTransactions,
-            parsedRecords = parsedRecords,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-            ownedAccountContainerIds = ownedAccountContainerIds,
-            ownedAccountLast4s = ownedAccountLast4s,
-            rawSmsById = rawSmsById,
-            debitCardScope = debitCardScope,
-        )
-        val spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
-            transactions = dedupedTransactions,
-            parsedRecords = parsedRecords,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-            ownedAccountContainerIds = ownedAccountContainerIds,
-            ownedAccountLast4s = ownedAccountLast4s,
-            rawSmsById = rawSmsById,
-            debitCardScope = debitCardScope,
-        )
-        val perAccount = OwnedAccountPeriodSummaryCalculator.summarize(
-            ownedAccounts = ownedAccounts,
-            transactions = dedupedTransactions,
-            parsedRecords = parsedRecords,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-            rawSmsById = rawSmsById,
-            debitCardScope = debitCardScope,
-        )
-        val accountsFleet = AccountsSummary.fromSummaries(
-            accounts = ownedAccounts.map { it.bank to it.maskedNumber },
-            summaries = perAccount.map { it.summary },
-        )
-        val flowDetail = CurrentAccountFlowDetailGrouper.group(
-            transactions = dedupedTransactions,
-            parsedRecords = parsedRecords,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-            ownedAccountContainerIds = ownedAccountContainerIds,
-            ownedAccountLast4s = ownedAccountLast4s,
-            rawSmsById = rawSmsById,
-            debitCardScope = debitCardScope,
-        )
-        val transactionAccountInvolvement = AccountTransactionInvolvementResolver.buildIndex(
-            transactions = dedupedTransactions,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-            ownedAccounts = ownedAccounts,
-        )
-        val transactionCardInvolvement = CardTransactionInvolvementResolver.buildIndex(
-            transactions = dedupedTransactions,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-        )
-        val transactionLoanInvolvement = LoanRepaymentAttribution.buildInvolvementIndex(
-            transactions = dedupedTransactions,
-            parsedRecords = parsedRecords,
-        )
-
-        val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-            zoneId = zoneId,
             periodEndExclusive = periodEndExclusive,
-        )
-        val cardQueryStart = minOf(
-            FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zoneId),
-            statementStart,
-        )
-        val cardTransactions = financialTransactionRepository.listOccurredBetween(
-            startInclusive = cardQueryStart,
-            endExclusive = periodEndExclusive,
-        )
-        val cardEvidence = evidenceSource.extend(evidence, cardTransactions)
-        val enrichedCardTransactions = TransactionDisplayEnricher.enrichMerchants(
-            transactions = cardTransactions,
-            parsedRecords = cardEvidence.parsedRecords,
-        )
-        val cardSarResolutions = sarEquivalentResolver.resolve(
-            transactions = enrichedCardTransactions,
-            parsedRecords = cardEvidence.parsedRecords,
-            rawSmsById = cardEvidence.rawSmsById,
-            primaryCurrency = primaryCurrency,
-        )
-        val cardSarEquivalents = cardSarResolutions.sarAmounts()
-        val displayLocale = AppLocale.displayLocale(appLocaleRepository.getLanguageTag())
-        val creditCardsFlat = CreditCardOverviewBuilder.build(
-            salaryPeriod = period,
-            cardTransactions = enrichedCardTransactions,
-            parsedRecords = cardEvidence.parsedRecords,
-            rawSmsById = cardEvidence.rawSmsById,
-            zoneId = zoneId,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = cardSarEquivalents,
-            displayLocale = displayLocale,
-        )
-        val debitSpend = DebitCardOverviewBuilder.buildSpendingByCardKey(
-            salaryPeriod = period,
-            debitCards = cardRegistry,
-            transactions = dedupedTransactions,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-            ownedAccountContainerIds = ownedAccountContainerIds,
-            ownedAccountLast4s = ownedAccountLast4s,
-            zoneId = zoneId,
-            displayLocale = displayLocale,
-        )
-        val creditFacilities = CreditFacilityOverviewBuilder.build(
-            overview = creditCardsFlat,
-            registryCards = cardRegistry,
-            registryAccounts = ownedAccounts,
-            debitSpendingByCardKey = debitSpend.spendingByCardKey,
-            debitSalaryPeriodLabel = debitSpend.salaryPeriodLabel ?: creditCardsFlat.salaryPeriodLabel,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-        )
-        val loansOverview = LoanOverviewBuilder.build(
-            salaryPeriod = period,
-            loans = loanRegistryRepository.listAll(),
-            transactions = dedupedTransactions,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-            zoneId = zoneId,
-            displayLocale = displayLocale,
-        )
-        val creditCardPaymentTransactions = creditFacilityPaymentTransactionsOutsidePeriod(
-            creditFacilities = creditFacilities,
-            salaryPeriod = period,
-            periodTransactionIds = periodTransactionIds,
-            zoneId = zoneId,
-        )
-        val creditCardPaymentEvidence = evidenceSource.extend(evidence, creditCardPaymentTransactions)
-        val creditCardPaymentSarEquivalents = sarEquivalentResolver.resolve(
-            transactions = creditCardPaymentTransactions,
-            parsedRecords = creditCardPaymentEvidence.parsedRecords,
-            rawSmsById = creditCardPaymentEvidence.rawSmsById,
-            primaryCurrency = primaryCurrency,
-        ).sarAmounts()
-        val commitmentTransactions = buildList {
-            addAll(dedupedTransactions)
-            addAll(commitmentSourceTransactions)
-            addAll(creditCardPaymentTransactions)
-        }.distinctBy { it.id }
-        val commitmentsOverview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
-            commitments = commitments,
-            creditFacilities = creditFacilities,
-            loansOverview = loansOverview,
-            transactions = commitmentTransactions,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = commitmentSarEquivalentAmounts + creditCardPaymentSarEquivalents,
-            zoneId = zoneId,
-        )
-        val merchantSpending = MerchantSpendingOverviewBuilder.build(
-            transactions = dedupedTransactions,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-        )
-        val dailySpendingTrend = DailySpendingTrendBuilder.build(
-            period = period,
-            transactions = dedupedTransactions,
-            parsedRecords = parsedRecords,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents,
-            zoneId = zoneId,
             today = LocalDate.now(clock),
-        )
-        val bankHierarchy = BankHierarchyBuilder.build(
+            evidence = evidence,
+            transactions = displayedTransactions,
+            sarEquivalents = sarResolutions.sarAmounts(),
+            reviewRequiredCount = reviewRepository.listRequired().size,
             ownedAccounts = ownedAccounts,
-            accountsFleet = accountsFleet,
-            creditFacilities = creditFacilities,
-            loans = loanRegistryRepository.listAll(),
-        )
-
-        val current = FinancialPeriodPolicy.periodContaining(LocalDate.now(clock))
-        return DashboardProjection(
-            period = period,
-            isCurrentPeriod = period == current,
-            summary = summary,
-            fleet = fleet,
-            spendingSplit = spendingSplit,
-            accountsFleet = accountsFleet,
-            perAccount = perAccount,
-            creditFacilities = creditFacilities,
-            loansOverview = loansOverview,
-            commitmentsOverview = commitmentsOverview,
-            merchantSpending = merchantSpending,
-            dailySpendingTrend = dailySpendingTrend,
-            bankHierarchy = bankHierarchy,
-            flowDetail = flowDetail,
-            transactionAccountInvolvement = transactionAccountInvolvement,
-            transactionCardInvolvement = transactionCardInvolvement,
-            transactionLoanInvolvement = transactionLoanInvolvement,
-            transactionDebitSpendInvolvement = debitSpend.transactionDebitSpendInvolvement,
-            transactions = dedupedTransactions,
-            meta = DashboardMeta(
-                transactionCount = summary.transactionCount,
-                reviewRequiredCount = reviewRequiredCount,
-                excludedOtherCurrencyCount = summary.excludedOtherCurrencyCount,
+            ownedAccountContainerIds = ownedAccounts
+                .mapNotNull { FinancialContainerIdFactory.accountId(it.bank, it.maskedNumber) }
+                .toSet(),
+            ownedAccountLast4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
+                ownedAccounts.map { it.maskedNumber },
             ),
-            accountRegistry = ownedAccounts,
             cardRegistry = cardRegistry,
+            loans = loanRegistryRepository.listAll(),
+            debitCardScope = DebitCardScopeFactory.fromRegistry(
+                cards = cardRegistry,
+                parsedRecords = evidence.parsedRecords,
+                rawSmsById = evidence.rawSmsById,
+                registryAccounts = ownedAccounts,
+            ),
+            displayLocale = AppLocale.displayLocale(appLocaleRepository.getLanguageTag()),
+            zoneId = zoneId,
+            primaryCurrency = primaryCurrency,
         )
-    }
-
-    private suspend fun creditFacilityPaymentTransactionsOutsidePeriod(
-        creditFacilities: CreditFacilitiesOverview,
-        salaryPeriod: FinancialPeriod,
-        periodTransactionIds: Set<String>,
-        zoneId: ZoneId,
-    ): List<FinancialTransaction> {
-        val relevantFacilities = creditFacilities.facilities.filter { facility ->
-            val due = facility.facilityDue ?: return@filter false
-            CommitmentsOverviewBuilder.isStatementDueInPeriod(due, salaryPeriod, zoneId)
-        }
-        if (relevantFacilities.isEmpty()) return emptyList()
-
-        val earliestDueUpdate = relevantFacilities.mapNotNull { it.facilityDue?.updatedAt }.min()
-        val creditCardPayments = financialTransactionRepository.listByTypesOccurredSince(
-            types = listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT),
-            startInclusive = earliestDueUpdate,
-        )
-        return relevantFacilities.flatMap { facility ->
-            val due = facility.facilityDue ?: return@flatMap emptyList()
-            val cardIds = facility.allCards.mapNotNull { card ->
-                FinancialContainerIdFactory.cardId(card.bank, card.last4)
-            }.toSet()
-            creditCardPayments.filter { transaction ->
-                transaction.id !in periodTransactionIds &&
-                    transaction.destinationContainerId in cardIds &&
-                    !transaction.occurredAt.isBefore(due.updatedAt)
-            }
-        }.distinctBy { it.id }
     }
 }

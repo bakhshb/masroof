@@ -151,6 +151,10 @@ class PackageDependencyRulesTest {
             "DashboardProjectionBuilder.kt",
             "DashboardEvidenceScope.kt",
             "AppliedExchangeRateSyncer.kt",
+            "AnalysisDashboardProjection.kt",
+            "AccountsDashboardProjection.kt",
+            "CardsDashboardProjection.kt",
+            "CommitmentsDashboardProjection.kt",
         ).map { File(sourceRoot, "application/dashboard/$it") }
         val writeCalls = listOf(
             ".save(",

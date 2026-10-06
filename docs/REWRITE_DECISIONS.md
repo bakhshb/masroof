@@ -375,3 +375,17 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Rates freeze when first persisted. Before, that happened on the first dashboard view;
   now it happens at ingestion or maintenance time with the same resolver and evidence, so
   the dashboard shows the same values before and after enrichment (characterized).
+
+### M4.3 — Dashboard projection is composed by read-model concern
+
+- `DashboardProjectionBuilder` loads a `DashboardProjectionContext` once and composes four
+  section projections: Analysis, Accounts, Cards, Commitments (`*DashboardProjection`, all in
+  `application/dashboard`). Bank hierarchy stays a one-call composition of section outputs.
+- Sections own only their extra reads (cards: statement-window transactions; commitments:
+  commitments, out-of-period sources, statement-settling payments). The loan registry, read
+  twice before, is now read once into the context.
+- No rule moved or changed: specialist builders/calculators are called with the same inputs.
+  `DashboardProjection` output for 100 projections (fixture corpus and long synthetic ledger,
+  with and without market rates, 25 periods) is byte-identical to the pre-split builder.
+- Section projections are covered by the read-only architecture rule
+  (`PackageDependencyRulesTest.dashboardProjection_isReadOnly`).
