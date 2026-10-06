@@ -39,6 +39,7 @@ import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
+import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.parser.SmsParseGateway
@@ -200,7 +201,8 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
      */
     fun historicalBatch(
         reconciliationFails: Boolean = false,
-        scheduler: LiveSmsWorkScheduler? = null,
+        batchRecoveryScheduler: HistoricalBatchRecoveryScheduler? = null,
+        processingRetryRepository: ProcessingRetryRepository = processingRetryRepo,
     ): HistoricalSmsBatchProcessor {
         val parsedForBatch = object : ParsedEventRepository by parsedRepo {
             override suspend fun listAll(): List<ParsedEventRecord> {
@@ -228,12 +230,37 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
             processingRecovery = ProcessingRecovery(
-                processingRetryRepository = processingRetryRepo,
+                processingRetryRepository = processingRetryRepository,
                 reviewRepository = reviewRepo,
                 ingestionReviewService = ingestionReview,
                 clock = clock,
             ),
-            workScheduler = scheduler,
+            batchRecoveryScheduler = batchRecoveryScheduler,
+        )
+    }
+
+    /** One batch derived pass over unreviewed retry rows. Does not reparse SMS text. */
+    fun derivedRecovery(reconciliationFails: Boolean = false): HistoricalDerivedRecovery {
+        val parsedForBatch = object : ParsedEventRepository by parsedRepo {
+            override suspend fun listAll(): List<ParsedEventRecord> {
+                if (reconciliationFails) throw IOException("batch reconciliation unavailable")
+                return parsedRepo.listAll()
+            }
+        }
+        return HistoricalDerivedRecovery(
+            parsedEventRepository = parsedRepo,
+            processingRetryRepository = processingRetryRepo,
+            reconciliation = TransactionReconciliationService(
+                parsedEventRepository = parsedForBatch,
+                rawSmsRepository = rawRepo,
+                financialTransactionRepository = ftRepo,
+                ownershipResolver = OwnershipResolver(
+                    RoomAccountRegistryRepository.from(db),
+                    cards,
+                    NoOpLoanRegistryRepository,
+                ),
+            ),
+            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
         )
     }
 

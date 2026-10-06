@@ -39,8 +39,9 @@ sealed interface HistoricalBatchDerivedResult {
  * reconciliation pass, one review refresh, and one exchange-rate enrichment pass. Live
  * processing stays per message.
  *
- * A correctness-blocking derived failure keeps the captured evidence and marks it for retry.
- * Exchange-rate enrichment stays best-effort.
+ * A correctness-blocking derived failure keeps the captured evidence and marks the affected
+ * financial rows in one transaction, then schedules one batch recovery. Exchange-rate
+ * enrichment stays best-effort.
  */
 class HistoricalSmsBatchProcessor(
     private val capture: CaptureBankSmsUseCase,
@@ -50,7 +51,7 @@ class HistoricalSmsBatchProcessor(
     private val reviewQueueUpdater: ReviewQueueUpdater? = null,
     private val exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
     private val processingRecovery: ProcessingRecovery? = null,
-    private val workScheduler: LiveSmsWorkScheduler? = null,
+    private val batchRecoveryScheduler: HistoricalBatchRecoveryScheduler? = null,
 ) {
     fun startBatch(): Batch = Batch()
 
@@ -81,12 +82,13 @@ class HistoricalSmsBatchProcessor(
         /**
          * Runs ownership, reconciliation, and review refresh once for the batch.
          * Evidence already stored is kept. A correctness-blocking failure is
-         * [HistoricalBatchDerivedResult.Incomplete] and the affected rows are marked for retry.
+         * [HistoricalBatchDerivedResult.Incomplete] only after the full retry set is saved.
+         * A failed marker write throws and leaves this batch unfinished so [finish] can be retried.
          */
         suspend fun finish(): HistoricalBatchDerivedResult {
             check(!finished) { "Batch already finished" }
-            finished = true
             val derived = runDerivedPass()
+            finished = true
             enrichExchangeRates()
             return derived
         }
@@ -135,28 +137,26 @@ class HistoricalSmsBatchProcessor(
         private suspend fun markAffected() {
             val recovery = processingRecovery
                 ?: throw IllegalStateException("processing recovery is required when derived work fails")
-            for (stored in storedEvents) {
-                if (stored.event.parseStatus == ParseStatus.NON_FINANCIAL) continue
-                recovery.markExhausted(stored.event.rawSmsId)
-                schedule(stored.event.rawSmsId)
-            }
+            val affected = storedEvents
+                .filter { it.event.parseStatus != ParseStatus.NON_FINANCIAL }
+                .map { it.event.rawSmsId }
+            if (!recovery.markExhaustedBatch(affected)) return
+            scheduleBatchRecovery()
         }
 
         private suspend fun clearRecovered() {
             val recovery = processingRecovery ?: return
-            for (stored in storedEvents) {
-                recovery.clear(stored.event.rawSmsId)
-            }
+            recovery.clearAll(storedEvents.map { it.event.rawSmsId })
         }
 
-        private fun schedule(rawSmsId: String) {
-            val scheduler = workScheduler ?: return
+        private fun scheduleBatchRecovery() {
+            val scheduler = batchRecoveryScheduler ?: return
             try {
-                scheduler.schedule(rawSmsId)
+                scheduler.schedule()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                // The retry row is durable; startup schedules anything enqueue missed.
+                // The retry set is durable; startup enqueues the one batch worker.
             }
         }
 

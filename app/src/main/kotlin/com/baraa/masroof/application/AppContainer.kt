@@ -101,6 +101,8 @@ import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessingRecovery
+import com.baraa.masroof.application.sms.HistoricalDerivedRecovery
+import com.baraa.masroof.application.sms.HistoricalDerivedRecoveryWorker
 import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
@@ -469,6 +471,15 @@ class AppContainer(
             processStored = processStoredSmsUseCase,
         )
 
+    val historicalDerivedRecovery: HistoricalDerivedRecovery =
+        HistoricalDerivedRecovery(
+            parsedEventRepository = parsedEventRepository,
+            processingRetryRepository = processingRetryRepository,
+            ownershipDiscovery = ownershipDiscoveryService,
+            reconciliation = transactionReconciliationService,
+            reviewQueueUpdater = reviewQueueUpdater,
+        )
+
     val liveSmsIntake: LiveSmsIntake =
         LiveSmsIntake(
             captureBankSms = captureBankSmsUseCase,
@@ -477,11 +488,15 @@ class AppContainer(
             reviewRepository = reviewRepository,
             processingRetryRepository = processingRetryRepository,
             appLogService = appLogService,
+            batchRecoveryScheduler = {
+                HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
+            },
         )
 
     val workerFactory: WorkerFactory =
         DelegatingWorkerFactory().apply {
             addFactory(LiveSmsProcessingWorker.Factory { processStoredSmsUseCase })
+            addFactory(HistoricalDerivedRecoveryWorker.Factory { historicalDerivedRecovery })
             addFactory(ParsedEventFactsBackfillWorker.Factory { parsedEventFactsBackfillCoordinator })
         }
 
@@ -499,7 +514,9 @@ class AppContainer(
                 reviewQueueUpdater = reviewQueueUpdater,
                 exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
                 processingRecovery = processingRecovery,
-                workScheduler = WorkManagerLiveSmsWorkScheduler { WorkManager.getInstance(appContext) },
+                batchRecoveryScheduler = {
+                    HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
+                },
             ),
             appLogService = appLogService,
         )

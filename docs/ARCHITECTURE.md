@@ -196,10 +196,13 @@ Batch.finish (once per scan)
 ```
 
 Historical import never reconciles per SMS. `finish` returns success or an incomplete
-stage. A correctness-blocking failure keeps the stored evidence and writes a
-processing-retry marker for the financial rows in that batch. A scan that fails mid-way
-(permission or provider error) keeps its counters and evidence and still runs `finish`
-for events it stored.
+stage. A correctness-blocking failure keeps the stored evidence and writes the affected
+financial rows to `processing_retry` in one transaction, then enqueues one batch recovery
+worker. That worker reloads the stored ParsedEvents and reruns ownership, reconciliation,
+and review refresh once. It does not reparse the SMS and it does not enqueue a live worker
+per row. If the marker transaction fails, no partial set is kept and `finish` can be
+retried. A scan that fails mid-way (permission or provider error) keeps its counters and
+evidence and still runs `finish` for events it stored.
 
 ### New messages
 
@@ -817,8 +820,8 @@ Live processing runs in WorkManager:
 | Retry | exponential backoff; `Result.retry()` for processing failures, exceptions, and `DerivedIncomplete` (ownership, reconciliation, review refresh) until `MAX_ATTEMPTS`. Parse failures keep their `processing_error` review. The final derived failure records that review and a `processing_retry` row. If that write fails, the worker returns `Result.retry()` instead of stopping. Exchange-rate enrichment failure stays `Result.success()` |
 | Permanent failure | missing input or `raw_sms_not_found` → `Result.failure()`. A final derived failure becomes `Result.failure()` only after the recovery marker is saved |
 | Cancellation | `CancellationException` propagates; captured evidence stays and is processed by the next run |
-| Process death | startup sweep `LiveSmsIntake.schedulePendingProcessing()` reschedules `RawSmsRepository.listIdsAwaitingProcessing()` (no ParsedEvent and no review row), REQUIRED `processing_error` reviews, and `processing_retry` rows. `USER_NON_FINANCIAL` stays closed. Other resolved reviews stay resolved and remain recoverable through the retry row. A successful retry clears the retry row and auto-resolves a processing-error review |
-| Wiring | `MasroofApplication.workManagerConfiguration` registers `AppContainer.workerFactory`, a `DelegatingWorkerFactory` over `LiveSmsProcessingWorker.Factory` and `ParsedEventFactsBackfillWorker.Factory`; other workers fall back to the default factory |
+| Process death | startup sweep `LiveSmsIntake.schedulePendingProcessing()` reschedules, per message, `RawSmsRepository.listIdsAwaitingProcessing()` (no ParsedEvent and no review row), REQUIRED `processing_error` reviews, and `processing_retry` rows that already have a review. Unreviewed historical retry rows enqueue one `HistoricalDerivedRecoveryWorker`. `USER_NON_FINANCIAL` stays closed. Other resolved reviews stay resolved and remain recoverable through the retry row. A successful live retry clears that row and auto-resolves a processing-error review. A successful historical recovery clears its retry set in one transaction |
+| Wiring | `MasroofApplication.workManagerConfiguration` registers `AppContainer.workerFactory`, a `DelegatingWorkerFactory` over `LiveSmsProcessingWorker.Factory`, `HistoricalDerivedRecoveryWorker.Factory`, and `ParsedEventFactsBackfillWorker.Factory`; other workers fall back to the default factory |
 
 ### 23.1 Startup maintenance policy
 

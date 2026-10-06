@@ -17,9 +17,33 @@ class RoomProcessingRetryRepository(
         )
     }
 
+    override suspend fun markRequired(rawSmsIds: List<String>, createdAt: Instant) {
+        if (rawSmsIds.isEmpty()) return
+        val createdAtEpochMillis = createdAt.toEpochMilli()
+        dao.upsertAllAtomic(
+            rawSmsIds.distinct().map { rawSmsId ->
+                ProcessingRetryEntity(
+                    rawSmsId = rawSmsId,
+                    createdAtEpochMillis = createdAtEpochMillis,
+                )
+            },
+        )
+    }
+
     override suspend fun clear(rawSmsId: String) {
         dao.delete(rawSmsId)
     }
 
+    override suspend fun clear(rawSmsIds: List<String>) {
+        if (rawSmsIds.isEmpty()) return
+        dao.deleteAllAtomic(rawSmsIds)
+    }
+
     override suspend fun listRetryableRawSmsIds(): List<String> = dao.listRetryableRawSmsIds()
+
+    override suspend fun listReviewedRetryableRawSmsIds(): List<String> =
+        dao.listReviewedRetryableRawSmsIds()
+
+    override suspend fun listUnreviewedRetryableRawSmsIds(): List<String> =
+        dao.listUnreviewedRetryableRawSmsIds()
 }

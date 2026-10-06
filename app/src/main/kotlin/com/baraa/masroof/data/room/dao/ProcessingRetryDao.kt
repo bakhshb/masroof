@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.baraa.masroof.data.room.entity.ProcessingRetryEntity
 
 @Dao
@@ -13,6 +14,27 @@ interface ProcessingRetryDao {
 
     @Query("DELETE FROM processing_retry WHERE rawSmsId = :rawSmsId")
     suspend fun delete(rawSmsId: String)
+
+    @Query("DELETE FROM processing_retry WHERE rawSmsId IN (:rawSmsIds)")
+    suspend fun deleteAll(rawSmsIds: List<String>)
+
+    /**
+     * One transaction for the whole set. A failure rolls every row in [entities] back.
+     */
+    @Transaction
+    suspend fun upsertAllAtomic(entities: List<ProcessingRetryEntity>) {
+        for (entity in entities) {
+            upsert(entity)
+        }
+    }
+
+    /** One transaction. Chunks stay inside the transaction so a failure rolls the clear back. */
+    @Transaction
+    suspend fun deleteAllAtomic(rawSmsIds: List<String>) {
+        for (chunk in rawSmsIds.distinct().chunked(RoomBatch.MAX_BIND_ARGS)) {
+            deleteAll(chunk)
+        }
+    }
 
     /**
      * Oldest receipt first. A [com.baraa.masroof.domain.model.ReviewResolutionKind.USER_NON_FINANCIAL]
@@ -28,4 +50,33 @@ interface ProcessingRetryDao {
         """,
     )
     suspend fun listRetryableRawSmsIds(): List<String>
+
+    /**
+     * Retry rows that already have a review. Live recovery schedules these one message at a time.
+     * [com.baraa.masroof.domain.model.ReviewResolutionKind.USER_NON_FINANCIAL] stays excluded.
+     */
+    @Query(
+        """
+        SELECT p.rawSmsId FROM processing_retry p
+        INNER JOIN raw_sms r ON r.id = p.rawSmsId
+        INNER JOIN review_item v ON v.rawSmsId = p.rawSmsId
+        WHERE v.resolutionKind IS NULL OR v.resolutionKind != 'USER_NON_FINANCIAL'
+        ORDER BY r.receivedAtEpochMillis ASC, r.id ASC
+        """,
+    )
+    suspend fun listReviewedRetryableRawSmsIds(): List<String>
+
+    /**
+     * Retry rows with no review. Historical batch recovery processes this set once.
+     */
+    @Query(
+        """
+        SELECT p.rawSmsId FROM processing_retry p
+        INNER JOIN raw_sms r ON r.id = p.rawSmsId
+        LEFT JOIN review_item v ON v.rawSmsId = p.rawSmsId
+        WHERE v.rawSmsId IS NULL
+        ORDER BY r.receivedAtEpochMillis ASC, r.id ASC
+        """,
+    )
+    suspend fun listUnreviewedRetryableRawSmsIds(): List<String>
 }

@@ -25,6 +25,7 @@ class LiveSmsIntake(
     private val reviewRepository: ReviewRepository,
     private val processingRetryRepository: ProcessingRetryRepository,
     private val appLogService: AppLogService,
+    private val batchRecoveryScheduler: HistoricalBatchRecoveryScheduler? = null,
 ) {
     suspend fun ingest(rawSms: RawSms): BankSmsCaptureResult {
         appLogService.info(
@@ -39,16 +40,19 @@ class LiveSmsIntake(
     }
 
     /**
-     * Reschedules captured evidence that still needs processing: rows with no outcome yet,
-     * REQUIRED `processing_error` reviews, and processing-retry markers. A
-     * non-financial resolution is not rescheduled. Returns how many ids were scheduled.
+     * Reschedules captured evidence that still needs processing.
+     *
+     * Per message: rows with no outcome yet, REQUIRED `processing_error` reviews, and
+     * processing-retry rows that already have a review. A non-financial resolution is not
+     * rescheduled. Historical retry rows with no review enqueue one batch recovery instead.
+     * Returns how many per-message ids were scheduled.
      */
     suspend fun schedulePendingProcessing(): Int {
         val pending = try {
             (
                 rawSmsRepository.listIdsAwaitingProcessing() +
                     reviewRepository.listRetryableProcessingErrorRawSmsIds() +
-                    processingRetryRepository.listRetryableRawSmsIds()
+                    processingRetryRepository.listReviewedRetryableRawSmsIds()
                 ).distinct()
         } catch (e: CancellationException) {
             throw e
@@ -66,7 +70,38 @@ class LiveSmsIntake(
                 "Rescheduled $scheduled of ${pending.size} captured SMS awaiting processing",
             )
         }
+        scheduleHistoricalBatchRecovery()
         return scheduled
+    }
+
+    private suspend fun scheduleHistoricalBatchRecovery() {
+        val scheduler = batchRecoveryScheduler ?: return
+        val pending = try {
+            processingRetryRepository.listUnreviewedRetryableRawSmsIds()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            appLogService.error(
+                AppLogCategories.SMS,
+                "Listing historical retry SMS failed (${e::class.java.simpleName})",
+            )
+            return
+        }
+        if (pending.isEmpty()) return
+        try {
+            scheduler.schedule()
+            appLogService.info(
+                AppLogCategories.SMS,
+                "Scheduled one historical recovery for ${pending.size} SMS",
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            appLogService.error(
+                AppLogCategories.SMS,
+                "Scheduling historical recovery failed (${e::class.java.simpleName}); kept for the next startup",
+            )
+        }
     }
 
     private fun schedule(rawSmsId: String): Boolean =
