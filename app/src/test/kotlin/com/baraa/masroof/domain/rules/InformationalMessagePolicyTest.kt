@@ -58,6 +58,38 @@ class InformationalMessagePolicyTest {
     }
 
     @Test
+    fun unknownPurchaseWithStatementDueWording_staysForReview() {
+        assertFalse(
+            InformationalMessagePolicy.shouldAutoIgnore(
+                messageFamily = MessageFamily.UNKNOWN,
+                parsedAmount = Money.of("89.50", Currency.SAR),
+                smsBody = """
+                    شراء عبر نقاط البيع
+                    بمبلغ: 89.50 SAR
+                    المبلغ المستحق: 1,250.00 SAR
+                    تاريخ الاستحقاق: 25/08/2026
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun unknownTransferWithBeneficiaryNotice_staysForReview() {
+        assertFalse(
+            InformationalMessagePolicy.shouldAutoIgnore(
+                messageFamily = MessageFamily.UNKNOWN,
+                parsedAmount = Money.of("100.00", Currency.SAR),
+                smsBody = """
+                    حوالة صادرة
+                    اسم المستفيد: TEST_PERSON
+                    حالة: غير نشط
+                    مبلغ: SAR 100.00
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
     fun nonFinancialFamily_isAutoIgnored() {
         assertTrue(
             InformationalMessagePolicy.shouldAutoIgnore(

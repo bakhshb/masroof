@@ -449,6 +449,7 @@ Classification is deterministic evidence resolution, never first-match order
 2. Keep the highest tier (security > account notice > balance notice > statement > named product > money movement > generic).
 3. A single family in that tier wins; evidence records `outranked:<rule>` for the other families that matched.
 4. Different families in that tier → `UNKNOWN` (`ambiguous_classification`, `candidate:<rule>`) → review.
+5. An informational top tier (account notice, balance notice, statement) does not erase a strong money-movement candidate at the product or movement tier. Both stay visible as `UNKNOWN` with `candidate:<rule>` and `family:<family>` evidence → review. Security (OTP) is exempt and still wins. A higher financial tier still outranks a lower one, so a refund title that names the purchase it reverses stays `REFUND`. A generic fee line is not strong movement and does not create this collision.
 
 Rule registration order must not change the result. Collision fixtures
 (`testdata/bank_aljazira/**/collision_*.json`) pin the tie-breaks.

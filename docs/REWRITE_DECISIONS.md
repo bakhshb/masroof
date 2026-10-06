@@ -434,3 +434,18 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   `TransactionListFilter`, `DashboardRegistryLabels`, card/loan/account summary screens)
   still build or parse container ids to filter rows and label registry entries. Moving them
   needs per-account/card row facts from the projection and is a follow-up.
+
+## 15. Financial integrity — classification collision safety
+
+### M0.1 — Informational tiers cannot hide money movement
+
+- `AlJaziraClassificationResolver` still picks the highest specificity tier, and same-tier
+  family ties still resolve to `UNKNOWN`.
+- When that top tier is informational (`NON_FINANCIAL` or `BALANCE_NOTICE`) and a product
+  or movement candidate also matched, the result is `UNKNOWN` / `REVIEW_REQUIRED`. Evidence
+  lists `candidate:<rule>` and `family:<family>` for both sides.
+- `SECURITY` (OTP) is exempt: a verification SMS that quotes a purchase stays OTP.
+- A generic fee line is not strong movement. A higher financial tier still wins, so
+  `collision_refund_pos_purchase_ar_001` stays `REFUND`.
+- Standalone statement and beneficiary notices stay `NON_FINANCIAL`.
+- No bank wording moved into reconciliation or presentation.

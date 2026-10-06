@@ -1,0 +1,16 @@
+{
+  "id": "collision_purchase_statement_due_ar_001",
+  "sender": "AlJazira",
+  "body": "شراء عبر نقاط البيع\nبطاقة: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 89.50 SAR\nفي: 2026-08-04 18:20\nالمبلغ المستحق: 1,250.00 SAR\nتاريخ الاستحقاق: 25/08/2026",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "UNKNOWN",
+    "amount": "89.50",
+    "currency": "SAR",
+    "cardLast4": "7271",
+    "occurredAt": "2026-08-04T18:20:00",
+    "parseStatus": "REVIEW_REQUIRED",
+    "paymentDueDate": "2026-08-25"
+  },
+  "notes": "Cross-tier collision: POS purchase plus statement due wording. The statement tier must not hide the purchase; both families stay visible for review."
+}
