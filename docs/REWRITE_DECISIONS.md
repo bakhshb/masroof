@@ -230,3 +230,14 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   `ambiguous_bank_route`, and neither candidate adapter parses it. Stored reparse
   of such a RawSms (no ParsedEvent, more than one adapter) stays in review.
 - Single-bank AlJazira routing is unchanged.
+
+### M1.2 — Router owns bank detection
+
+- Detection runs once, at `BankSmsRegistry.route`. `AlJaziraMessageParser` no longer
+  holds a detector, `BankMessageParser.canHandle` is removed, and
+  `AlJaziraParsingPipeline` parses without a second sender check.
+- Stored reparse that selects the adapter from the stored ParsedEvent bank is no
+  longer silently rejected by a parser-level sender check.
+- `ProcessRawSmsUseCase` treats an event whose bank differs from the routed adapter
+  as a processing error (direct review), so parser and router cannot disagree.
+- Sender near-miss coverage moved from parser assertions to routing assertions.

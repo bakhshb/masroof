@@ -890,6 +890,44 @@ class ProcessRawSmsUseCaseTest {
         assertEquals(Bank.BANK_ALJAZIRA, (result as SmsIngestionResult.Parsed).event.bank)
     }
 
+    @Test
+    fun parserEventForDifferentBank_isRejectedAsProcessingError() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val disagreeing = SmsParseGateway { input ->
+            val ok = AlJaziraParsingPipeline().parse(input) as com.baraa.masroof.parsing.model.ParseResult.Success
+            ok.copy(event = ok.event.copy(bank = Bank("OTHER_BANK")))
+        }
+        val svc = reviewingUseCase(disagreeing, reviewRepo)
+        val raw = aljaziraPurchase(id = "android-sms:bank-mismatch", deviceId = "bank-mismatch")
+
+        val result = svc.ingest(raw)
+
+        assertTrue(result is SmsIngestionResult.Failed)
+        assertTrue((result as SmsIngestionResult.Failed).message.startsWith("parser_bank_mismatch"))
+        assertEquals(raw, rawRepo.getById(raw.id))
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+        assertDirectReview(reviewRepo, raw.id, "processing_error")
+    }
+
+    @Test
+    fun reparseStored_routeIsAuthoritative_parserDoesNotRedetectSender() = runBlocking {
+        val svc = ProcessRawSmsUseCase(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankSmsRegistry = alJaziraSmsRegistry(),
+        )
+        val purchase = aljaziraPurchase(id = "android-sms:legacy-sender", deviceId = "legacy-sender")
+        val raw = purchase.copy(sender = "LegacyAlJaziraLabel")
+        rawRepo.insertIfAbsent(raw)
+
+        val result = svc.reparseStored(raw)
+
+        assertTrue("got $result", result is SmsIngestionResult.Parsed)
+        val event = (result as SmsIngestionResult.Parsed).event
+        assertEquals(Bank.BANK_ALJAZIRA, event.bank)
+        assertEquals(Money.of("51.99", Currency.SAR), event.amount)
+    }
+
     private fun ambiguousUseCase(
         alJaziraParses: AtomicInteger,
         lookalike: CountingLookalikeAdapter,

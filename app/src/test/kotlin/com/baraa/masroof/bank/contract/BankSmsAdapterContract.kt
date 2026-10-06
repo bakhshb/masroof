@@ -70,7 +70,15 @@ object BankSmsAdapterContract {
         samples.financial.forEach { verifyFinancial(adapter, it) }
         samples.nonFinancial.forEach { verifyNonFinancial(adapter, it) }
         samples.noAutomaticFinancialOutput.forEach { verifyNoAutomaticFinancialOutput(adapter, it) }
+        (samples.financial + samples.nonFinancial).forEach { verifyParseTrustsRoute(adapter, it) }
         verifyArbitraryInputStaysInBank(adapter)
+    }
+
+    /** Routing is authoritative: parse output must not depend on a second sender check. */
+    private fun verifyParseTrustsRoute(adapter: BankSmsAdapter, sms: ContractSms) {
+        val routed = parse(adapter, sms)
+        val unroutedSender = parse(adapter, sms.copy(sender = "unrouted-sender"))
+        assertEquals("${sms.label}: parse must not re-detect the sender", routed, unroutedSender)
     }
 
     fun parse(adapter: BankSmsAdapter, sms: ContractSms): ParseResult =

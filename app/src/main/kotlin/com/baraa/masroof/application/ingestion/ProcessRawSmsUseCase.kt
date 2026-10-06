@@ -197,6 +197,16 @@ class ProcessRawSmsUseCase(
             )
         }
 
+        val parsedBank = parseResult.eventOrNull()?.bank
+        if (parsedBank != null && parsedBank != adapter.bank) {
+            val message = "parser_bank_mismatch:${adapter.bank.id}->${parsedBank.id}"
+            if (logOutcome) {
+                logIngestFailure(rawSms, message)
+            }
+            recordIngestionReview(rawSms.id, IngestionReviewService.REASON_PROCESSING_ERROR)
+            return SmsIngestionResult.Failed(rawSmsId = rawSms.id, message = message)
+        }
+
         return try {
             mapAndSave(rawSms, parseResult, logOutcome)
         } catch (e: CancellationException) {
@@ -333,6 +343,17 @@ class ProcessRawSmsUseCase(
                     findings = parseResult.findings,
                 )
             }
+        }
+
+    private fun ParseResult.eventOrNull(): ParsedEvent? =
+        when (this) {
+            is ParseResult.Success -> event
+            is ParseResult.Partial -> event
+            is ParseResult.ReviewRequired -> event
+            is ParseResult.NonFinancial -> event
+            is ParseResult.Unsupported,
+            is ParseResult.Invalid,
+            -> null
         }
 
     private suspend fun recordIngestionReview(rawSmsId: String, reason: String) {

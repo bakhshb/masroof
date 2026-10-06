@@ -36,11 +36,11 @@ import com.baraa.masroof.parsing.validator.DefaultParsedEventValidator
 /**
  * Production Bank AlJazira SMS parser.
  *
- * Pipeline: detect → classify → extract → draft → validate → finalize.
+ * Pipeline: classify → extract → draft → validate → finalize. Sender detection
+ * already happened at the routing boundary ([AlJaziraSmsAdapter.detect]).
  * Stops at parse facts. Never decides ownership, SELF_TRANSFER, or financial type.
  */
 class AlJaziraMessageParser(
-    private val detector: AlJaziraBankDetector = AlJaziraBankDetector(),
     private val classifier: AlJaziraMessageClassifier = AlJaziraMessageClassifier(),
     private val amountExtractor: AmountExtractor = AmountExtractor(),
     private val balanceExtractor: BalanceExtractor = BalanceExtractor(),
@@ -58,15 +58,7 @@ class AlJaziraMessageParser(
 
     override val bank: Bank = Bank.BANK_ALJAZIRA
 
-    override fun canHandle(message: NormalizedSms, sender: String): Boolean =
-        detector.detect(sender, message.originalBody) is com.baraa.masroof.parsing.model.BankDetectionResult.Detected
-
     override fun parse(input: SmsParseInput, normalized: NormalizedSms): ParseResult {
-        val detection = detector.detect(input.sender, input.body)
-        if (detection !is com.baraa.masroof.parsing.model.BankDetectionResult.Detected) {
-            return ParseResult.Unsupported(reason = "not_bank_aljazira")
-        }
-
         val classification = classifier.classify(normalized)
         val amountCandidates = amountExtractor.extract(normalized)
         val txnAmounts = amountCandidates.filter { it.sourceKind == AmountSourceKind.TRANSACTION_AMOUNT }
@@ -140,7 +132,6 @@ class AlJaziraMessageParser(
                 listOfNotNull(
                     selectedAmount?.let { "labeled_amount:${it.evidenceLabel}" },
                     card?.let { "card_last4" },
-                    detection.evidence.firstOrNull(),
                 ),
         )
 

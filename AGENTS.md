@@ -24,7 +24,7 @@
 
 **Parse-status gate:** Only `ParseStatus.SUCCESS` (or user-corrected) evidence may create/pair/post a `FinancialTransaction` (`TransactionAssembler.isAutomationEligible`). Never bypass it in reconciliation passes.
 
-**Bank routing:** `BankSmsRegistry` evaluates every adapter; `BankRoutingResult.Ambiguous` is persisted and reviewed (`ambiguous_bank_route`), never parsed by a guessed adapter. Never resolve collisions by registration order.
+**Bank routing:** `BankSmsRegistry` evaluates every adapter; `BankRoutingResult.Ambiguous` is persisted and reviewed (`ambiguous_bank_route`), never parsed by a guessed adapter. Never resolve collisions by registration order. The router owns detection: adapter parse pipelines must not re-check the sender.
 
 **New bank:** Implement `BankSmsAdapter`, add fixture tests under `testdata/`, and register a `BankSmsAdapterContractCase` (real financial + non-financial fixtures, positive/negative senders) in `BankSmsAdapterContractTest`; no sample may be claimed by more than one adapter.
 

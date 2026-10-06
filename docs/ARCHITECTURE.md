@@ -330,14 +330,25 @@ Bank-specific behavior should be grouped behind a bank parser/adapter concept.
 Example:
 
 ```kotlin
+interface BankSmsAdapter {
+    val bank: Bank
+
+    fun detect(sender: String, body: String): BankDetectionResult
+
+    fun parse(input: SmsParseInput): ParseResult
+}
+
 interface BankMessageParser {
     val bank: Bank
 
-    fun canHandle(message: NormalizedSms): Boolean
-
-    fun parse(message: NormalizedSms): ParseResult
+    fun parse(input: SmsParseInput, normalized: NormalizedSms): ParseResult
 }
 ```
+
+The router owns bank detection: `detect` is evaluated once per processing attempt by
+`BankSmsRegistry`. Once an adapter is selected, its parse pipeline trusts the route
+and never re-checks the sender. Ingestion rejects (as `processing_error`) any parse
+result whose event bank differs from the routed adapter's bank.
 
 Initial:
 

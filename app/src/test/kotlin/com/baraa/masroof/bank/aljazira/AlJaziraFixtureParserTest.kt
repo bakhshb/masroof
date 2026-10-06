@@ -1,5 +1,7 @@
 package com.baraa.masroof.bank.aljazira
 
+import com.baraa.masroof.bank.BankRoutingResult
+import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
@@ -12,6 +14,8 @@ import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.domain.model.TransferOwnershipType
 import com.baraa.masroof.parsing.fixtures.AlJaziraFixture
 import com.baraa.masroof.parsing.fixtures.AlJaziraFixtureLoader
+import com.baraa.masroof.parsing.detector.BankDetector
+import com.baraa.masroof.parsing.model.BankDetectionResult
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.parsing.model.CardSmsChannel
@@ -29,11 +33,38 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(Parameterized::class)
 class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
 
     private val pipeline = AlJaziraParsingPipeline()
+
+    @Test
+    fun routesThroughRegistry_andAdapterParsesIdenticallyWithoutRedetecting() {
+        val detectCalls = AtomicInteger(0)
+        val countingDetector = object : BankDetector {
+            override fun detect(sender: String, body: String): BankDetectionResult {
+                detectCalls.incrementAndGet()
+                return AlJaziraBankDetector().detect(sender, body)
+            }
+        }
+        val adapter = AlJaziraSmsAdapter(detector = countingDetector)
+        val route = BankSmsRegistry(listOf(adapter)).route(fixture.sender, fixture.body)
+        assertTrue("${fixture.id} must route to AlJazira, got $route", route is BankRoutingResult.Matched)
+        assertEquals(1, detectCalls.get())
+
+        val input = SmsParseInput(
+            rawSmsId = fixture.id,
+            sender = fixture.sender,
+            body = fixture.body,
+            receivedAt = Instant.parse("2026-08-10T00:00:00Z"),
+        )
+        val viaAdapter = (route as BankRoutingResult.Matched).adapter.parse(input)
+
+        assertEquals(fixture.id, pipeline.parse(input), viaAdapter)
+        assertEquals("parse must not re-run detection", 1, detectCalls.get())
+    }
 
     @Test
     fun parsesFixtureExpectations() {

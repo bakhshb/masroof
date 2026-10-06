@@ -10,6 +10,9 @@ import com.baraa.masroof.parsing.parser.SmsParseGateway
 
 /**
  * Bank AlJazira SMS adapter wrapping the existing detector and parse pipeline.
+ *
+ * [detect] is the only AlJazira sender check; [parse] runs after routing and does
+ * not re-detect.
  */
 class AlJaziraSmsAdapter(
     private val detector: BankDetector = AlJaziraBankDetector(),
