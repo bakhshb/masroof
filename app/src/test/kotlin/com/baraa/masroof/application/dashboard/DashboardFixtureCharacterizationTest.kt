@@ -7,22 +7,160 @@ import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardType
+import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.parsing.fixtures.AlJaziraFixtureParseHarness
+import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.CardSmsChannel
+import com.baraa.masroof.testsupport.CountingParsedEventRepository
+import com.baraa.masroof.testsupport.CountingRawSmsRepository
+import com.baraa.masroof.testsupport.DashboardLedgerWorld
+import com.baraa.masroof.testsupport.ReadOnlyFinancialTransactionRepository
+import com.baraa.masroof.testsupport.WholeHistoryDashboardEvidenceSource
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
 
 /**
- * End-to-end characterization: on-disk Bank AlJazira fixtures → parse facts → dashboard helpers.
+ * End-to-end characterization: on-disk Bank AlJazira fixtures → parse facts → dashboard helpers,
+ * and scoped dashboard evidence ([DashboardEvidenceScope]) versus the former whole-history load.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class DashboardFixtureCharacterizationTest {
+    @Test
+    fun scopedEvidence_matchesWholeHistoryProjection_forFixtureCorpus() = runBlocking<Unit> {
+        DashboardLedgerWorld(context()).use { world ->
+            world.importFixtureCorpus()
+            assertScopedEqualsWholeHistory(world, months(YearMonth.of(2026, 4), YearMonth.of(2026, 10)))
+        }
+    }
+
+    @Test
+    fun scopedEvidence_matchesWholeHistoryProjection_acrossLongHistory() = runBlocking<Unit> {
+        DashboardLedgerWorld(context()).use { world ->
+            world.importFixtureCorpus()
+            world.seedSyntheticHistory(DashboardLedgerWorld.SYNTHETIC_MONTHS)
+            val projections = assertScopedEqualsWholeHistory(
+                world,
+                months(YearMonth.of(2024, 12), YearMonth.of(2026, 12)),
+            )
+
+            // The scenario must exercise every history fact the scope bounds.
+            val facilities = projections.flatMap { it.creditFacilities.facilities }
+            assertTrue(facilities.any { it.facilityDue != null })
+            assertTrue(facilities.flatMap { it.allCards }.any { it.snapshot?.availableBalance != null })
+            // Card seen only in one old plain credit SMS: a real row, not a registry placeholder.
+            assertTrue(facilities.any { it.primary.last4 == "3333" && it.primary.statementPeriodLabel != null })
+            val debitCards = projections.flatMap { it.creditFacilities.debitCards }
+            assertTrue(debitCards.any { it.last4 == "2210" && it.linkedAccountMaskedNumber == "3001" })
+            assertTrue(debitCards.any { it.last4 == "6666" && it.linkedAccountMaskedNumber == "3002" })
+            val loans = projections.flatMap { it.loansOverview.loans }
+            assertTrue(loans.any { it.loanType == LoanType.PERSONAL && it.remainingBalance != null })
+            assertTrue(loans.any { it.loanType == LoanType.AUTO && it.latestInstallmentAmount != null })
+            assertTrue(projections.any { it.commitmentsOverview.hasContent })
+            assertTrue(
+                projections.flatMap { it.transactions }.any {
+                    it.merchant == "SPOTIFY" && it.exchangeRateSource == ExchangeRateSource.HISTORICAL_MERCHANT
+                },
+            )
+            assertTrue(
+                projections.any { projection ->
+                    projection.transactions.any { it.amount.currency == Currency.USD } &&
+                        projection.summary.excludedOtherCurrencyCount == 0
+                },
+            )
+        }
+    }
+
+    @Test
+    fun scopedLoad_readsBoundedEvidence_withoutWholeHistoryOrPerRowLookups() = runBlocking<Unit> {
+        DashboardLedgerWorld(context()).use { world ->
+            world.importFixtureCorpus()
+            world.seedSyntheticHistory(DashboardLedgerWorld.SYNTHETIC_MONTHS)
+            val parsed = CountingParsedEventRepository(world.parsedRepo)
+            val raw = CountingRawSmsRepository(world.rawRepo)
+            val recorder = RecordingEvidenceSource(
+                DashboardEvidenceScope(
+                    financialTransactionRepository = ReadOnlyFinancialTransactionRepository(world.ftRepo),
+                    parsedEventRepository = parsed,
+                    rawSmsRepository = raw,
+                ),
+            )
+            val service = world.dashboardService(
+                evidenceSource = recorder,
+                parsedEventRepository = parsed,
+                rawSmsRepository = raw,
+            )
+
+            val projection = service.loadProjection(FinancialPeriodPolicy.periodContaining(LocalDate.parse("2025-11-10")))
+
+            assertTrue(projection.transactions.isNotEmpty())
+            assertEquals(0, parsed.listAllCalls)
+            assertEquals(0, raw.getByIdCalls)
+            assertTrue(raw.getByIdsCalls > 0)
+            val history = world.parsedRepo.listAll().size
+            assertTrue(
+                "scoped ${recorder.largest} of $history parsed rows",
+                recorder.largest * 2 < history,
+            )
+        }
+    }
+
+    private suspend fun assertScopedEqualsWholeHistory(
+        world: DashboardLedgerWorld,
+        months: List<YearMonth>,
+    ): List<DashboardProjection> {
+        val wholeHistory = world.dashboardService(
+            evidenceSource = WholeHistoryDashboardEvidenceSource(world.parsedRepo, world.rawRepo),
+        )
+        val scoped = world.dashboardService()
+        val periods = months.map { FinancialPeriodPolicy.periodContaining(it.atDay(10)) }.distinct()
+        return periods.map { period ->
+            val expected = wholeHistory.loadProjection(period)
+            assertEquals("period ${period.startDate}", expected, scoped.loadProjection(period))
+            expected
+        }
+    }
+
+    private fun months(from: YearMonth, toInclusive: YearMonth): List<YearMonth> =
+        generateSequence(from) { it.plusMonths(1) }.takeWhile { !it.isAfter(toInclusive) }.toList()
+
+    private fun context(): Context = ApplicationProvider.getApplicationContext()
+
+    private class RecordingEvidenceSource(private val delegate: DashboardEvidenceSource) : DashboardEvidenceSource {
+        var largest = 0
+            private set
+
+        override suspend fun load(
+            transactions: Collection<FinancialTransaction>,
+            registryCards: List<CardRegistryEntry>,
+            periodEndExclusive: Instant,
+        ): DashboardEvidence = delegate.load(transactions, registryCards, periodEndExclusive).also(::record)
+
+        override suspend fun extend(
+            evidence: DashboardEvidence,
+            transactions: Collection<FinancialTransaction>,
+        ): DashboardEvidence = delegate.extend(evidence, transactions).also(::record)
+
+        private fun record(evidence: DashboardEvidence) {
+            largest = maxOf(largest, evidence.parsedRecords.size)
+        }
+    }
+
     @Test
     fun salaryTransferFixture_detectedAsSalaryIncome() {
         val record = AlJaziraFixtureParseHarness.parseRecord("transfer_in_salary_ar_001")

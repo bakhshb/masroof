@@ -62,6 +62,13 @@ interface FinancialTransactionRepository {
             listAll().filter { it.type in types }
         }
 
+    /** [listByTypes] restricted to occurredAt at or after [startInclusive], same order. */
+    suspend fun listByTypesOccurredSince(
+        types: Collection<FinancialTransactionType>,
+        startInclusive: Instant,
+    ): List<FinancialTransaction> =
+        listByTypes(types).filter { !it.occurredAt.isBefore(startInclusive) }
+
     /**
      * Transactions with occurredAt in `[startInclusive, endExclusive)`, newest first.
      */
@@ -73,6 +80,10 @@ interface FinancialTransactionRepository {
     suspend fun isRawSmsLinked(rawSmsId: String): Boolean
 
     suspend fun listRawSmsIds(transactionId: String): List<String>
+
+    /** RawSms evidence ids linked to any of [transactionIds], in one batch lookup. */
+    suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> =
+        transactionIds.distinct().flatMapTo(linkedSetOf()) { listRawSmsIds(it) }
 
     suspend fun update(transaction: FinancialTransaction): Boolean
 

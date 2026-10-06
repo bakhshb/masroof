@@ -44,12 +44,15 @@ data class DashboardOverview(
 
 /**
  * Application service that loads period transactions and builds a dashboard projection.
+ *
+ * SMS evidence comes from [evidenceSource] — by default the bounded [DashboardEvidenceScope],
+ * never a whole-history ParsedEvent scan.
  */
 class DashboardService(
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val reviewRepository: ReviewRepository,
-    private val parsedEventRepository: ParsedEventRepository,
-    private val rawSmsRepository: RawSmsRepository,
+    parsedEventRepository: ParsedEventRepository,
+    rawSmsRepository: RawSmsRepository,
     private val appLocaleRepository: AppLocaleRepository,
     private val accountRegistryRepository: AccountRegistryRepository,
     private val cardRegistryRepository: CardRegistryRepository,
@@ -59,6 +62,11 @@ class DashboardService(
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val primaryCurrency: Currency = Currency.SAR,
+    private val evidenceSource: DashboardEvidenceSource = DashboardEvidenceScope(
+        financialTransactionRepository = financialTransactionRepository,
+        parsedEventRepository = parsedEventRepository,
+        rawSmsRepository = rawSmsRepository,
+    ),
 ) : DashboardOverviewLoader {
     private val projectionBuilder by lazy {
         DashboardProjectionBuilder(
@@ -70,6 +78,7 @@ class DashboardService(
             commitmentRepository = commitmentRepository,
             appLocaleRepository = appLocaleRepository,
             sarEquivalentResolver = sarEquivalentResolver,
+            evidenceSource = evidenceSource,
             zoneId = zoneId,
             clock = clock,
             primaryCurrency = primaryCurrency,
@@ -96,22 +105,7 @@ class DashboardService(
             startInclusive = startInclusive,
             endExclusive = endExclusive,
         )
-        val parsedRecords = parsedEventRepository.listAll()
-        val rawSmsById = parsedRecords
-            .map { it.event.rawSmsId }
-            .distinct()
-            .mapNotNull { id -> rawSmsRepository.getById(id)?.let { id to it } }
-            .toMap()
-        val enrichedTransactions = TransactionDisplayEnricher.enrichMerchants(
-            transactions = transactions,
-            parsedRecords = parsedRecords,
-        )
-        return projectionBuilder.build(
-            period = period,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-            enrichedTransactions = enrichedTransactions,
-        )
+        return projectionBuilder.build(period = period, transactions = transactions)
     }
 
     suspend fun loadCurrentOverview(): DashboardOverview =

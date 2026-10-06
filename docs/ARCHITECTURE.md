@@ -729,6 +729,34 @@ ViewModels should not contain:
 - bank identification logic
 - financial calculation rules
 
+### 22.1 Dashboard read model
+
+The dashboard is a scoped read model over persisted facts. `DashboardService.loadProjection`
+reads the selected salary period's `FinancialTransaction`s and hands them to
+`DashboardProjectionBuilder`, which obtains parsed/raw evidence only through
+`DashboardEvidenceSource` (`DashboardEvidenceScope` in production):
+
+| Evidence | Query |
+|---|---|
+| Linked evidence of displayed transactions (period, statement window, commitment sources, statement-settling payments) | `FinancialTransactionRepository.listRawSmsIdsForTransactions` → `ParsedEventRepository.listByRawSmsIds` → `RawSmsRepository.getByIds` |
+| Statement cycles | `listCardStatementFacts` |
+| Credit-card identity (newest row per card) | `listLatestCreditCardRowFacts` |
+| Available-balance snapshot | `listLatestCreditCardAvailableBalanceFacts(periodEnd)` |
+| Loans | `listFinancingInstallmentFacts` |
+| Historical merchant FX rates | `listExchangeRateFacts` |
+| Debit-card classification / linked account | `listFirstDebitCardFacts(registry last4s)` |
+| Credit-card payments settling an in-period due | `listByTypesOccurredSince(CREDIT_CARD_PAYMENT, earliest due update)` |
+
+Rules:
+
+- No `ParsedEventRepository.listAll()` and no per-row `RawSmsRepository.getById` on the
+  normal load path. Batch queries chunk their `IN (...)` lists (`RoomBatch`).
+- A history-fact query may return a superset of the rows its calculator rule can use,
+  never a subset; records reach calculators distinct and ordered by event id, so
+  "first/last matching row" rules behave as with a whole-history scan.
+- A new calculator rule that needs history not linked to a displayed transaction adds an
+  explicit fact query here; it must not widen the load to whole history.
+
 ---
 
 ## 23. Background Processing

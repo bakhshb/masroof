@@ -335,3 +335,24 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   `reconcileStoredEvents` already gives for the same evidence.
 - A scan that fails mid-way keeps counters/evidence and still finishes the batch for events
   it stored; a cancelled scan leaves stored evidence for the next scan or reprocess pass.
+
+### M4.1 — Dashboard evidence is scoped
+
+- `DashboardService.loadProjection` no longer calls `ParsedEventRepository.listAll()` or
+  loads RawSms one by one. `DashboardEvidenceScope` loads linked evidence for the
+  transaction sets a projection displays (batched: transaction ids → RawSms ids →
+  ParsedEventRecords → RawSms) and extends it per stage (commitment sources, card
+  statement window, statement-settling payments) only for transactions not yet covered.
+- History rules that do not depend on a displayed transaction get one explicit fact query
+  each (statements, newest credit row per card, latest available balance before the period
+  end, financing installments, merchant FX rates, first debit/source-account row per
+  registry card). They are bounded by kind rather than by a received-at window: the
+  statement, loan, and FX rules take "latest before the period end" with no lower bound,
+  so a time window would change outputs for long histories.
+- Fact queries may over-fetch but never under-fetch; evidence is ordered by event id, so
+  every projection equals the former whole-history load. Characterization compares both
+  loads over the AlJazira fixture corpus and a 23-month synthetic Room ledger, and each
+  fact query/extension is proven necessary by that comparison.
+- Out-of-period credit-card payments are read with
+  `listByTypesOccurredSince(CREDIT_CARD_PAYMENT, earliest due update)` instead of every
+  payment ever recorded.

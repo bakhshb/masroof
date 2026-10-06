@@ -18,6 +18,10 @@ interface RawSmsDao {
     @Query("SELECT * FROM raw_sms WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): RawSmsEntity?
 
+    /** Callers keep [ids] under [RoomBatch.MAX_BIND_ARGS]. */
+    @Query("SELECT * FROM raw_sms WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<String>): List<RawSmsEntity>
+
     @Query("SELECT EXISTS(SELECT 1 FROM raw_sms WHERE id = :id)")
     suspend fun existsById(id: String): Boolean
 

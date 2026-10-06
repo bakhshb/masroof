@@ -11,7 +11,6 @@ import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
-import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
@@ -31,14 +30,10 @@ import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
-import com.baraa.masroof.parsing.fixtures.AlJaziraFixtureLoader
-import com.baraa.masroof.parsing.model.ParseResult
-import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.time.InstantClock
-import java.time.LocalDateTime
-import java.time.ZoneId
+import com.baraa.masroof.testsupport.AlJaziraFixtureInbox
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.aljazira.AlJaziraSmsAdapter
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
@@ -284,7 +279,7 @@ class HistoricalSmsScannerTest {
     @Test
     fun batchImport_matchesLegacyPerMessageImport_forFixtureCorpusInbox() = runBlocking {
         for (preOwned in listOf(false, true)) {
-            val inbox = fixtureCorpusInbox()
+            val inbox = AlJaziraFixtureInbox.rows()
             ImportWorld(context(), preOwned).use { legacy ->
                 ImportWorld(context(), preOwned).use { batched ->
                     val legacyResult = legacy.legacyImport(inbox)
@@ -372,7 +367,7 @@ class HistoricalSmsScannerTest {
     @Test
     fun batchImport_rerun_isIdempotent() = runBlocking {
         ImportWorld(context(), preOwned = true).use { world ->
-            val inbox = fixtureCorpusInbox()
+            val inbox = AlJaziraFixtureInbox.rows()
             val first = world.scanner(inbox).scan()
             val afterFirst = world.snapshot()
 
@@ -397,37 +392,6 @@ class HistoricalSmsScannerTest {
                 receivedAt = Instant.parse("2026-08-03T${time}:00Z"),
             )
         }
-
-    /**
-     * Every on-disk AlJazira fixture as one inbox. Rows are ordered by their parsed local
-     * time (falling back to a fixed base) so transfer legs land together like a real inbox.
-     */
-    private fun fixtureCorpusInbox(): List<ProviderSmsRecord> {
-        val zone = ZoneId.of("Asia/Riyadh")
-        val base = Instant.parse("2026-06-01T00:00:00Z")
-        return AlJaziraFixtureLoader.loadAllFromClasspath()
-            .sortedBy { it.id }
-            .mapIndexed { index, fixture ->
-                val local = occurredAtLocal(fixture.sender, fixture.body)
-                val receivedAt = (local?.atZone(zone)?.toInstant() ?: base).plusSeconds(index.toLong())
-                ProviderSmsRecord("fx-$index", fixture.sender, fixture.body, receivedAt)
-            }
-            .sortedBy { it.receivedAt }
-    }
-
-    private fun occurredAtLocal(sender: String, body: String): LocalDateTime? {
-        val result = AlJaziraParsingPipeline().parse(
-            SmsParseInput("probe", sender, body, Instant.parse("2026-08-11T00:00:00Z")),
-        )
-        val details = when (result) {
-            is ParseResult.Success -> result.details
-            is ParseResult.Partial -> result.details
-            is ParseResult.ReviewRequired -> result.details
-            is ParseResult.NonFinancial -> result.details
-            is ParseResult.Unsupported, is ParseResult.Invalid -> null
-        }
-        return details?.occurredAtLocal
-    }
 
     /** Production-equivalent wiring of import + derived processing on one in-memory DB. */
     private class ImportWorld(context: Context, preOwned: Boolean) : AutoCloseable {

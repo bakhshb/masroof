@@ -14,6 +14,10 @@ interface RawSmsRepository {
 
     suspend fun getById(id: String): RawSms?
 
+    /** Batch lookup; missing ids are skipped. Result order is unspecified. */
+    suspend fun getByIds(ids: Collection<String>): List<RawSms> =
+        ids.distinct().mapNotNull { getById(it) }
+
     suspend fun existsById(id: String): Boolean
 
     suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms?

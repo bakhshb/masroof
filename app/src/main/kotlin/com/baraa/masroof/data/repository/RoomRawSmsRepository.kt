@@ -1,6 +1,7 @@
 package com.baraa.masroof.data.repository
 
 import com.baraa.masroof.data.room.dao.RawSmsDao
+import com.baraa.masroof.data.room.dao.RoomBatch
 import com.baraa.masroof.data.room.mapper.RawSmsMapper
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
@@ -25,6 +26,9 @@ class RoomRawSmsRepository(
 
     override suspend fun getById(id: String): RawSms? =
         dao.getById(id)?.let(RawSmsMapper::toDomain)
+
+    override suspend fun getByIds(ids: Collection<String>): List<RawSms> =
+        RoomBatch.query(ids) { chunk -> dao.getByIds(chunk) }.map(RawSmsMapper::toDomain)
 
     override suspend fun existsById(id: String): Boolean = dao.existsById(id)
 

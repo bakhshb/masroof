@@ -50,8 +50,10 @@
 - Credit facility due is one value per facility (primary + supplementaries share the statement due).
 - Mada (debit) cards have salary-period spending only — no statement due.
 - Loan repayments are detected from `LOAN_REPAYMENT` or `FEE` + `FINANCING_INSTALLMENT` SMS via `LoanRepaymentAttribution`; all dashboard calculators must use it.
+- Dashboard evidence is scoped: read parsed/raw SMS only through `DashboardEvidenceSource` (`DashboardEvidenceScope`). Never call `ParsedEventRepository.listAll()` or per-row `RawSmsRepository.getById` on the dashboard load path; a rule needing unlinked history gets an explicit fact query (superset-safe, ordered by event id).
 
 ## Testing dashboard changes
 
 - Run targeted unit tests under `app/src/test/kotlin/com/baraa/masroof/application/dashboard/`.
+- Evidence-scope changes must keep `DashboardFixtureCharacterizationTest` scoped-vs-whole-history equality green.
 - For Mada linking, cover both registry-linked cards and Google Pay SMS without `خصمت من حساب`.

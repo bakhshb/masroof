@@ -1,6 +1,7 @@
 package com.baraa.masroof.data.repository
 
 import com.baraa.masroof.data.room.dao.ParsedEventDao
+import com.baraa.masroof.data.room.dao.RoomBatch
 import com.baraa.masroof.data.room.mapper.ParsedEventMapper
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.ParsedEventDetails
@@ -39,4 +40,34 @@ class RoomParsedEventRepository(
 
     override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> =
         dao.listUnlinkedTransfers().map(ParsedEventMapper::toRecord)
+
+    override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> =
+        RoomBatch.query(rawSmsIds) { chunk -> dao.listByRawSmsIds(chunk) }
+            .sortedBy { it.id }
+            .map(ParsedEventMapper::toRecord)
+
+    override suspend fun listCardStatementFacts(): List<ParsedEventRecord> =
+        dao.listCardStatementFacts().map(ParsedEventMapper::toRecord)
+
+    override suspend fun listLatestCreditCardRowFacts(): List<ParsedEventRecord> =
+        dao.listLatestCreditCardRowFacts().map(ParsedEventMapper::toRecord)
+
+    override suspend fun listLatestCreditCardAvailableBalanceFacts(
+        beforeExclusive: java.time.Instant,
+    ): List<ParsedEventRecord> =
+        dao.listLatestCreditCardAvailableBalanceFacts(beforeExclusive.toEpochMilli())
+            .map(ParsedEventMapper::toRecord)
+
+    override suspend fun listFinancingInstallmentFacts(): List<ParsedEventRecord> =
+        dao.listFinancingInstallmentFacts().map(ParsedEventMapper::toRecord)
+
+    override suspend fun listExchangeRateFacts(): List<ParsedEventRecord> =
+        dao.listExchangeRateFacts().map(ParsedEventMapper::toRecord)
+
+    override suspend fun listFirstDebitCardFacts(cardLast4s: Collection<String>): List<ParsedEventRecord> =
+        RoomBatch.query(cardLast4s, chunkSize = RoomBatch.MAX_BIND_ARGS / 2) { chunk ->
+            dao.listFirstDebitCardFacts(chunk)
+        }
+            .sortedBy { it.id }
+            .map(ParsedEventMapper::toRecord)
 }

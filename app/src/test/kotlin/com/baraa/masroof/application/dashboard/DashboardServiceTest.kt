@@ -183,9 +183,78 @@ class DashboardServiceTest {
         assertFalse(older.isCurrentPeriod)
     }
 
+    @Test
+    fun loadProjection_usesBatchScopedEvidence_neverWholeHistoryOrPerRowLookups() = runBlocking {
+        val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val foreign = tx("usd", FinancialTransactionType.EXPENSE, "10", start.plusSeconds(60)).copy(
+            amount = Money.of("10.00", Currency.USD),
+            linkedParsedEventIds = listOf("evt-usd"),
+        )
+        val record = ParsedEventRecord(
+            event = parsedEvent("evt-usd", "sms-usd", merchant = "AMAZON", amount = foreign.amount),
+            details = ParsedEventDetails(exchangeRate = java.math.BigDecimal("3.75")),
+        )
+        val ftRepo = object : FinancialTransactionRepository by FakeFtRepo(listOf(foreign)) {
+            override suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> =
+                if ("usd" in transactionIds) setOf("sms-usd") else emptySet()
+        }
+        val parsedRepo = object : ParsedEventRepository by FakeParsedRepo() {
+            override suspend fun listAll(): List<ParsedEventRecord> = error("whole-history scan")
+            override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>) =
+                listOf(record).filter { it.event.rawSmsId in rawSmsIds }
+            override suspend fun listCardStatementFacts() = emptyList<ParsedEventRecord>()
+            override suspend fun listLatestCreditCardRowFacts() = emptyList<ParsedEventRecord>()
+            override suspend fun listLatestCreditCardAvailableBalanceFacts(beforeExclusive: Instant) =
+                emptyList<ParsedEventRecord>()
+            override suspend fun listFinancingInstallmentFacts() = emptyList<ParsedEventRecord>()
+            override suspend fun listExchangeRateFacts() = emptyList<ParsedEventRecord>()
+            override suspend fun listFirstDebitCardFacts(cardLast4s: Collection<String>) = emptyList<ParsedEventRecord>()
+        }
+        val raw = RawSms("sms-usd", "BankAlJazira", "body", start, null, "hash")
+        val rawRepo = object : RawSmsRepository by FakeRawRepo(mapOf(raw.id to raw)) {
+            override suspend fun getById(id: String): RawSms? = error("per-row RawSms lookup")
+            override suspend fun getByIds(ids: Collection<String>): List<RawSms> = listOf(raw).filter { it.id in ids }
+        }
+
+        val projection = dashboardService(ftRepo, FakeReviewRepo(), parsedRepo = parsedRepo, rawRepo = rawRepo)
+            .loadProjection(period)
+
+        val shown = projection.transactions.single()
+        assertEquals("AMAZON", shown.merchant)
+        assertEquals(Money.of("37.50", Currency.SAR), projection.summary.spendingGross)
+        assertEquals(0, projection.summary.excludedOtherCurrencyCount)
+    }
+
+    private fun parsedEvent(
+        id: String,
+        rawSmsId: String,
+        merchant: String?,
+        amount: Money,
+    ) = ParsedEvent(
+        id = id,
+        rawSmsId = rawSmsId,
+        bank = Bank.BANK_ALJAZIRA,
+        messageFamily = com.baraa.masroof.domain.model.MessageFamily.PURCHASE,
+        direction = null,
+        amount = amount,
+        purchaseChannel = null,
+        sourceAccountRef = null,
+        destinationAccountRef = null,
+        cardRef = null,
+        merchant = merchant,
+        counterparty = null,
+        occurredAt = null,
+        bankNetworkType = null,
+        confidence = com.baraa.masroof.domain.model.Confidence(0.9),
+        parseStatus = com.baraa.masroof.domain.model.ParseStatus.SUCCESS,
+    )
+
     private fun dashboardService(
         ftRepo: FinancialTransactionRepository,
         reviewRepo: ReviewRepository,
+        parsedRepo: ParsedEventRepository = FakeParsedRepo(),
+        rawRepo: RawSmsRepository = FakeRawRepo(),
         accountRepo: AccountRegistryRepository = FakeAccountRepo(),
         cardRepo: CardRegistryRepository = FakeCardRepo(),
         loanRepo: LoanRegistryRepository = FakeLoanRepo(),
@@ -194,8 +263,8 @@ class DashboardServiceTest {
         DashboardService(
             financialTransactionRepository = ftRepo,
             reviewRepository = reviewRepo,
-            parsedEventRepository = FakeParsedRepo(),
-            rawSmsRepository = FakeRawRepo(),
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
             appLocaleRepository = FakeAppLocaleRepository(),
             accountRegistryRepository = accountRepo,
             cardRegistryRepository = cardRepo,

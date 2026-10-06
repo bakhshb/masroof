@@ -80,6 +80,19 @@ interface FinancialTransactionDao {
     @Query(
         """
         SELECT * FROM financial_transaction
+        WHERE type IN (:types)
+          AND occurredAtEpochMillis >= :startInclusiveEpochMillis
+        ORDER BY occurredAtEpochMillis, id
+        """,
+    )
+    suspend fun listByTypesOccurredSince(
+        types: List<String>,
+        startInclusiveEpochMillis: Long,
+    ): List<FinancialTransactionEntity>
+
+    @Query(
+        """
+        SELECT * FROM financial_transaction
         WHERE occurredAtEpochMillis >= :startInclusiveEpochMillis
           AND occurredAtEpochMillis < :endExclusiveEpochMillis
         ORDER BY occurredAtEpochMillis DESC, id DESC
@@ -107,6 +120,16 @@ interface FinancialTransactionDao {
         """,
     )
     suspend fun listRawSmsIdsForTransaction(transactionId: String): List<String>
+
+    /** Callers keep [transactionIds] under [RoomBatch.MAX_BIND_ARGS]. */
+    @Query(
+        """
+        SELECT rawSmsId FROM financial_transaction_raw_sms_link
+        WHERE transactionId IN (:transactionIds)
+        ORDER BY rawSmsId
+        """,
+    )
+    suspend fun listRawSmsIdsForTransactions(transactionIds: List<String>): List<String>
 
     @Query("SELECT COUNT(*) FROM financial_transaction")
     suspend fun count(): Int

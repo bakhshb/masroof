@@ -6,7 +6,6 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.application.locale.AppLocale
@@ -17,7 +16,6 @@ import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.CommitmentRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
@@ -31,18 +29,31 @@ class DashboardProjectionBuilder(
     private val commitmentRepository: CommitmentRepository,
     private val appLocaleRepository: AppLocaleRepository,
     private val sarEquivalentResolver: TransactionSarEquivalentResolver,
+    private val evidenceSource: DashboardEvidenceSource,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val primaryCurrency: Currency = Currency.SAR,
 ) {
+    /** [transactions] are the selected period's stored transactions. */
     suspend fun build(
         period: FinancialPeriod,
-        parsedRecords: List<ParsedEventRecord>,
-        rawSmsById: Map<String, RawSms>,
-        enrichedTransactions: List<FinancialTransaction>,
+        transactions: List<FinancialTransaction>,
     ): DashboardProjection {
         val reviewRequiredCount = reviewRepository.listRequired().size
         val commitments = commitmentRepository.listAll()
+        val cardRegistry = cardRegistryRepository.listAll()
+        val periodEndExclusive = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zoneId)
+        val evidence = evidenceSource.load(
+            transactions = transactions,
+            registryCards = cardRegistry,
+            periodEndExclusive = periodEndExclusive,
+        )
+        val parsedRecords = evidence.parsedRecords
+        val rawSmsById = evidence.rawSmsById
+        val enrichedTransactions = TransactionDisplayEnricher.enrichMerchants(
+            transactions = transactions,
+            parsedRecords = parsedRecords,
+        )
         val sarResolutions = sarEquivalentResolver.resolve(
             transactions = enrichedTransactions,
             parsedRecords = parsedRecords,
@@ -67,10 +78,11 @@ class DashboardProjectionBuilder(
                 financialTransactionRepository.getById(commitment.sourceTransactionId)
             }
         }
+        val commitmentEvidence = evidenceSource.extend(evidence, commitmentSourceTransactions)
         val commitmentSarEquivalents = sarEquivalentResolver.resolve(
             transactions = commitmentSourceTransactions,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
+            parsedRecords = commitmentEvidence.parsedRecords,
+            rawSmsById = commitmentEvidence.rawSmsById,
             primaryCurrency = primaryCurrency,
         ).sarAmounts()
         val commitmentSarEquivalentAmounts = sarEquivalents + commitmentSarEquivalents
@@ -83,7 +95,6 @@ class DashboardProjectionBuilder(
         val ownedAccountLast4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
             ownedAccounts.map { it.maskedNumber },
         )
-        val cardRegistry = cardRegistryRepository.listAll()
         val debitCardScope = DebitCardScopeFactory.fromRegistry(
             cards = cardRegistry,
             parsedRecords = parsedRecords,
@@ -158,7 +169,6 @@ class DashboardProjectionBuilder(
             parsedRecords = parsedRecords,
         )
 
-        val periodEndExclusive = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zoneId)
         val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
@@ -173,14 +183,15 @@ class DashboardProjectionBuilder(
             startInclusive = cardQueryStart,
             endExclusive = periodEndExclusive,
         )
+        val cardEvidence = evidenceSource.extend(evidence, cardTransactions)
         val enrichedCardTransactions = TransactionDisplayEnricher.enrichMerchants(
             transactions = cardTransactions,
-            parsedRecords = parsedRecords,
+            parsedRecords = cardEvidence.parsedRecords,
         )
         val cardSarResolutions = sarEquivalentResolver.resolve(
             transactions = enrichedCardTransactions,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
+            parsedRecords = cardEvidence.parsedRecords,
+            rawSmsById = cardEvidence.rawSmsById,
             primaryCurrency = primaryCurrency,
         )
         AppliedExchangeRateSyncer.sync(
@@ -193,8 +204,8 @@ class DashboardProjectionBuilder(
         val creditCardsFlat = CreditCardOverviewBuilder.build(
             salaryPeriod = period,
             cardTransactions = enrichedCardTransactions,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
+            parsedRecords = cardEvidence.parsedRecords,
+            rawSmsById = cardEvidence.rawSmsById,
             zoneId = zoneId,
             primaryCurrency = primaryCurrency,
             sarEquivalents = cardSarEquivalents,
@@ -239,10 +250,11 @@ class DashboardProjectionBuilder(
             periodTransactionIds = periodTransactionIds,
             zoneId = zoneId,
         )
+        val creditCardPaymentEvidence = evidenceSource.extend(evidence, creditCardPaymentTransactions)
         val creditCardPaymentSarEquivalents = sarEquivalentResolver.resolve(
             transactions = creditCardPaymentTransactions,
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
+            parsedRecords = creditCardPaymentEvidence.parsedRecords,
+            rawSmsById = creditCardPaymentEvidence.rawSmsById,
             primaryCurrency = primaryCurrency,
         ).sarAmounts()
         val commitmentTransactions = buildList {
@@ -324,8 +336,10 @@ class DashboardProjectionBuilder(
         }
         if (relevantFacilities.isEmpty()) return emptyList()
 
-        val creditCardPayments = financialTransactionRepository.listByTypes(
-            listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT),
+        val earliestDueUpdate = relevantFacilities.mapNotNull { it.facilityDue?.updatedAt }.min()
+        val creditCardPayments = financialTransactionRepository.listByTypesOccurredSince(
+            types = listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT),
+            startInclusive = earliestDueUpdate,
         )
         return relevantFacilities.flatMap { facility ->
             val due = facility.facilityDue ?: return@flatMap emptyList()
