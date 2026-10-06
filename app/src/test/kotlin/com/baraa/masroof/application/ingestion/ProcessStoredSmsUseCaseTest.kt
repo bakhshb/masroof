@@ -122,6 +122,19 @@ class ProcessStoredSmsUseCaseTest {
     }
 
     @Test
+    fun parseAndStore_persistsParsedEvent_withoutDerivedProcessing() = runBlocking {
+        val raw = sms(PURCHASE_BODY)
+        val captured = capture.capture(raw) as BankSmsCaptureResult.Captured
+
+        val result = processStored.parseAndStore(captured.rawSms, captured.route)
+
+        assertTrue(result is SmsIngestionResult.Parsed)
+        assertEquals(ParseStatus.SUCCESS, parsedRepo.findByRawSmsId(raw.id)!!.event.parseStatus)
+        assertNull(ftRepo.findByRawSmsId(raw.id))
+        assertTrue(reviewRepo.listAll().isEmpty())
+    }
+
+    @Test
     fun processById_retried_isIdempotent() = runBlocking {
         val raw = sms(PURCHASE_BODY)
         capture.capture(raw)

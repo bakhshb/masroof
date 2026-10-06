@@ -314,3 +314,24 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   sweep runs after startup maintenance and never blocks it.
 - No expedited work: on API < 31 that requires foreground-service info, and plain
   one-time work without constraints already runs promptly.
+
+### M3.3 — Historical import uses one derived pass per batch
+
+- `HistoricalSmsBatchProcessor.Batch.ingest` captures and calls
+  `ProcessStoredSmsUseCase.parseAndStore` (ParsedEvent or direct review, no derived work).
+  `Batch.finish` observes ownership for the stored events in arrival order, runs one
+  `TransactionReconciliationService.reconcileBatchDetailed` pass, and applies its report to
+  the review queue once. This replaces per-SMS reconciliation plus the two full passes that
+  previously ran at scan end. Live processing is unchanged (per message).
+- `reconcileBatchDetailed` visits stored events in RawSms arrival order (not ParsedEvent id
+  order), so new transaction ids equal those a message-by-message import assigns.
+- Characterization: the full AlJazira fixture corpus imported as one inbox (empty and
+  pre-owned registries) yields identical RawSms, ParsedEvents, transactions, reviews, and
+  registry entries to the per-message flow.
+- Deliberate difference: transfer legs between owned accounts that are bridged only by a
+  shared reference (neither SMS names the other account) used to become two external
+  transfers, because each leg was posted before its counterpart existed. The batch pass sees
+  both legs and pairs them into one SELF_TRANSFER — the order-independent result
+  `reconcileStoredEvents` already gives for the same evidence.
+- A scan that fails mid-way keeps counters/evidence and still finishes the batch for events
+  it stored; a cancelled scan leaves stored evidence for the next scan or reprocess pass.

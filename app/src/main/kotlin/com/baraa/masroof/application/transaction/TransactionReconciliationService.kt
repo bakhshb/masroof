@@ -69,6 +69,19 @@ class TransactionReconciliationService(
     }
 
     /**
+     * Single pass for a batch of newly stored events (historical import): every stored event,
+     * visited in RawSms arrival order like per-message processing, so transactions created by
+     * the batch get the same rawSms-derived ids a message-by-message import would assign.
+     */
+    suspend fun reconcileBatchDetailed(): ReconciliationReport {
+        val arrival = rawSmsRepository.listIdsByReceivedAt()
+            .withIndex()
+            .associate { (index, rawSmsId) -> rawSmsId to index }
+        val records = loadRecords().sortedBy { arrival[it.event.rawSmsId] ?: Int.MAX_VALUE }
+        return reconcileRecordsDetailed(records)
+    }
+
+    /**
      * Reconcile after a newly saved ParsedEvent. Failures are swallowed by callers
      * that treat P8 as derived processing.
      */

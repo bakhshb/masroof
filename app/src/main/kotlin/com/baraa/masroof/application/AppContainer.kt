@@ -90,6 +90,7 @@ import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
+import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
 import com.baraa.masroof.application.sms.LiveSmsProcessingWorker
@@ -447,12 +448,14 @@ class AppContainer(
     val historicalSmsScanner: HistoricalSmsScanner =
         HistoricalSmsScanner(
             dataSource = smsDataSource,
-            processRawSms = processRawSmsUseCase,
+            batchProcessor = HistoricalSmsBatchProcessor(
+                capture = captureBankSmsUseCase,
+                processStored = processStoredSmsUseCase,
+                ownershipDiscovery = ownershipDiscoveryService,
+                reconciliation = transactionReconciliationService,
+                reviewQueueUpdater = reviewQueueUpdater,
+            ),
             appLogService = appLogService,
-            onScanComplete = {
-                reconcileStoredEvents()
-                refreshReviewQueue()
-            },
         )
 
     /**

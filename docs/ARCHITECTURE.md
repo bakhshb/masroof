@@ -186,12 +186,17 @@ Two paths:
 ```text
 Android SMS Provider
    ↓
-HistoricalSmsScanner
+HistoricalSmsScanner (oldest → newest)
    ↓
-RawSms
+HistoricalSmsBatchProcessor.Batch.ingest
+   (CaptureBankSmsUseCase → ProcessStoredSmsUseCase.parseAndStore, per row)
    ↓
-RawSmsRepository
+Batch.finish (once per scan)
+   ownership discovery for stored events → reconcileBatchDetailed → review refresh
 ```
+
+Historical import never reconciles per SMS. A scan that fails mid-way (permission or
+provider error) keeps its counters and evidence and still runs `finish` for events it stored.
 
 ### New messages
 

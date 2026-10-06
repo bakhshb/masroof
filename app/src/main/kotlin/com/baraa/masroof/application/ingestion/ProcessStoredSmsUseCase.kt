@@ -48,8 +48,27 @@ class ProcessStoredSmsUseCase(
         rawSms: RawSms,
         route: BankRoutingResult,
         logOutcome: Boolean = true,
+    ): SmsIngestionResult = processRouted(rawSms, route, logOutcome, deriveImmediately = true)
+
+    /**
+     * Parses captured evidence and persists its ParsedEvent (or direct review) without
+     * ownership discovery, reconciliation, or review refresh. Batch callers
+     * ([com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor]) run those once
+     * for the whole batch.
+     */
+    suspend fun parseAndStore(
+        rawSms: RawSms,
+        route: BankRoutingResult,
+        logOutcome: Boolean = true,
+    ): SmsIngestionResult = processRouted(rawSms, route, logOutcome, deriveImmediately = false)
+
+    private suspend fun processRouted(
+        rawSms: RawSms,
+        route: BankRoutingResult,
+        logOutcome: Boolean,
+        deriveImmediately: Boolean,
     ): SmsIngestionResult = when (route) {
-        is BankRoutingResult.Matched -> parseAndPersist(rawSms, route.adapter, logOutcome)
+        is BankRoutingResult.Matched -> parseAndPersist(rawSms, route.adapter, logOutcome, deriveImmediately)
         is BankRoutingResult.Ambiguous -> holdAmbiguousRoute(rawSms, route, logOutcome)
         is BankRoutingResult.NotMatched -> SmsIngestionResult.NotRelevant(reason = route.reason)
     }
@@ -88,7 +107,7 @@ class ProcessStoredSmsUseCase(
                 is BankRoutingResult.Ambiguous ->
                     return holdAmbiguousRoute(rawSms, route, logOutcome)
             }
-        return parseAndPersist(rawSms, adapter, logOutcome)
+        return parseAndPersist(rawSms, adapter, logOutcome, deriveImmediately = true)
     }
 
     /** Ambiguous bank-like evidence is kept and reviewed, never parsed by a guessed adapter. */
@@ -117,6 +136,7 @@ class ProcessStoredSmsUseCase(
         rawSms: RawSms,
         adapter: BankSmsAdapter,
         logOutcome: Boolean,
+        deriveImmediately: Boolean,
     ): SmsIngestionResult {
         val parseResult = try {
             adapter.parse(
@@ -144,7 +164,7 @@ class ProcessStoredSmsUseCase(
         }
 
         return try {
-            mapAndSave(rawSms, parseResult, logOutcome)
+            mapAndSave(rawSms, parseResult, logOutcome, deriveImmediately)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -169,10 +189,14 @@ class ProcessStoredSmsUseCase(
         rawSms: RawSms,
         parseResult: ParseResult,
         logOutcome: Boolean,
-    ): SmsIngestionResult =
-        when (parseResult) {
+        deriveImmediately: Boolean,
+    ): SmsIngestionResult {
+        suspend fun save(event: ParsedEvent, details: ParsedEventDetails, outcome: String) =
+            saveEvent(rawSms, event, details, outcome, logOutcome, deriveImmediately)
+
+        return when (parseResult) {
             is ParseResult.Success -> {
-                saveEvent(rawSms, parseResult.event, parseResult.details, "parsed", logOutcome)
+                save(parseResult.event, parseResult.details, "parsed")
                 SmsIngestionResult.Parsed(
                     rawSmsId = rawSms.id,
                     event = parseResult.event,
@@ -182,7 +206,7 @@ class ProcessStoredSmsUseCase(
 
             is ParseResult.Partial -> {
                 if (parseResult.event != null) {
-                    saveEvent(rawSms, parseResult.event, parseResult.details, "parsed_partial", logOutcome)
+                    save(parseResult.event, parseResult.details, "parsed_partial")
                     SmsIngestionResult.Parsed(
                         rawSmsId = rawSms.id,
                         event = parseResult.event,
@@ -205,7 +229,7 @@ class ProcessStoredSmsUseCase(
 
             is ParseResult.ReviewRequired -> {
                 if (parseResult.event != null) {
-                    saveEvent(rawSms, parseResult.event, parseResult.details, "review_required", logOutcome)
+                    save(parseResult.event, parseResult.details, "review_required")
                 } else {
                     if (logOutcome) {
                         appLogService?.info(
@@ -225,7 +249,7 @@ class ProcessStoredSmsUseCase(
 
             is ParseResult.NonFinancial -> {
                 if (parseResult.event != null) {
-                    saveEvent(rawSms, parseResult.event, parseResult.details, "non_financial", logOutcome)
+                    save(parseResult.event, parseResult.details, "non_financial")
                 } else if (logOutcome) {
                     appLogService?.info(
                         AppLogCategories.INGEST,
@@ -268,6 +292,7 @@ class ProcessStoredSmsUseCase(
                 )
             }
         }
+    }
 
     private suspend fun saveEvent(
         rawSms: RawSms,
@@ -275,9 +300,12 @@ class ProcessStoredSmsUseCase(
         details: ParsedEventDetails,
         outcome: String,
         logOutcome: Boolean,
+        deriveImmediately: Boolean,
     ) {
         parsedEventRepository.save(event, details)
-        afterParsedEvent(event, details.loanType)
+        if (deriveImmediately) {
+            afterParsedEvent(event, details.loanType)
+        }
         if (logOutcome) {
             logParsedOutcome(rawSms, event.messageFamily, outcome)
         }

@@ -782,6 +782,110 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
+    fun batchPass_matchesIncrementalPerEventReconciliation() = runBlocking {
+        val t = LocalDateTime.parse("2026-08-10T12:00:00")
+        val own3001 = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        val own3003 = AccountReference(Bank.BANK_ALJAZIRA, "3003")
+        val batch = listOf(
+            Triple(
+                event("pe-b-out", "sms-b-out", MessageFamily.TRANSFER_OUT, money("700.00"), source = own3001, destination = own3003),
+                ParsedEventDetails(occurredAtLocal = t),
+                Instant.parse("2026-08-10T09:00:00Z"),
+            ),
+            Triple(
+                event("pe-b-in", "sms-b-in", MessageFamily.TRANSFER_IN, money("700.00"), source = own3001, destination = own3003),
+                ParsedEventDetails(occurredAtLocal = t),
+                Instant.parse("2026-08-10T09:00:30Z"),
+            ),
+            Triple(
+                event(
+                    "pe-b-buy",
+                    "sms-b-buy",
+                    MessageFamily.PURCHASE,
+                    money("51.99"),
+                    card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                    merchant = "Keeta",
+                ),
+                ParsedEventDetails(occurredAtLocal = t.plusHours(1)),
+                Instant.parse("2026-08-10T10:00:00Z"),
+            ),
+            Triple(
+                event("pe-b-ext", "sms-b-ext", MessageFamily.TRANSFER_OUT, money("120.00"), source = own3001, counterparty = "TEST_PERSON"),
+                ParsedEventDetails(occurredAtLocal = t.plusHours(2)),
+                Instant.parse("2026-08-10T11:00:00Z"),
+            ),
+        )
+
+        suspend fun seedAndReconcile(incremental: Boolean): List<com.baraa.masroof.domain.model.FinancialTransaction> {
+            db.clearAllTables()
+            confirmation.confirmAccountOwned(own3001)
+            confirmation.confirmAccountOwned(own3003)
+            confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+            for ((event, details, at) in batch) {
+                persistEvent(smsId = event.rawSmsId, event = event, details = details, at = at)
+                if (incremental) reconciliation.reconcileAfterParsedEvent(event)
+            }
+            if (incremental) {
+                reconciliation.reconcileStoredEvents()
+                reconciliation.reconcileStoredEvents()
+            } else {
+                reconciliation.reconcileBatchDetailed()
+            }
+            return ftRepo.listAll().sortedBy { it.id }
+        }
+
+        val perEvent = seedAndReconcile(incremental = true)
+        val batched = seedAndReconcile(incremental = false)
+
+        assertEquals(perEvent, batched)
+        assertEquals(
+            setOf(
+                FinancialTransactionType.EXPENSE,
+                FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
+                FinancialTransactionType.SELF_TRANSFER,
+            ),
+            batched.map { it.type }.toSet(),
+        )
+    }
+
+    @Test
+    fun batchPass_pairsReferenceBridgedLegs_likeOrderIndependentStoredPass() = runBlocking {
+        val t = LocalDateTime.parse("2026-08-10T12:00:00")
+        val own3001 = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        val own3003 = AccountReference(Bank.BANK_ALJAZIRA, "3003")
+
+        suspend fun seed() {
+            db.clearAllTables()
+            confirmation.confirmAccountOwned(own3001)
+            confirmation.confirmAccountOwned(own3003)
+            persistEvent(
+                smsId = "sms-r-out",
+                event = event("pe-r-out", "sms-r-out", MessageFamily.TRANSFER_OUT, money("700.00"), source = own3001),
+                details = ParsedEventDetails(occurredAtLocal = t, transactionReference = "REF-R"),
+                at = Instant.parse("2026-08-10T09:00:00Z"),
+            )
+            persistEvent(
+                smsId = "sms-r-in",
+                event = event("pe-r-in", "sms-r-in", MessageFamily.TRANSFER_IN, money("700.00"), destination = own3003),
+                details = ParsedEventDetails(occurredAtLocal = t, transactionReference = "REF-R"),
+                at = Instant.parse("2026-08-10T09:00:30Z"),
+            )
+        }
+
+        seed()
+        reconciliation.reconcileStoredEvents()
+        val storedPass = ftRepo.listAll()
+        seed()
+        reconciliation.reconcileBatchDetailed()
+        val batchPass = ftRepo.listAll()
+
+        assertEquals(storedPass, batchPass)
+        val selfTransfer = batchPass.single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, selfTransfer.type)
+        assertEquals(listOf("pe-r-in", "pe-r-out"), selfTransfer.linkedParsedEventIds.sorted())
+    }
+
+    @Test
     fun parseReprocessing_keepsTransactionLinkedToCurrentEvent() = runBlocking {
         persistEvent(
             smsId = "sms-re",
