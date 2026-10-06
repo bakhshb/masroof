@@ -37,7 +37,7 @@ class LiveSmsProcessingWorker(
         }
 
         return when (outcome) {
-            is SmsIngestionResult.DerivedIncomplete -> retryOrGiveUp()
+            is SmsIngestionResult.DerivedIncomplete -> retryDerivedOrGiveUp(outcome.rawSmsId)
             is SmsIngestionResult.Failed ->
                 if (outcome.message == ProcessStoredSmsUseCase.REASON_RAW_SMS_NOT_FOUND) {
                     Result.failure()
@@ -46,6 +46,16 @@ class LiveSmsProcessingWorker(
                 }
             else -> Result.success()
         }
+    }
+
+    /**
+     * Intermediate derived failures stay retryable without a review row.
+     * The final attempt records `processing_error` so startup can reschedule the evidence.
+     */
+    private suspend fun retryDerivedOrGiveUp(rawSmsId: String): Result {
+        if (runAttemptCount + 1 < MAX_ATTEMPTS) return Result.retry()
+        processStoredSms.recordExhaustedDerivedProcessing(rawSmsId)
+        return Result.failure()
     }
 
     /** After [MAX_ATTEMPTS], parse failures keep their processing_error review for reparse. */

@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
+import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ids.ReviewIdFactory
 import com.baraa.masroof.domain.model.RawSms
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference
 class IngestionReviewServiceTest {
 
     private lateinit var db: MasroofDatabase
+    private lateinit var rawRepo: RawSmsRepository
     private lateinit var reviewRepo: RoomReviewRepository
     private lateinit var service: IngestionReviewService
     private val now = AtomicReference(Instant.parse("2026-08-11T12:00:00Z"))
@@ -40,8 +42,9 @@ class IngestionReviewServiceTest {
             .allowMainThreadQueries()
             .build()
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
+        rawRepo = RoomRawSmsRepository(db.rawSmsDao())
         service = IngestionReviewService(reviewRepo, InstantClock { now.get() })
-        RoomRawSmsRepository(db.rawSmsDao()).insertIfAbsent(
+        rawRepo.insertIfAbsent(
             RawSms(
                 id = "sms-1",
                 sender = "AlJazira",
@@ -91,5 +94,40 @@ class IngestionReviewServiceTest {
         val stored = reviewRepo.findByRawSmsId("sms-1")!!
         assertEquals(ReviewStatus.RESOLVED, stored.status)
         assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, stored.resolutionKind)
+    }
+
+    @Test
+    fun retryableProcessingErrors_areOldestReceiptFirst_andSkipOtherReviews() = runBlocking {
+        insertRaw("sms-newer", "2026-08-12T10:00:00Z")
+        insertRaw("sms-older", "2026-08-10T10:00:00Z")
+        insertRaw("sms-resolved", "2026-08-09T10:00:00Z")
+        service.requireReview("sms-1", IngestionReviewService.REASON_UNSUPPORTED_FORMAT)
+        service.requireReview("sms-newer", IngestionReviewService.REASON_PROCESSING_ERROR)
+        service.requireReview("sms-older", IngestionReviewService.REASON_PROCESSING_ERROR)
+        val resolved = service.requireReview("sms-resolved", IngestionReviewService.REASON_PROCESSING_ERROR)
+        reviewRepo.markResolved(
+            id = resolved.id,
+            resolutionKind = ReviewResolutionKind.USER_FINANCIAL_TYPE,
+            resolvedAt = now.get(),
+            resolvedTransactionId = null,
+        )
+
+        assertEquals(
+            listOf("sms-older", "sms-newer"),
+            reviewRepo.listRetryableProcessingErrorRawSmsIds(),
+        )
+    }
+
+    private suspend fun insertRaw(id: String, at: String) {
+        rawRepo.insertIfAbsent(
+            RawSms(
+                id = id,
+                sender = "AlJazira",
+                body = "body-$id",
+                receivedAt = Instant.parse(at),
+                deviceMessageId = id,
+                bodyHash = SmsBodyHasher.sha256Hex("body-$id"),
+            ),
+        )
     }
 }

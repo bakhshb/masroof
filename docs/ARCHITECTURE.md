@@ -811,10 +811,10 @@ Live processing runs in WorkManager:
 |---|---|
 | Work input | `rawSmsId` only (`LiveSmsProcessingWorker.KEY_RAW_SMS_ID`); never body or OTP text |
 | Duplicates | unique work per rawSmsId with `ExistingWorkPolicy.KEEP`; capture dedupe returns `Duplicate` without scheduling |
-| Retry | exponential backoff; `Result.retry()` for processing failures, exceptions, and `DerivedIncomplete` (ownership, reconciliation, review refresh) until `MAX_ATTEMPTS`. Parse failures keep their `processing_error` review. Exchange-rate enrichment failure stays `Result.success()` |
+| Retry | exponential backoff; `Result.retry()` for processing failures, exceptions, and `DerivedIncomplete` (ownership, reconciliation, review refresh) until `MAX_ATTEMPTS`. Parse failures keep their `processing_error` review. The final derived failure records that same review. Exchange-rate enrichment failure stays `Result.success()` |
 | Permanent failure | missing input or `raw_sms_not_found` → `Result.failure()` |
 | Cancellation | `CancellationException` propagates; captured evidence stays and is processed by the next run |
-| Process death | startup sweep `LiveSmsIntake.schedulePendingProcessing()` reschedules `RawSmsRepository.listIdsAwaitingProcessing()` (no ParsedEvent and no review row) |
+| Process death | startup sweep `LiveSmsIntake.schedulePendingProcessing()` reschedules `RawSmsRepository.listIdsAwaitingProcessing()` (no ParsedEvent and no review row) and REQUIRED `processing_error` reviews. A resolved user review is not rescheduled. A successful retry auto-resolves the processing-error review |
 | Wiring | `MasroofApplication.workManagerConfiguration` registers `AppContainer.workerFactory`, a `DelegatingWorkerFactory` over `LiveSmsProcessingWorker.Factory` and `ParsedEventFactsBackfillWorker.Factory`; other workers fall back to the default factory |
 
 ### 23.1 Startup maintenance policy

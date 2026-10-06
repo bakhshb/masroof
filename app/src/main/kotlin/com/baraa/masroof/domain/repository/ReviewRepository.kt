@@ -20,6 +20,12 @@ interface ReviewRepository {
     suspend fun listAll(): List<ReviewItem>
 
     /**
+     * RawSms ids whose REQUIRED review is only `processing_error`, oldest receipt first.
+     * A resolved user review is not included.
+     */
+    suspend fun listRetryableProcessingErrorRawSmsIds(): List<String> = emptyList()
+
+    /**
      * Create or refresh a REQUIRED review for [rawSmsId].
      * Preserves [ReviewItem.createdAt] when the row already exists.
      */

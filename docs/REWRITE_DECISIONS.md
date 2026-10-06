@@ -463,5 +463,17 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   result and does not retry the worker.
 - `CancellationException` still propagates from every derived stage.
 - Historical `parseAndStore` still skips per-message derived work. Batch `finish` is unchanged.
-- Not in this step: startup recovery of a parsed row whose worker already gave up. That
-  remains a later recovery story.
+- Startup recovery of a row whose worker already gave up is M1.2.
+
+### M1.2 — Exhausted derived work is recoverable at startup
+
+- The live worker records a REQUIRED `processing_error` review only when a derived
+  failure reaches `MAX_ATTEMPTS`. Earlier retries leave the ParsedEvent without that review.
+- `ReviewRepository.listRetryableProcessingErrorRawSmsIds()` returns those rows, oldest
+  RawSms receipt first. Other REQUIRED reasons, and any RESOLVED row, are excluded.
+- `LiveSmsIntake.schedulePendingProcessing()` schedules that list together with evidence
+  that still has neither a ParsedEvent nor a review. It does not reparse the backlog.
+- `upsertRequired` still refuses to reopen a RESOLVED review, so a user resolution survives
+  a later exhausted-processing write.
+- A successful retry that settles the RawSms auto-resolves the processing-error review
+  through the existing review-queue update (`AUTO_NO_LONGER_REQUIRED`).

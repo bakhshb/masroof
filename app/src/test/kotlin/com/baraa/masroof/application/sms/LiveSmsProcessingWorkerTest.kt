@@ -13,6 +13,7 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewKind
+import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import kotlinx.coroutines.CancellationException
@@ -219,9 +220,16 @@ class LiveSmsProcessingWorkerTest {
             ),
         )
 
-        val results = (0 until LiveSmsProcessingWorker.MAX_ATTEMPTS).map { attempt ->
-            worker(raw.id, attempt = attempt, processStored = processStored).doWork()
-        }
+        assertEquals(
+            ListenableWorker.Result.retry(),
+            worker(raw.id, attempt = 0, processStored = processStored).doWork(),
+        )
+        assertTrue(harness.reviewRepo.listAll().isEmpty())
+
+        val results = listOf(ListenableWorker.Result.retry()) +
+            (1 until LiveSmsProcessingWorker.MAX_ATTEMPTS).map { attempt ->
+                worker(raw.id, attempt = attempt, processStored = processStored).doWork()
+            }
 
         assertEquals(
             List(LiveSmsProcessingWorker.MAX_ATTEMPTS - 1) { ListenableWorker.Result.retry() } +
@@ -230,7 +238,62 @@ class LiveSmsProcessingWorkerTest {
         )
         assertNotNull(harness.parsedRepo.findByRawSmsId(raw.id))
         assertNull(harness.ftRepo.findByRawSmsId(raw.id))
-        assertTrue(harness.reviewRepo.listAll().isEmpty())
+        val review = harness.reviewRepo.findByRawSmsId(raw.id)!!
+        assertEquals(ReviewStatus.REQUIRED, review.status)
+        assertEquals(listOf(IngestionReviewService.REASON_PROCESSING_ERROR), review.reasons)
+        assertNull(review.resolutionKind)
+
+        val scheduled = mutableListOf<String>()
+        assertEquals(1, harness.intake { scheduled += it }.schedulePendingProcessing())
+        assertEquals(listOf(raw.id), scheduled)
+    }
+
+    @Test
+    fun exhaustedDerivedFailure_isRecoveredByStartup_andResolvesTheProcessingError() = runBlocking {
+        val raw = captured()
+        val exhausted = harness.processStored(
+            derivedFailures = DerivedFailureInjection(
+                reconciliationFailuresRemaining = AtomicInteger(Int.MAX_VALUE),
+            ),
+        )
+        repeat(LiveSmsProcessingWorker.MAX_ATTEMPTS) { attempt ->
+            worker(raw.id, attempt = attempt, processStored = exhausted).doWork()
+        }
+        assertEquals(ReviewStatus.REQUIRED, harness.reviewRepo.findByRawSmsId(raw.id)!!.status)
+
+        assertEquals(
+            ListenableWorker.Result.success(),
+            worker(raw.id, processStored = harness.processStored()).doWork(),
+        )
+        val review = harness.reviewRepo.findByRawSmsId(raw.id)!!
+        assertEquals(ReviewStatus.RESOLVED, review.status)
+        assertEquals(ReviewResolutionKind.AUTO_NO_LONGER_REQUIRED, review.resolutionKind)
+        assertEquals(1, harness.db.financialTransactionDao().count())
+        assertEquals(0, harness.intake { }.schedulePendingProcessing())
+    }
+
+    @Test
+    fun exhaustedDerivedProcessing_doesNotReopenAResolvedUserReview() = runBlocking {
+        val raw = captured()
+        val created = harness.reviewRepo.upsertRequired(
+            rawSmsId = raw.id,
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf(IngestionReviewService.REASON_PROCESSING_ERROR),
+            now = Instant.parse("2026-08-11T12:00:00Z"),
+        )
+        harness.reviewRepo.markResolved(
+            id = created.id,
+            resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
+            resolvedAt = Instant.parse("2026-08-11T12:05:00Z"),
+            resolvedTransactionId = null,
+        )
+
+        harness.processStored().recordExhaustedDerivedProcessing(raw.id)
+
+        val stored = harness.reviewRepo.findByRawSmsId(raw.id)!!
+        assertEquals(ReviewStatus.RESOLVED, stored.status)
+        assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, stored.resolutionKind)
+        assertEquals(0, harness.intake { }.schedulePendingProcessing())
     }
 
     @Test

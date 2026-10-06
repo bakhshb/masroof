@@ -479,6 +479,14 @@ class ProcessStoredSmsUseCase(
         data class Incomplete(val result: SmsIngestionResult.DerivedIncomplete) : ReconcileDerivedResult
     }
 
+    /**
+     * Records a REQUIRED `processing_error` review after live retries are exhausted.
+     * Does not reopen a resolved user review.
+     */
+    suspend fun recordExhaustedDerivedProcessing(rawSmsId: String) {
+        recordIngestionReview(rawSmsId, IngestionReviewService.REASON_PROCESSING_ERROR)
+    }
+
     companion object {
         const val REASON_RAW_SMS_NOT_FOUND = "raw_sms_not_found"
     }

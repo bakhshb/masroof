@@ -7,6 +7,7 @@ import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsRepository
+import com.baraa.masroof.domain.repository.ReviewRepository
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -20,6 +21,7 @@ class LiveSmsIntake(
     private val captureBankSms: CaptureBankSmsUseCase,
     private val scheduler: LiveSmsWorkScheduler,
     private val rawSmsRepository: RawSmsRepository,
+    private val reviewRepository: ReviewRepository,
     private val appLogService: AppLogService,
 ) {
     suspend fun ingest(rawSms: RawSms): BankSmsCaptureResult {
@@ -35,12 +37,16 @@ class LiveSmsIntake(
     }
 
     /**
-     * Reschedules captured evidence that has no durable processing outcome, e.g. when the
-     * process died between capture and scheduling. Returns how many ids were scheduled.
+     * Reschedules captured evidence that still needs processing: rows with no outcome yet,
+     * and rows whose live worker exhausted retries and left a REQUIRED `processing_error`
+     * review. A resolved user review is not rescheduled. Returns how many ids were scheduled.
      */
     suspend fun schedulePendingProcessing(): Int {
         val pending = try {
-            rawSmsRepository.listIdsAwaitingProcessing()
+            (
+                rawSmsRepository.listIdsAwaitingProcessing() +
+                    reviewRepository.listRetryableProcessingErrorRawSmsIds()
+                ).distinct()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
