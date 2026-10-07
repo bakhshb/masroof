@@ -622,6 +622,9 @@
     <string name="review_reason_processing_error">تعذّرت معالجة الرسالة — محفوظة لإعادة المحاولة</string>
     <string name="review_reason_ambiguous_bank_route">المرسل يطابق أكثر من بنك — لم تُحلَّل الرسالة</string>
     <string name="review_reason_suspected_bank_sender">المرسل يشبه بنكاً معروفاً — لم تُحلَّل الرسالة قبل تأكيد البنك</string>
+    <string name="review_reason_user_selected_bank">تم اختيار البنك يدوياً لهذه الرسالة</string>
+    <string name="review_bank_choice_title">اختر البنك لتحليل الرسالة</string>
+    <string name="review_parse_with_bank">تحليل كـ %1$s</string>
     <string name="review_reason_purchase_ownership_unknown">شراء — ملكية البطاقة غير محددة</string>
     <string name="review_reason_purchase_unresolved">شراء — لم يُحدد حساب الدفع</string>
     <string name="review_reason_card_payment_missing">سداد بطاقة — بيانات ناقصة</string>

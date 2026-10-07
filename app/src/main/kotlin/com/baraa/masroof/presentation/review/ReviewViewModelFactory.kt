@@ -29,6 +29,10 @@ class ReviewViewModelFactory(
                     container.refreshReviewQueue()
                 }
             },
+            selectableBanks = container.explicitBankSelectionWorkflow.selectableBanks(),
+            selectBankAndReparse = { rawSmsId, bankId ->
+                container.explicitBankSelectionWorkflow.selectAndReparse(rawSmsId, bankId)
+            },
             appLocaleRepository = container.appLocaleRepository,
             maintenanceCompletions = container.maintenanceCompletionSignal.completions,
         ) as T

@@ -19,6 +19,11 @@ data class ReviewListItemUi(
     val ignored: Boolean = false,
 )
 
+data class ReviewBankChoiceUi(
+    val bankId: String,
+    val labelRes: Int?,
+)
+
 data class ReviewDetailUi(
     val id: String,
     val rawSmsId: String,
@@ -43,6 +48,7 @@ data class ReviewDetailUi(
     val showRestoreActions: Boolean = false,
     val readOnly: Boolean = false,
     val resolvedAtLabel: String? = null,
+    val bankChoices: List<ReviewBankChoiceUi> = emptyList(),
 )
 
 enum class ReviewListMode {

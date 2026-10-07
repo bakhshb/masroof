@@ -1,10 +1,14 @@
 package com.baraa.masroof.presentation.review
 
 import com.baraa.masroof.R
+import com.baraa.masroof.domain.model.ExplicitBankSelection
 
 object ReviewReasonLabels {
-    fun labelRes(reason: String): Int? =
-        when (reason) {
+    fun labelRes(reason: String): Int? {
+        if (ExplicitBankSelection.isSelection(reason)) {
+            return R.string.review_reason_user_selected_bank
+        }
+        return when (reason) {
             "transfer_pending_match" -> R.string.review_reason_transfer_pending_match
             "bill_payment_financial_treatment_unresolved" ->
                 R.string.review_reason_bill_payment
@@ -46,4 +50,5 @@ object ReviewReasonLabels {
             "update_failed" -> R.string.transaction_detail_reclassify_failed
             else -> null
         }
+    }
 }

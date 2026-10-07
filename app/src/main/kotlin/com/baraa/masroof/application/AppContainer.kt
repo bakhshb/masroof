@@ -15,6 +15,7 @@ import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
 import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.review.ExplicitBankSelectionWorkflow
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewOwnershipWorkflow
 import com.baraa.masroof.application.review.ReviewQueueUpdater
@@ -463,6 +464,17 @@ class AppContainer(
             appLogService = appLogService,
             exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
             processingRecovery = processingRecovery,
+            reviewRepository = reviewRepository,
+        )
+
+    val explicitBankSelectionWorkflow: ExplicitBankSelectionWorkflow =
+        ExplicitBankSelectionWorkflow(
+            reviewRepository = reviewRepository,
+            rawSmsRepository = rawSmsRepository,
+            parsedEventRepository = parsedEventRepository,
+            bankSmsRegistry = bankSmsRegistry,
+            processStored = processStoredSmsUseCase,
+            clock = clock,
         )
 
     val processRawSmsUseCase: ProcessRawSmsUseCase =

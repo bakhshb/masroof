@@ -249,6 +249,13 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   as a processing error (direct review), so parser and router cannot disagree.
 - Sender near-miss coverage moved from parser assertions to routing assertions.
 
+### Explicit bank selection (phase 2.3)
+
+- A review action stores `user_selected_bank:<bankId>` on that RawSms's review reasons. Stored-evidence adapter selection is: that choice, then the existing ParsedEvent bank, then a fresh route. Matched parses. Ambiguous and SuspectedBank stay in review. Only a genuine NotMatched route may use the sole-adapter fallback.
+- The prefix survives `ReviewRepository.upsertRequired` (queue refresh and later ingestion reasons). Detector allowlists are unchanged, and a second RawSms without the prefix is not reclassified.
+- The action is offered for `ambiguous_bank_route` and `suspected_bank_sender`. Choosing an adapter that still does not produce a ParsedEvent leaves the route reason in place so another bank can be chosen.
+- No schema change. The choice is per RawSms, not a new bank and not a guessed route.
+
 ### M2.1 — Comparison-only Arabic normalization
 
 - `core/text/ArabicTextFolding` defines the equivalence (alef/yeh folding, tatweel,
@@ -302,8 +309,10 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   route). It never parses or reconciles.
 - `ProcessStoredSmsUseCase` owns parse → ParsedEvent → discovery → reconciliation →
   review. `process(rawSms, route)` reuses the capture's route in the same attempt;
-  `process(rawSmsId)` loads stored evidence (adapter: stored event bank → sole adapter
-  → route) and is safe to retry; `reparseStored` is the backlog entry point.
+  `process(rawSmsId)` loads stored evidence (adapter: explicit `user_selected_bank`
+  choice → stored event bank → fresh route; sole adapter only for NotMatched)
+  and is safe to retry;
+  `reparseStored` is the backlog entry point.
 - `ProcessRawSmsUseCase` remains as a capture-then-process facade (historical scan,
   reprocessing, tests). `LiveSmsIntake` calls the two use cases directly.
 

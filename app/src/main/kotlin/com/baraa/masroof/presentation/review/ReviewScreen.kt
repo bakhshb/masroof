@@ -67,6 +67,7 @@ fun ReviewRoute(
             onResolveExternal = viewModel::resolveAsExternalTransfer,
             onResolvePair = viewModel::resolveSelfTransferPair,
             onDismissNonFinancial = viewModel::resolveAsIgnored,
+            onSelectBank = viewModel::selectBank,
             onConfirmOwnershipCardOwned = viewModel::confirmOwnershipCardOwned,
             onMarkOwnershipCardExternal = viewModel::markOwnershipCardExternal,
             onRestoreIgnored = viewModel::restoreIgnoredMessage,
@@ -323,6 +324,7 @@ private fun ReviewDetailScreen(
     onResolveExternal: () -> Unit,
     onResolvePair: (String) -> Unit,
     onDismissNonFinancial: () -> Unit,
+    onSelectBank: (String) -> Unit,
     onConfirmOwnershipCardOwned: () -> Unit,
     onMarkOwnershipCardExternal: () -> Unit,
     onRestoreIgnored: (FinancialTransactionType?) -> Unit,
@@ -452,6 +454,23 @@ private fun ReviewDetailScreen(
                     textAlign = TextAlign.Start,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+            }
+
+            if (detail.bankChoices.isNotEmpty()) {
+                MasroofSectionHeader(
+                    title = stringResource(R.string.review_bank_choice_title),
+                    icon = MasroofIcons.moneyMovement,
+                )
+                detail.bankChoices.forEach { choice ->
+                    val bankName = choice.labelRes?.let { stringResource(it) } ?: choice.bankId
+                    IconTextButton(
+                        onClick = { onSelectBank(choice.bankId) },
+                        enabled = !resolving,
+                        icon = MasroofIcons.moneyMovement,
+                        text = stringResource(R.string.review_parse_with_bank, bankName),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
 
             if (detail.showDismissNonFinancialAction) {

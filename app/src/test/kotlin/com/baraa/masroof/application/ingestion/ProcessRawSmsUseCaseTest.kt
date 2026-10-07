@@ -3,6 +3,7 @@ package com.baraa.masroof.application.ingestion
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.review.ExplicitBankSelectionWorkflow
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankSmsRegistry
@@ -17,6 +18,7 @@ import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.ExplicitBankSelection
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -46,6 +48,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -899,7 +902,7 @@ class ProcessRawSmsUseCaseTest {
         val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
         val alJaziraParses = AtomicInteger(0)
         val lookalike = CountingLookalikeAdapter()
-        val svc = ambiguousUseCase(alJaziraParses, lookalike, reviewRepo)
+        val svc = ambiguousUseCase(ambiguousRegistry(alJaziraParses, lookalike), reviewRepo)
         val raw = aljaziraPurchase(id = "android-sms:ambiguous", deviceId = "ambiguous")
 
         val result = svc.ingest(raw)
@@ -959,13 +962,163 @@ class ProcessRawSmsUseCaseTest {
         val raw = aljaziraPurchase(id = "android-sms:ambiguous-reparse", deviceId = "ambiguous-reparse")
         rawRepo.insertIfAbsent(raw)
 
-        val result = ambiguousUseCase(alJaziraParses, lookalike, reviewRepo).reparseStored(raw)
+        val result = ambiguousUseCase(ambiguousRegistry(alJaziraParses, lookalike), reviewRepo).reparseStored(raw)
 
         assertTrue(result is SmsIngestionResult.ReviewRequired)
         assertNull(parsedRepo.findByRawSmsId(raw.id))
         assertEquals(0, alJaziraParses.get())
         assertEquals(0, lookalike.parseCalls.get())
         assertDirectReview(reviewRepo, raw.id, "ambiguous_bank_route")
+    }
+
+    @Test
+    fun explicitBankSelection_parsesOnlyTheChosenSms() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val alJaziraParses = AtomicInteger(0)
+        val lookalike = CountingLookalikeAdapter()
+        val harness = ambiguousHarness(alJaziraParses, lookalike, reviewRepo)
+        val chosen = aljaziraPurchase(id = "android-sms:choose-aljazira", deviceId = "choose-aljazira")
+        val otherBody = aljaziraPurchase(id = "android-sms:leave-ambiguous", deviceId = "leave-ambiguous")
+            .body
+            .replace("51.99", "52.99")
+        val other = aljaziraPurchase(id = "android-sms:leave-ambiguous", deviceId = "leave-ambiguous").copy(
+            body = otherBody,
+            bodyHash = SmsBodyHasher.sha256Hex(otherBody),
+        )
+        assertTrue(harness.facade.ingest(chosen) is SmsIngestionResult.ReviewRequired)
+        assertTrue(harness.facade.ingest(other) is SmsIngestionResult.ReviewRequired)
+        assertEquals(0, alJaziraParses.get())
+        assertEquals(0, lookalike.parseCalls.get())
+
+        selectionWorkflow(harness.registry, reviewRepo, harness.stored)
+            .selectAndReparse(chosen.id, Bank.BANK_ALJAZIRA.id)
+
+        assertEquals(Bank.BANK_ALJAZIRA, parsedRepo.findByRawSmsId(chosen.id)!!.event.bank)
+        assertEquals(1, alJaziraParses.get())
+        assertEquals(0, lookalike.parseCalls.get())
+        assertNull(parsedRepo.findByRawSmsId(other.id))
+        val chosenReview = reviewRepo.findByRawSmsId(chosen.id)!!
+        assertTrue(chosenReview.reasons.contains(ExplicitBankSelection.reasonFor(Bank.BANK_ALJAZIRA)))
+        assertFalse(ExplicitBankSelection.offersBankChoice(chosenReview.reasons))
+
+        reviewRepo.upsertRequired(
+            rawSmsId = chosen.id,
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf("needs_review"),
+            now = Instant.parse("2026-08-03T16:00:00Z"),
+        )
+        val refreshed = reviewRepo.findByRawSmsId(chosen.id)!!
+        assertTrue(refreshed.reasons.contains(ExplicitBankSelection.reasonFor(Bank.BANK_ALJAZIRA)))
+        assertTrue(refreshed.reasons.contains("needs_review"))
+
+        harness.facade.reparseStored(chosen)
+        assertEquals(2, alJaziraParses.get())
+        assertEquals(0, lookalike.parseCalls.get())
+        assertNull(parsedRepo.findByRawSmsId(other.id))
+        harness.facade.reparseStored(other)
+        assertEquals(2, alJaziraParses.get())
+        assertEquals(0, lookalike.parseCalls.get())
+        assertDirectReview(reviewRepo, other.id, "ambiguous_bank_route")
+    }
+
+    @Test
+    fun explicitBankSelection_unknownBankDoesNotParse_failedChoiceStaysRetryable() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val alJaziraParses = AtomicInteger(0)
+        val lookalike = CountingLookalikeAdapter()
+        val harness = ambiguousHarness(alJaziraParses, lookalike, reviewRepo)
+        val raw = aljaziraPurchase(id = "android-sms:choose-lookalike", deviceId = "choose-lookalike")
+        harness.facade.ingest(raw)
+
+        val workflow = selectionWorkflow(harness.registry, reviewRepo, harness.stored)
+        workflow.selectAndReparse(raw.id, "NO_SUCH_BANK")
+        assertEquals(0, alJaziraParses.get())
+        assertEquals(0, lookalike.parseCalls.get())
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+        assertDirectReview(reviewRepo, raw.id, "ambiguous_bank_route")
+
+        workflow.selectAndReparse(raw.id, lookalike.bank.id)
+        assertEquals(0, alJaziraParses.get())
+        assertEquals(1, lookalike.parseCalls.get())
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+        val reasons = reviewRepo.findByRawSmsId(raw.id)!!.reasons
+        assertTrue(reasons.contains(ExplicitBankSelection.REASON_AMBIGUOUS_BANK_ROUTE))
+        assertTrue(reasons.contains(ExplicitBankSelection.reasonFor(lookalike.bank)))
+        assertTrue(reasons.contains("unsupported_bank_message_format"))
+    }
+
+    @Test
+    fun explicitBankSelection_parsesOnlyTheChosenSuspectedSms() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val parses = AtomicInteger(0)
+        val registry = BankSmsRegistry(
+            listOf(
+                AlJaziraSmsAdapter(
+                    pipeline = SmsParseGateway { input ->
+                        parses.incrementAndGet()
+                        AlJaziraParsingPipeline().parse(input)
+                    },
+                ),
+            ),
+        )
+        val stored = ProcessStoredSmsUseCase(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankSmsRegistry = registry,
+            ingestionReviewService = com.baraa.masroof.application.review.IngestionReviewService(
+                reviewRepo,
+                InstantClock { Instant.parse("2026-08-03T15:00:00Z") },
+            ),
+            reviewRepository = reviewRepo,
+        )
+        val facade = ProcessRawSmsUseCase(
+            capture = CaptureBankSmsUseCase(rawSmsRepository = rawRepo, bankSmsRegistry = registry),
+            processStored = stored,
+        )
+        val chosen = aljaziraPurchase(id = "android-sms:choose-suspected", deviceId = "choose-suspected")
+            .copy(sender = "NotAlJazira")
+        val otherBody = chosen.body.replace("51.99", "52.99")
+        val other = chosen.copy(
+            id = "android-sms:leave-suspected",
+            sender = "NotAlJaziraToo",
+            deviceMessageId = "leave-suspected",
+            body = otherBody,
+            bodyHash = SmsBodyHasher.sha256Hex(otherBody),
+        )
+
+        assertTrue(facade.ingest(chosen) is SmsIngestionResult.ReviewRequired)
+        assertTrue(facade.ingest(other) is SmsIngestionResult.ReviewRequired)
+        assertEquals(0, parses.get())
+        assertNull(parsedRepo.findByRawSmsId(chosen.id))
+        assertNull(parsedRepo.findByRawSmsId(other.id))
+        assertDirectReview(reviewRepo, chosen.id, "suspected_bank_sender")
+        assertDirectReview(reviewRepo, other.id, "suspected_bank_sender")
+
+        selectionWorkflow(registry, reviewRepo, stored)
+            .selectAndReparse(chosen.id, Bank.BANK_ALJAZIRA.id)
+
+        assertEquals(Bank.BANK_ALJAZIRA, parsedRepo.findByRawSmsId(chosen.id)!!.event.bank)
+        assertEquals(1, parses.get())
+        assertNull(parsedRepo.findByRawSmsId(other.id))
+        assertTrue(
+            reviewRepo.findByRawSmsId(chosen.id)!!.reasons
+                .contains(ExplicitBankSelection.reasonFor(Bank.BANK_ALJAZIRA)),
+        )
+
+        reviewRepo.upsertRequired(
+            rawSmsId = chosen.id,
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf("needs_review"),
+            now = Instant.parse("2026-08-03T16:00:00Z"),
+        )
+        val refreshed = reviewRepo.findByRawSmsId(chosen.id)!!
+        assertTrue(refreshed.reasons.contains(ExplicitBankSelection.reasonFor(Bank.BANK_ALJAZIRA)))
+        assertTrue(refreshed.reasons.contains("needs_review"))
+
+        facade.reparseStored(other)
+        assertEquals(1, parses.get())
+        assertNull(parsedRepo.findByRawSmsId(other.id))
+        assertDirectReview(reviewRepo, other.id, "suspected_bank_sender")
     }
 
     @Test
@@ -1035,28 +1188,71 @@ class ProcessRawSmsUseCaseTest {
         assertEquals(Money.of("51.99", Currency.SAR), event.amount)
     }
 
+    private fun ambiguousRegistry(
+        alJaziraParses: AtomicInteger,
+        lookalike: CountingLookalikeAdapter,
+    ) = BankSmsRegistry(
+        listOf(
+            AlJaziraSmsAdapter(
+                pipeline = SmsParseGateway { input ->
+                    alJaziraParses.incrementAndGet()
+                    AlJaziraParsingPipeline().parse(input)
+                },
+            ),
+            lookalike,
+        ),
+    )
+
     private fun ambiguousUseCase(
+        registry: BankSmsRegistry,
+        reviewRepo: com.baraa.masroof.data.repository.RoomReviewRepository,
+    ) = ambiguousHarness(
+        alJaziraParses = AtomicInteger(0),
+        lookalike = CountingLookalikeAdapter(),
+        reviewRepo = reviewRepo,
+        registry = registry,
+    ).facade
+
+    private class AmbiguousHarness(
+        val facade: ProcessRawSmsUseCase,
+        val stored: ProcessStoredSmsUseCase,
+        val registry: BankSmsRegistry,
+    )
+
+    private fun ambiguousHarness(
         alJaziraParses: AtomicInteger,
         lookalike: CountingLookalikeAdapter,
         reviewRepo: com.baraa.masroof.data.repository.RoomReviewRepository,
-    ) = ProcessRawSmsUseCase(
+        registry: BankSmsRegistry = ambiguousRegistry(alJaziraParses, lookalike),
+    ): AmbiguousHarness {
+        val stored = ProcessStoredSmsUseCase(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
+            bankSmsRegistry = registry,
+            ingestionReviewService = com.baraa.masroof.application.review.IngestionReviewService(
+                reviewRepo,
+                InstantClock { Instant.parse("2026-08-03T15:00:00Z") },
+            ),
+            reviewRepository = reviewRepo,
+        )
+        val facade = ProcessRawSmsUseCase(
+            capture = CaptureBankSmsUseCase(rawSmsRepository = rawRepo, bankSmsRegistry = registry),
+            processStored = stored,
+        )
+        return AmbiguousHarness(facade, stored, registry)
+    }
+
+    private fun selectionWorkflow(
+        registry: BankSmsRegistry,
+        reviewRepo: com.baraa.masroof.data.repository.RoomReviewRepository,
+        stored: ProcessStoredSmsUseCase,
+    ) = ExplicitBankSelectionWorkflow(
+        reviewRepository = reviewRepo,
         rawSmsRepository = rawRepo,
         parsedEventRepository = parsedRepo,
-        bankSmsRegistry = BankSmsRegistry(
-            listOf(
-                AlJaziraSmsAdapter(
-                    pipeline = SmsParseGateway { input ->
-                        alJaziraParses.incrementAndGet()
-                        AlJaziraParsingPipeline().parse(input)
-                    },
-                ),
-                lookalike,
-            ),
-        ),
-        ingestionReviewService = com.baraa.masroof.application.review.IngestionReviewService(
-            reviewRepo,
-            InstantClock { Instant.parse("2026-08-03T15:00:00Z") },
-        ),
+        bankSmsRegistry = registry,
+        processStored = stored,
+        clock = InstantClock { Instant.parse("2026-08-03T15:30:00Z") },
     )
 
     private class CountingLookalikeAdapter : com.baraa.masroof.bank.BankSmsAdapter {

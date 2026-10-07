@@ -3,6 +3,7 @@ package com.baraa.masroof.data.repository
 import com.baraa.masroof.data.room.dao.ReviewItemDao
 import com.baraa.masroof.data.room.mapper.ReviewItemMapper
 import com.baraa.masroof.domain.ids.ReviewIdFactory
+import com.baraa.masroof.domain.model.ExplicitBankSelection
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
@@ -38,7 +39,8 @@ class RoomReviewRepository(
         now: Instant,
     ): ReviewItem {
         val id = ReviewIdFactory.fromRawSmsId(rawSmsId)
-        val sortedReasons = reasons.distinct().sorted()
+        val existingReasons = findByRawSmsId(rawSmsId)?.reasons.orEmpty()
+        val sortedReasons = ExplicitBankSelection.mergePreservedSelection(existingReasons, reasons)
         val entity = ReviewItemMapper.toEntity(
             ReviewItem(
                 id = id,
