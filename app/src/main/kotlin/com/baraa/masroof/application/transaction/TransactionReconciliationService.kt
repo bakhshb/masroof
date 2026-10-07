@@ -485,9 +485,12 @@ class TransactionReconciliationService(
     }
 
     /**
-     * Replace a posted external leg when a later counterpart is mutually unique
-     * under the same strong bridges as the initial matcher (shared reference,
-     * intra-bank accounts, or the unknown-destination suffix).
+     * Replace a posted single leg when a counterpart is mutually unique under
+     * [TransactionMatcher]: shared reference, intra-bank accounts, or the
+     * unknown-destination suffix, inside the matcher time window.
+     *
+     * The posted leg may be an external transfer or a single-evidence self-transfer.
+     * Amount, endpoint, and timestamp equality alone never joins two transactions.
      */
     private suspend fun upgradeStaleExternalPairs(
         records: List<ParsedEventRecord>,
@@ -612,7 +615,12 @@ class TransactionReconciliationService(
             val hasStaleExternal =
                 outLeg.transaction?.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
                     inLeg.transaction?.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN
-            if (!hasStaleExternal) continue
+            val joinsSingleLegSelfTransfer = listOfNotNull(outLeg.transaction, inLeg.transaction)
+                .any { posted ->
+                    posted.type == FinancialTransactionType.SELF_TRANSFER &&
+                        posted.linkedParsedEventIds.size == 1
+                }
+            if (!hasStaleExternal && !joinsSingleLegSelfTransfer) continue
             val sourceOwn = pair.outgoing.sourceOwnership
             val destOwn = pair.incoming.destinationOwnership
             val healZone = listOfNotNull(
@@ -782,46 +790,12 @@ class TransactionReconciliationService(
     private suspend fun persist(
         transaction: FinancialTransaction,
         rawSmsIds: List<String>,
-    ): PersistOutcome {
-        if (transaction.type == FinancialTransactionType.SELF_TRANSFER) {
-            val existing = findMatchingSelfTransfer(transaction)
-            if (existing != null) {
-                var linkedAny = false
-                for (rawSmsId in rawSmsIds) {
-                    if (!financialTransactionRepository.isRawSmsLinked(rawSmsId)) {
-                        if (financialTransactionRepository.linkRawSmsIfAbsent(existing.id, rawSmsId)) {
-                            linkedAny = true
-                        }
-                    }
-                }
-                return if (linkedAny || rawSmsIds.all { financialTransactionRepository.isRawSmsLinked(it) }) {
-                    PersistOutcome.Already
-                } else {
-                    PersistOutcome.Failed
-                }
-            }
-        }
-        return when (financialTransactionRepository.save(transaction, rawSmsIds)) {
+    ): PersistOutcome =
+        when (financialTransactionRepository.save(transaction, rawSmsIds)) {
             FinancialTransactionSaveResult.Saved -> PersistOutcome.Saved
             FinancialTransactionSaveResult.AlreadyExists -> PersistOutcome.Already
             is FinancialTransactionSaveResult.Conflict -> PersistOutcome.Failed
         }
-    }
-
-    private suspend fun findMatchingSelfTransfer(
-        transaction: FinancialTransaction,
-    ): FinancialTransaction? {
-        val source = transaction.sourceContainerId ?: return null
-        val dest = transaction.destinationContainerId ?: return null
-        return financialTransactionRepository.listAll().firstOrNull { existing ->
-            existing.id != transaction.id &&
-                existing.type == FinancialTransactionType.SELF_TRANSFER &&
-                existing.sourceContainerId == source &&
-                existing.destinationContainerId == dest &&
-                existing.amount == transaction.amount &&
-                existing.occurredAt == transaction.occurredAt
-        }
-    }
 
     private suspend fun shouldReleaseStaleSelfTransferLink(
         record: ParsedEventRecord,

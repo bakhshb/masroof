@@ -170,6 +170,9 @@ class ReconciliationCharacterizationFixture private constructor(
         )
     }
 
+    suspend fun storedDirections(): Map<String, MoneyDirection?> =
+        parsedRepo.listAll().associate { it.event.id to it.event.direction }
+
     suspend fun seedReviewRequiredPurchase() {
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, CORRECTION_CARD))
         persist(
@@ -272,7 +275,7 @@ class ReconciliationCharacterizationFixture private constructor(
         rawSmsId = rawSmsId,
         bank = Bank.BANK_ALJAZIRA,
         messageFamily = family,
-        direction = MoneyDirection.OUTGOING,
+        direction = directionFor(family),
         amount = amount,
         purchaseChannel = null,
         sourceAccountRef = source,
@@ -285,6 +288,15 @@ class ReconciliationCharacterizationFixture private constructor(
         confidence = Confidence(1.0),
         parseStatus = status,
     )
+
+    /** V-011: transfer-in evidence is incoming. Transfer-out and purchase stay outgoing. */
+    private fun directionFor(family: MessageFamily): MoneyDirection = when (family) {
+        MessageFamily.TRANSFER_IN -> MoneyDirection.INCOMING
+        MessageFamily.TRANSFER_OUT,
+        MessageFamily.PURCHASE,
+        -> MoneyDirection.OUTGOING
+        else -> error("ReconciliationCharacterizationFixture has no direction for $family")
+    }
 
     data class PostedTransactionShape(
         val id: String,
