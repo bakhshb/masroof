@@ -357,6 +357,46 @@ class LiveSmsProcessingWorkerTest {
     }
 
     @Test
+    fun persistentUnsupportedReviewFailure_keepsRetryingPastMaxAttempts() = runBlocking {
+        assertReviewStorageFailureStaysOpen { ParseResult.Unsupported("unsupported_test") }
+    }
+
+    @Test
+    fun persistentNoEventReviewFailure_keepsRetryingPastMaxAttempts() = runBlocking {
+        assertReviewStorageFailureStaysOpen {
+            ParseResult.ReviewRequired(
+                draft = null,
+                event = null,
+                findings = emptyList(),
+                reasons = listOf("needs_review"),
+            )
+        }
+    }
+
+    @Test
+    fun persistentProcessingErrorReviewFailure_keepsRetryingPastMaxAttempts() = runBlocking {
+        val raw = captured()
+        harness.parserFailuresRemaining.set(Int.MAX_VALUE)
+        val processStored = harness.processStored(
+            derivedFailures = DerivedFailureInjection(
+                processingErrorUpsertFailuresRemaining = AtomicInteger(Int.MAX_VALUE),
+            ),
+        )
+
+        val results = (0..LiveSmsProcessingWorker.MAX_ATTEMPTS).map { attempt ->
+            worker(raw.id, attempt = attempt, processStored = processStored).doWork()
+        }
+
+        assertEquals(List(LiveSmsProcessingWorker.MAX_ATTEMPTS + 1) { ListenableWorker.Result.retry() }, results)
+        assertNotNull(harness.rawRepo.getById(raw.id))
+        assertNull(harness.parsedRepo.findByRawSmsId(raw.id))
+        assertNull(harness.ftRepo.findByRawSmsId(raw.id))
+        assertNull(harness.reviewRepo.findByRawSmsId(raw.id))
+        assertTrue(harness.processingRetryRepo.listRetryableRawSmsIds().isEmpty())
+        assertEquals(listOf(raw.id), harness.rawRepo.listIdsAwaitingProcessing())
+    }
+
+    @Test
     fun reviewUpdateFailure_retriesWithoutLosingThePostedTransaction() = runBlocking {
         val raw = captured()
         harness.reviewRepo.upsertRequired(
@@ -427,6 +467,30 @@ class LiveSmsProcessingWorkerTest {
         assertEquals(ListenableWorker.Result.success(), worker(raw.id).doWork())
         assertEquals(FinancialTransactionType.EXPENSE, harness.ftRepo.findByRawSmsId(raw.id)!!.type)
         assertEquals(0, restarted.schedulePendingProcessing())
+    }
+
+    private suspend fun assertReviewStorageFailureStaysOpen(
+        parseOverride: (com.baraa.masroof.parsing.model.SmsParseInput) -> ParseResult,
+    ) {
+        val raw = captured()
+        harness.parseOverride = parseOverride
+        val processStored = harness.processStored(
+            derivedFailures = DerivedFailureInjection(
+                processingErrorUpsertFailuresRemaining = AtomicInteger(Int.MAX_VALUE),
+            ),
+        )
+
+        val results = (0..LiveSmsProcessingWorker.MAX_ATTEMPTS).map { attempt ->
+            worker(raw.id, attempt = attempt, processStored = processStored).doWork()
+        }
+
+        assertEquals(List(LiveSmsProcessingWorker.MAX_ATTEMPTS + 1) { ListenableWorker.Result.retry() }, results)
+        assertNotNull(harness.rawRepo.getById(raw.id))
+        assertNull(harness.parsedRepo.findByRawSmsId(raw.id))
+        assertNull(harness.ftRepo.findByRawSmsId(raw.id))
+        assertNull(harness.reviewRepo.findByRawSmsId(raw.id))
+        assertTrue(harness.processingRetryRepo.listRetryableRawSmsIds().isEmpty())
+        assertEquals(listOf(raw.id), harness.rawRepo.listIdsAwaitingProcessing())
     }
 
     private suspend fun captured(raw: RawSms = LiveSmsProcessingHarness.liveSms()): RawSms {

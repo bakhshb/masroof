@@ -550,6 +550,10 @@ The conversion policy now lives in `BankTransactionTimePolicy` (phase 4.3):
 - A derived failure that has not yet exhausted live retries is intentionally not terminal.
   The final attempt closes that gap only after the recovery marker from M1.2 / M1.4 is saved.
   A failed marker write stays `Result.retry()`.
+- A direct review that cannot be saved, including a `processing_error` review, is
+  `REASON_REVIEW_NOT_PERSISTED`. That stays `Result.retry()` past `MAX_ATTEMPTS`.
+  The worker does not finish while the RawSms has neither a required review nor a
+  LIVE `processing_retry` row.
 - An unrecognized sender is still not persisted, so it is outside this set.
 
 ### M1.4 — Recovery markers survive batch failure and resolved financial reviews
@@ -653,8 +657,9 @@ The conversion policy now lives in `BankTransactionTimePolicy` (phase 4.3):
 - Stale-transfer match candidates pass the transaction's persisted
   `occurredAtZone` into that same conversion. A later device-zone change does not
   recompute a stored leg.
-- Unsupported, Invalid, and no-event ReviewRequired stay retryable when the review
-  row cannot be saved. RawSms remains. The worker does not report success for that attempt.
+- Unsupported, Invalid, no-event ReviewRequired, and a failed `processing_error`
+  review stay `Result.retry()` past `MAX_ATTEMPTS` while the review row is missing.
+  RawSms remains. The worker does not finish in a RawSms-only state.
 - Backup import migrates and integrity-checks a temporary copy, then renames it
   over the live database. A failed replace puts the parked live file back.
   Preferences and process restart run only after that swap. There is no
