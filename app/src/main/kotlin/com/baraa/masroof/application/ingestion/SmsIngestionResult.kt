@@ -5,6 +5,16 @@ import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.validator.ValidationFinding
 
 /**
+ * Correctness-blocking work after a ParsedEvent is already durable.
+ * Exchange-rate enrichment is not one of these stages.
+ */
+enum class DerivedProcessingStage {
+    OWNERSHIP_DISCOVERY,
+    RECONCILIATION,
+    REVIEW_UPDATE,
+}
+
+/**
  * Explicit outcome of ingesting one [com.baraa.masroof.domain.model.RawSms] / provider SMS.
  * Expected duplicate / unsupported cases are not exceptions.
  *
@@ -26,6 +36,18 @@ sealed interface SmsIngestionResult {
         val rawSmsId: String,
         val event: ParsedEvent,
         val details: ParsedEventDetails,
+    ) : SmsIngestionResult
+
+    /**
+     * Parse evidence is durable, but ownership discovery, reconciliation, or review
+     * refresh failed. Live processing retries this. It is not an exchange-rate failure.
+     */
+    data class DerivedIncomplete(
+        val rawSmsId: String,
+        val event: ParsedEvent,
+        val details: ParsedEventDetails,
+        val stage: DerivedProcessingStage,
+        val cause: Throwable? = null,
     ) : SmsIngestionResult
 
     data class ReviewRequired(

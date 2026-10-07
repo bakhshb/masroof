@@ -2,12 +2,15 @@ package com.baraa.masroof.application.sms
 
 import android.content.Context
 import androidx.room.Room
+import com.baraa.masroof.application.dashboard.ForeignSarMarketRateProvider
+import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
@@ -20,18 +23,30 @@ import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
+import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.model.ReviewItem
+import com.baraa.masroof.domain.model.ReviewResolutionKind
+import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
+import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.parser.SmsParseGateway
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import com.baraa.masroof.sms.time.InstantClock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import java.io.IOException
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -70,13 +85,64 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         runBlocking { cards.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "7271"), OwnershipStatus.OWNED) }
     }
 
-    fun processStored(rawSmsRepository: RawSmsRepository = rawRepo): ProcessStoredSmsUseCase =
-        ProcessStoredSmsUseCase(
+    fun processStored(
+        rawSmsRepository: RawSmsRepository = rawRepo,
+        derivedFailures: DerivedFailureInjection = DerivedFailureInjection(),
+    ): ProcessStoredSmsUseCase {
+        val parsedForReconcile = object : ParsedEventRepository by parsedRepo {
+            override suspend fun listReceivedBetween(
+                startInclusive: Instant,
+                endExclusive: Instant,
+            ): List<ParsedEventRecord> {
+                if (derivedFailures.reconciliationCancels) throw CancellationException("reconciliation cancelled")
+                if (derivedFailures.reconciliationFailuresRemaining.getAndDecrement() > 0) {
+                    throw IOException("reconciliation unavailable")
+                }
+                return parsedRepo.listReceivedBetween(startInclusive, endExclusive)
+            }
+        }
+        val discoveryCards = object : CardRegistryRepository by cards {
+            override suspend fun observe(reference: CardReference, rawSmsId: String) {
+                if (derivedFailures.ownershipFailuresRemaining.getAndDecrement() > 0) {
+                    throw IOException("ownership unavailable")
+                }
+                cards.observe(reference, rawSmsId)
+            }
+        }
+        val reviewForUpdate = object : ReviewRepository by reviewRepo {
+            override suspend fun markResolved(
+                id: String,
+                resolutionKind: ReviewResolutionKind,
+                resolvedAt: Instant,
+                resolvedTransactionId: String?,
+            ): ReviewItem? {
+                if (derivedFailures.reviewUpdateFailuresRemaining.getAndDecrement() > 0) {
+                    throw IOException("review update unavailable")
+                }
+                return reviewRepo.markResolved(id, resolutionKind, resolvedAt, resolvedTransactionId)
+            }
+        }
+        val ftForEnrichment = object : FinancialTransactionRepository by ftRepo {
+            override suspend fun listAwaitingAppliedExchangeRate(
+                primaryCurrency: Currency,
+            ): List<FinancialTransaction> {
+                if (derivedFailures.exchangeRateFailuresRemaining.getAndDecrement() > 0) {
+                    throw IOException("fx unavailable")
+                }
+                return ftRepo.listAwaitingAppliedExchangeRate(primaryCurrency)
+            }
+        }
+        return ProcessStoredSmsUseCase(
             rawSmsRepository = rawSmsRepository,
-            parsedEventRepository = parsedRepo,
+            parsedEventRepository = parsedForReconcile,
             bankSmsRegistry = registry,
+            ownershipDiscovery = OwnershipDiscoveryService(
+                accountRegistry = RoomAccountRegistryRepository.from(db),
+                cardRegistry = discoveryCards,
+                loanRegistry = NoOpLoanRegistryRepository,
+            ),
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
+                parsedEventRepository = parsedForReconcile,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = ftRepo,
                 ownershipResolver = OwnershipResolver(
@@ -85,14 +151,23 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                     NoOpLoanRegistryRepository,
                 ),
                 effectiveParsedEventProvider = EffectiveParsedEventProvider(
-                    parsedRepo,
+                    parsedForReconcile,
                     RoomUserCorrectionRepository(db.userCorrectionDao()),
                 ),
                 reviewRepository = reviewRepo,
             ),
-            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
+            reviewQueueUpdater = ReviewQueueUpdater(reviewForUpdate, ftRepo, clock),
             ingestionReviewService = IngestionReviewService(reviewRepo, clock),
+            exchangeRateEnrichment = ExchangeRateEnrichmentWorkflow(
+                financialTransactionRepository = ftForEnrichment,
+                parsedEventRepository = parsedRepo,
+                rawSmsRepository = rawRepo,
+                sarEquivalentResolver = TransactionSarEquivalentResolver(
+                    marketRateProvider = ForeignSarMarketRateProvider { _, _ -> null },
+                ),
+            ),
         )
+    }
 
     fun intake(scheduler: LiveSmsWorkScheduler): LiveSmsIntake =
         LiveSmsIntake(
@@ -124,3 +199,12 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             AndroidSmsMapper.toRawSms(ProviderSmsRecord(null, "AlJazira", body, Instant.parse(at)))
     }
 }
+
+/** Counts injected failures for one derived stage. Zero means that stage runs normally. */
+internal class DerivedFailureInjection(
+    val ownershipFailuresRemaining: AtomicInteger = AtomicInteger(0),
+    val reconciliationFailuresRemaining: AtomicInteger = AtomicInteger(0),
+    val reviewUpdateFailuresRemaining: AtomicInteger = AtomicInteger(0),
+    val exchangeRateFailuresRemaining: AtomicInteger = AtomicInteger(0),
+    val reconciliationCancels: Boolean = false,
+)

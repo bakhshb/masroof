@@ -15,6 +15,8 @@ import kotlinx.coroutines.CancellationException
  *
  * Input is the rawSmsId only. Delegates to [ProcessStoredSmsUseCase]; contains no bank
  * parsing or financial rules. Retrying is safe because stored-SMS processing is idempotent.
+ * Ownership, reconciliation, and review-refresh failures are retried. Exchange-rate
+ * enrichment failure is not.
  */
 class LiveSmsProcessingWorker(
     appContext: Context,
@@ -34,14 +36,19 @@ class LiveSmsProcessingWorker(
             return retryOrGiveUp()
         }
 
-        return when {
-            outcome !is SmsIngestionResult.Failed -> Result.success()
-            outcome.message == ProcessStoredSmsUseCase.REASON_RAW_SMS_NOT_FOUND -> Result.failure()
-            else -> retryOrGiveUp()
+        return when (outcome) {
+            is SmsIngestionResult.DerivedIncomplete -> retryOrGiveUp()
+            is SmsIngestionResult.Failed ->
+                if (outcome.message == ProcessStoredSmsUseCase.REASON_RAW_SMS_NOT_FOUND) {
+                    Result.failure()
+                } else {
+                    retryOrGiveUp()
+                }
+            else -> Result.success()
         }
     }
 
-    /** After [MAX_ATTEMPTS] the evidence keeps its processing_error review for reparse. */
+    /** After [MAX_ATTEMPTS], parse failures keep their processing_error review for reparse. */
     private fun retryOrGiveUp(): Result =
         if (runAttemptCount + 1 >= MAX_ATTEMPTS) Result.failure() else Result.retry()
 

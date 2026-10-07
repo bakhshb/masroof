@@ -5,11 +5,15 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
 import com.baraa.masroof.application.ingestion.BankSmsCaptureResult
+import com.baraa.masroof.application.ingestion.DerivedProcessingStage
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
+import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.model.ReviewKind
+import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -27,6 +31,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.IOException
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
@@ -167,6 +172,121 @@ class LiveSmsProcessingWorkerTest {
 
         assertEquals(1, harness.db.rawSmsDao().count())
         assertEquals(1, harness.db.financialTransactionDao().count())
+    }
+
+    @Test
+    fun ownershipDiscoveryFailure_retriesThenPostsOneTransaction() = runBlocking {
+        val raw = captured()
+        val injection = DerivedFailureInjection(ownershipFailuresRemaining = AtomicInteger(1))
+        val processStored = harness.processStored(derivedFailures = injection)
+
+        val outcome = processStored.process(raw.id)
+        assertEquals(
+            DerivedProcessingStage.OWNERSHIP_DISCOVERY,
+            (outcome as SmsIngestionResult.DerivedIncomplete).stage,
+        )
+        assertNull(harness.ftRepo.findByRawSmsId(raw.id))
+
+        assertEquals(ListenableWorker.Result.success(), worker(raw.id, processStored = processStored).doWork())
+        assertEquals(1, harness.db.financialTransactionDao().count())
+        assertEquals(FinancialTransactionType.EXPENSE, harness.ftRepo.findByRawSmsId(raw.id)!!.type)
+    }
+
+    @Test
+    fun reconciliationFailure_isRetriedByWorker_thenPostsOneTransaction() = runBlocking {
+        val raw = captured()
+        val injection = DerivedFailureInjection(reconciliationFailuresRemaining = AtomicInteger(1))
+        val processStored = harness.processStored(derivedFailures = injection)
+
+        assertEquals(ListenableWorker.Result.retry(), worker(raw.id, processStored = processStored).doWork())
+        assertNotNull(harness.parsedRepo.findByRawSmsId(raw.id))
+        assertNull(harness.ftRepo.findByRawSmsId(raw.id))
+
+        assertEquals(
+            ListenableWorker.Result.success(),
+            worker(raw.id, attempt = 1, processStored = processStored).doWork(),
+        )
+        assertEquals(1, harness.db.financialTransactionDao().count())
+        assertEquals(FinancialTransactionType.EXPENSE, harness.ftRepo.findByRawSmsId(raw.id)!!.type)
+    }
+
+    @Test
+    fun persistentReconciliationFailure_givesUpWithoutPosting() = runBlocking {
+        val raw = captured()
+        val processStored = harness.processStored(
+            derivedFailures = DerivedFailureInjection(
+                reconciliationFailuresRemaining = AtomicInteger(Int.MAX_VALUE),
+            ),
+        )
+
+        val results = (0 until LiveSmsProcessingWorker.MAX_ATTEMPTS).map { attempt ->
+            worker(raw.id, attempt = attempt, processStored = processStored).doWork()
+        }
+
+        assertEquals(
+            List(LiveSmsProcessingWorker.MAX_ATTEMPTS - 1) { ListenableWorker.Result.retry() } +
+                ListenableWorker.Result.failure(),
+            results,
+        )
+        assertNotNull(harness.parsedRepo.findByRawSmsId(raw.id))
+        assertNull(harness.ftRepo.findByRawSmsId(raw.id))
+        assertTrue(harness.reviewRepo.listAll().isEmpty())
+    }
+
+    @Test
+    fun reviewUpdateFailure_retriesWithoutLosingThePostedTransaction() = runBlocking {
+        val raw = captured()
+        harness.reviewRepo.upsertRequired(
+            rawSmsId = raw.id,
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf("seed"),
+            now = Instant.parse("2026-08-11T12:00:00Z"),
+        )
+        val injection = DerivedFailureInjection(reviewUpdateFailuresRemaining = AtomicInteger(1))
+        val processStored = harness.processStored(derivedFailures = injection)
+
+        val outcome = processStored.process(raw.id)
+        assertEquals(
+            DerivedProcessingStage.REVIEW_UPDATE,
+            (outcome as SmsIngestionResult.DerivedIncomplete).stage,
+        )
+        val posted = harness.ftRepo.findByRawSmsId(raw.id)
+        assertNotNull(posted)
+
+        assertEquals(ListenableWorker.Result.success(), worker(raw.id, processStored = processStored).doWork())
+        assertEquals(posted!!.id, harness.ftRepo.findByRawSmsId(raw.id)!!.id)
+        assertEquals(1, harness.db.financialTransactionDao().count())
+        assertEquals(ReviewStatus.RESOLVED, harness.reviewRepo.findByRawSmsId(raw.id)!!.status)
+    }
+
+    @Test
+    fun exchangeRateEnrichmentFailure_succeedsAndStillPosts() = runBlocking {
+        val raw = captured()
+        val processStored = harness.processStored(
+            derivedFailures = DerivedFailureInjection(
+                exchangeRateFailuresRemaining = AtomicInteger(5),
+            ),
+        )
+
+        val outcome = processStored.process(raw.id)
+        assertTrue(outcome is SmsIngestionResult.Parsed)
+        assertEquals(ListenableWorker.Result.success(), worker(raw.id, processStored = processStored).doWork())
+        assertEquals(1, harness.db.financialTransactionDao().count())
+        assertEquals(FinancialTransactionType.EXPENSE, harness.ftRepo.findByRawSmsId(raw.id)!!.type)
+    }
+
+    @Test
+    fun reconciliationCancellation_propagatesWithoutPosting() = runBlocking {
+        val raw = captured()
+        val processStored = harness.processStored(
+            derivedFailures = DerivedFailureInjection(reconciliationCancels = true),
+        )
+
+        val cancelled = runCatching { worker(raw.id, processStored = processStored).doWork() }.exceptionOrNull()
+
+        assertTrue(cancelled is CancellationException)
+        assertNotNull(harness.parsedRepo.findByRawSmsId(raw.id))
+        assertNull(harness.ftRepo.findByRawSmsId(raw.id))
     }
 
     @Test

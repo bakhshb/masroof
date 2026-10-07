@@ -494,6 +494,8 @@ class HistoricalSmsScannerTest {
             is SmsIngestionResult.Invalid -> copy(inserted = inserted + 1, failed = failed + 1)
             is SmsIngestionResult.Failed ->
                 copy(inserted = inserted + if (outcome.rawSmsId != null) 1 else 0, failed = failed + 1)
+            is SmsIngestionResult.DerivedIncomplete ->
+                copy(inserted = inserted + 1, failed = failed + 1)
         }
     }
 

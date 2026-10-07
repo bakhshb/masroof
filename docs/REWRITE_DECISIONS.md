@@ -435,7 +435,7 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   still build or parse container ids to filter rows and label registry entries. Moving them
   needs per-account/card row facts from the projection and is a follow-up.
 
-## 15. Financial integrity — classification collision safety
+## 15. Financial integrity
 
 ### M0.1 — Informational tiers cannot hide money movement
 
@@ -449,3 +449,19 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   `collision_refund_pos_purchase_ar_001` stays `REFUND`.
 - Standalone statement and beneficiary notices stay `NON_FINANCIAL`.
 - No bank wording moved into reconciliation or presentation.
+
+### M1.1 — Incomplete ownership, reconciliation, and review refresh are retried
+
+- `ProcessStoredSmsUseCase` still persists RawSms and ParsedEvent before derived work, and
+  still does not roll that evidence back when a derived step throws.
+- Ownership discovery, reconciliation, and review refresh no longer disappear inside the
+  use case. Each failure is `SmsIngestionResult.DerivedIncomplete` with the stage that
+  stopped. `LiveSmsProcessingWorker` maps that to `Result.retry()` until `MAX_ATTEMPTS`.
+- A review-refresh failure retries the same rawSmsId. Transactions already posted stay;
+  reconciliation is idempotent.
+- Exchange-rate enrichment stays best-effort. Its failure does not change the ingestion
+  result and does not retry the worker.
+- `CancellationException` still propagates from every derived stage.
+- Historical `parseAndStore` still skips per-message derived work. Batch `finish` is unchanged.
+- Not in this step: startup recovery of a parsed row whose worker already gave up. That
+  remains a later recovery story.
