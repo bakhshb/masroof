@@ -84,21 +84,49 @@ class CaptureBankSmsUseCase(
 
     private suspend fun hasCrossSourceNearDuplicate(rawSms: RawSms): Boolean {
         val receivedAt = rawSms.receivedAt
-        return rawSmsRepository.findCrossSourceNearDuplicate(
+        val lookingForLiveRow = rawSms.deviceMessageId != null
+        val tight = crossSourceTwins(
+            rawSms = rawSms,
+            tolerance = CROSS_SOURCE_RECEIVED_AT_TOLERANCE,
+            lookingForLiveRow = lookingForLiveRow,
+        )
+        if (tight.isNotEmpty()) return true
+        val widened = crossSourceTwins(
+            rawSms = rawSms,
+            tolerance = CROSS_SOURCE_UNIQUE_SKEW_TOLERANCE,
+            lookingForLiveRow = lookingForLiveRow,
+        )
+        return widened.size == 1
+    }
+
+    private suspend fun crossSourceTwins(
+        rawSms: RawSms,
+        tolerance: Duration,
+        lookingForLiveRow: Boolean,
+    ): List<RawSms> {
+        val receivedAt = rawSms.receivedAt
+        return rawSmsRepository.listCrossSourceNearDuplicates(
             sender = rawSms.sender,
             bodyHash = rawSms.bodyHash,
-            fromInclusive = receivedAt.minus(CROSS_SOURCE_RECEIVED_AT_TOLERANCE),
-            toInclusive = receivedAt.plus(CROSS_SOURCE_RECEIVED_AT_TOLERANCE),
-            lookingForLiveRow = rawSms.deviceMessageId != null,
-        ) != null
+            fromInclusive = receivedAt.minus(tolerance),
+            toInclusive = receivedAt.plus(tolerance),
+            lookingForLiveRow = lookingForLiveRow,
+        )
     }
 
     companion object {
         /**
-         * Maximum |live receipt − historical DATE| for opposite-source reconciliation.
+         * Maximum |live receipt − historical DATE| that always counts as one SMS.
          * Same-source rows are never merged by this window alone.
          */
         val CROSS_SOURCE_RECEIVED_AT_TOLERANCE: Duration = Duration.ofSeconds(5)
+
+        /**
+         * Wider opposite-source window for provider/device clock skew. A match
+         * counts only when exactly one stored twin falls inside it, so two real
+         * messages with the same text are not collapsed.
+         */
+        val CROSS_SOURCE_UNIQUE_SKEW_TOLERANCE: Duration = Duration.ofHours(6)
     }
 }
 

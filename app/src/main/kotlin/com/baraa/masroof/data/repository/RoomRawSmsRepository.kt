@@ -53,4 +53,19 @@ class RoomRawSmsRepository(
             toMillis = toInclusive.toEpochMilli(),
             requireDeviceMessageIdNull = lookingForLiveRow,
         )?.let(RawSmsMapper::toDomain)
+
+    override suspend fun listCrossSourceNearDuplicates(
+        sender: String,
+        bodyHash: String,
+        fromInclusive: Instant,
+        toInclusive: Instant,
+        lookingForLiveRow: Boolean,
+    ): List<RawSms> =
+        dao.listCrossSourceNearDuplicates(
+            sender = sender,
+            bodyHash = bodyHash,
+            fromMillis = fromInclusive.toEpochMilli(),
+            toMillis = toInclusive.toEpochMilli(),
+            requireDeviceMessageIdNull = lookingForLiveRow,
+        ).map(RawSmsMapper::toDomain)
 }
