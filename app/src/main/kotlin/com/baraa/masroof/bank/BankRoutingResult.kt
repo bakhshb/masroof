@@ -34,7 +34,18 @@ sealed interface BankRoutingResult {
         val reason: String get() = REASON_AMBIGUOUS_BANK_ROUTE
     }
 
+    /**
+     * No adapter claimed the SMS, but at least one reported a conservative suspicion.
+     * Carries routing evidence only. There is no adapter to parse with.
+     */
+    data class SuspectedBank(
+        val evidence: List<String>,
+    ) : BankRoutingResult {
+        val reason: String get() = REASON_SUSPECTED_BANK
+    }
+
     companion object {
         const val REASON_AMBIGUOUS_BANK_ROUTE = "ambiguous_bank_route"
+        const val REASON_SUSPECTED_BANK = "suspected_bank_sender"
     }
 }

@@ -47,17 +47,21 @@ class AlJaziraBankDetectorTest {
 
     @Test
     fun nearMissSenders_areNotDetected() {
-        listOf(
-            "JaziraNews",
-            "NotAlJazira",
-            "OtherBank",
-            "MyJaziraService",
-            "jazira",
-            "AlJaziraBanks",
-            "NotAlJaziraBank",
-        ).forEach { sender ->
+        listOf("JaziraNews", "OtherBank", "MyJaziraService", "jazira").forEach { sender ->
             val result = detector.detect(sender, "شراء بمبلغ: 10.00 SAR")
             assertTrue("$sender should be Unknown", result is BankDetectionResult.Unknown)
         }
+    }
+
+    @Test
+    fun plausibleSenderOrBody_isSuspectedWithoutClaimingTheBank() {
+        listOf("NotAlJazira", "AlJaziraX", "AlJaziraBanks", "NotAlJaziraBank").forEach { sender ->
+            val result = detector.detect(sender, "hello")
+            assertTrue("$sender should be Suspected", result is BankDetectionResult.Suspected)
+        }
+        val fromBody = detector.detect("Mom", "تحويل عبر بنك الجزيرة بمبلغ 10")
+        assertTrue(fromBody is BankDetectionResult.Suspected)
+        val ordinary = detector.detect("Mom", "See you at 6")
+        assertTrue(ordinary is BankDetectionResult.Unknown)
     }
 }

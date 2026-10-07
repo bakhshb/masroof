@@ -18,6 +18,7 @@ object ReviewReasonLabels {
             "unsupported_bank_message_format" -> R.string.review_reason_unsupported_format
             "processing_error" -> R.string.review_reason_processing_error
             "ambiguous_bank_route" -> R.string.review_reason_ambiguous_bank_route
+            "suspected_bank_sender" -> R.string.review_reason_suspected_bank_sender
             "purchase_instrument_ownership_unknown" ->
                 R.string.review_reason_purchase_ownership_unknown
             "purchase_without_resolved_owned_instrument" ->

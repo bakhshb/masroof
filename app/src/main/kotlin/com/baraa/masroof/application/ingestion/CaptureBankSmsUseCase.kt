@@ -139,8 +139,8 @@ sealed interface BankSmsCaptureResult {
     data object Duplicate : BankSmsCaptureResult
 
     /**
-     * Newly persisted evidence. [route] is the [BankRoutingResult.Matched] or
-     * [BankRoutingResult.Ambiguous] outcome computed for this capture.
+     * Newly persisted evidence. [route] is [BankRoutingResult.Matched],
+     * [BankRoutingResult.Ambiguous], or [BankRoutingResult.SuspectedBank].
      */
     data class Captured(
         val rawSms: RawSms,

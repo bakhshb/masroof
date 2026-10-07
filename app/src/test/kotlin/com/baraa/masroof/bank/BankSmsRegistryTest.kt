@@ -127,6 +127,32 @@ class BankSmsRegistryTest {
         assertEquals(listOf(Bank("M_BANK"), Bank("Z_BANK")), (result as BankRoutingResult.Ambiguous).banks)
     }
 
+    @Test
+    fun suspicionDoesNotClaimAndDoesNotLetTheFirstAdapterWin() {
+        val suspecting = FakeBankSmsAdapter(
+            bank = Bank("Z_BANK"),
+            detection = BankDetectionResult.Suspected(evidence = listOf("sender:near")),
+        )
+        val otherSuspect = FakeBankSmsAdapter(
+            bank = Bank("M_BANK"),
+            detection = BankDetectionResult.Suspected(evidence = listOf("body:phrase")),
+        )
+        val suspected = BankSmsRegistry(listOf(suspecting, otherSuspect)).route("near", "phrase")
+        assertTrue(suspected is BankRoutingResult.SuspectedBank)
+        assertEquals(
+            listOf("sender:near", "suspected_bank_sender", "body:phrase"),
+            (suspected as BankRoutingResult.SuspectedBank).evidence,
+        )
+
+        val detecting = detectingAdapter("M_BANK")
+        val forward = BankSmsRegistry(listOf(suspecting, detecting)).route("s", "b")
+        val reversed = BankSmsRegistry(listOf(detecting, suspecting)).route("s", "b")
+        assertTrue(forward is BankRoutingResult.Matched)
+        assertTrue(reversed is BankRoutingResult.Matched)
+        assertEquals(Bank("M_BANK"), (forward as BankRoutingResult.Matched).adapter.bank)
+        assertEquals(Bank("M_BANK"), (reversed as BankRoutingResult.Matched).adapter.bank)
+    }
+
     private fun detectingAdapter(id: String) = FakeBankSmsAdapter(
         bank = Bank(id),
         detection = BankDetectionResult.Detected(

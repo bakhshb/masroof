@@ -668,12 +668,20 @@ class AlJaziraParserRegressionTest {
 
     @Test
     fun nearMissSenders_areNotAlJazira() {
-        listOf("JaziraNews", "NotAlJazira", "OtherBank", "MyJaziraService", "jazira").forEach { sender ->
+        listOf("JaziraNews", "OtherBank", "MyJaziraService", "jazira").forEach { sender ->
             val detection = detector.detect(sender, "شراء بمبلغ: 10.00 SAR")
             assertTrue("$sender should be Unknown", detection is BankDetectionResult.Unknown)
             val route = registry.route(sender, "شراء عبر الانترنت بمبلغ: 10.00 SAR")
             assertTrue("$sender must not route to AlJazira", route is BankRoutingResult.NotMatched)
         }
+    }
+
+    @Test
+    fun plausibleNearMiss_isSuspectedNotParsed() {
+        val detection = detector.detect("NotAlJazira", "شراء بمبلغ: 10.00 SAR")
+        assertTrue(detection is BankDetectionResult.Suspected)
+        val route = registry.route("AlJaziraX", "شراء عبر الانترنت بمبلغ: 10.00 SAR")
+        assertTrue(route is BankRoutingResult.SuspectedBank)
     }
 
     @Test
