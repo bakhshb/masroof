@@ -890,8 +890,10 @@ class ReviewWorkflowServiceTest {
             body = "اسم المستفيد : TEST\nحالة: غير نشط",
         )
         workflow.refreshReviewQueue()
-        assertTrue(workflow.listRequiredReviews().none { it.rawSmsId == "sms-info" })
-        assertNull(reviewRepo.findByRawSmsId("sms-info"))
+        val review = workflow.listRequiredReviews().single { it.rawSmsId == "sms-info" }
+        assertEquals(ReviewStatus.REQUIRED, review.status)
+        assertTrue(review.reasons.contains("unknown_message_family"))
+        assertEquals(0, ftRepo.listAll().size)
     }
 
     private suspend fun persistEvent(
