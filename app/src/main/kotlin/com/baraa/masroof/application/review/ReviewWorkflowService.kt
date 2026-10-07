@@ -6,6 +6,7 @@ import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.assembly.TransactionAssembler
+import com.baraa.masroof.domain.assembly.TransactionTiming
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.ids.UserCorrectionIdFactory
@@ -14,6 +15,7 @@ import com.baraa.masroof.domain.matching.TransferMatchPair
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewItem
@@ -29,6 +31,9 @@ import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.sms.time.InstantClock
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.UUID
 
 /**
@@ -47,6 +52,7 @@ class ReviewWorkflowService(
     private val reviewQueueUpdater: ReviewQueueUpdater,
     private val manualReviewResolutionRepository: ManualReviewResolutionRepository,
     private val clock: InstantClock,
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val appLogService: AppLogService? = null,
     private val newCorrectionId: () -> String = {
         UserCorrectionIdFactory.create(UUID.randomUUID().toString())
@@ -180,17 +186,23 @@ class ReviewWorkflowService(
             else -> return ReviewWorkflowResult.Rejected("not_a_transfer")
         }
 
+        val (occurredAt, occurredAtZone) = resolvedTransactionTime(
+            event = event,
+            occurredAtLocal = record.details.occurredAtLocal,
+            receivedAt = raw.receivedAt,
+        )
         val tx = FinancialTransaction(
             id = TransactionIdFactory.fromRawSmsIds(listOf(review.rawSmsId)),
             type = type,
             amount = amount,
-            occurredAt = event.occurredAt ?: raw.receivedAt,
+            occurredAt = occurredAt,
             sourceContainerId = sourceId,
             destinationContainerId = destId,
             merchant = event.merchant,
             counterparty = event.counterparty,
             categoryId = null,
             linkedParsedEventIds = listOf(event.id),
+            occurredAtZone = occurredAtZone,
         )
         return mapPersistResult(
             manualReviewResolutionRepository.persistSingleResolution(
@@ -395,17 +407,23 @@ class ReviewWorkflowService(
                 return ReviewWorkflowResult.Rejected("type_not_allowed_for_single_resolution")
         }
 
+        val (occurredAt, occurredAtZone) = resolvedTransactionTime(
+            event = event,
+            occurredAtLocal = record.details.occurredAtLocal,
+            receivedAt = raw.receivedAt,
+        )
         val tx = FinancialTransaction(
             id = TransactionIdFactory.fromRawSmsIds(listOf(review.rawSmsId)),
             type = type,
             amount = amount,
-            occurredAt = event.occurredAt ?: raw.receivedAt,
+            occurredAt = occurredAt,
             sourceContainerId = sourceId,
             destinationContainerId = destId,
             merchant = event.merchant,
             counterparty = event.counterparty,
             categoryId = null,
             linkedParsedEventIds = listOf(event.id),
+            occurredAtZone = occurredAtZone,
         )
         return mapPersistResult(
             manualReviewResolutionRepository.persistSingleResolution(
@@ -420,6 +438,25 @@ class ReviewWorkflowService(
                 logReviewAction("Resolved as ${type.name.lowercase()}", reviewId)
             }
         }
+    }
+
+    /**
+     * Same instant and zone as automatic reconciliation: fixed bank zone, then the
+     * bank-local wall clock, then SMS receipt time.
+     */
+    private fun resolvedTransactionTime(
+        event: ParsedEvent,
+        occurredAtLocal: LocalDateTime?,
+        receivedAt: Instant,
+    ): Pair<Instant, String> {
+        val zone = TransactionTiming.zoneFor(bank = event.bank, fallback = zoneId)
+        val occurredAt = TransactionTiming.effectiveOccurredAt(
+            event = event,
+            occurredAtLocal = occurredAtLocal,
+            receivedAt = receivedAt,
+            zoneId = zoneId,
+        )
+        return occurredAt to zone.id
     }
 
     private fun logReviewAction(action: String, reviewId: String) {

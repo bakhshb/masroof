@@ -878,6 +878,140 @@ class ReviewWorkflowServiceTest {
     }
 
     @Test
+    fun manualResolution_matchesAutomaticAlJaziraTimeAroundSalaryBoundary() = runBlocking {
+        val newYork = java.time.ZoneId.of("America/New_York")
+        val riyadh = java.time.ZoneId.of("Asia/Riyadh")
+        val local = java.time.LocalDateTime.of(2026, 8, 26, 22, 30)
+        val receivedAt = Instant.parse("2026-08-27T02:00:00Z")
+        val expected = local.atZone(riyadh).toInstant()
+        assertTrue(expected.isBefore(receivedAt))
+
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val cards = RoomCardRegistryRepository.from(db)
+        val resolver = OwnershipResolver(accounts, cards, loans)
+        val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
+        val auto = TransactionReconciliationService(
+            parsedEventRepository = parsedRepo,
+            rawSmsRepository = rawRepo,
+            financialTransactionRepository = ftRepo,
+            ownershipResolver = resolver,
+            effectiveParsedEventProvider = effective,
+            zoneId = newYork,
+        )
+        val manual = ReviewWorkflowService(
+            reviewRepository = reviewRepo,
+            userCorrectionRepository = correctionRepo,
+            financialTransactionRepository = ftRepo,
+            rawSmsRepository = rawRepo,
+            ownershipResolver = resolver,
+            ownershipConfirmationService = confirmation,
+            effectiveParsedEventProvider = effective,
+            reconciliationService = auto,
+            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
+            manualReviewResolutionRepository = RoomManualReviewResolutionRepository(db, ftRepo),
+            clock = clock,
+            zoneId = newYork,
+        )
+
+        persistEvent(
+            smsId = "sms-auto-purchase",
+            at = receivedAt,
+            details = ParsedEventDetails(occurredAtLocal = local),
+            event = event(
+                id = "pe-auto-purchase",
+                rawSmsId = "sms-auto-purchase",
+                family = MessageFamily.PURCHASE,
+                amount = money("12.00"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                channel = PurchaseChannel.ONLINE,
+                merchant = "Shop",
+            ),
+        )
+        persistEvent(
+            smsId = "sms-auto-transfer",
+            at = receivedAt,
+            details = ParsedEventDetails(occurredAtLocal = local),
+            event = event(
+                id = "pe-auto-transfer",
+                rawSmsId = "sms-auto-transfer",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("40.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.UNKNOWN, "6810"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        auto.reconcileStoredEvents()
+        val autoPurchase = ftRepo.findByRawSmsId("sms-auto-purchase")!!
+        val autoTransfer = ftRepo.findByRawSmsId("sms-auto-transfer")!!
+        assertEquals(expected, autoPurchase.occurredAt)
+        assertEquals("Asia/Riyadh", autoPurchase.occurredAtZone)
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, autoTransfer.type)
+        assertEquals(expected, autoTransfer.occurredAt)
+        assertEquals("Asia/Riyadh", autoTransfer.occurredAtZone)
+
+        persistEvent(
+            smsId = "sms-manual-purchase",
+            at = receivedAt,
+            details = ParsedEventDetails(occurredAtLocal = local),
+            event = event(
+                id = "pe-manual-purchase",
+                rawSmsId = "sms-manual-purchase",
+                family = MessageFamily.PURCHASE,
+                amount = money("12.00"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                channel = PurchaseChannel.ONLINE,
+                merchant = "Shop",
+            ),
+        )
+        persistEvent(
+            smsId = "sms-manual-transfer",
+            at = receivedAt,
+            details = ParsedEventDetails(occurredAtLocal = local),
+            event = event(
+                id = "pe-manual-transfer",
+                rawSmsId = "sms-manual-transfer",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("40.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.UNKNOWN, "6810"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-manual-purchase",
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf("needs_review"),
+            now = clock.now(),
+        )
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-manual-transfer",
+            kind = ReviewKind.PENDING_MATCH,
+            reasons = listOf("transfer_pending_match"),
+            now = clock.now(),
+        )
+
+        val purchase = manual.resolveAsFinancialType(
+            ReviewIdFactory.fromRawSmsId("sms-manual-purchase"),
+            FinancialTransactionType.EXPENSE,
+        ) as ReviewWorkflowResult.Success
+        val transfer = manual.resolveTransferAsExternal(
+            ReviewIdFactory.fromRawSmsId("sms-manual-transfer"),
+        ) as ReviewWorkflowResult.Success
+
+        assertEquals(autoPurchase.occurredAt, purchase.transaction!!.occurredAt)
+        assertEquals(autoPurchase.occurredAtZone, purchase.transaction!!.occurredAtZone)
+        assertEquals(expected, purchase.transaction!!.occurredAt)
+        assertNotEquals(receivedAt, purchase.transaction!!.occurredAt)
+        assertEquals(autoTransfer.occurredAt, transfer.transaction!!.occurredAt)
+        assertEquals(autoTransfer.occurredAtZone, transfer.transaction!!.occurredAtZone)
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, transfer.transaction!!.type)
+        assertNotEquals(receivedAt, transfer.transaction!!.occurredAt)
+    }
+
+    @Test
     fun refreshReviewQueue_autoIgnoresInformationalUnknown() = runBlocking {
         persistEvent(
             smsId = "sms-info",

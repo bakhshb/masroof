@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.database.sqlite.SQLiteDatabase
+import androidx.room.Room
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.locale.AppLocale
@@ -32,6 +33,7 @@ class DatabaseBackupService(
     private val appLogService: AppLogService? = null,
     private val clockEpochMillis: () -> Long = { System.currentTimeMillis() },
     private val restartProcess: () -> Unit = { defaultRestartProcess(appContext) },
+    private val beforeValidatedInstall: () -> Unit = {},
 ) : DatabaseBackupGateway {
     override suspend fun exportTo(destination: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
@@ -112,17 +114,34 @@ class DatabaseBackupService(
                 BackupPackageCodec.decodePreferences(prefsFile.readText())
             }.getOrElse { return@withContext BackupImportOutcome.InvalidPackage }
 
+            checkpointWal()
             closeDatabase()
 
             val liveDb = appContext.getDatabasePath(MasroofDatabase.NAME)
-            liveDb.parentFile?.mkdirs()
-            deleteSidecarFiles(liveDb)
-            dbFile.copyTo(liveDb, overwrite = true)
-            restorePreferences(preferences)
-            resetParseFactsBackfillMarker()
-            restartProcess()
-            appLogService?.info(AppLogCategories.BACKUP, "Database import succeeded; restart required")
-            BackupImportOutcome.SuccessNeedsRestart
+            val databasesDir = liveDb.parentFile ?: error("Database directory missing")
+            databasesDir.mkdirs()
+            val validated = File(databasesDir, "masroof-import-${clockEpochMillis()}.db")
+            discardDatabaseFiles(validated)
+            dbFile.copyTo(validated, overwrite = false)
+            try {
+                openMigrateAndValidate(validated)
+                beforeValidatedInstall()
+                installValidatedDatabase(validated, liveDb)
+                try {
+                    restorePreferences(preferences)
+                    resetParseFactsBackfillMarker()
+                } catch (error: Exception) {
+                    restoreParkedLive(liveDb)
+                    throw error
+                }
+                discardRollback(liveDb)
+                restartProcess()
+                appLogService?.info(AppLogCategories.BACKUP, "Database import succeeded; restart required")
+                BackupImportOutcome.SuccessNeedsRestart
+            } catch (error: Exception) {
+                if (validated.exists()) discardDatabaseFiles(validated)
+                throw error
+            }
         } catch (error: Exception) {
             appLogService?.error(
                 AppLogCategories.BACKUP,
@@ -267,6 +286,84 @@ class DatabaseBackupService(
         File(dbFile.path + "-shm").delete()
         File(dbFile.path + "-journal").delete()
     }
+
+    /**
+     * Migrates a copy of the backup and checks it before the live file is replaced.
+     * The live database stays in place until [installValidatedDatabase].
+     */
+    private fun openMigrateAndValidate(dbFile: File) {
+        val opened = Room.databaseBuilder(appContext, MasroofDatabase::class.java, dbFile.name)
+            .addMigrations(*MasroofDatabase.ALL_MIGRATIONS)
+            .build()
+        try {
+            val db = opened.openHelper.writableDatabase
+            check(db.version == MasroofDatabase.VERSION) {
+                "Imported database did not migrate to ${MasroofDatabase.VERSION}"
+            }
+            db.query("PRAGMA integrity_check").use { cursor ->
+                check(cursor.moveToFirst() && cursor.getString(0) == "ok" && !cursor.moveToNext()) {
+                    "Imported database failed integrity_check"
+                }
+            }
+            db.query("PRAGMA foreign_key_check").use { cursor ->
+                check(!cursor.moveToFirst()) { "Imported database failed foreign_key_check" }
+            }
+            db.query("PRAGMA wal_checkpoint(FULL)").use { cursor ->
+                cursor.moveToFirst()
+            }
+        } finally {
+            opened.close()
+        }
+        deleteSidecarFiles(dbFile)
+    }
+
+    /**
+     * Parks the live database, then renames the validated file into its place.
+     * A failed rename puts the parked file back.
+     */
+    private fun installValidatedDatabase(validated: File, live: File) {
+        val rollback = rollbackFile(live)
+        if (rollback.exists()) {
+            deleteSidecarFiles(rollback)
+            check(rollback.delete()) { "Cannot clear a previous restore rollback" }
+        }
+        deleteSidecarFiles(live)
+        val parkedLive = live.exists()
+        if (parkedLive && !live.renameTo(rollback)) {
+            error("Cannot preserve the current database before restore")
+        }
+        if (!validated.renameTo(live)) {
+            discardDatabaseFiles(validated)
+            if (parkedLive && !rollback.renameTo(live)) {
+                error("Cannot restore the original database after a failed replace")
+            }
+            error("Cannot replace the live database")
+        }
+    }
+
+    private fun restoreParkedLive(live: File) {
+        val rollback = rollbackFile(live)
+        if (!rollback.exists()) return
+        if (live.exists()) {
+            deleteSidecarFiles(live)
+            check(live.delete()) { "Cannot remove the failed replacement" }
+        }
+        check(rollback.renameTo(live)) { "Cannot restore the original database" }
+    }
+
+    private fun discardRollback(live: File) {
+        val rollback = rollbackFile(live)
+        if (!rollback.exists()) return
+        deleteSidecarFiles(rollback)
+        rollback.delete()
+    }
+
+    private fun discardDatabaseFiles(dbFile: File) {
+        deleteSidecarFiles(dbFile)
+        if (dbFile.exists()) dbFile.delete()
+    }
+
+    private fun rollbackFile(live: File): File = File(live.path + ".rollback")
 
     private fun readIdentityHash(dbFile: File): String? {
         return runCatching {

@@ -10,6 +10,7 @@ import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewKind
@@ -325,6 +326,34 @@ class LiveSmsProcessingWorkerTest {
         assertEquals(ReviewStatus.REQUIRED, review.status)
         assertEquals(listOf(IngestionReviewService.REASON_PROCESSING_ERROR), review.reasons)
         assertEquals(listOf(raw.id), harness.processingRetryRepo.listRetryableRawSmsIds())
+    }
+
+    @Test
+    fun reviewPersistenceFailure_retriesInsteadOfPermanentSuccess() = runBlocking {
+        val raw = captured()
+        harness.parseOverride = { ParseResult.Unsupported("unsupported_test") }
+        val processStored = harness.processStored(
+            derivedFailures = DerivedFailureInjection(
+                processingErrorUpsertFailuresRemaining = AtomicInteger(1),
+            ),
+        )
+
+        assertEquals(
+            ListenableWorker.Result.retry(),
+            worker(raw.id, processStored = processStored).doWork(),
+        )
+        assertNotNull(harness.rawRepo.getById(raw.id))
+        assertNull(harness.reviewRepo.findByRawSmsId(raw.id))
+        assertNull(harness.parsedRepo.findByRawSmsId(raw.id))
+
+        assertEquals(
+            ListenableWorker.Result.success(),
+            worker(raw.id, attempt = 1, processStored = processStored).doWork(),
+        )
+        val review = harness.reviewRepo.findByRawSmsId(raw.id)!!
+        assertEquals(ReviewStatus.REQUIRED, review.status)
+        assertEquals(listOf(IngestionReviewService.REASON_UNSUPPORTED_FORMAT), review.reasons)
+        assertNotNull(harness.rawRepo.getById(raw.id))
     }
 
     @Test
