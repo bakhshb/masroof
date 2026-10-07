@@ -120,6 +120,73 @@ class CaptureBankSmsUseCaseTest {
     }
 
     @Test
+    fun crossSourceTwinOutsideFiveSeconds_dedupesWhenUniquelyCompatible() = runBlocking {
+        val liveRow = live(PURCHASE_BODY, "2026-08-03T14:32:00.000Z")
+        val historical = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("42", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:33:30.000Z")),
+        )
+        val useCase = capture()
+
+        assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(historical))
+        assertEquals(1, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun crossSourceTwinBeyondSkewWindow_staysSeparate() = runBlocking {
+        val liveRow = live(PURCHASE_BODY, "2026-08-03T08:00:00.000Z")
+        val historical = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("42", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T15:00:00.000Z")),
+        )
+        val useCase = capture()
+
+        assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(historical) is BankSmsCaptureResult.Captured)
+        assertEquals(2, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun repeatedIdenticalNotifications_staySeparateWhenHoursApart() = runBlocking {
+        val liveRow = live(PURCHASE_BODY, "2026-08-03T14:32:00.000Z")
+        val historical = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("42", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T16:02:00.000Z")),
+        )
+        val useCase = capture()
+
+        assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(historical) is BankSmsCaptureResult.Captured)
+        assertEquals(2, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun skewedTwin_isNotMergedWhenAnotherOppositeCopyExists() = runBlocking {
+        val first = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("10", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:00:00.000Z")),
+        )
+        val second = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("11", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:00:40.000Z")),
+        )
+        val liveRow = live(PURCHASE_BODY, "2026-08-03T14:01:00.000Z")
+        val useCase = capture()
+
+        assertTrue(useCase.capture(first) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(second) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
+        assertEquals(3, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun sameSourceRows_areNotMergedByBodyHash() = runBlocking {
+        val first = live(PURCHASE_BODY, "2026-08-03T14:32:00.000Z")
+        val second = live(PURCHASE_BODY, "2026-08-03T14:40:00.000Z")
+        val useCase = capture()
+
+        assertTrue(useCase.capture(first) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(second) is BankSmsCaptureResult.Captured)
+        assertEquals(2, db.rawSmsDao().count())
+    }
+
+    @Test
     fun ambiguousRoute_isCapturedWithItsRoute_andLeftForProcessing() = runBlocking {
         val registry = BankSmsRegistry(listOf(AlJaziraSmsAdapter(), LookalikeAdapter()))
         val raw = live(PURCHASE_BODY, "2026-08-03T14:32:00Z")

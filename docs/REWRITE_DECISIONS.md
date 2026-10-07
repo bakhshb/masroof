@@ -88,9 +88,11 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   valid timestamp. Missing or invalid timestamps fall back to the injectable
   device [InstantClock]. Inbox rows keep `Telephony.Sms.DATE`, which is that
   same provider clock.
-- Live↔historical near-duplicates (opposite `deviceMessageId` nullness only) may
-  reconcile within a 5s receivedAt tolerance on exact sender+bodyHash; same-source
-  rows are never merged by that rule alone.
+- Live↔historical near-duplicates (opposite `deviceMessageId` nullness only) merge
+  inside 5s on exact sender+bodyHash. Outside that, they merge only inside a 2-minute
+  skew window when exactly one opposite-source twin exists. Same-source rows are
+  never merged by body hash alone, and identical bodies at materially different times,
+  including a 90-minute gap, stay separate.
 
 ## 9. P7 — Account/card ownership registry
 
@@ -294,9 +296,10 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 
 ### M3.1 — Capture is separate from processing
 
-- `CaptureBankSmsUseCase` routes, dedupes (including the cross-source near-duplicate
-  window) and persists `RawSms`, returning `BankSmsCaptureResult` (`Captured` carries
-  the row and its `Matched`/`Ambiguous` route). It never parses or reconciles.
+- `CaptureBankSmsUseCase` routes, dedupes (5-second cross-source window, plus a
+  unique match inside 2 minutes for residual clock skew) and persists `RawSms`, returning
+  `BankSmsCaptureResult` (`Captured` carries the row and its `Matched`/`Ambiguous`
+  route). It never parses or reconciles.
 - `ProcessStoredSmsUseCase` owns parse → ParsedEvent → discovery → reconciliation →
   review. `process(rawSms, route)` reuses the capture's route in the same attempt;
   `process(rawSmsId)` loads stored evidence (adapter: stored event bank → sole adapter
@@ -553,3 +556,13 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   `receivedAt`.
 - `0`, negative values, and values that are not an `Instant` fall back to
   `InstantClock`. Parser and domain code do not see this choice.
+
+### M3.2 — Cross-source duplicates survive clock skew
+
+- Capture still requires exact sender, exact body hash, and the opposite source
+  (`deviceMessageId` null versus present).
+- A pair inside 5 seconds is one SMS. A unique opposite-source twin inside 2 minutes
+  is also one SMS. That window covers residual clock skew only. Identical notifications
+  at materially different times, including a 90-minute gap, stay separate even when
+  no other copy exists. Two stored copies inside the window stay separate too.
+  Same-source rows are never merged by body hash.

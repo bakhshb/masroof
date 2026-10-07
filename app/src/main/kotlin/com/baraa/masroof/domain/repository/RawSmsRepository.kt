@@ -50,6 +50,26 @@ interface RawSmsRepository {
         toInclusive: Instant,
         lookingForLiveRow: Boolean,
     ): RawSms?
+
+    /**
+     * Same match as [findCrossSourceNearDuplicate], up to two rows so capture can
+     * tell a unique twin from an ambiguous pair. Ordered by receipt time.
+     */
+    suspend fun listCrossSourceNearDuplicates(
+        sender: String,
+        bodyHash: String,
+        fromInclusive: Instant,
+        toInclusive: Instant,
+        lookingForLiveRow: Boolean,
+    ): List<RawSms> = listOfNotNull(
+        findCrossSourceNearDuplicate(
+            sender = sender,
+            bodyHash = bodyHash,
+            fromInclusive = fromInclusive,
+            toInclusive = toInclusive,
+            lookingForLiveRow = lookingForLiveRow,
+        ),
+    )
 }
 
 /**

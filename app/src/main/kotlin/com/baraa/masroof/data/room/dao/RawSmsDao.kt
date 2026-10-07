@@ -73,6 +73,29 @@ interface RawSmsDao {
         requireDeviceMessageIdNull: Boolean,
     ): RawSmsEntity?
 
+    @Query(
+        """
+        SELECT * FROM raw_sms
+        WHERE sender = :sender
+          AND bodyHash = :bodyHash
+          AND receivedAtEpochMillis BETWEEN :fromMillis AND :toMillis
+          AND (
+            (:requireDeviceMessageIdNull = 1 AND deviceMessageId IS NULL)
+            OR
+            (:requireDeviceMessageIdNull = 0 AND deviceMessageId IS NOT NULL)
+          )
+        ORDER BY receivedAtEpochMillis ASC
+        LIMIT 2
+        """,
+    )
+    suspend fun listCrossSourceNearDuplicates(
+        sender: String,
+        bodyHash: String,
+        fromMillis: Long,
+        toMillis: Long,
+        requireDeviceMessageIdNull: Boolean,
+    ): List<RawSmsEntity>
+
     @Query("SELECT COUNT(*) FROM raw_sms")
     suspend fun count(): Int
 }
