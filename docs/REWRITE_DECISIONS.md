@@ -477,3 +477,11 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   a later exhausted-processing write.
 - A successful retry that settles the RawSms auto-resolves the processing-error review
   through the existing review-queue update (`AUTO_NO_LONGER_REQUIRED`).
+
+### M1.3 — Finished live work has one terminal outcome
+
+- After the live worker returns success or gives up, every persisted recognized-bank RawSms
+  is posted, non-financial, pending review, or a retryable `processing_error`.
+- A derived failure that has not yet exhausted retries is intentionally not terminal.
+  The final attempt closes that gap with the processing-error review from M1.2.
+- An unrecognized sender is still not persisted, so it is outside this set.
