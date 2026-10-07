@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import com.baraa.masroof.data.room.ExchangeRatePairWrite
 import com.baraa.masroof.data.room.entity.FinancialTransactionEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 
@@ -53,6 +54,7 @@ interface FinancialTransactionDao {
           appliedExchangeRate = :exchangeRate,
           exchangeRateSource = :source
         WHERE id = :id
+          AND (appliedExchangeRate IS NULL OR exchangeRateSource IS NULL)
         """,
     )
     suspend fun updateAppliedExchangeRate(
@@ -231,6 +233,14 @@ interface FinancialTransactionDao {
         val inserted = insertTransactionIfAbsent(entity)
         if (inserted == -1L) {
             // Same id already present — refresh columns (idempotent re-save).
+            // A complete exchange-rate pair stays; a partial pair is replaced whole.
+            val existing = getById(entity.id)
+            val (rate, source) = ExchangeRatePairWrite.storedOrIncoming(
+                storedRate = existing?.appliedExchangeRate,
+                storedSource = existing?.exchangeRateSource,
+                incomingRate = entity.appliedExchangeRate,
+                incomingSource = entity.exchangeRateSource,
+            )
             updateTransaction(
                 id = entity.id,
                 type = entity.type,
@@ -242,8 +252,8 @@ interface FinancialTransactionDao {
                 merchant = entity.merchant,
                 counterparty = entity.counterparty,
                 categoryId = entity.categoryId,
-                appliedExchangeRate = entity.appliedExchangeRate,
-                exchangeRateSource = entity.exchangeRateSource,
+                appliedExchangeRate = rate,
+                exchangeRateSource = source,
                 occurredAtZone = entity.occurredAtZone,
             )
         }

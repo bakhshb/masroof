@@ -96,8 +96,17 @@ interface FinancialTransactionRepository {
     suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> =
         transactionIds.distinct().flatMapTo(linkedSetOf()) { listRawSmsIds(it) }
 
+    /**
+     * Updates posting fields. A complete stored exchange-rate pair is left unchanged.
+     * When either half is missing, [FinancialTransaction.appliedExchangeRate] and
+     * [FinancialTransaction.exchangeRateSource] are written together from [transaction].
+     */
     suspend fun update(transaction: FinancialTransaction): Boolean
 
+    /**
+     * Writes [exchangeRate] and [source] as one pair. Returns false when both are already
+     * stored. A row with only one half is replaced entirely, so the orphan is not kept.
+     */
     suspend fun updateAppliedExchangeRate(
         id: String,
         exchangeRate: java.math.BigDecimal,

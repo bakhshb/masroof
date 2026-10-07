@@ -14,6 +14,7 @@ import java.math.BigDecimal
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -64,7 +65,97 @@ class ExchangeRateEnrichmentWorkflowTest {
 
             assertTrue(first.persisted > 0)
             assertEquals(ExchangeRateEnrichmentResult(pending = 0, persisted = 0), second)
-            assertEquals(BigDecimal("9.99"), world.ftRepo.getById(preset.id)!!.appliedExchangeRate)
+            val presetStored = world.ftRepo.getById(preset.id)!!
+            assertEquals(BigDecimal("9.99"), presetStored.appliedExchangeRate)
+            assertEquals(ExchangeRateSource.MARKET, presetStored.exchangeRateSource)
+        }
+    }
+
+    @Test
+    fun immutableHistoricalRate_survivesLaterMarketRateAndRewrite() = runBlocking<Unit> {
+        seededWorld().use { world ->
+            val complete = world.ftRepo.listAwaitingAppliedExchangeRate(Currency.SAR).first()
+            assertTrue(world.ftRepo.updateAppliedExchangeRate(complete.id, BigDecimal("9.99"), ExchangeRateSource.MARKET))
+
+            assertEquals(false, world.ftRepo.updateAppliedExchangeRate(complete.id, BigDecimal("4.25"), ExchangeRateSource.SMS))
+            val storedComplete = world.ftRepo.getById(complete.id)!!
+            assertTrue(
+                world.ftRepo.update(
+                    storedComplete.copy(
+                        merchant = "kept-rate",
+                        appliedExchangeRate = BigDecimal("4.25"),
+                        exchangeRateSource = ExchangeRateSource.SMS,
+                    ),
+                ),
+            )
+
+            val laterMarket = ForeignSarMarketRateProvider { _, _ -> BigDecimal("4.25") }
+            val enriched = world.exchangeRateEnrichmentWorkflow(laterMarket).enrichPending()
+            assertTrue(enriched.persisted > 0)
+
+            val afterComplete = world.ftRepo.getById(complete.id)!!
+            assertEquals(BigDecimal("9.99"), afterComplete.appliedExchangeRate)
+            assertEquals(ExchangeRateSource.MARKET, afterComplete.exchangeRateSource)
+            assertEquals("kept-rate", afterComplete.merchant)
+        }
+    }
+
+    @Test
+    fun partialPair_isReplacedByOneResolution() = runBlocking<Unit> {
+        seededWorld().use { world ->
+            val awaiting = world.ftRepo.listAwaitingAppliedExchangeRate(Currency.SAR)
+            assertTrue(awaiting.size >= 3)
+            val rateOnly = awaiting[0]
+            val sourceOnly = awaiting[1]
+            val orphanRate = BigDecimal("8.888")
+            assertTrue(world.ftRepo.update(rateOnly.copy(appliedExchangeRate = orphanRate, exchangeRateSource = null)))
+            assertTrue(
+                world.ftRepo.update(
+                    sourceOnly.copy(appliedExchangeRate = null, exchangeRateSource = ExchangeRateSource.SMS),
+                ),
+            )
+            assertNull(world.ftRepo.getById(rateOnly.id)!!.exchangeRateSource)
+            assertNull(world.ftRepo.getById(sourceOnly.id)!!.appliedExchangeRate)
+
+            assertTrue(world.ftRepo.updateAppliedExchangeRate(rateOnly.id, BigDecimal("4.25"), ExchangeRateSource.MARKET))
+            assertTrue(world.ftRepo.updateAppliedExchangeRate(sourceOnly.id, BigDecimal("4.25"), ExchangeRateSource.MARKET))
+
+            val repairedRate = world.ftRepo.getById(rateOnly.id)!!
+            assertEquals(BigDecimal("4.25"), repairedRate.appliedExchangeRate)
+            assertEquals(ExchangeRateSource.MARKET, repairedRate.exchangeRateSource)
+            val repairedSource = world.ftRepo.getById(sourceOnly.id)!!
+            assertEquals(BigDecimal("4.25"), repairedSource.appliedExchangeRate)
+            assertEquals(ExchangeRateSource.MARKET, repairedSource.exchangeRateSource)
+
+            val rewriteTarget = awaiting[2]
+            assertTrue(world.ftRepo.update(rewriteTarget.copy(appliedExchangeRate = orphanRate)))
+            assertTrue(
+                world.ftRepo.update(
+                    world.ftRepo.getById(rewriteTarget.id)!!.copy(
+                        appliedExchangeRate = BigDecimal("4.25"),
+                        exchangeRateSource = ExchangeRateSource.HISTORICAL_MERCHANT,
+                    ),
+                ),
+            )
+            val rewritten = world.ftRepo.getById(rewriteTarget.id)!!
+            assertEquals(BigDecimal("4.25"), rewritten.appliedExchangeRate)
+            assertEquals(ExchangeRateSource.HISTORICAL_MERCHANT, rewritten.exchangeRateSource)
+        }
+    }
+
+    @Test
+    fun enrichment_repairsOrphanRateWithoutKeepingIt() = runBlocking<Unit> {
+        seededWorld().use { world ->
+            val partial = world.ftRepo.listAwaitingAppliedExchangeRate(Currency.SAR).first()
+            val orphanRate = BigDecimal("8.888")
+            assertTrue(world.ftRepo.update(partial.copy(appliedExchangeRate = orphanRate, exchangeRateSource = null)))
+
+            world.exchangeRateEnrichmentWorkflow(marketRate).enrichPending()
+
+            val repaired = world.ftRepo.getById(partial.id)!!
+            assertNotNull(repaired.appliedExchangeRate)
+            assertNotNull(repaired.exchangeRateSource)
+            assertTrue(orphanRate.compareTo(repaired.appliedExchangeRate) != 0)
         }
     }
 

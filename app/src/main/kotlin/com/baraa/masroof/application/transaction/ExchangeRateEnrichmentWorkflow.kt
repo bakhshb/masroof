@@ -28,7 +28,11 @@ data class ExchangeRateEnrichmentResult(
  * resolution in memory.
  *
  * Every rate is resolved before the first write, so a failing resolution writes nothing.
- * Row updates are independent and only target rows still missing a rate; rerunning is safe.
+ * Policy is an immutable historical pair: once both the rate and its source are stored,
+ * this workflow does not overwrite them. A legacy row with only one half is not a
+ * resolution. The resolver ignores that orphan and this workflow writes both columns
+ * from the new resolution together. Changing a frozen pair is a separate correction
+ * workflow. Row updates are independent and only target rows still missing a rate or source.
  */
 class ExchangeRateEnrichmentWorkflow(
     private val financialTransactionRepository: FinancialTransactionRepository,

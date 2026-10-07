@@ -400,10 +400,10 @@ The conversion policy now lives in `BankTransactionTimePolicy` (phase 4.3):
   in memory, exactly as they did after the old write, so totals and displayed rates are
   unchanged. The card-window write, whose in-memory result was already discarded, is gone.
 - `ExchangeRateEnrichmentWorkflow` owns persistence: it lists foreign transactions with no
-  persisted rate (`listAwaitingAppliedExchangeRate`), loads their linked evidence plus the
+  complete rate pair (`listAwaitingAppliedExchangeRate`), loads their linked evidence plus the
   merchant-rate facts, resolves with the shared `TransactionSarEquivalentResolver`, and
   writes only after every resolution succeeded. It is serialized by a mutex, never
-  overwrites a persisted rate, and is idempotent.
+  overwrites a complete stored pair, and is idempotent.
 - Callers: `ProcessStoredSmsUseCase.process(rawSmsId)` (live worker path),
   `HistoricalSmsBatchProcessor.Batch.finish`, the bulk-reparse derived refresh, and startup
   maintenance (background, after the pending-SMS sweep). Each call is best-effort; neither
@@ -411,6 +411,21 @@ The conversion policy now lives in `BankTransactionTimePolicy` (phase 4.3):
 - Rates freeze when first persisted. Before, that happened on the first dashboard view;
   now it happens at ingestion or maintenance time with the same resolver and evidence, so
   the dashboard shows the same values before and after enrichment (characterized).
+
+### Exchange-rate persistence (phase 5.2)
+
+- Mode A, immutable historical rate. Mode B (refreshable market rates) is not implemented.
+- `appliedExchangeRate` and `exchangeRateSource` are one pair from the same accepted
+  resolution. Once both are stored, `updateAppliedExchangeRate` updates no row, and
+  `update` / atomic re-save keep that pair while still refreshing other posting fields
+  (including `occurredAtZone`).
+- A legacy row with only one half is not frozen. Repair writes both columns from the
+  new resolution and drops the orphan, so an old rate cannot sit next to a newly
+  inferred source (and an old source cannot sit next to a newly inferred rate).
+- A later market quote, a direct rate write, and a transaction update that carries a
+  different pair all leave a complete stored pair in place.
+- Dashboard loads stay read-only. The in-memory syncer uses the same pair rule.
+  Correcting a frozen pair would be its own workflow.
 
 ### M4.3 — Dashboard projection is composed by read-model concern
 
