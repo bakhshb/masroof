@@ -89,10 +89,9 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   device [InstantClock]. Inbox rows keep `Telephony.Sms.DATE`, which is that
   same provider clock.
 - Live↔historical near-duplicates (opposite `deviceMessageId` nullness only) merge
-  inside 5s on exact sender+bodyHash. Outside that, they merge only inside a 6-hour
+  inside 5s on exact sender+bodyHash. Outside that, they merge only inside a 2-minute
   skew window when exactly one opposite-source twin exists. Same-source rows are
-  never merged by body hash alone, and identical bodies more than 6 hours apart stay
-  separate.
+  never merged by body hash alone, and identical bodies minutes apart stay separate.
 
 ## 9. P7 — Account/card ownership registry
 
@@ -297,7 +296,7 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 ### M3.1 — Capture is separate from processing
 
 - `CaptureBankSmsUseCase` routes, dedupes (5-second cross-source window, plus a
-  unique match inside 6 hours for clock skew) and persists `RawSms`, returning
+  unique match inside 2 minutes for residual clock skew) and persists `RawSms`, returning
   `BankSmsCaptureResult` (`Captured` carries the row and its `Matched`/`Ambiguous`
   route). It never parses or reconciles.
 - `ProcessStoredSmsUseCase` owns parse → ParsedEvent → discovery → reconciliation →
@@ -561,6 +560,8 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 
 - Capture still requires exact sender, exact body hash, and the opposite source
   (`deviceMessageId` null versus present).
-- A pair inside 5 seconds is one SMS. A pair inside 6 hours is one SMS only when
-  that opposite-source twin is unique. Two stored copies, or a gap beyond 6 hours,
-  stay separate. Same-source rows are never merged by body hash.
+- A pair inside 5 seconds is one SMS. A unique opposite-source twin inside 2 minutes
+  is also one SMS. That window covers residual clock skew only. Identical notifications
+  at materially different times, including a 90-minute gap, stay separate even when
+  no other copy exists. Two stored copies inside the window stay separate too.
+  Same-source rows are never merged by body hash.

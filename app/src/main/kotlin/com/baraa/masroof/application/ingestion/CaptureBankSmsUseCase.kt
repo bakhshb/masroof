@@ -83,7 +83,6 @@ class CaptureBankSmsUseCase(
     }
 
     private suspend fun hasCrossSourceNearDuplicate(rawSms: RawSms): Boolean {
-        val receivedAt = rawSms.receivedAt
         val lookingForLiveRow = rawSms.deviceMessageId != null
         val tight = crossSourceTwins(
             rawSms = rawSms,
@@ -122,11 +121,12 @@ class CaptureBankSmsUseCase(
         val CROSS_SOURCE_RECEIVED_AT_TOLERANCE: Duration = Duration.ofSeconds(5)
 
         /**
-         * Wider opposite-source window for provider/device clock skew. A match
-         * counts only when exactly one stored twin falls inside it, so two real
-         * messages with the same text are not collapsed.
+         * Residual provider/device skew beyond the 5-second window. A match counts
+         * only when exactly one opposite-source twin falls inside it. Two minutes
+         * is enough for a late inbox clock and too short to treat a repeated
+         * notification as the same SMS.
          */
-        val CROSS_SOURCE_UNIQUE_SKEW_TOLERANCE: Duration = Duration.ofHours(6)
+        val CROSS_SOURCE_UNIQUE_SKEW_TOLERANCE: Duration = Duration.ofMinutes(2)
     }
 }
 
