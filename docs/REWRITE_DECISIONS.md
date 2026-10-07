@@ -91,7 +91,8 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Live↔historical near-duplicates (opposite `deviceMessageId` nullness only) merge
   inside 5s on exact sender+bodyHash. Outside that, they merge only inside a 2-minute
   skew window when exactly one opposite-source twin exists. Same-source rows are
-  never merged by body hash alone, and identical bodies minutes apart stay separate.
+  never merged by body hash alone, and identical bodies at materially different times,
+  including a 90-minute gap, stay separate.
 
 ## 9. P7 — Account/card ownership registry
 
