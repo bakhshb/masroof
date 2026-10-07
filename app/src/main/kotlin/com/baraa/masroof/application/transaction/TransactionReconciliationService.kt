@@ -260,6 +260,7 @@ class TransactionReconciliationService(
                                 receivedAt = receivedAt,
                                 sourceOwnership = sourceOwn,
                                 destinationOwnership = destOwn,
+                                effectiveOccurredAt = transactionOccurredAt,
                             )
                             pendingMatch++
                         }
@@ -556,6 +557,9 @@ class TransactionReconciliationService(
 
         val candidates = buildList {
             for (leg in outLegs + inLegs) {
+                val receivedAt = rawSmsRepository.getById(leg.event.rawSmsId)?.receivedAt
+                    ?: leg.transaction?.occurredAt
+                    ?: continue
                 val sourceOwn = leg.event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
                     ?: OwnershipStatus.UNKNOWN
                 val destOwn = leg.event.destinationAccountRef?.let { ownershipResolver.resolveAccount(it) }
@@ -565,11 +569,15 @@ class TransactionReconciliationService(
                         event = leg.event,
                         transactionReference = leg.record?.details?.transactionReference,
                         occurredAtLocal = leg.record?.details?.occurredAtLocal,
-                        receivedAt = rawSmsRepository.getById(leg.event.rawSmsId)?.receivedAt
-                            ?: leg.transaction?.occurredAt
-                            ?: continue,
+                        receivedAt = receivedAt,
                         sourceOwnership = sourceOwn,
                         destinationOwnership = destOwn,
+                        effectiveOccurredAt = TransactionTiming.effectiveOccurredAt(
+                            event = leg.event,
+                            occurredAtLocal = leg.record?.details?.occurredAtLocal,
+                            receivedAt = receivedAt,
+                            zoneId = zoneId,
+                        ),
                     ),
                 )
             }
