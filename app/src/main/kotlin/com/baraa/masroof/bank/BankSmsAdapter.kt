@@ -4,7 +4,6 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.parsing.model.BankDetectionResult
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.SmsParseInput
-import java.time.ZoneId
 
 /**
  * Bank-specific SMS detection and parsing boundary.
@@ -16,13 +15,6 @@ import java.time.ZoneId
  */
 interface BankSmsAdapter {
     val bank: Bank
-
-    /**
-     * Civil zone of this bank's offset-less SMS timestamps, when the bank
-     * guarantees one. Null means the first resolution zone is persisted instead.
-     */
-    val transactionZone: ZoneId?
-        get() = null
 
     fun detect(sender: String, body: String): BankDetectionResult
 

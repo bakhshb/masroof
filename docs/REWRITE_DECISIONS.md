@@ -60,7 +60,8 @@ pretending local wall time is UTC (`…Z`).
 
 The conversion policy now lives in `BankTransactionTimePolicy` (phase 4.3):
 
-- Bank AlJazira wall clocks use `Asia/Riyadh`. Saudi Arabia has one civil zone,
+- Bank AlJazira wall clocks use `Asia/Riyadh`, mapped only in `BankTransactionTimePolicy`.
+  Adapters do not repeat that zone. Saudi Arabia has one civil zone,
   UTC+3 with no daylight-saving time, and the SMS text has no offset. Treating
   that clock as the handset zone moves a 22:30 purchase onto the next Riyadh day.
 - Any other bank persists the zone of first assembly on `financial_transaction.occurredAtZone`.

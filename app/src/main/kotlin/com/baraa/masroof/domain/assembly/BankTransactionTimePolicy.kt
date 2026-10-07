@@ -6,13 +6,16 @@ import java.time.ZoneId
 /**
  * How an offset-less SMS wall clock becomes an [java.time.Instant].
  *
+ * This object is the only bank-to-zone mapping. Adapters do not carry a second copy.
+ *
  * Bank AlJazira prints civil time with no offset. Saudi Arabia's only civil
  * zone is [ALJAZIRA] (`Asia/Riyadh`, UTC+3, no daylight-saving time). The
  * handset zone is not that clock: using it would move a late-evening purchase
  * onto the next salary-period day after a timezone change.
  *
  * A bank without a fixed zone keeps the zone stored on its first transaction.
- * [fallback] is only for the first resolution of such a bank.
+ * [fallback] is only for the first resolution of such a bank. A new bank adds
+ * its zone here, not on its adapter.
  */
 object BankTransactionTimePolicy {
     val ALJAZIRA: ZoneId = ZoneId.of("Asia/Riyadh")
