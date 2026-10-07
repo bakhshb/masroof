@@ -401,6 +401,12 @@ The router owns bank detection: `detect` is evaluated once per processing attemp
 and never re-checks the sender. Ingestion rejects (as `processing_error`) any parse
 result whose event bank differs from the routed adapter's bank.
 
+AlJazira `cardSmsChannel` is decided in the parser. Credit is an explicit credit
+label, a due-amount line, or an unlabeled card line together with `الرصيد المتاح` /
+available balance. Debit markers (`بطاقة مدى`, `خصمت من حساب`, standalone `mada`)
+win over that balance line. A card number with none of those signals stays null.
+The dashboard reads the stored channel and does not re-read the SMS.
+
 Initial:
 
 ```text

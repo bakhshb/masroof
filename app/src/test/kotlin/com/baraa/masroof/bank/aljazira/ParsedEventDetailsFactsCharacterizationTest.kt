@@ -36,6 +36,51 @@ class ParsedEventDetailsFactsCharacterizationTest {
     }
 
     @Test
+    fun unlabeledCardPurchaseWithAvailableBalance_isCredit() {
+        val body = """
+            شراء عبر الانترنت
+            بطاقة: 7271
+            لدى: Keeta
+            بمبلغ: 51.99 SAR
+            الرصيد المتاح: SAR 17230.03
+        """.trimIndent()
+        assertEquals(CardSmsChannel.CREDIT, parseDetails(body).cardSmsChannel)
+    }
+
+    @Test
+    fun cardLineWithoutCreditOrDebitEvidence_staysUnclassified() {
+        val body = """
+            POS Purchase
+            Card: 4521
+            At: TEST_MERCHANT_POS
+            Amount: 89.50 SAR
+        """.trimIndent()
+        assertEquals(null, parseAny(body).cardSmsChannel)
+    }
+
+    @Test
+    fun accountBalanceNotice_isNotACreditCardChannel() {
+        val body = """
+            إشعار رصيد
+            حساب: 3001
+            الرصيد المتاح: SAR 17230.03
+        """.trimIndent()
+        assertEquals(null, parseAny(body).cardSmsChannel)
+    }
+
+    @Test
+    fun debitMarkerWinsOverAvailableBalance() {
+        val body = """
+            شراء من نقاط البيع
+            بطاقة مدى: 2210
+            خصمت من حساب: 3001
+            بمبلغ: 51.99 SAR
+            الرصيد المتاح: SAR 100.00
+        """.trimIndent()
+        assertEquals(CardSmsChannel.DEBIT, parseDetails(body).cardSmsChannel)
+    }
+
+    @Test
     fun madaPurchase_populatesDebitChannel() {
         val body = """
             شراء عبر نقاط البيع (Google Pay)
@@ -105,7 +150,7 @@ class ParsedEventDetailsFactsCharacterizationTest {
         assertEquals(java.time.LocalDate.of(2026, 8, 15), details.paymentDueDate)
     }
 
-    private fun parseDetails(body: String) =
+    private fun parseAny(body: String) =
         when (
             val result = parser.parse(
                 SmsParseInput(
@@ -122,7 +167,10 @@ class ParsedEventDetailsFactsCharacterizationTest {
             is ParseResult.ReviewRequired -> result.details
             is ParseResult.NonFinancial -> result.details
             else -> error("Unexpected parse result: $result")
-        }.also { details ->
+        }
+
+    private fun parseDetails(body: String) =
+        parseAny(body).also { details ->
             assertTrue(
                 details.cardSmsChannel != null ||
                     details.exchangeRate != null ||
