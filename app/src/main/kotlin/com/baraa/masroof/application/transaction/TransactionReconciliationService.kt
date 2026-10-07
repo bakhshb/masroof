@@ -614,12 +614,19 @@ class TransactionReconciliationService(
             if (!hasStaleExternal) continue
             val sourceOwn = pair.outgoing.sourceOwnership
             val destOwn = pair.incoming.destinationOwnership
+            val healZone = listOfNotNull(
+                outLeg.transaction?.occurredAtZone,
+                inLeg.transaction?.occurredAtZone,
+            ).firstNotNullOfOrNull { stored ->
+                runCatching { ZoneId.of(stored) }.getOrNull()
+            } ?: zoneId
 
             when (
                 val outcome = TransactionAssembler.assembleMatchedPair(
                     pair = pair,
                     outgoingSourceOwnership = sourceOwn,
                     incomingDestinationOwnership = destOwn,
+                    fallbackZone = healZone,
                 )
             ) {
                 is TransactionAssembler.Outcome.Assembled -> {

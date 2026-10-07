@@ -64,8 +64,9 @@ The conversion policy now lives in `BankTransactionTimePolicy` (phase 4.3):
   UTC+3 with no daylight-saving time, and the SMS text has no offset. Treating
   that clock as the handset zone moves a 22:30 purchase onto the next Riyadh day.
 - Any other bank persists the zone of first assembly on `financial_transaction.occurredAtZone`.
-  A later reprocess reuses it. Schema 16 adds the nullable column and does not
-  rewrite existing instants; the column stays null until the next assembly.
+  A later reprocess reuses it, including when a stale external leg is healed into a
+  self-transfer. Schema 16 adds the nullable column and does not rewrite existing
+  instants; the column stays null until the next assembly.
 - The parser still extracts `LocalDateTime`. Dashboard code does not choose a bank zone.
 
 ## 7. P5 — Persistence schema (clean rewrite)

@@ -1793,6 +1793,64 @@ class TransactionReconciliationServiceTest {
         assertEquals("Asia/Tokyo", again.occurredAtZone)
     }
 
+    @Test
+    fun stalePairHeal_keepsUnknownBankZoneWhenDeviceDefaultDiffers() = runBlocking {
+        val previous = java.util.TimeZone.getDefault()
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"))
+        try {
+            val other = Bank("OTHER")
+            confirmation.confirmAccountOwned(AccountReference(other, "3001"))
+            val local = java.time.LocalDateTime.parse("2026-08-01T12:00:00")
+            val tokyo = java.time.ZoneId.of("Asia/Tokyo")
+            val outAt = Instant.parse("2026-08-01T12:00:00Z")
+            val inAt = outAt.plus(TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(3))
+            persistEvent(
+                smsId = "sms-out-zone-heal",
+                at = outAt,
+                details = ParsedEventDetails(occurredAtLocal = local),
+                event = event(
+                    id = "pe-out-zone-heal",
+                    rawSmsId = "sms-out-zone-heal",
+                    family = MessageFamily.TRANSFER_OUT,
+                    amount = money("90.00"),
+                    bank = other,
+                    source = AccountReference(other, "3001"),
+                    destination = AccountReference(other, "3003"),
+                    network = BankNetworkType.INTRA_BANK,
+                ),
+            )
+            val outgoing = parsedRepo.findByRawSmsId("sms-out-zone-heal")!!.event
+            serviceIn(tokyo).reconcileAfterParsedEvent(outgoing)
+            assertEquals("Asia/Tokyo", ftRepo.listAll().single().occurredAtZone)
+
+            confirmation.confirmAccountOwned(AccountReference(other, "3003"))
+            persistEvent(
+                smsId = "sms-in-zone-heal",
+                at = inAt,
+                details = ParsedEventDetails(occurredAtLocal = local),
+                event = event(
+                    id = "pe-in-zone-heal",
+                    rawSmsId = "sms-in-zone-heal",
+                    family = MessageFamily.TRANSFER_IN,
+                    amount = money("90.00"),
+                    bank = other,
+                    source = AccountReference(other, "3001"),
+                    destination = AccountReference(other, "3003"),
+                    network = BankNetworkType.INTRA_BANK,
+                ),
+            )
+            val incoming = parsedRepo.findByRawSmsId("sms-in-zone-heal")!!.event
+            serviceIn(java.time.ZoneId.of("America/New_York")).reconcileAfterParsedEvent(incoming)
+
+            val healed = ftRepo.listAll().single()
+            assertEquals(FinancialTransactionType.SELF_TRANSFER, healed.type)
+            assertEquals(local.atZone(tokyo).toInstant(), healed.occurredAt)
+            assertEquals("Asia/Tokyo", healed.occurredAtZone)
+        } finally {
+            java.util.TimeZone.setDefault(previous)
+        }
+    }
+
     private fun serviceIn(zone: java.time.ZoneId) = TransactionReconciliationService(
         parsedEventRepository = parsedRepo,
         rawSmsRepository = rawRepo,
