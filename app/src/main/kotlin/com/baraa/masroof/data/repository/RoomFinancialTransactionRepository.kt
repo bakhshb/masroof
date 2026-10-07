@@ -135,6 +135,7 @@ class RoomFinancialTransactionRepository(
             categoryId = entity.categoryId,
             appliedExchangeRate = entity.appliedExchangeRate,
             exchangeRateSource = entity.exchangeRateSource,
+            occurredAtZone = entity.occurredAtZone,
         ) > 0
     }
 

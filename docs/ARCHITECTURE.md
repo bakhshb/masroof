@@ -643,6 +643,20 @@ exists, ingestion writes the review row directly (`IngestionReviewService`).
 
 ---
 
+### 17.2 Transaction time zone
+
+The parser still stores an offset-less `LocalDateTime`. `BankTransactionTimePolicy`
+turns that wall clock into `FinancialTransaction.occurredAt`.
+
+Bank AlJazira SMS times are Saudi civil time: `Asia/Riyadh` (UTC+3, no daylight-saving
+time). The handset zone is not used for that bank. A bank without a fixed zone keeps
+the zone id stored on the transaction at first assembly (`occurredAtZone`, schema 16).
+Reassembly uses that stored zone, so a later device timezone does not move the instant.
+
+Dashboard period code keeps its own zone and does not branch on the bank.
+
+---
+
 ## 18. Review Queue
 
 Any unresolved situation should create a review item.

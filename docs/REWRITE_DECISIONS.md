@@ -56,7 +56,17 @@ DOMAIN `ParsedEvent.occurredAt` is `Instant?`.
 
 **Decision:** store local values in `ParsedEventDetails.occurredAtLocal`
 (`LocalDateTime`). Leave `ParsedEvent.occurredAt` null at parse time rather than
-pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
+pretending local wall time is UTC (`…Z`).
+
+The conversion policy now lives in `BankTransactionTimePolicy` (phase 4.3):
+
+- Bank AlJazira wall clocks use `Asia/Riyadh`. Saudi Arabia has one civil zone,
+  UTC+3 with no daylight-saving time, and the SMS text has no offset. Treating
+  that clock as the handset zone moves a 22:30 purchase onto the next Riyadh day.
+- Any other bank persists the zone of first assembly on `financial_transaction.occurredAtZone`.
+  A later reprocess reuses it. Schema 16 adds the nullable column and does not
+  rewrite existing instants; the column stays null until the next assembly.
+- The parser still extracts `LocalDateTime`. Dashboard code does not choose a bank zone.
 
 ## 7. P5 — Persistence schema (clean rewrite)
 

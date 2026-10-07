@@ -26,7 +26,8 @@ interface FinancialTransactionDao {
           counterparty = :counterparty,
           categoryId = :categoryId,
           appliedExchangeRate = :appliedExchangeRate,
-          exchangeRateSource = :exchangeRateSource
+          exchangeRateSource = :exchangeRateSource,
+          occurredAtZone = :occurredAtZone
         WHERE id = :id
         """,
     )
@@ -43,6 +44,7 @@ interface FinancialTransactionDao {
         categoryId: String?,
         appliedExchangeRate: String?,
         exchangeRateSource: String?,
+        occurredAtZone: String?,
     ): Int
 
     @Query(
@@ -242,6 +244,7 @@ interface FinancialTransactionDao {
                 categoryId = entity.categoryId,
                 appliedExchangeRate = entity.appliedExchangeRate,
                 exchangeRateSource = entity.exchangeRateSource,
+                occurredAtZone = entity.occurredAtZone,
             )
         }
 

@@ -1734,6 +1734,74 @@ class TransactionReconciliationServiceTest {
         assertEquals(money("51.99"), tx.amount)
     }
 
+    @Test
+    fun reprocessInAnotherDeviceZone_keepsAlJaziraOccurredAt() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        val local = java.time.LocalDateTime.of(2026, 8, 26, 22, 30)
+        persistEvent(
+            smsId = "sms-zone",
+            event = event(
+                id = "pe-zone",
+                rawSmsId = "sms-zone",
+                family = MessageFamily.PURCHASE,
+                amount = money("12.00"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                channel = PurchaseChannel.ONLINE,
+                merchant = "Shop",
+            ),
+            details = ParsedEventDetails(occurredAtLocal = local),
+        )
+        val tokyo = serviceIn(java.time.ZoneId.of("Asia/Tokyo"))
+        tokyo.reconcileStoredEvents()
+        val first = ftRepo.findByRawSmsId("sms-zone")!!
+        assertEquals(local.atZone(java.time.ZoneId.of("Asia/Riyadh")).toInstant(), first.occurredAt)
+        assertEquals("Asia/Riyadh", first.occurredAtZone)
+
+        val newYork = serviceIn(java.time.ZoneId.of("America/New_York"))
+        newYork.reconcileStoredEvents()
+        val again = ftRepo.findByRawSmsId("sms-zone")!!
+        assertEquals(first.occurredAt, again.occurredAt)
+        assertEquals("Asia/Riyadh", again.occurredAtZone)
+    }
+
+    @Test
+    fun unknownBank_persistsFirstZoneAcrossReprocess() = runBlocking {
+        val other = Bank("OTHER")
+        confirmation.confirmCardOwned(CardReference(other, "1111"))
+        val local = java.time.LocalDateTime.of(2026, 8, 26, 22, 30)
+        persistEvent(
+            smsId = "sms-other-zone",
+            event = event(
+                id = "pe-other-zone",
+                rawSmsId = "sms-other-zone",
+                family = MessageFamily.PURCHASE,
+                amount = money("8.00"),
+                bank = other,
+                card = CardReference(other, "1111"),
+                channel = PurchaseChannel.ONLINE,
+            ),
+            details = ParsedEventDetails(occurredAtLocal = local),
+        )
+        serviceIn(java.time.ZoneId.of("Asia/Tokyo")).reconcileStoredEvents()
+        val first = ftRepo.findByRawSmsId("sms-other-zone")!!
+        assertEquals("Asia/Tokyo", first.occurredAtZone)
+        assertEquals(local.atZone(java.time.ZoneId.of("Asia/Tokyo")).toInstant(), first.occurredAt)
+
+        serviceIn(java.time.ZoneId.of("America/New_York")).reconcileStoredEvents()
+        val again = ftRepo.findByRawSmsId("sms-other-zone")!!
+        assertEquals(first.occurredAt, again.occurredAt)
+        assertEquals("Asia/Tokyo", again.occurredAtZone)
+    }
+
+    private fun serviceIn(zone: java.time.ZoneId) = TransactionReconciliationService(
+        parsedEventRepository = parsedRepo,
+        rawSmsRepository = rawRepo,
+        financialTransactionRepository = ftRepo,
+        ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(accounts, cards, loans),
+        ownershipConfirmationService = confirmation,
+        zoneId = zone,
+    )
+
     private suspend fun persistEvent(
         smsId: String,
         event: ParsedEvent,

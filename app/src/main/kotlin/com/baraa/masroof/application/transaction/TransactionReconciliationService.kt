@@ -181,7 +181,8 @@ class TransactionReconciliationService(
                     userConfirmed = true
                 }
             }
-            if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) {
+            val linkedBefore = financialTransactionRepository.findByRawSmsId(event.rawSmsId)
+            if (linkedBefore != null) {
                 if (
                     eventShouldNotProduceTransaction(event) &&
                     financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
@@ -199,11 +200,14 @@ class TransactionReconciliationService(
 
             val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt
                 ?: continue
+            val persistedZone = linkedBefore?.occurredAtZone
+            val zone = TransactionTiming.zoneFor(event.bank, persistedZone, zoneId)
             val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(
                 event = event,
                 occurredAtLocal = record.details.occurredAtLocal,
                 receivedAt = receivedAt,
                 zoneId = zoneId,
+                persistedZoneId = persistedZone,
             )
 
             val sourceOwn = event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
@@ -232,6 +236,7 @@ class TransactionReconciliationService(
                         loanType = loanType,
                         transactionOccurredAt = transactionOccurredAt,
                         userConfirmed = userConfirmed,
+                        occurredAtZone = zone,
                     )
                     when (single) {
                         is TransactionAssembler.Outcome.Assembled -> {
@@ -293,6 +298,7 @@ class TransactionReconciliationService(
                             loanType = loanType,
                             transactionOccurredAt = transactionOccurredAt,
                             userConfirmed = userConfirmed,
+                            occurredAtZone = zone,
                         )
                     ) {
                         is TransactionAssembler.Outcome.Assembled -> {
@@ -364,6 +370,7 @@ class TransactionReconciliationService(
                     pair = pair,
                     outgoingSourceOwnership = outSourceOwn,
                     incomingDestinationOwnership = inDestOwn,
+                    fallbackZone = zoneId,
                 )
             ) {
                 is TransactionAssembler.Outcome.Assembled -> {
@@ -402,6 +409,7 @@ class TransactionReconciliationService(
                     pendingCounterparts = stillOpen.filter {
                         it.event.rawSmsId != candidate.event.rawSmsId
                     },
+                    fallbackZone = zoneId,
                 )
             ) {
                 is TransactionAssembler.Outcome.Assembled -> {
@@ -686,7 +694,9 @@ class TransactionReconciliationService(
                 occurredAtLocal = record.details.occurredAtLocal,
                 receivedAt = receivedAt,
                 zoneId = zoneId,
+                persistedZoneId = existing.occurredAtZone,
             )
+            val zone = TransactionTiming.zoneFor(event.bank, existing.occurredAtZone, zoneId)
             when (
                 val outcome = TransactionAssembler.assembleSingle(
                     event = event,
@@ -698,6 +708,7 @@ class TransactionReconciliationService(
                     loanType = loanType,
                     transactionOccurredAt = transactionOccurredAt,
                     userConfirmed = record.automationConfirmed,
+                    occurredAtZone = zone,
                 )
             ) {
                 is TransactionAssembler.Outcome.Assembled -> {
@@ -821,6 +832,7 @@ class TransactionReconciliationService(
             occurredAtLocal = record.details.occurredAtLocal,
             receivedAt = receivedAt,
             zoneId = zoneId,
+            persistedZoneId = linked.occurredAtZone,
         )
         return linked.occurredAt != expectedAt
     }

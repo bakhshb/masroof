@@ -23,4 +23,6 @@ data class FinancialTransactionEntity(
     val categoryId: String?,
     val appliedExchangeRate: String? = null,
     val exchangeRateSource: String? = null,
+    /** IANA zone id captured when [occurredAtEpochMillis] was resolved. Null on legacy rows. */
+    val occurredAtZone: String? = null,
 )

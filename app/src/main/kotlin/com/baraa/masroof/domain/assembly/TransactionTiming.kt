@@ -1,6 +1,7 @@
 package com.baraa.masroof.domain.assembly
 
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.ParsedEvent
 import java.time.Instant
 import java.time.LocalDateTime
@@ -13,22 +14,36 @@ import java.time.ZoneId
  * [receivedAt] so salary-period filtering matches the bank-stated transaction time.
  */
 object TransactionTiming {
+    fun zoneFor(
+        bank: Bank,
+        persistedZoneId: String? = null,
+        fallback: ZoneId = ZoneId.systemDefault(),
+    ): ZoneId = BankTransactionTimePolicy.resolve(bank, persistedZoneId, fallback)
+
     fun effectiveOccurredAt(
         event: ParsedEvent,
         occurredAtLocal: LocalDateTime?,
         receivedAt: Instant,
         zoneId: ZoneId = ZoneId.systemDefault(),
-    ): Instant =
-        event.occurredAt
-            ?: occurredAtLocal?.atZone(zoneId)?.toInstant()
+        persistedZoneId: String? = null,
+    ): Instant {
+        val zone = zoneFor(event.bank, persistedZoneId, zoneId)
+        return event.occurredAt
+            ?: occurredAtLocal?.atZone(zone)?.toInstant()
             ?: receivedAt
+    }
 
-    fun effectiveOccurredAt(candidate: TransferMatchCandidate, zoneId: ZoneId): Instant =
+    fun effectiveOccurredAt(
+        candidate: TransferMatchCandidate,
+        zoneId: ZoneId,
+        persistedZoneId: String? = null,
+    ): Instant =
         effectiveOccurredAt(
             event = candidate.event,
             occurredAtLocal = candidate.occurredAtLocal,
             receivedAt = candidate.receivedAt,
             zoneId = zoneId,
+            persistedZoneId = persistedZoneId,
         )
 
     fun earliestEffectiveOccurredAt(

@@ -22,7 +22,6 @@ import com.baraa.masroof.domain.rules.ContainerKind
 import com.baraa.masroof.domain.rules.ResolvedContainerFacts
 import com.baraa.masroof.domain.rules.TransactionClassifier
 import java.time.Instant
-import java.time.ZoneId
 
 /**
  * Pure assembly of [FinancialTransaction] from validated evidence + ownership.
@@ -94,6 +93,7 @@ object TransactionAssembler {
         loanType: LoanType? = null,
         transactionOccurredAt: Instant = receivedAt,
         userConfirmed: Boolean = false,
+        occurredAtZone: java.time.ZoneId? = null,
     ): Outcome {
         when (event.messageFamily) {
             MessageFamily.OTP,
@@ -172,6 +172,7 @@ object TransactionAssembler {
                     linkedEventIds = listOf(event.id),
                     rawSmsIds = listOf(event.rawSmsId),
                     loanType = resolvedLoanType,
+                    occurredAtZone = occurredAtZone,
                 )
                 Outcome.Assembled(tx.transaction, tx.rawSmsIds)
             }
@@ -189,6 +190,7 @@ object TransactionAssembler {
                         linkedEventIds = listOf(event.id),
                         rawSmsIds = listOf(event.rawSmsId),
                         loanType = resolvedLoanType,
+                        occurredAtZone = occurredAtZone,
                     )
                     return Outcome.Assembled(tx.transaction, tx.rawSmsIds)
                 }
@@ -213,6 +215,7 @@ object TransactionAssembler {
     fun assembleUnmatchedOwnedTransfer(
         candidate: TransferMatchCandidate,
         pendingCounterparts: List<TransferMatchCandidate> = emptyList(),
+        fallbackZone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
     ): Outcome {
         val event = candidate.event
         val receivedAt = candidate.receivedAt
@@ -231,7 +234,7 @@ object TransactionAssembler {
         if (sourceOwnership == OwnershipStatus.OWNED &&
             destinationOwnership == OwnershipStatus.OWNED
         ) {
-            val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, ZoneId.systemDefault())
+            val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, fallbackZone)
             return assembleSingle(
                 event = event,
                 receivedAt = receivedAt,
@@ -239,10 +242,12 @@ object TransactionAssembler {
                 destinationOwnership = destinationOwnership,
                 cardOwnership = OwnershipStatus.UNKNOWN,
                 transactionOccurredAt = transactionOccurredAt,
+                occurredAtZone = TransactionTiming.zoneFor(event.bank, fallback = fallbackZone),
             )
         }
 
-        val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, ZoneId.systemDefault())
+        val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, fallbackZone)
+        val zone = TransactionTiming.zoneFor(event.bank, fallback = fallbackZone)
 
         return when (event.messageFamily) {
             MessageFamily.TRANSFER_OUT -> {
@@ -265,6 +270,7 @@ object TransactionAssembler {
                     event = event,
                     linkedEventIds = listOf(event.id),
                     rawSmsIds = listOf(event.rawSmsId),
+                    occurredAtZone = zone,
                 )
                 // Prefer durable owned source even if buildTransaction dropped UNKNOWN dest.
                 val tx = built.transaction.copy(sourceContainerId = sourceId)
@@ -291,6 +297,7 @@ object TransactionAssembler {
                     event = event,
                     linkedEventIds = listOf(event.id),
                     rawSmsIds = listOf(event.rawSmsId),
+                    occurredAtZone = zone,
                 )
                 val tx = built.transaction.copy(destinationContainerId = destId)
                 Outcome.Assembled(tx, built.rawSmsIds)
@@ -308,6 +315,7 @@ object TransactionAssembler {
         pair: TransferMatchPair,
         outgoingSourceOwnership: OwnershipStatus,
         incomingDestinationOwnership: OwnershipStatus,
+        fallbackZone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
     ): Outcome {
         if (outgoingSourceOwnership != OwnershipStatus.OWNED) {
             return Outcome.PendingMatch
@@ -362,9 +370,10 @@ object TransactionAssembler {
         val occurredAt = listOfNotNull(out.occurredAt, inn.occurredAt).minOrNull()
             ?: TransactionTiming.earliestEffectiveOccurredAt(
                 candidates = listOf(pair.outgoing, pair.incoming),
-                zoneId = ZoneId.systemDefault(),
+                zoneId = fallbackZone,
             )
             ?: minOf(pair.outgoing.receivedAt, pair.incoming.receivedAt)
+        val zone = TransactionTiming.zoneFor(out.bank, fallback = fallbackZone)
 
         val rawSmsIds = listOf(out.rawSmsId, inn.rawSmsId).sorted()
         val linked = listOf(out.id, inn.id).sorted()
@@ -379,6 +388,7 @@ object TransactionAssembler {
             counterparty = out.counterparty ?: inn.counterparty,
             categoryId = null,
             linkedParsedEventIds = linked,
+            occurredAtZone = zone.id,
         )
         return Outcome.Assembled(tx, rawSmsIds)
     }
@@ -454,7 +464,9 @@ object TransactionAssembler {
         linkedEventIds: List<String>,
         rawSmsIds: List<String>,
         loanType: LoanType? = null,
+        occurredAtZone: java.time.ZoneId? = null,
     ): Built {
+        val zone = occurredAtZone ?: TransactionTiming.zoneFor(event.bank)
         // Resolve durable ids from references only (null for Bank.UNKNOWN / incomplete).
         val durableSourceAccountId = event.sourceAccountRef?.let(FinancialContainerIdFactory::accountId)
         val durableDestAccountId = event.destinationAccountRef?.let(FinancialContainerIdFactory::accountId)
@@ -501,6 +513,7 @@ object TransactionAssembler {
                 counterparty = event.counterparty,
                 categoryId = null,
                 linkedParsedEventIds = linkedEventIds.sorted(),
+                occurredAtZone = zone.id,
             ),
             rawSmsIds = rawSmsIds.sorted(),
         )
