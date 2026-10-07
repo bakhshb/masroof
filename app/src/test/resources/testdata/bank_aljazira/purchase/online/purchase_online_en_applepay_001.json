@@ -14,7 +14,8 @@
     "occurredAt": "2026-08-02T12:31:00",
     "parseStatus": "SUCCESS",
     "availableBalance": "17339.02",
-    "outstandingBalance": "1826.12"
+    "outstandingBalance": "1826.12",
+    "cardSmsChannel": "CREDIT"
   },
   "notes": "Irregular spacing preserved. PurchaseChannel stays ONLINE (Apple Pay not a separate channel in accepted decisions)."
 }

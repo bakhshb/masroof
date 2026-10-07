@@ -13,7 +13,8 @@
     "merchant": "Keeta",
     "occurredAt": "2026-08-03T14:32:00",
     "parseStatus": "SUCCESS",
-    "availableBalance": "17230.03"
+    "availableBalance": "17230.03",
+    "cardSmsChannel": "CREDIT"
   },
   "notes": "Canonical card-before-amount / balance-after regression shape."
 }

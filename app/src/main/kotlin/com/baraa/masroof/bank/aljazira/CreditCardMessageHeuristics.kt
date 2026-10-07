@@ -28,11 +28,26 @@ object CreditCardMessageHeuristics {
         "due amount",
     )
 
+    /**
+     * Credit purchases that omit the word «ائتمان» still close with the card's
+     * available balance. A bare "بطاقة" / "card" line is not enough.
+     */
+    private val AVAILABLE_BALANCE_MARKERS = listOf(
+        "الرصيد المتاح",
+        "available balance",
+    )
+
+    private val GENERIC_CARD_LINE = listOf(
+        "بطاقة:",
+        "card:",
+    )
+
     fun isCreditCardSms(body: String): Boolean {
         val text = body.replace('\n', ' ')
         if (containsDebitMarkers(text)) return false
         if (CREDIT_MARKERS.any { text.containsComparison(it, ignoreCase = true) }) return true
         if (DUE_MARKERS.any { text.containsComparison(it, ignoreCase = true) }) return true
+        if (hasAvailableBalance(text) && hasGenericCardLine(text)) return true
         return false
     }
 
@@ -40,6 +55,12 @@ object CreditCardMessageHeuristics {
         val text = body.replace('\n', ' ')
         return containsDebitMarkers(text)
     }
+
+    private fun hasAvailableBalance(text: String): Boolean =
+        AVAILABLE_BALANCE_MARKERS.any { text.containsComparison(it, ignoreCase = true) }
+
+    private fun hasGenericCardLine(text: String): Boolean =
+        GENERIC_CARD_LINE.any { text.containsComparison(it, ignoreCase = true) }
 
     private fun containsDebitMarkers(text: String): Boolean {
         if (text.containsComparison("خصمت من حساب", ignoreCase = true)) return true

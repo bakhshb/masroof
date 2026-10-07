@@ -313,6 +313,13 @@ The conversion policy now lives in `BankTransactionTimePolicy` (phase 4.3):
   referenced account or card. Instrument presence (card/account) is not required:
   existing SUCCESS parses include instrument-less SMS, so requiring it would change output.
 
+### Card SMS channel (phase 5.1)
+
+- `cardSmsChannel` stays a parse-time fact. Dashboard code does not classify Mada vs credit from SMS text.
+- Credit: explicit credit wording, a due-amount line, or an unlabeled `بطاقة` / `card` line plus available balance (`purchase_online_ar_001`).
+- Debit markers still win when both a Mada label and an available balance are present.
+- A card line with neither credit nor debit evidence (`purchase_pos_en_001`) stays null.
+
 ### M3.1 — Capture is separate from processing
 
 - `CaptureBankSmsUseCase` routes, dedupes (5-second cross-source window, plus a
