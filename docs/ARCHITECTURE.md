@@ -211,7 +211,7 @@ evidence and still runs `finish` for events it stored.
 ### New messages
 
 ```text
-IncomingSmsReceiver (assemble multipart, Android I/O only)
+IncomingSmsReceiver (assemble multipart, provider timestamp or device clock)
    ↓
 LiveSmsIntake → CaptureBankSmsUseCase (durable RawSms)
    ↓

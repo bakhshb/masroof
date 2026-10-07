@@ -14,8 +14,9 @@ import kotlinx.coroutines.launch
  * application [com.baraa.masroof.application.sms.LiveSmsIntake] boundary.
  *
  * Multipart PDUs are combined into one RawSms body via [ReceivedSmsAssembler].
- * [com.baraa.masroof.domain.model.RawSms.receivedAt] uses the application
- * [com.baraa.masroof.sms.time.InstantClock] (device receipt), not SMSC timestamps.
+ * [com.baraa.masroof.domain.model.RawSms.receivedAt] uses the PDU service-center
+ * timestamp when Android supplies a valid one ([LiveReceiptTimestamp]); otherwise
+ * the application [com.baraa.masroof.sms.time.InstantClock].
  *
  * Android I/O only: assembles the message, then [goAsync] covers just the short
  * capture of durable RawSms evidence and scheduling of its processing by rawSmsId.
@@ -45,11 +46,15 @@ class IncomingSmsReceiver : BroadcastReceiver() {
                 ReceivedSmsAssembler.Part(
                     sender = msg.displayOriginatingAddress,
                     body = msg.displayMessageBody,
+                    providerTimestampMillis = msg.timestampMillis,
                 )
             },
         ) ?: return
 
-        val receivedAt = app.container.clock.now()
+        val receivedAt = LiveReceiptTimestamp.resolve(
+            providerTimestampsMillis = assembled.providerTimestampsMillis,
+            deviceNow = app.container.clock.now(),
+        )
         val rawSms = try {
             AndroidSmsMapper.toRawSms(
                 ProviderSmsRecord(
