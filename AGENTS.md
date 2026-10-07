@@ -26,6 +26,8 @@
 
 **Parse-status gate:** Only `ParseStatus.SUCCESS`, an explicit automation-confirming correction (message family/amount), or an explicit `USER_FINANCIAL_TYPE` resolution may create/pair/post a `FinancialTransaction` (`TransactionAssembler.isAutomationEligible`). Merchant/counterparty-only edits never lift the gate. Never bypass it in reconciliation passes.
 
+**Informational authority:** Auto-ignore and stale-link cleanup follow the parsed message family (`OTP`, `NON_FINANCIAL`, `BALANCE_NOTICE`) via `InformationalMessagePolicy`. Reconciliation and review dismiss do not re-read SMS wording. `UNKNOWN` stays reviewable.
+
 **Bank routing:** `BankSmsRegistry` evaluates every adapter; `BankRoutingResult.Ambiguous` is persisted and reviewed (`ambiguous_bank_route`), never parsed by a guessed adapter. Never resolve collisions by registration order. The router owns detection: adapter parse pipelines must not re-check the sender.
 
 **SMS text matching:** Match on `NormalizedSms.comparisonBody` with `comparisonRegex(...)` / `containsComparison(...)` (Arabic-folded patterns); never display `comparisonBody` — slice display values with `normalizedSlice(range)`.

@@ -103,8 +103,6 @@ class ReviewViewModel(
                     shouldOfferNonFinancialDismiss(
                         messageFamily = summary.messageFamily,
                         reasons = summary.review.reasons,
-                        body = summary.body.orEmpty(),
-                        amount = summary.amount,
                     )
                 }
                 var dismissed = 0
@@ -383,8 +381,6 @@ class ReviewViewModel(
         val dismissible = shouldOfferNonFinancialDismiss(
             messageFamily = summary.messageFamily,
             reasons = review.reasons,
-            body = summary.body.orEmpty(),
-            amount = summary.amount,
         )
         return ReviewListItemUi(
             id = review.id,
@@ -420,8 +416,6 @@ class ReviewViewModel(
         val dismissNonFinancial = shouldOfferNonFinancialDismiss(
             messageFamily = family,
             reasons = review.reasons,
-            body = detail.body.orEmpty(),
-            amount = detail.amount,
         )
         val dateLabel = detail.receivedAt?.atZone(zoneId)?.toLocalDate()?.let(dateFormatter::format)
             ?: "—"

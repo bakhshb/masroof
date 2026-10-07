@@ -460,6 +460,7 @@ Classification is deterministic evidence resolution, never first-match order
 3. A single family in that tier wins; evidence records `outranked:<rule>` for the other families that matched.
 4. Different families in that tier → `UNKNOWN` (`ambiguous_classification`, `candidate:<rule>`) → review.
 5. An informational top tier (account notice, balance notice, statement) does not erase a strong money-movement candidate at the product or movement tier. Both stay visible as `UNKNOWN` with `candidate:<rule>` and `family:<family>` evidence → review. Security (OTP) is exempt and still wins. A higher financial tier still outranks a lower one, so a refund title that names the purchase it reverses stays `REFUND`. A generic fee line is not strong movement and does not create this collision.
+6. That parsed family is the only text decision reconciliation uses. `InformationalMessagePolicy` auto-ignores `OTP`, `NON_FINANCIAL`, and `BALANCE_NOTICE` and leaves `UNKNOWN` reviewable. It does not read the SMS body, so statement or beneficiary wording cannot hide a purchase, transfer, or unresolved family. Review dismiss uses the same family, or the explicit `non_financial_or_informational_message` reason. Stale-link cleanup removes a posted transaction only when the parsed family is one of those three informational families.
 
 Rule registration order must not change the result. Collision fixtures
 (`testdata/bank_aljazira/**/collision_*.json`) pin the tie-breaks.
