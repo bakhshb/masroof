@@ -141,6 +141,78 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
+    fun purchaseWithStatementWording_isNotAutoIgnored() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        persistEvent(
+            smsId = "sms-buy-statement",
+            body = """
+                شراء عبر نقاط البيع
+                بمبلغ: 89.50 SAR
+                المبلغ المستحق: 1,250.00 SAR
+                تاريخ الاستحقاق: 25/08/2026
+            """.trimIndent(),
+            event = event(
+                id = "pe-buy-statement",
+                rawSmsId = "sms-buy-statement",
+                family = MessageFamily.PURCHASE,
+                amount = money("89.50"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+            ),
+        )
+        val summary = reconciliation.reconcileStoredEvents()
+        assertEquals(1, summary.assembledSingle)
+        assertEquals(0, summary.ignored)
+        assertEquals(FinancialTransactionType.EXPENSE, ftRepo.listAll().single().type)
+    }
+
+    @Test
+    fun unknownWithInformationalWording_staysInReview() = runBlocking {
+        persistEvent(
+            smsId = "sms-unknown-statement",
+            body = """
+                بطاقة إئتمانية: إصدار كشف حساب
+                إجمالي المبلغ المستحق: SAR 0.00
+                تاريخ الاستحقاق: 07/09/2026
+            """.trimIndent(),
+            event = event(
+                id = "pe-unknown-statement",
+                rawSmsId = "sms-unknown-statement",
+                family = MessageFamily.UNKNOWN,
+                amount = money("0.00"),
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+        )
+        val summary = reconciliation.reconcileStoredEvents()
+        assertEquals(0, summary.ignored)
+        assertEquals(0, summary.assembledSingle)
+        assertEquals(1, summary.needsReview)
+        assertTrue(ftRepo.listAll().isEmpty())
+    }
+
+    @Test
+    fun linkedPurchase_isNotRemovedBecauseBodyHasInformationalWording() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        persistEvent(
+            smsId = "sms-linked-buy",
+            body = "شراء\nتاريخ الاستحقاق: 25/08/2026\nالمبلغ المستحق: 10 SAR",
+            event = event(
+                id = "pe-linked-buy",
+                rawSmsId = "sms-linked-buy",
+                family = MessageFamily.PURCHASE,
+                amount = money("40.00"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+        assertEquals(1, ftRepo.listAll().size)
+
+        val summary = reconciliation.reconcileStoredEvents()
+        assertEquals(1, summary.alreadyLinked)
+        assertEquals(0, summary.ignored)
+        assertEquals(1, ftRepo.listAll().size)
+    }
+
+    @Test
     fun purchase_assemblesExpense() = runBlocking {
         persistEvent(
             smsId = "sms-buy",
@@ -937,7 +1009,7 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
-    fun unknownInformationalNotice_isAutoIgnored() = runBlocking {
+    fun unknownBeneficiaryNotice_staysInReview() = runBlocking {
         val body = """
             اسم المستفيد : براء ف بن
             الاسم المختصر : حسابي D360
@@ -958,7 +1030,28 @@ class TransactionReconciliationServiceTest {
         )
         val summary = reconciliation.reconcileStoredEvents()
         assertEquals(0, ftRepo.listAll().size)
-        assertTrue(summary.ignored >= 1)
+        assertEquals(0, summary.ignored)
+        assertEquals(1, summary.needsReview)
+    }
+
+    @Test
+    fun parsedNonFinancialBeneficiary_isIgnoredWithoutReadingBody() = runBlocking {
+        persistEvent(
+            smsId = "sms-beneficiary",
+            body = """
+                اسم المستفيد : براء ف بن
+                حالة: غير نشط
+            """.trimIndent(),
+            event = event(
+                id = "pe-beneficiary",
+                rawSmsId = "sms-beneficiary",
+                family = MessageFamily.NON_FINANCIAL,
+                amount = null,
+            ),
+        )
+        val summary = reconciliation.reconcileStoredEvents()
+        assertEquals(0, ftRepo.listAll().size)
+        assertEquals(1, summary.ignored)
         assertEquals(0, summary.needsReview)
     }
 

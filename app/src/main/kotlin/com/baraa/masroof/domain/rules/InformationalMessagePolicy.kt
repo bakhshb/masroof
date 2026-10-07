@@ -1,124 +1,26 @@
 package com.baraa.masroof.domain.rules
 
-import com.baraa.masroof.domain.rules.OtpMessageHeuristics
-import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
-import java.math.BigDecimal
 
 /**
- * Decides whether an SMS is informational only and should never enter review.
+ * Families the parser has already decided are not financial movement.
+ *
+ * Reconciliation and review use this parsed family only. SMS wording is not
+ * read here: a second text pass could hide a purchase or transfer that the
+ * classifier left as [MessageFamily.UNKNOWN] for review.
  */
 object InformationalMessagePolicy {
-    private val INFORMATIONAL_BODY_MARKERS = listOf(
-        "one time password",
-        "one-time password",
-        "كلمة مرور",
-        "كلمة المرور",
-        "صالحة لمرة واحدة",
-        "رمز التفعيل",
-        "لإضافة المستفيد",
-        "رمز التحقق",
-        "تم تسجيل الدخول",
-        "مكافآتي",
-        "رصيد نقاطك",
-        "برنامج مكاف",
-        "اسم المستفيد",
-        "الاسم المختصر",
-        "حالة: غير نشط",
-        "حالة : غير نشط",
-        "تم إضافة المستفيد",
-        "إضافة مستفيد",
-        "تنبيه أمني",
-        "تنويه",
-        "إصدار كشف حساب",
-        "كشف حساب",
-        "تاريخ الاستحقاق",
-        "المبلغ المستحق",
-    )
+    fun shouldAutoIgnore(event: ParsedEvent): Boolean =
+        shouldAutoIgnore(event.messageFamily)
 
-    private val TRANSACTION_BODY_MARKERS = listOf(
-        "refund",
-        "purchase",
-        "withdrawal",
-        "شراء",
-        "سحب نقدي",
-        "حوالة واردة",
-        "حوالة صادرة",
-        "سداد بطاقة",
-        "سداد فاتورة",
-        "رسوم",
-    )
-
-    private val REFUND_AR_PATTERN = Regex("""[اأإآ]سترداد""")
-
-    fun shouldAutoIgnore(event: ParsedEvent, smsBody: String): Boolean =
-        shouldAutoIgnore(
-            messageFamily = event.messageFamily,
-            parsedAmount = event.amount,
-            smsBody = smsBody,
-        )
-
-    fun shouldAutoIgnore(
-        messageFamily: MessageFamily?,
-        parsedAmount: Money?,
-        smsBody: String,
-    ): Boolean {
+    fun shouldAutoIgnore(messageFamily: MessageFamily?): Boolean =
         when (messageFamily) {
             MessageFamily.OTP,
             MessageFamily.NON_FINANCIAL,
             MessageFamily.BALANCE_NOTICE,
-            -> return true
+            -> true
 
-            MessageFamily.UNKNOWN -> return isInformationalUnknown(parsedAmount, smsBody)
-
-            else -> return false
+            else -> false
         }
-    }
-
-    private fun isInformationalUnknown(parsedAmount: Money?, smsBody: String): Boolean {
-        if (parsedAmount.isSignificantTransactionAmount() && looksLikeTransactionBody(smsBody)) {
-            return false
-        }
-        if (looksLikeInformationalBody(smsBody)) {
-            return true
-        }
-        if (!parsedAmount.isSignificantTransactionAmount()) {
-            return !smsBody.containsNonZeroMoneyWording()
-        }
-        return false
-    }
-
-    private fun looksLikeTransactionBody(smsBody: String): Boolean {
-        val comparison = smsBody.lowercase()
-        return TRANSACTION_BODY_MARKERS.any { marker ->
-            comparison.contains(marker.lowercase())
-        } || REFUND_AR_PATTERN.containsMatchIn(comparison)
-    }
-
-    private fun looksLikeInformationalBody(smsBody: String): Boolean {
-        val comparison = smsBody.lowercase()
-        if (OtpMessageHeuristics.isOtpMessage(comparison)) return true
-        return INFORMATIONAL_BODY_MARKERS.any { smsBody.contains(it, ignoreCase = true) }
-    }
-
-    private fun Money?.isSignificantTransactionAmount(): Boolean =
-        this != null && amount.compareTo(BigDecimal.ZERO) > 0
-
-    /**
-     * Detects money wording with a non-zero numeric value (transaction-like SMS).
-     */
-    private fun String.containsNonZeroMoneyWording(): Boolean {
-        val amountPatterns = listOf(
-            Regex("""(\d[\d,]*(?:\.\d+)?)\s*(?:SAR|ر\.س|ريال)""", RegexOption.IGNORE_CASE),
-            Regex("""(?:SAR|ر\.س|ريال)\s*(\d[\d,]*(?:\.\d+)?)""", RegexOption.IGNORE_CASE),
-            Regex("""(?:بمبلغ|مبلغ|القيمة|القسط)\s*:?\s*(\d[\d,]*(?:\.\d+)?)"""),
-        )
-        return amountPatterns.any { pattern ->
-            pattern.findAll(this).any { match ->
-                val raw = match.groupValues.getOrNull(1)?.replace(",", "") ?: return@any false
-                raw.toBigDecimalOrNull()?.let { it.compareTo(BigDecimal.ZERO) > 0 } == true
-            }
-        }
-    }
 }

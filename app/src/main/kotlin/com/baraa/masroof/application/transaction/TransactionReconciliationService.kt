@@ -182,12 +182,12 @@ class TransactionReconciliationService(
                 }
             }
             if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) {
-                val body = rawSmsRepository.getById(event.rawSmsId)?.body.orEmpty()
                 if (
-                    eventShouldNotProduceTransaction(event, body) &&
+                    eventShouldNotProduceTransaction(event) &&
                     financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
                 ) {
-                    // Stale transaction from a prior misclassification (e.g. OTP matched as purchase).
+                    // Stale transaction from a prior misclassification (e.g. OTP stored as a purchase).
+                    // Family comes from the parsed event; the raw body is not reclassified.
                 } else if (shouldReleaseStaleSelfTransferLink(record)) {
                     financialTransactionRepository.unlinkRawSms(event.rawSmsId)
                 } else {
@@ -222,19 +222,16 @@ class TransactionReconciliationService(
                 MessageFamily.TRANSFER_IN,
                 MessageFamily.TRANSFER_OUT,
                 -> {
-                    val single = finalizeAssemblyOutcome(
+                    val single = TransactionAssembler.assembleSingle(
                         event = event,
-                        outcome = TransactionAssembler.assembleSingle(
-                            event = event,
-                            receivedAt = receivedAt,
-                            sourceOwnership = sourceOwn,
-                            destinationOwnership = destOwn,
-                            cardOwnership = cardOwn,
-                            loanOwnership = loanOwn,
-                            loanType = loanType,
-                            transactionOccurredAt = transactionOccurredAt,
-                            userConfirmed = userConfirmed,
-                        ),
+                        receivedAt = receivedAt,
+                        sourceOwnership = sourceOwn,
+                        destinationOwnership = destOwn,
+                        cardOwnership = cardOwn,
+                        loanOwnership = loanOwn,
+                        loanType = loanType,
+                        transactionOccurredAt = transactionOccurredAt,
+                        userConfirmed = userConfirmed,
                     )
                     when (single) {
                         is TransactionAssembler.Outcome.Assembled -> {
@@ -285,19 +282,16 @@ class TransactionReconciliationService(
 
                 else -> {
                     when (
-                        val outcome = finalizeAssemblyOutcome(
+                        val outcome = TransactionAssembler.assembleSingle(
                             event = event,
-                            outcome = TransactionAssembler.assembleSingle(
-                                event = event,
-                                receivedAt = receivedAt,
-                                sourceOwnership = sourceOwn,
-                                destinationOwnership = destOwn,
-                                cardOwnership = cardOwn,
-                                loanOwnership = loanOwn,
-                                loanType = loanType,
-                                transactionOccurredAt = transactionOccurredAt,
-                                userConfirmed = userConfirmed,
-                            ),
+                            receivedAt = receivedAt,
+                            sourceOwnership = sourceOwn,
+                            destinationOwnership = destOwn,
+                            cardOwnership = cardOwn,
+                            loanOwnership = loanOwn,
+                            loanType = loanType,
+                            transactionOccurredAt = transactionOccurredAt,
+                            userConfirmed = userConfirmed,
                         )
                     ) {
                         is TransactionAssembler.Outcome.Assembled -> {
@@ -820,31 +814,13 @@ class TransactionReconciliationService(
         return linked.occurredAt != expectedAt
     }
 
-    private fun eventShouldNotProduceTransaction(event: ParsedEvent, smsBody: String): Boolean {
-        when (event.messageFamily) {
-            MessageFamily.OTP,
-            MessageFamily.BALANCE_NOTICE,
-            MessageFamily.NON_FINANCIAL,
-            -> return true
-
-            else -> return InformationalMessagePolicy.shouldAutoIgnore(event, smsBody)
-        }
-    }
-
-    private suspend fun finalizeAssemblyOutcome(
-        event: ParsedEvent,
-        outcome: TransactionAssembler.Outcome,
-    ): TransactionAssembler.Outcome {
-        if (outcome !is TransactionAssembler.Outcome.NeedsReview) {
-            return outcome
-        }
-        val body = rawSmsRepository.getById(event.rawSmsId)?.body.orEmpty()
-        return if (InformationalMessagePolicy.shouldAutoIgnore(event, body)) {
-            TransactionAssembler.Outcome.Ignored
-        } else {
-            outcome
-        }
-    }
+    /**
+     * Legacy cleanup only: a transaction linked to a message the parser now
+     * calls informational is removed. Financial and [MessageFamily.UNKNOWN]
+     * families are never dropped because of SMS wording.
+     */
+    private fun eventShouldNotProduceTransaction(event: ParsedEvent): Boolean =
+        InformationalMessagePolicy.shouldAutoIgnore(event)
 
     private suspend fun maybeAutoConfirmLoanOwnership(
         event: ParsedEvent,

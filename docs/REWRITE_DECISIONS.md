@@ -450,6 +450,20 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Standalone statement and beneficiary notices stay `NON_FINANCIAL`.
 - No bank wording moved into reconciliation or presentation.
 
+### M0.2 — Parsed family is the informational authority
+
+- `InformationalMessagePolicy` no longer matches OTP, statement, or beneficiary
+  wording. It auto-ignores only `OTP`, `NON_FINANCIAL`, and `BALANCE_NOTICE`.
+- `UNKNOWN` stays reviewable, including when the body also contains statement or
+  beneficiary text. A `PURCHASE` is not dropped because those words are present.
+- `TransactionReconciliationService` no longer reads `RawSms.body` to turn a
+  `NeedsReview` assembly into `Ignored`. The assembler outcome is used as-is.
+- Stale cleanup still deletes an exclusive link when the parsed family is
+  informational (the OTP-stored-as-purchase case). It does not reclassify from text.
+- Review dismiss offers the non-financial action for that parsed family or for
+  the explicit `non_financial_or_informational_message` reason. The review screen
+  does not scan the SMS body to decide.
+
 ### M1.1 — Incomplete ownership, reconciliation, and review refresh are retried
 
 - `ProcessStoredSmsUseCase` still persists RawSms and ParsedEvent before derived work, and
