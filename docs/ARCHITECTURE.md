@@ -363,6 +363,11 @@ Do not hard-code bank checks throughout the application.
 
 Registration order never decides the bank; `Ambiguous` candidates are sorted by bank id.
 
+Bank AlJazira detection is an exact allowlist after sender normalization
+(`aljazira`, `jazirabank`, `bankaljazira`, `aljazirabank`, and the Arabic labels).
+A promotional `-AD` suffix is stripped only when the remainder is already on that
+list. The message body never identifies the bank by itself.
+
 ---
 
 ## 11. Bank Adapter Boundary

@@ -39,6 +39,7 @@ class BankSmsAdapterContractTest(
                     "AlJazira",
                     "BankAlJazira",
                     "JaziraBank",
+                    "AlJaziraBank",
                     "AlJazira-AD",
                     "بنك الجزيرة",
                 ),

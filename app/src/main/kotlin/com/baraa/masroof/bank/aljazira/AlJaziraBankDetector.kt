@@ -37,6 +37,7 @@ class AlJaziraBankDetector : BankDetector {
             "aljazira",
             "jazirabank",
             "bankaljazira",
+            "aljazirabank",
         )
 
         /** Arabic sender labels (after normalization). */
