@@ -449,7 +449,66 @@ class TransactionReconciliationServiceTest {
         assertEquals(1, ftRepo.listAll().size)
         val tx = ftRepo.listAll().single()
         assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
+        assertEquals(
+            TransactionIdFactory.fromRawSmsIds(listOf("sms-in", "sms-out")),
+            tx.id,
+        )
         assertEquals(setOf("sms-in", "sms-out"), ftRepo.listRawSmsIds(tx.id).toSet())
+    }
+
+    @Test
+    fun identicalSelfTransferOutLegs_staySeparateWithoutAMatcherPair() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        val at = Instant.parse("2026-08-10T09:00:00Z")
+        val amount = money("4445.67")
+        persistEvent(
+            smsId = "sms-out-a",
+            at = at,
+            event = event(
+                id = "pe-out-a",
+                rawSmsId = "sms-out-a",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = amount,
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        persistEvent(
+            smsId = "sms-out-b",
+            at = at,
+            event = event(
+                id = "pe-out-b",
+                rawSmsId = "sms-out-b",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = amount,
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+
+        reconciliation.reconcileStoredEvents()
+
+        val posted = ftRepo.listAll()
+        assertEquals(2, posted.size)
+        assertTrue(posted.all { it.type == FinancialTransactionType.SELF_TRANSFER })
+        assertEquals(amount, posted.first().amount)
+        assertEquals(posted.first().sourceContainerId, posted.last().sourceContainerId)
+        assertEquals(posted.first().destinationContainerId, posted.last().destinationContainerId)
+        assertEquals(posted.first().occurredAt, posted.last().occurredAt)
+        assertEquals(
+            setOf(
+                TransactionIdFactory.fromRawSmsIds(listOf("sms-out-a")),
+                TransactionIdFactory.fromRawSmsIds(listOf("sms-out-b")),
+            ),
+            posted.map { it.id }.toSet(),
+        )
+        val firstId = posted.single { it.linkedParsedEventIds == listOf("pe-out-a") }.id
+        val secondId = posted.single { it.linkedParsedEventIds == listOf("pe-out-b") }.id
+        assertEquals(setOf("sms-out-a"), ftRepo.listRawSmsIds(firstId).toSet())
+        assertEquals(setOf("sms-out-b"), ftRepo.listRawSmsIds(secondId).toSet())
     }
 
     @Test
