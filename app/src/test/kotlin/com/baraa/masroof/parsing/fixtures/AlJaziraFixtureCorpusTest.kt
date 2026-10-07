@@ -115,6 +115,8 @@ class AlJaziraFixtureCorpusTest {
             "collision_otp_online_purchase_en_001" to "OTP",
             "collision_otp_online_purchase_ar_001" to "OTP",
             "collision_statement_amount_ar_001" to "NON_FINANCIAL",
+            "collision_purchase_statement_due_ar_001" to "UNKNOWN",
+            "collision_transfer_beneficiary_notice_ar_001" to "UNKNOWN",
             "collision_refund_pos_purchase_ar_001" to "REFUND",
             "collision_intra_generic_labels_ar_001" to "TRANSFER_OUT",
             "collision_intra_generic_labels_ar_002" to "TRANSFER_OUT",

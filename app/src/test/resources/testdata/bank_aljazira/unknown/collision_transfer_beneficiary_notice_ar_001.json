@@ -1,0 +1,15 @@
+{
+  "id": "collision_transfer_beneficiary_notice_ar_001",
+  "sender": "AlJazira",
+  "body": "حوالة صادرة\nاسم المستفيد: TEST_PERSON\nحالة: غير نشط\nمن حساب: 3001\nمبلغ: SAR 100.00\nفي: 2026-08-03 10:38",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "UNKNOWN",
+    "amount": "100.00",
+    "currency": "SAR",
+    "sourceAccountLast4": "3001",
+    "occurredAt": "2026-08-03T10:38:00",
+    "parseStatus": "REVIEW_REQUIRED"
+  },
+  "notes": "Cross-tier collision: outgoing transfer plus beneficiary/account-status wording. The notice must not hide the transfer."
+}

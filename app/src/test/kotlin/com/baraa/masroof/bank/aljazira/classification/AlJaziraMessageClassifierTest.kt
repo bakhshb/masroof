@@ -62,6 +62,35 @@ class AlJaziraMessageClassifierTest {
     }
 
     @Test
+    fun purchaseWithStatementDueWording_isReviewAndListsBothFamilies() {
+        val result = classify(fixture("collision_purchase_statement_due_ar_001"))
+
+        assertEquals(MessageFamily.UNKNOWN, result.family)
+        assertTrue(result.evidence.contains("candidate:purchase_pos"))
+        assertTrue(result.evidence.contains("candidate:statement_notice"))
+        assertTrue(result.evidence.contains("family:PURCHASE"))
+        assertTrue(result.evidence.contains("family:NON_FINANCIAL"))
+    }
+
+    @Test
+    fun transferWithBeneficiaryNotice_isReviewAndListsBothFamilies() {
+        val result = classify(fixture("collision_transfer_beneficiary_notice_ar_001"))
+
+        assertEquals(MessageFamily.UNKNOWN, result.family)
+        assertTrue(result.evidence.contains("candidate:transfer_out"))
+        assertTrue(result.evidence.contains("candidate:beneficiary_notice"))
+        assertTrue(result.evidence.contains("family:TRANSFER_OUT"))
+        assertTrue(result.evidence.contains("family:NON_FINANCIAL"))
+    }
+
+    @Test
+    fun standaloneStatementAndBeneficiary_stayNonFinancial() {
+        assertEquals(MessageFamily.NON_FINANCIAL, classify(fixture("statement_ar_001")).family)
+        assertEquals(MessageFamily.NON_FINANCIAL, classify(fixture("beneficiary_notice_ar_001")).family)
+        assertEquals(MessageFamily.NON_FINANCIAL, classify(fixture("collision_statement_amount_ar_001")).family)
+    }
+
+    @Test
     fun competingMovementTitles_areAmbiguousAndListCandidates() {
         assertEquals(
             listOf("ambiguous_classification", "candidate:fee", "candidate:transfer_out"),

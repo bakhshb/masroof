@@ -1,0 +1,11 @@
+{
+  "id": "beneficiary_notice_ar_001",
+  "sender": "AlJazira",
+  "body": "اسم المستفيد: TEST_PERSON\nالاسم المختصر: TEST_SHORT\nحالة: غير نشط",
+  "expected": {
+    "bank": "BANK_ALJAZIRA",
+    "messageFamily": "NON_FINANCIAL",
+    "parseStatus": "NON_FINANCIAL"
+  },
+  "notes": "Standalone beneficiary status notice. No money-movement title, so it stays non-financial."
+}
