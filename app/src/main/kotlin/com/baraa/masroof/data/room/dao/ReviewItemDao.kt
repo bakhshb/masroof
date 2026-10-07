@@ -30,6 +30,22 @@ interface ReviewItemDao {
     )
     suspend fun listIgnored(): List<ReviewItemEntity>
 
+    /**
+     * REQUIRED rows whose only reason is [reason], oldest RawSms receipt first.
+     * RESOLVED rows are excluded, including an explicit user resolution.
+     */
+    @Query(
+        """
+        SELECT v.rawSmsId FROM review_item v
+        INNER JOIN raw_sms r ON r.id = v.rawSmsId
+        WHERE v.status = 'REQUIRED'
+          AND v.resolutionKind IS NULL
+          AND v.reasons = :reason
+        ORDER BY r.receivedAtEpochMillis ASC, r.id ASC
+        """,
+    )
+    suspend fun listRawSmsIdsForRequiredReason(reason: String): List<String>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfAbsent(entity: ReviewItemEntity): Long
 

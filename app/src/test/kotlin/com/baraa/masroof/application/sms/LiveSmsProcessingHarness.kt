@@ -174,6 +174,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             captureBankSms = capture,
             scheduler = scheduler,
             rawSmsRepository = rawRepo,
+            reviewRepository = reviewRepo,
             appLogService = appLog,
         )
 

@@ -28,6 +28,9 @@ class RoomReviewRepository(
     override suspend fun listAll(): List<ReviewItem> =
         dao.listAll().map(ReviewItemMapper::toDomain)
 
+    override suspend fun listRetryableProcessingErrorRawSmsIds(): List<String> =
+        dao.listRawSmsIdsForRequiredReason(RETRYABLE_PROCESSING_ERROR_REASON)
+
     override suspend fun upsertRequired(
         rawSmsId: String,
         kind: ReviewKind,
@@ -68,5 +71,10 @@ class RoomReviewRepository(
             updatedAtEpochMillis = resolvedAt.toEpochMilli(),
         )
         return updated?.let(ReviewItemMapper::toDomain)
+    }
+
+    private companion object {
+        /** Persisted ingestion reason code for exhausted processing. */
+        const val RETRYABLE_PROCESSING_ERROR_REASON = "processing_error"
     }
 }

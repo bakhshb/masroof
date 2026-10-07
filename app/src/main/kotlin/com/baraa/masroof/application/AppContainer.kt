@@ -459,6 +459,7 @@ class AppContainer(
             captureBankSms = captureBankSmsUseCase,
             scheduler = WorkManagerLiveSmsWorkScheduler { WorkManager.getInstance(appContext) },
             rawSmsRepository = rawSmsRepository,
+            reviewRepository = reviewRepository,
             appLogService = appLogService,
         )
 
