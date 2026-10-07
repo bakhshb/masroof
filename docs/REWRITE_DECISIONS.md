@@ -83,8 +83,11 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Bank AlJazira scope is checked with the existing P4 detector **before**
   RawSms persistence so unrelated personal SMS are not stored.
 - Historical scan processes inbox DATE ASC (oldest → newest).
-- Live `RawSms.receivedAt` uses injectable device receipt [InstantClock], not SMSC
-  part timestamps.
+- Live `RawSms.receivedAt` uses the PDU service-center timestamp when it is a
+  positive instant (`LiveReceiptTimestamp`). Multipart parts use the earliest
+  valid timestamp. Missing or invalid timestamps fall back to the injectable
+  device [InstantClock]. Inbox rows keep `Telephony.Sms.DATE`, which is that
+  same provider clock.
 - Live↔historical near-duplicates (opposite `deviceMessageId` nullness only) may
   reconcile within a 5s receivedAt tolerance on exact sender+bodyHash; same-source
   rows are never merged by that rule alone.
@@ -541,3 +544,12 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   suffix. Matching stays exact after normalization. There is no substring match and no
   body-only bank claim.
 - Near misses stay rejected: `jazira`, `AlJaziraX`, `AlJaziraBanks`, `NotAlJaziraBank`.
+
+### M3.1 — Live receipt uses the provider timestamp
+
+- `IncomingSmsReceiver` passes each PDU `timestampMillis` into `ReceivedSmsAssembler`.
+- `LiveReceiptTimestamp` keeps the earliest positive instant. That matches the inbox
+  `Telephony.Sms.DATE` clock, so a live copy and a later inbox copy normally share
+  `receivedAt`.
+- `0`, negative values, and values that are not an `Instant` fall back to
+  `InstantClock`. Parser and domain code do not see this choice.

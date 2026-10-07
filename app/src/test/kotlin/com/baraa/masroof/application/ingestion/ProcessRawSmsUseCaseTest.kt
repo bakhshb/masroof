@@ -380,20 +380,41 @@ class ProcessRawSmsUseCaseTest {
     }
 
     @Test
-    fun liveReceivedAt_usesReceiptClockNotSmsc() {
-        val fixed = Instant.parse("2026-08-10T15:30:00Z")
-        val clock = InstantClock { fixed }
-        assertEquals(fixed, clock.now())
-        // IncomingSmsReceiver uses AppContainer.clock; assembler does not touch SMSC time.
+    fun liveReceivedAt_usesProviderTimestampWhenValid() {
+        val deviceNow = Instant.parse("2026-08-10T15:30:00Z")
+        val provider = Instant.parse("2026-08-10T15:29:58Z")
+        val assembled = com.baraa.masroof.sms.receiver.ReceivedSmsAssembler.assemble(
+            listOf(
+                com.baraa.masroof.sms.receiver.ReceivedSmsAssembler.Part(
+                    sender = "AlJazira",
+                    body = "body",
+                    providerTimestampMillis = provider.toEpochMilli(),
+                ),
+            ),
+        )!!
+        val receivedAt = com.baraa.masroof.sms.receiver.LiveReceiptTimestamp.resolve(
+            assembled.providerTimestampsMillis,
+            deviceNow,
+        )
+        val raw = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord(null, assembled.sender, assembled.body, receivedAt),
+        )
+        assertEquals(provider, raw.receivedAt)
+    }
+
+    @Test
+    fun liveReceivedAt_fallsBackToDeviceClockWhenProviderTimestampMissing() {
+        val deviceNow = Instant.parse("2026-08-10T15:30:00Z")
         val assembled = com.baraa.masroof.sms.receiver.ReceivedSmsAssembler.assemble(
             listOf(
                 com.baraa.masroof.sms.receiver.ReceivedSmsAssembler.Part("AlJazira", "body"),
             ),
         )!!
-        val raw = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord(null, assembled.sender, assembled.body, clock.now()),
+        val receivedAt = com.baraa.masroof.sms.receiver.LiveReceiptTimestamp.resolve(
+            assembled.providerTimestampsMillis,
+            deviceNow,
         )
-        assertEquals(fixed, raw.receivedAt)
+        assertEquals(deviceNow, receivedAt)
     }
 
     @Test

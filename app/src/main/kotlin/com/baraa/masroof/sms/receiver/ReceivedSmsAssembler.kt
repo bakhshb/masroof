@@ -9,11 +9,13 @@ object ReceivedSmsAssembler {
     data class Part(
         val sender: String?,
         val body: String?,
+        val providerTimestampMillis: Long? = null,
     )
 
     data class Assembled(
         val sender: String,
         val body: String,
+        val providerTimestampsMillis: List<Long> = emptyList(),
     )
 
     /**
@@ -24,6 +26,11 @@ object ReceivedSmsAssembler {
         val sender = parts.firstOrNull()?.sender?.takeIf { it.isNotBlank() } ?: return null
         val body = parts.joinToString(separator = "") { it.body.orEmpty() }
         if (body.isEmpty()) return null
-        return Assembled(sender = sender, body = body)
+        val timestamps = parts.mapNotNull { it.providerTimestampMillis }
+        return Assembled(
+            sender = sender,
+            body = body,
+            providerTimestampsMillis = timestamps,
+        )
     }
 }

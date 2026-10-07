@@ -34,6 +34,19 @@ class MultipartSmsAssemblyTest {
         )!!
         assertEquals("AlJazira", assembled.sender)
         assertEquals("ab", assembled.body)
+        assertEquals(emptyList<Long>(), assembled.providerTimestampsMillis)
+    }
+
+    @Test
+    fun keepsEveryPartTimestampForReceiptPolicy() {
+        val assembled = ReceivedSmsAssembler.assemble(
+            listOf(
+                ReceivedSmsAssembler.Part("AlJazira", "aa", providerTimestampMillis = 2_000L),
+                ReceivedSmsAssembler.Part("AlJazira", "bb", providerTimestampMillis = 1_000L),
+                ReceivedSmsAssembler.Part("AlJazira", "cc", providerTimestampMillis = null),
+            ),
+        )!!
+        assertEquals(listOf(2_000L, 1_000L), assembled.providerTimestampsMillis)
     }
 
     @Test
