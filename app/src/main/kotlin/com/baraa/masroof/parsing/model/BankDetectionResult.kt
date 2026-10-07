@@ -16,4 +16,13 @@ sealed interface BankDetectionResult {
     data class Unknown(
         val reasons: List<String> = emptyList(),
     ) : BankDetectionResult
+
+    /**
+     * Sender or body looks like this bank, but not enough to parse.
+     * Evidence only — no bank identity and no permission to run the parser.
+     */
+    data class Suspected(
+        val evidence: List<String>,
+        val reasons: List<String> = listOf("suspected_bank_sender"),
+    ) : BankDetectionResult
 }

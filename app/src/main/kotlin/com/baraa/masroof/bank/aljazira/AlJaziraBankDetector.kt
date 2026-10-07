@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira
 
+import com.baraa.masroof.core.text.ArabicTextFolding
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.parsing.detector.BankDetector
@@ -9,9 +10,10 @@ import java.util.Locale
 /**
  * Conservative Bank AlJazira detection via normalized sender match.
  *
- * False negative is preferred over false positive. No substring matching on sender.
- * Common device variants (spacing, hyphens, punctuation, promotional -AD suffix,
- * Arabic sender labels) are normalized before the exact allowlist check.
+ * A positive [BankDetectionResult.Detected] is an exact allowlist hit after
+ * normalization (spacing, hyphens, punctuation, promotional -AD suffix, Arabic
+ * labels). A plausible sender stem or body phrase is [BankDetectionResult.Suspected]
+ * and does not claim the bank.
  */
 class AlJaziraBankDetector : BankDetector {
     override fun detect(sender: String, body: String): BankDetectionResult {
@@ -24,6 +26,12 @@ class AlJaziraBankDetector : BankDetector {
                     reasons = listOf("exact_sender:$normalizedSender"),
                 ),
                 evidence = listOf("sender:$sender"),
+            )
+        }
+        if (isPlausibleSender(sender, normalizedSender) || bodySuggestsAlJazira(body)) {
+            return BankDetectionResult.Suspected(
+                evidence = listOf("sender:$sender"),
+                reasons = listOf("suspected_aljazira_sender"),
             )
         }
         return BankDetectionResult.Unknown(
@@ -67,6 +75,20 @@ class AlJaziraBankDetector : BankDetector {
                 }
             }
             return latin
+        }
+
+        private fun isPlausibleSender(rawSender: String, normalizedSender: String): Boolean {
+            if (normalizedSender.contains("aljazira")) return true
+            val arabic = normalizeArabicSender(rawSender)
+            return arabic.contains("بنكالجزيرة") || arabic.contains("بنكالجزيره")
+        }
+
+        private fun bodySuggestsAlJazira(body: String): Boolean {
+            val comparison = ArabicTextFolding.foldForComparison(body)
+            return comparison.contains("بنك الجزيرة") ||
+                comparison.contains("بنك الجزيره") ||
+                comparison.contains("bank aljazira") ||
+                comparison.contains("aljazira bank")
         }
 
         private fun normalizeArabicSender(sender: String): String =

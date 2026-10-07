@@ -35,5 +35,6 @@ class IngestionReviewService(
         const val REASON_PARSE_REVIEW_REQUIRED = "parse_review_required"
         const val REASON_PROCESSING_ERROR = "processing_error"
         const val REASON_AMBIGUOUS_BANK_ROUTE = BankRoutingResult.REASON_AMBIGUOUS_BANK_ROUTE
+        const val REASON_SUSPECTED_BANK = BankRoutingResult.REASON_SUSPECTED_BANK
     }
 }

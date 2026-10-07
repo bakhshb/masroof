@@ -155,17 +155,34 @@ class ProcessRawSmsUseCaseTest {
 
     @Test
     fun nearMissSender_notPersisted() = runBlocking {
-        listOf("JaziraNews", "NotAlJazira", "OtherBank").forEach { sender ->
-            val body = "شراء عبر الانترنت بمبلغ: 10.00 SAR"
-            val raw = RawSms(
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val svc = reviewingUseCase(AlJaziraParsingPipeline(), reviewRepo)
+        val body = "شراء عبر الانترنت بمبلغ: 10.00 SAR"
+        val plausible = RawSms(
+            id = "android-sms-live:NotAlJazira",
+            sender = "NotAlJazira",
+            body = body,
+            receivedAt = Instant.parse("2026-08-03T08:00:00Z"),
+            deviceMessageId = null,
+            bodyHash = SmsBodyHasher.sha256Hex(body),
+        )
+        val suspected = svc.ingest(plausible)
+        assertTrue(suspected is SmsIngestionResult.ReviewRequired)
+        assertEquals(
+            listOf("suspected_bank_sender"),
+            (suspected as SmsIngestionResult.ReviewRequired).reasons,
+        )
+        assertEquals(plausible, rawRepo.getById(plausible.id))
+        assertNull(parsedRepo.findByRawSmsId(plausible.id))
+        assertDirectReview(reviewRepo, plausible.id, "suspected_bank_sender")
+
+        listOf("JaziraNews", "OtherBank").forEach { sender ->
+            val raw = plausible.copy(
                 id = "android-sms-live:$sender",
                 sender = sender,
-                body = body,
-                receivedAt = Instant.parse("2026-08-03T08:00:00Z"),
-                deviceMessageId = null,
                 bodyHash = SmsBodyHasher.sha256Hex(body),
             )
-            val result = useCase.ingest(raw)
+            val result = svc.ingest(raw)
             assertTrue(result is SmsIngestionResult.NotRelevant)
             assertEquals(
                 "sender_not_recognized_as_bank_aljazira",
@@ -173,8 +190,8 @@ class ProcessRawSmsUseCaseTest {
             )
             assertNull(rawRepo.getById(raw.id))
         }
-        assertEquals(0, db.rawSmsDao().count())
-        assertEquals(0, parseCalls.get())
+        assertEquals(1, db.rawSmsDao().count())
+        assertNull(parsedRepo.findByRawSmsId(plausible.id))
     }
 
     @Test
@@ -904,6 +921,37 @@ class ProcessRawSmsUseCaseTest {
     }
 
     @Test
+    fun suspectedSender_isPersistedAndReviewedWithoutATransaction() = runBlocking {
+        val raw = aljaziraPurchase(id = "android-sms:suspected", deviceId = "suspected")
+            .copy(sender = "AlJaziraX")
+        val result = useCase.ingest(raw)
+
+        assertTrue(result is SmsIngestionResult.ReviewRequired)
+        val review = result as SmsIngestionResult.ReviewRequired
+        assertNull(review.event)
+        assertEquals(listOf("suspected_bank_sender"), review.reasons)
+        assertEquals(raw.body, rawRepo.getById(raw.id)?.body)
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+        assertEquals(0, parseCalls.get())
+        assertEquals(0, db.financialTransactionDao().count())
+
+        val again = useCase.reparseStored(rawRepo.getById(raw.id)!!)
+        assertTrue(again is SmsIngestionResult.ReviewRequired)
+        assertEquals(0, parseCalls.get())
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+    }
+
+    @Test
+    fun ordinarySms_isNotPersisted() = runBlocking {
+        val raw = aljaziraPurchase(id = "android-sms:mom", deviceId = "mom")
+            .copy(sender = "Mom", body = "See you at 6", bodyHash = com.baraa.masroof.sms.hash.SmsBodyHasher.sha256Hex("See you at 6"))
+        val result = useCase.ingest(raw)
+        assertTrue(result is SmsIngestionResult.NotRelevant)
+        assertEquals(0, db.rawSmsDao().count())
+        assertEquals(0, parseCalls.get())
+    }
+
+    @Test
     fun ambiguousRoute_reparseStoredWithoutParsedEvent_staysReviewed() = runBlocking {
         val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
         val alJaziraParses = AtomicInteger(0)
@@ -955,13 +1003,28 @@ class ProcessRawSmsUseCaseTest {
 
     @Test
     fun reparseStored_routeIsAuthoritative_parserDoesNotRedetectSender() = runBlocking {
+        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
+        val svc = reviewingUseCase(AlJaziraParsingPipeline(), reviewRepo)
+        val purchase = aljaziraPurchase(id = "android-sms:legacy-sender", deviceId = "legacy-sender")
+        val raw = purchase.copy(sender = "LegacyAlJaziraLabel")
+        rawRepo.insertIfAbsent(raw)
+
+        val result = svc.reparseStored(raw)
+
+        assertTrue("got $result", result is SmsIngestionResult.ReviewRequired)
+        assertNull(parsedRepo.findByRawSmsId(raw.id))
+        assertDirectReview(reviewRepo, raw.id, "suspected_bank_sender")
+    }
+
+    @Test
+    fun reparseStored_notMatchedLegacySender_usesSoleAdapter() = runBlocking {
         val svc = ProcessRawSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = alJaziraSmsRegistry(),
         )
-        val purchase = aljaziraPurchase(id = "android-sms:legacy-sender", deviceId = "legacy-sender")
-        val raw = purchase.copy(sender = "LegacyAlJaziraLabel")
+        val purchase = aljaziraPurchase(id = "android-sms:legacy-unmatched", deviceId = "legacy-unmatched")
+        val raw = purchase.copy(sender = "LegacyInboxLabel")
         rawRepo.insertIfAbsent(raw)
 
         val result = svc.reparseStored(raw)

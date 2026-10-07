@@ -116,6 +116,8 @@ object BankSmsAdapterContract {
                 assertEquals("positive sender '$sender' must report adapter bank", adapter.bank, detection.bank)
             is BankDetectionResult.Unknown ->
                 fail("${adapter.bank.id} must claim positive sender '$sender': ${detection.reasons}")
+            is BankDetectionResult.Suspected ->
+                fail("${adapter.bank.id} must claim positive sender '$sender', not merely suspect it")
         }
     }
 
@@ -125,6 +127,8 @@ object BankSmsAdapterContract {
                 fail("${adapter.bank.id} must not claim known-negative sender '$sender'")
             is BankDetectionResult.Unknown ->
                 assertTrue("Unknown detection must explain why", detection.reasons.isNotEmpty())
+            is BankDetectionResult.Suspected ->
+                assertTrue("Suspicion must carry evidence and must not name an adapter", detection.evidence.isNotEmpty())
         }
     }
 

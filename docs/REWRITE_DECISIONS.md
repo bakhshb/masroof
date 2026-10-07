@@ -544,9 +544,11 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 
 - `AlJaziraBankDetector` allowlist adds the normalized form `aljazirabank`, covering
   `AlJaziraBank`, spaced/hyphenated `Al Jazira Bank`, and the promotional `AlJaziraBank-AD`
-  suffix. Matching stays exact after normalization. There is no substring match and no
-  body-only bank claim.
-- Near misses stay rejected: `jazira`, `AlJaziraX`, `AlJaziraBanks`, `NotAlJaziraBank`.
+  suffix. A positive detection stays an exact allowlist hit after normalization.
+  A substring or body phrase never claims the bank.
+- A bare `jazira` stays unrecognized. Senders that contain the `aljazira` stem
+  without an exact allowlist hit are Suspected (M2.2), including `AlJaziraX`,
+  `AlJaziraBanks`, and `NotAlJaziraBank`.
 
 ### M3.1 — Live receipt uses the provider timestamp
 
@@ -584,3 +586,18 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Healing is no longer limited to `INTRA_BANK` rows. Two eligible counterparts
   stay unmerged. The previous external transaction is replaced rather than
   copied, and both raw SMS ids stay on the self-transfer.
+
+### M2.2 — Suspected bank senders are quarantined
+
+- A detector may return `BankDetectionResult.Suspected` from a conservative sender
+  stem or body phrase. That is evidence only. It is not a bank claim and it does
+  not select an adapter.
+- `BankSmsRegistry` returns `SuspectedBank` when nothing matched and at least one
+  adapter suspected the SMS. A real match still wins. Two matches stay
+  `Ambiguous`. Registration order never picks a parser.
+- Capture persists the RawSms. Processing writes a `suspected_bank_sender` review
+  and does not parse, so no `FinancialTransaction` is created. Ordinary
+  unrecognized SMS stays `NotMatched` and is not stored.
+- Reprocessing a suspected row routes again. A `Matched` route parses with that
+  adapter. A still-suspected route stays in review and is not parsed by the
+  sole-adapter shortcut.

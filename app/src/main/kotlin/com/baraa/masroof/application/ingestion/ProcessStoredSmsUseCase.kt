@@ -75,6 +75,7 @@ class ProcessStoredSmsUseCase(
     ): SmsIngestionResult = when (route) {
         is BankRoutingResult.Matched -> parseAndPersist(rawSms, route.adapter, logOutcome, deriveImmediately)
         is BankRoutingResult.Ambiguous -> holdAmbiguousRoute(rawSms, route, logOutcome)
+        is BankRoutingResult.SuspectedBank -> holdSuspectedRoute(rawSms, route, logOutcome)
         is BankRoutingResult.NotMatched -> SmsIngestionResult.NotRelevant(reason = route.reason)
     }
 
@@ -108,11 +109,11 @@ class ProcessStoredSmsUseCase(
         processStoredEvidence(rawSms, logOutcome = false, deriveImmediately = false)
 
     /**
-     * Does not re-apply ingest-time sender detection. Stored SMS is already accepted
-     * evidence; detector allowlist changes must not skip backlog refresh.
-     *
-     * Adapter selection: existing ParsedEvent bank, else the sole registered adapter,
-     * else routing only when bank identity cannot be determined.
+     * Stored ParsedEvent bank is reused. Otherwise the SMS is routed again.
+     * [BankRoutingResult.SuspectedBank] and [BankRoutingResult.Ambiguous] are reviewed
+     * and never parsed. A sole adapter is used only for [BankRoutingResult.NotMatched],
+     * so previously accepted bank evidence can still refresh if its sender is no longer
+     * recognized, without letting that shortcut parse a suspected sender.
      */
     private suspend fun processStoredEvidence(
         rawSms: RawSms,
@@ -120,16 +121,26 @@ class ProcessStoredSmsUseCase(
         deriveImmediately: Boolean = true,
     ): SmsIngestionResult {
         val storedBank = parsedEventRepository.findByRawSmsId(rawSms.id)?.event?.bank
-        val adapter = storedBank?.let(bankSmsRegistry::adapterFor)
-            ?: bankSmsRegistry.singleAdapterOrNull()
-            ?: when (val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)) {
-                is BankRoutingResult.Matched -> route.adapter
-                is BankRoutingResult.NotMatched ->
-                    return SmsIngestionResult.NotRelevant(reason = route.reason)
-                is BankRoutingResult.Ambiguous ->
-                    return holdAmbiguousRoute(rawSms, route, logOutcome)
+        val storedAdapter = storedBank?.let(bankSmsRegistry::adapterFor)
+        if (storedAdapter != null) {
+            return parseAndPersist(rawSms, storedAdapter, logOutcome, deriveImmediately)
+        }
+        return when (val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)) {
+            is BankRoutingResult.Matched ->
+                parseAndPersist(rawSms, route.adapter, logOutcome, deriveImmediately)
+            is BankRoutingResult.Ambiguous ->
+                holdAmbiguousRoute(rawSms, route, logOutcome)
+            is BankRoutingResult.SuspectedBank ->
+                holdSuspectedRoute(rawSms, route, logOutcome)
+            is BankRoutingResult.NotMatched -> {
+                val sole = bankSmsRegistry.singleAdapterOrNull()
+                if (sole != null) {
+                    parseAndPersist(rawSms, sole, logOutcome, deriveImmediately)
+                } else {
+                    SmsIngestionResult.NotRelevant(reason = route.reason)
+                }
             }
-        return parseAndPersist(rawSms, adapter, logOutcome, deriveImmediately = deriveImmediately)
+        }
     }
 
     /** Ambiguous bank-like evidence is kept and reviewed, never parsed by a guessed adapter. */
@@ -146,6 +157,27 @@ class ProcessStoredSmsUseCase(
             )
         }
         recordIngestionReview(rawSms.id, IngestionReviewService.REASON_AMBIGUOUS_BANK_ROUTE)
+        return SmsIngestionResult.ReviewRequired(
+            rawSmsId = rawSms.id,
+            event = null,
+            details = ParsedEventDetails(),
+            reasons = listOf(route.reason),
+        )
+    }
+
+    /** Suspected senders are kept for review. No adapter is allowed to parse them. */
+    private suspend fun holdSuspectedRoute(
+        rawSms: RawSms,
+        route: BankRoutingResult.SuspectedBank,
+        logOutcome: Boolean,
+    ): SmsIngestionResult {
+        if (logOutcome) {
+            appLogService?.warn(
+                AppLogCategories.INGEST,
+                "Suspected bank sender from ${AppLogFormatting.maskSender(rawSms.sender)}; held for review",
+            )
+        }
+        recordIngestionReview(rawSms.id, IngestionReviewService.REASON_SUSPECTED_BANK)
         return SmsIngestionResult.ReviewRequired(
             rawSmsId = rawSms.id,
             event = null,

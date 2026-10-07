@@ -359,7 +359,8 @@ Do not hard-code bank checks throughout the application.
 |---|---|---|
 | `Matched` | exactly one adapter detected the SMS | persist RawSms, parse with that adapter |
 | `Ambiguous` | more than one adapter detected it | persist RawSms, direct `ambiguous_bank_route` review, parse with **neither** |
-| `NotMatched` | no adapter detected it | not persisted |
+| `SuspectedBank` | no adapter detected it, but at least one reported a conservative suspicion | persist RawSms, direct `suspected_bank_sender` review, parse with **none** |
+| `NotMatched` | no adapter detected or suspected it | not persisted |
 
 Registration order never decides the bank; `Ambiguous` candidates are sorted by bank id.
 
