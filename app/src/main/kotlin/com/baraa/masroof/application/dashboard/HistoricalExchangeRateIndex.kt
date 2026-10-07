@@ -8,6 +8,9 @@ import java.time.Instant
 
 /**
  * Merchant + currency → exchange-rate evidence from persisted parse-time facts.
+ *
+ * The merchant key is [MerchantNameNormalizer.key] only. A similar name is not evidence:
+ * `STC` does not borrow a rate stored for `STC PAY`.
  */
 class HistoricalExchangeRateIndex private constructor(
     private val ratesByMerchant: Map<String, Map<Currency, BigDecimal>>,
@@ -15,12 +18,7 @@ class HistoricalExchangeRateIndex private constructor(
     fun rateForMerchant(merchant: String?, currency: Currency): BigDecimal? {
         if (!currency.convertsToSar()) return null
         val normalized = merchant?.let(MerchantNameNormalizer::key)?.takeIf { it.isNotBlank() } ?: return null
-        val byCurrency = ratesByMerchant[normalized]
-            ?: ratesByMerchant.entries.firstOrNull { (key, _) ->
-                normalized.contains(key) || key.contains(normalized)
-            }?.value
-            ?: return null
-        return byCurrency[currency]
+        return ratesByMerchant[normalized]?.get(currency)
     }
 
     companion object {

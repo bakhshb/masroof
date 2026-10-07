@@ -180,6 +180,119 @@ class TransactionSarEquivalentResolverTest {
         assertEquals(ExchangeRateSource.MARKET, resolution.source)
     }
 
+    @Test
+    fun similarMerchant_doesNotHideTheMarketRate() = runBlocking {
+        val stcPay = parsedEvent(
+            id = "pe-pay",
+            rawSmsId = "sms-pay",
+            family = MessageFamily.PURCHASE,
+            merchant = "STC PAY",
+            amount = Money.of("10.00", Currency.USD),
+        )
+        val stc = FinancialTransaction(
+            id = "tx-stc",
+            type = FinancialTransactionType.EXPENSE,
+            amount = Money.of("8.00", Currency.USD),
+            occurredAt = Instant.parse("2026-08-17T15:23:00Z"),
+            sourceContainerId = null,
+            destinationContainerId = null,
+            merchant = "STC",
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = listOf("pe-stc"),
+        )
+        val stcEvent = parsedEvent(
+            id = "pe-stc",
+            rawSmsId = "sms-stc",
+            family = MessageFamily.PURCHASE,
+            merchant = "STC",
+            amount = Money.of("8.00", Currency.USD),
+        )
+        val resolver = TransactionSarEquivalentResolver(
+            marketRateProvider = ForeignSarMarketRateProvider { currency, _ ->
+                if (currency == Currency.USD) BigDecimal("3.75") else null
+            },
+        )
+        val resolution = resolver.resolve(
+            transactions = listOf(stc),
+            parsedRecords = listOf(
+                ParsedEventRecord(
+                    stcPay,
+                    com.baraa.masroof.parsing.model.ParsedEventDetails(
+                        exchangeRate = BigDecimal("3.80"),
+                    ),
+                ),
+                ParsedEventRecord(stcEvent, com.baraa.masroof.parsing.model.ParsedEventDetails()),
+            ),
+            rawSmsById = mapOf(
+                "sms-pay" to raw("sms-pay", "body"),
+                "sms-stc" to raw("sms-stc", "body"),
+            ),
+        )["tx-stc"]
+
+        assertNotNull(resolution)
+        assertEquals(BigDecimal("3.75"), resolution!!.exchangeRate)
+        assertEquals(ExchangeRateSource.MARKET, resolution.source)
+    }
+
+    @Test
+    fun linkedSmsRate_winsBeforeHistoricalMerchantEvidence() = runBlocking {
+        val linked = parsedEvent(
+            id = "pe-stc",
+            rawSmsId = "sms-stc",
+            family = MessageFamily.PURCHASE,
+            merchant = "STC",
+            amount = Money.of("8.00", Currency.USD),
+        )
+        val historical = parsedEvent(
+            id = "pe-stc-old",
+            rawSmsId = "sms-old",
+            family = MessageFamily.PURCHASE,
+            merchant = "STC",
+            amount = Money.of("10.00", Currency.USD),
+        )
+        val transaction = FinancialTransaction(
+            id = "tx-stc",
+            type = FinancialTransactionType.EXPENSE,
+            amount = Money.of("8.00", Currency.USD),
+            occurredAt = Instant.parse("2026-08-17T15:23:00Z"),
+            sourceContainerId = null,
+            destinationContainerId = null,
+            merchant = "STC",
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = listOf("pe-stc"),
+        )
+        val resolver = TransactionSarEquivalentResolver(
+            marketRateProvider = ForeignSarMarketRateProvider { _, _ -> BigDecimal("9.99") },
+        )
+        val resolution = resolver.resolve(
+            transactions = listOf(transaction),
+            parsedRecords = listOf(
+                ParsedEventRecord(
+                    linked,
+                    com.baraa.masroof.parsing.model.ParsedEventDetails(
+                        exchangeRate = BigDecimal("3.70"),
+                    ),
+                ),
+                ParsedEventRecord(
+                    historical,
+                    com.baraa.masroof.parsing.model.ParsedEventDetails(
+                        exchangeRate = BigDecimal("3.10"),
+                    ),
+                ),
+            ),
+            rawSmsById = mapOf(
+                "sms-stc" to raw("sms-stc", "body"),
+                "sms-old" to raw("sms-old", "body"),
+            ),
+        )["tx-stc"]
+
+        assertNotNull(resolution)
+        assertEquals(BigDecimal("3.70"), resolution!!.exchangeRate)
+        assertEquals(ExchangeRateSource.SMS, resolution.source)
+    }
+
     private fun parsedEvent(
         id: String,
         rawSmsId: String,
