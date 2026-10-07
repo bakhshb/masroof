@@ -10,7 +10,9 @@ import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.RestoreResult
 import com.baraa.masroof.application.transaction.TransactionRestoreService
 import com.baraa.masroof.application.review.ReviewOwnershipWorkflow
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
+import com.baraa.masroof.domain.model.ExplicitBankSelection
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ReviewKind
@@ -35,6 +37,8 @@ class ReviewViewModel(
     private val transactionRestoreService: TransactionRestoreService,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredSms: suspend (String) -> Unit,
+    private val selectableBanks: List<Bank> = emptyList(),
+    private val selectBankAndReparse: suspend (rawSmsId: String, bankId: String) -> Unit = { _, _ -> },
     private val appLocaleRepository: AppLocaleRepository,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     maintenanceCompletions: Flow<Unit> = emptyFlow(),
@@ -183,6 +187,42 @@ class ReviewViewModel(
 
     fun resolveAsIgnored() {
         resolveAsNonFinancial()
+    }
+
+    fun selectBank(bankId: String) {
+        val reviewId = _uiState.value.selectedDetail?.id ?: return
+        val rawSmsId = _uiState.value.selectedDetail?.rawSmsId ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
+            try {
+                selectBankAndReparse(rawSmsId, bankId)
+                val detail = detailLoader.loadDetail(reviewId)
+                if (detail == null || detail.review.status == ReviewStatus.RESOLVED) {
+                    refreshAfterAction(message = ReviewMessage.RESOLVED, closeDetail = true)
+                    return@launch
+                }
+                val pairCandidates = if (detail.review.kind == ReviewKind.PENDING_MATCH) {
+                    detailLoader.loadPairCandidates(reviewId).map(::toListItem)
+                } else {
+                    emptyList()
+                }
+                val stillChoosing = ExplicitBankSelection.offersBankChoice(detail.review.reasons)
+                _uiState.update {
+                    it.copy(
+                        loading = false,
+                        resolving = false,
+                        selectedDetail = toDetailUi(detail, pairCandidates),
+                        message = if (stillChoosing) ReviewMessage.STILL_NEEDS_REVIEW else null,
+                        error = null,
+                    )
+                }
+                applySummaries(detailLoader.loadSummaries())
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(resolving = false, error = ReviewError.ACTION_FAILED) }
+            }
+        }
     }
 
     fun resolveAsNonFinancial() {
@@ -457,7 +497,22 @@ class ReviewViewModel(
             showRestoreActions = ignored,
             readOnly = false,
             resolvedAtLabel = resolvedAtLabel,
+            bankChoices = bankChoicesFor(review, ignored),
         )
+    }
+
+    private fun bankChoicesFor(
+        review: com.baraa.masroof.domain.model.ReviewItem,
+        ignored: Boolean,
+    ): List<ReviewBankChoiceUi> {
+        if (ignored || review.kind != ReviewKind.NEEDS_REVIEW) return emptyList()
+        if (!ExplicitBankSelection.offersBankChoice(review.reasons)) return emptyList()
+        return selectableBanks.map { bank ->
+            ReviewBankChoiceUi(
+                bankId = bank.id,
+                labelRes = if (bank == Bank.BANK_ALJAZIRA) com.baraa.masroof.R.string.bank_aljazira else null,
+            )
+        }
     }
 
     private companion object {

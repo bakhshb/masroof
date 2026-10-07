@@ -367,7 +367,10 @@ Registration order never decides the bank; `Ambiguous` candidates are sorted by 
 Bank AlJazira detection is an exact allowlist after sender normalization
 (`aljazira`, `jazirabank`, `bankaljazira`, `aljazirabank`, and the Arabic labels).
 A promotional `-AD` suffix is stripped only when the remainder is already on that
-list. The message body never identifies the bank by itself.
+list. A sender stem or body phrase can only raise `Suspected`; it never identifies
+the bank by itself.
+
+A REQUIRED review that still carries `ambiguous_bank_route` or `suspected_bank_sender` may record `user_selected_bank:<bankId>` for that RawSms only. Stored reprocessing then parses with that registered adapter and does not change detector rules. Queue refresh keeps the prefix when it replaces the other reasons. A different RawSms is not reclassified.
 
 ---
 

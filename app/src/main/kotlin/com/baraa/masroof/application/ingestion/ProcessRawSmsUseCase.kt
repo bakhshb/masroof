@@ -8,6 +8,7 @@ import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.repository.RawSmsRepository
+import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 
 /**
@@ -30,6 +31,7 @@ class ProcessRawSmsUseCase(
         reviewQueueUpdater: ReviewQueueUpdater? = null,
         ingestionReviewService: IngestionReviewService? = null,
         appLogService: AppLogService? = null,
+        reviewRepository: ReviewRepository? = null,
     ) : this(
         capture = CaptureBankSmsUseCase(rawSmsRepository, bankSmsRegistry, appLogService),
         processStored = ProcessStoredSmsUseCase(
@@ -41,6 +43,7 @@ class ProcessRawSmsUseCase(
             reviewQueueUpdater = reviewQueueUpdater,
             ingestionReviewService = ingestionReviewService,
             appLogService = appLogService,
+            reviewRepository = reviewRepository,
         ),
     )
 

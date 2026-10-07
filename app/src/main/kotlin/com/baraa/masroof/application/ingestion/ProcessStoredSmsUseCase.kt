@@ -11,11 +11,14 @@ import com.baraa.masroof.application.transaction.TransactionReconciliationServic
 import com.baraa.masroof.bank.BankRoutingResult
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.bank.BankSmsRegistry
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.ExplicitBankSelection
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.repository.RawSmsRepository
+import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.SmsParseInput
@@ -47,6 +50,7 @@ class ProcessStoredSmsUseCase(
     private val appLogService: AppLogService? = null,
     private val exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
     private val processingRecovery: ProcessingRecovery? = null,
+    private val reviewRepository: ReviewRepository? = null,
 ) {
     /** Processes evidence captured in this same attempt, reusing the capture's [route]. */
     suspend fun process(
@@ -109,17 +113,23 @@ class ProcessStoredSmsUseCase(
         processStoredEvidence(rawSms, logOutcome = false, deriveImmediately = false)
 
     /**
-     * Stored ParsedEvent bank is reused. Otherwise the SMS is routed again.
-     * [BankRoutingResult.SuspectedBank] and [BankRoutingResult.Ambiguous] are reviewed
-     * and never parsed. A sole adapter is used only for [BankRoutingResult.NotMatched],
-     * so previously accepted bank evidence can still refresh if its sender is no longer
-     * recognized, without letting that shortcut parse a suspected sender.
+     * Adapter selection for stored evidence:
+     * explicit user bank selection, then an existing ParsedEvent bank, then a fresh
+     * route. [BankRoutingResult.Matched] parses. [BankRoutingResult.Ambiguous] and
+     * [BankRoutingResult.SuspectedBank] stay in review and are never parsed.
+     * Only [BankRoutingResult.NotMatched] may use the sole-adapter fallback, so a
+     * previously accepted backlog row can refresh without parsing a suspected sender.
+     * The explicit choice applies to this RawSms only.
      */
     private suspend fun processStoredEvidence(
         rawSms: RawSms,
         logOutcome: Boolean,
         deriveImmediately: Boolean = true,
     ): SmsIngestionResult {
+        val selected = explicitSelectionAdapter(rawSms)
+        if (selected != null) {
+            return parseAndPersist(rawSms, selected, logOutcome, deriveImmediately = deriveImmediately)
+        }
         val storedBank = parsedEventRepository.findByRawSmsId(rawSms.id)?.event?.bank
         val storedAdapter = storedBank?.let(bankSmsRegistry::adapterFor)
         if (storedAdapter != null) {
@@ -141,6 +151,18 @@ class ProcessStoredSmsUseCase(
                 }
             }
         }
+    }
+
+    /**
+     * The review choice names one registered adapter. A missing review, a blank
+     * or unknown bank id, or two stored selections falls through to the usual
+     * adapter selection instead of guessing.
+     */
+    private suspend fun explicitSelectionAdapter(rawSms: RawSms): BankSmsAdapter? {
+        val reviews = reviewRepository ?: return null
+        val reasons = reviews.findByRawSmsId(rawSms.id)?.reasons ?: return null
+        val bankId = ExplicitBankSelection.selectedBankId(reasons) ?: return null
+        return bankSmsRegistry.adapterFor(Bank.fromId(bankId))
     }
 
     /** Ambiguous bank-like evidence is kept and reviewed, never parsed by a guessed adapter. */

@@ -45,4 +45,8 @@ class BankSmsRegistry(
 
     fun singleAdapterOrNull(): BankSmsAdapter? =
         adapters.singleOrNull()
+
+    /** Registered banks, sorted by id. Registration order is not an identity. */
+    fun banks(): List<Bank> =
+        adapters.map { it.bank }.distinct().sortedBy { it.id }
 }

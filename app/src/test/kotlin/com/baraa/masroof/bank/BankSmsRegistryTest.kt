@@ -192,6 +192,10 @@ class BankSmsRegistryTest {
         assertEquals(only, BankSmsRegistry(listOf(only)).singleAdapterOrNull())
         assertNull(BankSmsRegistry(emptyList()).singleAdapterOrNull())
         assertNull(BankSmsRegistry(listOf(only, other)).singleAdapterOrNull())
+        assertEquals(
+            listOf(Bank.BANK_ALJAZIRA, Bank("OTHER")),
+            BankSmsRegistry(listOf(other, only)).banks(),
+        )
     }
 
     private class FakeBankSmsAdapter(
