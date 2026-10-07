@@ -566,3 +566,12 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   at materially different times, including a 90-minute gap, stay separate even when
   no other copy exists. Two stored copies inside the window stay separate too.
   Same-source rows are never merged by body hash.
+
+### M4.1 — Mixed transfer timestamps can match
+
+- When both legs have `occurredAtLocal`, the matcher still compares those local
+  times inside 10 minutes. When neither does, it still compares `receivedAt`.
+- When exactly one leg has a local time, it compares caller-supplied
+  `effectiveOccurredAt` instants inside the same 10-minute window. Missing
+  effective instants stay unmatched. The matcher does not read a clock or zone.
+- Amounts stay exact. Reconciliation passes `TransactionTiming.effectiveOccurredAt`.

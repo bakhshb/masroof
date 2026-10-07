@@ -21,6 +21,12 @@ data class TransferMatchCandidate(
     val receivedAt: Instant,
     val sourceOwnership: OwnershipStatus,
     val destinationOwnership: OwnershipStatus,
+    /**
+     * Caller-supplied instant for this leg: local wall time in the bank zone when
+     * present, otherwise [receivedAt]. The matcher does not read a clock or zone.
+     * Used only when exactly one leg has [occurredAtLocal].
+     */
+    val effectiveOccurredAt: Instant? = null,
 ) {
     val amount: Money? get() = event.amount
 }
@@ -117,12 +123,18 @@ object TransactionMatcher {
             val seconds = kotlin.math.abs(java.time.Duration.between(aLocal, bLocal).seconds)
             return seconds <= TRANSFER_MATCH_WINDOW.seconds
         }
-        // Do not mix LocalDateTime with receivedAt.
-        if (aLocal != null || bLocal != null) return false
-        val delta = kotlin.math.abs(
-            java.time.Duration.between(a.receivedAt, b.receivedAt).seconds,
+        if (aLocal == null && bLocal == null) {
+            val delta = kotlin.math.abs(
+                java.time.Duration.between(a.receivedAt, b.receivedAt).seconds,
+            )
+            return delta <= TRANSFER_MATCH_WINDOW.seconds
+        }
+        val aEffective = a.effectiveOccurredAt ?: return false
+        val bEffective = b.effectiveOccurredAt ?: return false
+        val mixedDelta = kotlin.math.abs(
+            java.time.Duration.between(aEffective, bEffective).seconds,
         )
-        return delta <= TRANSFER_MATCH_WINDOW.seconds
+        return mixedDelta <= TRANSFER_MATCH_WINDOW.seconds
     }
 
     private fun hasStrongBridge(

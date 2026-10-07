@@ -46,9 +46,38 @@ class TransactionMatcherTest {
     }
 
     @Test
-    fun doesNotMatchWhenOneCandidateUsesReceivedTimeAndOtherUsesLocalTime() {
+    fun doesNotMatchMixedTimestampsWithoutEffectiveInstant() {
         val outgoing = outgoing(reference = "ref-1", localTime = defaultLocalTime)
         val incoming = incoming(reference = "ref-1", localTime = null)
+
+        assertFalse(TransactionMatcher.compatiblePair(outgoing, incoming))
+    }
+
+    @Test
+    fun matchesMixedTimestampsWhenEffectiveInstantsAreInsideWindow() {
+        val local = defaultLocalTime
+        val zone = java.time.ZoneId.of("Asia/Riyadh")
+        val outgoing = outgoing(reference = "ref-1", localTime = local).copy(
+            effectiveOccurredAt = local.atZone(zone).toInstant(),
+        )
+        val incoming = incoming(reference = "ref-1", localTime = null).copy(
+            receivedAt = local.atZone(zone).toInstant().plusSeconds(120),
+            effectiveOccurredAt = local.atZone(zone).toInstant().plusSeconds(120),
+        )
+
+        assertTrue(TransactionMatcher.compatiblePair(outgoing, incoming))
+    }
+
+    @Test
+    fun rejectsMixedTimestampsWhenEffectiveInstantsExceedWindow() {
+        val local = defaultLocalTime
+        val zone = java.time.ZoneId.of("Asia/Riyadh")
+        val outgoing = outgoing(reference = "ref-1", localTime = local).copy(
+            effectiveOccurredAt = local.atZone(zone).toInstant(),
+        )
+        val incoming = incoming(reference = "ref-1", localTime = null).copy(
+            effectiveOccurredAt = local.atZone(zone).toInstant().plus(java.time.Duration.ofMinutes(11)),
+        )
 
         assertFalse(TransactionMatcher.compatiblePair(outgoing, incoming))
     }
