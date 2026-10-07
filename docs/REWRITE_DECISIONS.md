@@ -644,3 +644,18 @@ The conversion policy now lives in `BankTransactionTimePolicy` (phase 4.3):
 - Reprocessing a suspected row routes again. A `Matched` route parses with that
   adapter. A still-suspected route stays in review and is not parsed by the
   sole-adapter shortcut.
+
+### Post-audit — manual time, stale zones, and restore safety
+
+- `resolveTransferAsExternal` and `resolveAsFinancialType` use
+  `TransactionTiming.effectiveOccurredAt` and store `occurredAtZone`. They do not
+  fall back to SMS receipt time while `occurredAtLocal` is present.
+- Stale-transfer match candidates pass the transaction's persisted
+  `occurredAtZone` into that same conversion. A later device-zone change does not
+  recompute a stored leg.
+- Unsupported, Invalid, and no-event ReviewRequired stay retryable when the review
+  row cannot be saved. RawSms remains. The worker does not report success for that attempt.
+- Backup import migrates and integrity-checks a temporary copy, then renames it
+  over the live database. A failed replace puts the parked live file back.
+  Preferences and process restart run only after that swap. There is no
+  destructive migration fallback.

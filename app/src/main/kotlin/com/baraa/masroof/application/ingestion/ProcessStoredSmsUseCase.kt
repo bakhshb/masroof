@@ -35,6 +35,9 @@ import kotlinx.coroutines.CancellationException
  * Ownership, reconciliation, and review-refresh failures are reported as
  * [SmsIngestionResult.DerivedIncomplete] so live work can retry. Exchange-rate
  * enrichment stays best-effort and does not change that outcome.
+ * A direct review write that fails for Unsupported, Invalid, or a no-event
+ * ReviewRequired is [SmsIngestionResult.Failed] with [REASON_REVIEW_NOT_PERSISTED].
+ * RawSms stays durable and live work retries.
  *
  * Every recognized-bank RawSms ends in a durable outcome: a ParsedEvent or, when no
  * usable ParsedEvent exists, a direct [IngestionReviewService] review row.
@@ -178,7 +181,7 @@ class ProcessStoredSmsUseCase(
                     "(${route.banks.joinToString { it.id }}); held for review",
             )
         }
-        recordIngestionReview(rawSms.id, IngestionReviewService.REASON_AMBIGUOUS_BANK_ROUTE)
+        reviewOrRetry(rawSms.id, IngestionReviewService.REASON_AMBIGUOUS_BANK_ROUTE)?.let { return it }
         return SmsIngestionResult.ReviewRequired(
             rawSmsId = rawSms.id,
             event = null,
@@ -199,7 +202,7 @@ class ProcessStoredSmsUseCase(
                 "Suspected bank sender from ${AppLogFormatting.maskSender(rawSms.sender)}; held for review",
             )
         }
-        recordIngestionReview(rawSms.id, IngestionReviewService.REASON_SUSPECTED_BANK)
+        reviewOrRetry(rawSms.id, IngestionReviewService.REASON_SUSPECTED_BANK)?.let { return it }
         return SmsIngestionResult.ReviewRequired(
             rawSmsId = rawSms.id,
             event = null,
@@ -295,7 +298,7 @@ class ProcessStoredSmsUseCase(
                             "Invalid parse from ${AppLogFormatting.maskSender(rawSms.sender)}",
                         )
                     }
-                    recordIngestionReview(rawSms.id, IngestionReviewService.REASON_INVALID_PARSED_EVENT)
+                    reviewOrRetry(rawSms.id, IngestionReviewService.REASON_INVALID_PARSED_EVENT)?.let { return it }
                     SmsIngestionResult.Invalid(
                         rawSmsId = rawSms.id,
                         findings = parseResult.findings,
@@ -313,7 +316,7 @@ class ProcessStoredSmsUseCase(
                             "Review required from ${AppLogFormatting.maskSender(rawSms.sender)}",
                         )
                     }
-                    recordIngestionReview(rawSms.id, IngestionReviewService.REASON_PARSE_REVIEW_REQUIRED)
+                    reviewOrRetry(rawSms.id, IngestionReviewService.REASON_PARSE_REVIEW_REQUIRED)?.let { return it }
                 }
                 SmsIngestionResult.ReviewRequired(
                     rawSmsId = rawSms.id,
@@ -347,7 +350,7 @@ class ProcessStoredSmsUseCase(
                         "Unsupported message from ${AppLogFormatting.maskSender(rawSms.sender)} (${parseResult.reason})",
                     )
                 }
-                recordIngestionReview(rawSms.id, IngestionReviewService.REASON_UNSUPPORTED_FORMAT)
+                reviewOrRetry(rawSms.id, IngestionReviewService.REASON_UNSUPPORTED_FORMAT)?.let { return it }
                 SmsIngestionResult.Unsupported(
                     rawSmsId = rawSms.id,
                     reason = parseResult.reason,
@@ -361,7 +364,7 @@ class ProcessStoredSmsUseCase(
                         "Invalid parse from ${AppLogFormatting.maskSender(rawSms.sender)}",
                     )
                 }
-                recordIngestionReview(rawSms.id, IngestionReviewService.REASON_INVALID_PARSED_EVENT)
+                reviewOrRetry(rawSms.id, IngestionReviewService.REASON_INVALID_PARSED_EVENT)?.let { return it }
                 SmsIngestionResult.Invalid(
                     rawSmsId = rawSms.id,
                     findings = parseResult.findings,
@@ -404,15 +407,30 @@ class ProcessStoredSmsUseCase(
             -> null
         }
 
-    private suspend fun recordIngestionReview(rawSmsId: String, reason: String) {
-        val service = ingestionReviewService ?: return
-        try {
+    /**
+     * @return false when the review row could not be saved. RawSms is already durable.
+     * A missing review service is not a failure; callers that have no review store
+     * keep their previous outcome.
+     */
+    private suspend fun recordIngestionReview(rawSmsId: String, reason: String): Boolean {
+        val service = ingestionReviewService ?: return true
+        return try {
             service.requireReview(rawSmsId, reason)
+            true
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            // Review persistence must not fail evidence ingestion; RawSms stays for reparse.
+            false
         }
+    }
+
+    /** No-event review outcomes must not look complete when the review row was not saved. */
+    private suspend fun reviewOrRetry(rawSmsId: String, reason: String): SmsIngestionResult.Failed? {
+        if (recordIngestionReview(rawSmsId, reason)) return null
+        return SmsIngestionResult.Failed(
+            rawSmsId = rawSmsId,
+            message = REASON_REVIEW_NOT_PERSISTED,
+        )
     }
 
     private fun logParsedOutcome(
@@ -553,5 +571,6 @@ class ProcessStoredSmsUseCase(
 
     companion object {
         const val REASON_RAW_SMS_NOT_FOUND = "raw_sms_not_found"
+        const val REASON_REVIEW_NOT_PERSISTED = "review_not_persisted"
     }
 }

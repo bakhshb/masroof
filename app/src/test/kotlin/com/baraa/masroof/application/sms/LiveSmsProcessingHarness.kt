@@ -42,6 +42,8 @@ import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.parsing.model.ParseResult
+import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
@@ -72,13 +74,16 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
     /** Throws from the parser while > 0, decrementing per call. */
     val parserFailuresRemaining = AtomicInteger(0)
 
+    /** When set, replaces the AlJazira pipeline result after the failure injection check. */
+    var parseOverride: ((SmsParseInput) -> ParseResult)? = null
+
     val registry = BankSmsRegistry(
         listOf(
             AlJaziraSmsAdapter(
                 pipeline = SmsParseGateway { input ->
                     parseCalls.incrementAndGet()
                     check(parserFailuresRemaining.getAndDecrement() <= 0) { "injected parser failure" }
-                    AlJaziraParsingPipeline().parse(input)
+                    parseOverride?.invoke(input) ?: AlJaziraParsingPipeline().parse(input)
                 },
             ),
         ),

@@ -15,8 +15,8 @@ import kotlinx.coroutines.CancellationException
  *
  * Input is the rawSmsId only. Delegates to [ProcessStoredSmsUseCase]; contains no bank
  * parsing or financial rules. Retrying is safe because stored-SMS processing is idempotent.
- * Ownership, reconciliation, and review-refresh failures are retried. Exchange-rate
- * enrichment failure is not.
+ * Ownership, reconciliation, and review-refresh failures are retried. A direct
+ * review write that fails is retried as well. Exchange-rate enrichment failure is not.
  */
 class LiveSmsProcessingWorker(
     appContext: Context,

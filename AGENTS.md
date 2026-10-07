@@ -28,7 +28,7 @@
 
 **Informational authority:** Auto-ignore and stale-link cleanup follow the parsed message family (`OTP`, `NON_FINANCIAL`, `BALANCE_NOTICE`) via `InformationalMessagePolicy`. Reconciliation and review dismiss do not re-read SMS wording. `UNKNOWN` stays reviewable.
 
-**Transaction time:** Convert SMS wall clocks with `BankTransactionTimePolicy`, the only bank-to-zone map. AlJazira uses `Asia/Riyadh`. Other banks keep the zone stored on first assembly (`occurredAtZone`). Dashboard code does not branch on a bank timezone.
+**Transaction time:** Convert SMS wall clocks with `BankTransactionTimePolicy`, the only bank-to-zone map. AlJazira uses `Asia/Riyadh`. Other banks keep the zone stored on first assembly (`occurredAtZone`). Manual resolutions `resolveTransferAsExternal` and `resolveAsFinancialType` use `TransactionTiming.effectiveOccurredAt` and persist that zone. Stale transfer healing matches with the zone already stored on the transaction. Dashboard code does not branch on a bank timezone.
 
 **Bank routing:** `BankSmsRegistry` evaluates every adapter; `Ambiguous` and `SuspectedBank` are persisted and reviewed, never parsed by a guessed adapter. Never resolve collisions by registration order. The router owns detection: adapter parse pipelines must not re-check the sender. Stored reprocessing selects an explicit `user_selected_bank:<bankId>` choice, then the stored ParsedEvent bank, then a fresh route. `Matched` parses. `Ambiguous` and `SuspectedBank` stay in review. Only a genuine `NotMatched` route may use the sole-adapter fallback. Queue refresh preserves the selection prefix. Selecting a bank does not change detector rules.
 

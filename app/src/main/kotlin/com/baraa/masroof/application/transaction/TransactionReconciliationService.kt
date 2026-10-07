@@ -588,6 +588,7 @@ class TransactionReconciliationService(
                             occurredAtLocal = leg.record?.details?.occurredAtLocal,
                             receivedAt = receivedAt,
                             zoneId = zoneId,
+                            persistedZoneId = leg.transaction?.occurredAtZone,
                         ),
                     ),
                 )
