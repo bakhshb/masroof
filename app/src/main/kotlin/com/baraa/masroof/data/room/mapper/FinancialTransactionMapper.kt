@@ -24,6 +24,7 @@ object FinancialTransactionMapper {
             categoryId = transaction.categoryId,
             appliedExchangeRate = transaction.appliedExchangeRate?.toPlainString(),
             exchangeRateSource = transaction.exchangeRateSource?.name,
+            occurredAtZone = transaction.occurredAtZone,
         )
     }
 
@@ -46,5 +47,6 @@ object FinancialTransactionMapper {
             linkedParsedEventIds = linkedParsedEventIds.sorted(),
             appliedExchangeRate = entity.appliedExchangeRate?.let { BigDecimal(it) },
             exchangeRateSource = entity.exchangeRateSource?.let { ExchangeRateSource.valueOf(it) },
+            occurredAtZone = entity.occurredAtZone,
         )
 }

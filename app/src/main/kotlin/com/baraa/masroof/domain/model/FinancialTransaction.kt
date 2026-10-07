@@ -31,4 +31,10 @@ data class FinancialTransaction(
     /** Foreign→SAR rate used for dashboard SAR totals when [amount] is foreign currency. */
     val appliedExchangeRate: BigDecimal? = null,
     val exchangeRateSource: ExchangeRateSource? = null,
+    /**
+     * Zone id used to interpret the SMS wall clock for [occurredAt].
+     * A bank with a fixed civil zone overwrites this on the next assembly.
+     * Null is a legacy row whose instant is already stored.
+     */
+    val occurredAtZone: String? = null,
 )

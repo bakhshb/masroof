@@ -34,6 +34,8 @@ object SchemaFactsBackfillPolicy {
         (12..14).forEach { put(it, MaintenanceRequirement.BACKGROUND) }
         // Processing-retry markers. No parse-fact columns.
         put(15, MaintenanceRequirement.BACKGROUND)
+        // Transaction timezone provenance. Existing instants stay valid; null zone is legacy.
+        put(16, MaintenanceRequirement.BACKGROUND)
     }
 
     /**

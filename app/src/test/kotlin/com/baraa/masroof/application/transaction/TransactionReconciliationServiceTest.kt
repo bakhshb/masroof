@@ -1734,6 +1734,132 @@ class TransactionReconciliationServiceTest {
         assertEquals(money("51.99"), tx.amount)
     }
 
+    @Test
+    fun reprocessInAnotherDeviceZone_keepsAlJaziraOccurredAt() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        val local = java.time.LocalDateTime.of(2026, 8, 26, 22, 30)
+        persistEvent(
+            smsId = "sms-zone",
+            event = event(
+                id = "pe-zone",
+                rawSmsId = "sms-zone",
+                family = MessageFamily.PURCHASE,
+                amount = money("12.00"),
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                channel = PurchaseChannel.ONLINE,
+                merchant = "Shop",
+            ),
+            details = ParsedEventDetails(occurredAtLocal = local),
+        )
+        val tokyo = serviceIn(java.time.ZoneId.of("Asia/Tokyo"))
+        tokyo.reconcileStoredEvents()
+        val first = ftRepo.findByRawSmsId("sms-zone")!!
+        assertEquals(local.atZone(java.time.ZoneId.of("Asia/Riyadh")).toInstant(), first.occurredAt)
+        assertEquals("Asia/Riyadh", first.occurredAtZone)
+
+        val newYork = serviceIn(java.time.ZoneId.of("America/New_York"))
+        newYork.reconcileStoredEvents()
+        val again = ftRepo.findByRawSmsId("sms-zone")!!
+        assertEquals(first.occurredAt, again.occurredAt)
+        assertEquals("Asia/Riyadh", again.occurredAtZone)
+    }
+
+    @Test
+    fun unknownBank_persistsFirstZoneAcrossReprocess() = runBlocking {
+        val other = Bank("OTHER")
+        confirmation.confirmCardOwned(CardReference(other, "1111"))
+        val local = java.time.LocalDateTime.of(2026, 8, 26, 22, 30)
+        persistEvent(
+            smsId = "sms-other-zone",
+            event = event(
+                id = "pe-other-zone",
+                rawSmsId = "sms-other-zone",
+                family = MessageFamily.PURCHASE,
+                amount = money("8.00"),
+                bank = other,
+                card = CardReference(other, "1111"),
+                channel = PurchaseChannel.ONLINE,
+            ),
+            details = ParsedEventDetails(occurredAtLocal = local),
+        )
+        serviceIn(java.time.ZoneId.of("Asia/Tokyo")).reconcileStoredEvents()
+        val first = ftRepo.findByRawSmsId("sms-other-zone")!!
+        assertEquals("Asia/Tokyo", first.occurredAtZone)
+        assertEquals(local.atZone(java.time.ZoneId.of("Asia/Tokyo")).toInstant(), first.occurredAt)
+
+        serviceIn(java.time.ZoneId.of("America/New_York")).reconcileStoredEvents()
+        val again = ftRepo.findByRawSmsId("sms-other-zone")!!
+        assertEquals(first.occurredAt, again.occurredAt)
+        assertEquals("Asia/Tokyo", again.occurredAtZone)
+    }
+
+    @Test
+    fun stalePairHeal_keepsUnknownBankZoneWhenDeviceDefaultDiffers() = runBlocking {
+        val previous = java.util.TimeZone.getDefault()
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"))
+        try {
+            val other = Bank("OTHER")
+            confirmation.confirmAccountOwned(AccountReference(other, "3001"))
+            val local = java.time.LocalDateTime.parse("2026-08-01T12:00:00")
+            val tokyo = java.time.ZoneId.of("Asia/Tokyo")
+            val outAt = Instant.parse("2026-08-01T12:00:00Z")
+            val inAt = outAt.plus(TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(3))
+            persistEvent(
+                smsId = "sms-out-zone-heal",
+                at = outAt,
+                details = ParsedEventDetails(occurredAtLocal = local),
+                event = event(
+                    id = "pe-out-zone-heal",
+                    rawSmsId = "sms-out-zone-heal",
+                    family = MessageFamily.TRANSFER_OUT,
+                    amount = money("90.00"),
+                    bank = other,
+                    source = AccountReference(other, "3001"),
+                    destination = AccountReference(other, "3003"),
+                    network = BankNetworkType.INTRA_BANK,
+                ),
+            )
+            val outgoing = parsedRepo.findByRawSmsId("sms-out-zone-heal")!!.event
+            serviceIn(tokyo).reconcileAfterParsedEvent(outgoing)
+            assertEquals("Asia/Tokyo", ftRepo.listAll().single().occurredAtZone)
+
+            confirmation.confirmAccountOwned(AccountReference(other, "3003"))
+            persistEvent(
+                smsId = "sms-in-zone-heal",
+                at = inAt,
+                details = ParsedEventDetails(occurredAtLocal = local),
+                event = event(
+                    id = "pe-in-zone-heal",
+                    rawSmsId = "sms-in-zone-heal",
+                    family = MessageFamily.TRANSFER_IN,
+                    amount = money("90.00"),
+                    bank = other,
+                    source = AccountReference(other, "3001"),
+                    destination = AccountReference(other, "3003"),
+                    network = BankNetworkType.INTRA_BANK,
+                ),
+            )
+            val incoming = parsedRepo.findByRawSmsId("sms-in-zone-heal")!!.event
+            serviceIn(java.time.ZoneId.of("America/New_York")).reconcileAfterParsedEvent(incoming)
+
+            val healed = ftRepo.listAll().single()
+            assertEquals(FinancialTransactionType.SELF_TRANSFER, healed.type)
+            assertEquals(local.atZone(tokyo).toInstant(), healed.occurredAt)
+            assertEquals("Asia/Tokyo", healed.occurredAtZone)
+        } finally {
+            java.util.TimeZone.setDefault(previous)
+        }
+    }
+
+    private fun serviceIn(zone: java.time.ZoneId) = TransactionReconciliationService(
+        parsedEventRepository = parsedRepo,
+        rawSmsRepository = rawRepo,
+        financialTransactionRepository = ftRepo,
+        ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(accounts, cards, loans),
+        ownershipConfirmationService = confirmation,
+        zoneId = zone,
+    )
+
     private suspend fun persistEvent(
         smsId: String,
         event: ParsedEvent,
