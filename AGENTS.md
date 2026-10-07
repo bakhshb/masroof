@@ -59,7 +59,7 @@
 - Loan repayments are detected from `LOAN_REPAYMENT` or `FEE` + `FINANCING_INSTALLMENT` SMS via `LoanRepaymentAttribution`; all dashboard calculators must use it.
 - Dashboard evidence is scoped: read parsed/raw SMS only through `DashboardEvidenceSource` (`DashboardEvidenceScope`). Never call `ParsedEventRepository.listAll()` or per-row `RawSmsRepository.getById` on the dashboard load path; a rule needing unlinked history gets an explicit fact query (superset-safe, ordered by event id).
 - `DashboardProjectionBuilder` is composition only. Add dashboard logic to the matching section (`AnalysisDashboardProjection`, `AccountsDashboardProjection`, `CardsDashboardProjection`, `CommitmentsDashboardProjection`) via specialist builders/calculators; shared inputs come from `DashboardProjectionContext`, never a second repository read.
-- Dashboard loads are read-only: never write from `application/dashboard/*` projection code. Persisted FX enrichment belongs to `ExchangeRateEnrichmentWorkflow`; the dashboard applies resolved rates in memory only.
+- Dashboard loads are read-only: never write from `application/dashboard/*` projection code. Persisted FX enrichment belongs to `ExchangeRateEnrichmentWorkflow`; the dashboard applies resolved rates in memory only. A complete `(appliedExchangeRate, exchangeRateSource)` pair is immutable. A row with only one half is repaired by writing both columns from the same resolution, and a later market rate does not replace a complete pair.
 
 ## Testing dashboard changes
 

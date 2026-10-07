@@ -1,6 +1,7 @@
 package com.baraa.masroof.data.repository
 
 import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.data.room.ExchangeRatePairWrite
 import com.baraa.masroof.data.room.dao.FinancialTransactionDao
 import com.baraa.masroof.data.room.dao.ParsedEventDao
 import com.baraa.masroof.data.room.dao.RoomBatch
@@ -122,6 +123,13 @@ class RoomFinancialTransactionRepository(
 
     override suspend fun update(transaction: FinancialTransaction): Boolean {
         val entity = FinancialTransactionMapper.toEntity(transaction)
+        val existing = dao.getById(entity.id) ?: return false
+        val (rate, source) = ExchangeRatePairWrite.storedOrIncoming(
+            storedRate = existing.appliedExchangeRate,
+            storedSource = existing.exchangeRateSource,
+            incomingRate = entity.appliedExchangeRate,
+            incomingSource = entity.exchangeRateSource,
+        )
         return dao.updateTransaction(
             id = entity.id,
             type = entity.type,
@@ -133,8 +141,8 @@ class RoomFinancialTransactionRepository(
             merchant = entity.merchant,
             counterparty = entity.counterparty,
             categoryId = entity.categoryId,
-            appliedExchangeRate = entity.appliedExchangeRate,
-            exchangeRateSource = entity.exchangeRateSource,
+            appliedExchangeRate = rate,
+            exchangeRateSource = source,
             occurredAtZone = entity.occurredAtZone,
         ) > 0
     }

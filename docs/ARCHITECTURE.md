@@ -832,6 +832,13 @@ Rules:
   and runs after live stored-SMS processing, after each historical batch, after bulk
   reparse, and as best-effort startup background maintenance. Unresolved rows (e.g. no
   network for a market rate) stay pending for the next run.
+- FX persistence is an immutable historical pair. The first complete
+  `(appliedExchangeRate, exchangeRateSource)` stays together. Enrichment and transaction
+  rewrites cannot replace or clear either column of a complete pair. A legacy row with
+  only one half is repaired by writing both columns from the same new resolution, so an
+  old rate is never stored next to a newly inferred source. A later market quote does not
+  move dashboard totals. User correction of a frozen pair is a separate workflow and is not
+  part of enrichment or dashboard load.
 
 ---
 

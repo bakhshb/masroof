@@ -3,11 +3,12 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.domain.model.FinancialTransaction
 
 /**
- * Applies resolved exchange rates to transactions that have no persisted rate yet.
+ * Replaces an incomplete exchange-rate pair for display.
  *
  * Pure: the dashboard shows the in-memory SAR equivalent, and persistence belongs to
- * `ExchangeRateEnrichmentWorkflow`. A transaction that already carries a rate and source
- * keeps them, so persisted values always win over a fresh resolution.
+ * `ExchangeRateEnrichmentWorkflow`. A complete stored pair stays. A row missing either
+ * half takes the rate and source from the same resolution, so an old number is never
+ * shown beside a newly inferred source.
  */
 object AppliedExchangeRateSyncer {
     fun applyInMemory(
