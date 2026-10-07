@@ -165,6 +165,13 @@ class DashboardEvidenceQueriesTest {
             world.ftRepo.listRawSmsIdsForTransactions(transactions.map { it.id } + "missing-tx"),
         )
 
+        val bulkPayments = transactions.filter { it.type == FinancialTransactionType.CREDIT_CARD_PAYMENT }
+        assertTrue(bulkPayments.size > RoomBatch.MAX_BIND_ARGS)
+        val bulkPaymentIds = bulkPayments.map { it.id }.toSet()
+        val loadedBulkPayments = world.ftRepo.listByTypes(listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT))
+            .filter { it.id in bulkPaymentIds }
+        assertEquals(bulkPayments.sortedBy { it.id }, loadedBulkPayments.sortedBy { it.id })
+
         val since = start.plusSeconds(100)
         val payments = world.ftRepo.listByTypesOccurredSince(listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT), since)
         val expected = world.ftRepo.listByTypes(listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT))

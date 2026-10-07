@@ -18,6 +18,7 @@ import java.time.Instant
 class RoomFinancialTransactionRepository(
     private val dao: FinancialTransactionDao,
     private val parsedEventDao: ParsedEventDao,
+    private val batchChunkSize: Int = RoomBatch.MAX_BIND_ARGS,
 ) : FinancialTransactionRepository {
     override suspend fun save(
         transaction: FinancialTransaction,
@@ -73,7 +74,7 @@ class RoomFinancialTransactionRepository(
 
     override suspend fun getById(id: String): FinancialTransaction? {
         val entity = dao.getById(id) ?: return null
-        return reconstruct(entity)
+        return reconstructBatch(listOf(entity)).single()
     }
 
     override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? {
@@ -82,11 +83,11 @@ class RoomFinancialTransactionRepository(
     }
 
     override suspend fun listAll(): List<FinancialTransaction> =
-        dao.listAll().map { reconstruct(it) }
+        reconstructBatch(dao.listAll())
 
     override suspend fun listByTypes(types: Collection<FinancialTransactionType>): List<FinancialTransaction> {
         if (types.isEmpty()) return emptyList()
-        return dao.listByTypes(types.map { it.name }).map { reconstruct(it) }
+        return reconstructBatch(dao.listByTypes(types.map { it.name }))
     }
 
     override suspend fun listByTypesOccurredSince(
@@ -94,23 +95,27 @@ class RoomFinancialTransactionRepository(
         startInclusive: Instant,
     ): List<FinancialTransaction> {
         if (types.isEmpty()) return emptyList()
-        return dao.listByTypesOccurredSince(
-            types = types.map { it.name },
-            startInclusiveEpochMillis = startInclusive.toEpochMilli(),
-        ).map { reconstruct(it) }
+        return reconstructBatch(
+            dao.listByTypesOccurredSince(
+                types = types.map { it.name },
+                startInclusiveEpochMillis = startInclusive.toEpochMilli(),
+            ),
+        )
     }
 
     override suspend fun listAwaitingAppliedExchangeRate(primaryCurrency: Currency): List<FinancialTransaction> =
-        dao.listAwaitingAppliedExchangeRate(primaryCurrency.name).map { reconstruct(it) }
+        reconstructBatch(dao.listAwaitingAppliedExchangeRate(primaryCurrency.name))
 
     override suspend fun listOccurredBetween(
         startInclusive: Instant,
         endExclusive: Instant,
     ): List<FinancialTransaction> =
-        dao.listOccurredBetween(
-            startInclusiveEpochMillis = startInclusive.toEpochMilli(),
-            endExclusiveEpochMillis = endExclusive.toEpochMilli(),
-        ).map { reconstruct(it) }
+        reconstructBatch(
+            dao.listOccurredBetween(
+                startInclusiveEpochMillis = startInclusive.toEpochMilli(),
+                endExclusiveEpochMillis = endExclusive.toEpochMilli(),
+            ),
+        )
 
     override suspend fun isRawSmsLinked(rawSmsId: String): Boolean =
         dao.findLinkByRawSmsId(rawSmsId) != null
@@ -171,13 +176,32 @@ class RoomFinancialTransactionRepository(
         ) != -1L
     }
 
-    private suspend fun reconstruct(
-        entity: com.baraa.masroof.data.room.entity.FinancialTransactionEntity,
-    ): FinancialTransaction {
-        val rawSmsIds = dao.listRawSmsIdsForTransaction(entity.id)
-        val linkedEventIds = rawSmsIds.mapNotNull { rawId ->
-            parsedEventDao.findByRawSmsId(rawId)?.id
-        }.sorted()
-        return FinancialTransactionMapper.toDomain(entity, linkedEventIds)
+    /**
+     * One link query and one parsed-event query per bind-sized chunk, then each
+     * entity is mapped with its sorted linked event ids. A missing parsed event
+     * is omitted, matching the previous per-link lookup.
+     */
+    private suspend fun reconstructBatch(
+        entities: List<com.baraa.masroof.data.room.entity.FinancialTransactionEntity>,
+    ): List<FinancialTransaction> {
+        if (entities.isEmpty()) return emptyList()
+        val links = RoomBatch.query(entities.map { it.id }, batchChunkSize) { chunk ->
+            dao.listLinksForTransactions(chunk)
+        }
+        val eventIdByRawSmsId = RoomBatch.query(links.map { it.rawSmsId }, batchChunkSize) { chunk ->
+            parsedEventDao.listByRawSmsIds(chunk)
+        }.associate { it.rawSmsId to it.id }
+        val linkedEventIdsByTransaction = links.groupBy(
+            keySelector = { it.transactionId },
+            valueTransform = { it.rawSmsId },
+        ).mapValues { (_, rawSmsIds) ->
+            rawSmsIds.mapNotNull(eventIdByRawSmsId::get).sorted()
+        }
+        return entities.map { entity ->
+            FinancialTransactionMapper.toDomain(
+                entity,
+                linkedEventIdsByTransaction[entity.id].orEmpty(),
+            )
+        }
     }
 }
