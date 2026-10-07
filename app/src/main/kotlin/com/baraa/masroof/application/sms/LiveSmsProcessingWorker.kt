@@ -16,7 +16,8 @@ import kotlinx.coroutines.CancellationException
  * Input is the rawSmsId only. Delegates to [ProcessStoredSmsUseCase]; contains no bank
  * parsing or financial rules. Retrying is safe because stored-SMS processing is idempotent.
  * Ownership, reconciliation, and review-refresh failures are retried. A direct
- * review write that fails is retried as well. Exchange-rate enrichment failure is not.
+ * review write that fails stays retryable past [MAX_ATTEMPTS] until a review row
+ * or a LIVE processing-retry marker exists. Exchange-rate enrichment failure is not.
  */
 class LiveSmsProcessingWorker(
     appContext: Context,
@@ -38,12 +39,11 @@ class LiveSmsProcessingWorker(
 
         return when (outcome) {
             is SmsIngestionResult.DerivedIncomplete -> retryDerivedOrGiveUp(outcome.rawSmsId)
-            is SmsIngestionResult.Failed ->
-                if (outcome.message == ProcessStoredSmsUseCase.REASON_RAW_SMS_NOT_FOUND) {
-                    Result.failure()
-                } else {
-                    retryOrGiveUp()
-                }
+            is SmsIngestionResult.Failed -> when (outcome.message) {
+                ProcessStoredSmsUseCase.REASON_RAW_SMS_NOT_FOUND -> Result.failure()
+                ProcessStoredSmsUseCase.REASON_REVIEW_NOT_PERSISTED -> Result.retry()
+                else -> retryOrGiveUp()
+            }
             else -> Result.success()
         }
     }
@@ -64,7 +64,11 @@ class LiveSmsProcessingWorker(
         }
     }
 
-    /** After [MAX_ATTEMPTS], parse failures keep their processing_error review for reparse. */
+    /**
+     * After [MAX_ATTEMPTS], a parse failure whose `processing_error` review was saved
+     * may stop. [ProcessStoredSmsUseCase.REASON_REVIEW_NOT_PERSISTED] does not: that
+     * attempt has no review row and no LIVE retry marker yet.
+     */
     private fun retryOrGiveUp(): Result =
         if (runAttemptCount + 1 >= MAX_ATTEMPTS) Result.failure() else Result.retry()
 

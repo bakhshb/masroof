@@ -35,9 +35,11 @@ import kotlinx.coroutines.CancellationException
  * Ownership, reconciliation, and review-refresh failures are reported as
  * [SmsIngestionResult.DerivedIncomplete] so live work can retry. Exchange-rate
  * enrichment stays best-effort and does not change that outcome.
- * A direct review write that fails for Unsupported, Invalid, or a no-event
- * ReviewRequired is [SmsIngestionResult.Failed] with [REASON_REVIEW_NOT_PERSISTED].
- * RawSms stays durable and live work retries.
+ * A direct review write that fails for Unsupported, Invalid, a no-event
+ * ReviewRequired, or a `processing_error` review is [SmsIngestionResult.Failed]
+ * with [REASON_REVIEW_NOT_PERSISTED]. RawSms stays durable. That result stays
+ * retryable past the live worker attempt cap until a review row or a LIVE
+ * processing-retry marker exists.
  *
  * Every recognized-bank RawSms ends in a durable outcome: a ParsedEvent or, when no
  * usable ParsedEvent exists, a direct [IngestionReviewService] review row.
@@ -260,7 +262,13 @@ class ProcessStoredSmsUseCase(
         if (logOutcome) {
             logIngestFailure(rawSms, message)
         }
-        recordIngestionReview(rawSms.id, IngestionReviewService.REASON_PROCESSING_ERROR)
+        if (!recordIngestionReview(rawSms.id, IngestionReviewService.REASON_PROCESSING_ERROR)) {
+            return SmsIngestionResult.Failed(
+                rawSmsId = rawSms.id,
+                message = REASON_REVIEW_NOT_PERSISTED,
+                cause = cause,
+            )
+        }
         return SmsIngestionResult.Failed(rawSmsId = rawSms.id, message = message, cause = cause)
     }
 
