@@ -438,7 +438,7 @@ class TransactionReconciliationService(
             }
         }
 
-        val upgraded = upgradeStaleIntraBankExternalPairs(records)
+        val upgraded = upgradeStaleExternalPairs(records)
         matchedPairs += upgraded.matchedPairs
         assembledSingle += upgraded.assembledSingle
         alreadyLinked += upgraded.alreadyLinked
@@ -476,7 +476,12 @@ class TransactionReconciliationService(
         )
     }
 
-    private suspend fun upgradeStaleIntraBankExternalPairs(
+    /**
+     * Replace a posted external leg when a later counterpart is mutually unique
+     * under the same strong bridges as the initial matcher (shared reference,
+     * intra-bank accounts, or the unknown-destination suffix).
+     */
+    private suspend fun upgradeStaleExternalPairs(
         records: List<ParsedEventRecord>,
     ): UpgradePassResult {
         val parsedById = records.associateBy { it.event.id }
@@ -506,7 +511,6 @@ class TransactionReconciliationService(
                     .mapNotNull { parsedById[it]?.event }
                     .firstOrNull { it.messageFamily == family }
                     ?: return@mapNotNull null
-                if (event.bankNetworkType != BankNetworkType.INTRA_BANK) return@mapNotNull null
                 val record = parsedById[event.id]
                 if (!TransactionAssembler.isAutomationEligible(event, record?.automationConfirmed == true)) {
                     return@mapNotNull null
@@ -523,7 +527,6 @@ class TransactionReconciliationService(
         for (record in records) {
             val event = record.event
             if (!event.messageFamily.isTransferFamily()) continue
-            if (event.bankNetworkType != BankNetworkType.INTRA_BANK) continue
             if (!TransactionAssembler.isAutomationEligible(event, record.automationConfirmed)) continue
             if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) continue
             val leg = StaleLeg(transaction = null, event = event, record = record)

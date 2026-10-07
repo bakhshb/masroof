@@ -502,6 +502,106 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
+    fun laterReferenceCounterpart_upgradesExternalWithoutDuplicating() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        val occurredAt = LocalDateTime.parse("2026-08-10T12:00:00")
+        persistEvent(
+            smsId = "sms-ref-out",
+            at = Instant.parse("2026-08-10T09:00:00Z"),
+            details = ParsedEventDetails(occurredAtLocal = occurredAt, transactionReference = "REF-HEAL"),
+            event = event(
+                id = "pe-ref-out",
+                rawSmsId = "sms-ref-out",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("700.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        reconciliation.reconcileAfterParsedEvent(parsedRepo.findByRawSmsId("sms-ref-out")!!.event)
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, ftRepo.listAll().single().type)
+
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        persistEvent(
+            smsId = "sms-ref-in",
+            at = Instant.parse("2026-08-10T09:02:00Z"),
+            details = ParsedEventDetails(occurredAtLocal = occurredAt.plusMinutes(1), transactionReference = "REF-HEAL"),
+            event = event(
+                id = "pe-ref-in",
+                rawSmsId = "sms-ref-in",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("700.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        reconciliation.reconcileAfterParsedEvent(parsedRepo.findByRawSmsId("sms-ref-in")!!.event)
+
+        assertEquals(1, ftRepo.listAll().size)
+        val healed = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, healed.type)
+        assertEquals(setOf("sms-ref-out", "sms-ref-in"), ftRepo.listRawSmsIds(healed.id).toSet())
+        assertEquals(listOf("pe-ref-in", "pe-ref-out"), healed.linkedParsedEventIds.sorted())
+    }
+
+    @Test
+    fun ambiguousReferenceCounterparts_areNotHealed() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        val occurredAt = LocalDateTime.parse("2026-08-10T12:00:00")
+        persistEvent(
+            smsId = "sms-amb-out",
+            at = Instant.parse("2026-08-10T09:00:00Z"),
+            details = ParsedEventDetails(occurredAtLocal = occurredAt, transactionReference = "REF-AMB"),
+            event = event(
+                id = "pe-amb-out",
+                rawSmsId = "sms-amb-out",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("700.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, ftRepo.listAll().single().type)
+
+        persistEvent(
+            smsId = "sms-amb-in-a",
+            at = Instant.parse("2026-08-10T09:01:00Z"),
+            details = ParsedEventDetails(occurredAtLocal = occurredAt, transactionReference = "REF-AMB"),
+            event = event(
+                id = "pe-amb-in-a",
+                rawSmsId = "sms-amb-in-a",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("700.00"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        persistEvent(
+            smsId = "sms-amb-in-b",
+            at = Instant.parse("2026-08-10T09:01:30Z"),
+            details = ParsedEventDetails(occurredAtLocal = occurredAt.plusMinutes(1), transactionReference = "REF-AMB"),
+            event = event(
+                id = "pe-amb-in-b",
+                rawSmsId = "sms-amb-in-b",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("700.00"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+
+        assertTrue(ftRepo.listAll().none { it.type == FinancialTransactionType.SELF_TRANSFER })
+        val outgoing = ftRepo.findByRawSmsId("sms-amb-out")
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, outgoing?.type)
+        assertEquals(listOf("sms-amb-out"), outgoing?.let { ftRepo.listRawSmsIds(it.id) })
+    }
+
+    @Test
     fun reconcileAfterParsedEvent_pairsSelfTransferWithinWindow() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))

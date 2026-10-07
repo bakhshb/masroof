@@ -575,3 +575,12 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   `effectiveOccurredAt` instants inside the same 10-minute window. Missing
   effective instants stay unmatched. The matcher does not read a clock or zone.
 - Amounts stay exact. Reconciliation passes `TransactionTiming.effectiveOccurredAt`.
+
+### M4.2 — Stale transfer healing uses the initial bridges
+
+- A posted external leg can be replaced when a later counterpart is mutually
+  unique under the same strong bridges as the first match: shared transaction
+  reference, intra-bank account suffixes, or the unknown-destination suffix.
+- Healing is no longer limited to `INTRA_BANK` rows. Two eligible counterparts
+  stay unmerged. The previous external transaction is replaced rather than
+  copied, and both raw SMS ids stay on the self-transfer.
