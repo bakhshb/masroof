@@ -512,6 +512,190 @@ class TransactionReconciliationServiceTest {
     }
 
     @Test
+    fun laterOppositeLeg_healsSingleEvidenceSelfTransferWhenMatcherAccepts() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        val at = Instant.parse("2026-08-10T09:00:00Z")
+        val amount = money("4445.67")
+        val source = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        val destination = AccountReference(Bank.BANK_ALJAZIRA, "3003")
+        persistEvent(
+            smsId = "sms-heal-out",
+            at = at,
+            event = event(
+                id = "pe-heal-out",
+                rawSmsId = "sms-heal-out",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = amount,
+                source = source,
+                destination = destination,
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+
+        val posted = ftRepo.listAll().single()
+        val singleLegId = TransactionIdFactory.fromRawSmsIds(listOf("sms-heal-out"))
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, posted.type)
+        assertEquals(singleLegId, posted.id)
+        assertEquals(listOf("pe-heal-out"), posted.linkedParsedEventIds)
+        assertEquals(setOf("sms-heal-out"), ftRepo.listRawSmsIds(posted.id).toSet())
+
+        persistEvent(
+            smsId = "sms-heal-in",
+            at = at.plusSeconds(60),
+            event = event(
+                id = "pe-heal-in",
+                rawSmsId = "sms-heal-in",
+                family = MessageFamily.TRANSFER_IN,
+                amount = amount,
+                source = source,
+                destination = destination,
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+
+        val healed = ftRepo.listAll().single()
+        val pairId = TransactionIdFactory.fromRawSmsIds(listOf("sms-heal-in", "sms-heal-out"))
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, healed.type)
+        assertEquals(pairId, healed.id)
+        assertNotEquals(singleLegId, healed.id)
+        assertEquals(setOf("sms-heal-in", "sms-heal-out"), ftRepo.listRawSmsIds(healed.id).toSet())
+        assertEquals(listOf("pe-heal-in", "pe-heal-out"), healed.linkedParsedEventIds.sorted())
+        assertEquals(healed.id, ftRepo.findByRawSmsId("sms-heal-out")?.id)
+        assertEquals(healed.id, ftRepo.findByRawSmsId("sms-heal-in")?.id)
+    }
+
+    @Test
+    fun similarAmountAccountTime_doesNotHealSingleEvidenceSelfTransfer() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        val at = Instant.parse("2026-08-10T09:00:00Z")
+        val amount = money("4445.67")
+        val source = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        val destination = AccountReference(Bank.BANK_ALJAZIRA, "3003")
+        persistEvent(
+            smsId = "sms-tuple-out",
+            at = at,
+            event = event(
+                id = "pe-tuple-out",
+                rawSmsId = "sms-tuple-out",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = amount,
+                source = source,
+                destination = destination,
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+        val singleLegId = TransactionIdFactory.fromRawSmsIds(listOf("sms-tuple-out"))
+        assertEquals(singleLegId, ftRepo.listAll().single().id)
+
+        persistEvent(
+            smsId = "sms-tuple-in",
+            at = at,
+            event = event(
+                id = "pe-tuple-in",
+                rawSmsId = "sms-tuple-in",
+                family = MessageFamily.TRANSFER_IN,
+                amount = amount,
+                source = source,
+                destination = destination,
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+
+        val posted = ftRepo.listAll()
+        assertEquals(2, posted.size)
+        assertTrue(posted.all { it.type == FinancialTransactionType.SELF_TRANSFER })
+        assertTrue(posted.all { it.amount == amount })
+        assertEquals(1, posted.map { it.sourceContainerId }.toSet().size)
+        assertEquals(1, posted.map { it.destinationContainerId }.toSet().size)
+        assertEquals(1, posted.map { it.occurredAt }.toSet().size)
+        val original = posted.single { it.id == singleLegId }
+        assertEquals(listOf("pe-tuple-out"), original.linkedParsedEventIds)
+        assertEquals(setOf("sms-tuple-out"), ftRepo.listRawSmsIds(original.id).toSet())
+        val incomingId = TransactionIdFactory.fromRawSmsIds(listOf("sms-tuple-in"))
+        val incoming = posted.single { it.id == incomingId }
+        assertEquals(listOf("pe-tuple-in"), incoming.linkedParsedEventIds)
+        assertEquals(setOf("sms-tuple-in"), ftRepo.listRawSmsIds(incoming.id).toSet())
+        val joinedId = TransactionIdFactory.fromRawSmsIds(listOf("sms-tuple-in", "sms-tuple-out"))
+        assertNull(posted.find { it.id == joinedId })
+    }
+
+    @Test
+    fun ambiguousOppositeLegs_doNotHealSingleEvidenceSelfTransfer() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        val at = Instant.parse("2026-08-10T09:00:00Z")
+        val amount = money("4445.67")
+        val source = AccountReference(Bank.BANK_ALJAZIRA, "3001")
+        val destination = AccountReference(Bank.BANK_ALJAZIRA, "3003")
+        persistEvent(
+            smsId = "sms-amb-self-out",
+            at = at,
+            event = event(
+                id = "pe-amb-self-out",
+                rawSmsId = "sms-amb-self-out",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = amount,
+                source = source,
+                destination = destination,
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+        val singleLegId = TransactionIdFactory.fromRawSmsIds(listOf("sms-amb-self-out"))
+        assertEquals(singleLegId, ftRepo.listAll().single().id)
+
+        persistEvent(
+            smsId = "sms-amb-self-in-a",
+            at = at.plusSeconds(60),
+            event = event(
+                id = "pe-amb-self-in-a",
+                rawSmsId = "sms-amb-self-in-a",
+                family = MessageFamily.TRANSFER_IN,
+                amount = amount,
+                source = source,
+                destination = destination,
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        persistEvent(
+            smsId = "sms-amb-self-in-b",
+            at = at.plusSeconds(90),
+            event = event(
+                id = "pe-amb-self-in-b",
+                rawSmsId = "sms-amb-self-in-b",
+                family = MessageFamily.TRANSFER_IN,
+                amount = amount,
+                source = source,
+                destination = destination,
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        reconciliation.reconcileStoredEvents()
+
+        val posted = ftRepo.listAll()
+        assertEquals(3, posted.size)
+        assertTrue(posted.all { it.type == FinancialTransactionType.SELF_TRANSFER })
+        val original = posted.single { it.id == singleLegId }
+        assertEquals(listOf("pe-amb-self-out"), original.linkedParsedEventIds)
+        assertEquals(setOf("sms-amb-self-out"), ftRepo.listRawSmsIds(original.id).toSet())
+        assertEquals(
+            setOf(
+                singleLegId,
+                TransactionIdFactory.fromRawSmsIds(listOf("sms-amb-self-in-a")),
+                TransactionIdFactory.fromRawSmsIds(listOf("sms-amb-self-in-b")),
+            ),
+            posted.map { it.id }.toSet(),
+        )
+        assertTrue(posted.all { ftRepo.listRawSmsIds(it.id).size == 1 })
+    }
+
+    @Test
     fun reconcileAfterParsedEvent_healsStaleExternalPairOutsideReceivedWindow() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         val occurredAt = LocalDateTime.parse("2026-08-01T12:00:00")

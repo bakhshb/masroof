@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.testsupport.ReconciliationCharacterizationFixture
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -58,6 +59,23 @@ class ReconciliationCharacterizationFixtureTest {
                     ReconciliationCharacterizationFixture.EXTERNAL_DESTINATION,
                 ),
                 posted.destinationContainerId,
+            )
+        }
+    }
+
+    @Test
+    fun transferInEvidence_usesIncomingDirection() = runBlocking {
+        ReconciliationCharacterizationFixture.open(ApplicationProvider.getApplicationContext()).use { world ->
+            world.seedMatchedSelfTransfer()
+
+            val directions = world.storedDirections()
+            assertEquals(
+                MoneyDirection.OUTGOING,
+                directions.getValue(ReconciliationCharacterizationFixture.SELF_OUT_EVENT),
+            )
+            assertEquals(
+                MoneyDirection.INCOMING,
+                directions.getValue(ReconciliationCharacterizationFixture.SELF_IN_EVENT),
             )
         }
     }
