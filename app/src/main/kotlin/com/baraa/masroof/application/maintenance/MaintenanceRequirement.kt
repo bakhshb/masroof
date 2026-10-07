@@ -30,8 +30,10 @@ object SchemaFactsBackfillPolicy {
         put(10, MaintenanceRequirement.BLOCKING)
         // loanType, debitSourceAccountLast4, salaryIncomeWording.
         put(11, MaintenanceRequirement.BLOCKING)
-        // Commitment table and pause history only.
+        // Commitment table and pause history.
         (12..14).forEach { put(it, MaintenanceRequirement.BACKGROUND) }
+        // Processing-retry markers. No parse-fact columns.
+        put(15, MaintenanceRequirement.BACKGROUND)
     }
 
     /**

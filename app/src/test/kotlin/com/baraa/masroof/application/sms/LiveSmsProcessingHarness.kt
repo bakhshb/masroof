@@ -6,6 +6,7 @@ import com.baraa.masroof.application.dashboard.ForeignSarMarketRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
+import com.baraa.masroof.application.ingestion.ProcessingRecovery
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.IngestionReviewService
@@ -19,6 +20,7 @@ import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
+import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
@@ -30,12 +32,14 @@ import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewItem
+import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
+import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.parser.SmsParseGateway
@@ -59,9 +63,10 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
     val parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
     val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
     val reviewRepo = RoomReviewRepository(db.reviewItemDao())
+    private val clock = InstantClock { Instant.parse("2026-08-11T12:00:00Z") }
+    val processingRetryRepo = RoomProcessingRetryRepository(db.processingRetryDao())
     val appLog = AppLogService(context)
     val parseCalls = AtomicInteger(0)
-    private val clock = InstantClock { Instant.parse("2026-08-11T12:00:00Z") }
     private val cards = RoomCardRegistryRepository.from(db)
 
     /** Throws from the parser while > 0, decrementing per call. */
@@ -109,6 +114,26 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 cards.observe(reference, rawSmsId)
             }
         }
+        val reviewForRecovery = object : ReviewRepository by reviewRepo {
+            override suspend fun upsertRequired(
+                rawSmsId: String,
+                kind: ReviewKind,
+                reasons: List<String>,
+                now: Instant,
+            ): ReviewItem {
+                if (derivedFailures.processingErrorUpsertFailuresRemaining.getAndDecrement() > 0) {
+                    throw IOException("processing_error upsert failed")
+                }
+                return reviewRepo.upsertRequired(rawSmsId, kind, reasons, now)
+            }
+        }
+        val ingestionReview = IngestionReviewService(reviewForRecovery, clock)
+        val recovery = ProcessingRecovery(
+            processingRetryRepository = processingRetryRepo,
+            reviewRepository = reviewForRecovery,
+            ingestionReviewService = ingestionReview,
+            clock = clock,
+        )
         val reviewForUpdate = object : ReviewRepository by reviewRepo {
             override suspend fun markResolved(
                 id: String,
@@ -157,7 +182,8 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 reviewRepository = reviewRepo,
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewForUpdate, ftRepo, clock),
-            ingestionReviewService = IngestionReviewService(reviewRepo, clock),
+            ingestionReviewService = ingestionReview,
+            processingRecovery = recovery,
             exchangeRateEnrichment = ExchangeRateEnrichmentWorkflow(
                 financialTransactionRepository = ftForEnrichment,
                 parsedEventRepository = parsedRepo,
@@ -169,12 +195,83 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         )
     }
 
+    /**
+     * One historical batch. [reconciliationFails] makes the single derived pass throw
+     * after each row has already been parsed and stored.
+     */
+    fun historicalBatch(
+        reconciliationFails: Boolean = false,
+        batchRecoveryScheduler: HistoricalBatchRecoveryScheduler? = null,
+        processingRetryRepository: ProcessingRetryRepository = processingRetryRepo,
+        reviewRepository: ReviewRepository = reviewRepo,
+    ): HistoricalSmsBatchProcessor {
+        val parsedForBatch = object : ParsedEventRepository by parsedRepo {
+            override suspend fun listAll(): List<ParsedEventRecord> {
+                if (reconciliationFails) throw IOException("batch reconciliation unavailable")
+                return parsedRepo.listAll()
+            }
+        }
+        val ingestionReview = IngestionReviewService(reviewRepo, clock)
+        return HistoricalSmsBatchProcessor(
+            capture = capture,
+            processStored = ProcessStoredSmsUseCase(
+                rawSmsRepository = rawRepo,
+                parsedEventRepository = parsedRepo,
+                bankSmsRegistry = registry,
+            ),
+            reconciliation = TransactionReconciliationService(
+                parsedEventRepository = parsedForBatch,
+                rawSmsRepository = rawRepo,
+                financialTransactionRepository = ftRepo,
+                ownershipResolver = OwnershipResolver(
+                    RoomAccountRegistryRepository.from(db),
+                    cards,
+                    NoOpLoanRegistryRepository,
+                ),
+            ),
+            reviewQueueUpdater = ReviewQueueUpdater(reviewRepository, ftRepo, clock),
+            processingRecovery = ProcessingRecovery(
+                processingRetryRepository = processingRetryRepository,
+                reviewRepository = reviewRepo,
+                ingestionReviewService = ingestionReview,
+                clock = clock,
+            ),
+            batchRecoveryScheduler = batchRecoveryScheduler,
+        )
+    }
+
+    /** One batch derived pass over historical retry rows. Does not reparse SMS text. */
+    fun derivedRecovery(reconciliationFails: Boolean = false): HistoricalDerivedRecovery {
+        val parsedForBatch = object : ParsedEventRepository by parsedRepo {
+            override suspend fun listAll(): List<ParsedEventRecord> {
+                if (reconciliationFails) throw IOException("batch reconciliation unavailable")
+                return parsedRepo.listAll()
+            }
+        }
+        return HistoricalDerivedRecovery(
+            parsedEventRepository = parsedRepo,
+            processingRetryRepository = processingRetryRepo,
+            reconciliation = TransactionReconciliationService(
+                parsedEventRepository = parsedForBatch,
+                rawSmsRepository = rawRepo,
+                financialTransactionRepository = ftRepo,
+                ownershipResolver = OwnershipResolver(
+                    RoomAccountRegistryRepository.from(db),
+                    cards,
+                    NoOpLoanRegistryRepository,
+                ),
+            ),
+            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
+        )
+    }
+
     fun intake(scheduler: LiveSmsWorkScheduler): LiveSmsIntake =
         LiveSmsIntake(
             captureBankSms = capture,
             scheduler = scheduler,
             rawSmsRepository = rawRepo,
             reviewRepository = reviewRepo,
+            processingRetryRepository = processingRetryRepo,
             appLogService = appLog,
         )
 
@@ -207,5 +304,6 @@ internal class DerivedFailureInjection(
     val reconciliationFailuresRemaining: AtomicInteger = AtomicInteger(0),
     val reviewUpdateFailuresRemaining: AtomicInteger = AtomicInteger(0),
     val exchangeRateFailuresRemaining: AtomicInteger = AtomicInteger(0),
+    val processingErrorUpsertFailuresRemaining: AtomicInteger = AtomicInteger(0),
     val reconciliationCancels: Boolean = false,
 )

@@ -462,7 +462,7 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
 - Exchange-rate enrichment stays best-effort. Its failure does not change the ingestion
   result and does not retry the worker.
 - `CancellationException` still propagates from every derived stage.
-- Historical `parseAndStore` still skips per-message derived work. Batch `finish` is unchanged.
+- Historical `parseAndStore` still skips per-message derived work. A failed batch derived pass is M1.4.
 - Startup recovery of a row whose worker already gave up is M1.2.
 
 ### M1.2 — Exhausted derived work is recoverable at startup
@@ -477,11 +477,45 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   a later exhausted-processing write.
 - A successful retry that settles the RawSms auto-resolves the processing-error review
   through the existing review-queue update (`AUTO_NO_LONGER_REQUIRED`).
+- A resolved financial review is not itself a retry marker. That case is M1.4.
 
-### M1.3 — Finished live work has one terminal outcome
+### M1.3 — Finished work has one terminal outcome
 
-- After the live worker returns success or gives up, every persisted recognized-bank RawSms
-  is posted, non-financial, pending review, or a retryable `processing_error`.
-- A derived failure that has not yet exhausted retries is intentionally not terminal.
-  The final attempt closes that gap with the processing-error review from M1.2.
+- After live work returns success or gives up, and after a historical batch derived pass
+  finishes, every persisted recognized-bank RawSms is posted, non-financial, pending review,
+  or retryable.
+- A derived failure that has not yet exhausted live retries is intentionally not terminal.
+  The final attempt closes that gap only after the recovery marker from M1.2 / M1.4 is saved.
+  A failed marker write stays `Result.retry()`.
 - An unrecognized sender is still not persisted, so it is outside this set.
+
+### M1.4 — Recovery markers survive batch failure and resolved financial reviews
+
+- `HistoricalSmsBatchProcessor.finish` returns `HistoricalBatchDerivedResult`. Ownership,
+  reconciliation, and review refresh still run once for the batch. A failure of those
+  steps writes the affected financial RawSms ids with
+  `markRequired(rawSmsIds, createdAt, HISTORICAL_BATCH)` in one Room transaction, then
+  enqueues one `HistoricalDerivedRecoveryWorker`. Parsing stays per row. The historical
+  path does not enqueue a live worker per SMS.
+- If that transaction fails, none of the batch is accepted and `finish` throws without
+  marking the batch finished, so the same batch can be retried. `Incomplete` is returned
+  only after the full set is saved.
+- Recovery ownership is the persisted `processing_retry.mode` (`LIVE` or
+  `HISTORICAL_BATCH`). It is not inferred from `review_item`. A review update that writes
+  some reviews and then throws still marks the full affected set `HISTORICAL_BATCH`.
+- The recovery worker loads every `HISTORICAL_BATCH` row, including rows that already
+  have reviews. It reruns ownership discovery, reconciliation, and review refresh once,
+  and does not reparse SMS text. Success clears that set in one transaction. Failure
+  leaves the rows and `Result.retry()`s the same worker. A second successful pass is a no-op.
+- The retry marker is a `processing_retry` row (schema 15, background maintenance). It is
+  not a review decision. `USER_NON_FINANCIAL` writes neither a retry row nor a reopened
+  review. `USER_FINANCIAL_TYPE`, `USER_CORRECTION`, `USER_EXTERNAL_TRANSFER`, and
+  `USER_SELF_TRANSFER_PAIR` stay resolved; the retry row is what keeps them recoverable.
+- On the live worker's final attempt, `ProcessingRecovery.markExhausted` writes one row
+  with `mode = LIVE` and throws when that write cannot be saved. The worker then returns
+  `Result.retry()`. It returns `Result.failure()` only after that write succeeds. Live
+  scheduling stays per message.
+- Startup scheduling uses the mode. `LIVE` rows, awaiting rows, and REQUIRED
+  `processing_error` reviews schedule `LiveSmsProcessingWorker` per RawSms. Any id in the
+  `HISTORICAL_BATCH` set is left off that live list. That set schedules exactly one batch
+  worker. `USER_NON_FINANCIAL` stays excluded.

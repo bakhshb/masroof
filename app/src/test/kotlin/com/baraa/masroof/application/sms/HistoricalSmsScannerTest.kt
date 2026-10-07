@@ -311,7 +311,7 @@ class HistoricalSmsScannerTest {
             assertTrue(world.reviewRepo.listAll().isEmpty())
             assertEquals(3, batch.storedEventCount)
 
-            val summary = batch.finish()!!
+            val summary = (batch.finish() as HistoricalBatchDerivedResult.Succeeded).summary!!
 
             assertEquals(3, summary.assembledSingle)
             assertEquals(3, world.db.financialTransactionDao().count())
