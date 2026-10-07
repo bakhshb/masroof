@@ -533,3 +533,11 @@ pretending local wall time is UTC (`…Z`). Timezone policy is deferred.
   `processing_error` reviews schedule `LiveSmsProcessingWorker` per RawSms. Any id in the
   `HISTORICAL_BATCH` set is left off that live list. That set schedules exactly one batch
   worker. `USER_NON_FINANCIAL` stays excluded.
+
+### M2.1 — Observed `AlJaziraBank` sender
+
+- `AlJaziraBankDetector` allowlist adds the normalized form `aljazirabank`, covering
+  `AlJaziraBank`, spaced/hyphenated `Al Jazira Bank`, and the promotional `AlJaziraBank-AD`
+  suffix. Matching stays exact after normalization. There is no substring match and no
+  body-only bank claim.
+- Near misses stay rejected: `jazira`, `AlJaziraX`, `AlJaziraBanks`, `NotAlJaziraBank`.

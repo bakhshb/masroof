@@ -23,6 +23,10 @@ class AlJaziraBankDetectorTest {
             "Jazira Bank.",
             "Bank AlJazira",
             "Bank Al Jazira",
+            "AlJaziraBank",
+            "Al Jazira Bank",
+            "Al-Jazira-Bank",
+            "AlJaziraBank-AD",
             "Jazira Bank-AD",
             "Jazira\u00a0Bank",
             "بنك الجزيرة",
@@ -37,11 +41,21 @@ class AlJaziraBankDetectorTest {
     fun jaziraBankSender_normalizesToAllowedForm() {
         assertEquals("jazirabank", AlJaziraBankDetector.normalizeSender("Jazira Bank"))
         assertEquals("jazirabank", AlJaziraBankDetector.normalizeSender("Jazira Bank."))
+        assertEquals("aljazirabank", AlJaziraBankDetector.normalizeSender("AlJaziraBank"))
+        assertEquals("aljazirabank", AlJaziraBankDetector.normalizeSender("AlJaziraBank-AD"))
     }
 
     @Test
     fun nearMissSenders_areNotDetected() {
-        listOf("JaziraNews", "NotAlJazira", "OtherBank", "MyJaziraService", "jazira").forEach { sender ->
+        listOf(
+            "JaziraNews",
+            "NotAlJazira",
+            "OtherBank",
+            "MyJaziraService",
+            "jazira",
+            "AlJaziraBanks",
+            "NotAlJaziraBank",
+        ).forEach { sender ->
             val result = detector.detect(sender, "شراء بمبلغ: 10.00 SAR")
             assertTrue("$sender should be Unknown", result is BankDetectionResult.Unknown)
         }
