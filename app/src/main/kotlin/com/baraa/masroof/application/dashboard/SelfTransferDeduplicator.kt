@@ -9,7 +9,9 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
  *
  * Shared parsed-event or RawSms ids are the proof. Equal amount and endpoints, with
  * different evidence, stay visible. Rows that share evidence but disagree on currency,
- * amount, direction, or account endpoints also stay visible.
+ * amount, direction, or account endpoints also stay visible. A connected group that
+ * mixes conflicting sources or destinations is left fully visible, so transitivity
+ * through a shared external row cannot hide a distinct movement.
  *
  * Lookup is indexed by event id and RawSms id. The dashboard does not compare every
  * transfer with every other transfer, and this filter does not write.
@@ -75,6 +77,7 @@ object SelfTransferDeduplicator {
             .values
             .filter { it.size > 1 }
             .forEach { component ->
+                if (hasConflictingEndpoints(component)) return@forEach
                 val canonical = component.maxWith(canonicalOrder(rawSmsIdsByTx))
                 component.filter { it.id != canonical.id }.forEach { suppressed.add(it.id) }
             }
@@ -100,6 +103,12 @@ object SelfTransferDeduplicator {
         if (self.size == 1 && externals.size == 1) {
             val internal = self.single()
             val external = externals.single()
+            if (!optionalEndpointAgrees(internal.sourceContainerId, external.sourceContainerId)) {
+                return false
+            }
+            if (!optionalEndpointAgrees(internal.destinationContainerId, external.destinationContainerId)) {
+                return false
+            }
             return when (external.type) {
                 FinancialTransactionType.EXTERNAL_TRANSFER_OUT ->
                     internal.sourceContainerId != null &&
@@ -115,6 +124,17 @@ object SelfTransferDeduplicator {
         return left.type == right.type &&
             left.sourceContainerId == right.sourceContainerId &&
             left.destinationContainerId == right.destinationContainerId
+    }
+
+    private fun hasConflictingEndpoints(component: List<FinancialTransaction>): Boolean {
+        val sources = component.mapNotNull { it.sourceContainerId }.toSet()
+        val destinations = component.mapNotNull { it.destinationContainerId }.toSet()
+        return sources.size > 1 || destinations.size > 1
+    }
+
+    private fun optionalEndpointAgrees(left: String?, right: String?): Boolean {
+        if (left == null || right == null) return true
+        return left == right
     }
 
     private fun canonicalOrder(

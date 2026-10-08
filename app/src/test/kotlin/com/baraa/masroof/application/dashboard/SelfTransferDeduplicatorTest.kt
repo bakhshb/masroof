@@ -185,6 +185,74 @@ class SelfTransferDeduplicatorTest {
     assertEquals(setOf("self-a", "self-b"), filtered.map { it.id }.toSet())
   }
 
+  @Test
+  fun conflictingDestinationsLinkedThroughSharedExternal_areNotHidden() {
+    val account1 = "account:bank_aljazira:3001"
+    val account2 = "account:bank_aljazira:3002"
+    val account3 = "account:bank_aljazira:3003"
+    val to3002 = tx(
+      id = "self-3002",
+      type = FinancialTransactionType.SELF_TRANSFER,
+      amount = "2000.00",
+      source = account1,
+      dest = account2,
+      linked = listOf("evt-a"),
+    )
+    val to3003 = tx(
+      id = "self-3003",
+      type = FinancialTransactionType.SELF_TRANSFER,
+      amount = "2000.00",
+      source = account1,
+      dest = account3,
+      linked = listOf("evt-b"),
+    )
+    val external = tx(
+      id = "external-out",
+      type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
+      amount = "2000.00",
+      source = account1,
+      dest = null,
+      linked = listOf("evt-a", "evt-b"),
+    )
+
+    val filtered = SelfTransferDeduplicator.filter(
+      transactions = listOf(to3002, to3003, external),
+      parsedRecords = emptyList(),
+    )
+
+    assertEquals(setOf("self-3002", "self-3003", "external-out"), filtered.map { it.id }.toSet())
+  }
+
+  @Test
+  fun selfAndExternalWithConflictingDestination_areNotHidden() {
+    val account1 = "account:bank_aljazira:3001"
+    val account2 = "account:bank_aljazira:3002"
+    val account3 = "account:bank_aljazira:3003"
+    val selfTransfer = tx(
+      id = "self",
+      type = FinancialTransactionType.SELF_TRANSFER,
+      amount = "2000.00",
+      source = account1,
+      dest = account2,
+      linked = listOf("evt-shared"),
+    )
+    val external = tx(
+      id = "external-out",
+      type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
+      amount = "2000.00",
+      source = account1,
+      dest = account3,
+      linked = listOf("evt-shared"),
+    )
+
+    val filtered = SelfTransferDeduplicator.filter(
+      transactions = listOf(selfTransfer, external),
+      parsedRecords = emptyList(),
+    )
+
+    assertEquals(setOf("self", "external-out"), filtered.map { it.id }.toSet())
+  }
+
   private fun tx(
     id: String,
     type: FinancialTransactionType,

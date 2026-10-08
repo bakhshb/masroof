@@ -441,6 +441,24 @@ class IntraBankSelfTransferReconciliationTest {
     }
 
     @Test
+    fun sameMinuteAmbiguousLegs_areNotPostedAsFourSelfTransfers() = runBlocking {
+        ownBothAccounts()
+        persistParsed("sms-out-a", intraOut("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:00Z"))
+        persistParsed("sms-out-b", intraOut("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:01Z"))
+        persistParsed("sms-in-a", intraIn("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:02Z"))
+        persistParsed("sms-in-b", intraIn("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:03Z"))
+
+        reconciliation.reconcileStoredEvents()
+
+        assertTrue(
+            "Irreducibly ambiguous same-minute legs must stay unmatched, not four self-transfers",
+            ftRepo.listAll().isEmpty(),
+        )
+        assertEquals(4, parsedRepo.listAll().size)
+        assertEquals(4, rawRepo.listIdsByReceivedAt().size)
+    }
+
+    @Test
     fun sameAmountExternalOut_staysVisibleBesideOneSelfTransfer() = runBlocking {
         ownBothAccounts()
         persistPair("self", "2026-09-02 10:00", "2026-09-02T07:00:00Z")
