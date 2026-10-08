@@ -3,6 +3,7 @@ package com.baraa.masroof.application.transaction
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ReviewResolutionKind
@@ -27,6 +28,7 @@ class TransactionRestoreService(
     private val reclassification: TransactionReclassificationService,
     private val clock: InstantClock,
     private val appLogService: AppLogService? = null,
+    private val reviewQueueUpdater: ReviewQueueUpdater? = null,
 ) {
     suspend fun listIgnoredRawSmsIds(): List<String> =
         reviewRepository.listIgnored().map { it.rawSmsId }
@@ -50,13 +52,14 @@ class TransactionRestoreService(
             resolvedTransactionId = null,
         ) ?: return RestoreResult.Rejected("review_clear_failed")
 
-        reconciliation.reconcileStoredEvents()
+        val report = reconciliation.reconcileAffectedRawSmsIds(listOf(rawSmsId))
         val tx = financialTransactionRepository.findByRawSmsId(rawSmsId)
         if (tx == null) {
             val rollbackReason = rollbackToIgnored(review.id, rawSmsId)
             return RestoreResult.Rejected(rollbackReason ?: "reconcile_failed")
         }
 
+        reviewQueueUpdater?.applyReport(report)
         if (newType == null || newType == tx.type) {
             logRestore(rawSmsId, tx.id, newType)
             return RestoreResult.Success(tx)

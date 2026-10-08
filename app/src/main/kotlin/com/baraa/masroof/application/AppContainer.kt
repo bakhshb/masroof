@@ -313,6 +313,7 @@ class AppContainer(
             ownershipResolver = ownershipResolver,
             ownershipConfirmationService = ownershipConfirmationService,
             effectiveParsedEventProvider = effectiveParsedEventProvider,
+            parsedEventRepository = parsedEventRepository,
             reconciliationService = transactionReconciliationService,
             reviewQueueUpdater = reviewQueueUpdater,
             manualReviewResolutionRepository = manualReviewResolutionRepository,
@@ -432,6 +433,7 @@ class AppContainer(
             reclassification = transactionReclassificationService,
             clock = clock,
             appLogService = appLogService,
+            reviewQueueUpdater = reviewQueueUpdater,
         )
 
     private val alJaziraSmsAdapter: AlJaziraSmsAdapter =

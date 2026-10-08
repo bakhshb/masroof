@@ -21,6 +21,9 @@ class SettingsViewModelFactory(
             themePreferencesRepository = container.themePreferencesRepository,
             databaseBackupService = container.databaseBackupService,
             refreshReviewQueue = { container.refreshReviewQueue() },
+            reconcileOwnershipChange = { change ->
+                container.reviewWorkflowService.reconcileOwnershipChange(change)
+            },
             reparseStoredEvents = { container.reparseAllStoredEvents().refreshedCount },
             importSmsFromInbox = { HistoricalSmsRescanService(container).rescan() },
             permissionStateProvider = permissionStateProvider,

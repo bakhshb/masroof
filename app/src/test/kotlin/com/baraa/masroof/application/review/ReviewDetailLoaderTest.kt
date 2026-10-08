@@ -73,6 +73,7 @@ class ReviewDetailLoaderTest {
             ownershipResolver = resolver,
             ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
             effectiveParsedEventProvider = effective,
+            parsedEventRepository = parsedRepo,
             reconciliationService = reconciliation,
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
             manualReviewResolutionRepository = RoomManualReviewResolutionRepository(db, ftRepo),

@@ -132,6 +132,7 @@ class IntraBankSelfTransferIngestionTest {
         parsedEventRepository = parsedRepo,
         userCorrectionRepository = RoomUserCorrectionRepository(db.userCorrectionDao()),
       ),
+      parsedEventRepository = parsedRepo,
       reconciliationService = reconciliation,
       reviewQueueUpdater = reviewQueueUpdater,
       manualReviewResolutionRepository = RoomManualReviewResolutionRepository(

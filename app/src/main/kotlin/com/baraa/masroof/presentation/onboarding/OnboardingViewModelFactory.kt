@@ -23,6 +23,9 @@ class OnboardingViewModelFactory(
                 onboardingOwnershipWorkflow = container.onboardingOwnershipWorkflow,
                 discoverFromStoredEvents = { container.discoverFromStoredEvents() },
                 refreshReviewQueue = { container.refreshReviewQueue() },
+                reconcileOwnershipChange = { change ->
+                    container.reviewWorkflowService.reconcileOwnershipChange(change)
+                },
                 databaseBackupService = container.databaseBackupService,
                 permissionStateProvider = permissionStateProvider,
             ) as T

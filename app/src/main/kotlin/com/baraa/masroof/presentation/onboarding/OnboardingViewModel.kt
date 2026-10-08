@@ -10,6 +10,7 @@ import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportFailure
 import com.baraa.masroof.application.onboarding.HistoricalImportResult
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
+import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.CardReference
@@ -31,6 +32,7 @@ class OnboardingViewModel(
     private val onboardingOwnershipWorkflow: OnboardingOwnershipWorkflow,
     private val discoverFromStoredEvents: suspend () -> Int,
     private val refreshReviewQueue: suspend () -> Unit,
+    private val reconcileOwnershipChange: suspend (ReviewWorkflowService.OwnershipChange) -> Unit = {},
     private val databaseBackupService: DatabaseBackupGateway,
     private val permissionStateProvider: () -> Boolean,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
@@ -273,7 +275,7 @@ class OnboardingViewModel(
                 } else {
                     onboardingOwnershipWorkflow.markAccountExternal(ref)
                 }
-                refreshReviewQueue()
+                reconcileOwnershipChange(ReviewWorkflowService.OwnershipChange.Account(ref))
                 loadCandidatesAndCounts()
             } catch (_: Exception) {
                 _uiState.update { it.copy(error = OnboardingError.OWNERSHIP_UPDATE_FAILED) }
@@ -290,7 +292,7 @@ class OnboardingViewModel(
                 } else {
                     onboardingOwnershipWorkflow.markCardExternal(ref)
                 }
-                refreshReviewQueue()
+                reconcileOwnershipChange(ReviewWorkflowService.OwnershipChange.Card(ref))
                 loadCandidatesAndCounts()
             } catch (_: Exception) {
                 _uiState.update { it.copy(error = OnboardingError.OWNERSHIP_UPDATE_FAILED) }
