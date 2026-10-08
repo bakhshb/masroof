@@ -101,6 +101,136 @@ class TransactionMatcherTest {
     }
 
     @Test
+    fun pairsTwoExactTimeTransfersEightMinutesApart() {
+        val firstOut = outgoing(
+            id = "out-1",
+            rawSmsId = "raw-out-1",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val firstIn = incoming(
+            id = "in-1",
+            rawSmsId = "raw-in-1",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val secondOut = outgoing(
+            id = "out-2",
+            rawSmsId = "raw-out-2",
+            reference = null,
+            localTime = defaultLocalTime.plusMinutes(8),
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val secondIn = incoming(
+            id = "in-2",
+            rawSmsId = "raw-in-2",
+            reference = null,
+            localTime = defaultLocalTime.plusMinutes(8),
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+
+        val pairs = TransactionMatcher.findMutuallyUniquePairs(
+            listOf(firstOut, secondOut, firstIn, secondIn),
+        )
+
+        assertEquals(
+            setOf("out-1" to "in-1", "out-2" to "in-2"),
+            pairs.map { it.outgoing.event.id to it.incoming.event.id }.toSet(),
+        )
+    }
+
+    @Test
+    fun sameMinuteCandidatesWithoutAStrongerIdentityStayUnpaired() {
+        val firstOut = outgoing(
+            id = "out-1",
+            rawSmsId = "raw-out-1",
+            reference = null,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val secondOut = outgoing(
+            id = "out-2",
+            rawSmsId = "raw-out-2",
+            reference = null,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val firstIn = incoming(
+            id = "in-1",
+            rawSmsId = "raw-in-1",
+            reference = null,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val secondIn = incoming(
+            id = "in-2",
+            rawSmsId = "raw-in-2",
+            reference = null,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+
+        assertTrue(
+            TransactionMatcher.findMutuallyUniquePairs(
+                listOf(firstOut, secondOut, firstIn, secondIn),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
+    fun conflictingReferencesDoNotMatchAcrossAnAccountBridge() {
+        val outgoing = outgoing(
+            reference = "REF-A",
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val incoming = incoming(
+            reference = "ref-b",
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+
+        assertFalse(TransactionMatcher.compatiblePair(outgoing, incoming))
+    }
+
+    @Test
+    fun intraBankBridgeRequiresTheSameBank() {
+        val outgoing = outgoing(
+            reference = null,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val incoming = incoming(
+            reference = null,
+            source = AccountReference(Bank("OTHER_BANK"), "3001"),
+            destination = AccountReference(Bank("OTHER_BANK"), "3002"),
+            network = BankNetworkType.INTRA_BANK,
+        ).let { candidate ->
+            candidate.copy(event = candidate.event.copy(bank = Bank("OTHER_BANK")))
+        }
+
+        assertFalse(TransactionMatcher.hasIntraBankAccountBridge(outgoing, incoming))
+        assertFalse(TransactionMatcher.compatiblePair(outgoing, incoming))
+    }
+
+    @Test
     fun rejectsDifferentCurrenciesEvenWhenNumericAmountsMatch() {
         val outgoing = outgoing(reference = "ref-1")
         val incoming = incoming(reference = "ref-1", amount = Money.of(BigDecimal.TEN, Currency.USD))

@@ -39,7 +39,7 @@ class SelfTransferDeduplicatorTest {
   }
 
   @Test
-  fun account3003_duplicateInternalTransfers_netToZeroCashPosition() {
+  fun account3003_provenDuplicateInternalTransfers_netToZeroCashPosition() {
     val account1 = "account:bank_aljazira:3001"
     val account3 = "account:bank_aljazira:3003"
     val amounts = listOf("4445.67", "0.33", "28093.33")
@@ -59,7 +59,7 @@ class SelfTransferDeduplicatorTest {
           amount = amount,
           source = account1,
           dest = account3,
-          linked = listOf("evt-$amount-in"),
+          linked = listOf("evt-$amount-out", "evt-$amount-in"),
         ),
       )
     } + tx(
@@ -85,6 +85,104 @@ class SelfTransferDeduplicatorTest {
     assertEquals(Money.of("32539.33", Currency.SAR), summary.inflow.selfTransfersIn)
     assertEquals(Money.zero(Currency.SAR), summary.outflow.selfTransfersOut)
     assertEquals(SignedMoneyAmount.zero(Currency.SAR), summary.accountFlow().accountSummary().remaining)
+  }
+
+  @Test
+  fun distinctSameAmountSelfTransfers_bothRemainAndSum() {
+    val account1 = "account:bank_aljazira:3001"
+    val account2 = "account:bank_aljazira:3002"
+    val first = tx(
+      id = "self-day-1",
+      type = FinancialTransactionType.SELF_TRANSFER,
+      amount = "2000.00",
+      source = account1,
+      dest = account2,
+      linked = listOf("evt-day-1-out", "evt-day-1-in"),
+    )
+    val second = tx(
+      id = "self-day-2",
+      type = FinancialTransactionType.SELF_TRANSFER,
+      amount = "2000.00",
+      source = account1,
+      dest = account2,
+      linked = listOf("evt-day-2-out", "evt-day-2-in"),
+    )
+
+    val filtered = SelfTransferDeduplicator.filter(listOf(first, second), parsedRecords = emptyList())
+
+    assertEquals(listOf("self-day-1", "self-day-2"), filtered.map { it.id })
+    val summary = CurrentAccountSummaryCalculator.summarize(
+      transactions = filtered,
+      parsedRecords = emptyList(),
+      ownedAccountContainerIds = setOf(account1),
+      ownedAccountLast4s = setOf("3001"),
+      scopeMode = AccountFlowScopeMode.SingleAccount,
+    )
+    assertEquals(Money.of("4000.00", Currency.SAR), summary.outflow.selfTransfersOut)
+  }
+
+  @Test
+  fun unrelatedExternalTransfer_staysVisibleWhenAmountMatchesSelfTransfer() {
+    val account1 = "account:bank_aljazira:3001"
+    val account2 = "account:bank_aljazira:3002"
+    val selfTransfer = tx(
+      id = "self",
+      type = FinancialTransactionType.SELF_TRANSFER,
+      amount = "2000.00",
+      source = account1,
+      dest = account2,
+      linked = listOf("evt-self-out", "evt-self-in"),
+    )
+    val external = tx(
+      id = "external-out",
+      type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
+      amount = "2000.00",
+      source = account1,
+      dest = null,
+      linked = listOf("evt-external"),
+    )
+
+    val filtered = SelfTransferDeduplicator.filter(
+      transactions = listOf(selfTransfer, external),
+      parsedRecords = emptyList(),
+    )
+
+    assertEquals(setOf("self", "external-out"), filtered.map { it.id }.toSet())
+    val summary = CurrentAccountSummaryCalculator.summarize(
+      transactions = filtered,
+      parsedRecords = emptyList(),
+      ownedAccountContainerIds = setOf(account1),
+      ownedAccountLast4s = setOf("3001"),
+      scopeMode = AccountFlowScopeMode.SingleAccount,
+    )
+    assertEquals(Money.of("2000.00", Currency.SAR), summary.outflow.externalTransfersOut)
+    assertEquals(Money.of("2000.00", Currency.SAR), summary.outflow.selfTransfersOut)
+  }
+
+  @Test
+  fun conflictingSharedEvidence_isNotHidden() {
+    val account1 = "account:bank_aljazira:3001"
+    val account2 = "account:bank_aljazira:3002"
+    val left = tx(
+      id = "self-a",
+      type = FinancialTransactionType.SELF_TRANSFER,
+      amount = "2000.00",
+      source = account1,
+      dest = account2,
+      linked = listOf("evt-shared"),
+    )
+    val right = tx(
+      id = "self-b",
+      type = FinancialTransactionType.SELF_TRANSFER,
+      amount = "50.00",
+      source = account1,
+      dest = account2,
+      linked = listOf("evt-shared"),
+    )
+
+    val filtered = SelfTransferDeduplicator.filter(listOf(left, right), parsedRecords = emptyList())
+
+    assertEquals(setOf("self-a", "self-b"), filtered.map { it.id }.toSet())
   }
 
   private fun tx(

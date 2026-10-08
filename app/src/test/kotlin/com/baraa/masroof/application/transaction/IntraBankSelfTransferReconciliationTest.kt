@@ -3,6 +3,9 @@ package com.baraa.masroof.application.transaction
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.dashboard.AccountFlowScopeMode
+import com.baraa.masroof.application.dashboard.CurrentAccountSummaryCalculator
+import com.baraa.masroof.application.dashboard.SelfTransferDeduplicator
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
@@ -370,6 +373,152 @@ class IntraBankSelfTransferReconciliationTest {
         assertEquals(Instant.parse("2026-08-27T04:36:00Z"), augTx.occurredAt)
         assertEquals(setOf("sms-july-out", "sms-july-in"), ftRepo.listRawSmsIds(julyTx.id).toSet())
         assertEquals(setOf("sms-aug-out", "sms-aug-in"), ftRepo.listRawSmsIds(augTx.id).toSet())
+    }
+
+    @Test
+    fun twoThousand_eightMinutesApart_becomeTwoMovementsNotFourLegs() = runBlocking {
+        ownBothAccounts()
+        persistPair("a", "2026-09-02 10:00", "2026-09-02T07:00:00Z")
+        persistPair("b", "2026-09-02 10:08", "2026-09-02T07:08:00Z")
+
+        reconciliation.reconcileStoredEvents()
+
+        val stored = ftRepo.listAll()
+        assertEquals(2, stored.size)
+        assertTrue(stored.all { it.type == FinancialTransactionType.SELF_TRANSFER })
+        assertEquals(Money.of("4000.00", Currency.SAR), selfTransferOutOf3001(stored))
+    }
+
+    @Test
+    fun twoThousand_differentDays_remainTwoAndSumToFourThousand() = runBlocking {
+        ownBothAccounts()
+        persistPair("day2", "2026-09-02 10:00", "2026-09-02T07:00:00Z")
+        persistPair("day9", "2026-09-09 10:00", "2026-09-09T07:00:00Z")
+
+        reconciliation.reconcileStoredEvents()
+        reconciliation.reconcileStoredEvents()
+
+        val stored = ftRepo.listAll()
+        assertEquals(2, stored.size)
+        assertEquals(Money.of("4000.00", Currency.SAR), selfTransferOutOf3001(stored))
+    }
+
+    @Test
+    fun salaryCycleBoundary_pairsEachClockWithoutCrossingTheWindow() = runBlocking {
+        ownBothAccounts()
+        persistPair("before", "2026-08-26 23:58", "2026-08-26T20:58:00Z")
+        persistPair("after", "2026-08-27 00:04", "2026-08-26T21:04:00Z")
+
+        reconciliation.reconcileStoredEvents()
+
+        val stored = ftRepo.listAll()
+        assertEquals(2, stored.size)
+        assertTrue(stored.all { it.type == FinancialTransactionType.SELF_TRANSFER })
+        val boundary = Instant.parse("2026-08-26T21:00:00Z")
+        assertEquals(1, stored.count { it.occurredAt.isBefore(boundary) })
+        assertEquals(1, stored.count { !it.occurredAt.isBefore(boundary) })
+    }
+
+    @Test
+    fun lateIncomingLeg_healsOutgoingWithoutDuplicatingMoney() = runBlocking {
+        ownBothAccounts()
+        persistParsed("sms-late-out", intraOut("2026-09-04 11:15"), Instant.parse("2026-09-04T08:15:00Z"))
+        reconciliation.reconcileStoredEvents()
+        assertEquals(1, ftRepo.listAll().size)
+
+        persistParsed("sms-late-in", intraIn("2026-09-04 11:15"), Instant.parse("2026-09-04T08:15:05Z"))
+        reconciliation.reconcileStoredEvents()
+
+        val healed = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, healed.type)
+        assertEquals(Money.of("2000.00", Currency.SAR), healed.amount)
+        assertEquals(setOf("sms-late-in", "sms-late-out"), ftRepo.listRawSmsIds(healed.id).toSet())
+
+        reconciliation.reconcileStoredEvents()
+        val again = ftRepo.listAll().single()
+        assertEquals(healed.id, again.id)
+        assertEquals(Money.of("2000.00", Currency.SAR), again.amount)
+    }
+
+    @Test
+    fun sameAmountExternalOut_staysVisibleBesideOneSelfTransfer() = runBlocking {
+        ownBothAccounts()
+        persistPair("self", "2026-09-02 10:00", "2026-09-02T07:00:00Z")
+        persistParsed(
+            "sms-external",
+            """
+            عملية حوالة مالية صادرة مقبولة
+            خصمت من حساب: 3001
+            الى: TEST_BENEFICIARY
+            مبلغ العملية: 2,000.00 SAR
+            المعرف البديل \الايبان : 0593
+            [البنك العربي الوطني]
+            في: 2026-09-02 15:00
+            رقم المعاملة: TEST_REFERENCE_EXT
+            """.trimIndent(),
+            Instant.parse("2026-09-02T12:00:00Z"),
+        )
+
+        reconciliation.reconcileStoredEvents()
+
+        val stored = ftRepo.listAll()
+        assertEquals(1, stored.count { it.type == FinancialTransactionType.SELF_TRANSFER })
+        assertEquals(1, stored.count { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT })
+        val displayed = SelfTransferDeduplicator.filter(stored, parsedRepo.listAll())
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = displayed,
+            parsedRecords = parsedRepo.listAll(),
+            ownedAccountContainerIds = setOf(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")),
+            ownedAccountLast4s = setOf("3001"),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
+        )
+        assertEquals(Money.of("2000.00", Currency.SAR), summary.outflow.selfTransfersOut)
+        assertEquals(Money.of("2000.00", Currency.SAR), summary.outflow.externalTransfersOut)
+    }
+
+    private suspend fun ownBothAccounts() {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3002"))
+    }
+
+    private suspend fun persistPair(suffix: String, local: String, receivedAt: String) {
+        val received = Instant.parse(receivedAt)
+        persistParsed("sms-$suffix-out", intraOut(local), received)
+        persistParsed("sms-$suffix-in", intraIn(local), received.plusSeconds(5))
+    }
+
+    private fun intraOut(local: String): String =
+        """
+        حوالة صادرة الى حسابك الجاري
+        من: 3001
+        مبلغ: SAR 2,000.00
+        إلى: 3002
+        في: $local
+        """.trimIndent()
+
+    private fun intraIn(local: String): String =
+        """
+        حوالة واردة داخلية
+        مبلغ: SAR 2,000.00
+        إلى: 3002
+        اسم المرسل: TEST_PERSON
+        رقم حساب المرسل: 3001
+        البنك المرسل: بنك الجزيرة
+        في: $local
+        """.trimIndent()
+
+    private suspend fun selfTransferOutOf3001(
+        stored: List<com.baraa.masroof.domain.model.FinancialTransaction>,
+    ): Money {
+        val displayed = SelfTransferDeduplicator.filter(stored, parsedRepo.listAll())
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = displayed,
+            parsedRecords = parsedRepo.listAll(),
+            ownedAccountContainerIds = setOf(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")),
+            ownedAccountLast4s = setOf("3001"),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
+        )
+        return summary.outflow.selfTransfersOut
     }
 
     private suspend fun seedStaleExternalPair(
