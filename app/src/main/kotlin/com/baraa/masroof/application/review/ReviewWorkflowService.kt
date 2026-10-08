@@ -65,8 +65,10 @@ class ReviewWorkflowService(
     /**
      * Full-history reconciliation and review-queue refresh.
      *
-     * Explicit maintenance and recovery use this sweep. Interactive correction,
-     * restore, and ownership changes reconcile only the affected RawSms ids.
+     * Maintenance, recovery, reparse, and import finalization use this sweep.
+     * Opening the review list only reads the queue. Interactive correction,
+     * restore, ownership changes, and other resolved review actions reconcile
+     * at most the affected RawSms ids, then reload that queue without a second sweep.
      */
     suspend fun refreshReviewQueue() {
         val report = reconciliationService.reconcileStoredEventsDetailed()
