@@ -492,6 +492,7 @@ class AppContainer(
             ownershipDiscovery = ownershipDiscoveryService,
             reconciliation = transactionReconciliationService,
             reviewQueueUpdater = reviewQueueUpdater,
+            rawSmsRepository = rawSmsRepository,
         )
 
     val liveSmsIntake: LiveSmsIntake =

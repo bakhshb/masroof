@@ -24,6 +24,8 @@ import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -32,6 +34,7 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.CardRegistryRepository
@@ -107,6 +110,7 @@ class HistoricalSmsBatchProcessorTest {
 
         assertEquals(0, cards.observed.size)
         assertEquals(0, parsedRepo.listAllCalls)
+        assertEquals(0, parsedRepo.scopedLoadCalls)
         assertEquals(0, transactions.awaitingCalls)
         assertEquals(0, reviews.upserts)
         assertEquals(0, db.financialTransactionDao().count())
@@ -114,7 +118,8 @@ class HistoricalSmsBatchProcessorTest {
         val finished = batch.finish()
         assertTrue(finished is HistoricalBatchDerivedResult.Succeeded)
         assertEquals(listOf(first, second), cards.observed)
-        assertEquals(1, parsedRepo.listAllCalls)
+        assertEquals(0, parsedRepo.listAllCalls)
+        assertEquals(1, parsedRepo.scopedLoadCalls)
         assertEquals(1, transactions.awaitingCalls)
         assertEquals(2, db.financialTransactionDao().count())
         assertEquals(FinancialTransactionType.EXPENSE, transactions.findByRawSmsId(first)!!.type)
@@ -125,7 +130,8 @@ class HistoricalSmsBatchProcessorTest {
 
         val rejected = runCatching { batch.finish() }.exceptionOrNull()
         assertTrue(rejected is IllegalStateException)
-        assertEquals(1, parsedRepo.listAllCalls)
+        assertEquals(0, parsedRepo.listAllCalls)
+        assertEquals(1, parsedRepo.scopedLoadCalls)
         assertEquals(1, transactions.awaitingCalls)
     }
 
@@ -140,7 +146,8 @@ class HistoricalSmsBatchProcessorTest {
 
         val finished = batch.finish()
         assertTrue(finished is HistoricalBatchDerivedResult.Succeeded)
-        assertEquals(1, parsedRepo.listAllCalls)
+        assertEquals(0, parsedRepo.listAllCalls)
+        assertEquals(1, parsedRepo.scopedLoadCalls)
         assertEquals(1, transactions.awaitingCalls)
         assertEquals(2, reviews.upserts)
         assertEquals(listOf(first.id, second.id), reviews.upsertedRawSmsIds)
@@ -148,7 +155,7 @@ class HistoricalSmsBatchProcessorTest {
 
     @Test
     fun reconciliationFailure_marksFinancialRowsOnceAndStillEnriches() = runBlocking {
-        parsedRepo.failListAll = true
+        parsedRepo.failScopedLoad = true
         val batch = processor().startBatch()
         val purchase = ingestParsed(batch, purchase("51.99"), "2026-08-02T10:00:00Z", "purchase-fail")
         val otp = sms(OTP_BODY, "2026-08-02T11:00:00Z", "otp-fail")
@@ -159,7 +166,8 @@ class HistoricalSmsBatchProcessorTest {
             DerivedProcessingStage.RECONCILIATION,
             (finished as HistoricalBatchDerivedResult.Incomplete).stage,
         )
-        assertEquals(1, parsedRepo.listAllCalls)
+        assertEquals(0, parsedRepo.listAllCalls)
+        assertEquals(1, parsedRepo.scopedLoadCalls)
         assertEquals(listOf(listOf(purchase)), retries.markedBatches)
         assertEquals(
             listOf(purchase),
@@ -185,7 +193,8 @@ class HistoricalSmsBatchProcessorTest {
             DerivedProcessingStage.REVIEW_UPDATE,
             (finished as HistoricalBatchDerivedResult.Incomplete).stage,
         )
-        assertEquals(1, parsedRepo.listAllCalls)
+        assertEquals(0, parsedRepo.listAllCalls)
+        assertEquals(1, parsedRepo.scopedLoadCalls)
         assertEquals(1, reviews.upserts)
         assertEquals(listOf(listOf(first.id, second.id)), retries.markedBatches)
         assertEquals(1, recoverySchedules)
@@ -226,7 +235,7 @@ class HistoricalSmsBatchProcessorTest {
 
     @Test
     fun markerWriteFailure_leavesTheBatchRetryable() = runBlocking {
-        parsedRepo.failListAll = true
+        parsedRepo.failScopedLoad = true
         retries.failMark = true
         val batch = processor().startBatch()
         val first = ingestParsed(batch, purchase("51.99"), "2026-08-06T10:00:00Z", "purchase-mark-1")
@@ -265,10 +274,57 @@ class HistoricalSmsBatchProcessorTest {
     }
 
     @Test
-    fun emptyBatch_stillReconcilesReviewsAndEnrichesOnce() = runBlocking {
+    fun finish_oneNewPurchase_doesNotLoadOrPostOlderHistory() = runBlocking {
+        val parked = processor().startBatch()
+        val older = ingestParsed(parked, purchase("9.00"), "2019-01-01T10:00:00Z", "old-purchase")
+        val batch = processor().startBatch()
+        val fresh = ingestParsed(batch, purchase("51.99"), "2026-08-01T10:00:00Z", "new-purchase")
+
+        val finished = batch.finish()
+
+        assertTrue(finished is HistoricalBatchDerivedResult.Succeeded)
+        assertEquals(0, parsedRepo.listAllCalls)
+        assertEquals(0, parsedRepo.globalUnlinkedCalls)
+        assertEquals(1, parsedRepo.scopedLoadCalls)
+        assertEquals(FinancialTransactionType.EXPENSE, transactions.findByRawSmsId(fresh)!!.type)
+        assertEquals(null, transactions.findByRawSmsId(older))
+    }
+
+    @Test
+    fun finish_transferMatchesStoredCounterpartInsideMatcherWindow() = runBlocking {
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val confirmation = OwnershipConfirmationService(
+            accounts,
+            RoomCardRegistryRepository.from(db),
+            NoOpLoanRegistryRepository,
+        )
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3002"))
+        val parked = processor().startBatch()
+        val older = ingestParsed(parked, purchase("9.00"), "2019-01-01T10:00:00Z", "old-beside-transfer")
+        val incoming = ingestParsed(parked, INCOMING_TRANSFER, "2026-08-27T04:36:00Z", "incoming")
+        val batch = processor().startBatch()
+        val outgoing = ingestParsed(batch, OUTGOING_TRANSFER, "2026-08-27T04:38:00Z", "outgoing")
+
+        val finished = batch.finish()
+
+        assertTrue(finished is HistoricalBatchDerivedResult.Succeeded)
+        assertEquals(0, parsedRepo.listAllCalls)
+        assertEquals(0, parsedRepo.globalUnlinkedCalls)
+        assertTrue(parsedRepo.scopedLoadCalls > 0)
+        val posted = transactions.findByRawSmsId(outgoing)!!
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, posted.type)
+        assertEquals(posted.id, transactions.findByRawSmsId(incoming)!!.id)
+        assertTrue(transactions.listRawSmsIds(posted.id).containsAll(listOf(outgoing, incoming)))
+        assertEquals(null, transactions.findByRawSmsId(older))
+    }
+
+    @Test
+    fun emptyBatch_enrichesWithoutScanningHistory() = runBlocking {
         val finished = processor().startBatch().finish()
         assertTrue(finished is HistoricalBatchDerivedResult.Succeeded)
-        assertEquals(1, parsedRepo.listAllCalls)
+        assertEquals(0, parsedRepo.listAllCalls)
+        assertEquals(0, parsedRepo.scopedLoadCalls)
         assertEquals(1, transactions.awaitingCalls)
         assertEquals(0, reviews.upserts)
         assertEquals(0, recoverySchedules)
@@ -338,12 +394,24 @@ class HistoricalSmsBatchProcessorTest {
         private val delegate: ParsedEventRepository,
     ) : ParsedEventRepository by delegate {
         var listAllCalls: Int = 0
-        var failListAll: Boolean = false
+        var scopedLoadCalls: Int = 0
+        var globalUnlinkedCalls: Int = 0
+        var failScopedLoad: Boolean = false
 
         override suspend fun listAll(): List<ParsedEventRecord> {
             listAllCalls += 1
-            if (failListAll) throw IOException("reconciliation unavailable")
             return delegate.listAll()
+        }
+
+        override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> {
+            globalUnlinkedCalls += 1
+            return delegate.listUnlinkedTransfers()
+        }
+
+        override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
+            scopedLoadCalls += 1
+            if (failScopedLoad) throw IOException("reconciliation unavailable")
+            return delegate.listByRawSmsIds(rawSmsIds)
         }
     }
 
@@ -421,6 +489,24 @@ class HistoricalSmsBatchProcessorTest {
             حوالة صادرة
             مبلغ: SAR 50.00
             في: 2026-08-05 11:00
+        """.trimIndent()
+
+        private val OUTGOING_TRANSFER = """
+            حوالة صادرة الى حسابك الجاري
+            من: 3001
+            مبلغ: SAR 5,500.00
+            إلى: 3002
+            في: 2026-08-27 07:36
+        """.trimIndent()
+
+        private val INCOMING_TRANSFER = """
+            حوالة واردة داخلية
+            مبلغ: SAR 5,500.00
+            إلى: 3002
+            اسم المرسل: براء بخش
+            رقم حساب المرسل: 3001
+            البنك المرسل: بنك الجزيرة
+            في: 2026-08-27 07:36
         """.trimIndent()
     }
 }

@@ -211,9 +211,9 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         reviewRepository: ReviewRepository = reviewRepo,
     ): HistoricalSmsBatchProcessor {
         val parsedForBatch = object : ParsedEventRepository by parsedRepo {
-            override suspend fun listAll(): List<ParsedEventRecord> {
+            override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
                 if (reconciliationFails) throw IOException("batch reconciliation unavailable")
-                return parsedRepo.listAll()
+                return parsedRepo.listByRawSmsIds(rawSmsIds)
             }
         }
         val ingestionReview = IngestionReviewService(reviewRepo, clock)
@@ -248,9 +248,9 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
     /** One batch derived pass over historical retry rows. Does not reparse SMS text. */
     fun derivedRecovery(reconciliationFails: Boolean = false): HistoricalDerivedRecovery {
         val parsedForBatch = object : ParsedEventRepository by parsedRepo {
-            override suspend fun listAll(): List<ParsedEventRecord> {
+            override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
                 if (reconciliationFails) throw IOException("batch reconciliation unavailable")
-                return parsedRepo.listAll()
+                return parsedRepo.listByRawSmsIds(rawSmsIds)
             }
         }
         return HistoricalDerivedRecovery(
@@ -267,6 +267,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 ),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
+            rawSmsRepository = rawRepo,
         )
     }
 
