@@ -8,6 +8,8 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogService
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -23,6 +25,7 @@ class LiveSmsProcessingWorker(
     appContext: Context,
     params: WorkerParameters,
     private val processStoredSms: ProcessStoredSmsUseCase,
+    private val appLogService: AppLogService? = null,
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val rawSmsId = inputData.getString(KEY_RAW_SMS_ID)
@@ -33,7 +36,8 @@ class LiveSmsProcessingWorker(
             processStoredSms.process(rawSmsId)
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logUnexpectedFailure(stage = "process", e)
             return retryOrGiveUp()
         }
 
@@ -59,9 +63,17 @@ class LiveSmsProcessingWorker(
             Result.failure()
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logUnexpectedFailure(stage = "record_exhausted_derived", e)
             Result.retry()
         }
+    }
+
+    private fun logUnexpectedFailure(stage: String, error: Exception) {
+        appLogService?.warn(
+            AppLogCategories.SMS,
+            "LiveSmsProcessingWorker $stage failed on attempt ${runAttemptCount + 1} (${error::class.java.simpleName})",
+        )
     }
 
     /**
@@ -78,6 +90,7 @@ class LiveSmsProcessingWorker(
      */
     class Factory(
         private val processStoredSms: () -> ProcessStoredSmsUseCase,
+        private val appLogService: AppLogService? = null,
     ) : WorkerFactory() {
         override fun createWorker(
             appContext: Context,
@@ -85,7 +98,7 @@ class LiveSmsProcessingWorker(
             workerParameters: WorkerParameters,
         ): ListenableWorker? =
             if (workerClassName == LiveSmsProcessingWorker::class.java.name) {
-                LiveSmsProcessingWorker(appContext, workerParameters, processStoredSms())
+                LiveSmsProcessingWorker(appContext, workerParameters, processStoredSms(), appLogService)
             } else {
                 null
             }

@@ -515,7 +515,7 @@ class AppContainer(
 
     val workerFactory: WorkerFactory =
         DelegatingWorkerFactory().apply {
-            addFactory(LiveSmsProcessingWorker.Factory { processStoredSmsUseCase })
+            addFactory(LiveSmsProcessingWorker.Factory({ processStoredSmsUseCase }, appLogService))
             addFactory(
                 ExchangeRateEnrichmentWorker.Factory {
                     PendingExchangeRateEnricher { exchangeRateEnrichmentWorkflow.enrichPending() }

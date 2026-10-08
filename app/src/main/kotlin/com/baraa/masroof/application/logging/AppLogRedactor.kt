@@ -8,6 +8,15 @@ object AppLogRedactor {
         Regex("""(?i)(authorization:\s*)(token|bearer)\s+\S+"""),
     )
 
+    private val panLikePattern =
+        Regex("""\b(?:\d[ -]?){11,18}\d\b""")
+
+    private val saudiIbanPattern =
+        Regex("""(?i)\bSA\d{2}[A-Z0-9]{20}\b""")
+
+    private val labeledOtpPattern =
+        Regex("""(?i)(?:otp|one[- ]time(?: password)?|verification code|رمز(?:\s+التحقق)?)\s*[:#]?\s*\d{4,8}""")
+
     fun redact(message: String): String {
         var sanitized = message
         tokenPatterns.forEach { pattern ->
@@ -19,6 +28,9 @@ object AppLogRedactor {
                 }
             }
         }
+        sanitized = sanitized.replace(panLikePattern, "[REDACTED]")
+        sanitized = sanitized.replace(saudiIbanPattern, "[REDACTED]")
+        sanitized = sanitized.replace(labeledOtpPattern, "[REDACTED]")
         return sanitized
     }
 }
