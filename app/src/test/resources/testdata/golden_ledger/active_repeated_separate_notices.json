@@ -1,0 +1,94 @@
+{
+  "id": "repeated_separate_notices",
+  "status": "ACTIVE",
+  "periodAnchor": "2026-09-10",
+  "description": "Two inbox purchases with the same merchant and amount on different days stay two movements.",
+  "ownedAccounts": [
+    {"bank": "BANK_ALJAZIRA", "masked": "3001"}
+  ],
+  "ownedCards": [
+    {"bank": "BANK_ALJAZIRA", "last4": "2210", "type": "DEBIT"}
+  ],
+  "messages": [
+    {
+      "providerMessageId": "inbox-grocer-02",
+      "sender": "AlJazira",
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_GROCER\nبمبلغ: 40.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 02-09-2026",
+      "receivedAt": "2026-09-02T08:05:00Z"
+    },
+    {
+      "providerMessageId": "inbox-grocer-04",
+      "sender": "AlJazira",
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_GROCER\nبمبلغ: 40.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 04-09-2026",
+      "receivedAt": "2026-09-04T08:05:00Z"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 2,
+    "parsed": [
+      {
+        "family": "PURCHASE",
+        "parseStatus": "SUCCESS",
+        "amount": "40.00",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "sourceAccount": "3001",
+        "cardLast4": "2210"
+      },
+      {
+        "family": "PURCHASE",
+        "parseStatus": "SUCCESS",
+        "amount": "40.00",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "sourceAccount": "3001",
+        "cardLast4": "2210"
+      }
+    ],
+    "transactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "40.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "linkedRawSmsCount": 1
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "40.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "linkedRawSmsCount": 1
+      }
+    ],
+    "displayedRows": [
+      {
+        "type": "EXPENSE",
+        "amount": "40.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "linkedRawSmsCount": 1
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "40.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "linkedRawSmsCount": 1
+      }
+    ],
+    "accountsFleetInflow": "0.00",
+    "accountsFleetOutflow": "80.00",
+    "accountsFleetRemaining": "-80.00",
+    "spendingGross": "80.00",
+    "excludedOtherCurrencyCount": 0,
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "posPurchases": "80.00",
+        "cashPosition": "-80.00"
+      }
+    ]
+  }
+}

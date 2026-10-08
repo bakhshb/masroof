@@ -1,0 +1,86 @@
+{
+  "id": "m8_asof_fx",
+  "status": "PENDING",
+  "ownerMilestone": "M8",
+  "periodAnchor": "2026-10-05",
+  "description": "An October 1 USD purchase must not inherit the October 7 merchant exchange rate. Only the dated SMS rate converts, so salary-period spending is 40 SAR and one foreign row stays unconverted. Owner M8 activates this oracle.",
+  "ownedCards": [
+    {"bank": "BANK_ALJAZIRA", "last4": "7271", "type": "CREDIT"}
+  ],
+  "messages": [
+    {
+      "providerMessageId": "inbox-m8-oct1",
+      "sender": "AlJazira",
+      "body": "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nلدى: TEST_FX_SHOP\nبمبلغ: USD 10.00\nفي: 2026-10-01 10:00",
+      "receivedAt": "2026-10-01T07:00:00Z"
+    },
+    {
+      "providerMessageId": "inbox-m8-oct7",
+      "sender": "AlJazira",
+      "body": "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nلدى: TEST_FX_SHOP\nبمبلغ: USD 10.00\nفي: 2026-10-07 10:00\nسعر الصرف: 4.000000",
+      "receivedAt": "2026-10-07T07:00:00Z"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 2,
+    "parsed": [
+      {
+        "family": "PURCHASE",
+        "parseStatus": "SUCCESS",
+        "amount": "10.00",
+        "currency": "USD",
+        "bank": "BANK_ALJAZIRA",
+        "cardLast4": "7271"
+      },
+      {
+        "family": "PURCHASE",
+        "parseStatus": "SUCCESS",
+        "amount": "10.00",
+        "currency": "USD",
+        "bank": "BANK_ALJAZIRA",
+        "cardLast4": "7271"
+      }
+    ],
+    "transactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "10.00",
+        "currency": "USD",
+        "source": "card:BANK_ALJAZIRA:7271",
+        "linkedRawSmsCount": 1
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "10.00",
+        "currency": "USD",
+        "source": "card:BANK_ALJAZIRA:7271",
+        "linkedRawSmsCount": 1
+      }
+    ],
+    "displayedRows": [
+      {
+        "type": "EXPENSE",
+        "amount": "10.00",
+        "currency": "USD",
+        "source": "card:BANK_ALJAZIRA:7271",
+        "linkedRawSmsCount": 1
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "10.00",
+        "currency": "USD",
+        "source": "card:BANK_ALJAZIRA:7271",
+        "linkedRawSmsCount": 1
+      }
+    ],
+    "spendingGross": "40.00",
+    "excludedOtherCurrencyCount": 1
+  },
+  "knownDefect": {
+    "ownerMilestone": "M8",
+    "signals": {
+      "spendingGross": "80.00",
+      "excludedOtherCurrencyCount": "0"
+    }
+  }
+}

@@ -16,6 +16,7 @@ import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.sms.HistoricalBatchDerivedResult
 import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
 import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
@@ -164,6 +165,33 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
         ).startBatch()
         rows.forEach { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
         batch.finish()
+    }
+
+    /**
+     * Imports caller-supplied provider rows through the same capture → parse → one-batch
+     * reconcile path as [importFixtureCorpus].
+     */
+    suspend fun importProviderRows(rows: List<ProviderSmsRecord>): HistoricalBatchDerivedResult {
+        val batch = HistoricalSmsBatchProcessor(
+            capture = captureBankSms,
+            processStored = processStoredSms(),
+            ownershipDiscovery = discovery,
+            reconciliation = reconciliation,
+            reviewQueueUpdater = reviewQueueUpdater,
+        ).startBatch()
+        rows.forEach { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
+        return batch.finish()
+    }
+
+    /**
+     * Re-runs parse and derived work for every stored RawSms.
+     * This is reprocessing of stored evidence, not an Android process restart.
+     */
+    suspend fun reprocessStoredEvidence() {
+        val processor = processStoredSms()
+        for (id in rawRepo.listIdsByReceivedAt()) {
+            processor.process(id, logOutcome = false)
+        }
     }
 
     /** Deterministic months of synthetic SMS facts and linked transactions. */

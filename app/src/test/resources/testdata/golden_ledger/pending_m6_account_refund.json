@@ -1,0 +1,130 @@
+{
+  "id": "m6_account_refund",
+  "status": "PENDING",
+  "ownerMilestone": "M6",
+  "periodAnchor": "2026-09-10",
+  "description": "A 100 SAR account purchase and a 100 SAR refund into that account net to 0 SAR cash and are not salary. A 25 SAR credit-card refund does not increase account cash. Owner M6 activates this oracle.",
+  "ownedAccounts": [
+    {"bank": "BANK_ALJAZIRA", "masked": "3001"}
+  ],
+  "ownedCards": [
+    {"bank": "BANK_ALJAZIRA", "last4": "2210", "type": "DEBIT"},
+    {"bank": "BANK_ALJAZIRA", "last4": "7271", "type": "CREDIT"}
+  ],
+  "messages": [
+    {
+      "providerMessageId": "inbox-m6-purchase",
+      "sender": "AlJazira",
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_GROCER\nبمبلغ: 100.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 02-09-2026",
+      "receivedAt": "2026-09-02T08:05:00Z"
+    },
+    {
+      "providerMessageId": "inbox-m6-account-refund",
+      "sender": "AlJazira",
+      "body": "استرداد مبلغ\nإلى: 3001\nلدى: TEST_SHOP\nبمبلغ: 100.00 SAR\nفي: 2026-09-06 13:10",
+      "receivedAt": "2026-09-06T10:10:00Z"
+    },
+    {
+      "providerMessageId": "inbox-m6-card-refund",
+      "sender": "AlJazira",
+      "body": "استرداد مبلغ\nبطاقة: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 25.00 SAR\nفي: 2026-09-07 13:10",
+      "receivedAt": "2026-09-07T10:10:00Z"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 3,
+    "parsed": [
+      {
+        "family": "PURCHASE",
+        "parseStatus": "SUCCESS",
+        "amount": "100.00",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "sourceAccount": "3001",
+        "cardLast4": "2210"
+      },
+      {
+        "family": "REFUND",
+        "parseStatus": "SUCCESS",
+        "amount": "100.00",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "destinationAccount": "3001"
+      },
+      {
+        "family": "REFUND",
+        "parseStatus": "SUCCESS",
+        "amount": "25.00",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "cardLast4": "7271"
+      }
+    ],
+    "transactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "100.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "linkedRawSmsCount": 1
+      },
+      {
+        "type": "REFUND",
+        "amount": "100.00",
+        "currency": "SAR",
+        "destination": "account:BANK_ALJAZIRA:3001",
+        "linkedRawSmsCount": 1
+      },
+      {
+        "type": "REFUND",
+        "amount": "25.00",
+        "currency": "SAR",
+        "destination": "card:BANK_ALJAZIRA:7271",
+        "linkedRawSmsCount": 1
+      }
+    ],
+    "displayedRows": [
+      {
+        "type": "EXPENSE",
+        "amount": "100.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "linkedRawSmsCount": 1
+      },
+      {
+        "type": "REFUND",
+        "amount": "100.00",
+        "currency": "SAR",
+        "destination": "account:BANK_ALJAZIRA:3001",
+        "linkedRawSmsCount": 1
+      },
+      {
+        "type": "REFUND",
+        "amount": "25.00",
+        "currency": "SAR",
+        "destination": "card:BANK_ALJAZIRA:7271",
+        "linkedRawSmsCount": 1
+      }
+    ],
+    "accountsFleetRemaining": "0.00",
+    "spendingGross": "100.00",
+    "excludedOtherCurrencyCount": 0,
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "posPurchases": "100.00",
+        "salary": "0.00",
+        "otherIncome": "0.00",
+        "cashPosition": "0.00"
+      }
+    ]
+  },
+  "knownDefect": {
+    "ownerMilestone": "M6",
+    "signals": {
+      "accountsFleetRemaining": "-100.00",
+      "account:BANK_ALJAZIRA:3001:cashPosition": "-100.00"
+    }
+  }
+}

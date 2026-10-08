@@ -1,0 +1,141 @@
+{
+  "id": "m1_two_day_same_amount",
+  "status": "PENDING",
+  "ownerMilestone": "M1",
+  "periodAnchor": "2026-09-10",
+  "description": "Two owned 2,000 SAR self-transfers on different days are two movements. Per-account self-transfer out is 4,000 SAR. Owner M1 activates this oracle.",
+  "ownedAccounts": [
+    {"bank": "BANK_ALJAZIRA", "masked": "3001"},
+    {"bank": "BANK_ALJAZIRA", "masked": "3002"}
+  ],
+  "messages": [
+    {
+      "providerMessageId": "inbox-m1-out-02",
+      "sender": "AlJazira",
+      "body": "حوالة صادرة الى حسابك الجاري\nمن: 3001\nمبلغ: SAR 2,000.00\nإلى: 3002\nفي: 2026-09-02 10:00",
+      "receivedAt": "2026-09-02T07:00:00Z"
+    },
+    {
+      "providerMessageId": "inbox-m1-in-02",
+      "sender": "AlJazira",
+      "body": "حوالة واردة داخلية\nمبلغ: SAR 2,000.00\nإلى: 3002\nاسم المرسل: TEST_PERSON\nرقم حساب المرسل: 3001\nالبنك المرسل: بنك الجزيرة\nفي: 2026-09-02 10:00",
+      "receivedAt": "2026-09-02T07:00:05Z"
+    },
+    {
+      "providerMessageId": "inbox-m1-out-09",
+      "sender": "AlJazira",
+      "body": "حوالة صادرة الى حسابك الجاري\nمن: 3001\nمبلغ: SAR 2,000.00\nإلى: 3002\nفي: 2026-09-09 10:00",
+      "receivedAt": "2026-09-09T07:00:00Z"
+    },
+    {
+      "providerMessageId": "inbox-m1-in-09",
+      "sender": "AlJazira",
+      "body": "حوالة واردة داخلية\nمبلغ: SAR 2,000.00\nإلى: 3002\nاسم المرسل: TEST_PERSON\nرقم حساب المرسل: 3001\nالبنك المرسل: بنك الجزيرة\nفي: 2026-09-09 10:00",
+      "receivedAt": "2026-09-09T07:00:05Z"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 4,
+    "parsed": [
+      {
+        "family": "TRANSFER_OUT",
+        "parseStatus": "SUCCESS",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "sourceAccount": "3001",
+        "destinationAccount": "3002"
+      },
+      {
+        "family": "TRANSFER_IN",
+        "parseStatus": "SUCCESS",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "sourceAccount": "3001",
+        "destinationAccount": "3002"
+      },
+      {
+        "family": "TRANSFER_OUT",
+        "parseStatus": "SUCCESS",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "sourceAccount": "3001",
+        "destinationAccount": "3002"
+      },
+      {
+        "family": "TRANSFER_IN",
+        "parseStatus": "SUCCESS",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "sourceAccount": "3001",
+        "destinationAccount": "3002"
+      }
+    ],
+    "transactions": [
+      {
+        "type": "SELF_TRANSFER",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "destination": "account:BANK_ALJAZIRA:3002",
+        "linkedRawSmsCount": 2
+      },
+      {
+        "type": "SELF_TRANSFER",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "destination": "account:BANK_ALJAZIRA:3002",
+        "linkedRawSmsCount": 2
+      }
+    ],
+    "displayedRows": [
+      {
+        "type": "SELF_TRANSFER",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "destination": "account:BANK_ALJAZIRA:3002",
+        "linkedRawSmsCount": 2
+      },
+      {
+        "type": "SELF_TRANSFER",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "destination": "account:BANK_ALJAZIRA:3002",
+        "linkedRawSmsCount": 2
+      }
+    ],
+    "accountsFleetInflow": "0.00",
+    "accountsFleetOutflow": "0.00",
+    "accountsFleetRemaining": "0.00",
+    "spendingGross": "0.00",
+    "excludedOtherCurrencyCount": 0,
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "selfTransfersOut": "4000.00",
+        "cashPosition": "-4000.00"
+      },
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3002",
+        "selfTransfersIn": "4000.00",
+        "cashPosition": "4000.00"
+      }
+    ]
+  },
+  "knownDefect": {
+    "ownerMilestone": "M1",
+    "signals": {
+      "displayedRowCount": "1",
+      "account:BANK_ALJAZIRA:3001:selfTransfersOut": "2000.00",
+      "account:BANK_ALJAZIRA:3002:selfTransfersIn": "2000.00"
+    }
+  }
+}
