@@ -1,23 +1,28 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.matching.TransactionMatcher
+import com.baraa.masroof.domain.matching.TransferMatchCandidate
+import com.baraa.masroof.domain.matching.TransferMatchPair
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /**
- * Removes duplicate representations of the same internal transfer.
+ * Hides a second dashboard row when it is another representation of a transfer
+ * already shown.
  *
- * Banks often emit two SMS legs (OUT + IN), each parsed with both endpoints, which
- * can produce two [FinancialTransactionType.SELF_TRANSFER] rows for one movement.
- * Orphan single-leg [EXTERNAL_TRANSFER_IN]/[EXTERNAL_TRANSFER_OUT] rows are dropped
- * when a self-transfer already covers the same amount and owned endpoint.
+ * A shared amount and the same endpoints are not evidence. Two rows collapse
+ * only when they share a parsed event or raw SMS, or when their legs are one
+ * mutually unique [TransactionMatcher] pair. Persisted transactions are left
+ * as stored; reconciliation owns any repair of duplicate links.
  */
 object SelfTransferDeduplicator {
-    data class TransferEndpoints(
-        val sourceId: String,
-        val destId: String,
-        val amount: Money,
+    private val transferTypes = setOf(
+        FinancialTransactionType.SELF_TRANSFER,
+        FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+        FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
     )
 
     fun filter(
@@ -25,60 +30,141 @@ object SelfTransferDeduplicator {
         parsedRecords: List<ParsedEventRecord>,
     ): List<FinancialTransaction> {
         val parsedById = parsedRecords.associateBy { it.event.id }
-        fun rawSmsIds(tx: FinancialTransaction): Set<String> =
-            tx.linkedParsedEventIds.mapNotNull { parsedById[it]?.event?.rawSmsId }.toSet()
+        val transfers = transactions.filter { it.type in transferTypes }
+        if (transfers.size < 2) return transactions
 
-        fun endpointsKey(tx: FinancialTransaction): TransferEndpoints? {
-            val source = tx.sourceContainerId ?: return null
-            val dest = tx.destinationContainerId ?: return null
-            return TransferEndpoints(source, dest, tx.amount)
+        val pairs = TransactionMatcher.findMutuallyUniquePairs(
+            matchCandidates(transfers, parsedById),
+        )
+        val suppressed = suppressedIds(transfers, parsedById, pairs)
+        if (suppressed.isEmpty()) return transactions
+        return transactions.filter { it.id !in suppressed }
+    }
+
+    private fun suppressedIds(
+        transfers: List<FinancialTransaction>,
+        parsedById: Map<String, ParsedEventRecord>,
+        pairs: List<TransferMatchPair>,
+    ): Set<String> {
+        val members = DisjointSet(transfers.map { it.id })
+        for (leftIndex in transfers.indices) {
+            for (rightIndex in leftIndex + 1 until transfers.size) {
+                val left = transfers[leftIndex]
+                val right = transfers[rightIndex]
+                if (sameMovement(left, right, parsedById, pairs)) {
+                    members.union(left.id, right.id)
+                }
+            }
         }
-
-        val suppressed = mutableSetOf<String>()
-
-        transactions
-            .filter { it.type == FinancialTransactionType.SELF_TRANSFER }
-            .groupBy { endpointsKey(it) }
-            .filterKeys { it != null }
+        return transfers
+            .groupBy { members.find(it.id) }
             .values
             .filter { it.size > 1 }
-            .forEach { group ->
-                val canonical = group.maxWith(
-                    compareBy<FinancialTransaction> { it.linkedParsedEventIds.size }
-                        .thenBy { rawSmsIds(it).size }
-                        .thenBy { it.id },
-                )
-                group.filter { it.id != canonical.id }.forEach { suppressed.add(it.id) }
+            .flatMap { group ->
+                val canonical = group.maxWith(canonicalOrder(parsedById))
+                group.filter { it.id != canonical.id }.map { it.id }
             }
+            .toSet()
+    }
 
-        val canonicalSelfTransfers = transactions.filter {
-            it.type == FinancialTransactionType.SELF_TRANSFER && it.id !in suppressed
+    private fun sameMovement(
+        left: FinancialTransaction,
+        right: FinancialTransaction,
+        parsedById: Map<String, ParsedEventRecord>,
+        pairs: List<TransferMatchPair>,
+    ): Boolean {
+        val leftEvents = left.linkedParsedEventIds.toSet()
+        val rightEvents = right.linkedParsedEventIds.toSet()
+        if (leftEvents.intersect(rightEvents).isNotEmpty()) return true
+        if (rawSmsIds(left, parsedById).intersect(rawSmsIds(right, parsedById)).isNotEmpty()) {
+            return true
         }
-        val selfRawSmsIds = canonicalSelfTransfers.flatMap { rawSmsIds(it) }.toSet()
-        val selfEndpointKeys = canonicalSelfTransfers.mapNotNull { endpointsKey(it) }.toSet()
+        return pairs.any { pair ->
+            val pairEvents = setOf(pair.outgoing.event.id, pair.incoming.event.id)
+            val fromLeft = leftEvents.intersect(pairEvents)
+            val fromRight = rightEvents.intersect(pairEvents)
+            fromLeft.isNotEmpty() && fromRight.isNotEmpty() && fromLeft + fromRight == pairEvents
+        }
+    }
 
-        return transactions.filter { tx ->
-            when {
-                tx.id in suppressed -> false
-
-                tx.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN -> {
-                    val overlapsSelfSms = rawSmsIds(tx).any { it in selfRawSmsIds }
-                    val dest = tx.destinationContainerId
-                    val overlapsSelfAmount = dest != null &&
-                        selfEndpointKeys.any { it.destId == dest && it.amount == tx.amount }
-                    !(overlapsSelfSms || overlapsSelfAmount)
-                }
-
-                tx.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT -> {
-                    val overlapsSelfSms = rawSmsIds(tx).any { it in selfRawSmsIds }
-                    val source = tx.sourceContainerId
-                    val overlapsSelfAmount = source != null &&
-                        selfEndpointKeys.any { it.sourceId == source && it.amount == tx.amount }
-                    !(overlapsSelfSms || overlapsSelfAmount)
-                }
-
-                else -> true
+    private fun matchCandidates(
+        transfers: List<FinancialTransaction>,
+        parsedById: Map<String, ParsedEventRecord>,
+    ): List<TransferMatchCandidate> {
+        val eventIds = transfers.flatMap { it.linkedParsedEventIds }.distinct()
+        return eventIds.mapNotNull { eventId ->
+            val record = parsedById[eventId] ?: return@mapNotNull null
+            val event = record.event
+            if (event.messageFamily != MessageFamily.TRANSFER_OUT &&
+                event.messageFamily != MessageFamily.TRANSFER_IN
+            ) {
+                return@mapNotNull null
             }
+            if (event.amount == null) return@mapNotNull null
+            val linked = transfers.filter { eventId in it.linkedParsedEventIds }
+            val occurredAt = linked.minOfOrNull { it.occurredAt } ?: return@mapNotNull null
+            val (sourceOwned, destinationOwned) = ownership(linked)
+            TransferMatchCandidate(
+                event = event,
+                transactionReference = record.details.transactionReference,
+                occurredAtLocal = record.details.occurredAtLocal,
+                receivedAt = occurredAt,
+                sourceOwnership = sourceOwned,
+                destinationOwnership = destinationOwned,
+                effectiveOccurredAt = occurredAt,
+            )
+        }
+    }
+
+    private fun ownership(
+        linked: List<FinancialTransaction>,
+    ): Pair<OwnershipStatus, OwnershipStatus> {
+        if (linked.any { it.type == FinancialTransactionType.SELF_TRANSFER }) {
+            return OwnershipStatus.OWNED to OwnershipStatus.OWNED
+        }
+        val source = if (linked.any { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT }) {
+            OwnershipStatus.OWNED
+        } else {
+            OwnershipStatus.UNKNOWN
+        }
+        val destination = if (linked.any { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN }) {
+            OwnershipStatus.OWNED
+        } else {
+            OwnershipStatus.UNKNOWN
+        }
+        return source to destination
+    }
+
+    private fun canonicalOrder(
+        parsedById: Map<String, ParsedEventRecord>,
+    ): Comparator<FinancialTransaction> =
+        compareBy<FinancialTransaction> { it.type == FinancialTransactionType.SELF_TRANSFER }
+            .thenBy { it.linkedParsedEventIds.size }
+            .thenBy { rawSmsIds(it, parsedById).size }
+            .thenBy { it.id }
+
+    private fun rawSmsIds(
+        transaction: FinancialTransaction,
+        parsedById: Map<String, ParsedEventRecord>,
+    ): Set<String> =
+        transaction.linkedParsedEventIds.mapNotNull { parsedById[it]?.event?.rawSmsId }.toSet()
+
+    private class DisjointSet(ids: Collection<String>) {
+        private val parent = ids.associateWithTo(mutableMapOf()) { it }
+
+        fun find(id: String): String {
+            val current = parent.getValue(id)
+            if (current == id) return id
+            val root = find(current)
+            parent[id] = root
+            return root
+        }
+
+        fun union(left: String, right: String) {
+            val leftRoot = find(left)
+            val rightRoot = find(right)
+            if (leftRoot == rightRoot) return
+            if (leftRoot < rightRoot) parent[rightRoot] = leftRoot else parent[leftRoot] = rightRoot
         }
     }
 }
