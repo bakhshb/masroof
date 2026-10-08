@@ -2,6 +2,8 @@ package com.baraa.masroof.instrumentation
 
 import androidx.test.platform.app.InstrumentationRegistry
 import com.baraa.masroof.MasroofApplication
+import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.TransactionIdFactory
@@ -37,6 +39,10 @@ internal object JourneyFixtures {
 /**
  * Inserts durable evidence before the activity reads it. Times are "now" so the
  * current salary period includes the rows the dashboard reconstructs.
+ *
+ * Seeded journeys wait until production startup maintenance reports READY, so a
+ * clean Orchestrator database cannot reparse over rows that were just inserted.
+ * The startup journey does not wait here and still exercises the real gate.
  */
 internal object JourneySeeder {
     fun prepare(methodName: String) {
@@ -46,14 +52,27 @@ internal object JourneySeeder {
             container.onboardingPreferencesRepository.setOnboardingCompleted(true)
             when {
                 methodName.matchesJourney("startup_reachesFinancialUiWhenMaintenanceIsReady") -> Unit
-                methodName.matchesJourney("dashboard_showsPersistedTransactionAfterReload") ->
+                methodName.matchesJourney("dashboard_showsPersistedTransactionAfterReload") -> {
+                    awaitReadyForFixtures(container)
                     seedDashboardTransaction()
-                methodName.matchesJourney("reviewCorrection_persistsChosenTypeAndReloads") ->
+                }
+                methodName.matchesJourney("reviewCorrection_persistsChosenTypeAndReloads") -> {
+                    awaitReadyForFixtures(container)
                     seedCorrectionReview()
-                methodName.matchesJourney("reviewRestore_persistsRestoredPurchaseAndReloads") ->
+                }
+                methodName.matchesJourney("reviewRestore_persistsRestoredPurchaseAndReloads") -> {
+                    awaitReadyForFixtures(container)
                     seedIgnoredPurchase()
+                }
                 else -> error("No device seed for $methodName")
             }
+        }
+    }
+
+    private suspend fun awaitReadyForFixtures(container: AppContainer) {
+        val outcome = container.awaitStartupMaintenance()
+        check(outcome == StartupMaintenanceOutcome.READY) {
+            "Device fixtures require startup maintenance READY, was $outcome"
         }
     }
 
