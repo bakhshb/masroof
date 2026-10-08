@@ -15,8 +15,11 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
  *
  * A shared amount and the same endpoints are not evidence. Two rows collapse
  * only when they share a parsed event or raw SMS, or when their legs are one
- * mutually unique [TransactionMatcher] pair. Persisted transactions are left
- * as stored; reconciliation owns any repair of duplicate links.
+ * mutually unique [TransactionMatcher] pair. A row is hidden only when the
+ * row that stays already carries its account endpoints, so one leg is not
+ * dropped while the other account's movement exists only on that leg.
+ * Persisted transactions are left as stored; reconciliation owns any repair
+ * of duplicate links.
  */
 object SelfTransferDeduplicator {
     private val transferTypes = setOf(
@@ -62,7 +65,9 @@ object SelfTransferDeduplicator {
             .filter { it.size > 1 }
             .flatMap { group ->
                 val canonical = group.maxWith(canonicalOrder(parsedById))
-                group.filter { it.id != canonical.id }.map { it.id }
+                group
+                    .filter { it.id != canonical.id && endpointsCovered(canonical, it) }
+                    .map { it.id }
             }
             .toSet()
     }
@@ -133,6 +138,22 @@ object SelfTransferDeduplicator {
             OwnershipStatus.UNKNOWN
         }
         return source to destination
+    }
+
+    /**
+     * True when every account named on [other] is already named on [canonical].
+     * Complementary external legs (out on one account, in on the other) stay
+     * visible until reconciliation stores one self-transfer that carries both.
+     */
+    private fun endpointsCovered(
+        canonical: FinancialTransaction,
+        other: FinancialTransaction,
+    ): Boolean {
+        fun covered(containerId: String?): Boolean =
+            containerId == null ||
+                containerId == canonical.sourceContainerId ||
+                containerId == canonical.destinationContainerId
+        return covered(other.sourceContainerId) && covered(other.destinationContainerId)
     }
 
     private fun canonicalOrder(

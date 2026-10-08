@@ -319,6 +319,31 @@ class SelfTransferDeduplicatorTest {
     }
 
     @Test
+    fun complementaryExternalLegs_stayVisibleUntilOneRowCarriesBothEndpoints() {
+        val outgoing = tx(
+            id = "external-out",
+            type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
+            amount = "2000.00",
+            source = account1,
+            dest = null,
+            linked = listOf("evt-out"),
+        )
+        val incoming = tx(
+            id = "external-in",
+            type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+            amount = "2000.00",
+            source = null,
+            dest = account3,
+            linked = listOf("evt-in"),
+        )
+        val records = intraPair("evt-out", "evt-in", "2000.00", LocalDateTime.parse("2026-08-03T10:38:00"))
+
+        val filtered = SelfTransferDeduplicator.filter(listOf(outgoing, incoming), records)
+
+        assertEquals(listOf("external-out", "external-in"), filtered.map { it.id })
+    }
+
+    @Test
     fun nonTransferRows_areLeftUntouched() {
         val expense = tx(
             id = "expense",
