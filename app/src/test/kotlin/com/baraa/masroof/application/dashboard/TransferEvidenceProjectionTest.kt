@@ -70,12 +70,11 @@ class TransferEvidenceProjectionTest {
                 sms("near-in-b", "2026-08-03T07:46:20Z", intraIn("3003", "3001", "2,000.00", "2026-08-03 10:46")),
             )
             world.importFixtureCorpus(rows)
-            val persisted = storedIds(world)
+            val persisted = world.ftRepo.listAll()
             val projection = load(world, "2026-08-10")
-            // Two movements inside the match window are not a mutually unique pair, so
-            // reconciliation leaves each SMS posted. Amount and endpoints must not hide any of them.
-            assertEquals(persisted, projection.transactions.map { it.id }.sorted())
-            assertEquals(4, projection.transactions.size)
+            assertEquals(persisted.map { it.id }.sorted(), storedIds(world))
+            assertEquals(persisted.map { it.id }.sorted(), projection.transactions.map { it.id }.sorted())
+            assertEquals(2, projection.transactions.size)
             assertEquals(
                 setOf(FinancialTransactionType.SELF_TRANSFER),
                 projection.transactions.map { it.type }.toSet(),
@@ -84,6 +83,46 @@ class TransferEvidenceProjectionTest {
                 setOf(Money.of("2000.00", Currency.SAR)),
                 projection.transactions.map { it.amount }.toSet(),
             )
+            assertEquals(
+                Money.of("4000.00", Currency.SAR),
+                account(projection, "3003").summary.inflow.selfTransfersIn,
+            )
+            assertEquals(Money.zero(Currency.SAR), projection.accountsFleet.totalOutflow)
+        }
+    }
+
+    @Test
+    fun sameMinuteRepeatedSelfTransfers_bothCountOnceEach() = runBlocking {
+        DashboardLedgerWorld(context()).use { world ->
+            val rows = listOf(
+                sms("same-out-a", "2026-08-03T07:38:00Z", intraOut("3001", "3003", "2,000.00", "2026-08-03 10:38")),
+                sms("same-in-a", "2026-08-03T07:38:10Z", intraIn("3003", "3001", "2,000.00", "2026-08-03 10:38")),
+                sms("same-out-b", "2026-08-03T07:38:20Z", intraOut("3001", "3003", "2,000.00", "2026-08-03 10:38")),
+                sms("same-in-b", "2026-08-03T07:38:30Z", intraIn("3003", "3001", "2,000.00", "2026-08-03 10:38")),
+            )
+            world.importFixtureCorpus(rows)
+            val beforeLoad = storedIds(world)
+            val projection = load(world, "2026-08-10")
+            assertEquals(beforeLoad, storedIds(world))
+            assertEquals(4, beforeLoad.size)
+            assertEquals(2, projection.transactions.size)
+            assertEquals(
+                setOf(FinancialTransactionType.SELF_TRANSFER),
+                projection.transactions.map { it.type }.toSet(),
+            )
+            assertEquals(
+                setOf(Money.of("2000.00", Currency.SAR)),
+                projection.transactions.map { it.amount }.toSet(),
+            )
+            assertEquals(
+                Money.of("4000.00", Currency.SAR),
+                account(projection, "3001").summary.outflow.selfTransfersOut,
+            )
+            assertEquals(
+                Money.of("4000.00", Currency.SAR),
+                account(projection, "3003").summary.inflow.selfTransfersIn,
+            )
+            assertEquals(Money.zero(Currency.SAR), projection.accountsFleet.totalOutflow)
         }
     }
 

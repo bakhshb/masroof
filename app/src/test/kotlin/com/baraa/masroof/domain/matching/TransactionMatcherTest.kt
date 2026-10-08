@@ -33,6 +33,135 @@ class TransactionMatcherTest {
     }
 
     @Test
+    fun pairsEachExactLocalTimeWhenAnotherMovementIsInsideTheWindow() {
+        val firstOut = outgoing(
+            id = "out-a",
+            rawSmsId = "raw-out-a",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val firstIn = incoming(
+            id = "in-a",
+            rawSmsId = "raw-in-a",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val secondOut = outgoing(
+            id = "out-b",
+            rawSmsId = "raw-out-b",
+            reference = null,
+            localTime = defaultLocalTime.plusMinutes(8),
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val secondIn = incoming(
+            id = "in-b",
+            rawSmsId = "raw-in-b",
+            reference = null,
+            localTime = defaultLocalTime.plusMinutes(8),
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+
+        val pairs = TransactionMatcher.findMutuallyUniquePairs(
+            listOf(firstOut, secondOut, firstIn, secondIn),
+        )
+
+        assertEquals(setOf("out-a" to "in-a", "out-b" to "in-b"), pairs.map {
+            it.outgoing.event.id to it.incoming.event.id
+        }.toSet())
+    }
+
+    @Test
+    fun doesNotPairTwoMovementsThatShareOneLocalTime() {
+        val firstOut = outgoing(
+            id = "out-a",
+            rawSmsId = "raw-out-a",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val secondOut = outgoing(
+            id = "out-b",
+            rawSmsId = "raw-out-b",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val firstIn = incoming(
+            id = "in-a",
+            rawSmsId = "raw-in-a",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val secondIn = incoming(
+            id = "in-b",
+            rawSmsId = "raw-in-b",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+
+        assertTrue(
+            TransactionMatcher.findMutuallyUniquePairs(
+                listOf(firstOut, secondOut, firstIn, secondIn),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
+    fun doesNotPairWhenIntraBankLegsAreUnequalAtOneLocalTime() {
+        val firstOut = outgoing(
+            id = "out-a",
+            rawSmsId = "raw-out-a",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val secondOut = outgoing(
+            id = "out-b",
+            rawSmsId = "raw-out-b",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+        val onlyIn = incoming(
+            id = "in-a",
+            rawSmsId = "raw-in-a",
+            reference = null,
+            localTime = defaultLocalTime,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+            network = BankNetworkType.INTRA_BANK,
+        )
+
+        assertTrue(
+            TransactionMatcher.findMutuallyUniquePairs(listOf(firstOut, secondOut, onlyIn)).isEmpty(),
+        )
+    }
+
+    @Test
     fun doesNotMatchAmbiguousCandidates() {
         val outgoing = outgoing(reference = "ref-1")
         val firstIncoming = incoming(id = "in-1", rawSmsId = "raw-in-1", reference = "ref-1")

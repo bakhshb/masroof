@@ -15,6 +15,7 @@ import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import java.time.LocalDateTime
@@ -247,7 +248,7 @@ class SelfTransferDeduplicatorTest {
     }
 
     @Test
-    fun twoMovementsInsideTheMatchWindow_withoutAUniquePair_allStayVisible() {
+    fun twoMovementsSharingOneLocalTime_eachShownOnceWithoutLinkingLegs() {
         val legs = listOf("out-a", "out-b", "in-a", "in-b").map { suffix ->
             tx(
                 id = "self-$suffix",
@@ -268,7 +269,30 @@ class SelfTransferDeduplicatorTest {
 
         val filtered = SelfTransferDeduplicator.filter(legs, records)
 
-        assertEquals(legs.map { it.id }, filtered.map { it.id })
+        assertEquals(listOf("self-out-a", "self-out-b"), filtered.map { it.id })
+        assertEquals(legs, SelfTransferDeduplicator.filter(legs, emptyList()))
+    }
+
+    @Test
+    fun unequalIntraBankLegs_allStayVisible() {
+        val legs = listOf("out-a", "out-b", "in-a").map { suffix ->
+            tx(
+                id = "self-$suffix",
+                type = FinancialTransactionType.SELF_TRANSFER,
+                amount = "2000.00",
+                source = account1,
+                dest = account3,
+                linked = listOf("evt-$suffix"),
+            )
+        }
+        val local = LocalDateTime.parse("2026-08-03T10:38:00")
+        val records = listOf(
+            record("evt-out-a", MessageFamily.TRANSFER_OUT, "2000.00", "3001", "3003", local = local),
+            record("evt-out-b", MessageFamily.TRANSFER_OUT, "2000.00", "3001", "3003", local = local),
+            record("evt-in-a", MessageFamily.TRANSFER_IN, "2000.00", "3001", "3003", local = local),
+        )
+
+        assertEquals(legs.map { it.id }, SelfTransferDeduplicator.filter(legs, records).map { it.id })
     }
 
     @Test
@@ -341,6 +365,26 @@ class SelfTransferDeduplicatorTest {
         val filtered = SelfTransferDeduplicator.filter(listOf(outgoing, incoming), records)
 
         assertEquals(listOf("external-out", "external-in"), filtered.map { it.id })
+    }
+
+    @Test
+    fun manyDistinctTransfers_allStayVisible() {
+        val transactions = (1..500).map { index ->
+            tx(
+                id = "self-$index",
+                type = FinancialTransactionType.SELF_TRANSFER,
+                amount = "10.00",
+                source = account1,
+                dest = account3,
+                linked = listOf("evt-$index"),
+                occurredAt = Instant.parse("2026-08-02T12:00:00Z").plusSeconds(index.toLong() * 3600),
+            )
+        }
+        val started = System.nanoTime()
+        val filtered = SelfTransferDeduplicator.filter(transactions, emptyList())
+        val elapsedMs = (System.nanoTime() - started) / 1_000_000
+        assertEquals(transactions.map { it.id }, filtered.map { it.id })
+        assertTrue(elapsedMs < 1000)
     }
 
     @Test

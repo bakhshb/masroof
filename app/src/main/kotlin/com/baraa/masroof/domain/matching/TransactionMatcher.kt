@@ -37,6 +37,16 @@ data class TransferMatchPair(
 )
 
 /**
+ * Equal number of intra-bank legs that are all compatible with each other.
+ * Any one-to-one pairing has the same accounts and amount, but the matcher
+ * does not choose a pairing: reconciliation must not store a guessed link.
+ */
+data class EqualIntraBankLegSet(
+    val outgoingEventIds: Set<String>,
+    val incomingEventIds: Set<String>,
+)
+
+/**
  * Pure conservative transfer-pair matcher. No Room / Android.
  *
  * Requires exact Money equality, documented time window, OWNED local sides,
@@ -68,28 +78,139 @@ object TransactionMatcher {
             val inns = group.filter { it.event.messageFamily == MessageFamily.TRANSFER_IN }
             if (outs.isEmpty() || inns.isEmpty()) continue
 
-            val eligibleOutToIn = mutableMapOf<String, MutableList<String>>()
-            val eligibleInToOut = mutableMapOf<String, MutableList<String>>()
-
+            val edges = mutableListOf<Pair<TransferMatchCandidate, TransferMatchCandidate>>()
             for (o in outs) {
                 for (i in inns) {
+                    if (compatiblePair(o, i)) edges += o to i
+                }
+            }
+            val exactEdges = edges.filter { (out, inn) -> timeDistanceSeconds(out, inn) == 0L }
+            val exactInsByOut = exactEdges.groupBy { it.first.event.id }
+            val exactOutsByIn = exactEdges.groupBy { it.second.event.id }
+            val proposedExact = exactEdges.filter { (out, inn) ->
+                exactInsByOut[out.event.id].orEmpty().size == 1 &&
+                    exactOutsByIn[inn.event.id].orEmpty().size == 1
+            }
+            val proposedIds = proposedExact
+                .flatMap { (out, inn) -> listOf(out.event.id, inn.event.id) }
+                .toSet()
+            val acceptedExact = proposedExact.filter { (out, inn) ->
+                val outNeighbors = edges.filter { it.first.event.id == out.event.id }.map { it.second.event.id }
+                val inNeighbors = edges.filter { it.second.event.id == inn.event.id }.map { it.first.event.id }
+                outNeighbors.all { it == inn.event.id || it in proposedIds } &&
+                    inNeighbors.all { it == out.event.id || it in proposedIds }
+            }
+            val consumed = acceptedExact
+                .flatMap { (out, inn) -> listOf(out.event.id, inn.event.id) }
+                .toSet()
+            for ((out, inn) in acceptedExact) {
+                pairs += TransferMatchPair(out, inn)
+            }
+
+            val restOuts = outs.filter { it.event.id !in consumed }
+            val restIns = inns.filter { it.event.id !in consumed }
+            val eligibleOutToIn = mutableMapOf<String, MutableList<String>>()
+            val eligibleInToOut = mutableMapOf<String, MutableList<String>>()
+            for (o in restOuts) {
+                for (i in restIns) {
                     if (!compatiblePair(o, i)) continue
                     eligibleOutToIn.getOrPut(o.event.id) { mutableListOf() }.add(i.event.id)
                     eligibleInToOut.getOrPut(i.event.id) { mutableListOf() }.add(o.event.id)
                 }
             }
-
-            for (o in outs) {
+            for (o in restOuts) {
                 val inIds = eligibleOutToIn[o.event.id].orEmpty()
                 if (inIds.size != 1) continue
                 val inId = inIds.single()
                 val outIds = eligibleInToOut[inId].orEmpty()
                 if (outIds.size != 1 || outIds.single() != o.event.id) continue
-                val incomingCandidate = inns.first { it.event.id == inId }
+                val incomingCandidate = restIns.first { it.event.id == inId }
                 pairs += TransferMatchPair(o, incomingCandidate)
             }
         }
         return pairs
+    }
+
+    /**
+     * Intra-bank legs that share an amount and a fully connected window, with
+     * the same number of outgoing and incoming events, after unique pairs are
+     * removed. Presentation can count one movement per outgoing leg. Persisted
+     * links stay untouched because no specific outgoing leg owns a specific
+     * incoming leg.
+     */
+    fun equalIntraBankLegSets(
+        candidates: List<TransferMatchCandidate>,
+        alreadyPairedEventIds: Set<String> = emptySet(),
+    ): List<EqualIntraBankLegSet> {
+        val remaining = candidates.mapNotNull { candidate ->
+            if (candidate.event.id in alreadyPairedEventIds) return@mapNotNull null
+            val amount = candidate.event.amount ?: return@mapNotNull null
+            moneyKey(amount) to candidate
+        }
+        if (remaining.isEmpty()) return emptyList()
+        val byAmount = remaining.groupBy({ it.first }, { it.second })
+        val sets = mutableListOf<EqualIntraBankLegSet>()
+        for ((_, group) in byAmount) {
+            val outs = group.filter { it.event.messageFamily == MessageFamily.TRANSFER_OUT }
+            val inns = group.filter { it.event.messageFamily == MessageFamily.TRANSFER_IN }
+            if (outs.isEmpty() || inns.isEmpty()) continue
+            val byId = group.associateBy { it.event.id }
+            val adjacent = mutableMapOf<String, MutableSet<String>>()
+            for (out in outs) {
+                for (inn in inns) {
+                    if (!compatiblePair(out, inn) || !hasIntraBankAccountBridge(out, inn)) continue
+                    adjacent.getOrPut(out.event.id) { mutableSetOf() }.add(inn.event.id)
+                    adjacent.getOrPut(inn.event.id) { mutableSetOf() }.add(out.event.id)
+                }
+            }
+            val seen = mutableSetOf<String>()
+            for (start in adjacent.keys) {
+                if (!seen.add(start)) continue
+                val component = mutableListOf<String>()
+                val stack = ArrayDeque<String>()
+                stack.add(start)
+                while (stack.isNotEmpty()) {
+                    val current = stack.removeLast()
+                    component += current
+                    for (next in adjacent[current].orEmpty()) {
+                        if (seen.add(next)) stack.add(next)
+                    }
+                }
+                val componentOuts = component.mapNotNull { id ->
+                    byId[id]?.takeIf { it.event.messageFamily == MessageFamily.TRANSFER_OUT }
+                }
+                val componentIns = component.mapNotNull { id ->
+                    byId[id]?.takeIf { it.event.messageFamily == MessageFamily.TRANSFER_IN }
+                }
+                if (componentOuts.size != componentIns.size || componentOuts.isEmpty()) continue
+                val complete = componentOuts.all { out ->
+                    componentIns.all { inn -> inn.event.id in adjacent[out.event.id].orEmpty() }
+                }
+                if (!complete) continue
+                sets += EqualIntraBankLegSet(
+                    outgoingEventIds = componentOuts.map { it.event.id }.toSet(),
+                    incomingEventIds = componentIns.map { it.event.id }.toSet(),
+                )
+            }
+        }
+        return sets
+    }
+
+    private fun timeDistanceSeconds(
+        a: TransferMatchCandidate,
+        b: TransferMatchCandidate,
+    ): Long? {
+        val aLocal = a.occurredAtLocal
+        val bLocal = b.occurredAtLocal
+        if (aLocal != null && bLocal != null) {
+            return kotlin.math.abs(java.time.Duration.between(aLocal, bLocal).seconds)
+        }
+        if (aLocal == null && bLocal == null) {
+            return kotlin.math.abs(java.time.Duration.between(a.receivedAt, b.receivedAt).seconds)
+        }
+        val aEffective = a.effectiveOccurredAt ?: return null
+        val bEffective = b.effectiveOccurredAt ?: return null
+        return kotlin.math.abs(java.time.Duration.between(aEffective, bEffective).seconds)
     }
 
     fun compatiblePair(

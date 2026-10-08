@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.dashboard
 
+import com.baraa.masroof.domain.matching.EqualIntraBankLegSet
 import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.matching.TransferMatchPair
@@ -15,8 +16,12 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
  *
  * A shared amount and the same endpoints are not evidence. Two rows collapse
  * only when they share a parsed event or raw SMS, or when their legs are one
- * mutually unique [TransactionMatcher] pair. A row is hidden only when the
- * row that stays already carries its account endpoints, so one leg is not
+ * mutually unique [TransactionMatcher] pair. When several intra-bank
+ * movements share one clock minute, no leg owns a unique counterpart, so
+ * stored rows stay separate. The dashboard still keeps one row per outgoing
+ * leg and hides the matching incoming-only rows, because every pairing would
+ * move the same amount between the same accounts. A row is hidden only when
+ * the row that stays already carries its account endpoints, so one leg is not
  * dropped while the other account's movement exists only on that leg.
  * Persisted transactions are left as stored; reconciliation owns any repair
  * of duplicate links.
@@ -36,10 +41,9 @@ object SelfTransferDeduplicator {
         val transfers = transactions.filter { it.type in transferTypes }
         if (transfers.size < 2) return transactions
 
-        val pairs = TransactionMatcher.findMutuallyUniquePairs(
-            matchCandidates(transfers, parsedById),
-        )
-        val suppressed = suppressedIds(transfers, parsedById, pairs)
+        val candidates = matchCandidates(transfers, parsedById)
+        val pairs = TransactionMatcher.findMutuallyUniquePairs(candidates)
+        val suppressed = suppressedIds(transfers, parsedById, pairs, candidates)
         if (suppressed.isEmpty()) return transactions
         return transactions.filter { it.id !in suppressed }
     }
@@ -48,18 +52,13 @@ object SelfTransferDeduplicator {
         transfers: List<FinancialTransaction>,
         parsedById: Map<String, ParsedEventRecord>,
         pairs: List<TransferMatchPair>,
+        candidates: List<TransferMatchCandidate>,
     ): Set<String> {
         val members = DisjointSet(transfers.map { it.id })
-        for (leftIndex in transfers.indices) {
-            for (rightIndex in leftIndex + 1 until transfers.size) {
-                val left = transfers[leftIndex]
-                val right = transfers[rightIndex]
-                if (sameMovement(left, right, parsedById, pairs)) {
-                    members.union(left.id, right.id)
-                }
-            }
-        }
-        return transfers
+        unionSharing(transfers, members) { tx -> tx.linkedParsedEventIds }
+        unionSharing(transfers, members) { tx -> rawSmsIds(tx, parsedById) }
+        unionMatcherPairs(transfers, members, pairs)
+        val pairedSuppressed = transfers
             .groupBy { members.find(it.id) }
             .values
             .filter { it.size > 1 }
@@ -70,25 +69,87 @@ object SelfTransferDeduplicator {
                     .map { it.id }
             }
             .toSet()
+        val pairedEventIds = pairs
+            .flatMap { listOf(it.outgoing.event.id, it.incoming.event.id) }
+            .toSet()
+        val ambiguousSuppressed = ambiguousIncomingLegs(
+            transfers = transfers.filter { it.id !in pairedSuppressed },
+            groups = TransactionMatcher.equalIntraBankLegSets(
+                candidates,
+                pairedEventIds,
+            ),
+        )
+        return pairedSuppressed + ambiguousSuppressed
     }
 
-    private fun sameMovement(
-        left: FinancialTransaction,
-        right: FinancialTransaction,
-        parsedById: Map<String, ParsedEventRecord>,
-        pairs: List<TransferMatchPair>,
-    ): Boolean {
-        val leftEvents = left.linkedParsedEventIds.toSet()
-        val rightEvents = right.linkedParsedEventIds.toSet()
-        if (leftEvents.intersect(rightEvents).isNotEmpty()) return true
-        if (rawSmsIds(left, parsedById).intersect(rawSmsIds(right, parsedById)).isNotEmpty()) {
-            return true
+    /**
+     * Hides incoming-only rows in an equal intra-bank set. The outgoing rows
+     * stay, one per movement, and already name both accounts.
+     */
+    private fun ambiguousIncomingLegs(
+        transfers: List<FinancialTransaction>,
+        groups: List<EqualIntraBankLegSet>,
+    ): Set<String> {
+        if (groups.isEmpty()) return emptySet()
+        val suppressed = mutableSetOf<String>()
+        for (group in groups) {
+            val outgoing = transfers.filter { tx ->
+                tx.linkedParsedEventIds.any { it in group.outgoingEventIds }
+            }
+            val incomingOnly = transfers.filter { tx ->
+                tx.linkedParsedEventIds.any { it in group.incomingEventIds } &&
+                    tx.linkedParsedEventIds.none { it in group.outgoingEventIds }
+            }
+            if (outgoing.size != group.outgoingEventIds.size) continue
+            if (incomingOnly.size != group.incomingEventIds.size) continue
+            for (incoming in incomingOnly) {
+                if (outgoing.any { endpointsCovered(it, incoming) }) suppressed += incoming.id
+            }
         }
-        return pairs.any { pair ->
+        return suppressed
+    }
+
+    private fun unionSharing(
+        transfers: List<FinancialTransaction>,
+        members: DisjointSet,
+        keys: (FinancialTransaction) -> Collection<String>,
+    ) {
+        val grouped = mutableMapOf<String, MutableList<String>>()
+        for (tx in transfers) {
+            for (key in keys(tx)) {
+                grouped.getOrPut(key) { mutableListOf() }.add(tx.id)
+            }
+        }
+        for (ids in grouped.values) {
+            if (ids.size < 2) continue
+            val head = ids.first()
+            for (id in ids.drop(1)) members.union(head, id)
+        }
+    }
+
+    private fun unionMatcherPairs(
+        transfers: List<FinancialTransaction>,
+        members: DisjointSet,
+        pairs: List<TransferMatchPair>,
+    ) {
+        if (pairs.isEmpty()) return
+        val holders = mutableMapOf<String, MutableList<FinancialTransaction>>()
+        for (tx in transfers) {
+            for (eventId in tx.linkedParsedEventIds) {
+                holders.getOrPut(eventId) { mutableListOf() }.add(tx)
+            }
+        }
+        for (pair in pairs) {
             val pairEvents = setOf(pair.outgoing.event.id, pair.incoming.event.id)
-            val fromLeft = leftEvents.intersect(pairEvents)
-            val fromRight = rightEvents.intersect(pairEvents)
-            fromLeft.isNotEmpty() && fromRight.isNotEmpty() && fromLeft + fromRight == pairEvents
+            val outgoingHolders = holders[pair.outgoing.event.id].orEmpty()
+            val incomingHolders = holders[pair.incoming.event.id].orEmpty()
+            for (left in outgoingHolders) {
+                for (right in incomingHolders) {
+                    if (left.id == right.id) continue
+                    val covered = (left.linkedParsedEventIds + right.linkedParsedEventIds).toSet()
+                    if (pairEvents.all { it in covered }) members.union(left.id, right.id)
+                }
+            }
         }
     }
 
@@ -96,8 +157,13 @@ object SelfTransferDeduplicator {
         transfers: List<FinancialTransaction>,
         parsedById: Map<String, ParsedEventRecord>,
     ): List<TransferMatchCandidate> {
-        val eventIds = transfers.flatMap { it.linkedParsedEventIds }.distinct()
-        return eventIds.mapNotNull { eventId ->
+        val holders = mutableMapOf<String, MutableList<FinancialTransaction>>()
+        for (tx in transfers) {
+            for (eventId in tx.linkedParsedEventIds) {
+                holders.getOrPut(eventId) { mutableListOf() }.add(tx)
+            }
+        }
+        return holders.mapNotNull { (eventId, linked) ->
             val record = parsedById[eventId] ?: return@mapNotNull null
             val event = record.event
             if (event.messageFamily != MessageFamily.TRANSFER_OUT &&
@@ -106,7 +172,6 @@ object SelfTransferDeduplicator {
                 return@mapNotNull null
             }
             if (event.amount == null) return@mapNotNull null
-            val linked = transfers.filter { eventId in it.linkedParsedEventIds }
             val occurredAt = linked.minOfOrNull { it.occurredAt } ?: return@mapNotNull null
             val (sourceOwned, destinationOwned) = ownership(linked)
             TransferMatchCandidate(
