@@ -879,8 +879,10 @@ Each task is classified, not moved wholesale to the background:
 - Schema facts backfill (re-parse of the stored RawSms backlog after a schema upgrade) is
   classified per Room version in `SchemaFactsBackfillPolicy`. A pending range is
   `BLOCKING` if any version in it is (v10, v11: parse-fact columns dashboard and
-  reconciliation rules read) or is undeclared; otherwise `BACKGROUND`. Every schema version
-  must be declared (`SchemaFactsBackfillPolicyTest`).
+  reconciliation rules read) or is undeclared. It is `NOT_REQUIRED` only when every pending
+  version needs no reparse (v17: indexes only); startup records that version and does not
+  schedule or run the backlog reparse. Any other declared range is `BACKGROUND`. Every schema
+  version must be declared (`SchemaFactsBackfillPolicyTest`).
 - `StartupMaintenance.runBlockingPhase` runs a `BLOCKING` backfill inline. If rows fail,
   financial UI stays gated and the startup screen offers retry; blocking work is never
   downgraded to background merely to release the UI.

@@ -70,6 +70,21 @@ class StartupMaintenanceTest {
     }
 
     @Test
+    fun indexOnlyUpgrade_recordsSchemaWithoutSchedulingOrRunningReparse() = runBlocking<Unit> {
+        recordLastReparsedVersion(16)
+        val coordinator = coordinator()
+        val maintenance = StartupMaintenance(coordinator, currentSchemaVersion = 17) { scheduleCount++ }
+
+        assertEquals(MaintenanceRequirement.NOT_REQUIRED, coordinator.pendingRequirement(17))
+        assertEquals(StartupMaintenanceOutcome.READY, maintenance.runBlockingPhase())
+
+        assertEquals(0, reparseCount)
+        assertEquals(0, scheduleCount)
+        assertEquals(17, lastReparsedVersion())
+        assertNull(coordinator.pendingRequirement(17))
+    }
+
+    @Test
     fun blockingBacklogWithFailedRows_staysBlockedUntilRetrySucceeds() = runBlocking<Unit> {
         recordLastReparsedVersion(9)
         failedRows = 2

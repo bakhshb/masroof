@@ -95,6 +95,20 @@ class AppContainerStartupMaintenanceTest {
     }
 
     @Test
+    fun indexOnlySchemaUpgrade_recordsVersionWithoutSchedulingReparse() = runBlocking<Unit> {
+        recordLastReparsedVersion(16)
+
+        container.runStartupMaintenance()
+        assertEquals(
+            StartupMaintenanceOutcome.READY,
+            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() },
+        )
+
+        assertTrue(backfillWork().isEmpty())
+        assertEquals(MasroofDatabase.VERSION, lastReparsedVersion())
+    }
+
+    @Test
     fun upToDate_schedulesNoBackfill() = runBlocking<Unit> {
         recordLastReparsedVersion(MasroofDatabase.VERSION)
 

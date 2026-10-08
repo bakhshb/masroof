@@ -55,6 +55,15 @@ class SchemaFactsBackfillPolicyTest {
         )
         assertEquals(
             MaintenanceRequirement.BACKGROUND,
+            SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 15, currentVersion = 17),
+        )
+    }
+
+    @Test
+    fun indexOnlySchemaUpgrade_requiresNoParseFactBackfill() {
+        assertEquals(MaintenanceRequirement.NOT_REQUIRED, SchemaFactsBackfillPolicy.requirementBySchemaVersion[17])
+        assertEquals(
+            MaintenanceRequirement.NOT_REQUIRED,
             SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 16, currentVersion = 17),
         )
     }
