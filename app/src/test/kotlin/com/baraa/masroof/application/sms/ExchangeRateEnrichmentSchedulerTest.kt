@@ -8,14 +8,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
-import com.baraa.masroof.application.dashboard.ForeignSarMarketRateProvider
-import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
-import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -25,6 +18,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -35,16 +30,20 @@ class ExchangeRateEnrichmentSchedulerTest {
     private lateinit var workManager: WorkManager
     private lateinit var harness: LiveSmsProcessingHarness
     private val enrichCalls = AtomicInteger(0)
+    private val executor = Executors.newSingleThreadExecutor()
+    private var blockFirstPass: CountDownLatch? = null
+    private var releaseFirstPass: CountDownLatch? = null
 
     @Before
     fun setUp() {
+        ExchangeRateEnrichmentGate.resetForTests()
         context = ApplicationProvider.getApplicationContext()
         harness = LiveSmsProcessingHarness(context)
-        val enricher = countingEnricher(harness, enrichCalls)
+        val enricher = blockingEnricher()
         WorkManagerTestInitHelper.initializeTestWorkManager(
             context,
             Configuration.Builder()
-                .setExecutor(SynchronousExecutor())
+                .setExecutor(executor)
                 .setWorkerFactory(ExchangeRateEnrichmentWorker.Factory { enricher })
                 .build(),
         )
@@ -53,8 +52,10 @@ class ExchangeRateEnrichmentSchedulerTest {
 
     @After
     fun tearDown() {
+        releaseFirstPass?.countDown()
         WorkManagerTestInitHelper.closeWorkDatabase()
         harness.close()
+        executor.shutdownNow()
     }
 
     @Test
@@ -100,31 +101,33 @@ class ExchangeRateEnrichmentSchedulerTest {
     }
 
     @Test
+    fun scheduleWhileRunning_readsPendingRowsAgain() {
+        blockFirstPass = CountDownLatch(1)
+        releaseFirstPass = CountDownLatch(1)
+        val scheduler = WorkManagerExchangeRateEnrichmentScheduler { workManager }
+
+        scheduler.schedule()
+        assertTrue(blockFirstPass!!.await(5, TimeUnit.SECONDS))
+        scheduler.schedule()
+        releaseFirstPass!!.countDown()
+
+        val finished = finishedUniqueWork().single()
+        assertEquals(WorkInfo.State.SUCCEEDED, finished.state)
+        assertEquals(2, enrichCalls.get())
+    }
+
+    @Test
     fun workRequest_isTaggedForDiscovery() {
         val request = WorkManagerExchangeRateEnrichmentScheduler.workRequest()
         assertTrue(WorkManagerExchangeRateEnrichmentScheduler.WORK_TAG in request.tags)
     }
 
-    private fun countingEnricher(
-        harness: LiveSmsProcessingHarness,
-        counter: AtomicInteger,
-    ): PendingExchangeRateEnricher {
-        val ftRepo = object : FinancialTransactionRepository by harness.ftRepo {
-            override suspend fun listAwaitingAppliedExchangeRate(
-                primaryCurrency: Currency,
-            ): List<FinancialTransaction> {
-                counter.incrementAndGet()
-                return harness.ftRepo.listAwaitingAppliedExchangeRate(primaryCurrency)
+    private fun blockingEnricher(): PendingExchangeRateEnricher =
+        PendingExchangeRateEnricher {
+            val call = enrichCalls.incrementAndGet()
+            if (call == 1) {
+                blockFirstPass?.countDown()
+                releaseFirstPass?.await()
             }
         }
-        val workflow = ExchangeRateEnrichmentWorkflow(
-            financialTransactionRepository = ftRepo,
-            parsedEventRepository = harness.parsedRepo,
-            rawSmsRepository = harness.rawRepo,
-            sarEquivalentResolver = TransactionSarEquivalentResolver(
-                marketRateProvider = ForeignSarMarketRateProvider { _, _ -> null },
-            ),
-        )
-        return PendingExchangeRateEnricher { workflow.enrichPending() }
-    }
 }

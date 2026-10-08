@@ -507,7 +507,14 @@ class ProcessStoredSmsUseCase(
     }
 
     private fun scheduleExchangeRateEnrichment() {
-        exchangeRateEnrichmentScheduler?.schedule()
+        val scheduler = exchangeRateEnrichmentScheduler ?: return
+        try {
+            scheduler.schedule()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Scheduling is best-effort. The financial outcome is already durable.
+        }
     }
 
     private suspend fun refreshReviewQueue(

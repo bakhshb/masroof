@@ -98,6 +98,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
     fun processStored(
         rawSmsRepository: RawSmsRepository = rawRepo,
         derivedFailures: DerivedFailureInjection = DerivedFailureInjection(),
+        exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler? = null,
     ): ProcessStoredSmsUseCase {
         val parsedForReconcile = object : ParsedEventRepository by parsedRepo {
             override suspend fun listReceivedBetween(
@@ -189,7 +190,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             reviewQueueUpdater = ReviewQueueUpdater(reviewForUpdate, ftRepo, clock),
             ingestionReviewService = ingestionReview,
             processingRecovery = recovery,
-            exchangeRateEnrichmentScheduler = ImmediateExchangeRateEnrichmentScheduler(
+            exchangeRateEnrichmentScheduler = exchangeRateEnrichmentScheduler ?: ImmediateExchangeRateEnrichmentScheduler(
                 PendingExchangeRateEnricher {
                     ExchangeRateEnrichmentWorkflow(
                         financialTransactionRepository = ftForEnrichment,
