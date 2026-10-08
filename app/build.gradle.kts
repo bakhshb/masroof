@@ -40,6 +40,8 @@ android {
         buildConfigField("boolean", "ENABLE_DESIGN_CATALOG", "false")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Orchestrator clears app data before each device smoke so journeys do not leak.
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
     signingConfigs {
@@ -95,6 +97,8 @@ android {
     }
 
     testOptions {
+        animationsDisabled = true
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
             it.maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
@@ -129,6 +133,7 @@ dependencies {
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
+    androidTestImplementation(composeBom)
 
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
@@ -136,6 +141,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
 
     implementation(libs.okhttp)
     implementation(libs.androidx.work.runtime.ktx)
@@ -147,6 +153,12 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.work.testing)
+
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    androidTestUtil(libs.androidx.test.orchestrator)
+    androidTestUtil(libs.androidx.test.services)
 
     detektPlugins(libs.detekt.formatting)
 }
