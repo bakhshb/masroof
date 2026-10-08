@@ -38,6 +38,12 @@ class AppLogRedactorTest {
     }
 
     @Test
+    fun redact_preservesHarmlessIds() {
+        val sanitized = AppLogRedactor.redact("rawSmsId=android-sms:42 tx=tx-100 ref=123456")
+        assertEquals("rawSmsId=android-sms:42 tx=tx-100 ref=123456", sanitized)
+    }
+
+    @Test
     fun redact_preservesOrdinaryAmounts() {
         val sanitized = AppLogRedactor.redact("purchase 51.99 SAR on 2026-08-03")
         assertEquals("purchase 51.99 SAR on 2026-08-03", sanitized)

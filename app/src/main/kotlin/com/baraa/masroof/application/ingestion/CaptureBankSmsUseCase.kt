@@ -50,14 +50,13 @@ class CaptureBankSmsUseCase(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            val message = e.message ?: e::class.java.simpleName
             if (logOutcome) {
                 appLogService?.error(
                     AppLogCategories.INGEST,
-                    "Ingest failed for ${AppLogFormatting.maskSender(rawSms.sender)}: $message",
+                    "Ingest failed for ${AppLogFormatting.maskSender(rawSms.sender)} (${e.javaClass.simpleName})",
                 )
             }
-            return BankSmsCaptureResult.Failed(message = message, cause = e)
+            return BankSmsCaptureResult.Failed(message = e.message ?: e::class.java.simpleName, cause = e)
         }
 
         return when (insertOutcome) {

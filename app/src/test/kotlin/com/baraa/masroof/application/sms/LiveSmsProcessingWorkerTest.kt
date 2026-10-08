@@ -440,6 +440,20 @@ class LiveSmsProcessingWorkerTest {
     }
 
     @Test
+    fun ingestException_logsClassWithoutExceptionMessage() = runBlocking {
+        val raw = captured()
+        harness.parseOverride = { throw IllegalStateException("secret sms body text") }
+        val processStored = harness.processStored(appLogService = harness.appLog)
+
+        val outcome = processStored.process(raw.id)
+
+        assertTrue(outcome is SmsIngestionResult.Failed)
+        val logged = harness.appLog.readAll().joinToString("\n") { it.message }
+        assertTrue(logged.contains("IllegalStateException"))
+        assertFalse(logged.contains("secret sms body text"))
+    }
+
+    @Test
     fun unexpectedProcessFailure_logsSanitizedDiagnostic() = runBlocking {
         val raw = captured()
         val processStored = harness.processStored(

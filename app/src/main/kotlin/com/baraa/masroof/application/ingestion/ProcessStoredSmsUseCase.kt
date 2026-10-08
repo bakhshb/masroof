@@ -260,7 +260,7 @@ class ProcessStoredSmsUseCase(
         logOutcome: Boolean,
     ): SmsIngestionResult.Failed {
         if (logOutcome) {
-            logIngestFailure(rawSms, message)
+            logIngestFailure(rawSms, cause?.javaClass?.simpleName ?: message)
         }
         if (!recordIngestionReview(rawSms.id, IngestionReviewService.REASON_PROCESSING_ERROR)) {
             return SmsIngestionResult.Failed(
