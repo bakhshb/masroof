@@ -148,6 +148,9 @@ class TransactionRestoreServiceTest {
                         override suspend fun latestForRawSmsId(rawSmsId: String) = null
                         override suspend fun listForRawSmsId(rawSmsId: String): List<com.baraa.masroof.domain.model.UserCorrection> =
                             emptyList()
+                        override suspend fun listForRawSmsIds(
+                            rawSmsIds: Collection<String>,
+                        ): List<com.baraa.masroof.domain.model.UserCorrection> = emptyList()
                     },
                 ),
                 ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
