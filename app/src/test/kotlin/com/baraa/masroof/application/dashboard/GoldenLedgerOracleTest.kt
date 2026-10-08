@@ -20,7 +20,8 @@ import org.robolectric.annotation.Config
  * stay exempt only while the ledger still misses that milestone's oracle.
  *
  * Re-import plus stored-SMS processing is called reprocessing here. It is not an
- * Android process restart.
+ * Android process restart. Active oracles require both steps to complete
+ * successfully, then a stable ledger fingerprint.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -89,8 +90,15 @@ class GoldenLedgerOracleTest {
             GoldenLedgerRunner.prepare(world, scenario)
             val first = GoldenLedgerRunner.read(world, scenario)
             assertMatches(scenario, first)
-            world.importProviderRows(GoldenLedgerRunner.providerRows(scenario))
-            world.reprocessStoredEvidence()
+            GoldenLedgerRunner.requireSuccessfulImport(
+                id = id,
+                imported = world.importProviderRows(GoldenLedgerRunner.providerRows(scenario)),
+                label = "reimport",
+            )
+            GoldenLedgerRunner.requireSuccessfulReprocess(
+                id = id,
+                results = world.reprocessStoredEvidence(),
+            )
             val afterReprocessing = GoldenLedgerRunner.read(world, scenario)
             assertEquals(
                 "$id reprocessing changed the ledger fingerprint",

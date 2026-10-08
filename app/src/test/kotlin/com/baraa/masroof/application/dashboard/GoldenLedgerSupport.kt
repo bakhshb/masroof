@@ -18,11 +18,13 @@ import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.sms.HistoricalBatchDerivedResult
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
+import com.baraa.masroof.testsupport.LedgerImportOutcome
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -244,10 +246,11 @@ object GoldenLedgerRunner {
             world.cards.updateCardType(reference, CardType.valueOf(card.type))
         }
         if (scenario.messages.isNotEmpty()) {
-            val derived = world.importProviderRows(providerRows(scenario))
-            check(derived is HistoricalBatchDerivedResult.Succeeded) {
-                "${scenario.id} import did not finish derived work: $derived"
-            }
+            requireSuccessfulImport(
+                id = scenario.id,
+                imported = world.importProviderRows(providerRows(scenario)),
+                label = "import",
+            )
         }
         for (row in scenario.seedRows) {
             seed(world, row)
@@ -336,6 +339,46 @@ object GoldenLedgerRunner {
 
     fun providerRows(scenario: GoldenLedgerScenario): List<ProviderSmsRecord> =
         scenario.messages.map(::toProviderRow)
+
+    fun requireSuccessfulImport(
+        id: String,
+        imported: LedgerImportOutcome,
+        label: String,
+    ) {
+        require(imported.ingest.isNotEmpty()) {
+            "$id $label produced no ingest outcomes"
+        }
+        requireCompletedIngestion(id, imported.ingest, label)
+        require(imported.derived is HistoricalBatchDerivedResult.Succeeded) {
+            "$id $label did not finish derived work: ${imported.derived}"
+        }
+    }
+
+    fun requireSuccessfulReprocess(
+        id: String,
+        results: List<SmsIngestionResult>,
+    ) {
+        require(results.isNotEmpty()) {
+            "$id reprocessing produced no outcomes"
+        }
+        requireCompletedIngestion(id, results, "reprocessing")
+    }
+
+    private fun requireCompletedIngestion(
+        id: String,
+        results: List<SmsIngestionResult>,
+        label: String,
+    ) {
+        results.forEachIndexed { index, result ->
+            when (result) {
+                is SmsIngestionResult.Failed ->
+                    error("$id $label[$index] failed: ${result.message}")
+                is SmsIngestionResult.DerivedIncomplete ->
+                    error("$id $label[$index] derived incomplete at ${result.stage}")
+                else -> Unit
+            }
+        }
+    }
 
     fun expectedMetric(expected: GoldenExpected, key: String): String? = when (key) {
         "rawSmsCount" -> expected.rawSmsCount.toString()

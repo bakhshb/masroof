@@ -11,6 +11,7 @@ import com.baraa.masroof.application.dashboard.ForeignSarMarketRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
+import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
@@ -171,7 +172,7 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
      * Imports caller-supplied provider rows through the same capture → parse → one-batch
      * reconcile path as [importFixtureCorpus].
      */
-    suspend fun importProviderRows(rows: List<ProviderSmsRecord>): HistoricalBatchDerivedResult {
+    suspend fun importProviderRows(rows: List<ProviderSmsRecord>): LedgerImportOutcome {
         val batch = HistoricalSmsBatchProcessor(
             capture = captureBankSms,
             processStored = processStoredSms(),
@@ -179,17 +180,20 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
         ).startBatch()
-        rows.forEach { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
-        return batch.finish()
+        val ingest = rows.map { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
+        return LedgerImportOutcome(
+            ingest = ingest,
+            derived = batch.finish(),
+        )
     }
 
     /**
      * Re-runs parse and derived work for every stored RawSms.
      * This is reprocessing of stored evidence, not an Android process restart.
      */
-    suspend fun reprocessStoredEvidence() {
+    suspend fun reprocessStoredEvidence(): List<SmsIngestionResult> {
         val processor = processStoredSms()
-        for (id in rawRepo.listIdsByReceivedAt()) {
+        return rawRepo.listIdsByReceivedAt().map { id ->
             processor.process(id, logOutcome = false)
         }
     }
@@ -660,3 +664,8 @@ class CountingRawSmsRepository(
         return delegate.getByIds(ids)
     }
 }
+
+data class LedgerImportOutcome(
+    val ingest: List<SmsIngestionResult>,
+    val derived: HistoricalBatchDerivedResult,
+)
