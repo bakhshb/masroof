@@ -239,7 +239,7 @@ class ReviewViewModel(
                 when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
                     is RestoreResult.Success -> {
                         val summaries = when (_uiState.value.listMode) {
-                            ReviewListMode.PENDING -> detailLoader.loadSummaries(reconcile = false)
+                            ReviewListMode.PENDING -> detailLoader.loadSummaries()
                             ReviewListMode.IGNORED -> detailLoader.loadIgnoredSummaries()
                         }
                         applySummaries(summaries)
@@ -305,7 +305,6 @@ class ReviewViewModel(
                         refreshAfterAction(
                             message = ReviewMessage.RESOLVED,
                             closeDetail = true,
-                            reconcile = false,
                         )
                         return@launch
                     }
@@ -323,9 +322,9 @@ class ReviewViewModel(
                             error = null,
                         )
                     }
-                    applySummaries(detailLoader.loadSummaries(reconcile = false))
+                    applySummaries(detailLoader.loadSummaries())
                 } else {
-                    applySummaries(detailLoader.loadSummaries(reconcile = false))
+                    applySummaries(detailLoader.loadSummaries())
                     _uiState.update { it.copy(resolving = false, message = ReviewMessage.RESOLVED) }
                 }
             } catch (ce: CancellationException) {
@@ -386,10 +385,9 @@ class ReviewViewModel(
     private suspend fun refreshAfterAction(
         message: ReviewMessage,
         closeDetail: Boolean,
-        reconcile: Boolean = true,
     ) {
         val summaries = when (_uiState.value.listMode) {
-            ReviewListMode.PENDING -> detailLoader.loadSummaries(reconcile = reconcile)
+            ReviewListMode.PENDING -> detailLoader.loadSummaries()
             ReviewListMode.IGNORED -> detailLoader.loadIgnoredSummaries()
         }
         val items = summaries.map(::toListItem)
