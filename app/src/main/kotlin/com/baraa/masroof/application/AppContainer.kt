@@ -53,6 +53,7 @@ import com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult
 import com.baraa.masroof.application.maintenance.StartupMaintenance
 import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
 import com.baraa.masroof.application.maintenance.StoredSmsReprocessor
+import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -676,11 +677,30 @@ class AppContainer(
         )
     }
 
+    private val transferIntegrityRepairCoordinator: TransferIntegrityRepairCoordinator by lazy {
+        TransferIntegrityRepairCoordinator(
+            prefs = appContext.getSharedPreferences(
+                MaintenancePreferences.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+            appLogService = appLogService,
+            repairStoredTransfers = {
+                reviewQueueUpdater.applyReport(
+                    transactionReconciliationService.reconcileStoredEventsDetailed(),
+                )
+            },
+            completionSignal = maintenanceCompletionSignal,
+        )
+    }
+
     /** Emits when background maintenance changed stored data; open screens reload on it. */
     val maintenanceCompletionSignal: MaintenanceCompletionSignal = MaintenanceCompletionSignal()
 
     private val startupMaintenance: StartupMaintenance by lazy {
-        StartupMaintenance(factsBackfill = parsedEventFactsBackfillCoordinator) {
+        StartupMaintenance(
+            factsBackfill = parsedEventFactsBackfillCoordinator,
+            transferIntegrityRepair = transferIntegrityRepairCoordinator,
+        ) {
             ParsedEventFactsBackfillWorker.enqueue(WorkManager.getInstance(appContext))
         }
     }

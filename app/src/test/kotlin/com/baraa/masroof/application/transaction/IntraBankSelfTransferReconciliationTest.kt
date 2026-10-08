@@ -6,6 +6,12 @@ import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.dashboard.AccountFlowScopeMode
 import com.baraa.masroof.application.dashboard.CurrentAccountSummaryCalculator
 import com.baraa.masroof.application.dashboard.SelfTransferDeduplicator
+import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.maintenance.BackfillOutcome
+import com.baraa.masroof.application.maintenance.MaintenancePreferences
+import com.baraa.masroof.application.maintenance.MaintenanceRequirement
+import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
+import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
@@ -14,23 +20,31 @@ import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
+import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.domain.assembly.TransactionTiming
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.ids.ReviewIdFactory
 import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
+import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
+import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.model.ReviewKind
+import com.baraa.masroof.domain.model.ReviewResolutionKind
+import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
+import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.model.ParseResult
-import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.sms.hash.SmsBodyHasher
-import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -68,10 +82,13 @@ class IntraBankSelfTransferReconciliationTest {
         في: 2026-08-27 07:36
         """.trimIndent()
 
+    private lateinit var context: Context
     private lateinit var db: MasroofDatabase
     private lateinit var rawRepo: RoomRawSmsRepository
     private lateinit var parsedRepo: RoomParsedEventRepository
     private lateinit var ftRepo: RoomFinancialTransactionRepository
+    private lateinit var reviewRepo: ReviewRepository
+    private lateinit var reviewQueueUpdater: ReviewQueueUpdater
     private lateinit var accounts: RoomAccountRegistryRepository
     private lateinit var cards: RoomCardRegistryRepository
     private lateinit var confirmation: OwnershipConfirmationService
@@ -81,13 +98,19 @@ class IntraBankSelfTransferReconciliationTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        context = ApplicationProvider.getApplicationContext()
         db = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java)
             .allowMainThreadQueries()
             .build()
         rawRepo = RoomRawSmsRepository(db.rawSmsDao())
         parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
         ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
+        reviewRepo = RoomReviewRepository(db.reviewItemDao())
+        reviewQueueUpdater = ReviewQueueUpdater(
+            reviewRepository = reviewRepo,
+            financialTransactionRepository = ftRepo,
+            clock = InstantClock.System,
+        )
         accounts = RoomAccountRegistryRepository.from(db)
         cards = RoomCardRegistryRepository.from(db)
         confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
@@ -96,6 +119,7 @@ class IntraBankSelfTransferReconciliationTest {
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
+            reviewRepository = reviewRepo,
             zoneId = zoneId,
         )
     }
@@ -443,12 +467,9 @@ class IntraBankSelfTransferReconciliationTest {
     @Test
     fun sameMinuteAmbiguousLegs_areNotPostedAsFourSelfTransfers() = runBlocking {
         ownBothAccounts()
-        persistParsed("sms-out-a", intraOut("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:00Z"))
-        persistParsed("sms-out-b", intraOut("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:01Z"))
-        persistParsed("sms-in-a", intraIn("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:02Z"))
-        persistParsed("sms-in-b", intraIn("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:03Z"))
+        persistSameMinuteAmbiguousLegs()
 
-        reconciliation.reconcileStoredEvents()
+        reconcileAndApplyReviews()
 
         assertTrue(
             "Irreducibly ambiguous same-minute legs must stay unmatched, not four self-transfers",
@@ -456,6 +477,96 @@ class IntraBankSelfTransferReconciliationTest {
         )
         assertEquals(4, parsedRepo.listAll().size)
         assertEquals(4, rawRepo.listIdsByReceivedAt().size)
+        assertPendingMatchReviews(SAME_MINUTE_SMS_IDS)
+    }
+
+    @Test
+    fun legacyFourPostedSameMinuteLegs_areRepairedToPendingMatchReviews() = runBlocking {
+        ownBothAccounts()
+        persistSameMinuteAmbiguousLegs()
+        seedPostedSingleLegSelf("sms-out-a", "out-a")
+        seedPostedSingleLegSelf("sms-out-b", "out-b")
+        seedPostedSingleLegSelf("sms-in-a", "in-a")
+        seedPostedSingleLegSelf("sms-in-b", "in-b")
+        assertEquals(4, ftRepo.listAll().size)
+        assertTrue(ftRepo.listAll().all { it.type == FinancialTransactionType.SELF_TRANSFER })
+
+        val prefs = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+        val coordinator = TransferIntegrityRepairCoordinator(
+            prefs = prefs,
+            appLogService = AppLogService(context),
+            repairStoredTransfers = { reconcileAndApplyReviews() },
+        )
+        assertEquals(MaintenanceRequirement.BLOCKING, coordinator.pendingRequirement())
+        assertEquals(BackfillOutcome.COMPLETED, coordinator.runIfNeeded())
+        assertEquals(BackfillOutcome.UP_TO_DATE, coordinator.runIfNeeded())
+
+        assertTrue(
+            "Upgrade must drop the four pre-M1 self-transfer legs instead of leaving double-counted money",
+            ftRepo.listAll().isEmpty(),
+        )
+        assertEquals(4, parsedRepo.listAll().size)
+        assertPendingMatchReviews(SAME_MINUTE_SMS_IDS)
+    }
+
+    @Test
+    fun legacyFourPostedEightMinutePairs_healToTwoSelfTransfersWithoutReview() = runBlocking {
+        ownBothAccounts()
+        persistPair("a", "2026-09-02 10:00", "2026-09-02T07:00:00Z")
+        persistPair("b", "2026-09-02 10:08", "2026-09-02T07:08:00Z")
+        seedPostedSingleLegSelf("sms-a-out", "a-out")
+        seedPostedSingleLegSelf("sms-a-in", "a-in")
+        seedPostedSingleLegSelf("sms-b-out", "b-out")
+        seedPostedSingleLegSelf("sms-b-in", "b-in")
+        assertEquals(4, ftRepo.listAll().size)
+
+        reconcileAndApplyReviews()
+        reconcileAndApplyReviews()
+
+        val stored = ftRepo.listAll()
+        assertEquals(2, stored.size)
+        assertTrue(stored.all { it.type == FinancialTransactionType.SELF_TRANSFER })
+        assertEquals(Money.of("4000.00", Currency.SAR), selfTransferOutOf3001(stored))
+        assertTrue(reviewRepo.listRequired().isEmpty())
+        val first = stored.single { it.occurredAt == Instant.parse("2026-09-02T07:00:00Z") }
+        val second = stored.single { it.occurredAt == Instant.parse("2026-09-02T07:08:00Z") }
+        assertEquals(setOf("sms-a-in", "sms-a-out"), ftRepo.listRawSmsIds(first.id).toSet())
+        assertEquals(setOf("sms-b-in", "sms-b-out"), ftRepo.listRawSmsIds(second.id).toSet())
+    }
+
+    @Test
+    fun legacyAmbiguousPostedSelfTransfer_userFinancialType_isNotUnlinked() = runBlocking {
+        ownBothAccounts()
+        persistSameMinuteAmbiguousLegs()
+        seedPostedSingleLegSelf("sms-out-a", "out-a")
+        seedPostedSingleLegSelf("sms-out-b", "out-b")
+        seedPostedSingleLegSelf("sms-in-a", "in-a")
+        seedPostedSingleLegSelf("sms-in-b", "in-b")
+        val keptId = ftRepo.findByRawSmsId("sms-out-a")!!.id
+        val now = Instant.parse("2026-09-02T12:00:00Z")
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-out-a",
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf("manual_resolution"),
+            now = now,
+        )
+        reviewRepo.markResolved(
+            id = ReviewIdFactory.fromRawSmsId("sms-out-a"),
+            resolutionKind = ReviewResolutionKind.USER_FINANCIAL_TYPE,
+            resolvedAt = now,
+            resolvedTransactionId = keptId,
+        )
+
+        reconcileAndApplyReviews()
+
+        val kept = ftRepo.findByRawSmsId("sms-out-a")
+        assertEquals(keptId, kept?.id)
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, kept?.type)
+        assertEquals(setOf("sms-out-b", "sms-in-a", "sms-in-b"), reviewRepo.listRequired().map { it.rawSmsId }.toSet())
+        assertTrue(reviewRepo.listRequired().all { it.kind == ReviewKind.PENDING_MATCH })
+        assertEquals(ReviewStatus.RESOLVED, reviewRepo.findByRawSmsId("sms-out-a")?.status)
+        assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.findByRawSmsId("sms-out-a")?.resolutionKind)
     }
 
     @Test
@@ -503,6 +614,52 @@ class IntraBankSelfTransferReconciliationTest {
         val received = Instant.parse(receivedAt)
         persistParsed("sms-$suffix-out", intraOut(local), received)
         persistParsed("sms-$suffix-in", intraIn(local), received.plusSeconds(5))
+    }
+
+    private suspend fun persistSameMinuteAmbiguousLegs() {
+        persistParsed("sms-out-a", intraOut("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:00Z"))
+        persistParsed("sms-out-b", intraOut("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:01Z"))
+        persistParsed("sms-in-a", intraIn("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:02Z"))
+        persistParsed("sms-in-b", intraIn("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:03Z"))
+    }
+
+    private suspend fun reconcileAndApplyReviews() {
+        reviewQueueUpdater.applyReport(reconciliation.reconcileStoredEventsDetailed())
+    }
+
+    private suspend fun assertPendingMatchReviews(rawSmsIds: Set<String>) {
+        val required = reviewRepo.listRequired()
+        assertEquals(rawSmsIds, required.map { it.rawSmsId }.toSet())
+        assertTrue(required.all { it.kind == ReviewKind.PENDING_MATCH })
+        assertTrue(required.all { it.status == ReviewStatus.REQUIRED })
+        assertTrue(required.all { it.reasons == listOf("transfer_pending_match") })
+    }
+
+    private suspend fun seedPostedSingleLegSelf(rawSmsId: String, idSuffix: String) {
+        val parsed = parsedRepo.listAll().first { it.event.rawSmsId == rawSmsId }
+        val receivedAt = rawRepo.getById(rawSmsId)!!.receivedAt
+        val occurredAt = TransactionTiming.effectiveOccurredAt(
+            event = parsed.event,
+            occurredAtLocal = parsed.details.occurredAtLocal,
+            receivedAt = receivedAt,
+            zoneId = zoneId,
+        )
+        ftRepo.save(
+            FinancialTransaction(
+                id = "tx-legacy-$idSuffix",
+                type = FinancialTransactionType.SELF_TRANSFER,
+                amount = parsed.event.amount!!,
+                occurredAt = occurredAt,
+                sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+                destinationContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002"),
+                merchant = null,
+                counterparty = parsed.event.counterparty,
+                categoryId = null,
+                linkedParsedEventIds = listOf(parsed.event.id),
+                occurredAtZone = "Asia/Riyadh",
+            ),
+            listOf(rawSmsId),
+        )
     }
 
     private fun intraOut(local: String): String =
@@ -629,4 +786,8 @@ class IntraBankSelfTransferReconciliationTest {
         sourceOwnership = com.baraa.masroof.domain.model.OwnershipStatus.OWNED,
         destinationOwnership = com.baraa.masroof.domain.model.OwnershipStatus.OWNED,
     )
+
+    private companion object {
+        val SAME_MINUTE_SMS_IDS = setOf("sms-out-a", "sms-out-b", "sms-in-a", "sms-in-b")
+    }
 }
