@@ -71,6 +71,20 @@ interface FinancialTransactionRepository {
         listByTypes(types).filter { !it.occurredAt.isBefore(startInclusive) }
 
     /**
+     * [listByTypes] restricted to occurredAt in `[startInclusive, endExclusive)`, same order.
+     */
+    suspend fun listByTypesOccurredBetween(
+        types: Collection<FinancialTransactionType>,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): List<FinancialTransaction> {
+        if (types.isEmpty() || !startInclusive.isBefore(endExclusive)) return emptyList()
+        return listByTypes(types).filter {
+            !it.occurredAt.isBefore(startInclusive) && it.occurredAt.isBefore(endExclusive)
+        }
+    }
+
+    /**
      * Transactions not in [primaryCurrency] that have no persisted applied exchange rate
      * (rate or source missing), oldest first.
      */

@@ -54,6 +54,25 @@ interface ParsedEventDao {
     )
     suspend fun listUnlinkedTransfers(): List<ParsedEventEntity>
 
+    @Query(
+        """
+        SELECT pe.* FROM parsed_event pe
+        INNER JOIN raw_sms rs ON pe.rawSmsId = rs.id
+        WHERE pe.messageFamily IN ('TRANSFER_IN', 'TRANSFER_OUT')
+          AND rs.receivedAtEpochMillis >= :startInclusiveMillis
+          AND rs.receivedAtEpochMillis < :endExclusiveMillis
+          AND NOT EXISTS (
+            SELECT 1 FROM financial_transaction_raw_sms_link link
+            WHERE link.rawSmsId = pe.rawSmsId
+          )
+        ORDER BY pe.id
+        """,
+    )
+    suspend fun listUnlinkedTransfersReceivedBetween(
+        startInclusiveMillis: Long,
+        endExclusiveMillis: Long,
+    ): List<ParsedEventEntity>
+
     /** Callers keep [rawSmsIds] under [RoomBatch.MAX_BIND_ARGS]. */
     @Query("SELECT * FROM parsed_event WHERE rawSmsId IN (:rawSmsIds)")
     suspend fun listByRawSmsIds(rawSmsIds: List<String>): List<ParsedEventEntity>

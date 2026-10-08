@@ -97,6 +97,21 @@ interface FinancialTransactionDao {
     @Query(
         """
         SELECT * FROM financial_transaction
+        WHERE type IN (:types)
+          AND occurredAtEpochMillis >= :startInclusiveEpochMillis
+          AND occurredAtEpochMillis < :endExclusiveEpochMillis
+        ORDER BY occurredAtEpochMillis, id
+        """,
+    )
+    suspend fun listByTypesOccurredBetween(
+        types: List<String>,
+        startInclusiveEpochMillis: Long,
+        endExclusiveEpochMillis: Long,
+    ): List<FinancialTransactionEntity>
+
+    @Query(
+        """
+        SELECT * FROM financial_transaction
         WHERE amountCurrency != :primaryCurrency
           AND (appliedExchangeRate IS NULL OR exchangeRateSource IS NULL)
         ORDER BY occurredAtEpochMillis, id

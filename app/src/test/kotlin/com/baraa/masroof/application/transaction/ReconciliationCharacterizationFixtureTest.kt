@@ -167,4 +167,79 @@ class ReconciliationCharacterizationFixtureTest {
             assertEquals("Keeta", posted.merchant)
         }
     }
+
+    @Test
+    fun scopedReconcile_matchesFullReconcileOnEachCharacterizationSeed() = runBlocking {
+        assertScopedMatchesFull(
+            affectedRawSmsIds = setOf(ReconciliationCharacterizationFixture.PURCHASE_SMS),
+        ) { seedNonTransfer() }
+        assertScopedMatchesFull(
+            affectedRawSmsIds = setOf(ReconciliationCharacterizationFixture.EXTERNAL_SMS),
+        ) { seedExternalTransfer() }
+        assertScopedMatchesFull(
+            affectedRawSmsIds = setOf(ReconciliationCharacterizationFixture.SELF_IN_SMS),
+        ) { seedMatchedSelfTransfer() }
+        assertScopedMatchesFull(
+            affectedRawSmsIds = setOf(ReconciliationCharacterizationFixture.CORRECTION_SMS),
+            withCorrections = true,
+            prepare = { saveAmountCorrection() },
+        ) { seedReviewRequiredPurchase() }
+    }
+
+    @Test
+    fun scopedReconcile_healsStaleSingleLegWhenOnlyTheIncomingSmsIsAffected() = runBlocking {
+        val full = openCharacterization().use { world ->
+            world.prepareStaleSingleLeg()
+            world.seedStaleIncomingCounterpart()
+            val report = world.reconciliation().reconcileStoredEventsDetailed()
+            world.snapshot() to report.reviewCandidates.sortedBy { it.rawSmsId }
+        }
+        val scoped = openCharacterization().use { world ->
+            world.prepareStaleSingleLeg()
+            world.seedStaleIncomingCounterpart()
+            val report = world.reconciliation().reconcileAffectedRawSmsIds(
+                setOf(ReconciliationCharacterizationFixture.STALE_IN_SMS),
+            )
+            world.snapshot() to report.reviewCandidates.sortedBy { it.rawSmsId }
+        }
+        assertEquals(full, scoped)
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, scoped.first.single().type)
+    }
+
+    @Test
+    fun scopedReconcile_emptyIds_doesNotPost() = runBlocking {
+        openCharacterization().use { world ->
+            world.seedNonTransfer()
+            val report = world.reconciliation().reconcileAffectedRawSmsIds(emptyList())
+            assertTrue(report.reviewCandidates.isEmpty())
+            assertTrue(report.settledRawSmsIds.isEmpty())
+            assertTrue(world.snapshot().isEmpty())
+        }
+    }
+
+    private suspend fun assertScopedMatchesFull(
+        affectedRawSmsIds: Set<String>,
+        withCorrections: Boolean = false,
+        prepare: suspend ReconciliationCharacterizationFixture.() -> Unit = {},
+        seed: suspend ReconciliationCharacterizationFixture.() -> Unit,
+    ) {
+        val full = openCharacterization().use { world ->
+            world.seed()
+            world.prepare()
+            val service = if (withCorrections) world.reconciliationWithCorrections() else world.reconciliation()
+            val report = service.reconcileStoredEventsDetailed()
+            world.snapshot() to report.reviewCandidates.sortedBy { it.rawSmsId }
+        }
+        val scoped = openCharacterization().use { world ->
+            world.seed()
+            world.prepare()
+            val service = if (withCorrections) world.reconciliationWithCorrections() else world.reconciliation()
+            val report = service.reconcileAffectedRawSmsIds(affectedRawSmsIds)
+            world.snapshot() to report.reviewCandidates.sortedBy { it.rawSmsId }
+        }
+        assertEquals(full, scoped)
+    }
+
+    private fun openCharacterization(): ReconciliationCharacterizationFixture =
+        ReconciliationCharacterizationFixture.open(ApplicationProvider.getApplicationContext())
 }

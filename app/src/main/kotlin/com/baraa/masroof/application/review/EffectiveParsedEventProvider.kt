@@ -34,6 +34,17 @@ class EffectiveParsedEventProvider(
     suspend fun listUnlinkedTransfersEffective(): List<ParsedEventRecord> =
         withCorrections(parsedEventRepository.listUnlinkedTransfers())
 
+    suspend fun listEffectiveByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> =
+        withCorrections(parsedEventRepository.listByRawSmsIds(rawSmsIds))
+
+    suspend fun listUnlinkedTransfersEffectiveReceivedBetween(
+        startInclusive: java.time.Instant,
+        endExclusive: java.time.Instant,
+    ): List<ParsedEventRecord> =
+        withCorrections(
+            parsedEventRepository.listUnlinkedTransfersReceivedBetween(startInclusive, endExclusive),
+        )
+
     suspend fun listAllEffective(): List<ParsedEventRecord> =
         withCorrections(parsedEventRepository.listAll())
 

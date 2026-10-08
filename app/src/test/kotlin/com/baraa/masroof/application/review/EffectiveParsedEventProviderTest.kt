@@ -126,6 +126,27 @@ class EffectiveParsedEventProviderTest {
         assertTrue(transfer.userCorrected)
         assertFalse(transfer.automationConfirmed)
 
+        val receivedStart = Instant.parse("2026-08-04T00:00:00Z")
+        val receivedEnd = Instant.parse("2026-08-05T00:00:00Z")
+        val boundedTransfers = expectedEffective(
+            parsedRepo.listUnlinkedTransfersReceivedBetween(receivedStart, receivedEnd),
+        )
+        countingDao.reset()
+        assertEquals(
+            boundedTransfers,
+            provider.listUnlinkedTransfersEffectiveReceivedBetween(receivedStart, receivedEnd),
+        )
+        assertEquals(listOf("raw-transfer-out"), boundedTransfers.map { it.event.rawSmsId })
+        assertEquals(1, countingDao.batchQueries)
+        assertEquals(0, countingDao.perSmsQueries)
+
+        val selected = expectedEffective(parsedRepo.listByRawSmsIds(listOf("raw-plain", "raw-multi")))
+        countingDao.reset()
+        assertEquals(selected, provider.listEffectiveByRawSmsIds(listOf("raw-plain", "raw-multi", "missing")))
+        assertEquals(listOf("raw-multi", "raw-plain"), selected.map { it.event.rawSmsId })
+        assertEquals(1, countingDao.batchQueries)
+        assertEquals(0, countingDao.perSmsQueries)
+
         countingDao.reset()
         assertEquals(
             emptyList<ParsedEventRecord>(),
