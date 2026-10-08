@@ -26,8 +26,13 @@ class SchemaFactsBackfillPolicyTest {
 
     @Test
     fun upToDate_hasNoRequirement() {
-        assertNull(SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 16, currentVersion = 16))
-        assertNull(SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 17, currentVersion = 16))
+        assertNull(
+            SchemaFactsBackfillPolicy.requirementFor(
+                lastReparsedVersion = MasroofDatabase.VERSION,
+                currentVersion = MasroofDatabase.VERSION,
+            ),
+        )
+        assertNull(SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 18, currentVersion = MasroofDatabase.VERSION))
     }
 
     @Test
@@ -47,6 +52,10 @@ class SchemaFactsBackfillPolicyTest {
         assertEquals(
             MaintenanceRequirement.BACKGROUND,
             SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 15, currentVersion = 16),
+        )
+        assertEquals(
+            MaintenanceRequirement.BACKGROUND,
+            SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 16, currentVersion = 17),
         )
     }
 
@@ -70,7 +79,10 @@ class SchemaFactsBackfillPolicyTest {
     fun undeclaredFutureVersion_isBlocking() {
         assertEquals(
             MaintenanceRequirement.BLOCKING,
-            SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion = 16, currentVersion = 17),
+            SchemaFactsBackfillPolicy.requirementFor(
+                lastReparsedVersion = MasroofDatabase.VERSION,
+                currentVersion = MasroofDatabase.VERSION + 1,
+            ),
         )
     }
 }

@@ -68,7 +68,7 @@ class Migration15To16Test {
             .build()
         try {
             val db = room.openHelper.writableDatabase
-            assertEquals(16, db.version)
+            assertEquals(MasroofDatabase.VERSION, db.version)
             db.query(
                 "SELECT occurredAtEpochMillis, occurredAtZone FROM financial_transaction WHERE id = 'tx-legacy'",
             ).use { cursor ->

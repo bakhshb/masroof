@@ -67,7 +67,6 @@ class Migration14To16PopulatedTest {
         try {
             val db = room.openHelper.writableDatabase
             assertEquals(MasroofDatabase.VERSION, db.version)
-            assertEquals(16, db.version)
             assertEquals(2, count(db, "raw_sms"))
             assertEquals(1, count(db, "parsed_event"))
             assertEquals(1, count(db, "financial_transaction"))

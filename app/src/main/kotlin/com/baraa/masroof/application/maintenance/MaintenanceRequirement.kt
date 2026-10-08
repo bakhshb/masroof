@@ -36,6 +36,8 @@ object SchemaFactsBackfillPolicy {
         put(15, MaintenanceRequirement.BACKGROUND)
         // Transaction timezone provenance. Existing instants stay valid; null zone is legacy.
         put(16, MaintenanceRequirement.BACKGROUND)
+        // Index-only migration; no parse-fact columns.
+        put(17, MaintenanceRequirement.BACKGROUND)
     }
 
     /**

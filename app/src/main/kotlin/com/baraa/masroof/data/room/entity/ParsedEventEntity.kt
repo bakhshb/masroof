@@ -29,6 +29,8 @@ import androidx.room.PrimaryKey
     ],
     indices = [
         Index(value = ["rawSmsId"], unique = true),
+        Index(value = ["cardBankId", "cardLast4"]),
+        Index(value = ["cardSmsChannel", "cardLast4"]),
     ],
 )
 data class ParsedEventEntity(
