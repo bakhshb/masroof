@@ -25,6 +25,8 @@ import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
+import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
 
 /**
@@ -63,6 +65,10 @@ class TransactionReconciliationService(
     suspend fun reconcileStoredEvents(): ReconciliationSummary =
         reconcileStoredEventsDetailed().summary
 
+    /**
+     * Full-history reconciliation for explicit maintenance and recovery.
+     * Interactive and incremental callers should use [reconcileAffectedRawSmsIds].
+     */
     suspend fun reconcileStoredEventsDetailed(): ReconciliationReport {
         val records = loadRecords()
         return reconcileRecordsDetailed(records)
@@ -91,6 +97,40 @@ class TransactionReconciliationService(
     suspend fun reconcileAfterParsedEventDetailed(event: ParsedEvent): ReconciliationReport {
         val records = loadRecordsAround(event)
         return reconcileRecordsDetailed(records)
+    }
+
+    /**
+     * Reconcile [rawSmsIds] without a full-history scan.
+     *
+     * Non-transfer evidence is loaded by those ids only. Transfer evidence also
+     * loads unlinked transfers whose receipt time or SMS-local occurrence time
+     * falls inside two [TransactionMatcher.TRANSFER_MATCH_WINDOW]s of the affected
+     * leg, plus posted external or single-leg self-transfers in that occurred-at
+     * range and the parse rows linked to those legs. [TransactionMatcher] still
+     * decides which of those candidates pair. Rows outside the affected set are
+     * candidates only: they are not posted on their own.
+     */
+    suspend fun reconcileAffectedRawSmsIds(rawSmsIds: Collection<String>): ReconciliationReport {
+        val ids = rawSmsIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (ids.isEmpty()) {
+            return ReconciliationReport(
+                summary = ReconciliationSummary(),
+                reviewCandidates = emptyList(),
+                settledRawSmsIds = emptySet(),
+            )
+        }
+        val affected = loadByRawSmsIds(ids)
+        val transfers = affected.filter { it.event.messageFamily.isTransferFamily() }
+        val windows = transferCandidateWindows(transfers)
+        val records = if (windows.receipt.isEmpty() && windows.local.isEmpty()) {
+            affected
+        } else {
+            loadTransferScopedRecords(affected, windows)
+        }
+        return reconcileRecordsDetailed(
+            records = records,
+            scope = AffectedScope(rawSmsIds = ids.toSet(), transferWindows = windows.receipt),
+        )
     }
 
     private suspend fun loadRecords(): List<ParsedEventRecord> =
@@ -149,8 +189,157 @@ class TransactionReconciliationService(
     private fun MessageFamily.isTransferFamily(): Boolean =
         this == MessageFamily.TRANSFER_IN || this == MessageFamily.TRANSFER_OUT
 
+    private suspend fun loadByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> =
+        effectiveParsedEventProvider?.listEffectiveByRawSmsIds(rawSmsIds)
+            ?: parsedEventRepository.listByRawSmsIds(rawSmsIds)
+
+    private suspend fun loadUnlinkedTransfersReceivedBetween(
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): List<ParsedEventRecord> =
+        effectiveParsedEventProvider?.listUnlinkedTransfersEffectiveReceivedBetween(
+            startInclusive,
+            endExclusive,
+        ) ?: parsedEventRepository.listUnlinkedTransfersReceivedBetween(startInclusive, endExclusive)
+
+    private suspend fun loadUnlinkedTransfersOccurredLocalBetween(
+        startInclusive: LocalDateTime,
+        endExclusive: LocalDateTime,
+    ): List<ParsedEventRecord> =
+        effectiveParsedEventProvider?.listUnlinkedTransfersEffectiveOccurredLocalBetween(
+            startInclusive,
+            endExclusive,
+        ) ?: parsedEventRepository.listUnlinkedTransfersOccurredLocalBetween(startInclusive, endExclusive)
+
+    /**
+     * Two matcher windows cover a competing leg that can pair with an in-window
+     * counterpart. Receipt instants and SMS-local times are both anchors:
+     * [TransactionMatcher] compares local times when both legs have them, receipt
+     * times when neither does, and effective instants when the clocks are mixed.
+     */
+    private suspend fun transferCandidateWindows(transfers: List<ParsedEventRecord>): CandidateWindows {
+        if (transfers.isEmpty()) return CandidateWindows(emptyList(), emptyList())
+        val instantAnchors = mutableListOf<Instant>()
+        val localAnchors = mutableListOf<LocalDateTime>()
+        for (record in transfers) {
+            val receivedAt = rawSmsRepository.getById(record.event.rawSmsId)?.receivedAt ?: continue
+            val persistedZone = financialTransactionRepository.findByRawSmsId(record.event.rawSmsId)
+                ?.occurredAtZone
+            val effective = TransactionTiming.effectiveOccurredAt(
+                event = record.event,
+                occurredAtLocal = record.details.occurredAtLocal,
+                receivedAt = receivedAt,
+                zoneId = zoneId,
+                persistedZoneId = persistedZone,
+            )
+            instantAnchors += receivedAt
+            instantAnchors += effective
+            record.details.occurredAtLocal?.let { localAnchors += it }
+            val zone = TransactionTiming.zoneFor(record.event.bank, persistedZone, zoneId)
+            localAnchors += LocalDateTime.ofInstant(effective, zone)
+        }
+        return CandidateWindows(
+            receipt = mergedWindows(instantAnchors),
+            local = mergedLocalWindows(localAnchors),
+        )
+    }
+
+    private fun mergedWindows(anchors: List<Instant>): List<TimeRange> {
+        if (anchors.isEmpty()) return emptyList()
+        val span = TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(2)
+        val sorted = anchors.map { anchor ->
+            TimeRange(
+                startInclusive = anchor.minus(span),
+                endExclusive = anchor.plus(span).plusMillis(1),
+            )
+        }.sortedBy { it.startInclusive }
+        val merged = mutableListOf<TimeRange>()
+        for (range in sorted) {
+            val last = merged.lastOrNull()
+            if (last == null || range.startInclusive.isAfter(last.endExclusive)) {
+                merged += range
+            } else {
+                val endExclusive = maxOf(last.endExclusive, range.endExclusive)
+                if (endExclusive != last.endExclusive) {
+                    merged[merged.lastIndex] = last.copy(endExclusive = endExclusive)
+                }
+            }
+        }
+        return merged
+    }
+
+    private fun mergedLocalWindows(anchors: List<LocalDateTime>): List<LocalWindow> {
+        if (anchors.isEmpty()) return emptyList()
+        val span = TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(2)
+        val sorted = anchors.map { anchor ->
+            LocalWindow(
+                startInclusive = anchor.minus(span),
+                endExclusive = anchor.plus(span).plusSeconds(1),
+            )
+        }.sortedBy { it.startInclusive }
+        val merged = mutableListOf<LocalWindow>()
+        for (range in sorted) {
+            val last = merged.lastOrNull()
+            if (last == null || range.startInclusive.isAfter(last.endExclusive)) {
+                merged += range
+            } else if (range.endExclusive.isAfter(last.endExclusive)) {
+                merged[merged.lastIndex] = last.copy(endExclusive = range.endExclusive)
+            }
+        }
+        return merged
+    }
+
+    private suspend fun loadTransferScopedRecords(
+        affected: List<ParsedEventRecord>,
+        windows: CandidateWindows,
+    ): List<ParsedEventRecord> {
+        val merged = affected.associateBy { it.event.id }.toMutableMap()
+        for (window in windows.receipt) {
+            for (record in loadUnlinkedTransfersReceivedBetween(window.startInclusive, window.endExclusive)) {
+                merged.putIfAbsent(record.event.id, record)
+            }
+        }
+        for (window in windows.local) {
+            for (record in loadUnlinkedTransfersOccurredLocalBetween(window.startInclusive, window.endExclusive)) {
+                merged.putIfAbsent(record.event.id, record)
+            }
+        }
+        val staleLegs = loadStaleTransferTransactions(windows.receipt)
+        val linkedRawSmsIds = financialTransactionRepository.listRawSmsIdsForTransactions(
+            staleLegs.map { it.id },
+        )
+        for (record in loadByRawSmsIds(linkedRawSmsIds)) {
+            if (!record.event.messageFamily.isTransferFamily()) continue
+            merged.putIfAbsent(record.event.id, record)
+        }
+        return merged.values.sortedBy { it.event.id }
+    }
+
+    private suspend fun loadStaleTransferTransactions(
+        windows: List<TimeRange>,
+    ): List<FinancialTransaction> {
+        if (windows.isEmpty()) return emptyList()
+        val types = listOf(
+            FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
+            FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+            FinancialTransactionType.SELF_TRANSFER,
+        )
+        return windows.flatMap { window ->
+            financialTransactionRepository.listByTypesOccurredBetween(
+                types = types,
+                startInclusive = window.startInclusive,
+                endExclusive = window.endExclusive,
+            )
+        }.distinctBy { it.id }
+            .filter { transaction ->
+                transaction.type != FinancialTransactionType.SELF_TRANSFER ||
+                    transaction.linkedParsedEventIds.size == 1
+            }
+    }
+
     private suspend fun reconcileRecordsDetailed(
         records: List<ParsedEventRecord>,
+        scope: AffectedScope? = null,
     ): ReconciliationReport {
         var assembledSingle = 0
         var matchedPairs = 0
@@ -166,6 +355,10 @@ class TransactionReconciliationService(
 
         for (record in records) {
             val event = record.event
+            if (scope != null && event.rawSmsId !in scope.rawSmsIds) {
+                observeUnlinkedTransfer(record)?.let { unresolvedTransfers += it }
+                continue
+            }
             var userConfirmed = record.automationConfirmed
             if (reviewRepository != null) {
                 val review = reviewRepository.findByRawSmsId(event.rawSmsId)
@@ -357,6 +550,12 @@ class TransactionReconciliationService(
             ) {
                 continue
             }
+            if (scope != null &&
+                pair.outgoing.event.rawSmsId !in scope.rawSmsIds &&
+                pair.incoming.event.rawSmsId !in scope.rawSmsIds
+            ) {
+                continue
+            }
             if (financialTransactionRepository.isRawSmsLinked(pair.outgoing.event.rawSmsId) ||
                 financialTransactionRepository.isRawSmsLinked(pair.incoming.event.rawSmsId)
             ) {
@@ -401,6 +600,7 @@ class TransactionReconciliationService(
         }
 
         for (candidate in stillOpen) {
+            if (scope != null && candidate.event.rawSmsId !in scope.rawSmsIds) continue
             if (candidate.event.rawSmsId in matchedRawSmsIds) continue
             if (financialTransactionRepository.isRawSmsLinked(candidate.event.rawSmsId)) continue
             when (
@@ -446,14 +646,14 @@ class TransactionReconciliationService(
             }
         }
 
-        val upgraded = upgradeStaleExternalPairs(records)
+        val upgraded = upgradeStaleExternalPairs(records, scope)
         matchedPairs += upgraded.matchedPairs
         assembledSingle += upgraded.assembledSingle
         alreadyLinked += upgraded.alreadyLinked
         failed += upgraded.failed
         settledRawSmsIds += upgraded.settledRawSmsIds
 
-        val healedLoans = upgradeStaleFeeFinancingInstallments(records)
+        val healedLoans = upgradeStaleFeeFinancingInstallments(records, scope)
         assembledSingle += healedLoans.assembledSingle
         alreadyLinked += healedLoans.alreadyLinked
         failed += healedLoans.failed
@@ -494,17 +694,28 @@ class TransactionReconciliationService(
      */
     private suspend fun upgradeStaleExternalPairs(
         records: List<ParsedEventRecord>,
+        scope: AffectedScope? = null,
     ): UpgradePassResult {
         val parsedById = records.associateBy { it.event.id }
-        val outs = financialTransactionRepository.listByTypes(
-            listOf(FinancialTransactionType.EXTERNAL_TRANSFER_OUT),
-        )
-        val ins = financialTransactionRepository.listByTypes(
-            listOf(FinancialTransactionType.EXTERNAL_TRANSFER_IN),
-        )
-        val singleLegSelfTransfers = financialTransactionRepository.listByTypes(
-            listOf(FinancialTransactionType.SELF_TRANSFER),
-        ).filter { it.linkedParsedEventIds.size == 1 }
+        val outs: List<FinancialTransaction>
+        val ins: List<FinancialTransaction>
+        val singleLegSelfTransfers: List<FinancialTransaction>
+        if (scope != null) {
+            val loaded = loadStaleTransferTransactions(scope.transferWindows)
+            outs = loaded.filter { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT }
+            ins = loaded.filter { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN }
+            singleLegSelfTransfers = loaded.filter { it.type == FinancialTransactionType.SELF_TRANSFER }
+        } else {
+            outs = financialTransactionRepository.listByTypes(
+                listOf(FinancialTransactionType.EXTERNAL_TRANSFER_OUT),
+            )
+            ins = financialTransactionRepository.listByTypes(
+                listOf(FinancialTransactionType.EXTERNAL_TRANSFER_IN),
+            )
+            singleLegSelfTransfers = financialTransactionRepository.listByTypes(
+                listOf(FinancialTransactionType.SELF_TRANSFER),
+            ).filter { it.linkedParsedEventIds.size == 1 }
+        }
         if (outs.isEmpty() && ins.isEmpty() && singleLegSelfTransfers.isEmpty()) return UpgradePassResult()
 
         data class StaleLeg(
@@ -612,6 +823,12 @@ class TransactionReconciliationService(
         for (pair in pairs) {
             val outLeg = outByEventId[pair.outgoing.event.id] ?: continue
             val inLeg = inByEventId[pair.incoming.event.id] ?: continue
+            if (scope != null &&
+                outLeg.event.rawSmsId !in scope.rawSmsIds &&
+                inLeg.event.rawSmsId !in scope.rawSmsIds
+            ) {
+                continue
+            }
             val hasStaleExternal =
                 outLeg.transaction?.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
                     inLeg.transaction?.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN
@@ -673,11 +890,23 @@ class TransactionReconciliationService(
 
     private suspend fun upgradeStaleFeeFinancingInstallments(
         records: List<ParsedEventRecord>,
+        scope: AffectedScope? = null,
     ): UpgradePassResult {
         val parsedById = records.associateBy { it.event.id }
-        val staleFees = financialTransactionRepository.listAll().filter { transaction ->
-            transaction.type == FinancialTransactionType.FEE &&
-                transaction.linkedParsedEventIds.any { parsedById[it]?.event?.messageFamily == MessageFamily.FINANCING_INSTALLMENT }
+        val staleFees = if (scope != null) {
+            records
+                .filter { it.event.messageFamily == MessageFamily.FINANCING_INSTALLMENT }
+                .filter { it.event.rawSmsId in scope.rawSmsIds }
+                .mapNotNull { financialTransactionRepository.findByRawSmsId(it.event.rawSmsId) }
+                .filter { it.type == FinancialTransactionType.FEE }
+                .distinctBy { it.id }
+        } else {
+            financialTransactionRepository.listAll().filter { transaction ->
+                transaction.type == FinancialTransactionType.FEE &&
+                    transaction.linkedParsedEventIds.any {
+                        parsedById[it]?.event?.messageFamily == MessageFamily.FINANCING_INSTALLMENT
+                    }
+            }
         }
         if (staleFees.isEmpty()) return UpgradePassResult()
 
@@ -797,6 +1026,44 @@ class TransactionReconciliationService(
             is FinancialTransactionSaveResult.Conflict -> PersistOutcome.Failed
         }
 
+    private suspend fun observeUnlinkedTransfer(record: ParsedEventRecord): TransferMatchCandidate? {
+        val event = record.event
+        if (!event.messageFamily.isTransferFamily()) return null
+        if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) return null
+        var userConfirmed = record.automationConfirmed
+        if (reviewRepository != null) {
+            val review = reviewRepository.findByRawSmsId(event.rawSmsId)
+            if (review?.status == ReviewStatus.RESOLVED &&
+                review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
+            ) {
+                return null
+            }
+            if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) {
+                userConfirmed = true
+            }
+        }
+        if (!TransactionAssembler.isAutomationEligible(event, userConfirmed)) return null
+        val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: return null
+        val sourceOwn = event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
+            ?: OwnershipStatus.UNKNOWN
+        val destOwn = event.destinationAccountRef?.let { ownershipResolver.resolveAccount(it) }
+            ?: OwnershipStatus.UNKNOWN
+        return TransferMatchCandidate(
+            event = event,
+            transactionReference = record.details.transactionReference,
+            occurredAtLocal = record.details.occurredAtLocal,
+            receivedAt = receivedAt,
+            sourceOwnership = sourceOwn,
+            destinationOwnership = destOwn,
+            effectiveOccurredAt = TransactionTiming.effectiveOccurredAt(
+                event = event,
+                occurredAtLocal = record.details.occurredAtLocal,
+                receivedAt = receivedAt,
+                zoneId = zoneId,
+            ),
+        )
+    }
+
     private suspend fun shouldReleaseStaleSelfTransferLink(
         record: ParsedEventRecord,
     ): Boolean {
@@ -841,4 +1108,24 @@ class TransactionReconciliationService(
     }
 
     private enum class PersistOutcome { Saved, Already, Failed }
+
+    private data class TimeRange(
+        val startInclusive: Instant,
+        val endExclusive: Instant,
+    )
+
+    private data class LocalWindow(
+        val startInclusive: LocalDateTime,
+        val endExclusive: LocalDateTime,
+    )
+
+    private data class CandidateWindows(
+        val receipt: List<TimeRange>,
+        val local: List<LocalWindow>,
+    )
+
+    private data class AffectedScope(
+        val rawSmsIds: Set<String>,
+        val transferWindows: List<TimeRange>,
+    )
 }

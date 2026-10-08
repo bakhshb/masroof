@@ -41,6 +41,28 @@ class RoomParsedEventRepository(
     override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> =
         dao.listUnlinkedTransfers().map(ParsedEventMapper::toRecord)
 
+    override suspend fun listUnlinkedTransfersReceivedBetween(
+        startInclusive: java.time.Instant,
+        endExclusive: java.time.Instant,
+    ): List<ParsedEventRecord> {
+        if (!startInclusive.isBefore(endExclusive)) return emptyList()
+        return dao.listUnlinkedTransfersReceivedBetween(
+            startInclusiveMillis = startInclusive.toEpochMilli(),
+            endExclusiveMillis = endExclusive.toEpochMilli(),
+        ).map(ParsedEventMapper::toRecord)
+    }
+
+    override suspend fun listUnlinkedTransfersOccurredLocalBetween(
+        startInclusive: java.time.LocalDateTime,
+        endExclusive: java.time.LocalDateTime,
+    ): List<ParsedEventRecord> {
+        if (!startInclusive.isBefore(endExclusive)) return emptyList()
+        return dao.listUnlinkedTransfersOccurredLocalBetween(
+            startInclusive = startInclusive.toString(),
+            endExclusive = endExclusive.toString(),
+        ).map(ParsedEventMapper::toRecord)
+    }
+
     override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> =
         RoomBatch.query(rawSmsIds) { chunk -> dao.listByRawSmsIds(chunk) }
             .sortedBy { it.id }

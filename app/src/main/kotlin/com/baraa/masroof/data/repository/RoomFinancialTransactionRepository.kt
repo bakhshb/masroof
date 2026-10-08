@@ -103,6 +103,21 @@ class RoomFinancialTransactionRepository(
         )
     }
 
+    override suspend fun listByTypesOccurredBetween(
+        types: Collection<FinancialTransactionType>,
+        startInclusive: Instant,
+        endExclusive: Instant,
+    ): List<FinancialTransaction> {
+        if (types.isEmpty() || !startInclusive.isBefore(endExclusive)) return emptyList()
+        return reconstructBatch(
+            dao.listByTypesOccurredBetween(
+                types = types.map { it.name },
+                startInclusiveEpochMillis = startInclusive.toEpochMilli(),
+                endExclusiveEpochMillis = endExclusive.toEpochMilli(),
+            ),
+        )
+    }
+
     override suspend fun listAwaitingAppliedExchangeRate(primaryCurrency: Currency): List<FinancialTransaction> =
         reconstructBatch(dao.listAwaitingAppliedExchangeRate(primaryCurrency.name))
 
