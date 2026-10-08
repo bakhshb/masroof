@@ -76,6 +76,10 @@ interface ParsedEventDao {
     /**
      * [startInclusive] and [endExclusive] are ISO-8601 local date-times.
      * `datetime()` normalizes stored text that omits zero seconds.
+     *
+     * `datetime()` is not sargable, so there is no index on [occurredAtLocal].
+     * The `messageFamily` index narrows the transfer families; the unlinked-link
+     * probe uses the link primary key.
      */
     @Query(
         """

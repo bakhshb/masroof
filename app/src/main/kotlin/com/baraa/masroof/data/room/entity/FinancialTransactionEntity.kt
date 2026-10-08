@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
     tableName = "financial_transaction",
     indices = [
         Index(value = ["occurredAtEpochMillis"]),
+        Index(value = ["type", "occurredAtEpochMillis"]),
     ],
 )
 data class FinancialTransactionEntity(

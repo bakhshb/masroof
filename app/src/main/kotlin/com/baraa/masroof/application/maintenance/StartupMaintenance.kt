@@ -24,6 +24,14 @@ class StartupMaintenance(
     suspend fun runBlockingPhase(): StartupMaintenanceOutcome =
         when (factsBackfill.pendingRequirement(currentSchemaVersion)) {
             null -> StartupMaintenanceOutcome.READY
+            MaintenanceRequirement.NOT_REQUIRED ->
+                when (factsBackfill.runIfNeeded(currentSchemaVersion)) {
+                    BackfillOutcome.UP_TO_DATE,
+                    BackfillOutcome.COMPLETED,
+                    -> StartupMaintenanceOutcome.READY
+
+                    BackfillOutcome.INCOMPLETE -> StartupMaintenanceOutcome.BLOCKED
+                }
             MaintenanceRequirement.BACKGROUND -> {
                 scheduleFactsBackfill()
                 StartupMaintenanceOutcome.READY

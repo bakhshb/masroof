@@ -13,6 +13,12 @@ enum class MaintenanceRequirement {
      * retryable background work, and open screens reload when it completes.
      */
     BACKGROUND,
+
+    /**
+     * The schema change does not need a stored-SMS reparse. Record the version and
+     * do not schedule or run parse-fact backfill.
+     */
+    NOT_REQUIRED,
 }
 
 /**
@@ -36,19 +42,26 @@ object SchemaFactsBackfillPolicy {
         put(15, MaintenanceRequirement.BACKGROUND)
         // Transaction timezone provenance. Existing instants stay valid; null zone is legacy.
         put(16, MaintenanceRequirement.BACKGROUND)
+        // Index-only. Existing rows stay correct; do not reparse the SMS backlog.
+        put(17, MaintenanceRequirement.NOT_REQUIRED)
     }
 
     /**
      * Strictest requirement among versions in (`lastReparsedVersion`, `currentVersion`], or
      * null when the backlog was already re-parsed for [currentVersion].
+     *
+     * A range is [MaintenanceRequirement.NOT_REQUIRED] only when every version in it is.
+     * Undeclared versions are [MaintenanceRequirement.BLOCKING].
      */
     fun requirementFor(lastReparsedVersion: Int, currentVersion: Int): MaintenanceRequirement? {
         if (currentVersion <= lastReparsedVersion) return null
-        val pending = (lastReparsedVersion + 1)..currentVersion
-        return if (pending.any { requirementBySchemaVersion[it] != MaintenanceRequirement.BACKGROUND }) {
-            MaintenanceRequirement.BLOCKING
-        } else {
-            MaintenanceRequirement.BACKGROUND
+        val pending = ((lastReparsedVersion + 1)..currentVersion).map { requirementBySchemaVersion[it] }
+        return when {
+            pending.any { it != MaintenanceRequirement.BACKGROUND && it != MaintenanceRequirement.NOT_REQUIRED } ->
+                MaintenanceRequirement.BLOCKING
+            pending.any { it == MaintenanceRequirement.BACKGROUND } ->
+                MaintenanceRequirement.BACKGROUND
+            else -> MaintenanceRequirement.NOT_REQUIRED
         }
     }
 }

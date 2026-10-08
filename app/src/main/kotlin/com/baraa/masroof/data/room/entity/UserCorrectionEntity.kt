@@ -17,7 +17,7 @@ import androidx.room.PrimaryKey
         ),
     ],
     indices = [
-        Index(value = ["targetRawSmsId", "createdAtEpochMillis"]),
+        Index(value = ["targetRawSmsId", "createdAtEpochMillis", "id"]),
     ],
 )
 data class UserCorrectionEntity(

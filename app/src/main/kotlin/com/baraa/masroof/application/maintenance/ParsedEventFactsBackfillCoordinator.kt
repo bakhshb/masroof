@@ -41,6 +41,16 @@ class ParsedEventFactsBackfillCoordinator(
     suspend fun runIfNeeded(currentSchemaVersion: Int = MasroofDatabase.VERSION): BackfillOutcome = mutex.withLock {
         val lastReparsedVersion = lastReparsedVersion()
         if (currentSchemaVersion <= lastReparsedVersion) return@withLock BackfillOutcome.UP_TO_DATE
+        if (SchemaFactsBackfillPolicy.requirementFor(lastReparsedVersion, currentSchemaVersion) ==
+            MaintenanceRequirement.NOT_REQUIRED
+        ) {
+            recordSchemaVersion(currentSchemaVersion)
+            appLogService.info(
+                AppLogCategories.PARSE,
+                "Schema v$currentSchemaVersion requires no parse-fact backfill",
+            )
+            return@withLock BackfillOutcome.COMPLETED
+        }
 
         appLogService.info(
             AppLogCategories.PARSE,
@@ -67,14 +77,18 @@ class ParsedEventFactsBackfillCoordinator(
             )
             return@withLock BackfillOutcome.INCOMPLETE
         }
-        prefs.edit()
-            .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, currentSchemaVersion)
-            .apply()
+        recordSchemaVersion(currentSchemaVersion)
         appLogService.info(
             AppLogCategories.PARSE,
             "Schema facts backfill finished: ${result.refreshedCount} messages refreshed",
         )
         BackfillOutcome.COMPLETED
+    }
+
+    private fun recordSchemaVersion(currentSchemaVersion: Int) {
+        prefs.edit()
+            .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, currentSchemaVersion)
+            .apply()
     }
 
     private fun lastReparsedVersion(): Int =

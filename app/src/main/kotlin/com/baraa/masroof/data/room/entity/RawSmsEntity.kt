@@ -18,6 +18,7 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["dedupeKey"], unique = true),
         Index(value = ["deviceMessageId"], unique = true),
+        Index(value = ["receivedAtEpochMillis"]),
     ],
 )
 data class RawSmsEntity(
