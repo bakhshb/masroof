@@ -365,10 +365,11 @@ class ScopedReconciliationTest {
 
         reconciliation.reconcileAffectedRawSmsIds(listOf("sms-a"))
 
-        val posted = ftDelegate.listAll().single()
-        assertEquals(FinancialTransactionType.SELF_TRANSFER, posted.type)
-        assertEquals(listOf("pe-a"), posted.linkedParsedEventIds)
-        assertEquals(setOf("sms-a"), ftDelegate.listRawSmsIds(posted.id).toSet())
+        assertTrue(
+            "Competing intra-bank counterparts must stay unmatched instead of posting one invented self-transfer",
+            ftDelegate.listAll().isEmpty(),
+        )
+        assertEquals(null, ftDelegate.findByRawSmsId("sms-a"))
         assertEquals(null, ftDelegate.findByRawSmsId("sms-b"))
         assertEquals(null, ftDelegate.findByRawSmsId("sms-d"))
         assertNoGlobalScan()
@@ -408,9 +409,7 @@ class ScopedReconciliationTest {
         )
 
         assertEquals(full.affected, scoped.affected)
-        assertEquals(setOf("sms-local-a"), full.affected.rawSmsIds)
-        assertEquals(listOf("pe-local-a"), full.affected.linkedParsedEventIds)
-        assertEquals(FinancialTransactionType.SELF_TRANSFER, full.affected.type)
+        assertEquals(null, full.affected)
         assertEquals(0, full.multiEvidenceTransfers)
         assertEquals(0, scoped.multiEvidenceTransfers)
         assertEquals(0, scoped.listAllCalls)
@@ -577,15 +576,16 @@ class ScopedReconciliationTest {
                 service.reconcileStoredEventsDetailed()
             }
             val affected = financial.findByRawSmsId("sms-local-a")
-            check(affected != null)
             val multiEvidence = financial.listAll().count { financial.listRawSmsIds(it.id).size > 1 }
             return AmbiguousLocalOutcome(
-                affected = AffectedPosting(
-                    type = affected.type,
-                    amount = affected.amount,
-                    rawSmsIds = financial.listRawSmsIds(affected.id).toSet(),
-                    linkedParsedEventIds = affected.linkedParsedEventIds,
-                ),
+                affected = affected?.let { posted ->
+                    AffectedPosting(
+                        type = posted.type,
+                        amount = posted.amount,
+                        rawSmsIds = financial.listRawSmsIds(posted.id).toSet(),
+                        linkedParsedEventIds = posted.linkedParsedEventIds,
+                    )
+                },
                 multiEvidenceTransfers = multiEvidence,
                 listAllCalls = countedParsed.listAllCalls,
                 globalUnlinkedCalls = countedParsed.globalUnlinkedCalls,
@@ -694,7 +694,7 @@ class ScopedReconciliationTest {
     )
 
     private data class AmbiguousLocalOutcome(
-        val affected: AffectedPosting,
+        val affected: AffectedPosting?,
         val multiEvidenceTransfers: Int,
         val listAllCalls: Int,
         val globalUnlinkedCalls: Int,
