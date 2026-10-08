@@ -189,13 +189,17 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             reviewQueueUpdater = ReviewQueueUpdater(reviewForUpdate, ftRepo, clock),
             ingestionReviewService = ingestionReview,
             processingRecovery = recovery,
-            exchangeRateEnrichment = ExchangeRateEnrichmentWorkflow(
-                financialTransactionRepository = ftForEnrichment,
-                parsedEventRepository = parsedRepo,
-                rawSmsRepository = rawRepo,
-                sarEquivalentResolver = TransactionSarEquivalentResolver(
-                    marketRateProvider = ForeignSarMarketRateProvider { _, _ -> null },
-                ),
+            exchangeRateEnrichmentScheduler = ImmediateExchangeRateEnrichmentScheduler(
+                PendingExchangeRateEnricher {
+                    ExchangeRateEnrichmentWorkflow(
+                        financialTransactionRepository = ftForEnrichment,
+                        parsedEventRepository = parsedRepo,
+                        rawSmsRepository = rawRepo,
+                        sarEquivalentResolver = TransactionSarEquivalentResolver(
+                            marketRateProvider = ForeignSarMarketRateProvider { _, _ -> null },
+                        ),
+                    ).enrichPending()
+                },
             ),
         )
     }

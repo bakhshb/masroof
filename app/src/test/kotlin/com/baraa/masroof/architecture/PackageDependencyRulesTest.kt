@@ -155,7 +155,11 @@ class PackageDependencyRulesTest {
 
     @Test
     fun liveSmsWork_isExecutionAdapterOnly() {
-        val files = listOf("LiveSmsProcessingWorker.kt", "LiveSmsWorkScheduler.kt")
+        val files = listOf(
+            "LiveSmsProcessingWorker.kt",
+            "LiveSmsWorkScheduler.kt",
+            "ExchangeRateEnrichmentScheduler.kt",
+        )
             .map { File(sourceRoot, "application/sms/$it") }
         files.forEach { assertTrue("${it.path} must exist", it.isFile) }
         assertFilesDoNotImport(

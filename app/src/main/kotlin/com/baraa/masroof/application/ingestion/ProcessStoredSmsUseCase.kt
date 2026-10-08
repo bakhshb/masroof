@@ -5,7 +5,7 @@ import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
-import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
+import com.baraa.masroof.application.sms.ExchangeRateEnrichmentScheduler
 import com.baraa.masroof.application.transaction.ReconciliationReport
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankRoutingResult
@@ -53,7 +53,7 @@ class ProcessStoredSmsUseCase(
     private val reviewQueueUpdater: ReviewQueueUpdater? = null,
     private val ingestionReviewService: IngestionReviewService? = null,
     private val appLogService: AppLogService? = null,
-    private val exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
+    private val exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler? = null,
     private val processingRecovery: ProcessingRecovery? = null,
     private val reviewRepository: ReviewRepository? = null,
 ) {
@@ -90,7 +90,7 @@ class ProcessStoredSmsUseCase(
 
     /**
      * Loads stored evidence by id and processes it (e.g. from a background worker), then
-     * persists pending exchange-rate enrichment. A missing row is
+     * schedules coalesced exchange-rate enrichment when configured. A missing row is
      * [SmsIngestionResult.Failed] with [REASON_RAW_SMS_NOT_FOUND].
      * Enrichment failure does not change the returned outcome.
      */
@@ -98,7 +98,7 @@ class ProcessStoredSmsUseCase(
         val rawSms = rawSmsRepository.getById(rawSmsId)
             ?: return SmsIngestionResult.Failed(rawSmsId = rawSmsId, message = REASON_RAW_SMS_NOT_FOUND)
         val result = processStoredEvidence(rawSms, logOutcome)
-        enrichExchangeRates()
+        scheduleExchangeRateEnrichment()
         return result
     }
 
@@ -506,15 +506,8 @@ class ProcessStoredSmsUseCase(
         }
     }
 
-    private suspend fun enrichExchangeRates() {
-        val workflow = exchangeRateEnrichment ?: return
-        try {
-            workflow.enrichPending()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // Enrichment is best-effort; pending rows are retried by the next run.
-        }
+    private fun scheduleExchangeRateEnrichment() {
+        exchangeRateEnrichmentScheduler?.schedule()
     }
 
     private suspend fun refreshReviewQueue(
