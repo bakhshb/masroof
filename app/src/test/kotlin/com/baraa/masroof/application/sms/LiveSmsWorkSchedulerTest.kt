@@ -42,7 +42,7 @@ class LiveSmsWorkSchedulerTest {
             context,
             Configuration.Builder()
                 .setExecutor(SynchronousExecutor())
-                .setWorkerFactory(LiveSmsProcessingWorker.Factory { harness.processStored() })
+                .setWorkerFactory(LiveSmsProcessingWorker.Factory({ harness.processStored() }, harness.appLog))
                 .build(),
         )
         workManager = WorkManager.getInstance(context)

@@ -481,7 +481,7 @@ class RecognizedSmsOutcomeInvariantTest {
         val result = TestListenableWorkerBuilder<LiveSmsProcessingWorker>(context)
             .setInputData(LiveSmsProcessingWorker.inputFor(rawSmsId))
             .setRunAttemptCount(attempt)
-            .setWorkerFactory(LiveSmsProcessingWorker.Factory { processStored })
+            .setWorkerFactory(LiveSmsProcessingWorker.Factory({ processStored }))
             .build()
             .doWork()
         return when (result) {

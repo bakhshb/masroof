@@ -24,6 +24,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -76,7 +77,7 @@ class LiveSmsProcessingWorkerTest {
     @Test
     fun missingInput_failsWithoutProcessing() = runBlocking {
         val worker = TestListenableWorkerBuilder<LiveSmsProcessingWorker>(context)
-            .setWorkerFactory(LiveSmsProcessingWorker.Factory { harness.processStored() })
+            .setWorkerFactory(LiveSmsProcessingWorker.Factory({ harness.processStored() }, harness.appLog))
             .build()
 
         assertEquals(ListenableWorker.Result.failure(), worker.doWork())
@@ -439,6 +440,36 @@ class LiveSmsProcessingWorkerTest {
     }
 
     @Test
+    fun ingestException_logsClassWithoutExceptionMessage() = runBlocking {
+        val raw = captured()
+        harness.parseOverride = { throw IllegalStateException("secret sms body text") }
+        val processStored = harness.processStored(appLogService = harness.appLog)
+
+        val outcome = processStored.process(raw.id)
+
+        assertTrue(outcome is SmsIngestionResult.Failed)
+        val logged = harness.appLog.readAll().joinToString("\n") { it.message }
+        assertTrue(logged.contains("IllegalStateException"))
+        assertFalse(logged.contains("secret sms body text"))
+    }
+
+    @Test
+    fun unexpectedProcessFailure_logsSanitizedDiagnostic() = runBlocking {
+        val raw = captured()
+        val processStored = harness.processStored(
+            rawSmsRepository = object : com.baraa.masroof.domain.repository.RawSmsRepository by harness.rawRepo {
+                override suspend fun getById(id: String): com.baraa.masroof.domain.model.RawSms? =
+                    throw IOException("secret diagnostic must not appear")
+            },
+        )
+        worker(raw.id, processStored = processStored).doWork()
+        val entry = harness.appLog.readAll().last()
+        assertTrue(entry.message.contains("LiveSmsProcessingWorker process failed"))
+        assertTrue(entry.message.contains("IOException"))
+        assertFalse(entry.message.contains("secret"))
+    }
+
+    @Test
     fun exchangeRateEnrichmentFailure_succeedsAndStillPosts() = runBlocking {
         val raw = captured()
         val processStored = harness.processStored(
@@ -522,7 +553,7 @@ class LiveSmsProcessingWorkerTest {
         TestListenableWorkerBuilder<LiveSmsProcessingWorker>(context)
             .setInputData(LiveSmsProcessingWorker.inputFor(rawSmsId))
             .setRunAttemptCount(attempt)
-            .setWorkerFactory(LiveSmsProcessingWorker.Factory { processStored })
+            .setWorkerFactory(LiveSmsProcessingWorker.Factory({ processStored }, harness.appLog))
             .build()
 
     private class FailingGetByIdRepository(

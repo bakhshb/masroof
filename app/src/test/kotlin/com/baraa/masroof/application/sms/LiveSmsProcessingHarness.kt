@@ -99,6 +99,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         rawSmsRepository: RawSmsRepository = rawRepo,
         derivedFailures: DerivedFailureInjection = DerivedFailureInjection(),
         exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler? = null,
+        appLogService: com.baraa.masroof.application.logging.AppLogService? = null,
     ): ProcessStoredSmsUseCase {
         val parsedForReconcile = object : ParsedEventRepository by parsedRepo {
             override suspend fun listReceivedBetween(
@@ -189,6 +190,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewForUpdate, ftRepo, clock),
             ingestionReviewService = ingestionReview,
+            appLogService = appLogService,
             processingRecovery = recovery,
             exchangeRateEnrichmentScheduler = exchangeRateEnrichmentScheduler ?: ImmediateExchangeRateEnrichmentScheduler(
                 PendingExchangeRateEnricher {

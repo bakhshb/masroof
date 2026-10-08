@@ -108,10 +108,10 @@ class ParsedEventFactsBackfillWorkerTest {
         val factory = DelegatingWorkerFactory().apply {
             addFactory(ParsedEventFactsBackfillWorker.Factory { error("must not build other workers") })
             addFactory(
-                LiveSmsProcessingWorker.Factory {
+                LiveSmsProcessingWorker.Factory({
                     liveFactoryUsed = true
                     error("live processing not used")
-                },
+                }),
             )
         }
 
@@ -152,7 +152,7 @@ class ParsedEventFactsBackfillWorkerTest {
 
     private fun initializeWorkManager(): WorkManager {
         val factory = DelegatingWorkerFactory().apply {
-            addFactory(LiveSmsProcessingWorker.Factory { error("not used") })
+            addFactory(LiveSmsProcessingWorker.Factory({ error("not used") }))
             addFactory(ParsedEventFactsBackfillWorker.Factory { coordinator })
         }
         WorkManagerTestInitHelper.initializeTestWorkManager(
