@@ -1,14 +1,19 @@
 package com.baraa.masroof.instrumentation
 
+import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.baraa.masroof.MainActivity
 import com.baraa.masroof.MasroofApplication
@@ -16,6 +21,7 @@ import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.presentation.review.reviewResolveTypeTestTag
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -69,9 +75,13 @@ class HardeningJourneySmokeTest {
     fun reviewCorrection_persistsChosenTypeAndReloads() {
         openReviewQueue()
         clickText(JourneyFixtures.CORRECTION_BODY, scroll = true)
-        clickText(text(R.string.txn_type_expense), scroll = true)
-        awaitText(text(R.string.review_empty), scroll = false)
+        clickTag(reviewResolveTypeTestTag(FinancialTransactionType.EXPENSE))
+        waitUntil("review queue empty or action failure") {
+            textExists(text(R.string.review_empty)) ||
+                textExists(text(R.string.review_action_failed))
+        }
         assertActionFailureAbsent()
+        awaitText(text(R.string.review_empty), scroll = false)
 
         returnToDashboard()
         awaitText(JourneyFixtures.CORRECTION_MERCHANT, scroll = true)
@@ -116,7 +126,7 @@ class HardeningJourneySmokeTest {
 
     private fun openReviewQueue() {
         val settings = text(R.string.dashboard_open_settings)
-        composeRule.waitUntil(TIMEOUT_MS) { contentDescriptionExists(settings) }
+        waitUntil("settings action") { contentDescriptionExists(settings) }
         composeRule.onNodeWithContentDescription(settings).performClick()
         clickText(text(R.string.settings_hub_review_title), scroll = true)
         awaitText(text(R.string.review_title), scroll = false)
@@ -126,6 +136,7 @@ class HardeningJourneySmokeTest {
         pressBack()
         awaitText(text(R.string.settings_title), scroll = false)
         pressBack()
+        composeRule.waitForIdle()
     }
 
     private fun pressBack() {
@@ -135,17 +146,44 @@ class HardeningJourneySmokeTest {
     }
 
     private fun awaitText(value: String, scroll: Boolean) {
-        composeRule.waitUntil(TIMEOUT_MS) { textExists(value) }
-        val node = composeRule.onAllNodes(textMatcher(value))[0]
-        if (scroll) node.performScrollTo()
-        node.assertIsDisplayed()
+        waitUntil("text '$value'") { textExists(value) }
+        if (scroll) scrollTo(textMatcher(value))
+        composeRule.onAllNodes(textMatcher(value))[0].assertIsDisplayed()
     }
 
     private fun clickText(value: String, scroll: Boolean = false) {
-        composeRule.waitUntil(TIMEOUT_MS) { textExists(value) }
-        val node = clickableNode(value)
-        if (scroll) node.performScrollTo()
-        node.performClick()
+        val matcher = textMatcher(value) and hasClickAction()
+        waitUntil("clickable text '$value'") { nodeExists(matcher) }
+        if (scroll) scrollTo(matcher)
+        clickableNode(value).performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun clickTag(tag: String) {
+        val matcher = hasTestTag(tag)
+        waitUntil("tag '$tag'") { nodeExists(matcher) }
+        scrollTo(matcher)
+        composeRule.onNodeWithTag(tag).assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun scrollTo(matcher: SemanticsMatcher) {
+        val scrollables = composeRule.onAllNodes(hasScrollAction())
+            .fetchSemanticsNodes(atLeastOneRootRequired = false)
+        for (index in scrollables.indices) {
+            val scrolled = runCatching {
+                composeRule.onAllNodes(hasScrollAction())[index].performScrollToNode(matcher)
+            }.isSuccess
+            if (scrolled) return
+        }
+    }
+
+    private fun waitUntil(description: String, condition: () -> Boolean) {
+        try {
+            composeRule.waitUntil(TIMEOUT_MS, condition)
+        } catch (e: ComposeTimeoutException) {
+            throw AssertionError("Timed out after ${TIMEOUT_MS}ms waiting for $description", e)
+        }
     }
 
     private fun clickableNode(value: String): SemanticsNodeInteraction =
@@ -153,10 +191,12 @@ class HardeningJourneySmokeTest {
 
     private fun textMatcher(value: String) = hasText(value, substring = true)
 
-    private fun textExists(value: String): Boolean =
-        composeRule.onAllNodes(textMatcher(value))
+    private fun nodeExists(matcher: SemanticsMatcher): Boolean =
+        composeRule.onAllNodes(matcher)
             .fetchSemanticsNodes(atLeastOneRootRequired = false)
             .isNotEmpty()
+
+    private fun textExists(value: String): Boolean = nodeExists(textMatcher(value))
 
     private fun contentDescriptionExists(value: String): Boolean =
         composeRule.onAllNodesWithContentDescription(value)
