@@ -64,7 +64,7 @@ class TransferIntegrityRepairCoordinator(
     private fun recordRepairVersion(version: Int) {
         prefs.edit()
             .putInt(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, version)
-            .apply()
+            .commit()
     }
 
     private fun lastRepairVersion(): Int =

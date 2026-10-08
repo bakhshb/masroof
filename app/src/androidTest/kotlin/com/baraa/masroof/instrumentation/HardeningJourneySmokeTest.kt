@@ -21,6 +21,7 @@ import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.presentation.review.REVIEW_RESTORE_AS_IS_TEST_TAG
 import com.baraa.masroof.presentation.review.reviewResolveTypeTestTag
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -101,9 +102,13 @@ class HardeningJourneySmokeTest {
         awaitText(text(R.string.review_empty), scroll = false)
         clickText(text(R.string.review_tab_ignored))
         clickText(JourneyFixtures.RESTORE_BODY, scroll = true)
-        clickText(text(R.string.review_action_restore), scroll = true)
-        awaitText(text(R.string.review_ignored_empty), scroll = false)
+        clickTag(REVIEW_RESTORE_AS_IS_TEST_TAG)
+        waitUntil("ignored list empty or restore failure") {
+            textExists(text(R.string.review_ignored_empty)) ||
+                textExists(text(R.string.review_action_failed))
+        }
         assertActionFailureAbsent()
+        awaitText(text(R.string.review_ignored_empty), scroll = false)
 
         returnToDashboard()
         awaitText(JourneyFixtures.RESTORE_MERCHANT, scroll = true)
