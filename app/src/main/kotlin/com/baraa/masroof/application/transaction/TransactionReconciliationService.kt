@@ -109,6 +109,9 @@ class TransactionReconciliationService(
      * range and the parse rows linked to those legs. [TransactionMatcher] still
      * decides which of those candidates pair. Rows outside the affected set are
      * candidates only: they are not posted on their own.
+     *
+     * Affected rows are visited in [rawSmsIds] order. Callers that need the same
+     * transaction ids as message-by-message import pass ids oldest receipt first.
      */
     suspend fun reconcileAffectedRawSmsIds(rawSmsIds: Collection<String>): ReconciliationReport {
         val ids = rawSmsIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
@@ -128,8 +131,19 @@ class TransactionReconciliationService(
             loadTransferScopedRecords(affected, windows)
         }
         return reconcileRecordsDetailed(
-            records = records,
+            records = recordsInCallerOrder(records, ids),
             scope = AffectedScope(rawSmsIds = ids.toSet(), transferWindows = windows.receipt),
+        )
+    }
+
+    private fun recordsInCallerOrder(
+        records: List<ParsedEventRecord>,
+        rawSmsIds: List<String>,
+    ): List<ParsedEventRecord> {
+        val order = rawSmsIds.withIndex().associate { (index, id) -> id to index }
+        return records.sortedWith(
+            compareBy<ParsedEventRecord> { order[it.event.rawSmsId] ?: Int.MAX_VALUE }
+                .thenBy { it.event.id },
         )
     }
 

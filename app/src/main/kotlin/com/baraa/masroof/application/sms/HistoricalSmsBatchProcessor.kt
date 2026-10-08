@@ -16,6 +16,7 @@ import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import kotlinx.coroutines.CancellationException
+import java.time.Instant
 
 /**
  * Outcome of one historical batch's derived pass. Parsing stays per row;
@@ -36,8 +37,9 @@ sealed interface HistoricalBatchDerivedResult {
  *
  * Each row is captured, parsed, and persisted on its own ([Batch.ingest]); derived work runs
  * once per batch ([Batch.finish]): ownership discovery for the events the batch stored, one
- * reconciliation pass, one review refresh, and one exchange-rate enrichment pass. Live
- * processing stays per message.
+ * reconciliation of those RawSms ids, one review refresh, and one exchange-rate enrichment
+ * pass. Transfer counterparts already in storage are loaded only inside the matcher window.
+ * Live processing stays per message.
  *
  * A correctness-blocking derived failure keeps the captured evidence and marks the affected
  * financial rows in one transaction, then schedules one batch recovery. Exchange-rate
@@ -75,7 +77,7 @@ class HistoricalSmsBatchProcessor(
                 is BankSmsCaptureResult.Captured ->
                     processStored.parseAndStore(captured.rawSms, captured.route, logOutcome = false)
             }
-            result.storedEvent()?.let(storedEvents::add)
+            result.storedEvent(rawSms.receivedAt)?.let(storedEvents::add)
             return result
         }
 
@@ -99,7 +101,7 @@ class HistoricalSmsBatchProcessor(
                 return HistoricalBatchDerivedResult.Incomplete(DerivedProcessingStage.OWNERSHIP_DISCOVERY)
             }
             val report = try {
-                reconciliation?.reconcileBatchDetailed()
+                reconciliation?.reconcileAffectedRawSmsIds(affectedRawSmsIds())
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -169,16 +171,28 @@ class HistoricalSmsBatchProcessor(
                 // Enrichment is best-effort; pending rows are retried by the next run.
             }
         }
+
+        private fun affectedRawSmsIds(): List<String> =
+            storedEvents
+                .sortedWith(compareBy({ it.receivedAt }, { it.event.rawSmsId }))
+                .map { it.event.rawSmsId }
+                .distinct()
     }
 
-    private class StoredEvent(val event: ParsedEvent, val loanType: LoanType?)
+    private class StoredEvent(
+        val event: ParsedEvent,
+        val loanType: LoanType?,
+        val receivedAt: Instant,
+    )
 
-    private fun SmsIngestionResult.storedEvent(): StoredEvent? =
+    private fun SmsIngestionResult.storedEvent(receivedAt: Instant): StoredEvent? =
         when (this) {
-            is SmsIngestionResult.Parsed -> StoredEvent(event, details.loanType)
-            is SmsIngestionResult.DerivedIncomplete -> StoredEvent(event, details.loanType)
-            is SmsIngestionResult.ReviewRequired -> event?.let { StoredEvent(it, details.loanType) }
-            is SmsIngestionResult.NonFinancial -> event?.let { StoredEvent(it, details.loanType) }
+            is SmsIngestionResult.Parsed -> StoredEvent(event, details.loanType, receivedAt)
+            is SmsIngestionResult.DerivedIncomplete -> StoredEvent(event, details.loanType, receivedAt)
+            is SmsIngestionResult.ReviewRequired ->
+                event?.let { StoredEvent(it, details.loanType, receivedAt) }
+            is SmsIngestionResult.NonFinancial ->
+                event?.let { StoredEvent(it, details.loanType, receivedAt) }
             else -> null
         }
 }
