@@ -676,23 +676,27 @@ class TransactionReconciliationServiceTest {
                 network = BankNetworkType.INTRA_BANK,
             ),
         )
-        reconciliation.reconcileStoredEvents()
+        val report = reconciliation.reconcileStoredEventsDetailed()
 
-        val posted = ftRepo.listAll()
-        assertEquals(3, posted.size)
-        assertTrue(posted.all { it.type == FinancialTransactionType.SELF_TRANSFER })
-        val original = posted.single { it.id == singleLegId }
-        assertEquals(listOf("pe-amb-self-out"), original.linkedParsedEventIds)
-        assertEquals(setOf("sms-amb-self-out"), ftRepo.listRawSmsIds(original.id).toSet())
-        assertEquals(
-            setOf(
-                singleLegId,
-                TransactionIdFactory.fromRawSmsIds(listOf("sms-amb-self-in-a")),
-                TransactionIdFactory.fromRawSmsIds(listOf("sms-amb-self-in-b")),
-            ),
-            posted.map { it.id }.toSet(),
+        assertTrue(
+            "Ambiguous opposite legs must not stay as three self-transfers or join the wrong pair",
+            ftRepo.listAll().isEmpty(),
         )
-        assertTrue(posted.all { ftRepo.listRawSmsIds(it.id).size == 1 })
+        assertEquals(3, parsedRepo.listAll().size)
+        assertNull(ftRepo.findByRawSmsId("sms-amb-self-out"))
+        assertEquals(
+            setOf("sms-amb-self-out", "sms-amb-self-in-a", "sms-amb-self-in-b"),
+            report.reviewCandidates.map { it.rawSmsId }.toSet(),
+        )
+        assertTrue(report.reviewCandidates.all { it.kind == ReviewKind.PENDING_MATCH })
+        assertTrue(report.reviewCandidates.all { it.reasons == listOf("transfer_pending_match") })
+        assertNull(
+            ftRepo.listAll().find {
+                it.id == TransactionIdFactory.fromRawSmsIds(
+                    listOf("sms-amb-self-in-a", "sms-amb-self-out"),
+                )
+            },
+        )
     }
 
     @Test
