@@ -7,6 +7,7 @@ import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.isCreditCardSms
 import com.baraa.masroof.parsing.model.isStatementSms
 import java.time.Instant
+import java.time.LocalDateTime
 
 /**
  * Parsing-facing persistence for structured parse output.
@@ -75,6 +76,25 @@ interface ParsedEventRepository {
         return listReceivedBetween(startInclusive, endExclusive).filter { record ->
             record.event.messageFamily == MessageFamily.TRANSFER_IN ||
                 record.event.messageFamily == MessageFamily.TRANSFER_OUT
+        }
+    }
+
+    /**
+     * Unlinked transfer rows whose SMS-local [ParsedEventDetails.occurredAtLocal]
+     * falls in `[startInclusive, endExclusive)`, ordered by event id.
+     *
+     * This is candidate discovery for [com.baraa.masroof.domain.matching.TransactionMatcher],
+     * which compares local times when both legs have them. Room keeps the lookup
+     * bounded to that range. In-memory defaults may scan.
+     */
+    suspend fun listUnlinkedTransfersOccurredLocalBetween(
+        startInclusive: LocalDateTime,
+        endExclusive: LocalDateTime,
+    ): List<ParsedEventRecord> {
+        if (!startInclusive.isBefore(endExclusive)) return emptyList()
+        return listUnlinkedTransfers().filter { record ->
+            val local = record.details.occurredAtLocal ?: return@filter false
+            !local.isBefore(startInclusive) && local.isBefore(endExclusive)
         }
     }
 

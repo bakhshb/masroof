@@ -51,6 +51,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlin.math.abs
 
 /**
  * Scoped reconciliation must match full reconciliation on the affected evidence
@@ -159,6 +160,46 @@ class ScopedReconciliationTest {
                 startInclusive = start,
                 endExclusive = end,
             ),
+        )
+
+        val localInside = LocalDateTime.parse("2026-08-04T12:05:00")
+        val localOutside = localInside.plusHours(3)
+        persistTransfer(
+            smsId = "sms-local-in",
+            eventId = "pe-local-in",
+            at = inside.plus(Duration.ofDays(4)),
+            family = MessageFamily.TRANSFER_OUT,
+            details = ParsedEventDetails(occurredAtLocal = localInside),
+        )
+        persistTransfer(
+            smsId = "sms-local-out",
+            eventId = "pe-local-out",
+            at = inside,
+            family = MessageFamily.TRANSFER_IN,
+            details = ParsedEventDetails(occurredAtLocal = localOutside),
+        )
+        persistTransfer(
+            smsId = "sms-local-linked",
+            eventId = "pe-local-linked",
+            at = inside.plus(Duration.ofDays(4)),
+            family = MessageFamily.TRANSFER_IN,
+            details = ParsedEventDetails(occurredAtLocal = localInside.plusMinutes(1)),
+        )
+        ftDelegate.save(
+            transaction(
+                id = "tx-local-linked",
+                type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+                occurredAt = inside.plus(Duration.ofDays(4)),
+                eventId = "pe-local-linked",
+            ),
+            listOf("sms-local-linked"),
+        )
+        assertEquals(
+            listOf("pe-local-in"),
+            parsedDelegate.listUnlinkedTransfersOccurredLocalBetween(
+                startInclusive = localInside.minusMinutes(30),
+                endExclusive = localInside.plusMinutes(30),
+            ).map { it.event.id },
         )
     }
 
@@ -334,6 +375,51 @@ class ScopedReconciliationTest {
     }
 
     @Test
+    fun localCompetitorOutsideReceiptWindow_matchesFullAndRefusesUniquePair() = runBlocking {
+        val aReceived = Instant.parse("2026-08-06T04:36:00Z")
+        val bReceived = aReceived.plus(Duration.ofMinutes(4))
+        val cReceived = aReceived.plus(Duration.ofDays(2))
+        val aLocal = LocalDateTime.parse("2026-08-06T07:36:00")
+        val bLocal = aLocal.plusMinutes(2)
+        val cLocal = aLocal.plusMinutes(8)
+        val receiptSpan = TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(2)
+        assertTrue(Duration.between(aReceived, cReceived).abs() > receiptSpan)
+        assertTrue(Duration.between(bReceived, cReceived).abs() > receiptSpan)
+        assertTrue(abs(Duration.between(aLocal, cLocal).seconds) <= TransactionMatcher.TRANSFER_MATCH_WINDOW.seconds)
+        assertTrue(abs(Duration.between(bLocal, cLocal).seconds) <= TransactionMatcher.TRANSFER_MATCH_WINDOW.seconds)
+
+        val full = ambiguousLocalOutcome(
+            scoped = false,
+            aReceived = aReceived,
+            bReceived = bReceived,
+            cReceived = cReceived,
+            aLocal = aLocal,
+            bLocal = bLocal,
+            cLocal = cLocal,
+        )
+        val scoped = ambiguousLocalOutcome(
+            scoped = true,
+            aReceived = aReceived,
+            bReceived = bReceived,
+            cReceived = cReceived,
+            aLocal = aLocal,
+            bLocal = bLocal,
+            cLocal = cLocal,
+        )
+
+        assertEquals(full.affected, scoped.affected)
+        assertEquals(setOf("sms-local-a"), full.affected.rawSmsIds)
+        assertEquals(listOf("pe-local-a"), full.affected.linkedParsedEventIds)
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, full.affected.type)
+        assertEquals(0, full.multiEvidenceTransfers)
+        assertEquals(0, scoped.multiEvidenceTransfers)
+        assertEquals(0, scoped.listAllCalls)
+        assertEquals(0, scoped.globalUnlinkedCalls)
+        assertEquals(0, scoped.listByTypesCalls)
+        assertTrue(scoped.boundedLocalCalls > 0)
+    }
+
+    @Test
     fun inWindowUnrelatedTransfer_isNotPostedOnItsOwn() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "4101"))
         val at = Instant.parse("2026-08-05T09:00:00Z")
@@ -414,6 +500,103 @@ class ScopedReconciliationTest {
         assertEquals(FinancialTransactionType.EXPENSE, ftDelegate.findByRawSmsId("sms-other")?.type)
     }
 
+    private suspend fun ambiguousLocalOutcome(
+        scoped: Boolean,
+        aReceived: Instant,
+        bReceived: Instant,
+        cReceived: Instant,
+        aLocal: LocalDateTime,
+        bLocal: LocalDateTime,
+        cLocal: LocalDateTime,
+    ): AmbiguousLocalOutcome {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val database = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val raw = RoomRawSmsRepository(database.rawSmsDao())
+            val parsedEvents = RoomParsedEventRepository(database.parsedEventDao())
+            val financial = RoomFinancialTransactionRepository(
+                database.financialTransactionDao(),
+                database.parsedEventDao(),
+            )
+            val countedParsed = CountingParsedEventRepository(parsedEvents)
+            val countedFinancial = CountingFinancialTransactionRepository(financial)
+            val accounts = RoomAccountRegistryRepository.from(database)
+            val cards = RoomCardRegistryRepository.from(database)
+            val loanRegistry = RoomLoanRegistryRepository.from(database)
+            val ownership = OwnershipConfirmationService(accounts, cards, loanRegistry)
+            ownership.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+            ownership.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+            val service = TransactionReconciliationService(
+                parsedEventRepository = countedParsed,
+                rawSmsRepository = raw,
+                financialTransactionRepository = countedFinancial,
+                ownershipResolver = OwnershipResolver(accounts, cards, loanRegistry),
+                ownershipConfirmationService = ownership,
+                zoneId = zoneId,
+            )
+            persistTransfer(
+                smsId = "sms-local-a",
+                eventId = "pe-local-a",
+                at = aReceived,
+                family = MessageFamily.TRANSFER_OUT,
+                source = "3001",
+                destination = "3003",
+                details = ParsedEventDetails(occurredAtLocal = aLocal),
+                raw = raw,
+                parsedEvents = parsedEvents,
+            )
+            persistTransfer(
+                smsId = "sms-local-b",
+                eventId = "pe-local-b",
+                at = bReceived,
+                family = MessageFamily.TRANSFER_IN,
+                source = "3001",
+                destination = "3003",
+                details = ParsedEventDetails(occurredAtLocal = bLocal),
+                raw = raw,
+                parsedEvents = parsedEvents,
+            )
+            persistTransfer(
+                smsId = "sms-local-c",
+                eventId = "pe-local-c",
+                at = cReceived,
+                family = MessageFamily.TRANSFER_OUT,
+                source = "3001",
+                destination = "3003",
+                details = ParsedEventDetails(occurredAtLocal = cLocal),
+                raw = raw,
+                parsedEvents = parsedEvents,
+            )
+            countedParsed.reset()
+            countedFinancial.reset()
+            if (scoped) {
+                service.reconcileAffectedRawSmsIds(listOf("sms-local-a"))
+            } else {
+                service.reconcileStoredEventsDetailed()
+            }
+            val affected = financial.findByRawSmsId("sms-local-a")
+            check(affected != null)
+            val multiEvidence = financial.listAll().count { financial.listRawSmsIds(it.id).size > 1 }
+            return AmbiguousLocalOutcome(
+                affected = AffectedPosting(
+                    type = affected.type,
+                    amount = affected.amount,
+                    rawSmsIds = financial.listRawSmsIds(affected.id).toSet(),
+                    linkedParsedEventIds = affected.linkedParsedEventIds,
+                ),
+                multiEvidenceTransfers = multiEvidence,
+                listAllCalls = countedParsed.listAllCalls,
+                globalUnlinkedCalls = countedParsed.globalUnlinkedCalls,
+                listByTypesCalls = countedFinancial.listByTypesCalls,
+                boundedLocalCalls = countedParsed.boundedLocalCalls,
+            )
+        } finally {
+            database.close()
+        }
+    }
+
     private fun assertNoGlobalScan() {
         assertEquals(0, parsed.listAllCalls)
         assertEquals(0, parsed.globalUnlinkedCalls)
@@ -459,11 +642,15 @@ class ScopedReconciliationTest {
         network: BankNetworkType = BankNetworkType.INTRA_BANK,
         details: ParsedEventDetails = ParsedEventDetails(),
         counterparty: String? = null,
+        raw: RoomRawSmsRepository = rawRepo,
+        parsedEvents: RoomParsedEventRepository = parsedDelegate,
     ) {
         persist(
             smsId = smsId,
             at = at,
             details = details,
+            raw = raw,
+            parsedEvents = parsedEvents,
             event = event(
                 id = eventId,
                 rawSmsId = smsId,
@@ -482,9 +669,11 @@ class ScopedReconciliationTest {
         event: ParsedEvent,
         at: Instant,
         details: ParsedEventDetails = ParsedEventDetails(),
+        raw: RoomRawSmsRepository = rawRepo,
+        parsedEvents: RoomParsedEventRepository = parsedDelegate,
     ) {
         val body = "body-$smsId"
-        rawRepo.insertIfAbsent(
+        raw.insertIfAbsent(
             RawSms(
                 id = smsId,
                 sender = "AlJazira",
@@ -494,8 +683,24 @@ class ScopedReconciliationTest {
                 bodyHash = SmsBodyHasher.sha256Hex(body),
             ),
         )
-        parsedDelegate.save(event, details)
+        parsedEvents.save(event, details)
     }
+
+    private data class AffectedPosting(
+        val type: FinancialTransactionType,
+        val amount: Money,
+        val rawSmsIds: Set<String>,
+        val linkedParsedEventIds: List<String>,
+    )
+
+    private data class AmbiguousLocalOutcome(
+        val affected: AffectedPosting,
+        val multiEvidenceTransfers: Int,
+        val listAllCalls: Int,
+        val globalUnlinkedCalls: Int,
+        val listByTypesCalls: Int,
+        val boundedLocalCalls: Int,
+    )
 
     private fun event(
         id: String,
@@ -554,6 +759,7 @@ class ScopedReconciliationTest {
         var listAllCalls: Int = 0
         var globalUnlinkedCalls: Int = 0
         var boundedUnlinkedCalls: Int = 0
+        var boundedLocalCalls: Int = 0
         var listByRawSmsIdsCalls: Int = 0
         val boundedWindows: MutableList<Pair<Instant, Instant>> = mutableListOf()
 
@@ -561,6 +767,7 @@ class ScopedReconciliationTest {
             listAllCalls = 0
             globalUnlinkedCalls = 0
             boundedUnlinkedCalls = 0
+            boundedLocalCalls = 0
             listByRawSmsIdsCalls = 0
             boundedWindows.clear()
         }
@@ -582,6 +789,14 @@ class ScopedReconciliationTest {
             boundedUnlinkedCalls += 1
             boundedWindows += startInclusive to endExclusive
             return delegate.listUnlinkedTransfersReceivedBetween(startInclusive, endExclusive)
+        }
+
+        override suspend fun listUnlinkedTransfersOccurredLocalBetween(
+            startInclusive: LocalDateTime,
+            endExclusive: LocalDateTime,
+        ): List<ParsedEventRecord> {
+            boundedLocalCalls += 1
+            return delegate.listUnlinkedTransfersOccurredLocalBetween(startInclusive, endExclusive)
         }
 
         override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {

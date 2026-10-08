@@ -45,6 +45,14 @@ class EffectiveParsedEventProvider(
             parsedEventRepository.listUnlinkedTransfersReceivedBetween(startInclusive, endExclusive),
         )
 
+    suspend fun listUnlinkedTransfersEffectiveOccurredLocalBetween(
+        startInclusive: java.time.LocalDateTime,
+        endExclusive: java.time.LocalDateTime,
+    ): List<ParsedEventRecord> =
+        withCorrections(
+            parsedEventRepository.listUnlinkedTransfersOccurredLocalBetween(startInclusive, endExclusive),
+        )
+
     suspend fun listAllEffective(): List<ParsedEventRecord> =
         withCorrections(parsedEventRepository.listAll())
 

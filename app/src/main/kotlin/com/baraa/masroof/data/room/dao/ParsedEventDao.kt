@@ -73,6 +73,29 @@ interface ParsedEventDao {
         endExclusiveMillis: Long,
     ): List<ParsedEventEntity>
 
+    /**
+     * [startInclusive] and [endExclusive] are ISO-8601 local date-times.
+     * `datetime()` normalizes stored text that omits zero seconds.
+     */
+    @Query(
+        """
+        SELECT pe.* FROM parsed_event pe
+        WHERE pe.messageFamily IN ('TRANSFER_IN', 'TRANSFER_OUT')
+          AND pe.occurredAtLocal IS NOT NULL
+          AND datetime(pe.occurredAtLocal) >= datetime(:startInclusive)
+          AND datetime(pe.occurredAtLocal) < datetime(:endExclusive)
+          AND NOT EXISTS (
+            SELECT 1 FROM financial_transaction_raw_sms_link link
+            WHERE link.rawSmsId = pe.rawSmsId
+          )
+        ORDER BY pe.id
+        """,
+    )
+    suspend fun listUnlinkedTransfersOccurredLocalBetween(
+        startInclusive: String,
+        endExclusive: String,
+    ): List<ParsedEventEntity>
+
     /** Callers keep [rawSmsIds] under [RoomBatch.MAX_BIND_ARGS]. */
     @Query("SELECT * FROM parsed_event WHERE rawSmsId IN (:rawSmsIds)")
     suspend fun listByRawSmsIds(rawSmsIds: List<String>): List<ParsedEventEntity>
