@@ -100,6 +100,34 @@ interface ParsedEventDao {
     @Query("SELECT * FROM parsed_event WHERE rawSmsId IN (:rawSmsIds)")
     suspend fun listByRawSmsIds(rawSmsIds: List<String>): List<ParsedEventEntity>
 
+    @Query(
+        """
+        SELECT rawSmsId FROM parsed_event
+        WHERE (sourceAccountBankId = :bankId AND sourceAccountMaskedNumber = :maskedNumber)
+           OR (destinationAccountBankId = :bankId AND destinationAccountMaskedNumber = :maskedNumber)
+        ORDER BY id
+        """,
+    )
+    suspend fun listRawSmsIdsReferencingAccount(bankId: String, maskedNumber: String): List<String>
+
+    @Query(
+        """
+        SELECT rawSmsId FROM parsed_event
+        WHERE cardBankId = :bankId AND cardLast4 = :last4
+        ORDER BY id
+        """,
+    )
+    suspend fun listRawSmsIdsReferencingCard(bankId: String, last4: String): List<String>
+
+    @Query(
+        """
+        SELECT rawSmsId FROM parsed_event
+        WHERE bankId = :bankId AND loanType = :loanType
+        ORDER BY id
+        """,
+    )
+    suspend fun listRawSmsIdsReferencingLoan(bankId: String, loanType: String): List<String>
+
     @Query("SELECT * FROM parsed_event WHERE cardSmsChannel = 'STATEMENT' ORDER BY id")
     suspend fun listCardStatementFacts(): List<ParsedEventEntity>
 

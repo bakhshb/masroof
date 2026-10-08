@@ -37,8 +37,18 @@ class ReviewDetailLoader(
         val cardRef: CardReference?,
     )
 
-    suspend fun loadSummaries(): List<ReviewSummary> {
-        reviewWorkflowService.refreshReviewQueue()
+    /**
+     * Required-review rows for the list.
+     *
+     * [reconcile] runs the full-history maintenance sweep. The normal review-list
+     * refresh keeps that default. Follow-ups after a scoped correction, restore, or
+     * ownership change pass false so the reload only reads the queue those actions
+     * already updated.
+     */
+    suspend fun loadSummaries(reconcile: Boolean = true): List<ReviewSummary> {
+        if (reconcile) {
+            reviewWorkflowService.refreshReviewQueue()
+        }
         val summaries = mutableListOf<ReviewSummary>()
         for (review in reviewWorkflowService.listRequiredReviews()) {
             toSummary(review)?.let { summaries += it }

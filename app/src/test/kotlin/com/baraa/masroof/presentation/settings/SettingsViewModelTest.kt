@@ -160,7 +160,12 @@ class SettingsViewModelTest {
             ),
         )
         var refreshCalls = 0
-        val vm = viewModel(cards = cards, onRefreshReviewQueue = { refreshCalls++ })
+        val ownershipChanges = mutableListOf<com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange>()
+        val vm = viewModel(
+            cards = cards,
+            onRefreshReviewQueue = { refreshCalls++ },
+            onReconcileOwnership = { ownershipChanges += it },
+        )
         vm.refresh()
         advanceUntilIdle()
         vm.resumeTracking(
@@ -177,7 +182,15 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(OwnershipStatus.OWNED, cards.entries.single().ownership)
-        assertEquals(1, refreshCalls)
+        assertEquals(0, refreshCalls)
+        assertEquals(
+            listOf(
+                com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange.Card(
+                    CardReference(Bank.BANK_ALJAZIRA, "9999"),
+                ),
+            ),
+            ownershipChanges,
+        )
         assertTrue(vm.uiState.value.followedCards.any { it.last4 == "9999" })
     }
 
@@ -603,6 +616,7 @@ class SettingsViewModelTest {
         loans: LoanRegistryRepository = FakeLoanRegistry(),
         themeMode: ThemeMode = ThemeMode.SYSTEM,
         onRefreshReviewQueue: () -> Unit = {},
+        onReconcileOwnership: (com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange) -> Unit = {},
         appUpdateService: com.baraa.masroof.application.update.AppUpdateService =
             SettingsViewModelTestFixtures.appUpdateService(),
         updateCheckCoordinator: com.baraa.masroof.application.update.UpdateCheckCoordinator =
@@ -625,6 +639,7 @@ class SettingsViewModelTest {
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
             databaseBackupService = FakeDatabaseBackupGateway(),
             refreshReviewQueue = { onRefreshReviewQueue() },
+            reconcileOwnershipChange = { onReconcileOwnership(it) },
             reparseStoredEvents = { 0 },
             importSmsFromInbox = { com.baraa.masroof.application.onboarding.HistoricalImportResult() },
             permissionStateProvider = { true },

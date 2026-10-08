@@ -1,7 +1,10 @@
 package com.baraa.masroof.parsing.repository
 
-import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.CardReference
+import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.isCreditCardSms
@@ -43,6 +46,52 @@ interface ParsedEventRepository {
     /** Current parse rows for [rawSmsIds] in one batch lookup, ordered by event id. */
     suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> =
         rawSmsIds.distinct().mapNotNull { findByRawSmsId(it) }.sortedBy { it.event.id }
+
+    /**
+     * RawSms ids whose source or destination account is exactly [account].
+     *
+     * This is the evidence whose [com.baraa.masroof.domain.ownership.OwnershipResolver]
+     * account result can change when that account's ownership changes. Room keeps the
+     * lookup bounded to those columns. In-memory defaults may scan.
+     */
+    suspend fun listRawSmsIdsReferencingAccount(account: AccountReference): List<String> {
+        val masked = account.maskedNumber ?: return emptyList()
+        val reference = account.copy(maskedNumber = masked)
+        return listAll()
+            .filter { record ->
+                record.event.sourceAccountRef == reference ||
+                    record.event.destinationAccountRef == reference
+            }
+            .sortedBy { it.event.id }
+            .map { it.event.rawSmsId }
+    }
+
+    /**
+     * RawSms ids whose card is exactly [card].
+     *
+     * Room bounds the lookup to the card columns. In-memory defaults may scan.
+     */
+    suspend fun listRawSmsIdsReferencingCard(card: CardReference): List<String> {
+        val last4 = card.last4 ?: return emptyList()
+        val reference = card.copy(last4 = last4)
+        return listAll()
+            .filter { it.event.cardRef == reference }
+            .sortedBy { it.event.id }
+            .map { it.event.rawSmsId }
+    }
+
+    /**
+     * RawSms ids for [loan]'s bank and loan type.
+     *
+     * Room bounds the lookup to those columns. In-memory defaults may scan.
+     */
+    suspend fun listRawSmsIdsReferencingLoan(loan: LoanReference): List<String> =
+        listAll()
+            .filter { record ->
+                record.event.bank == loan.bank && record.details.loanType == loan.loanType
+            }
+            .sortedBy { it.event.id }
+            .map { it.event.rawSmsId }
 
     /**
      * Parse results whose [com.baraa.masroof.domain.model.RawSms.receivedAt] falls in

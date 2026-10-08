@@ -12,11 +12,13 @@ import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.ids.UserCorrectionIdFactory
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.matching.TransferMatchPair
+import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewResolutionKind
@@ -30,6 +32,7 @@ import com.baraa.masroof.domain.repository.ManualReviewResolutionResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.UserCorrectionRepository
+import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -48,6 +51,7 @@ class ReviewWorkflowService(
     private val ownershipResolver: OwnershipResolver,
     private val ownershipConfirmationService: OwnershipConfirmationService,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider,
+    private val parsedEventRepository: ParsedEventRepository,
     private val reconciliationService: TransactionReconciliationService,
     private val reviewQueueUpdater: ReviewQueueUpdater,
     private val manualReviewResolutionRepository: ManualReviewResolutionRepository,
@@ -58,8 +62,34 @@ class ReviewWorkflowService(
         UserCorrectionIdFactory.create(UUID.randomUUID().toString())
     },
 ) {
+    /**
+     * Full-history reconciliation and review-queue refresh.
+     *
+     * Explicit maintenance and recovery use this sweep. Interactive correction,
+     * restore, and ownership changes reconcile only the affected RawSms ids.
+     */
     suspend fun refreshReviewQueue() {
         val report = reconciliationService.reconcileStoredEventsDetailed()
+        reviewQueueUpdater.applyReport(report)
+    }
+
+    /**
+     * Reconcile the RawSms rows whose ownership result can change for [change],
+     * then apply that report to the review queue.
+     *
+     * Account and card matches are exact bank-scoped references. Loan matches
+     * are the bank plus loan type. Unrelated history is not loaded.
+     */
+    suspend fun reconcileOwnershipChange(change: OwnershipChange) {
+        val rawSmsIds = when (change) {
+            is OwnershipChange.Account ->
+                parsedEventRepository.listRawSmsIdsReferencingAccount(change.account)
+            is OwnershipChange.Card ->
+                parsedEventRepository.listRawSmsIdsReferencingCard(change.card)
+            is OwnershipChange.Loan ->
+                parsedEventRepository.listRawSmsIdsReferencingLoan(change.loan)
+        }
+        val report = reconciliationService.reconcileAffectedRawSmsIds(rawSmsIds)
         reviewQueueUpdater.applyReport(report)
     }
 
@@ -107,7 +137,7 @@ class ReviewWorkflowService(
         )
         userCorrectionRepository.save(correction)
 
-        val report = reconciliationService.reconcileStoredEventsDetailed()
+        val report = reconciliationService.reconcileAffectedRawSmsIds(listOf(review.rawSmsId))
         reviewQueueUpdater.applyReport(report)
 
         val updated = reviewRepository.findByRawSmsId(review.rawSmsId)
@@ -490,6 +520,12 @@ class ReviewWorkflowService(
     private suspend fun maybeConfirmLoanOwned(reference: LoanReference) {
         if (ownershipResolver.resolveLoan(reference) != OwnershipStatus.UNKNOWN) return
         ownershipConfirmationService.confirmLoanOwned(reference)
+    }
+
+    sealed interface OwnershipChange {
+        data class Account(val account: AccountReference) : OwnershipChange
+        data class Card(val card: CardReference) : OwnershipChange
+        data class Loan(val loan: LoanReference) : OwnershipChange
     }
 
     companion object {

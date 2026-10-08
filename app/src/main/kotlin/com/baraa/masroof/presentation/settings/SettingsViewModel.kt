@@ -26,6 +26,7 @@ import com.baraa.masroof.application.onboarding.userOutcome
 import com.baraa.masroof.application.settings.CommitmentHistoryBuilder
 import com.baraa.masroof.application.settings.CommitmentRecordBuilder
 import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
+import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountType
@@ -52,6 +53,7 @@ class SettingsViewModel(
     private val themePreferencesRepository: ThemePreferencesRepository,
     private val databaseBackupService: DatabaseBackupGateway,
     private val refreshReviewQueue: suspend () -> Unit,
+    private val reconcileOwnershipChange: suspend (ReviewWorkflowService.OwnershipChange) -> Unit = {},
     private val reparseStoredEvents: suspend () -> Int,
     private val importSmsFromInbox: suspend () -> HistoricalImportResult,
     private val permissionStateProvider: () -> Boolean,
@@ -787,7 +789,7 @@ class SettingsViewModel(
                 } else {
                     settingsRegistryWorkflow.markCardExternal(ref)
                 }
-                refreshReviewQueue()
+                reconcileOwnershipChange(ReviewWorkflowService.OwnershipChange.Card(ref))
                 val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
                     cards = snapshot.cards,
@@ -814,7 +816,7 @@ class SettingsViewModel(
                 } else {
                     settingsRegistryWorkflow.markAccountExternal(ref)
                 }
-                refreshReviewQueue()
+                reconcileOwnershipChange(ReviewWorkflowService.OwnershipChange.Account(ref))
                 val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
                     cards = snapshot.cards,
@@ -841,7 +843,7 @@ class SettingsViewModel(
                 } else {
                     settingsRegistryWorkflow.markLoanExternal(ref)
                 }
-                refreshReviewQueue()
+                reconcileOwnershipChange(ReviewWorkflowService.OwnershipChange.Loan(ref))
                 val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(
                     cards = snapshot.cards,

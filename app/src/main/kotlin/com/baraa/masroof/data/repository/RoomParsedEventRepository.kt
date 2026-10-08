@@ -3,6 +3,9 @@ package com.baraa.masroof.data.repository
 import com.baraa.masroof.data.room.dao.ParsedEventDao
 import com.baraa.masroof.data.room.dao.RoomBatch
 import com.baraa.masroof.data.room.mapper.ParsedEventMapper
+import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.CardReference
+import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -67,6 +70,19 @@ class RoomParsedEventRepository(
         RoomBatch.query(rawSmsIds) { chunk -> dao.listByRawSmsIds(chunk) }
             .sortedBy { it.id }
             .map(ParsedEventMapper::toRecord)
+
+    override suspend fun listRawSmsIdsReferencingAccount(account: AccountReference): List<String> {
+        val masked = account.maskedNumber ?: return emptyList()
+        return dao.listRawSmsIdsReferencingAccount(account.bank.id, masked)
+    }
+
+    override suspend fun listRawSmsIdsReferencingCard(card: CardReference): List<String> {
+        val last4 = card.last4 ?: return emptyList()
+        return dao.listRawSmsIdsReferencingCard(card.bank.id, last4)
+    }
+
+    override suspend fun listRawSmsIdsReferencingLoan(loan: LoanReference): List<String> =
+        dao.listRawSmsIdsReferencingLoan(loan.bank.id, loan.loanType.name)
 
     override suspend fun listCardStatementFacts(): List<ParsedEventRecord> =
         dao.listCardStatementFacts().map(ParsedEventMapper::toRecord)

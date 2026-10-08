@@ -35,7 +35,6 @@ class ReviewViewModel(
     private val detailLoader: ReviewDetailLoader,
     private val reviewOwnershipWorkflow: ReviewOwnershipWorkflow,
     private val transactionRestoreService: TransactionRestoreService,
-    private val refreshReviewQueue: suspend () -> Unit,
     private val reparseStoredSms: suspend (String) -> Unit,
     private val selectableBanks: List<Bank> = emptyList(),
     private val selectBankAndReparse: suspend (rawSmsId: String, bankId: String) -> Unit = { _, _ -> },
@@ -239,9 +238,8 @@ class ReviewViewModel(
             try {
                 when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
                     is RestoreResult.Success -> {
-                        refreshReviewQueue()
                         val summaries = when (_uiState.value.listMode) {
-                            ReviewListMode.PENDING -> detailLoader.loadSummaries()
+                            ReviewListMode.PENDING -> detailLoader.loadSummaries(reconcile = false)
                             ReviewListMode.IGNORED -> detailLoader.loadIgnoredSummaries()
                         }
                         applySummaries(summaries)
@@ -297,12 +295,18 @@ class ReviewViewModel(
                 } else {
                     reviewOwnershipWorkflow.markCardExternal(cardRef)
                 }
-                refreshReviewQueue()
+                reviewWorkflowService.reconcileOwnershipChange(
+                    ReviewWorkflowService.OwnershipChange.Card(cardRef),
+                )
                 val reviewId = _uiState.value.selectedDetail?.id
                 if (reviewId != null) {
                     val detail = detailLoader.loadDetail(reviewId)
                     if (detail == null) {
-                        refreshAfterAction(message = ReviewMessage.RESOLVED, closeDetail = true)
+                        refreshAfterAction(
+                            message = ReviewMessage.RESOLVED,
+                            closeDetail = true,
+                            reconcile = false,
+                        )
                         return@launch
                     }
                     val pairCandidates = if (detail.review.kind == ReviewKind.PENDING_MATCH) {
@@ -319,9 +323,9 @@ class ReviewViewModel(
                             error = null,
                         )
                     }
-                    applySummaries(detailLoader.loadSummaries())
+                    applySummaries(detailLoader.loadSummaries(reconcile = false))
                 } else {
-                    applySummaries(detailLoader.loadSummaries())
+                    applySummaries(detailLoader.loadSummaries(reconcile = false))
                     _uiState.update { it.copy(resolving = false, message = ReviewMessage.RESOLVED) }
                 }
             } catch (ce: CancellationException) {
@@ -379,9 +383,13 @@ class ReviewViewModel(
         }
     }
 
-    private suspend fun refreshAfterAction(message: ReviewMessage, closeDetail: Boolean) {
+    private suspend fun refreshAfterAction(
+        message: ReviewMessage,
+        closeDetail: Boolean,
+        reconcile: Boolean = true,
+    ) {
         val summaries = when (_uiState.value.listMode) {
-            ReviewListMode.PENDING -> detailLoader.loadSummaries()
+            ReviewListMode.PENDING -> detailLoader.loadSummaries(reconcile = reconcile)
             ReviewListMode.IGNORED -> detailLoader.loadIgnoredSummaries()
         }
         val items = summaries.map(::toListItem)
