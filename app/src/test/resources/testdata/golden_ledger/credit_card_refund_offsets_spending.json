@@ -1,0 +1,70 @@
+{
+  "id": "credit_card_refund_offsets_spending",
+  "evidence": "Credit card 7271 spends 80.00 SAR at TEST_SHOP_C and is refunded 80.00 SAR. Card salary-period spending nets to zero. The refund does not become current-account income, and the purchase does not leave account 3001.",
+  "periodAnchor": "2026-08-10",
+  "ownership": {
+    "accounts": [
+      {"bank": "BANK_ALJAZIRA", "masked": "3001"}
+    ],
+    "cards": [
+      {"bank": "BANK_ALJAZIRA", "last4": "7271", "type": "CREDIT"}
+    ]
+  },
+  "messages": [
+    {
+      "id": "card-purchase",
+      "sender": "AlJazira",
+      "receivedAt": "2026-07-30T06:08:00Z",
+      "body": "شراء عبر نقاط البيع\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 80.00 SAR\nفي: 09:08 30-07-2026\nالرصيد المتاح: 1000.00 SAR"
+    },
+    {
+      "id": "card-refund",
+      "sender": "AlJazira",
+      "receivedAt": "2026-08-05T10:10:00Z",
+      "body": "استرداد مبلغ\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 80.00 SAR\nفي: 2026-08-05 13:10\nالرصيد المتاح: 1080.00 SAR"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 2,
+    "persistedTransactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "80.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "CARD",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "7271",
+        "evidenceMessageIds": ["card-purchase"]
+      },
+      {
+        "type": "REFUND",
+        "amount": "80.00",
+        "currency": "SAR",
+        "direction": "INCOMING",
+        "destinationKind": "CARD",
+        "destinationBank": "BANK_ALJAZIRA",
+        "destinationRef": "7271",
+        "evidenceMessageIds": ["card-refund"]
+      }
+    ],
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "posPurchases": "0.00",
+        "salary": "0.00",
+        "otherIncome": "0.00",
+        "externalTransfersIn": "0.00",
+        "cashPosition": "0.00"
+      }
+    ],
+    "cards": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "last4": "7271",
+        "salaryPeriodSpendingNet": "0.00"
+      }
+    ]
+  }
+}

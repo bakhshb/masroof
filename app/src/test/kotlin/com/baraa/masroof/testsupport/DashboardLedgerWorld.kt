@@ -16,6 +16,7 @@ import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.sms.HistoricalBatchDerivedResult
 import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
 import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
@@ -154,16 +155,35 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
         exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
     ) {
         ownFixtureInstruments()
+        importProviderBatch(rows, exchangeRateEnrichment)
+    }
+
+    /**
+     * Historical import of an isolated provider inbox through the production batch
+     * processor. Does not seed the fixture corpus or change ownership.
+     */
+    suspend fun importProviderBatch(
+        rows: List<ProviderSmsRecord>,
+        exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
+    ): HistoricalBatchDerivedResult {
         val batch = HistoricalSmsBatchProcessor(
             capture = captureBankSms,
-            processStored = processStoredSms(),
+            processStored = processStoredSms(exchangeRateEnrichment),
             ownershipDiscovery = discovery,
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
             exchangeRateEnrichment = exchangeRateEnrichment,
         ).startBatch()
         rows.forEach { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
-        batch.finish()
+        return batch.finish()
+    }
+
+    /** Re-runs stored processing for every captured row, as a worker would after restart. */
+    suspend fun reprocessAllStored(
+        exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
+    ) {
+        val processor = processStoredSms(exchangeRateEnrichment)
+        rawRepo.listIdsByReceivedAt().forEach { processor.process(it, logOutcome = false) }
     }
 
     /** Deterministic months of synthetic SMS facts and linked transactions. */

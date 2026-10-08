@@ -1,0 +1,109 @@
+{
+  "id": "separate_external_same_amount",
+  "evidence": "One 2000.00 SAR intra-bank movement from 3001 to 3003, plus a separate 2000.00 SAR inter-bank transfer from 3001 to beneficiary TEST_BENEFICIARY on the next day. The external transfer leaves the owned fleet. Sharing an amount and the source account with the internal movement does not make it the same transfer.",
+  "pendingFix": "M1",
+  "pendingAssertions": [
+    "displayedTransactions",
+    "account.BANK_ALJAZIRA:3001.externalTransfersOut",
+    "account.BANK_ALJAZIRA:3001.cashPosition",
+    "fleet.totalOutflow"
+  ],
+  "periodAnchor": "2026-08-10",
+  "ownership": {
+    "accounts": [
+      {"bank": "BANK_ALJAZIRA", "masked": "3001"},
+      {"bank": "BANK_ALJAZIRA", "masked": "3003"}
+    ]
+  },
+  "messages": [
+    {
+      "id": "self-out",
+      "sender": "AlJazira",
+      "receivedAt": "2026-08-03T07:38:00Z",
+      "body": "حوالة صادرة الى حسابك الجاري\nمن: 3001\nمبلغ: SAR 2,000.00\nإلى: 3003\nفي: 2026-08-03 10:38"
+    },
+    {
+      "id": "self-in",
+      "sender": "AlJazira",
+      "receivedAt": "2026-08-03T07:38:30Z",
+      "body": "حوالة واردة داخلية\nمبلغ: SAR 2,000.00\nإلى: 3003\nاسم المرسل: TEST_PERSON\nرقم حساب المرسل: 3001\nالبنك المرسل: بنك الجزيرة\nفي: 2026-08-03 10:38"
+    },
+    {
+      "id": "external-out",
+      "sender": "AlJazira",
+      "receivedAt": "2026-08-04T09:26:00Z",
+      "body": "عملية حوالة مالية صادرة مقبولة\nخصمت من حساب: 3001\nالى: TEST_BENEFICIARY\nمبلغ العملية: 2,000.00 SAR\nالمعرف البديل \\الايبان : 0593\n[البنك العربي الوطني]\nفي: 2026-08-04 12:26\nرقم المعاملة: TEST_REFERENCE_EXT"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 3,
+    "persistedTransactions": [
+      {
+        "type": "SELF_TRANSFER",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "direction": "NEUTRAL",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "destinationKind": "ACCOUNT",
+        "destinationBank": "BANK_ALJAZIRA",
+        "destinationRef": "3003",
+        "evidenceMessageIds": ["self-in", "self-out"]
+      },
+      {
+        "type": "EXTERNAL_TRANSFER_OUT",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "evidenceMessageIds": ["external-out"]
+      }
+    ],
+    "displayedTransactions": [
+      {
+        "type": "SELF_TRANSFER",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "direction": "NEUTRAL",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "destinationKind": "ACCOUNT",
+        "destinationBank": "BANK_ALJAZIRA",
+        "destinationRef": "3003",
+        "evidenceMessageIds": ["self-in", "self-out"]
+      },
+      {
+        "type": "EXTERNAL_TRANSFER_OUT",
+        "amount": "2000.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "evidenceMessageIds": ["external-out"]
+      }
+    ],
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "selfTransfersOut": "2000.00",
+        "externalTransfersOut": "2000.00",
+        "cashPosition": "-4000.00"
+      },
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3003",
+        "selfTransfersIn": "2000.00",
+        "externalTransfersIn": "0.00",
+        "cashPosition": "2000.00"
+      }
+    ],
+    "fleetTotalInflow": "0.00",
+    "fleetTotalOutflow": "2000.00"
+  }
+}

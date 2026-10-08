@@ -1,0 +1,67 @@
+{
+  "id": "duplicated_sms_intake",
+  "evidence": "The same 18.00 SAR debit purchase is seen once in the inbox and once from the live path two seconds later. That is one SMS and one expense of 18.00 from account 3001. Processing the stored row again must not create a second expense.",
+  "periodAnchor": "2026-08-10",
+  "restart": true,
+  "ownership": {
+    "accounts": [
+      {"bank": "BANK_ALJAZIRA", "masked": "3001"}
+    ],
+    "cards": [
+      {"bank": "BANK_ALJAZIRA", "last4": "2210", "type": "DEBIT"}
+    ]
+  },
+  "messages": [
+    {
+      "id": "purchase-inbox",
+      "sender": "AlJazira",
+      "receivedAt": "2026-08-04T08:10:00Z",
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 18.00 SAR\nخصمت من حساب: 3001\nفي: 11:10 04-08-2026"
+    },
+    {
+      "id": "purchase-live",
+      "sender": "AlJazira",
+      "receivedAt": "2026-08-04T08:10:02Z",
+      "live": true,
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 18.00 SAR\nخصمت من حساب: 3001\nفي: 11:10 04-08-2026"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 1,
+    "reimportStable": true,
+    "persistedTransactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "18.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "evidenceMessageIds": ["purchase-inbox"]
+      }
+    ],
+    "displayedTransactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "18.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "evidenceMessageIds": ["purchase-inbox"]
+      }
+    ],
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "posPurchases": "18.00",
+        "salary": "0.00",
+        "otherIncome": "0.00",
+        "cashPosition": "-18.00"
+      }
+    ]
+  }
+}

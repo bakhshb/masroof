@@ -1,0 +1,82 @@
+{
+  "id": "distinct_identical_notices",
+  "evidence": "Two inbox notifications with the same 15.00 SAR debit-purchase text arrive three seconds apart, each with its own provider id. Same-source rows are different notices. Account 3001 spent 30.00, not 15.00.",
+  "periodAnchor": "2026-08-10",
+  "ownership": {
+    "accounts": [
+      {"bank": "BANK_ALJAZIRA", "masked": "3001"}
+    ],
+    "cards": [
+      {"bank": "BANK_ALJAZIRA", "last4": "2210", "type": "DEBIT"}
+    ]
+  },
+  "messages": [
+    {
+      "id": "notice-a",
+      "sender": "AlJazira",
+      "receivedAt": "2026-08-04T08:05:00Z",
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 15.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 04-08-2026"
+    },
+    {
+      "id": "notice-b",
+      "sender": "AlJazira",
+      "receivedAt": "2026-08-04T08:05:03Z",
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 15.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 04-08-2026"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 2,
+    "persistedTransactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "15.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "evidenceMessageIds": ["notice-a"]
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "15.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "evidenceMessageIds": ["notice-b"]
+      }
+    ],
+    "displayedTransactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "15.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "evidenceMessageIds": ["notice-a"]
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "15.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "evidenceMessageIds": ["notice-b"]
+      }
+    ],
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "posPurchases": "30.00",
+        "cashPosition": "-30.00"
+      }
+    ]
+  }
+}

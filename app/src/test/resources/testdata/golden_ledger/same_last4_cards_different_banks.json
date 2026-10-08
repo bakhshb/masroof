@@ -1,0 +1,93 @@
+{
+  "id": "same_last4_cards_different_banks",
+  "evidence": "BANK_ALJAZIRA credit card 7271 spends 100.00 SAR and BANK_OTHER credit card 7271 spends 40.00 SAR. The shared last4 is not a shared card. Each facility's salary-period spending stays on its own bank. There is no second-bank SMS parser, so these rows are persisted facts with the original message text kept as evidence.",
+  "pendingFix": "M5",
+  "pendingAssertions": [
+    "cardSpending"
+  ],
+  "periodAnchor": "2026-08-10",
+  "mode": "PERSISTED_FACTS",
+  "ownership": {
+    "cards": [
+      {"bank": "BANK_ALJAZIRA", "last4": "7271", "type": "CREDIT"},
+      {"bank": "BANK_OTHER", "last4": "7271", "type": "CREDIT"}
+    ]
+  },
+  "facts": [
+    {
+      "messageId": "aj-card-7271",
+      "sender": "AlJazira",
+      "body": "شراء عبر نقاط البيع\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 100.00 SAR\nفي: 09:08 04-08-2026\nالرصيد المتاح: 1000.00 SAR",
+      "receivedAt": "2026-08-04T06:08:00Z",
+      "bank": "BANK_ALJAZIRA",
+      "messageFamily": "PURCHASE",
+      "direction": "OUTGOING",
+      "amount": "100.00",
+      "currency": "SAR",
+      "transactionType": "EXPENSE",
+      "occurredAt": "2026-08-04T06:08:00Z",
+      "sourceKind": "CARD",
+      "sourceBank": "BANK_ALJAZIRA",
+      "sourceRef": "7271",
+      "cardLast4": "7271",
+      "cardSmsChannel": "CREDIT",
+      "merchant": "TEST_SHOP_C"
+    },
+    {
+      "messageId": "other-card-7271",
+      "sender": "OtherBank",
+      "body": "Credit purchase\nCard: 7271\nMerchant: TEST_SHOP_C\nAmount: 40.00 SAR\nAt: 2026-08-04 15:00",
+      "receivedAt": "2026-08-04T12:00:00Z",
+      "bank": "BANK_OTHER",
+      "messageFamily": "PURCHASE",
+      "direction": "OUTGOING",
+      "amount": "40.00",
+      "currency": "SAR",
+      "transactionType": "EXPENSE",
+      "occurredAt": "2026-08-04T12:00:00Z",
+      "sourceKind": "CARD",
+      "sourceBank": "BANK_OTHER",
+      "sourceRef": "7271",
+      "cardLast4": "7271",
+      "cardSmsChannel": "CREDIT",
+      "merchant": "TEST_SHOP_C"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 2,
+    "persistedTransactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "100.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "CARD",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "7271",
+        "evidenceMessageIds": ["aj-card-7271"]
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "40.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "CARD",
+        "sourceBank": "BANK_OTHER",
+        "sourceRef": "7271",
+        "evidenceMessageIds": ["other-card-7271"]
+      }
+    ],
+    "cards": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "last4": "7271",
+        "salaryPeriodSpendingNet": "100.00"
+      },
+      {
+        "bank": "BANK_OTHER",
+        "last4": "7271",
+        "salaryPeriodSpendingNet": "40.00"
+      }
+    ]
+  }
+}

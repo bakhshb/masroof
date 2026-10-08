@@ -1,0 +1,59 @@
+{
+  "id": "fx_does_not_borrow_later_rate",
+  "evidence": "TEST_SHOP_FX charges 10.00 USD on 1 Oct 2026 with no rate in that SMS, then 10.00 USD on 7 Oct 2026 at an SMS rate of 3.90. The 7 Oct purchase is 39.00 SAR from its own SMS. The 1 Oct purchase must not borrow 3.90. With no rate of its own and no market rate, its SAR equivalent stays absent.",
+  "pendingFix": "M8",
+  "pendingAssertions": [
+    "fx.fx-oct-01.rate",
+    "fx.fx-oct-01.source",
+    "fx.fx-oct-01.sar"
+  ],
+  "periodAnchor": "2026-10-07",
+  "ownership": {
+    "cards": [
+      {"bank": "BANK_ALJAZIRA", "last4": "7271", "type": "CREDIT"}
+    ]
+  },
+  "messages": [
+    {
+      "id": "fx-oct-01",
+      "sender": "AlJazira",
+      "receivedAt": "2026-10-01T06:00:00Z",
+      "body": "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_FX\nبمبلغ: USD 10.00\nفي: 2026-10-01 09:00\nالرصيد المتاح: SAR 1000.00"
+    },
+    {
+      "id": "fx-oct-07",
+      "sender": "AlJazira",
+      "receivedAt": "2026-10-07T06:00:00Z",
+      "body": "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_FX\nبمبلغ: USD 10.00\nفي: 2026-10-07 09:00\nسعر الصرف: 3.90\nالرصيد المتاح: SAR 900.00"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 2,
+    "persistedTransactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "10.00",
+        "currency": "USD",
+        "direction": "OUTGOING",
+        "sourceKind": "CARD",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "7271",
+        "evidenceMessageIds": ["fx-oct-01"]
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "10.00",
+        "currency": "USD",
+        "direction": "OUTGOING",
+        "sourceKind": "CARD",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "7271",
+        "evidenceMessageIds": ["fx-oct-07"]
+      }
+    ],
+    "rates": [
+      {"messageId": "fx-oct-01", "absent": true},
+      {"messageId": "fx-oct-07", "rate": "3.90", "source": "SMS", "sarEquivalent": "39.00"}
+    ]
+  }
+}

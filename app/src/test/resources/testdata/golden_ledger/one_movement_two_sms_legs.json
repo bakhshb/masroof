@@ -1,0 +1,77 @@
+{
+  "id": "one_movement_two_sms_legs",
+  "evidence": "One intra-bank movement of 5500.00 SAR from 3001 to 3002 at 09:00 on 11 Aug 2026, told by an outgoing SMS and an incoming SMS. Those two legs are one movement. Re-importing the same inbox rows and processing the stored SMS again must keep the same transaction.",
+  "periodAnchor": "2026-08-15",
+  "reimport": true,
+  "restart": true,
+  "ownership": {
+    "accounts": [
+      {"bank": "BANK_ALJAZIRA", "masked": "3001"},
+      {"bank": "BANK_ALJAZIRA", "masked": "3002"}
+    ]
+  },
+  "messages": [
+    {
+      "id": "leg-out",
+      "sender": "AlJazira",
+      "receivedAt": "2026-08-11T06:00:00Z",
+      "body": "حوالة صادرة الى حسابك الجاري\nمن: 3001\nمبلغ: SAR 5,500.00\nإلى: 3002\nفي: 2026-08-11 09:00"
+    },
+    {
+      "id": "leg-in",
+      "sender": "AlJazira",
+      "receivedAt": "2026-08-11T06:00:20Z",
+      "body": "حوالة واردة داخلية\nمبلغ: SAR 5,500.00\nإلى: 3002\nاسم المرسل: TEST_PERSON\nرقم حساب المرسل: 3001\nالبنك المرسل: بنك الجزيرة\nفي: 2026-08-11 09:00"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 2,
+    "reimportStable": true,
+    "persistedTransactions": [
+      {
+        "type": "SELF_TRANSFER",
+        "amount": "5500.00",
+        "currency": "SAR",
+        "direction": "NEUTRAL",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "destinationKind": "ACCOUNT",
+        "destinationBank": "BANK_ALJAZIRA",
+        "destinationRef": "3002",
+        "evidenceMessageIds": ["leg-in", "leg-out"]
+      }
+    ],
+    "displayedTransactions": [
+      {
+        "type": "SELF_TRANSFER",
+        "amount": "5500.00",
+        "currency": "SAR",
+        "direction": "NEUTRAL",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "destinationKind": "ACCOUNT",
+        "destinationBank": "BANK_ALJAZIRA",
+        "destinationRef": "3002",
+        "evidenceMessageIds": ["leg-in", "leg-out"]
+      }
+    ],
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "selfTransfersOut": "5500.00",
+        "cashPosition": "-5500.00"
+      },
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3002",
+        "selfTransfersIn": "5500.00",
+        "cashPosition": "5500.00"
+      }
+    ],
+    "fleetTotalInflow": "0.00",
+    "fleetTotalOutflow": "0.00"
+  }
+}

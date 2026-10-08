@@ -1,0 +1,97 @@
+{
+  "id": "same_last4_accounts_different_banks",
+  "evidence": "BANK_ALJAZIRA account 3001 spends 100.00 SAR and BANK_OTHER account 3001 spends 250.00 SAR. The shared suffix is not a shared account. AlJazira pos purchases stay 100.00, the other bank stays 250.00, and fleet outflow is 350.00. There is no second-bank SMS parser, so these rows are persisted facts with the original message text kept as evidence.",
+  "pendingFix": "M5",
+  "pendingAssertions": [
+    "account.BANK_ALJAZIRA:3001.posPurchases",
+    "account.BANK_ALJAZIRA:3001.cashPosition",
+    "account.BANK_OTHER:3001.posPurchases",
+    "account.BANK_OTHER:3001.cashPosition",
+    "fleet.totalOutflow"
+  ],
+  "periodAnchor": "2026-08-10",
+  "mode": "PERSISTED_FACTS",
+  "ownership": {
+    "accounts": [
+      {"bank": "BANK_ALJAZIRA", "masked": "3001"},
+      {"bank": "BANK_OTHER", "masked": "3001"}
+    ]
+  },
+  "facts": [
+    {
+      "messageId": "aj-pos-3001",
+      "sender": "AlJazira",
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_GROCER\nبمبلغ: 100.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 04-08-2026",
+      "receivedAt": "2026-08-04T08:05:00Z",
+      "bank": "BANK_ALJAZIRA",
+      "messageFamily": "PURCHASE",
+      "direction": "OUTGOING",
+      "amount": "100.00",
+      "currency": "SAR",
+      "transactionType": "EXPENSE",
+      "occurredAt": "2026-08-04T08:05:00Z",
+      "sourceKind": "ACCOUNT",
+      "sourceBank": "BANK_ALJAZIRA",
+      "sourceRef": "3001",
+      "merchant": "TEST_GROCER"
+    },
+    {
+      "messageId": "other-pos-3001",
+      "sender": "OtherBank",
+      "body": "POS purchase\nAccount: 3001\nMerchant: TEST_GROCER\nAmount: 250.00 SAR\nAt: 2026-08-04 12:00",
+      "receivedAt": "2026-08-04T09:00:00Z",
+      "bank": "BANK_OTHER",
+      "messageFamily": "PURCHASE",
+      "direction": "OUTGOING",
+      "amount": "250.00",
+      "currency": "SAR",
+      "transactionType": "EXPENSE",
+      "occurredAt": "2026-08-04T09:00:00Z",
+      "sourceKind": "ACCOUNT",
+      "sourceBank": "BANK_OTHER",
+      "sourceRef": "3001",
+      "merchant": "TEST_GROCER"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 2,
+    "persistedTransactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "100.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_ALJAZIRA",
+        "sourceRef": "3001",
+        "evidenceMessageIds": ["aj-pos-3001"]
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "250.00",
+        "currency": "SAR",
+        "direction": "OUTGOING",
+        "sourceKind": "ACCOUNT",
+        "sourceBank": "BANK_OTHER",
+        "sourceRef": "3001",
+        "evidenceMessageIds": ["other-pos-3001"]
+      }
+    ],
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "posPurchases": "100.00",
+        "cashPosition": "-100.00"
+      },
+      {
+        "bank": "BANK_OTHER",
+        "masked": "3001",
+        "posPurchases": "250.00",
+        "cashPosition": "-250.00"
+      }
+    ],
+    "fleetTotalInflow": "0.00",
+    "fleetTotalOutflow": "350.00"
+  }
+}
