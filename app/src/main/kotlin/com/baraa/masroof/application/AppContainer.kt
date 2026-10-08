@@ -108,6 +108,9 @@ import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
 import com.baraa.masroof.application.sms.LiveSmsProcessingWorker
+import com.baraa.masroof.application.sms.ExchangeRateEnrichmentWorker
+import com.baraa.masroof.application.sms.PendingExchangeRateEnricher
+import com.baraa.masroof.application.sms.WorkManagerExchangeRateEnrichmentScheduler
 import com.baraa.masroof.application.sms.WorkManagerLiveSmsWorkScheduler
 import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CancellationException
@@ -464,7 +467,9 @@ class AppContainer(
             reviewQueueUpdater = reviewQueueUpdater,
             ingestionReviewService = ingestionReviewService,
             appLogService = appLogService,
-            exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
+            exchangeRateEnrichmentScheduler = WorkManagerExchangeRateEnrichmentScheduler {
+                WorkManager.getInstance(appContext)
+            },
             processingRecovery = processingRecovery,
             reviewRepository = reviewRepository,
         )
@@ -511,6 +516,11 @@ class AppContainer(
     val workerFactory: WorkerFactory =
         DelegatingWorkerFactory().apply {
             addFactory(LiveSmsProcessingWorker.Factory { processStoredSmsUseCase })
+            addFactory(
+                ExchangeRateEnrichmentWorker.Factory {
+                    PendingExchangeRateEnricher { exchangeRateEnrichmentWorkflow.enrichPending() }
+                },
+            )
             addFactory(HistoricalDerivedRecoveryWorker.Factory { historicalDerivedRecovery })
             addFactory(ParsedEventFactsBackfillWorker.Factory { parsedEventFactsBackfillCoordinator })
         }

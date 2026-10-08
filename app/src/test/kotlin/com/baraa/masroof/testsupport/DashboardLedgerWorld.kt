@@ -133,7 +133,11 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
             ingestionReviewService = IngestionReviewService(reviewRepo, importClock),
-            exchangeRateEnrichment = exchangeRateEnrichment,
+            exchangeRateEnrichmentScheduler = exchangeRateEnrichment?.let { workflow ->
+                com.baraa.masroof.application.sms.ImmediateExchangeRateEnrichmentScheduler(
+                    com.baraa.masroof.application.sms.PendingExchangeRateEnricher { workflow.enrichPending() },
+                )
+            },
         )
 
     suspend fun ownFixtureInstruments() {

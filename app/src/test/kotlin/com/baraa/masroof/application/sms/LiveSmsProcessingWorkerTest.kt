@@ -423,6 +423,22 @@ class LiveSmsProcessingWorkerTest {
     }
 
     @Test
+    fun exchangeRateSchedulerFailure_keepsTheProcessingOutcome() = runBlocking {
+        val raw = captured()
+        val processStored = harness.processStored(
+            exchangeRateEnrichmentScheduler = ExchangeRateEnrichmentScheduler {
+                throw IllegalStateException("scheduler unavailable")
+            },
+        )
+
+        val outcome = processStored.process(raw.id)
+
+        assertTrue(outcome is SmsIngestionResult.Parsed)
+        assertEquals(ListenableWorker.Result.success(), worker(raw.id, processStored = processStored).doWork())
+        assertEquals(FinancialTransactionType.EXPENSE, harness.ftRepo.findByRawSmsId(raw.id)!!.type)
+    }
+
+    @Test
     fun exchangeRateEnrichmentFailure_succeedsAndStillPosts() = runBlocking {
         val raw = captured()
         val processStored = harness.processStored(
