@@ -29,4 +29,14 @@ interface UserCorrectionDao {
         """,
     )
     suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrectionEntity>
+
+    /** Callers keep [rawSmsIds] under [RoomBatch.MAX_BIND_ARGS]. */
+    @Query(
+        """
+        SELECT * FROM user_correction
+        WHERE targetRawSmsId IN (:rawSmsIds)
+        ORDER BY targetRawSmsId ASC, createdAtEpochMillis ASC, id ASC
+        """,
+    )
+    suspend fun listForRawSmsIds(rawSmsIds: List<String>): List<UserCorrectionEntity>
 }

@@ -61,6 +61,8 @@ internal object SettingsViewModelTestSupport {
                         override suspend fun latestForRawSmsId(rawSmsId: String) = null
                         override suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrection> =
                             emptyList()
+                        override suspend fun listForRawSmsIds(rawSmsIds: Collection<String>): List<UserCorrection> =
+                            emptyList()
                     },
                 ),
                 ownershipResolver = OwnershipResolver(

@@ -11,6 +11,8 @@ import com.baraa.masroof.parsing.repository.ParsedEventRepository
  *
  * Corrections are applied in ascending `(createdAt, id)` order; each non-null
  * corrected field overlays the previous projection (later wins per field).
+ * List reads load those corrections once per bind-sized chunk. Single-record
+ * reads stay on [UserCorrectionRepository.listForRawSmsId].
  * Does not mutate RawSms or stored ParsedEvent rows.
  */
 class EffectiveParsedEventProvider(
@@ -30,27 +32,24 @@ class EffectiveParsedEventProvider(
     }
 
     suspend fun listUnlinkedTransfersEffective(): List<ParsedEventRecord> =
-        parsedEventRepository.listUnlinkedTransfers().map { record ->
-            val corrections = userCorrectionRepository.listForRawSmsId(record.event.rawSmsId)
-            applyCorrections(record, corrections)
-        }
+        withCorrections(parsedEventRepository.listUnlinkedTransfers())
 
-    suspend fun listAllEffective(): List<ParsedEventRecord> {
-        val stored = parsedEventRepository.listAll()
-        return stored.map { record ->
-            val corrections = userCorrectionRepository.listForRawSmsId(record.event.rawSmsId)
-            applyCorrections(record, corrections)
-        }
-    }
+    suspend fun listAllEffective(): List<ParsedEventRecord> =
+        withCorrections(parsedEventRepository.listAll())
 
     suspend fun listEffectiveReceivedBetween(
         startInclusive: java.time.Instant,
         endExclusive: java.time.Instant,
-    ): List<ParsedEventRecord> {
-        val stored = parsedEventRepository.listReceivedBetween(startInclusive, endExclusive)
-        return stored.map { record ->
-            val corrections = userCorrectionRepository.listForRawSmsId(record.event.rawSmsId)
-            applyCorrections(record, corrections)
+    ): List<ParsedEventRecord> =
+        withCorrections(parsedEventRepository.listReceivedBetween(startInclusive, endExclusive))
+
+    private suspend fun withCorrections(records: List<ParsedEventRecord>): List<ParsedEventRecord> {
+        if (records.isEmpty()) return emptyList()
+        val correctionsByRawSmsId = userCorrectionRepository
+            .listForRawSmsIds(records.map { it.event.rawSmsId })
+            .groupBy { it.targetRawSmsId }
+        return records.map { record ->
+            applyCorrections(record, correctionsByRawSmsId[record.event.rawSmsId].orEmpty())
         }
     }
 

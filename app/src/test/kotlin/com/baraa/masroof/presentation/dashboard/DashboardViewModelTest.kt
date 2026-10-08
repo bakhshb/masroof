@@ -840,6 +840,8 @@ class DashboardViewModelTest {
                         override suspend fun save(correction: com.baraa.masroof.domain.model.UserCorrection) = Unit
                         override suspend fun latestForRawSmsId(rawSmsId: String) = null
                         override suspend fun listForRawSmsId(rawSmsId: String) = emptyList<com.baraa.masroof.domain.model.UserCorrection>()
+                        override suspend fun listForRawSmsIds(rawSmsIds: Collection<String>) =
+                            emptyList<com.baraa.masroof.domain.model.UserCorrection>()
                     },
                 ),
                 ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(

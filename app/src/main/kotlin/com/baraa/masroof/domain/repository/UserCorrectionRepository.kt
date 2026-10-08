@@ -11,4 +11,10 @@ interface UserCorrectionRepository {
     suspend fun latestForRawSmsId(rawSmsId: String): UserCorrection?
 
     suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrection>
+
+    /**
+     * Corrections for [rawSmsIds], ordered by target, [UserCorrection.createdAt], then id.
+     * Ids with no corrections are omitted.
+     */
+    suspend fun listForRawSmsIds(rawSmsIds: Collection<String>): List<UserCorrection>
 }
