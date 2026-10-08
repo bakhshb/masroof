@@ -27,8 +27,8 @@ import java.time.Instant
  * on the parsed-event rows; reconstruction must sort them. The saved domain
  * object's link list is intentionally reversed so a mapper that echoed it would fail.
  *
- * Current read shape, recorded for later batching: each list load issues one
- * link query and one parsed-event lookup per link, per transaction.
+ * List reads load links and parsed events for the returned transactions in
+ * bind-sized chunks: one link query and one parsed-event query per chunk.
  */
 object TransactionReconstructionFixture {
     const val ZONE = "Asia/Riyadh"
