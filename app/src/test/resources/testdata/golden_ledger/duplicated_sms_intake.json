@@ -5,10 +5,17 @@
   "restart": true,
   "ownership": {
     "accounts": [
-      {"bank": "BANK_ALJAZIRA", "masked": "3001"}
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001"
+      }
     ],
     "cards": [
-      {"bank": "BANK_ALJAZIRA", "last4": "2210", "type": "DEBIT"}
+      {
+        "bank": "BANK_ALJAZIRA",
+        "last4": "2210",
+        "type": "DEBIT"
+      }
     ]
   },
   "messages": [
@@ -16,14 +23,16 @@
       "id": "purchase-inbox",
       "sender": "AlJazira",
       "receivedAt": "2026-08-04T08:10:00Z",
-      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 18.00 SAR\nخصمت من حساب: 3001\nفي: 11:10 04-08-2026"
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 18.00 SAR\nخصمت من حساب: 3001\nفي: 11:10 04-08-2026",
+      "intendedFamily": "PURCHASE"
     },
     {
       "id": "purchase-live",
       "sender": "AlJazira",
       "receivedAt": "2026-08-04T08:10:02Z",
       "live": true,
-      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 18.00 SAR\nخصمت من حساب: 3001\nفي: 11:10 04-08-2026"
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 18.00 SAR\nخصمت من حساب: 3001\nفي: 11:10 04-08-2026",
+      "intendedFamily": "PURCHASE"
     }
   ],
   "expected": {
@@ -38,7 +47,9 @@
         "sourceKind": "ACCOUNT",
         "sourceBank": "BANK_ALJAZIRA",
         "sourceRef": "3001",
-        "evidenceMessageIds": ["purchase-inbox"]
+        "evidenceMessageIds": [
+          "purchase-inbox"
+        ]
       }
     ],
     "displayedTransactions": [
@@ -50,7 +61,9 @@
         "sourceKind": "ACCOUNT",
         "sourceBank": "BANK_ALJAZIRA",
         "sourceRef": "3001",
-        "evidenceMessageIds": ["purchase-inbox"]
+        "evidenceMessageIds": [
+          "purchase-inbox"
+        ]
       }
     ],
     "accounts": [

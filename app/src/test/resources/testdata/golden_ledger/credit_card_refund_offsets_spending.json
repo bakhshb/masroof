@@ -4,10 +4,17 @@
   "periodAnchor": "2026-08-10",
   "ownership": {
     "accounts": [
-      {"bank": "BANK_ALJAZIRA", "masked": "3001"}
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001"
+      }
     ],
     "cards": [
-      {"bank": "BANK_ALJAZIRA", "last4": "7271", "type": "CREDIT"}
+      {
+        "bank": "BANK_ALJAZIRA",
+        "last4": "7271",
+        "type": "CREDIT"
+      }
     ]
   },
   "messages": [
@@ -15,13 +22,15 @@
       "id": "card-purchase",
       "sender": "AlJazira",
       "receivedAt": "2026-07-30T06:08:00Z",
-      "body": "شراء عبر نقاط البيع\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 80.00 SAR\nفي: 09:08 30-07-2026\nالرصيد المتاح: 1000.00 SAR"
+      "body": "شراء عبر نقاط البيع\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 80.00 SAR\nفي: 09:08 30-07-2026\nالرصيد المتاح: 1000.00 SAR",
+      "intendedFamily": "PURCHASE"
     },
     {
       "id": "card-refund",
       "sender": "AlJazira",
       "receivedAt": "2026-08-05T10:10:00Z",
-      "body": "استرداد مبلغ\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 80.00 SAR\nفي: 2026-08-05 13:10\nالرصيد المتاح: 1080.00 SAR"
+      "body": "استرداد مبلغ\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 80.00 SAR\nفي: 2026-08-05 13:10\nالرصيد المتاح: 1080.00 SAR",
+      "intendedFamily": "REFUND"
     }
   ],
   "expected": {
@@ -35,7 +44,9 @@
         "sourceKind": "CARD",
         "sourceBank": "BANK_ALJAZIRA",
         "sourceRef": "7271",
-        "evidenceMessageIds": ["card-purchase"]
+        "evidenceMessageIds": [
+          "card-purchase"
+        ]
       },
       {
         "type": "REFUND",
@@ -45,7 +56,9 @@
         "destinationKind": "CARD",
         "destinationBank": "BANK_ALJAZIRA",
         "destinationRef": "7271",
-        "evidenceMessageIds": ["card-refund"]
+        "evidenceMessageIds": [
+          "card-refund"
+        ]
       }
     ],
     "accounts": [

@@ -153,6 +153,10 @@ class GoldenLedgerReplay(context: Context) : AutoCloseable {
         val messageByEventId = messageIdsByEventId(rawIdToMessageId)
         val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse(scenario.periodAnchor))
         val projection = world.dashboardService().loadProjection(period)
+        val wholeHistory = world.dashboardService(
+            evidenceSource = WholeHistoryDashboardEvidenceSource(world.parsedRepo, world.rawRepo),
+        ).loadProjection(period)
+        val evidenceScopeMatches = projection == wholeHistory
         val persisted = world.ftRepo.listAll().map { observeTransaction(it, messageByEventId) }
         val displayed = projection.transactions.map { tx ->
             val observed = observeTransaction(tx, messageByEventId)
@@ -184,6 +188,10 @@ class GoldenLedgerReplay(context: Context) : AutoCloseable {
                 salaryPeriodSpendingNet = facility.primary.salaryPeriodSpendingNet.amount.toPlainString(),
             )
         }
+        val parsedFamilies = world.parsedRepo.listAll().mapNotNull { record ->
+            val messageId = messageByEventId[record.event.id] ?: return@mapNotNull null
+            messageId to record.event.messageFamily.name
+        }.toMap()
         return GoldenObservation(
             ingestionError = ingestionError,
             rawSmsCount = world.rawRepo.listIdsByReceivedAt().size,
@@ -194,6 +202,8 @@ class GoldenLedgerReplay(context: Context) : AutoCloseable {
             fleetTotalInflow = projection.accountsFleet.totalInflow?.amount?.toPlainString(),
             fleetTotalOutflow = projection.accountsFleet.totalOutflow?.amount?.toPlainString(),
             reimportStable = reimportStable,
+            parsedFamilies = parsedFamilies,
+            evidenceScopeMatches = evidenceScopeMatches,
         )
     }
 
@@ -331,6 +341,8 @@ data class GoldenObservation(
     val fleetTotalInflow: String?,
     val fleetTotalOutflow: String?,
     val reimportStable: Boolean,
+    val parsedFamilies: Map<String, String>,
+    val evidenceScopeMatches: Boolean,
 )
 
 data class GoldenObservedTransaction(

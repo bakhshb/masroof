@@ -1,5 +1,6 @@
 package com.baraa.masroof.testsupport
 
+import com.baraa.masroof.domain.model.MessageFamily
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -58,6 +59,8 @@ data class GoldenMessage(
     val sender: String,
     val body: String,
     val receivedAt: String,
+    /** Message family the SMS is intended to be, independent of the parser result. */
+    val intendedFamily: String,
     val live: Boolean = false,
 )
 
@@ -172,8 +175,18 @@ object GoldenLedgerFixtureLoader {
                 "${scenario.id} marks ${scenario.pendingFix} but lists no pending assertions"
             }
             when (scenario.mode) {
-                GoldenScenario.MODE_SMS_REPLAY ->
+                GoldenScenario.MODE_SMS_REPLAY -> {
                     require(scenario.messages.isNotEmpty()) { "${scenario.id} has no SMS messages" }
+                    scenario.messages.forEach { message ->
+                        require(message.intendedFamily.isNotBlank()) {
+                            "${scenario.id} message ${message.id} needs an intended family"
+                        }
+                        val family = runCatching { MessageFamily.valueOf(message.intendedFamily) }.getOrNull()
+                        require(family != null) {
+                            "${scenario.id} message ${message.id} has unknown family ${message.intendedFamily}"
+                        }
+                    }
+                }
                 GoldenScenario.MODE_PERSISTED_FACTS ->
                     require(scenario.facts.isNotEmpty()) { "${scenario.id} has no persisted facts" }
                 else -> error("${scenario.id} has unknown mode ${scenario.mode}")

@@ -10,7 +10,11 @@
   "periodAnchor": "2026-10-07",
   "ownership": {
     "cards": [
-      {"bank": "BANK_ALJAZIRA", "last4": "7271", "type": "CREDIT"}
+      {
+        "bank": "BANK_ALJAZIRA",
+        "last4": "7271",
+        "type": "CREDIT"
+      }
     ]
   },
   "messages": [
@@ -18,13 +22,15 @@
       "id": "fx-oct-01",
       "sender": "AlJazira",
       "receivedAt": "2026-10-01T06:00:00Z",
-      "body": "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_FX\nبمبلغ: USD 10.00\nفي: 2026-10-01 09:00\nالرصيد المتاح: SAR 1000.00"
+      "body": "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_FX\nبمبلغ: USD 10.00\nفي: 2026-10-01 09:00\nالرصيد المتاح: SAR 1000.00",
+      "intendedFamily": "PURCHASE"
     },
     {
       "id": "fx-oct-07",
       "sender": "AlJazira",
       "receivedAt": "2026-10-07T06:00:00Z",
-      "body": "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_FX\nبمبلغ: USD 10.00\nفي: 2026-10-07 09:00\nسعر الصرف: 3.90\nالرصيد المتاح: SAR 900.00"
+      "body": "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nلدى: TEST_SHOP_FX\nبمبلغ: USD 10.00\nفي: 2026-10-07 09:00\nسعر الصرف: 3.90\nالرصيد المتاح: SAR 900.00",
+      "intendedFamily": "PURCHASE"
     }
   ],
   "expected": {
@@ -38,7 +44,9 @@
         "sourceKind": "CARD",
         "sourceBank": "BANK_ALJAZIRA",
         "sourceRef": "7271",
-        "evidenceMessageIds": ["fx-oct-01"]
+        "evidenceMessageIds": [
+          "fx-oct-01"
+        ]
       },
       {
         "type": "EXPENSE",
@@ -48,12 +56,22 @@
         "sourceKind": "CARD",
         "sourceBank": "BANK_ALJAZIRA",
         "sourceRef": "7271",
-        "evidenceMessageIds": ["fx-oct-07"]
+        "evidenceMessageIds": [
+          "fx-oct-07"
+        ]
       }
     ],
     "rates": [
-      {"messageId": "fx-oct-01", "absent": true},
-      {"messageId": "fx-oct-07", "rate": "3.90", "source": "SMS", "sarEquivalent": "39.00"}
+      {
+        "messageId": "fx-oct-01",
+        "absent": true
+      },
+      {
+        "messageId": "fx-oct-07",
+        "rate": "3.90",
+        "source": "SMS",
+        "sarEquivalent": "39.00"
+      }
     ]
   }
 }

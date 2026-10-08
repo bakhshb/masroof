@@ -28,8 +28,11 @@ import org.robolectric.annotation.Config
  * and are not derived from the code under test.
  *
  * A scenario may name pending assertions for a known defect. Those misses are
- * reported as assumptions so this baseline stays green until the owning
- * milestone makes the oracle true. Every other miss fails.
+ * reported as assumptions, and the test name ends in `_pendingM#`, so this
+ * baseline stays green until the owning milestone makes the oracle true.
+ * Every other miss fails. Parsed message family is checked against each SMS
+ * fixture's intended family. Scoped dashboard evidence must match a
+ * whole-history load.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -49,10 +52,10 @@ class GoldenLedgerOracleTest {
     }
 
     @Test
-    fun repeatedIdenticalSelfTransfers_bothRemainInTheAccount() = check("repeated_identical_self_transfers")
+    fun repeatedIdenticalSelfTransfers_bothRemainInTheAccount_pendingM1() = check("repeated_identical_self_transfers")
 
     @Test
-    fun separateExternalTransfer_sameAmountStaysVisible() = check("separate_external_same_amount")
+    fun separateExternalTransfer_sameAmountStaysVisible_pendingM1() = check("separate_external_same_amount")
 
     @Test
     fun oneMovementTwoSmsLegs_postsOnceAndReplaysCleanly() = check("one_movement_two_sms_legs")
@@ -64,19 +67,19 @@ class GoldenLedgerOracleTest {
     fun distinctIdenticalNotices_staySeparate() = check("distinct_identical_notices")
 
     @Test
-    fun bankAccountRefund_returnsNetCashToZero() = check("bank_account_refund_nets_cash")
+    fun bankAccountRefund_returnsNetCashToZero_pendingM6() = check("bank_account_refund_nets_cash")
 
     @Test
     fun creditCardRefund_offsetsCardSpendingOnly() = check("credit_card_refund_offsets_spending")
 
     @Test
-    fun fxAcrossDates_doesNotBorrowALaterMerchantRate() = check("fx_does_not_borrow_later_rate")
+    fun fxAcrossDates_doesNotBorrowALaterMerchantRate_pendingM8() = check("fx_does_not_borrow_later_rate")
 
     @Test
-    fun sameLast4Accounts_doNotMixBanks() = check("same_last4_accounts_different_banks")
+    fun sameLast4Accounts_doNotMixBanks_pendingM5() = check("same_last4_accounts_different_banks")
 
     @Test
-    fun sameLast4Cards_doNotMixBanks() = check("same_last4_cards_different_banks")
+    fun sameLast4Cards_doNotMixBanks_pendingM5() = check("same_last4_cards_different_banks")
 
     private fun check(id: String) = runBlocking {
         val scenario = GoldenLedgerFixtureLoader.load(id)
@@ -91,7 +94,10 @@ class GoldenLedgerOracleTest {
             if (pending.isNotEmpty()) {
                 val pendingGap = format(scenario, pending, emptyList())
                 println(pendingGap)
-                assumeTrue(pendingGap, false)
+                assumeTrue(
+                    "EXPECTED FAILURE pending ${scenario.pendingFix}\n$pendingGap",
+                    false,
+                )
             }
         }
     }
@@ -108,6 +114,11 @@ class GoldenLedgerOracleTest {
             if (!sameValue(expectedValue, renderedActual)) {
                 found += Mismatch(key, expectedValue, renderedActual)
             }
+        }
+        check("evidenceScope", "match", if (observed.evidenceScopeMatches) "match" else "diverges")
+        scenario.messages.forEach { message ->
+            val actualFamily = observed.parsedFamilies[message.id] ?: return@forEach
+            check("family.${message.id}", message.intendedFamily, actualFamily)
         }
         check("rawSmsCount", expected.rawSmsCount?.toString(), observed.rawSmsCount.toString())
         check(

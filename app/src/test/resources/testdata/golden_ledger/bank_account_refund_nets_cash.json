@@ -8,10 +8,17 @@
   "periodAnchor": "2026-08-10",
   "ownership": {
     "accounts": [
-      {"bank": "BANK_ALJAZIRA", "masked": "3001"}
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001"
+      }
     ],
     "cards": [
-      {"bank": "BANK_ALJAZIRA", "last4": "2210", "type": "DEBIT"}
+      {
+        "bank": "BANK_ALJAZIRA",
+        "last4": "2210",
+        "type": "DEBIT"
+      }
     ]
   },
   "messages": [
@@ -19,13 +26,15 @@
       "id": "bank-purchase",
       "sender": "AlJazira",
       "receivedAt": "2026-08-04T08:05:00Z",
-      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_SHOP_A\nبمبلغ: 100.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 04-08-2026"
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_SHOP_A\nبمبلغ: 100.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 04-08-2026",
+      "intendedFamily": "PURCHASE"
     },
     {
       "id": "bank-refund",
       "sender": "AlJazira",
       "receivedAt": "2026-08-05T10:10:00Z",
-      "body": "استرداد مبلغ\nإلى: 3001\nلدى: TEST_SHOP_A\nبمبلغ: 100.00 SAR\nفي: 2026-08-05 13:10"
+      "body": "استرداد مبلغ\nإلى: 3001\nلدى: TEST_SHOP_A\nبمبلغ: 100.00 SAR\nفي: 2026-08-05 13:10",
+      "intendedFamily": "REFUND"
     }
   ],
   "expected": {
@@ -39,7 +48,9 @@
         "sourceKind": "ACCOUNT",
         "sourceBank": "BANK_ALJAZIRA",
         "sourceRef": "3001",
-        "evidenceMessageIds": ["bank-purchase"]
+        "evidenceMessageIds": [
+          "bank-purchase"
+        ]
       },
       {
         "type": "REFUND",
@@ -49,7 +60,9 @@
         "destinationKind": "ACCOUNT",
         "destinationBank": "BANK_ALJAZIRA",
         "destinationRef": "3001",
-        "evidenceMessageIds": ["bank-refund"]
+        "evidenceMessageIds": [
+          "bank-refund"
+        ]
       }
     ],
     "accounts": [

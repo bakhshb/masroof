@@ -4,10 +4,17 @@
   "periodAnchor": "2026-08-10",
   "ownership": {
     "accounts": [
-      {"bank": "BANK_ALJAZIRA", "masked": "3001"}
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001"
+      }
     ],
     "cards": [
-      {"bank": "BANK_ALJAZIRA", "last4": "2210", "type": "DEBIT"}
+      {
+        "bank": "BANK_ALJAZIRA",
+        "last4": "2210",
+        "type": "DEBIT"
+      }
     ]
   },
   "messages": [
@@ -15,13 +22,15 @@
       "id": "notice-a",
       "sender": "AlJazira",
       "receivedAt": "2026-08-04T08:05:00Z",
-      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 15.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 04-08-2026"
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 15.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 04-08-2026",
+      "intendedFamily": "PURCHASE"
     },
     {
       "id": "notice-b",
       "sender": "AlJazira",
       "receivedAt": "2026-08-04T08:05:03Z",
-      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 15.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 04-08-2026"
+      "body": "شراء من نقاط البيع\nبطاقة مدى: 2210\nلدى: TEST_KIOSK\nبمبلغ: 15.00 SAR\nخصمت من حساب: 3001\nفي: 11:05 04-08-2026",
+      "intendedFamily": "PURCHASE"
     }
   ],
   "expected": {
@@ -35,7 +44,9 @@
         "sourceKind": "ACCOUNT",
         "sourceBank": "BANK_ALJAZIRA",
         "sourceRef": "3001",
-        "evidenceMessageIds": ["notice-a"]
+        "evidenceMessageIds": [
+          "notice-a"
+        ]
       },
       {
         "type": "EXPENSE",
@@ -45,7 +56,9 @@
         "sourceKind": "ACCOUNT",
         "sourceBank": "BANK_ALJAZIRA",
         "sourceRef": "3001",
-        "evidenceMessageIds": ["notice-b"]
+        "evidenceMessageIds": [
+          "notice-b"
+        ]
       }
     ],
     "displayedTransactions": [
@@ -57,7 +70,9 @@
         "sourceKind": "ACCOUNT",
         "sourceBank": "BANK_ALJAZIRA",
         "sourceRef": "3001",
-        "evidenceMessageIds": ["notice-a"]
+        "evidenceMessageIds": [
+          "notice-a"
+        ]
       },
       {
         "type": "EXPENSE",
@@ -67,7 +82,9 @@
         "sourceKind": "ACCOUNT",
         "sourceBank": "BANK_ALJAZIRA",
         "sourceRef": "3001",
-        "evidenceMessageIds": ["notice-b"]
+        "evidenceMessageIds": [
+          "notice-b"
+        ]
       }
     ],
     "accounts": [
