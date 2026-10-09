@@ -22,9 +22,15 @@ class AppUpdateService(
         appLogService.info(AppLogCategories.UPDATE, "Update channel set to ${channel.storageValue}")
     }
 
-    fun saveToken(token: String) {
-        tokenRepository.setToken(token)
-        appLogService.info(AppLogCategories.UPDATE, "GitHub token saved")
+    fun saveToken(token: String): Boolean {
+        val trimmed = token.trim()
+        val saved = tokenRepository.setToken(token) && tokenRepository.getToken() == trimmed
+        if (saved) {
+            appLogService.info(AppLogCategories.UPDATE, "GitHub token saved")
+        } else {
+            appLogService.error(AppLogCategories.UPDATE, "GitHub token was not saved")
+        }
+        return saved
     }
 
     fun clearToken() {

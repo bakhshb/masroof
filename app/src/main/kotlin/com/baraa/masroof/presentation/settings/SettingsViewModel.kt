@@ -419,11 +419,15 @@ class SettingsViewModel(
 
     fun saveGithubToken(token: String) {
         if (token.isBlank()) return
-        appUpdateService.saveToken(token)
+        val saved = appUpdateService.saveToken(token)
         _uiState.update {
             it.copy(
-                githubTokenConfigured = true,
-                updateMessage = AppUpdateMessage.TOKEN_SAVED,
+                githubTokenConfigured = appUpdateService.hasConfiguredToken(),
+                updateMessage = if (saved) {
+                    AppUpdateMessage.TOKEN_SAVED
+                } else {
+                    AppUpdateMessage.TOKEN_SAVE_FAILED
+                },
             )
         }
     }

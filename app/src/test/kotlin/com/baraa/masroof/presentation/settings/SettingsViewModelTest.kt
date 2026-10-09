@@ -331,6 +331,23 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun saveGithubToken_failedPersistence_isNotReportedAsSaved() = runTest {
+        val appUpdateService = SettingsViewModelTestFixtures.appUpdateService(persistToken = false)
+        val vm = viewModel(
+            appUpdateService = appUpdateService,
+            updateCheckCoordinator = SettingsViewModelTestFixtures.updateCheckCoordinator(
+                appUpdateService = appUpdateService,
+            ),
+        )
+
+        vm.saveGithubToken("ghp_secret")
+
+        assertEquals(AppUpdateMessage.TOKEN_SAVE_FAILED, vm.uiState.value.updateMessage)
+        assertFalse(vm.uiState.value.githubTokenConfigured)
+        assertFalse(appUpdateService.hasConfiguredToken())
+    }
+
+    @Test
     fun refresh_clearsStalePendingUpdateAfterInstall() = runTest {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
         val pendingUpdateStore = com.baraa.masroof.application.update.PendingUpdateStore(

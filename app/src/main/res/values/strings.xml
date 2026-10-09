@@ -198,6 +198,7 @@
     <string name="settings_github_token_configured">تم حفظ الرمز على الجهاز (تخزين خاص للتطبيق).</string>
     <string name="settings_github_token_missing">لم يُضبط رمز GitHub بعد.</string>
     <string name="settings_github_token_saved">تم حفظ رمز GitHub</string>
+    <string name="settings_github_token_save_failed">تعذر حفظ رمز GitHub</string>
     <string name="settings_github_token_required">المستودع خاص — أدخل رمز GitHub للقراءة فقط ثم اضغط حفظ الرمز</string>
     <string name="settings_github_auth_failed">فشل التحقق من GitHub — تأكد أن الرمز للقراءة فقط وله صلاحية Contents على المستودع</string>
     <string name="settings_check_updates">التحقق من التحديثات</string>
