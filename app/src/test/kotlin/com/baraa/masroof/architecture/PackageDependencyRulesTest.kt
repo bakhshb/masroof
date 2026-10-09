@@ -220,6 +220,34 @@ class PackageDependencyRulesTest {
     }
 
     @Test
+    fun application_dashboard_doesNotClassifyBankWordingFromSmsBody() {
+        val files = listOf(
+            "application/dashboard/CurrentAccountTransactionScope.kt",
+            "application/dashboard/DebitCardSpendClassifier.kt",
+        ).map { File(sourceRoot, it) }
+        val forbidden = listOf(
+            ".body",
+            "comparisonBody",
+            "سداد فاتورة",
+            "المفوتر",
+            "سداد بطاقة",
+            "سحب نقدي",
+            "خصمت",
+            "تسديد",
+        )
+        files.forEach { file ->
+            assertTrue("${file.path} must exist", file.isFile)
+            val source = file.readText()
+            forbidden.forEach { phrase ->
+                assertFalse(
+                    "${file.name} must classify from persisted parse facts, not '$phrase'",
+                    source.contains(phrase),
+                )
+            }
+        }
+    }
+
+    @Test
     fun application_dashboard_doesNotMapArabicLoanLabels() {
         val forbidden = listOf("تمويل شخصي", "سيارة", "عقار")
         kotlinFilesIn("application/dashboard").forEach { file ->

@@ -59,12 +59,11 @@ object AccountFlowClassifier {
         context: AccountFlowClassificationContext,
     ): List<FlowAssignment> {
         val parsedRecordsById = context.parsedRecordsById
-        val rawSmsById = context.rawSmsById
         val billPaymentTxIds = context.billPaymentTxIds
 
         return when (tx.type) {
             FinancialTransactionType.INCOME -> {
-                if (!scope.involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)) {
+                if (!scope.involvesOwnedDestination(tx, parsedRecordsById)) {
                     return emptyList()
                 }
                 listOf(
@@ -77,7 +76,7 @@ object AccountFlowClassifier {
             }
 
             FinancialTransactionType.EXTERNAL_TRANSFER_IN -> {
-                if (!scope.involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)) {
+                if (!scope.involvesOwnedDestination(tx, parsedRecordsById)) {
                     return emptyList()
                 }
                 listOf(
@@ -90,56 +89,56 @@ object AccountFlowClassifier {
             }
 
             FinancialTransactionType.CREDIT_CARD_PAYMENT ->
-                if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
+                if (!scope.involvesOwnedSource(tx, parsedRecordsById)) {
                     emptyList()
                 } else {
                     listOf(FlowAssignment.Expense(FlowExpenseCategory.CREDIT_CARD_PAYMENT))
                 }
 
             FinancialTransactionType.EXTERNAL_TRANSFER_OUT ->
-                if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
+                if (!scope.involvesOwnedSource(tx, parsedRecordsById)) {
                     emptyList()
                 } else {
                     listOf(FlowAssignment.Expense(FlowExpenseCategory.EXTERNAL_TRANSFER_OUT))
                 }
 
             FinancialTransactionType.CASH_WITHDRAWAL ->
-                if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
+                if (!scope.involvesOwnedSource(tx, parsedRecordsById)) {
                     emptyList()
                 } else {
                     listOf(FlowAssignment.Expense(FlowExpenseCategory.CASH_WITHDRAWAL))
                 }
 
             FinancialTransactionType.BILL_PAYMENT ->
-                if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
+                if (!scope.involvesOwnedSource(tx, parsedRecordsById)) {
                     emptyList()
                 } else {
                     listOf(FlowAssignment.Expense(FlowExpenseCategory.BILL_PAYMENT))
                 }
 
             FinancialTransactionType.LOAN_REPAYMENT ->
-                if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
+                if (!scope.involvesOwnedSource(tx, parsedRecordsById)) {
                     emptyList()
                 } else {
                     listOf(FlowAssignment.Expense(FlowExpenseCategory.LOAN_REPAYMENT))
                 }
 
             FinancialTransactionType.EXPENSE -> {
-                if (scope.isCreditCardSourcedExpenseWithoutOwnedAccount(tx, parsedRecordsById, rawSmsById)) {
+                if (scope.isCreditCardSourcedExpenseWithoutOwnedAccount(tx, parsedRecordsById)) {
                     return emptyList()
                 }
-                if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
+                if (!scope.involvesOwnedSource(tx, parsedRecordsById)) {
                     return emptyList()
                 }
                 listOf(
                     when {
-                        scope.isCreditCardPayment(tx, parsedRecordsById, rawSmsById) ->
+                        scope.isCreditCardPayment(tx, parsedRecordsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.CREDIT_CARD_PAYMENT)
 
-                        scope.isCashWithdrawal(tx, parsedRecordsById, rawSmsById) ->
+                        scope.isCashWithdrawal(tx, parsedRecordsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.CASH_WITHDRAWAL)
 
-                        scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById) ->
+                        scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.BILL_PAYMENT)
 
                         else -> FlowAssignment.Expense(FlowExpenseCategory.POS_PURCHASE)
@@ -148,10 +147,10 @@ object AccountFlowClassifier {
             }
 
             FinancialTransactionType.FEE -> {
-                if (scope.isCreditCardSourcedExpenseWithoutOwnedAccount(tx, parsedRecordsById, rawSmsById)) {
+                if (scope.isCreditCardSourcedExpenseWithoutOwnedAccount(tx, parsedRecordsById)) {
                     return emptyList()
                 }
-                if (!scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
+                if (!scope.involvesOwnedSource(tx, parsedRecordsById)) {
                     return emptyList()
                 }
                 listOf(
@@ -159,10 +158,10 @@ object AccountFlowClassifier {
                         scope.isFinancingInstallment(tx, parsedRecordsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.LOAN_REPAYMENT)
 
-                        scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById, rawSmsById) ->
+                        scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.BILL_PAYMENT)
 
-                        scope.isCashWithdrawal(tx, parsedRecordsById, rawSmsById) ->
+                        scope.isCashWithdrawal(tx, parsedRecordsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.CASH_WITHDRAWAL)
 
                         else -> FlowAssignment.Expense(FlowExpenseCategory.FEE)
@@ -171,10 +170,10 @@ object AccountFlowClassifier {
             }
 
             FinancialTransactionType.SELF_TRANSFER -> buildList {
-                if (scope.involvesOwnedDestination(tx, parsedRecordsById, rawSmsById)) {
+                if (scope.involvesOwnedDestination(tx, parsedRecordsById)) {
                     add(FlowAssignment.SelfTransfer(SelfTransferLeg.IN))
                 }
-                if (scope.involvesOwnedSource(tx, parsedRecordsById, rawSmsById)) {
+                if (scope.involvesOwnedSource(tx, parsedRecordsById)) {
                     add(FlowAssignment.SelfTransfer(SelfTransferLeg.OUT))
                 }
             }
