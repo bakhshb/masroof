@@ -44,6 +44,9 @@ class DatabaseBackupImportMigrationTest {
     fun clearMaintenancePreferences() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.deleteDatabase(MasroofDatabase.NAME)
+        DatabaseRestoreRecovery.deleteRestoreArtifacts(
+            context.getDatabasePath(MasroofDatabase.NAME),
+        )
         context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .clear()
@@ -217,9 +220,8 @@ class DatabaseBackupImportMigrationTest {
             val v5DbFile = createV5DatabaseFile(context)
             val backupZip = createBackupZip(v5DbFile)
             val restartRequested = AtomicBoolean(false)
-            val validated = File(
-                context.getDatabasePath(MasroofDatabase.NAME).parentFile,
-                "masroof-import-1700000000000.db",
+            val validated = DatabaseRestoreRecovery.incomingFile(
+                context.getDatabasePath(MasroofDatabase.NAME),
             )
 
             val backupService = DatabaseBackupService(
@@ -257,6 +259,92 @@ class DatabaseBackupImportMigrationTest {
                 context.deleteDatabase(MasroofDatabase.NAME)
                 backupZip.delete()
                 v5DbFile.delete()
+            }
+        }
+    }
+
+    @Test
+    fun import_terminatedAfterEveryStage_restartsOntoOriginalOrCommittedDatabase() {
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val stages = listOf(
+                DatabaseRestoreRecovery.Stage.PREPARED to "original",
+                DatabaseRestoreRecovery.Stage.OLD_PARKED to "original",
+                DatabaseRestoreRecovery.Stage.NEW_INSTALLED to "imported",
+                DatabaseRestoreRecovery.Stage.COMMITTED to "imported",
+            )
+            for ((stage, expectedOwner) in stages) {
+                context.deleteDatabase(MasroofDatabase.NAME)
+                DatabaseRestoreRecovery.deleteRestoreArtifacts(context.getDatabasePath(MasroofDatabase.NAME))
+                context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("onboarding_completed", false)
+                    .commit()
+                val liveDatabase = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
+                    .addMigrations(*MasroofDatabase.ALL_MIGRATIONS)
+                    .allowMainThreadQueries()
+                    .build()
+                RoomCardRegistryRepository.from(liveDatabase).setOwnership(
+                    CardReference(Bank.BANK_ALJAZIRA, "1111"),
+                    OwnershipStatus.OWNED,
+                )
+                val v5DbFile = createV5DatabaseFile(context)
+                val backupZip = createBackupZip(v5DbFile)
+                val backupService = DatabaseBackupService(
+                    appContext = context,
+                    database = liveDatabase,
+                    closeDatabase = { liveDatabase.close() },
+                    appVersionName = "test",
+                    clockEpochMillis = { 1_700_000_000_000L },
+                    restartProcess = { },
+                    afterRestoreStage = { reached ->
+                        if (reached == stage) throw DatabaseRestoreRecovery.ProcessTerminated(reached)
+                    },
+                )
+                try {
+                    backupService.importFrom(Uri.fromFile(backupZip))
+                    org.junit.Assert.fail("expected termination at $stage")
+                } catch (error: DatabaseRestoreRecovery.ProcessTerminated) {
+                    assertEquals(stage.name, error.message?.substringAfterLast(' '))
+                }
+                DatabaseRestoreRecovery.recover(context)
+                val reopened = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
+                    .addMigrations(*MasroofDatabase.ALL_MIGRATIONS)
+                    .allowMainThreadQueries()
+                    .build()
+                try {
+                    val cards = RoomCardRegistryRepository.from(reopened)
+                    if (expectedOwner == "original") {
+                        assertEquals(
+                            OwnershipStatus.OWNED,
+                            cards.get(CardReference(Bank.BANK_ALJAZIRA, "1111"))!!.ownership,
+                        )
+                        assertNull(cards.get(CardReference(Bank.BANK_ALJAZIRA, "7271")))
+                        assertFalse(
+                            context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE)
+                                .getBoolean("onboarding_completed", false),
+                        )
+                    } else {
+                        assertNull(cards.get(CardReference(Bank.BANK_ALJAZIRA, "1111")))
+                        assertEquals(
+                            OwnershipStatus.OWNED,
+                            cards.get(CardReference(Bank.BANK_ALJAZIRA, "7271"))!!.ownership,
+                        )
+                        assertTrue(
+                            context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE)
+                                .getBoolean("onboarding_completed", false),
+                        )
+                    }
+                    val livePath = context.getDatabasePath(MasroofDatabase.NAME).path
+                    assertFalse(File(livePath + ".restore-journal").exists())
+                    assertFalse(File(livePath + ".rollback").exists())
+                } finally {
+                    reopened.close()
+                    context.deleteDatabase(MasroofDatabase.NAME)
+                    DatabaseRestoreRecovery.deleteRestoreArtifacts(context.getDatabasePath(MasroofDatabase.NAME))
+                    backupZip.delete()
+                    v5DbFile.delete()
+                }
             }
         }
     }

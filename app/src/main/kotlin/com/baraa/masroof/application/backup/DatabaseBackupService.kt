@@ -35,6 +35,7 @@ class DatabaseBackupService(
     private val clockEpochMillis: () -> Long = { System.currentTimeMillis() },
     private val restartProcess: () -> Unit = { defaultRestartProcess(appContext) },
     private val beforeValidatedInstall: () -> Unit = {},
+    private val afterRestoreStage: (DatabaseRestoreRecovery.Stage) -> Unit = {},
     private val maintenancePreferences: SharedPreferences? = null,
     /**
      * Production export tries `VACUUM INTO` when the device SQLite supports it.
@@ -125,26 +126,63 @@ class DatabaseBackupService(
             val liveDb = appContext.getDatabasePath(MasroofDatabase.NAME)
             val databasesDir = liveDb.parentFile ?: error("Database directory missing")
             databasesDir.mkdirs()
-            val validated = File(databasesDir, "masroof-import-${clockEpochMillis()}.db")
-            discardDatabaseFiles(validated)
-            dbFile.copyTo(validated, overwrite = false)
+            DatabaseRestoreRecovery.recover(appContext)
+            val incoming = DatabaseRestoreRecovery.incomingFile(liveDb)
+            discardDatabaseFiles(incoming)
+            dbFile.copyTo(incoming, overwrite = false)
             try {
-                openMigrateAndValidate(validated)
-                beforeValidatedInstall()
-                installValidatedDatabase(validated, liveDb)
-                try {
-                    restorePreferences(preferences)
-                    resetMaintenanceMarkers()
-                } catch (error: Exception) {
-                    restoreParkedLive(liveDb)
-                    throw error
+                openMigrateAndValidate(incoming)
+                val preservedRollback = DatabaseRestoreRecovery.hasPreexistingRollback(liveDb)
+                DatabaseRestoreRecovery.writeSnapshots(
+                    live = liveDb,
+                    original = DatabaseRestoreRecovery.capturePreferences(appContext),
+                    incoming = DatabaseRestoreRecovery.incomingPreferences(preferences),
+                )
+                DatabaseRestoreRecovery.writeJournal(
+                    liveDb,
+                    DatabaseRestoreRecovery.Stage.PREPARED,
+                    preservedRollback,
+                )
+                if (preservedRollback) {
+                    DatabaseRestoreRecovery.preserveExistingRollback(liveDb)
                 }
-                discardRollback(liveDb)
+                afterRestoreStage(DatabaseRestoreRecovery.Stage.PREPARED)
+                beforeValidatedInstall()
+                if (!incoming.isFile) {
+                    error("Validated import file missing")
+                }
+                DatabaseRestoreRecovery.parkOriginal(liveDb)
+                DatabaseRestoreRecovery.writeJournal(
+                    liveDb,
+                    DatabaseRestoreRecovery.Stage.OLD_PARKED,
+                    preservedRollback,
+                )
+                afterRestoreStage(DatabaseRestoreRecovery.Stage.OLD_PARKED)
+                if (!incoming.renameTo(liveDb)) {
+                    error("Cannot replace the live database")
+                }
+                deleteSidecarFiles(incoming)
+                DatabaseRestoreRecovery.writeJournal(
+                    liveDb,
+                    DatabaseRestoreRecovery.Stage.NEW_INSTALLED,
+                    preservedRollback,
+                )
+                afterRestoreStage(DatabaseRestoreRecovery.Stage.NEW_INSTALLED)
+                restorePreferences(preferences)
+                resetMaintenanceMarkers()
+                DatabaseRestoreRecovery.writeJournal(
+                    liveDb,
+                    DatabaseRestoreRecovery.Stage.COMMITTED,
+                    preservedRollback,
+                )
+                afterRestoreStage(DatabaseRestoreRecovery.Stage.COMMITTED)
+                DatabaseRestoreRecovery.cleanupCommitted(appContext, liveDb)
                 restartProcess()
                 appLogService?.info(AppLogCategories.BACKUP, "Database import succeeded; restart required")
                 BackupImportOutcome.SuccessNeedsRestart
             } catch (error: Exception) {
-                if (validated.exists()) discardDatabaseFiles(validated)
+                if (incoming.exists()) discardDatabaseFiles(incoming)
+                DatabaseRestoreRecovery.failImport(appContext, liveDb)
                 throw error
             }
         } catch (error: Exception) {
@@ -531,53 +569,10 @@ class DatabaseBackupService(
         deleteSidecarFiles(dbFile)
     }
 
-    /**
-     * Parks the live database, then renames the validated file into its place.
-     * A failed rename puts the parked file back.
-     */
-    private fun installValidatedDatabase(validated: File, live: File) {
-        val rollback = rollbackFile(live)
-        if (rollback.exists()) {
-            deleteSidecarFiles(rollback)
-            check(rollback.delete()) { "Cannot clear a previous restore rollback" }
-        }
-        deleteSidecarFiles(live)
-        val parkedLive = live.exists()
-        if (parkedLive && !live.renameTo(rollback)) {
-            error("Cannot preserve the current database before restore")
-        }
-        if (!validated.renameTo(live)) {
-            discardDatabaseFiles(validated)
-            if (parkedLive && !rollback.renameTo(live)) {
-                error("Cannot restore the original database after a failed replace")
-            }
-            error("Cannot replace the live database")
-        }
-    }
-
-    private fun restoreParkedLive(live: File) {
-        val rollback = rollbackFile(live)
-        if (!rollback.exists()) return
-        if (live.exists()) {
-            deleteSidecarFiles(live)
-            check(live.delete()) { "Cannot remove the failed replacement" }
-        }
-        check(rollback.renameTo(live)) { "Cannot restore the original database" }
-    }
-
-    private fun discardRollback(live: File) {
-        val rollback = rollbackFile(live)
-        if (!rollback.exists()) return
-        deleteSidecarFiles(rollback)
-        rollback.delete()
-    }
-
     private fun discardDatabaseFiles(dbFile: File) {
         deleteSidecarFiles(dbFile)
         if (dbFile.exists()) dbFile.delete()
     }
-
-    private fun rollbackFile(live: File): File = File(live.path + ".rollback")
 
     private fun readIdentityHash(dbFile: File): String? {
         return runCatching {
