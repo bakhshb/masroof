@@ -49,6 +49,7 @@ class DatabaseRestoreRecoveryTest {
     @After
     fun tearDown() {
         DatabaseRestoreRecovery.afterJournalTempDurable = null
+        DatabaseRestoreRecovery.afterOriginalRestoreStep = null
         DatabaseRestoreRecovery.deleteRestoreArtifacts(live)
         if (live.exists()) live.delete()
         context.deleteDatabase(MasroofDatabase.NAME)
@@ -389,6 +390,30 @@ class DatabaseRestoreRecoveryTest {
     }
 
     @Test
+    fun newInstalledRollback_crashAfterOriginalMainMoves_keepsOriginalPreferences() {
+        resumeOriginalRollback(DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_MAIN)
+    }
+
+    @Test
+    fun originalRollback_eachInterruptionFinishesOriginalDatabaseAndPreferences() {
+        listOf(
+            DatabaseRestoreRecovery.OriginalRestoreStep.BEFORE_MAIN,
+            DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_MAIN,
+            DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_WAL,
+            DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_SHM,
+            DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_DATABASE,
+            DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_PREFERENCES,
+        ).forEach { step ->
+            DatabaseRestoreRecovery.deleteRestoreArtifacts(live)
+            if (live.exists()) live.delete()
+            File(live.path + "-wal").delete()
+            File(live.path + "-shm").delete()
+            File(live.path + "-journal").delete()
+            resumeOriginalRollback(step)
+        }
+    }
+
+    @Test
     fun crashAfterMovingRollbackMain_beforeWal_restoresTheWholeBundleAndImportCanStart() {
         recoverPartialRollbackMove(moveWal = false)
     }
@@ -449,6 +474,50 @@ class DatabaseRestoreRecoveryTest {
 
         assertEquals("bad-live", live.readText())
         assertFalse(File(live.path + ".rollback").exists())
+    }
+
+    private fun resumeOriginalRollback(stopAfter: DatabaseRestoreRecovery.OriginalRestoreStep) {
+        writeDatabase(live, "imported")
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(rollback, "original")
+        File(rollback.path + "-wal").writeText("wal-bytes")
+        File(rollback.path + "-shm").writeText("shm-bytes")
+        DatabaseRestoreRecovery.writeSnapshots(
+            live,
+            preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 6),
+            preferenceSnapshot(onboardingCompleted = true, reparsedSchemaVersion = null),
+        )
+        applyMixedPreferences(onboardingCompleted = true, reparsedSchemaVersion = 1)
+        DatabaseRestoreRecovery.writeJournal(
+            live,
+            DatabaseRestoreRecovery.Stage.NEW_INSTALLED,
+            preservedRollback = false,
+        )
+        DatabaseRestoreRecovery.afterOriginalRestoreStep = { step ->
+            if (step == stopAfter) throw DatabaseRestoreRecovery.ProcessTerminated(DatabaseRestoreRecovery.Stage.ORIGINAL_SELECTED)
+        }
+
+        try {
+            DatabaseRestoreRecovery.restoreOriginalFilesForTest(context, live)
+            org.junit.Assert.fail("expected interruption at $stopAfter")
+        } catch (error: DatabaseRestoreRecovery.ProcessTerminated) {
+            assertTrue(journal().readText().startsWith("stage=ORIGINAL_SELECTED"))
+        }
+        DatabaseRestoreRecovery.afterOriginalRestoreStep = null
+
+        DatabaseRestoreRecovery.recover(context)
+
+        assertEquals("wal-bytes", File(live.path + "-wal").readText())
+        assertEquals("shm-bytes", File(live.path + "-shm").readText())
+        File(live.path + "-wal").delete()
+        File(live.path + "-shm").delete()
+        assertEquals("original", readMarker(live))
+        assertFalse(onboarding().getBoolean("onboarding_completed", true))
+        assertEquals(6, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
+        assertFalse(journal().exists())
+        assertFalse(rollback.exists())
+        assertFalse(File(rollback.path + "-wal").exists())
+        assertFalse(File(rollback.path + "-shm").exists())
     }
 
     private fun recoverPartialRollbackMove(moveWal: Boolean) {

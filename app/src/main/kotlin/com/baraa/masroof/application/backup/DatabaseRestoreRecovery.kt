@@ -35,8 +35,25 @@ object DatabaseRestoreRecovery {
         PREPARED,
         OLD_PARKED,
         NEW_INSTALLED,
+        ORIGINAL_SELECTED,
         COMMITTED,
     }
+
+    /** Points where a rollback onto the original database can be interrupted. */
+    internal enum class OriginalRestoreStep {
+        BEFORE_MAIN,
+        AFTER_MAIN,
+        AFTER_WAL,
+        AFTER_SHM,
+        AFTER_DATABASE,
+        AFTER_PREFERENCES,
+    }
+
+    /**
+     * Test seam. Runs during rollback onto the original database.
+     * Production leaves this null.
+     */
+    internal var afterOriginalRestoreStep: ((OriginalRestoreStep) -> Unit)? = null
 
     class ProcessTerminated(stage: Stage) : Error("Database restore terminated after $stage")
 
@@ -74,6 +91,7 @@ object DatabaseRestoreRecovery {
                 Stage.PREPARED -> recoverPrepared(context, live, read.journal)
                 Stage.OLD_PARKED -> recoverParkedOriginal(context, live, read.journal)
                 Stage.NEW_INSTALLED -> recoverNewInstalled(context, live, read.journal)
+                Stage.ORIGINAL_SELECTED -> finishOriginalSelection(context, live, read.journal)
                 Stage.COMMITTED -> cleanupCommitted(live)
             }
         }
@@ -178,6 +196,7 @@ object DatabaseRestoreRecovery {
                 Stage.OLD_PARKED,
                 Stage.NEW_INSTALLED,
                 -> restoreOriginalFiles(context, live, read.journal)
+                Stage.ORIGINAL_SELECTED -> finishOriginalSelection(context, live, read.journal)
                 Stage.COMMITTED -> cleanupCommitted(live)
             }
         }
@@ -342,16 +361,52 @@ object DatabaseRestoreRecovery {
         journalFile(live).delete()
     }
 
-    private fun restoreOriginalFiles(context: Context, live: File, journal: Journal) {
-        if (rollbackFile(live).exists() || hasSidecar(rollbackFile(live))) {
-            discardDatabase(live)
-            restoreRollbackOverLive(live)
+    internal fun restoreOriginalFilesForTest(context: Context, live: File) {
+        val journal = when (val read = readJournalState(live)) {
+            is JournalRead.Ready -> read.journal
+            else -> Journal(stage = Stage.NEW_INSTALLED, preservedRollback = false)
         }
+        restoreOriginalFiles(context, live, journal)
+    }
+
+    private fun restoreOriginalFiles(context: Context, live: File, journal: Journal) {
+        writeJournal(live, Stage.ORIGINAL_SELECTED, journal.preservedRollback)
+        finishOriginalSelection(
+            context,
+            live,
+            journal.copy(stage = Stage.ORIGINAL_SELECTED),
+        )
+    }
+
+    /**
+     * [Stage.ORIGINAL_SELECTED] means the original database won. Repeating this
+     * finishes the main file, WAL, SHM, original preferences, and cleanup
+     * without applying the imported preference snapshot.
+     */
+    private fun finishOriginalSelection(context: Context, live: File, journal: Journal) {
+        signalOriginalRestore(OriginalRestoreStep.BEFORE_MAIN)
+        val rollback = rollbackFile(live)
+        if (rollback.exists()) {
+            discardDatabase(live)
+            moveBundlePart(rollback, live)
+        }
+        signalOriginalRestore(OriginalRestoreStep.AFTER_MAIN)
+        moveBundlePart(File(rollback.path + "-wal"), File(live.path + "-wal"))
+        signalOriginalRestore(OriginalRestoreStep.AFTER_WAL)
+        moveBundlePart(File(rollback.path + "-shm"), File(live.path + "-shm"))
+        signalOriginalRestore(OriginalRestoreStep.AFTER_SHM)
+        moveBundlePart(File(rollback.path + "-journal"), File(live.path + "-journal"))
+        signalOriginalRestore(OriginalRestoreStep.AFTER_DATABASE)
         readPreferences(originalPrefsFile(live))?.let { applyPreferences(context, it) }
+        signalOriginalRestore(OriginalRestoreStep.AFTER_PREFERENCES)
         discardDatabase(incomingFile(live))
         restorePreservedRollback(live, journal)
         deleteSnapshots(live)
         journalFile(live).delete()
+    }
+
+    private fun signalOriginalRestore(step: OriginalRestoreStep) {
+        afterOriginalRestoreStep?.invoke(step)
     }
 
     /**
@@ -373,6 +428,14 @@ object DatabaseRestoreRecovery {
         }
     }
 
+    private fun restoreRollbackOverLive(live: File) {
+        val rollback = rollbackFile(live)
+        if (rollback.exists() && !rollback.renameTo(live)) {
+            error("Cannot restore the original database")
+        }
+        moveSidecars(rollback, live)
+    }
+
     private fun moveBundlePart(from: File, to: File) {
         if (!from.exists()) return
         if (to.exists()) {
@@ -383,14 +446,6 @@ object DatabaseRestoreRecovery {
         if (!from.renameTo(to)) {
             error("Cannot recombine the preexisting rollback")
         }
-    }
-
-    private fun restoreRollbackOverLive(live: File) {
-        val rollback = rollbackFile(live)
-        if (rollback.exists() && !rollback.renameTo(live)) {
-            error("Cannot restore the original database")
-        }
-        moveSidecars(rollback, live)
     }
 
     private fun applyPreferences(context: Context, snapshot: PreferenceSnapshot) {
