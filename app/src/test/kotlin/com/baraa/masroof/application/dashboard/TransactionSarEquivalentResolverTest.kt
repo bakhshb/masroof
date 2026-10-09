@@ -322,7 +322,11 @@ class TransactionSarEquivalentResolverTest {
             record(october8, rate = null),
         )
         val rawSms = records.associate { record ->
-            record.event.rawSmsId to raw(record.event.rawSmsId, Instant.parse("2026-10-01T07:00:00Z"))
+            record.event.rawSmsId to raw(
+                record.event.rawSmsId,
+                "body",
+                Instant.parse("2026-10-01T07:00:00Z"),
+            )
         }
         val resolver = TransactionSarEquivalentResolver(noMarketRate)
 
@@ -479,11 +483,15 @@ class TransactionSarEquivalentResolverTest {
         parseStatus = ParseStatus.SUCCESS,
     )
 
-    private fun raw(id: String, body: String) = RawSms(
+    private fun raw(
+        id: String,
+        body: String,
+        receivedAt: Instant = Instant.parse("2026-08-17T15:23:00Z"),
+    ) = RawSms(
         id = id,
         sender = "AlJazira",
         body = body,
-        receivedAt = Instant.parse("2026-08-17T15:23:00Z"),
+        receivedAt = receivedAt,
         deviceMessageId = id,
         bodyHash = "hash-$id",
     )
