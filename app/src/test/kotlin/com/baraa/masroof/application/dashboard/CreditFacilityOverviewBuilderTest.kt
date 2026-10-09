@@ -1,6 +1,7 @@
 package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardRole
@@ -11,6 +12,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import java.math.BigDecimal
+import java.time.Instant
+import java.time.LocalDate
 
 class CreditFacilityOverviewBuilderTest {
     @Test
@@ -49,6 +52,41 @@ class CreditFacilityOverviewBuilderTest {
             facilities.facilities.single().facilityStatementSpending.amount,
         )
         assertEquals("9999", facilities.debitCards.single().last4)
+    }
+
+    @Test
+    fun twoBanksWithTheSameCardNumber_doNotShareStatementSpendOrDue() {
+        val otherBank = Bank("OTHER_BANK")
+        val overview = CreditCardsOverview(
+            cards = listOf(
+                row("7271", "100.00", bank = Bank.BANK_ALJAZIRA, due = "80.00"),
+                row("7271", "250.00", bank = otherBank, due = "20.00"),
+            ),
+            aggregateDueAmount = null,
+            aggregateDueUpdatedAt = null,
+            aggregateDueDate = null,
+            aggregatePeriodSpendingNet = SignedMoneyAmount(BigDecimal("350.00"), Currency.SAR),
+            aggregateStatementSpendingNet = SignedMoneyAmount(BigDecimal("350.00"), Currency.SAR),
+            aggregateStatementPeriodLabel = "Jul-Aug",
+            calendarMonthLabel = null,
+            salaryPeriodLabel = "Aug",
+            currency = Currency.SAR,
+        )
+        val registry = listOf(
+            card("7271", CardRole.STANDALONE, bank = Bank.BANK_ALJAZIRA),
+            card("7271", CardRole.STANDALONE, bank = otherBank),
+        )
+
+        val facilities = CreditFacilityOverviewBuilder.build(overview, registry)
+
+        assertEquals(2, facilities.facilities.size)
+        val aljazira = facilities.facilities.single { it.bank == Bank.BANK_ALJAZIRA }
+        val other = facilities.facilities.single { it.bank == otherBank }
+        assertEquals(BigDecimal("100.00"), aljazira.facilityStatementSpending.amount)
+        assertEquals(BigDecimal("250.00"), other.facilityStatementSpending.amount)
+        assertEquals(Money.of("80.00", Currency.SAR), aljazira.facilityDue!!.amount)
+        assertEquals(Money.of("20.00", Currency.SAR), other.facilityDue!!.amount)
+        assertEquals(BigDecimal("350.00"), aljazira.facilityStatementSpending.amount + other.facilityStatementSpending.amount)
     }
 
     @Test
@@ -225,15 +263,32 @@ class CreditFacilityOverviewBuilderTest {
         assertEquals("3001", facilities.debitCards.single().linkedAccountMaskedNumber)
     }
 
-    private fun row(last4: String, amount: String): CreditCardDashboardRow =
+    private fun row(
+        last4: String,
+        amount: String,
+        bank: Bank = Bank.BANK_ALJAZIRA,
+        due: String? = null,
+    ): CreditCardDashboardRow =
         CreditCardDashboardRow(
-            bank = Bank.BANK_ALJAZIRA,
+            bank = bank,
             last4 = last4,
             calendarMonthSpendingNet = SignedMoneyAmount.zero(Currency.SAR),
             statementSpendingNet = SignedMoneyAmount(BigDecimal(amount), Currency.SAR),
             salaryPeriodSpendingNet = SignedMoneyAmount(BigDecimal(amount), Currency.SAR),
             statementPeriodLabel = "Jul-Aug",
-            snapshot = null,
+            snapshot = due?.let {
+                CreditCardBalanceSnapshot(
+                    availableBalance = null,
+                    dueAmount = Money.of(it, Currency.SAR),
+                    dueDate = LocalDate.parse("2026-09-20"),
+                    statementIssuedAt = if (bank == Bank.BANK_ALJAZIRA) {
+                        Instant.parse("2026-08-20T00:00:00Z")
+                    } else {
+                        Instant.parse("2026-08-21T00:00:00Z")
+                    },
+                    updatedAt = Instant.parse("2026-08-21T00:00:00Z"),
+                )
+            },
         )
 
     private fun card(
@@ -241,9 +296,10 @@ class CreditFacilityOverviewBuilderTest {
         role: CardRole,
         cardType: CardType = CardType.CREDIT,
         parent: String? = null,
+        bank: Bank = Bank.BANK_ALJAZIRA,
     ): CardRegistryEntry =
         CardRegistryEntry.forTest(
-            bank = Bank.BANK_ALJAZIRA,
+            bank = bank,
             last4 = last4,
             ownership = OwnershipStatus.OWNED,
             cardType = cardType,

@@ -154,6 +154,28 @@ class CardTransactionInvolvementResolverTest {
         return ParsedEventRecord(event = event, details = ParsedEventDetails())
     }
 
+    @Test
+    fun sameLast4AtTwoBanks_staysTwoCardKeys() {
+        val aljazira = FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "7271")
+        val other = FinancialContainerIdFactory.cardId(Bank("OTHER_BANK"), "7271")
+        val index = CardTransactionInvolvementResolver.buildIndex(
+            transactions = listOf(
+                transaction(id = "alj", source = aljazira, linked = emptyList()),
+                transaction(id = "other", source = other, linked = emptyList()),
+            ),
+            parsedRecords = emptyList(),
+        )
+
+        assertEquals(setOf("BANK_ALJAZIRA:7271"), index.getValue("alj"))
+        assertEquals(setOf("OTHER_BANK:7271"), index.getValue("other"))
+        assertTrue(
+            CardTransactionInvolvementResolver.matchesCard("alj", "BANK_ALJAZIRA", "7271", index),
+        )
+        assertTrue(
+            !CardTransactionInvolvementResolver.matchesCard("alj", "OTHER_BANK", "7271", index),
+        )
+    }
+
     private fun transaction(
         id: String,
         source: String?,

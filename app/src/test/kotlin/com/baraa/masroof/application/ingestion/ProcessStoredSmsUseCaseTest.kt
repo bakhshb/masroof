@@ -25,7 +25,11 @@ import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
+import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.repository.FinancialTransactionRepository
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.parsing.model.BankDetectionResult
@@ -229,6 +233,83 @@ class ProcessStoredSmsUseCaseTest {
 
         assertTrue(multiBank.process(raw.id) is SmsIngestionResult.NotRelevant)
         assertNull(parsedRepo.findByRawSmsId(raw.id))
+    }
+
+    @Test
+    fun liveProcess_doesNotScanGlobalTransferLists() = runBlocking {
+        val countedParsed = CountingParsedEvents(parsedRepo)
+        val countedTransactions = CountingTransactions(ftRepo)
+        val cards = RoomCardRegistryRepository.from(db)
+        val live = ProcessStoredSmsUseCase(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = countedParsed,
+            bankSmsRegistry = registry,
+            reconciliation = TransactionReconciliationService(
+                parsedEventRepository = countedParsed,
+                rawSmsRepository = rawRepo,
+                financialTransactionRepository = countedTransactions,
+                ownershipResolver = OwnershipResolver(
+                    RoomAccountRegistryRepository.from(db),
+                    cards,
+                    NoOpLoanRegistryRepository,
+                ),
+                effectiveParsedEventProvider = EffectiveParsedEventProvider(
+                    countedParsed,
+                    RoomUserCorrectionRepository(db.userCorrectionDao()),
+                ),
+                reviewRepository = reviewRepo,
+            ),
+            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, countedTransactions, clock),
+            ingestionReviewService = IngestionReviewService(reviewRepo, clock),
+        )
+        repeat(12) { index ->
+            rawRepo.insertIfAbsent(
+                sms("old transfer $index", at = "2020-01-01T00:00:${index.coerceAtMost(59).toString().padStart(2, '0')}Z"),
+            )
+        }
+        val raw = sms(PURCHASE_BODY)
+        assertTrue(capture.capture(raw) is BankSmsCaptureResult.Captured)
+        countedParsed.reset()
+        countedTransactions.reset()
+
+        val result = live.process(raw.id)
+
+        assertTrue(result is SmsIngestionResult.Parsed)
+        assertEquals(FinancialTransactionType.EXPENSE, ftRepo.findByRawSmsId(raw.id)!!.type)
+        assertEquals(0, countedParsed.globalUnlinkedCalls)
+        assertEquals(0, countedTransactions.listByTypesCalls)
+    }
+
+    private class CountingParsedEvents(
+        private val delegate: ParsedEventRepository,
+    ) : ParsedEventRepository by delegate {
+        var globalUnlinkedCalls: Int = 0
+
+        fun reset() {
+            globalUnlinkedCalls = 0
+        }
+
+        override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> {
+            globalUnlinkedCalls += 1
+            return delegate.listUnlinkedTransfers()
+        }
+    }
+
+    private class CountingTransactions(
+        private val delegate: FinancialTransactionRepository,
+    ) : FinancialTransactionRepository by delegate {
+        var listByTypesCalls: Int = 0
+
+        fun reset() {
+            listByTypesCalls = 0
+        }
+
+        override suspend fun listByTypes(
+            types: Collection<FinancialTransactionType>,
+        ): List<FinancialTransaction> {
+            listByTypesCalls += 1
+            return delegate.listByTypes(types)
+        }
     }
 
     private fun countingGateway() = SmsParseGateway { input ->

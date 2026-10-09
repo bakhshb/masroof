@@ -708,6 +708,62 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
+    fun twoBanksSharingAccountSuffix_keepSeparatePosTotals() {
+        val aljazira = "account:BANK_ALJAZIRA:3001"
+        val other = "account:OTHER_BANK:3001"
+        val transactions = listOf(
+            tx("alj", FinancialTransactionType.EXPENSE, "100.00", source = aljazira),
+            tx("other", FinancialTransactionType.EXPENSE, "250.00", source = other),
+        )
+        val fleet = CurrentAccountSummaryCalculator.summarize(
+            transactions = transactions,
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(aljazira, other),
+            ownedAccountLast4s = setOf("3001"),
+            scopeMode = AccountFlowScopeMode.Fleet,
+        )
+        val aljaziraSummary = summarizeOwned(transactions, aljazira)
+        val otherSummary = summarizeOwned(transactions, other)
+
+        assertEquals(Money.of("100.00", Currency.SAR), aljaziraSummary.outflow.posPurchases)
+        assertEquals(Money.of("250.00", Currency.SAR), otherSummary.outflow.posPurchases)
+        assertEquals(Money.of("350.00", Currency.SAR), fleet.outflow.posPurchases)
+        assertEquals(
+            fleet.outflow.posPurchases,
+            aljaziraSummary.outflow.posPurchases + otherSummary.outflow.posPurchases,
+        )
+    }
+
+    @Test
+    fun unqualifiedSuffix_matchesOnlyWhenOneOwnedAccountHasIt() {
+        val aljazira = "account:BANK_ALJAZIRA:3001"
+        val other = "account:OTHER_BANK:3001"
+        val legacy = tx(
+            "legacy",
+            FinancialTransactionType.EXPENSE,
+            "40.00",
+            source = "account:3001",
+        )
+        val unique = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(legacy),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(aljazira),
+            ownedAccountLast4s = setOf("3001"),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
+        )
+        val ambiguous = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(legacy),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(aljazira, other),
+            ownedAccountLast4s = setOf("3001"),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
+        )
+
+        assertEquals(Money.of("40.00", Currency.SAR), unique.outflow.posPurchases)
+        assertEquals(Money.zero(Currency.SAR), ambiguous.outflow.posPurchases)
+    }
+
+    @Test
     fun loanRepayment_countsInAccountOutflow() {
         val owned = "account:bank_aljazira:3001"
         val loanTx = tx(
