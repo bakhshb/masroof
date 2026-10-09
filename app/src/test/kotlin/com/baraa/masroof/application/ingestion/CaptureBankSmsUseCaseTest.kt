@@ -28,6 +28,7 @@ import com.baraa.masroof.sms.receiver.ReceivedSmsAssembler
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -198,7 +199,49 @@ class CaptureBankSmsUseCaseTest {
         assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
         assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(historical))
         assertEquals(1, db.rawSmsDao().count())
-        assertEquals(liveRow, rawRepo.getById(liveRow.id))
+        val stored = rawRepo.getById(liveRow.id)
+        assertEquals(liveRow.id, stored?.id)
+        assertEquals(liveRow.body, stored?.body)
+        assertEquals("42", stored?.deviceMessageId)
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(historical))
+        assertEquals(1, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun liveThenTwoProviderIds_keepsBothIdentifiedMessages_inEveryOrder() = runBlocking {
+        val orders = listOf(
+            listOf("live", "10", "11"),
+            listOf("live", "11", "10"),
+            listOf("10", "11", "live"),
+            listOf("10", "live", "11"),
+            listOf("11", "live", "10"),
+        )
+        val base = Instant.parse("2026-08-03T14:32:00.000Z")
+        orders.forEachIndexed { index, order ->
+            val at = base.plusSeconds(index * 3_600L).toString()
+            val providerA = "a$index"
+            val providerB = "b$index"
+            val useCase = capture()
+            val liveRow = live(PURCHASE_BODY, at)
+            val first = inbox(providerA, at)
+            val second = inbox(providerB, at)
+            val before = db.rawSmsDao().count()
+            order.forEach { step ->
+                val sms = when (step) {
+                    "live" -> liveRow
+                    "10" -> first
+                    else -> second
+                }
+                useCase.capture(sms)
+            }
+            assertEquals("order $order", before + 2, db.rawSmsDao().count())
+            assertNotNull("order $order missing $providerA", rawRepo.findByDeviceMessageId(providerA))
+            assertNotNull("order $order missing $providerB", rawRepo.findByDeviceMessageId(providerB))
+            assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(first))
+            assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(second))
+            assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(liveRow))
+            assertEquals("order $order replay", before + 2, db.rawSmsDao().count())
+        }
     }
 
     @Test
@@ -338,7 +381,10 @@ class CaptureBankSmsUseCaseTest {
         assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
         assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(historical))
         assertEquals(1, db.rawSmsDao().count())
-        assertEquals(liveRow, rawRepo.getById(liveRow.id))
+        val stored = rawRepo.getById(liveRow.id)
+        assertEquals(liveRow.id, stored?.id)
+        assertEquals(liveRow.body, stored?.body)
+        assertEquals("42", stored?.deviceMessageId)
     }
 
     @Test
@@ -372,7 +418,10 @@ class CaptureBankSmsUseCaseTest {
         )
         assertEquals(BankSmsCaptureResult.Duplicate, capture().capture(inboxCopy))
         assertEquals(1, db.rawSmsDao().count())
-        assertEquals(liveRow, rawRepo.getById(liveRow.id))
+        val stored = rawRepo.getById(liveRow.id)
+        assertEquals(liveRow.id, stored?.id)
+        assertEquals(liveRow.body, stored?.body)
+        assertEquals("42", stored?.deviceMessageId)
     }
 
     @Test

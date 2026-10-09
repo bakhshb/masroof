@@ -23,6 +23,12 @@ interface RawSmsRepository {
     suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms?
 
     /**
+     * Records [deviceMessageId] on a live row that does not have one yet.
+     * Returns false when the row is missing, already identified, or the id is taken.
+     */
+    suspend fun adoptDeviceMessageIdIfAbsent(id: String, deviceMessageId: String): Boolean = false
+
+    /**
      * Every stored RawSms id, oldest receipt first. Used by bulk reprocessing so
      * evidence without a ParsedEvent (Unsupported / Invalid / failed) is retried.
      */

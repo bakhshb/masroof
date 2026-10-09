@@ -43,6 +43,7 @@ class CaptureBankSmsUseCase(
         val insertOutcome = try {
             insertMutex.withLock {
                 if (hasCrossSourceNearDuplicate(rawSms)) {
+                    claimInboxIdentityOnLiveTwin(rawSms)
                     return@withLock RawSmsInsertResult.AlreadyExists
                 }
                 rawSmsRepository.insertIfAbsent(rawSms)
@@ -79,6 +80,38 @@ class CaptureBankSmsUseCase(
                 BankSmsCaptureResult.Captured(rawSms = rawSms, route = route)
             }
         }
+    }
+
+    /**
+     * A live row has no provider id, so the first matching inbox message is that
+     * same SMS. Remember its provider id on the live row. A later inbox message
+     * with a different provider id then no longer sees an unidentified live twin
+     * and is stored as its own RawSms.
+     */
+    private suspend fun claimInboxIdentityOnLiveTwin(incoming: RawSms) {
+        val providerId = incoming.deviceMessageId?.takeIf { it.isNotBlank() } ?: return
+        if (rawSmsRepository.findByDeviceMessageId(providerId) != null) return
+        val tight = crossSourceTwins(
+            rawSms = incoming,
+            tolerance = CROSS_SOURCE_RECEIVED_AT_TOLERANCE,
+            lookingForLiveRow = true,
+        )
+        val candidates = if (tight.isNotEmpty()) {
+            tight
+        } else {
+            val widened = crossSourceTwins(
+                rawSms = incoming,
+                tolerance = CROSS_SOURCE_UNIQUE_SKEW_TOLERANCE,
+                lookingForLiveRow = true,
+            )
+            if (widened.size == 1) widened else emptyList()
+        }
+        val incomingAt = incoming.receivedAt.toEpochMilli()
+        val target = candidates.minWithOrNull(
+            compareBy<RawSms> { kotlin.math.abs(it.receivedAt.toEpochMilli() - incomingAt) }
+                .thenBy { it.id },
+        ) ?: return
+        rawSmsRepository.adoptDeviceMessageIdIfAbsent(target.id, providerId)
     }
 
     private suspend fun hasCrossSourceNearDuplicate(rawSms: RawSms): Boolean {

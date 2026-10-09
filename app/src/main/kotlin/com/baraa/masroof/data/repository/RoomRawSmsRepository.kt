@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import android.database.sqlite.SQLiteException
 import com.baraa.masroof.data.room.dao.RawSmsDao
 import com.baraa.masroof.data.room.dao.RoomBatch
 import com.baraa.masroof.data.room.mapper.RawSmsMapper
@@ -54,6 +55,13 @@ class RoomRawSmsRepository(
 
     override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? =
         dao.findByDeviceMessageId(deviceMessageId)?.let(RawSmsMapper::toDomain)
+
+    override suspend fun adoptDeviceMessageIdIfAbsent(id: String, deviceMessageId: String): Boolean =
+        try {
+            dao.adoptDeviceMessageIdIfAbsent(id, deviceMessageId) == 1
+        } catch (error: SQLiteException) {
+            false
+        }
 
     override suspend fun listIdsByReceivedAt(): List<String> = dao.listIdsByReceivedAt()
 
