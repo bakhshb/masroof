@@ -43,6 +43,7 @@ data class CurrentAccountSummary(
             fees: Money,
             loanRepayments: Money = Money.zero(currency),
             selfTransfersOut: Money,
+            accountRefunds: Money = Money.zero(currency),
         ): CurrentAccountSummary =
             CurrentAccountSummary(
                 inflow = AccountInflow(
@@ -51,6 +52,7 @@ data class CurrentAccountSummary(
                     otherIncome = otherIncome,
                     externalTransfersIn = externalTransfersIn,
                     selfTransfersIn = selfTransfersIn,
+                    accountRefunds = accountRefunds,
                 ),
                 outflow = AccountOutflow(
                     currency = currency,

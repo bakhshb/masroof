@@ -19,6 +19,7 @@ enum class FlowExpenseCategory {
 enum class FlowIncomeCategory {
     SALARY,
     EXTERNAL_TRANSFER_IN,
+    ACCOUNT_REFUND,
     OTHER_INCOME,
 }
 
@@ -42,6 +43,7 @@ data class CurrentAccountFlowDetailGrouping(
         val INCOME_DISPLAY_ORDER = listOf(
             FlowIncomeCategory.SALARY,
             FlowIncomeCategory.EXTERNAL_TRANSFER_IN,
+            FlowIncomeCategory.ACCOUNT_REFUND,
             FlowIncomeCategory.OTHER_INCOME,
         )
 

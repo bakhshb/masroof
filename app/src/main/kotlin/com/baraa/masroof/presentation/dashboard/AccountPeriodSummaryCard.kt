@@ -76,6 +76,11 @@ fun AccountPeriodSummaryCard(
                 amount = summary.inflow.externalTransfersIn,
                 direction = TransactionDirectionUi.TRANSFER_IN,
             )
+            AccountFlowMoneyRow(
+                label = stringResource(R.string.dashboard_account_refunds),
+                amount = summary.inflow.accountRefunds,
+                direction = TransactionDirectionUi.INCOME,
+            )
             if (summary.inflow.otherIncome.amount.signum() > 0) {
                 AccountFlowMoneyRow(
                     label = stringResource(R.string.dashboard_other_income),
