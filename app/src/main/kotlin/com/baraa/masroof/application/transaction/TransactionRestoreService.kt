@@ -61,10 +61,10 @@ class TransactionRestoreService(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            return incompleteRestore(review.id, rawSmsId, failureCount = 1)
+            return incompleteRestore(rawSmsId, failureCount = 1)
         }
         if (!ReconciliationCompletionPolicy.isComplete(report)) {
-            return incompleteRestore(review.id, rawSmsId, report.summary.failed)
+            return incompleteRestore(rawSmsId, report.summary.failed)
         }
         val tx = financialTransactionRepository.findByRawSmsId(rawSmsId)
         if (tx == null) {
@@ -103,28 +103,14 @@ class TransactionRestoreService(
     ): RestoreResult = restore(rawSmsId, newType)
 
     /**
-     * A restore that did not post rolls back to the previous non-financial decision.
-     * A restore that already posted keeps that decision and the transaction, and
-     * records a durable retry for this RawSms only.
+     * The caller already recorded [ReviewResolutionKind.USER_FINANCIAL_TYPE].
+     * A failed reconcile keeps that decision and the RawSms durably retryable.
+     * It does not write [ReviewResolutionKind.USER_NON_FINANCIAL] back.
      */
     private suspend fun incompleteRestore(
-        reviewId: String,
         rawSmsId: String,
         failureCount: Int,
     ): RestoreResult {
-        val posted = financialTransactionRepository.findByRawSmsId(rawSmsId)
-        if (posted == null) {
-            // No ledger row was created, so there is nothing to delete.
-            // Put back the previous non-financial decision.
-            reviewRepository.markResolved(
-                id = reviewId,
-                resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
-                resolvedAt = clock.now(),
-                resolvedTransactionId = null,
-            ) ?: return RestoreResult.Rejected("rollback_review_failed")
-            logIncomplete(rawSmsId, failureCount, retryState = "rolled_back")
-            return RestoreResult.Rejected("reconciliation_incomplete")
-        }
         retainRetry(rawSmsId, failureCount, ReconciliationCompletionPolicy.STAGE_RECONCILIATION)
         return RestoreResult.Rejected("reconciliation_incomplete")
     }

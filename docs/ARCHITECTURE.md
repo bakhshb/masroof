@@ -215,7 +215,10 @@ Recovery clears that set only after a later pass reports `failed == 0` and the r
 review update succeeds. Live processing maps the same report to
 `DerivedIncomplete(RECONCILIATION)`. Interactive correction, restore, and ownership
 changes keep the committed manual decision and record a durable retry for the failed
-RawSms ids. This completion check does not start a global reconciliation.
+RawSms ids. A restore that has already stored `USER_FINANCIAL_TYPE` keeps that
+decision when reconciliation fails; it is not rewritten to `USER_NON_FINANCIAL`.
+`refreshReviewQueue` throws when `summary.failed > 0` and records those RawSms ids.
+It does not return success. This completion check does not start a global reconciliation.
 If the marker transaction fails, no partial set is kept and `finish` can be retried.
 A scan that fails mid-way (permission or provider error) keeps its counters and
 evidence and still runs `finish` for events it stored.

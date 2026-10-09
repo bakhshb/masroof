@@ -244,7 +244,7 @@ class ProcessingCompletionFailureMatrixTest {
     }
 
     @Test
-    fun restoreConflictWithoutAPost_rollsBackToThePreviousNonFinancialDecision() = runBlocking {
+    fun restoreConflictWithoutAPost_keepsTheFinancialDecisionAndRetries() = runBlocking {
         val raw = LiveSmsProcessingHarness.liveSms(at = "2026-08-14T10:00:00Z")
         val captured = harness.capture.capture(raw) as BankSmsCaptureResult.Captured
         val stored = harness.processStored().parseAndStore(captured.rawSms, captured.route)
@@ -301,10 +301,41 @@ class ProcessingCompletionFailureMatrixTest {
             "reconciliation_incomplete",
             (result as com.baraa.masroof.application.transaction.RestoreResult.Rejected).reason,
         )
-        assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, resolutionOf(raw.id))
+        assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, resolutionOf(raw.id))
         assertNull(harness.ftRepo.findByRawSmsId(raw.id))
-        assertTrue(harness.processingRetryRepo.listRetryableRawSmsIds().isEmpty())
+        assertEquals(
+            listOf(raw.id),
+            harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH),
+        )
         assertNotNull(harness.parsedRepo.findByRawSmsId(raw.id))
+    }
+
+    @Test
+    fun refreshReviewQueue_nonzeroFailed_doesNotReturnSuccess() = runBlocking {
+        val raw = LiveSmsProcessingHarness.liveSms(at = "2026-08-16T10:00:00Z")
+        val captured = harness.capture.capture(raw) as BankSmsCaptureResult.Captured
+        val stored = harness.processStored().parseAndStore(captured.rawSms, captured.route)
+        assertTrue(stored is SmsIngestionResult.Parsed)
+        harness.nonthrowingSaveConflicts.set(Int.MAX_VALUE)
+        val schedules = AtomicInteger(0)
+        val workflow = reviewWorkflow(
+            OwnershipConfirmationService(
+                RoomAccountRegistryRepository.from(harness.db),
+                RoomCardRegistryRepository.from(harness.db),
+                NoOpLoanRegistryRepository,
+            ),
+            schedules,
+        )
+
+        val failure = runCatching { workflow.refreshReviewQueue() }.exceptionOrNull()
+
+        assertTrue(failure is ReconciliationIncompleteException)
+        assertTrue((failure as ReconciliationIncompleteException).failureCount > 0)
+        assertEquals(
+            listOf(raw.id),
+            harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH),
+        )
+        assertEquals(1, schedules.get())
     }
 
     @Test

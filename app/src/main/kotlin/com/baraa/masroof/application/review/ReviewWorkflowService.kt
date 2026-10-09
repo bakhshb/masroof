@@ -77,15 +77,30 @@ class ReviewWorkflowService(
      * at most the affected RawSms ids, then reload that queue without a second sweep.
      */
     suspend fun refreshReviewQueue() {
-        val report = reconciliationService.reconcileStoredEventsDetailed()
-        reviewQueueUpdater.applyReport(report)
-        if (!ReconciliationCompletionPolicy.isComplete(report)) {
-            logIncomplete(
-                stage = ReconciliationCompletionPolicy.STAGE_RECONCILIATION,
-                failureCount = report.summary.failed,
-                rawSmsIds = report.failedRawSmsIds,
-                retryState = "maintenance",
+        val report = try {
+            reconciliationService.reconcileStoredEventsDetailed()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            throw incomplete(emptyList(), failureCount = 1)
+        }
+        try {
+            reviewQueueUpdater.applyReport(report)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            val failedIds = report.failedRawSmsIds
+            retainHistoricalRetry(failedIds, failureCount = report.summary.failed.coerceAtLeast(1))
+            throw incomplete(
+                failedIds,
+                report.summary.failed.coerceAtLeast(1),
+                ReconciliationCompletionPolicy.STAGE_REVIEW_UPDATE,
             )
+        }
+        if (!ReconciliationCompletionPolicy.isComplete(report)) {
+            val failedIds = report.failedRawSmsIds
+            retainHistoricalRetry(failedIds, report.summary.failed)
+            throw incomplete(failedIds, report.summary.failed)
         }
     }
 
