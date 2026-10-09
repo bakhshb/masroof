@@ -11,7 +11,6 @@ import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
@@ -23,7 +22,6 @@ class DebitCardScopeFactoryTest {
     fun fromRegistry_infersLinkedAccountFromSmsWhenRegistryLinkMissing() {
         val body = "شراء من نقاط البيع\nبطاقة مدى: 2210\nخصمت من حساب: 3001"
         val parsedRecords = listOf(parsedRecord("2210", body))
-        val rawSmsById = rawSmsMap(parsedRecords)
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "2210",
@@ -45,7 +43,6 @@ class DebitCardScopeFactoryTest {
         val scope = DebitCardScopeFactory.fromRegistry(
             cards = listOf(debit),
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
             registryAccounts = accounts,
         )
 
@@ -76,16 +73,4 @@ class DebitCardScopeFactoryTest {
         )
         return ParsedEventRecord(event = event, details = ParsedEventDetails(debitSourceAccountLast4 = "3001"))
     }
-
-    private fun rawSmsMap(parsedRecords: List<ParsedEventRecord>): Map<String, RawSms> =
-        parsedRecords.associate { record ->
-            record.event.rawSmsId to RawSms(
-                id = record.event.rawSmsId,
-                sender = "AlJazira",
-                body = record.event.counterparty.orEmpty(),
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-                deviceMessageId = record.event.id,
-                bodyHash = record.event.id,
-            )
-        }
 }

@@ -43,7 +43,6 @@ object DebitCardOverviewBuilder {
                 CardRegistryDebitClassifier.isDebitRegistryEntry(
                     it,
                     parsedRecords = parsedRecords,
-                    rawSmsById = rawSmsById,
                 )
         }
         if (ownedDebit.isEmpty()) {
@@ -60,7 +59,6 @@ object DebitCardOverviewBuilder {
         val cardInvolvement = CardTransactionInvolvementResolver.buildIndex(
             transactions = transactions,
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
         )
         val context = AccountFlowClassifier.buildContext(
             transactions = transactions,

@@ -4,7 +4,6 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 data class DebitCardScopeFacts(
@@ -16,7 +15,6 @@ object DebitCardScopeFactory {
     fun fromRegistry(
         cards: List<CardRegistryEntry>,
         parsedRecords: List<ParsedEventRecord> = emptyList(),
-        rawSmsById: Map<String, RawSms> = emptyMap(),
         registryAccounts: List<AccountRegistryEntry> = emptyList(),
     ): DebitCardScopeFacts {
         val ownedDebit = cards.filter {
@@ -24,7 +22,6 @@ object DebitCardScopeFactory {
                 CardRegistryDebitClassifier.isDebitRegistryEntry(
                     it,
                     parsedRecords = parsedRecords,
-                    rawSmsById = rawSmsById,
                 )
         }
         val ownedDebitCardContainerIds = ownedDebit.mapNotNull { entry ->
@@ -32,7 +29,7 @@ object DebitCardScopeFactory {
         }.toSet()
         val debitCardLinkedAccountIds = ownedDebit.mapNotNull { entry ->
             val cardId = FinancialContainerIdFactory.cardId(entry.bank, entry.last4) ?: return@mapNotNull null
-            val accountId = resolveLinkedAccountId(entry, parsedRecords, rawSmsById, registryAccounts)
+            val accountId = resolveLinkedAccountId(entry, parsedRecords, registryAccounts)
                 ?: return@mapNotNull null
             cardId to accountId
         }.toMap()
@@ -45,7 +42,6 @@ object DebitCardScopeFactory {
     private fun resolveLinkedAccountId(
         entry: CardRegistryEntry,
         parsedRecords: List<ParsedEventRecord>,
-        rawSmsById: Map<String, RawSms>,
         registryAccounts: List<AccountRegistryEntry>,
     ): String? {
         entry.linkedAccount?.let(FinancialContainerIdFactory::accountId)?.let { return it }

@@ -3,7 +3,6 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardType
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.model.isCreditCardSms
 import com.baraa.masroof.parsing.model.isDebitCardSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -19,7 +18,6 @@ object CardRegistryDebitClassifier {
     fun isDebitRegistryEntry(
         entry: CardRegistryEntry,
         parsedRecords: List<ParsedEventRecord> = emptyList(),
-        rawSmsById: Map<String, RawSms> = emptyMap(),
     ): Boolean {
         when (entry.cardType) {
             CardType.DEBIT -> return true
@@ -34,10 +32,9 @@ object CardRegistryDebitClassifier {
     fun isCreditRegistryEntry(
         entry: CardRegistryEntry,
         parsedRecords: List<ParsedEventRecord> = emptyList(),
-        rawSmsById: Map<String, RawSms> = emptyMap(),
     ): Boolean =
         entry.cardType == CardType.CREDIT ||
-            (entry.cardType == null && !isDebitRegistryEntry(entry, parsedRecords, rawSmsById))
+            (entry.cardType == null && !isDebitRegistryEntry(entry, parsedRecords))
 
     private fun inferDebitFromSms(
         entry: CardRegistryEntry,

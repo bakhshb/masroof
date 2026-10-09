@@ -9,7 +9,6 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.ParseStatus
@@ -32,21 +31,6 @@ import java.time.Instant
  * never explicitly marked [CardType.DEBIT] during registry setup.
  */
 class MadaDebitCardsDashboardVisibilityTest {
-    private val googlePayBody = """
-        شراء عبر نقاط البيع (Google Pay)
-        بطاقة مدى: 8219
-        لدى: MALAYSIA FOODS RESTA
-        بمبلغ: 127.00 SAR
-        في: 13:24 03-08-2026
-    """.trimIndent()
-
-    private val madaPosBody = """
-        شراء من نقاط البيع
-        بطاقة مدى: 5555
-        لدى: GROCERY
-        بمبلغ: 45.00 SAR
-    """.trimIndent()
-
     @Test
     fun ownedMadaCardsWithoutDebitType_appearInDashboardDebitList() {
         val registry = listOf(
@@ -59,11 +43,6 @@ class MadaDebitCardsDashboardVisibilityTest {
             parsedMadaPurchase("evt-8219", "sms-8219", "8219"),
             parsedMadaPurchase("evt-5555", "sms-5555", "5555"),
             parsedMadaPurchase("evt-7777", "sms-7777", "7777"),
-        )
-        val rawSmsById = mapOf(
-            "sms-8219" to rawSms("sms-8219", googlePayBody),
-            "sms-5555" to rawSms("sms-5555", madaPosBody),
-            "sms-7777" to rawSms("sms-7777", madaPosBody.replace("5555", "7777")),
         )
         val overview = CreditCardsOverview(
             cards = listOf(creditRow("1111")),
@@ -82,7 +61,6 @@ class MadaDebitCardsDashboardVisibilityTest {
             overview = overview,
             registryCards = registry,
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
         )
 
         assertEquals(1, facilities.facilities.size)
@@ -104,15 +82,10 @@ class MadaDebitCardsDashboardVisibilityTest {
             parsedMadaPurchase("evt-8219", "sms-8219", "8219"),
             parsedMadaPurchase("evt-5555", "sms-5555", "5555"),
         )
-        val rawSmsById = mapOf(
-            "sms-8219" to rawSms("sms-8219", googlePayBody),
-            "sms-5555" to rawSms("sms-5555", madaPosBody),
-        )
         val built = CreditFacilityOverviewBuilder.build(
             overview = emptyCreditOverview(),
             registryCards = registry,
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
         )
         val state = DashboardUiState(
             creditFacilities = built,
@@ -135,13 +108,11 @@ class MadaDebitCardsDashboardVisibilityTest {
     fun debitCardRegistryInferrer_detectsMadaFromSmsWhenTypeMissing() {
         val entry = ownedMadaWithoutMetadata("8219")
         val parsedRecords = listOf(parsedMadaPurchase("evt-8219", "sms-8219", "8219"))
-        val rawSmsById = mapOf("sms-8219" to rawSms("sms-8219", googlePayBody))
 
         assertTrue(
             CardRegistryDebitClassifier.isDebitRegistryEntry(
                 entry,
                 parsedRecords = parsedRecords,
-                rawSmsById = rawSmsById,
             ),
         )
     }
@@ -149,24 +120,14 @@ class MadaDebitCardsDashboardVisibilityTest {
     @Test
     fun debitCardRegistryInferrer_ignoresCreditSmsAtRamadanMerchant() {
         val entry = ownedMadaWithoutMetadata("7271")
-        val ramadanCreditBody = """
-            شراء عبر نقاط البيع (Google Pay)
-            بطاقة ائتمانية: 7271
-            لدى: Ramadan Gifts
-            بمبلغ: 75.00 SAR
-            الرصيد المتاح: 14569.09 SAR
-            إجمالي المبلغ المستحق:3921.11 SAR
-        """.trimIndent()
         val parsedRecords = listOf(
             parsedMadaPurchase("evt-7271", "sms-7271", "7271", CardSmsChannel.CREDIT),
         )
-        val rawSmsById = mapOf("sms-7271" to rawSms("sms-7271", ramadanCreditBody))
 
         assertFalse(
             CardRegistryDebitClassifier.isDebitRegistryEntry(
                 entry,
                 parsedRecords = parsedRecords,
-                rawSmsById = rawSmsById,
             ),
         )
     }
@@ -244,15 +205,5 @@ class MadaDebitCardsDashboardVisibilityTest {
                 parseStatus = ParseStatus.SUCCESS,
             ),
             details = ParsedEventDetails(cardSmsChannel = channel),
-        )
-
-    private fun rawSms(id: String, body: String): RawSms =
-        RawSms(
-            id = id,
-            sender = "AlJazira",
-            body = body,
-            receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-            deviceMessageId = id,
-            bodyHash = id,
         )
 }

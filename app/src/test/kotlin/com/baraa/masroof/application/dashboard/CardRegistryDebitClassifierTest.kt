@@ -12,7 +12,6 @@ import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.parsing.model.CardSmsChannel
@@ -65,29 +64,17 @@ class CardRegistryDebitClassifierTest {
             بمبلغ: 127.00 SAR
         """.trimIndent()
         val parsed = parsedRecord(last4 = "8219", body = body, channel = CardSmsChannel.DEBIT)
-        val rawSmsById = mapOf(
-            parsed.event.rawSmsId to RawSms(
-                id = parsed.event.rawSmsId,
-                sender = "AlJazira",
-                body = body,
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-                deviceMessageId = "1",
-                bodyHash = "h",
-            ),
-        )
 
         assertTrue(
             CardRegistryDebitClassifier.isDebitRegistryEntry(
                 entry,
                 parsedRecords = listOf(parsed),
-                rawSmsById = rawSmsById,
             ),
         )
         assertFalse(
             CardRegistryDebitClassifier.isCreditRegistryEntry(
                 entry,
                 parsedRecords = listOf(parsed),
-                rawSmsById = rawSmsById,
             ),
         )
     }
@@ -111,29 +98,17 @@ class CardRegistryDebitClassifierTest {
             إجمالي المبلغ المستحق:3921.11 SAR
         """.trimIndent()
         val parsed = parsedRecord(last4 = "7271", body = body, channel = CardSmsChannel.CREDIT)
-        val rawSmsById = mapOf(
-            parsed.event.rawSmsId to RawSms(
-                id = parsed.event.rawSmsId,
-                sender = "AlJazira",
-                body = body,
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-                deviceMessageId = "1",
-                bodyHash = "h",
-            ),
-        )
 
         assertFalse(
             CardRegistryDebitClassifier.isDebitRegistryEntry(
                 entry,
                 parsedRecords = listOf(parsed),
-                rawSmsById = rawSmsById,
             ),
         )
         assertTrue(
             CardRegistryDebitClassifier.isCreditRegistryEntry(
                 entry,
                 parsedRecords = listOf(parsed),
-                rawSmsById = rawSmsById,
             ),
         )
     }
