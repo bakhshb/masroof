@@ -1,6 +1,11 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
+import com.baraa.masroof.application.transaction.ReconciliationIncompleteException
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ProcessingRetryMode
@@ -15,8 +20,9 @@ import java.time.Instant
  *
  * Loads the retry set's ParsedEvents, then runs ownership discovery, scoped
  * reconciliation, and review refresh once. It does not reparse SMS text and does
- * not scan unrelated history. Success clears that set in one transaction.
- * Failure leaves the set in place.
+ * not scan unrelated history. The set is cleared only after the report's failed
+ * count is zero and the required review update has finished. A nonzero failed
+ * count leaves the set in place and fails the attempt. A thrown failure does too.
  */
 class HistoricalDerivedRecovery(
     private val parsedEventRepository: ParsedEventRepository,
@@ -25,6 +31,7 @@ class HistoricalDerivedRecovery(
     private val reconciliation: TransactionReconciliationService? = null,
     private val reviewQueueUpdater: ReviewQueueUpdater? = null,
     private val rawSmsRepository: RawSmsRepository? = null,
+    private val appLogService: AppLogService? = null,
 ) {
     suspend fun recoverPending() {
         val ids = processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH)
@@ -39,6 +46,18 @@ class HistoricalDerivedRecovery(
         val report = reconciliation?.reconcileAffectedRawSmsIds(idsInArrivalOrder(ids))
         if (report != null && reviewQueueUpdater != null) {
             reviewQueueUpdater.applyReport(report)
+        }
+        if (report != null && !ReconciliationCompletionPolicy.isComplete(report)) {
+            val masked = AppLogFormatting.maskId(report.failedRawSmsIds.firstOrNull() ?: ids.first())
+            appLogService?.error(
+                AppLogCategories.INGEST,
+                "Derived reconciliation incomplete failures=${report.summary.failed} id=$masked " +
+                    "retry_state=retained (ReconciliationIncompleteException)",
+            )
+            throw ReconciliationIncompleteException(
+                failureCount = report.summary.failed,
+                maskedRawSmsId = masked,
+            )
         }
         processingRetryRepository.clear(ids)
         if (processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).isNotEmpty()) {
