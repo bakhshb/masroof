@@ -9,6 +9,7 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
+import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.room.MasroofDatabase
@@ -49,12 +50,16 @@ class DatabaseBackupImportMigrationTest {
     }
 
     @Test
-    fun importV5Backup_resetsParseFactsBackfillMarker() {
+    fun importV5Backup_resetsParseFactsAndTransferIntegrityMarkers() {
         runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, MasroofDatabase.VERSION)
+            .putInt(
+                MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION,
+                TransferIntegrityRepairCoordinator.CURRENT_VERSION,
+            )
             .commit()
 
         val v5DbFile = createV5DatabaseFile(context)
@@ -73,10 +78,14 @@ class DatabaseBackupImportMigrationTest {
             appVersionName = "test",
             clockEpochMillis = { 1_700_000_000_000L },
             restartProcess = {
+                val maintenance = context.getSharedPreferences(
+                    MaintenancePreferences.PREFS_NAME,
+                    Context.MODE_PRIVATE,
+                )
+                assertEquals(0, maintenance.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0))
                 assertEquals(
                     0,
-                    context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
-                        .getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0),
+                    maintenance.getInt(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, 0),
                 )
                 restartRequested.set(true)
             },

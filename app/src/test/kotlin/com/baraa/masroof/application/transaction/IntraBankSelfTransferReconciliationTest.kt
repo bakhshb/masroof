@@ -11,6 +11,7 @@ import com.baraa.masroof.application.maintenance.BackfillOutcome
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
 import com.baraa.masroof.application.maintenance.MaintenanceRequirement
 import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
+import com.baraa.masroof.application.maintenance.TransferIntegrityRepairResult
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.core.money.Currency
@@ -496,7 +497,10 @@ class IntraBankSelfTransferReconciliationTest {
         val coordinator = TransferIntegrityRepairCoordinator(
             prefs = prefs,
             appLogService = AppLogService(context),
-            repairStoredTransfers = { reconcileAndApplyReviews() },
+            repairStoredTransfers = {
+                reconcileAndApplyReviews()
+                TransferIntegrityRepairResult()
+            },
         )
         assertEquals(MaintenanceRequirement.BLOCKING, coordinator.pendingRequirement())
         assertEquals(BackfillOutcome.COMPLETED, coordinator.runIfNeeded())

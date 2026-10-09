@@ -129,7 +129,7 @@ class DatabaseBackupService(
                 installValidatedDatabase(validated, liveDb)
                 try {
                     restorePreferences(preferences)
-                    resetParseFactsBackfillMarker()
+                    resetMaintenanceMarkers()
                 } catch (error: Exception) {
                     restoreParkedLive(liveDb)
                     throw error
@@ -233,10 +233,15 @@ class DatabaseBackupService(
         ).commit()
     }
 
-    private fun resetParseFactsBackfillMarker() {
+    /**
+     * The restored database may predate the current parse-fact or transfer-integrity
+     * rules. Clearing these markers makes the next launch re-run both repairs.
+     */
+    private fun resetMaintenanceMarkers() {
         appContext.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION)
+            .remove(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION)
             .commit()
     }
 

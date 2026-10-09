@@ -175,7 +175,10 @@ class StartupMaintenanceTest {
     ) = TransferIntegrityRepairCoordinator(
         prefs = prefs,
         appLogService = AppLogService(context),
-        repairStoredTransfers = { block() },
+        repairStoredTransfers = {
+            block()
+            TransferIntegrityRepairResult()
+        },
     )
 
     private fun coordinator() = ParsedEventFactsBackfillCoordinator(

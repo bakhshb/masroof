@@ -54,6 +54,7 @@ import com.baraa.masroof.application.maintenance.StartupMaintenance
 import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
 import com.baraa.masroof.application.maintenance.StoredSmsReprocessor
 import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
+import com.baraa.masroof.application.maintenance.TransferIntegrityRepairResult
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -690,10 +691,12 @@ class AppContainer(
                     financialTransactionRepository.listByTypes(
                         listOf(FinancialTransactionType.SELF_TRANSFER),
                     ).any { it.linkedParsedEventIds.size == 1 }
-                if (hasPostedSingleLegSelfTransfer) {
-                    reviewQueueUpdater.applyReport(
-                        transactionReconciliationService.reconcileStoredEventsDetailed(),
-                    )
+                if (!hasPostedSingleLegSelfTransfer) {
+                    TransferIntegrityRepairResult()
+                } else {
+                    val report = transactionReconciliationService.reconcileStoredEventsDetailed()
+                    reviewQueueUpdater.applyReport(report)
+                    TransferIntegrityRepairResult(failedCount = report.summary.failed)
                 }
             },
             completionSignal = maintenanceCompletionSignal,

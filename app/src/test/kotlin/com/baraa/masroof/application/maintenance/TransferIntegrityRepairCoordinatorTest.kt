@@ -33,7 +33,10 @@ class TransferIntegrityRepairCoordinatorTest {
     @Test
     fun pendingRequirement_isBlockingUntilThePassCompletes() = runBlocking<Unit> {
         var runs = 0
-        val coordinator = coordinator { runs++ }
+        val coordinator = coordinator {
+            runs++
+            TransferIntegrityRepairResult()
+        }
 
         assertEquals(MaintenanceRequirement.BLOCKING, coordinator.pendingRequirement())
         assertEquals(BackfillOutcome.COMPLETED, coordinator.runIfNeeded())
@@ -48,11 +51,28 @@ class TransferIntegrityRepairCoordinatorTest {
     }
 
     @Test
+    fun runIfNeeded_reconcileFailuresStayPendingAndRetry() = runBlocking<Unit> {
+        var attempts = 0
+        val coordinator = coordinator {
+            attempts++
+            TransferIntegrityRepairResult(failedCount = if (attempts == 1) 2 else 0)
+        }
+
+        assertEquals(BackfillOutcome.INCOMPLETE, coordinator.runIfNeeded())
+        assertEquals(MaintenanceRequirement.BLOCKING, coordinator.pendingRequirement())
+        assertEquals(0, prefs().getInt(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, 0))
+        assertEquals(BackfillOutcome.COMPLETED, coordinator.runIfNeeded())
+        assertEquals(2, attempts)
+        assertNull(coordinator.pendingRequirement())
+    }
+
+    @Test
     fun runIfNeeded_failedRepairStaysPendingAndRetries() = runBlocking<Unit> {
         var attempts = 0
         val coordinator = coordinator {
             attempts++
             if (attempts == 1) error("database unavailable")
+            TransferIntegrityRepairResult()
         }
 
         assertEquals(BackfillOutcome.INCOMPLETE, coordinator.runIfNeeded())
@@ -69,7 +89,7 @@ class TransferIntegrityRepairCoordinatorTest {
         val coordinator = TransferIntegrityRepairCoordinator(
             prefs = prefs(),
             appLogService = AppLogService(context),
-            repairStoredTransfers = {},
+            repairStoredTransfers = { TransferIntegrityRepairResult() },
             completionSignal = signal,
         )
         val completion = async(start = CoroutineStart.UNDISPATCHED) { signal.completions.first() }
@@ -78,7 +98,9 @@ class TransferIntegrityRepairCoordinatorTest {
         withTimeout(1_000) { completion.await() }
     }
 
-    private fun coordinator(block: () -> Unit) = TransferIntegrityRepairCoordinator(
+    private fun coordinator(
+        block: () -> TransferIntegrityRepairResult = { TransferIntegrityRepairResult() },
+    ) = TransferIntegrityRepairCoordinator(
         prefs = prefs(),
         appLogService = AppLogService(context),
         repairStoredTransfers = { block() },
