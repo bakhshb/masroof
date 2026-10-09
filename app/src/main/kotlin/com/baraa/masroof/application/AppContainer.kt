@@ -7,6 +7,7 @@ import androidx.work.DelegatingWorkerFactory
 import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import com.baraa.masroof.application.backup.DatabaseBackupService
+import com.baraa.masroof.application.backup.DatabaseRestoreRecovery
 import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.application.dashboard.DashboardService
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
@@ -138,6 +139,9 @@ class AppContainer(
 ) {
     private val appContext = context.applicationContext
 
+    /** Room must not open until an interrupted restore has chosen a valid file. */
+    private val databaseRestoreRecovered: Unit = DatabaseRestoreRecovery.recover(appContext)
+
     val clock: InstantClock = InstantClock.System
 
     val applicationScope: CoroutineScope =
@@ -150,13 +154,15 @@ class AppContainer(
         database.withTransaction(block)
 
     private val database: MasroofDatabase =
-        Room.databaseBuilder(
-            appContext,
-            MasroofDatabase::class.java,
-            MasroofDatabase.NAME,
-        )
-            .addMigrations(*MasroofDatabase.ALL_MIGRATIONS)
-            .build()
+        databaseRestoreRecovered.let {
+            Room.databaseBuilder(
+                appContext,
+                MasroofDatabase::class.java,
+                MasroofDatabase.NAME,
+            )
+                .addMigrations(*MasroofDatabase.ALL_MIGRATIONS)
+                .build()
+        }
 
     val rawSmsRepository: RawSmsRepository =
         RoomRawSmsRepository(database.rawSmsDao())

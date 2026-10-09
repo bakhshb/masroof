@@ -109,6 +109,10 @@ abstract class MasroofDatabase : RoomDatabase() {
     abstract fun userCorrectionDao(): UserCorrectionDao
 
     companion object {
+        /**
+         * Live database file. [com.baraa.masroof.application.backup.DatabaseRestoreRecovery]
+         * must finish before Room opens this name.
+         */
         const val NAME: String = "masroof.db"
         const val VERSION: Int = 18
 
