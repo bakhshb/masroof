@@ -206,6 +206,9 @@ object DatabaseRestoreRecovery {
     }
 
     internal fun cleanupCommitted(context: Context, live: File) {
+        // A committed journal whose live file is unusable must not keep the
+        // imported preferences. ORIGINAL_SELECTED restores the original database
+        // and its preference snapshot before cleanup deletes either one.
         if (!isSqliteOk(live)) {
             if (!rollbackFile(live).exists() && !hasSidecar(rollbackFile(live))) {
                 reclaimOrphanedPreservedRollback(live)

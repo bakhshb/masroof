@@ -403,6 +403,16 @@ class DatabaseRestoreRecoveryTest {
     }
 
     @Test
+    fun committedInvalidLive_restoresOriginalDatabaseAndPreferencesTogether() {
+        resumeCommittedFallback(stopAfter = null)
+    }
+
+    @Test
+    fun committedFallback_crashAfterOriginalMainMoves_finishesOriginalRestore() {
+        resumeCommittedFallback(stopAfter = DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_MAIN)
+    }
+
+    @Test
     fun newInstalledRollback_crashAfterOriginalMainMoves_keepsOriginalPreferences() {
         resumeOriginalRollback(DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_MAIN)
     }
@@ -527,6 +537,53 @@ class DatabaseRestoreRecoveryTest {
 
         assertEquals("bad-live", live.readText())
         assertFalse(File(live.path + ".rollback").exists())
+    }
+
+    private fun resumeCommittedFallback(stopAfter: DatabaseRestoreRecovery.OriginalRestoreStep?) {
+        live.writeText("imported-broken")
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(rollback, "original")
+        File(rollback.path + "-wal").writeText("wal-bytes")
+        File(rollback.path + "-shm").writeText("shm-bytes")
+        DatabaseRestoreRecovery.writeSnapshots(
+            live,
+            preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 6),
+            preferenceSnapshot(onboardingCompleted = true, reparsedSchemaVersion = null),
+        )
+        applyMixedPreferences(onboardingCompleted = true, reparsedSchemaVersion = 1)
+        DatabaseRestoreRecovery.writeJournal(
+            live,
+            DatabaseRestoreRecovery.Stage.COMMITTED,
+            preservedRollback = false,
+        )
+        if (stopAfter != null) {
+            DatabaseRestoreRecovery.afterOriginalRestoreStep = { step ->
+                if (step == stopAfter) {
+                    throw DatabaseRestoreRecovery.ProcessTerminated(DatabaseRestoreRecovery.Stage.ORIGINAL_SELECTED)
+                }
+            }
+            try {
+                DatabaseRestoreRecovery.recover(context)
+                org.junit.Assert.fail("expected interruption after $stopAfter")
+            } catch (error: DatabaseRestoreRecovery.ProcessTerminated) {
+                assertTrue(journal().readText().startsWith("stage=ORIGINAL_SELECTED"))
+            }
+            DatabaseRestoreRecovery.afterOriginalRestoreStep = null
+        }
+
+        DatabaseRestoreRecovery.recover(context)
+
+        assertEquals("wal-bytes", File(live.path + "-wal").readText())
+        assertEquals("shm-bytes", File(live.path + "-shm").readText())
+        File(live.path + "-wal").delete()
+        File(live.path + "-shm").delete()
+        assertEquals("original", readMarker(live))
+        assertFalse(onboarding().getBoolean("onboarding_completed", true))
+        assertEquals(6, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
+        assertFalse(journal().exists())
+        assertFalse(rollback.exists())
+        assertFalse(File(live.path + ".prefs-original").exists())
+        assertFalse(File(live.path + ".prefs-incoming").exists())
     }
 
     private fun resumeOriginalRollback(stopAfter: DatabaseRestoreRecovery.OriginalRestoreStep) {
