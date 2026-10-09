@@ -48,6 +48,7 @@ class DatabaseRestoreRecoveryTest {
 
     @After
     fun tearDown() {
+        DatabaseRestoreRecovery.afterJournalTempDurable = null
         DatabaseRestoreRecovery.deleteRestoreArtifacts(live)
         if (live.exists()) live.delete()
         context.deleteDatabase(MasroofDatabase.NAME)
@@ -265,7 +266,164 @@ class DatabaseRestoreRecoveryTest {
         assertTrue(journal().exists())
     }
 
+    @Test
+    fun advancingOldParkedToNewInstalled_interruptionKeepsOriginalDatabaseAndPreferences() {
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(rollback, "original")
+        writeDatabase(live, "imported")
+        val original = preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 7)
+        val incoming = preferenceSnapshot(onboardingCompleted = true, reparsedSchemaVersion = null)
+        DatabaseRestoreRecovery.writeSnapshots(live, original, incoming)
+        applyMixedPreferences(onboardingCompleted = true, reparsedSchemaVersion = 7)
+        DatabaseRestoreRecovery.writeJournal(live, DatabaseRestoreRecovery.Stage.OLD_PARKED, preservedRollback = false)
+        DatabaseRestoreRecovery.afterJournalTempDurable = { stage ->
+            if (stage == DatabaseRestoreRecovery.Stage.NEW_INSTALLED) {
+                throw DatabaseRestoreRecovery.ProcessTerminated(stage)
+            }
+        }
+
+        try {
+            DatabaseRestoreRecovery.writeJournal(
+                live,
+                DatabaseRestoreRecovery.Stage.NEW_INSTALLED,
+                preservedRollback = false,
+            )
+            org.junit.Assert.fail("expected interruption before the journal replace")
+        } catch (error: DatabaseRestoreRecovery.ProcessTerminated) {
+            assertEquals("NEW_INSTALLED", error.message?.substringAfterLast(' '))
+        }
+
+        assertTrue(journal().readText().contains("stage=OLD_PARKED"))
+        assertTrue(journalTemp().readText().contains("stage=NEW_INSTALLED"))
+        DatabaseRestoreRecovery.afterJournalTempDurable = null
+
+        DatabaseRestoreRecovery.recover(context)
+
+        assertEquals("original", readMarker(live))
+        assertFalse(onboarding().getBoolean("onboarding_completed", true))
+        assertEquals(7, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
+        assertFalse(rollback.exists())
+        assertFalse(journal().exists())
+        assertFalse(journalTemp().exists())
+    }
+
+    @Test
+    fun advancingNewInstalledToCommitted_interruptionKeepsImportedDatabaseAndPreferences() {
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(live, "imported")
+        writeDatabase(rollback, "original")
+        val original = preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 4)
+        val incoming = preferenceSnapshot(onboardingCompleted = true, reparsedSchemaVersion = null)
+        DatabaseRestoreRecovery.writeSnapshots(live, original, incoming)
+        applyMixedPreferences(onboardingCompleted = false, reparsedSchemaVersion = 4)
+        DatabaseRestoreRecovery.writeJournal(
+            live,
+            DatabaseRestoreRecovery.Stage.NEW_INSTALLED,
+            preservedRollback = false,
+        )
+        DatabaseRestoreRecovery.afterJournalTempDurable = { stage ->
+            if (stage == DatabaseRestoreRecovery.Stage.COMMITTED) {
+                throw DatabaseRestoreRecovery.ProcessTerminated(stage)
+            }
+        }
+
+        try {
+            DatabaseRestoreRecovery.writeJournal(live, DatabaseRestoreRecovery.Stage.COMMITTED, preservedRollback = false)
+            org.junit.Assert.fail("expected interruption before the journal replace")
+        } catch (error: DatabaseRestoreRecovery.ProcessTerminated) {
+            assertEquals("COMMITTED", error.message?.substringAfterLast(' '))
+        }
+
+        assertTrue(journal().readText().contains("stage=NEW_INSTALLED"))
+        assertTrue(journalTemp().readText().contains("stage=COMMITTED"))
+        DatabaseRestoreRecovery.afterJournalTempDurable = null
+
+        DatabaseRestoreRecovery.recover(context)
+
+        assertEquals("imported", readMarker(live))
+        assertTrue(onboarding().getBoolean("onboarding_completed", false))
+        assertFalse(maintenance().contains(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION))
+        assertFalse(rollback.exists())
+        assertFalse(journal().exists())
+    }
+
+    @Test
+    fun corruptJournal_restoresOriginalDatabaseAndPreferencesTogether() {
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(live, "imported")
+        writeDatabase(rollback, "original")
+        DatabaseRestoreRecovery.writeSnapshots(
+            live,
+            preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 9),
+            preferenceSnapshot(onboardingCompleted = true, reparsedSchemaVersion = null),
+        )
+        applyMixedPreferences(onboardingCompleted = true, reparsedSchemaVersion = 9)
+        journal().writeText("stage=NEW_INST")
+
+        DatabaseRestoreRecovery.recover(context)
+
+        assertEquals("original", readMarker(live))
+        assertFalse(onboarding().getBoolean("onboarding_completed", true))
+        assertEquals(9, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
+        assertFalse(rollback.exists())
+        assertFalse(journal().exists())
+    }
+
+    @Test
+    fun corruptJournal_whenNeitherDatabaseIsValid_failsClosed() {
+        live.writeText("bad-live")
+        val rollback = File(live.path + ".rollback")
+        rollback.writeText("bad-rollback")
+        journal().writeText("stage=COMMITTED\npreservedRollback=tru")
+
+        try {
+            DatabaseRestoreRecovery.recover(context)
+            org.junit.Assert.fail("expected fail closed")
+        } catch (error: DatabaseRestoreRecovery.IncompleteRestoreException) {
+            assertTrue(error.message.orEmpty().contains("unreadable"))
+        }
+
+        assertEquals("bad-live", live.readText())
+        assertEquals("bad-rollback", rollback.readText())
+        assertFalse(live.readText().startsWith("SQLite format 3"))
+    }
+
+    @Test
+    fun missingJournal_whenLiveFileIsNotSqlite_failsClosed() {
+        live.writeText("bad-live")
+
+        try {
+            DatabaseRestoreRecovery.recover(context)
+            org.junit.Assert.fail("expected fail closed")
+        } catch (error: DatabaseRestoreRecovery.IncompleteRestoreException) {
+            assertTrue(error.message.orEmpty().contains("neither copy"))
+        }
+
+        assertEquals("bad-live", live.readText())
+        assertFalse(File(live.path + ".rollback").exists())
+    }
+
     private fun journal(): File = File(live.path + ".restore-journal")
+
+    private fun journalTemp(): File = File(journal().path + ".tmp")
+
+    private fun preferenceSnapshot(
+        onboardingCompleted: Boolean,
+        reparsedSchemaVersion: Int?,
+    ): DatabaseRestoreRecovery.PreferenceSnapshot {
+        val captured = DatabaseRestoreRecovery.capturePreferences(context)
+        return captured.copy(
+            onboardingCompleted = onboardingCompleted,
+            reparsedSchemaVersion = reparsedSchemaVersion,
+        )
+    }
+
+    private fun applyMixedPreferences(onboardingCompleted: Boolean, reparsedSchemaVersion: Int) {
+        onboarding().edit().putBoolean("onboarding_completed", onboardingCompleted).commit()
+        maintenance().edit()
+            .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, reparsedSchemaVersion)
+            .commit()
+    }
 
     private fun onboarding() =
         context.getSharedPreferences(SharedPrefsOnboardingPreferencesRepository.PREFS_NAME, Context.MODE_PRIVATE)

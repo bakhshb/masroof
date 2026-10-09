@@ -12,14 +12,19 @@ import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * Crash-safe replacement of the live Room file.
  *
- * Import writes a durable stage before each destructive rename. [recover] runs
- * before Room opens the database and finishes on exactly one valid file: the
- * original, or a fully committed import. It does not create a replacement file
- * when neither copy is valid.
+ * Import writes a durable stage before each destructive rename. Each new stage
+ * is fsynced to a temporary journal, then atomically replaces the previous
+ * journal. [recover] runs before Room opens the database and finishes on one
+ * pair: the original database with its preferences, or a fully committed import
+ * with its preferences. A database file that is not valid SQLite, with no valid
+ * rollback, fails closed instead of letting Room create an empty database.
  *
  * Preferences and maintenance markers are one commit with the new database.
  * A preexisting rollback is moved aside for the attempt and deleted only after
@@ -36,6 +41,12 @@ object DatabaseRestoreRecovery {
     class ProcessTerminated(stage: Stage) : Error("Database restore terminated after $stage")
 
     class IncompleteRestoreException(message: String) : IllegalStateException(message)
+
+    /**
+     * Test seam. Runs after the next journal is fsynced and before it replaces
+     * the previous journal. Production leaves this null.
+     */
+    internal var afterJournalTempDurable: ((Stage) -> Unit)? = null
 
     internal data class Journal(
         val stage: Stage,
@@ -56,17 +67,17 @@ object DatabaseRestoreRecovery {
     fun recover(context: Context) {
         val live = liveDatabase(context)
         live.parentFile?.mkdirs()
-        val journal = readJournal(live)
-        if (journal == null) {
-            recoverWithoutJournal(live)
-            return
+        when (val read = readJournalState(live)) {
+            JournalRead.Absent -> recoverWithoutJournal(live)
+            JournalRead.Corrupt -> recoverCorruptJournal(context, live)
+            is JournalRead.Ready -> when (read.journal.stage) {
+                Stage.PREPARED -> recoverPrepared(context, live, read.journal)
+                Stage.OLD_PARKED -> recoverParkedOriginal(context, live, read.journal)
+                Stage.NEW_INSTALLED -> recoverNewInstalled(context, live, read.journal)
+                Stage.COMMITTED -> cleanupCommitted(live)
+            }
         }
-        when (journal.stage) {
-            Stage.PREPARED -> recoverPrepared(context, live, journal)
-            Stage.OLD_PARKED -> recoverParkedOriginal(context, live, journal)
-            Stage.NEW_INSTALLED -> recoverNewInstalled(context, live, journal)
-            Stage.COMMITTED -> cleanupCommitted(live)
-        }
+        journalTempFile(live).delete()
     }
 
     fun liveDatabase(context: Context): File = context.getDatabasePath(MasroofDatabase.NAME)
@@ -134,10 +145,10 @@ object DatabaseRestoreRecovery {
     }
 
     internal fun writeJournal(live: File, stage: Stage, preservedRollback: Boolean) {
-        writeDurable(
-            journalFile(live),
-            "stage=${stage.name}\npreservedRollback=$preservedRollback\n",
-        )
+        val temp = journalTempFile(live)
+        writeDurable(temp, journalText(stage, preservedRollback))
+        afterJournalTempDurable?.invoke(stage)
+        replaceJournal(temp, journalFile(live))
     }
 
     internal fun parkOriginal(live: File) {
@@ -154,13 +165,16 @@ object DatabaseRestoreRecovery {
      * Every earlier stage puts the original database and preferences back.
      */
     internal fun failImport(context: Context, live: File) {
-        val journal = readJournal(live) ?: return
-        when (journal.stage) {
-            Stage.PREPARED -> abortPrepared(context, live, journal)
-            Stage.OLD_PARKED,
-            Stage.NEW_INSTALLED,
-            -> restoreOriginalFiles(context, live, journal)
-            Stage.COMMITTED -> cleanupCommitted(live)
+        when (val read = readJournalState(live)) {
+            JournalRead.Absent -> return
+            JournalRead.Corrupt -> recoverCorruptJournal(context, live)
+            is JournalRead.Ready -> when (read.journal.stage) {
+                Stage.PREPARED -> abortPrepared(context, live, read.journal)
+                Stage.OLD_PARKED,
+                Stage.NEW_INSTALLED,
+                -> restoreOriginalFiles(context, live, read.journal)
+                Stage.COMMITTED -> cleanupCommitted(live)
+            }
         }
     }
 
@@ -191,6 +205,7 @@ object DatabaseRestoreRecovery {
         originalPrefsFile(live).delete()
         incomingPrefsFile(live).delete()
         journalFile(live).delete()
+        journalTempFile(live).delete()
     }
 
     private fun recoverWithoutJournal(live: File) {
@@ -202,6 +217,40 @@ object DatabaseRestoreRecovery {
         if (rollbackOk) {
             discardDatabase(live)
             restoreRollbackOverLive(live)
+            return
+        }
+        throw IncompleteRestoreException(
+            "A database file exists but neither copy is a valid SQLite database",
+        )
+    }
+
+    /**
+     * A torn journal is not a commit marker. The original database and its
+     * preference snapshot stay together when that copy is still valid.
+     * Otherwise the surviving database is paired with the incoming snapshot.
+     */
+    private fun recoverCorruptJournal(context: Context, live: File) {
+        val rollbackOk = isSqliteOk(rollbackFile(live))
+        val liveOk = isSqliteOk(live)
+        when {
+            rollbackOk -> restoreOriginalFiles(
+                context,
+                live,
+                Journal(
+                    stage = Stage.OLD_PARKED,
+                    preservedRollback = preservedRollbackFile(live).exists() ||
+                        hasSidecar(preservedRollbackFile(live)),
+                ),
+            )
+            liveOk -> {
+                readPreferences(incomingPrefsFile(live))?.let { applyPreferences(context, it) }
+                discardDatabase(rollbackFile(live))
+                deleteSnapshots(live)
+                journalFile(live).delete()
+            }
+            else -> throw IncompleteRestoreException(
+                "Restore journal is unreadable and neither database is valid",
+            )
         }
     }
 
@@ -353,17 +402,41 @@ object DatabaseRestoreRecovery {
         }
     }
 
-    private fun readJournal(live: File): Journal? {
+    private fun readJournalState(live: File): JournalRead {
         val file = journalFile(live)
-        if (!file.isFile) return null
-        val values = file.readLines().mapNotNull { line ->
-            val separator = line.indexOf('=')
-            if (separator <= 0) null else line.substring(0, separator) to line.substring(separator + 1).trim()
-        }.toMap()
-        val stage = values["stage"]?.let { raw ->
-            runCatching { Stage.valueOf(raw) }.getOrNull()
-        } ?: return null
-        return Journal(stage = stage, preservedRollback = values["preservedRollback"] == "true")
+        if (!file.exists()) return JournalRead.Absent
+        val text = try {
+            if (!file.isFile) return JournalRead.Corrupt
+            file.readText()
+        } catch (_: Exception) {
+            return JournalRead.Corrupt
+        }
+        val match = JOURNAL_PATTERN.matchEntire(text) ?: return JournalRead.Corrupt
+        val stage = runCatching { Stage.valueOf(match.groupValues[1]) }.getOrNull()
+            ?: return JournalRead.Corrupt
+        return JournalRead.Ready(
+            Journal(
+                stage = stage,
+                preservedRollback = match.groupValues[2] == "true",
+            ),
+        )
+    }
+
+    private fun journalText(stage: Stage, preservedRollback: Boolean): String =
+        "stage=${stage.name}\npreservedRollback=$preservedRollback\n"
+
+    private fun replaceJournal(temp: File, destination: File) {
+        try {
+            Files.move(
+                temp.toPath(),
+                destination.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (error: AtomicMoveNotSupportedException) {
+            temp.delete()
+            throw IllegalStateException("Cannot replace the restore journal atomically", error)
+        }
     }
 
     private fun readPreferences(file: File): PreferenceSnapshot? {
@@ -435,6 +508,8 @@ object DatabaseRestoreRecovery {
 
     private fun journalFile(live: File): File = File(live.path + JOURNAL_SUFFIX)
 
+    private fun journalTempFile(live: File): File = File(live.path + JOURNAL_SUFFIX + ".tmp")
+
     private fun originalPrefsFile(live: File): File = File(live.path + ORIGINAL_PREFS_SUFFIX)
 
     private fun incomingPrefsFile(live: File): File = File(live.path + INCOMING_PREFS_SUFFIX)
@@ -445,6 +520,13 @@ object DatabaseRestoreRecovery {
     private const val ROLLBACK_SUFFIX = ".rollback"
     private const val PRESERVED_ROLLBACK_SUFFIX = ".rollback.preserved"
     private const val JOURNAL_SUFFIX = ".restore-journal"
+    private val JOURNAL_PATTERN = Regex("""stage=([A-Z_]+)\npreservedRollback=(true|false)\n""")
+
+    private sealed interface JournalRead {
+        data object Absent : JournalRead
+        data object Corrupt : JournalRead
+        data class Ready(val journal: Journal) : JournalRead
+    }
     private const val ORIGINAL_PREFS_SUFFIX = ".prefs-original"
     private const val INCOMING_PREFS_SUFFIX = ".prefs-incoming"
     private val SIDECARS = listOf("-wal", "-shm", "-journal")
