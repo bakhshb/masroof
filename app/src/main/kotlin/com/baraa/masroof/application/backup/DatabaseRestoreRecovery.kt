@@ -27,8 +27,11 @@ import java.nio.file.StandardCopyOption
  * rollback, fails closed instead of letting Room create an empty database.
  *
  * Preferences and maintenance markers are one commit with the new database.
- * A preexisting rollback is moved aside for the attempt and deleted only after
- * [Stage.COMMITTED].
+ * [rollbackFile] is the only candidate for the current original database.
+ * [preservedRollbackFile] is a rollback that already existed before this import.
+ * It is put back in the rollback slot after the current original is restored,
+ * and it is never installed as that original. A preexisting rollback is deleted
+ * only after [Stage.COMMITTED] and the imported database has been verified.
  */
 object DatabaseRestoreRecovery {
     enum class Stage {
@@ -216,9 +219,14 @@ object DatabaseRestoreRecovery {
             journalFile(live).delete()
             return
         }
-        // Imported preferences are already active. Persist ORIGINAL_SELECTED
-        // before renaming .rollback, then finishOriginalSelection restores the
-        // original database and applies its snapshot before either copy is deleted.
+        // Imported preferences are already active. The current original is
+        // .rollback only after it verifies. A preserved rollback is older
+        // evidence and cannot fill in for a missing or corrupt .rollback.
+        if (!isSqliteOk(rollbackFile(live))) {
+            throw IncompleteRestoreException(
+                "Committed restore has no valid database",
+            )
+        }
         val recorded = when (val read = readJournalState(live)) {
             is JournalRead.Ready -> read.journal
             else -> Journal(stage = Stage.COMMITTED, preservedRollback = false)
@@ -226,12 +234,6 @@ object DatabaseRestoreRecovery {
         val preserved = recorded.preservedRollback ||
             preservedRollbackFile(live).exists() ||
             hasSidecar(preservedRollbackFile(live))
-        val rollback = rollbackFile(live)
-        if (!rollback.exists() && !hasSidecar(rollback) && !preserved) {
-            throw IncompleteRestoreException(
-                "Committed restore has no valid database",
-            )
-        }
         restoreOriginalFiles(
             context,
             live,
@@ -260,10 +262,7 @@ object DatabaseRestoreRecovery {
             reclaimOrphanedPreservedRollback(live)
             return
         }
-        if (!rollbackFile(live).exists() && !hasSidecar(rollbackFile(live))) {
-            reclaimOrphanedPreservedRollback(live)
-        }
-        if (rollbackFile(live).exists() || hasSidecar(rollbackFile(live))) {
+        if (isSqliteOk(rollbackFile(live))) {
             selectOriginalDatabase(context, live)
             return
         }
@@ -273,6 +272,9 @@ object DatabaseRestoreRecovery {
     }
 
     private fun selectOriginalDatabase(context: Context, live: File) {
+        if (!isSqliteOk(rollbackFile(live))) {
+            throw IncompleteRestoreException("Original rollback database is not valid")
+        }
         val preserved = preservedRollbackFile(live)
         val preservedRollback = preserved.exists() || hasSidecar(preserved)
         writeJournal(live, Stage.ORIGINAL_SELECTED, preservedRollback)
@@ -395,6 +397,9 @@ object DatabaseRestoreRecovery {
     }
 
     private fun restoreOriginalFiles(context: Context, live: File, journal: Journal) {
+        if (!isSqliteOk(rollbackFile(live))) {
+            throw IncompleteRestoreException("Original rollback database is not valid")
+        }
         writeJournal(live, Stage.ORIGINAL_SELECTED, journal.preservedRollback)
         finishOriginalSelection(
             context,
@@ -404,17 +409,23 @@ object DatabaseRestoreRecovery {
     }
 
     /**
-     * [Stage.ORIGINAL_SELECTED] means the original database won. Repeating this
-     * finishes the main file, WAL, SHM, original preferences, and cleanup
-     * without applying the imported preference snapshot.
+     * [Stage.ORIGINAL_SELECTED] means the current [.rollback] database won.
+     * Repeating this finishes that file, its WAL and SHM, the original
+     * preferences, and cleanup. A preserved rollback is returned to the
+     * rollback slot only after the journal is gone, so a restart cannot
+     * install that older file as the current original.
      */
     private fun finishOriginalSelection(context: Context, live: File, journal: Journal) {
         signalOriginalRestore(OriginalRestoreStep.BEFORE_MAIN)
-        prepareEmptyRollbackFromPreserved(live, journal)
         val rollback = rollbackFile(live)
         if (rollback.exists()) {
+            if (!isSqliteOk(rollback)) {
+                throw IncompleteRestoreException("Original rollback database is not valid")
+            }
             discardDatabase(live)
             moveBundlePart(rollback, live)
+        } else if (!looksLikeSqlite(live)) {
+            throw IncompleteRestoreException("Original rollback database is not valid")
         }
         signalOriginalRestore(OriginalRestoreStep.AFTER_MAIN)
         moveBundlePart(File(rollback.path + "-wal"), File(live.path + "-wal"))
@@ -423,23 +434,14 @@ object DatabaseRestoreRecovery {
         signalOriginalRestore(OriginalRestoreStep.AFTER_SHM)
         moveBundlePart(File(rollback.path + "-journal"), File(live.path + "-journal"))
         signalOriginalRestore(OriginalRestoreStep.AFTER_DATABASE)
+        if (!isSqliteOk(live)) {
+            throw IncompleteRestoreException("Restored original database is not valid")
+        }
         applyOriginalPreferences(context, live)
         signalOriginalRestore(OriginalRestoreStep.AFTER_PREFERENCES)
         discardDatabase(incomingFile(live))
-        restorePreservedRollback(live, journal)
         deleteSnapshots(live)
         journalFile(live).delete()
-    }
-
-    /**
-     * Recombine a preserved rollback onto an empty rollback path only while the
-     * live file is still unusable. A resume after the original main file has
-     * already moved must not put that older bundle back over the original.
-     */
-    private fun prepareEmptyRollbackFromPreserved(live: File, journal: Journal) {
-        val rollback = rollbackFile(live)
-        if (rollback.exists() || hasSidecar(rollback) || !journal.preservedRollback) return
-        if (isSqliteOk(live)) return
         restorePreservedRollback(live, journal)
     }
 
@@ -581,14 +583,48 @@ object DatabaseRestoreRecovery {
         }
     }
 
+    /**
+     * Checks a copy so the scan cannot rewrite the WAL or SHM that recovery
+     * still has to move.
+     */
     private fun isSqliteOk(file: File): Boolean {
         if (!looksLikeSqlite(file)) return false
         integrityCheckCount += 1
+        val scratchDir = File(file.parentFile, file.name + ".integrity-check")
+        scratchDir.deleteRecursively()
+        if (!scratchDir.mkdirs()) return false
         return try {
-            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            val scratch = File(scratchDir, file.name)
+            file.copyTo(scratch)
+            if (usesWriteAheadLog(file)) {
+                val wal = File(file.path + "-wal")
+                if (wal.isFile) wal.copyTo(File(scratch.path + "-wal"))
+            }
+            SQLiteDatabase.openDatabase(scratch.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
                 db.rawQuery("PRAGMA integrity_check", null).use { cursor ->
                     cursor.moveToFirst() && cursor.getString(0) == "ok" && !cursor.moveToNext()
                 }
+            }
+        } catch (_: Exception) {
+            false
+        } finally {
+            scratchDir.deleteRecursively()
+        }
+    }
+
+    /** Byte 18 of the SQLite header is 2 when the file uses a WAL. */
+    private fun usesWriteAheadLog(file: File): Boolean {
+        if (file.length() < WAL_FORMAT_OFFSET + 1) return false
+        return try {
+            file.inputStream().use { input ->
+                val header = ByteArray(WAL_FORMAT_OFFSET + 1)
+                var offset = 0
+                while (offset < header.size) {
+                    val read = input.read(header, offset, header.size - offset)
+                    if (read < 0) return false
+                    offset += read
+                }
+                header[WAL_FORMAT_OFFSET] == WAL_FORMAT_VERSION
             }
         } catch (_: Exception) {
             false
@@ -728,6 +764,8 @@ object DatabaseRestoreRecovery {
         0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66,
         0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
     )
+    private const val WAL_FORMAT_OFFSET = 18
+    private const val WAL_FORMAT_VERSION = 2.toByte()
 
     private const val KEY_ONBOARDING_STARTED = "onboarding_started"
     private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"

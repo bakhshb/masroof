@@ -408,11 +408,23 @@ class DatabaseRestoreRecoveryTest {
     }
 
     @Test
-    fun committedInvalidLive_withOnlyPreservedRollback_restoresThatBundleAndOriginalPreferences() {
+    fun committedInvalidLive_missingRollback_doesNotPromotePreservedRollback() {
+        assertPreservedRollbackIsNotTheCurrentOriginal(expectedRollback = null)
+    }
+
+    @Test
+    fun committedInvalidLive_corruptRollback_doesNotPromotePreservedRollback() {
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(rollback, "corrupt")
+        val truncated = rollback.readBytes().copyOf(100)
+        assertPreservedRollbackIsNotTheCurrentOriginal(truncated)
+    }
+
+    @Test
+    fun committedFallback_invalidAfterMove_keepsEvidenceAndImportedPreferences() {
         live.writeText("imported-broken")
-        val preserved = File(live.path + ".rollback.preserved")
-        writeDatabase(preserved, "original")
-        File(preserved.path + "-wal").writeText("wal-bytes")
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(rollback, "original")
         DatabaseRestoreRecovery.writeSnapshots(
             live,
             preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 6),
@@ -422,20 +434,41 @@ class DatabaseRestoreRecoveryTest {
         DatabaseRestoreRecovery.writeJournal(
             live,
             DatabaseRestoreRecovery.Stage.COMMITTED,
-            preservedRollback = true,
+            preservedRollback = false,
         )
+        DatabaseRestoreRecovery.afterOriginalRestoreStep = { step ->
+            if (step == DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_DATABASE) {
+                live.writeText("torn-after-move")
+            }
+        }
 
-        DatabaseRestoreRecovery.cleanupCommitted(context, live)
+        try {
+            DatabaseRestoreRecovery.cleanupCommitted(context, live)
+            org.junit.Assert.fail("expected the moved database to fail verification")
+        } catch (error: DatabaseRestoreRecovery.IncompleteRestoreException) {
+            assertTrue(error.message.orEmpty().contains("not valid"))
+        }
+        DatabaseRestoreRecovery.afterOriginalRestoreStep = null
 
-        assertEquals("wal-bytes", File(live.path + "-wal").readText())
-        File(live.path + "-wal").delete()
-        assertEquals("original", readMarker(live))
-        assertFalse(onboarding().getBoolean("onboarding_completed", true))
-        assertEquals(6, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
-        assertFalse(journal().exists())
-        assertFalse(preserved.exists())
-        assertFalse(File(live.path + ".prefs-original").exists())
-        assertFalse(File(live.path + ".prefs-incoming").exists())
+        assertEquals("torn-after-move", live.readText())
+        assertTrue(journal().readText().startsWith("stage=ORIGINAL_SELECTED"))
+        assertTrue(File(live.path + ".prefs-original").exists())
+        assertTrue(File(live.path + ".prefs-incoming").exists())
+        assertTrue(onboarding().getBoolean("onboarding_completed", false))
+        assertEquals(1, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
+
+        try {
+            DatabaseRestoreRecovery.recover(context)
+            org.junit.Assert.fail("expected restart to stay fail closed")
+        } catch (error: DatabaseRestoreRecovery.IncompleteRestoreException) {
+            assertTrue(error.message.orEmpty().contains("not valid"))
+        }
+
+        assertEquals("torn-after-move", live.readText())
+        assertTrue(journal().exists())
+        assertTrue(File(live.path + ".prefs-original").exists())
+        assertTrue(onboarding().getBoolean("onboarding_completed", false))
+        assertEquals(1, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
     }
 
     @Test
@@ -597,6 +630,54 @@ class DatabaseRestoreRecoveryTest {
 
         assertEquals("bad-live", live.readText())
         assertFalse(File(live.path + ".rollback").exists())
+    }
+
+    private fun assertPreservedRollbackIsNotTheCurrentOriginal(expectedRollback: ByteArray?) {
+        live.writeText("imported-broken")
+        val rollback = File(live.path + ".rollback")
+        if (expectedRollback == null) {
+            rollback.delete()
+        } else {
+            rollback.writeBytes(expectedRollback)
+        }
+        val preserved = File(live.path + ".rollback.preserved")
+        writeDatabase(preserved, "older")
+        val preservedWal = File(preserved.path + "-wal")
+        preservedWal.writeText("older-wal")
+        DatabaseRestoreRecovery.writeSnapshots(
+            live,
+            preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 6),
+            preferenceSnapshot(onboardingCompleted = true, reparsedSchemaVersion = null),
+        )
+        applyMixedPreferences(onboardingCompleted = true, reparsedSchemaVersion = 1)
+        DatabaseRestoreRecovery.writeJournal(
+            live,
+            DatabaseRestoreRecovery.Stage.COMMITTED,
+            preservedRollback = true,
+        )
+        val journalText = journal().readText()
+
+        try {
+            DatabaseRestoreRecovery.recover(context)
+            org.junit.Assert.fail("expected fail closed")
+        } catch (error: DatabaseRestoreRecovery.IncompleteRestoreException) {
+            assertTrue(error.message.orEmpty().contains("no valid database"))
+        }
+
+        assertEquals("imported-broken", live.readText())
+        if (expectedRollback == null) {
+            assertFalse(rollback.exists())
+        } else {
+            assertTrue(expectedRollback.contentEquals(rollback.readBytes()))
+        }
+        assertEquals("older", readMarker(preserved))
+        assertEquals("older-wal", preservedWal.readText())
+        assertEquals(journalText, journal().readText())
+        assertTrue(journalText.startsWith("stage=COMMITTED"))
+        assertTrue(File(live.path + ".prefs-original").exists())
+        assertTrue(File(live.path + ".prefs-incoming").exists())
+        assertTrue(onboarding().getBoolean("onboarding_completed", false))
+        assertEquals(1, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
     }
 
     private fun resumeCommittedFallback(stopAfter: DatabaseRestoreRecovery.OriginalRestoreStep?) {
