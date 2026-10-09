@@ -72,11 +72,17 @@ class DashboardFixtureCharacterizationTest {
             assertTrue(loans.any { it.loanType == LoanType.PERSONAL && it.remainingBalance != null })
             assertTrue(loans.any { it.loanType == LoanType.AUTO && it.latestInstallmentAmount != null })
             assertTrue(projections.any { it.commitmentsOverview.hasContent })
+            // A NETFLIX purchase the day after a quoted rate is inside the 30-day window.
+            // Later SPOTIFY purchases are months after the last quoted rate and stay outside it.
+            val transactions = projections.flatMap { it.transactions }
             assertTrue(
-                projections.flatMap { it.transactions }.any {
-                    it.merchant == "SPOTIFY" && it.exchangeRateSource == ExchangeRateSource.HISTORICAL_MERCHANT
+                transactions.any {
+                    it.merchant == "NETFLIX" && it.exchangeRateSource == ExchangeRateSource.HISTORICAL_MERCHANT
                 },
             )
+            val spotify = transactions.filter { it.merchant == "SPOTIFY" }
+            assertTrue(spotify.isNotEmpty())
+            assertTrue(spotify.none { it.exchangeRateSource == ExchangeRateSource.HISTORICAL_MERCHANT })
             assertTrue(
                 projections.any { projection ->
                     projection.transactions.any { it.amount.currency == Currency.USD } &&
