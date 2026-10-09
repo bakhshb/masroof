@@ -68,10 +68,29 @@ class TransactionReconciliationService(
     /**
      * Full-history reconciliation for explicit maintenance and recovery.
      * Interactive and incremental callers should use [reconcileAffectedRawSmsIds].
+     *
+     * This pass heals a uniquely proven pair. It does not unlink an already posted
+     * ambiguous self-transfer; that legacy cleanup is [repairLegacyTransfersDetailed].
      */
     suspend fun reconcileStoredEventsDetailed(): ReconciliationReport {
         val records = loadRecords()
         return reconcileRecordsDetailed(records)
+    }
+
+    /**
+     * One-time upgrade entrypoint. Unlinks irreducibly ambiguous posted single-leg
+     * self-transfers, then runs a full reconcile so unique external or self-transfer
+     * legs can heal. Ordinary scoped and full reconciliation do not call this.
+     */
+    suspend fun repairLegacyTransfersDetailed(): ReconciliationReport {
+        val records = loadRecords()
+        val release = releaseAmbiguousPostedSelfTransfers(records)
+        val reconciled = reconcileRecordsDetailed(records)
+        return reconciled.copy(
+            summary = reconciled.summary.copy(
+                failed = reconciled.summary.failed + release.failedCount,
+            ),
+        )
     }
 
     /**
@@ -366,7 +385,7 @@ class TransactionReconciliationService(
         val unresolvedTransfers = mutableListOf<TransferMatchCandidate>()
         val reviewCandidates = mutableListOf<ReconciliationReviewCandidate>()
         val settledRawSmsIds = linkedSetOf<String>()
-        val releasedAmbiguousRawSmsIds = releaseAmbiguousPostedSelfTransfers(records)
+        val postedSingleLegCounterparts = mutableListOf<TransferMatchCandidate>()
 
         for (record in records) {
             val event = record.event
@@ -402,6 +421,11 @@ class TransactionReconciliationService(
                 } else {
                     alreadyLinked++
                     settledRawSmsIds += event.rawSmsId
+                    if (linkedBefore.type == FinancialTransactionType.SELF_TRANSFER &&
+                        linkedBefore.linkedParsedEventIds.size == 1
+                    ) {
+                        transferCandidateFor(record)?.let { postedSingleLegCounterparts += it }
+                    }
                     continue
                 }
             }
@@ -623,7 +647,7 @@ class TransactionReconciliationService(
                     candidate = candidate,
                     pendingCounterparts = stillOpen.filter {
                         it.event.rawSmsId != candidate.event.rawSmsId
-                    },
+                    } + postedSingleLegCounterparts,
                     fallbackZone = zoneId,
                 )
             ) {
@@ -673,18 +697,7 @@ class TransactionReconciliationService(
         alreadyLinked += healedLoans.alreadyLinked
         failed += healedLoans.failed
         settledRawSmsIds += healedLoans.settledRawSmsIds
-
-        for (rawSmsId in releasedAmbiguousRawSmsIds) {
-            if (rawSmsId in settledRawSmsIds) continue
-            if (financialTransactionRepository.isRawSmsLinked(rawSmsId)) continue
-            if (reviewCandidates.any { it.rawSmsId == rawSmsId }) continue
-            pendingMatch++
-            reviewCandidates += ReconciliationReviewCandidate(
-                rawSmsId = rawSmsId,
-                kind = ReviewKind.PENDING_MATCH,
-                reasons = listOf("transfer_pending_match"),
-            )
-        }
+        reviewCandidates.removeAll { it.rawSmsId in settledRawSmsIds }
 
         val summary = ReconciliationSummary(
             assembledSingle = assembledSingle,
@@ -1053,47 +1066,89 @@ class TransactionReconciliationService(
             is FinancialTransactionSaveResult.Conflict -> PersistOutcome.Failed
         }
 
+    private data class LegacyReleaseResult(
+        val releasedRawSmsIds: Set<String> = emptySet(),
+        val skippedRawSmsIds: Set<String> = emptySet(),
+        val failedCount: Int = 0,
+    )
+
     /**
      * Pre-M1 assemblers posted each owned-owned transfer SMS as its own
-     * self-transfer. After upgrade those rows must not stay on the ledger:
-     * uniquely pairable legs are left for [upgradeStaleExternalPairs], and
-     * irreducibly ambiguous legs are unlinked so they re-enter PENDING_MATCH.
+     * self-transfer. Upgrade-only: uniquely pairable legs stay for
+     * [upgradeStaleExternalPairs], and irreducibly ambiguous exclusive legs are
+     * unlinked so the following reconcile can put them in PENDING_MATCH.
      *
-     * Explicit user resolutions are left in place. Two-evidence self-transfers
-     * and lone legs with no intra-bank counterpart are not touched.
+     * A false delete is rechecked. A protected, shared, or already-settled row is
+     * a skip. A row that still needs release counts as a failure. Explicit user
+     * resolutions, two-evidence self-transfers, and lone legs are not touched.
      */
     private suspend fun releaseAmbiguousPostedSelfTransfers(
         records: List<ParsedEventRecord>,
-    ): Set<String> {
+    ): LegacyReleaseResult {
         val postedSingleLeg = mutableListOf<ParsedEventRecord>()
+        val skipped = linkedSetOf<String>()
         for (record in records) {
             val event = record.event
             if (!event.messageFamily.isTransferFamily()) continue
             val linked = financialTransactionRepository.findByRawSmsId(event.rawSmsId) ?: continue
             if (linked.type != FinancialTransactionType.SELF_TRANSFER) continue
             if (linked.linkedParsedEventIds.size != 1) continue
-            if (shouldProtectFromAutomaticUnlink(event.rawSmsId)) continue
+            if (shouldProtectFromAutomaticUnlink(event.rawSmsId)) {
+                skipped += event.rawSmsId
+                continue
+            }
             postedSingleLeg += record
         }
-        if (postedSingleLeg.isEmpty()) return emptySet()
+        if (postedSingleLeg.isEmpty()) {
+            return LegacyReleaseResult(skippedRawSmsIds = skipped)
+        }
 
         val candidates = records.mapNotNull { transferCandidateFor(it) }
-        if (candidates.isEmpty()) return emptySet()
+        if (candidates.isEmpty()) return LegacyReleaseResult(skippedRawSmsIds = skipped)
         val uniquelyPairedEventIds = TransactionMatcher.findMutuallyUniquePairs(candidates)
             .flatMap { pair -> listOf(pair.outgoing.event.id, pair.incoming.event.id) }
             .toSet()
 
         val released = linkedSetOf<String>()
+        var failed = 0
         for (record in postedSingleLeg) {
             val event = record.event
             if (event.id in uniquelyPairedEventIds) continue
             val candidate = candidates.firstOrNull { it.event.id == event.id } ?: continue
             if (!TransactionMatcher.hasPendingIntraBankCounterpart(candidate, candidates)) continue
-            if (financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)) {
+            val deleted = try {
+                financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                failed++
+                continue
+            }
+            if (deleted) {
                 released += event.rawSmsId
+            } else if (ambiguousReleaseStillRequired(event.rawSmsId)) {
+                failed++
+            } else {
+                skipped += event.rawSmsId
             }
         }
-        return released
+        return LegacyReleaseResult(
+            releasedRawSmsIds = released,
+            skippedRawSmsIds = skipped,
+            failedCount = failed,
+        )
+    }
+
+    /**
+     * True when an exclusive single-leg self-transfer is still posted after a
+     * delete that returned false. Shared links and rows that already moved are skips.
+     */
+    private suspend fun ambiguousReleaseStillRequired(rawSmsId: String): Boolean {
+        if (shouldProtectFromAutomaticUnlink(rawSmsId)) return false
+        val linked = financialTransactionRepository.findByRawSmsId(rawSmsId) ?: return false
+        if (linked.type != FinancialTransactionType.SELF_TRANSFER) return false
+        if (linked.linkedParsedEventIds.size != 1) return false
+        return financialTransactionRepository.listRawSmsIds(linked.id).size == 1
     }
 
     private suspend fun shouldProtectFromAutomaticUnlink(rawSmsId: String): Boolean {

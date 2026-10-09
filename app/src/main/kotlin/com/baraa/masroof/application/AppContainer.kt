@@ -82,7 +82,6 @@ import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
@@ -687,17 +686,9 @@ class AppContainer(
             ),
             appLogService = appLogService,
             repairStoredTransfers = {
-                val hasPostedSingleLegSelfTransfer =
-                    financialTransactionRepository.listByTypes(
-                        listOf(FinancialTransactionType.SELF_TRANSFER),
-                    ).any { it.linkedParsedEventIds.size == 1 }
-                if (!hasPostedSingleLegSelfTransfer) {
-                    TransferIntegrityRepairResult()
-                } else {
-                    val report = transactionReconciliationService.reconcileStoredEventsDetailed()
-                    reviewQueueUpdater.applyReport(report)
-                    TransferIntegrityRepairResult(failedCount = report.summary.failed)
-                }
+                val report = transactionReconciliationService.repairLegacyTransfersDetailed()
+                reviewQueueUpdater.applyReport(report)
+                TransferIntegrityRepairResult(failedCount = report.summary.failed)
             },
             completionSignal = maintenanceCompletionSignal,
         )

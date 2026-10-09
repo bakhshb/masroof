@@ -1,6 +1,7 @@
 package com.baraa.masroof.application.maintenance
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.logging.AppLogService
 import kotlinx.coroutines.CoroutineStart
@@ -84,6 +85,19 @@ class TransferIntegrityRepairCoordinatorTest {
     }
 
     @Test
+    fun runIfNeeded_commitFailureLeavesMarkerUnset() = runBlocking<Unit> {
+        val coordinator = TransferIntegrityRepairCoordinator(
+            prefs = CommitFailsPreferences(prefs()),
+            appLogService = AppLogService(context),
+            repairStoredTransfers = { TransferIntegrityRepairResult() },
+        )
+
+        assertEquals(BackfillOutcome.INCOMPLETE, coordinator.runIfNeeded())
+        assertEquals(MaintenanceRequirement.BLOCKING, coordinator.pendingRequirement())
+        assertEquals(0, prefs().getInt(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, 0))
+    }
+
+    @Test
     fun runIfNeeded_signalsCompletionWhenItRepairs() = runBlocking<Unit> {
         val signal = MaintenanceCompletionSignal()
         val coordinator = TransferIntegrityRepairCoordinator(
@@ -108,4 +122,21 @@ class TransferIntegrityRepairCoordinatorTest {
 
     private fun prefs() =
         context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+
+    private class CommitFailsPreferences(
+        private val delegate: SharedPreferences,
+    ) : SharedPreferences by delegate {
+        override fun edit(): SharedPreferences.Editor = CommitFailsEditor(delegate.edit())
+    }
+
+    private class CommitFailsEditor(
+        private val delegate: SharedPreferences.Editor,
+    ) : SharedPreferences.Editor by delegate {
+        override fun putInt(key: String, value: Int): SharedPreferences.Editor {
+            delegate.putInt(key, value)
+            return this
+        }
+
+        override fun commit(): Boolean = false
+    }
 }

@@ -70,7 +70,13 @@ class TransferIntegrityRepairCoordinator(
             return@withLock BackfillOutcome.INCOMPLETE
         }
 
-        recordRepairVersion(CURRENT_VERSION)
+        if (!recordRepairVersion(CURRENT_VERSION)) {
+            appLogService.warn(
+                AppLogCategories.TRANSACTION,
+                "Transfer integrity repair could not record completion; will retry",
+            )
+            return@withLock BackfillOutcome.INCOMPLETE
+        }
         appLogService.info(
             AppLogCategories.TRANSACTION,
             "Transfer integrity repair finished: v$CURRENT_VERSION",
@@ -78,11 +84,10 @@ class TransferIntegrityRepairCoordinator(
         BackfillOutcome.COMPLETED
     }
 
-    private fun recordRepairVersion(version: Int) {
+    private fun recordRepairVersion(version: Int): Boolean =
         prefs.edit()
             .putInt(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, version)
             .commit()
-    }
 
     private fun lastRepairVersion(): Int =
         prefs.getInt(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, 0)

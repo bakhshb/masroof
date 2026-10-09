@@ -678,14 +678,14 @@ class TransactionReconciliationServiceTest {
         )
         val report = reconciliation.reconcileStoredEventsDetailed()
 
-        assertTrue(
-            "Ambiguous opposite legs must not stay as three self-transfers or join the wrong pair",
-            ftRepo.listAll().isEmpty(),
-        )
-        assertEquals(3, parsedRepo.listAll().size)
-        assertNull(ftRepo.findByRawSmsId("sms-amb-self-out"))
+        val original = ftRepo.findByRawSmsId("sms-amb-self-out")
+        assertEquals(singleLegId, original?.id)
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, original?.type)
+        assertEquals(setOf("sms-amb-self-out"), ftRepo.listRawSmsIds(singleLegId).toSet())
+        assertNull(ftRepo.findByRawSmsId("sms-amb-self-in-a"))
+        assertNull(ftRepo.findByRawSmsId("sms-amb-self-in-b"))
         assertEquals(
-            setOf("sms-amb-self-out", "sms-amb-self-in-a", "sms-amb-self-in-b"),
+            setOf("sms-amb-self-in-a", "sms-amb-self-in-b"),
             report.reviewCandidates.map { it.rawSmsId }.toSet(),
         )
         assertTrue(report.reviewCandidates.all { it.kind == ReviewKind.PENDING_MATCH })
