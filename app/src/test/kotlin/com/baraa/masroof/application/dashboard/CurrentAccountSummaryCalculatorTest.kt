@@ -648,7 +648,7 @@ class CurrentAccountSummaryCalculatorTest {
         assertEquals(SignedMoneyAmount.of(Money.of("100.00", Currency.SAR)), adjacent.cashPosition().remaining)
         assertEquals(
             SignedMoneyAmount.zero(Currency.SAR),
-            current.cashPosition().remaining + adjacent.cashPosition().remaining,
+            current.cashPosition().remaining.plus(adjacent.cashPosition().remaining),
         )
         assertEquals(
             Money.of("100.00", Currency.SAR),
