@@ -176,7 +176,7 @@ class DatabaseBackupService(
                     preservedRollback,
                 )
                 afterRestoreStage(DatabaseRestoreRecovery.Stage.COMMITTED)
-                DatabaseRestoreRecovery.cleanupCommitted(liveDb)
+                DatabaseRestoreRecovery.cleanupCommitted(appContext, liveDb)
                 restartProcess()
                 appLogService?.info(AppLogCategories.BACKUP, "Database import succeeded; restart required")
                 BackupImportOutcome.SuccessNeedsRestart

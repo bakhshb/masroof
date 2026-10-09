@@ -408,6 +408,46 @@ class DatabaseRestoreRecoveryTest {
     }
 
     @Test
+    fun rollbackWithoutJournal_crashAfterMainMoves_keepsOriginalPreferences() {
+        live.writeText("imported-broken")
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(rollback, "original")
+        File(rollback.path + "-wal").writeText("wal-bytes")
+        File(rollback.path + "-shm").writeText("shm-bytes")
+        DatabaseRestoreRecovery.writeSnapshots(
+            live,
+            preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 6),
+            preferenceSnapshot(onboardingCompleted = true, reparsedSchemaVersion = null),
+        )
+        applyMixedPreferences(onboardingCompleted = true, reparsedSchemaVersion = 1)
+        DatabaseRestoreRecovery.afterOriginalRestoreStep = { step ->
+            if (step == DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_MAIN) {
+                throw DatabaseRestoreRecovery.ProcessTerminated(DatabaseRestoreRecovery.Stage.ORIGINAL_SELECTED)
+            }
+        }
+
+        try {
+            DatabaseRestoreRecovery.recover(context)
+            org.junit.Assert.fail("expected interruption after the original main file moved")
+        } catch (error: DatabaseRestoreRecovery.ProcessTerminated) {
+            assertTrue(journal().readText().startsWith("stage=ORIGINAL_SELECTED"))
+        }
+        DatabaseRestoreRecovery.afterOriginalRestoreStep = null
+
+        DatabaseRestoreRecovery.recover(context)
+
+        assertEquals("wal-bytes", File(live.path + "-wal").readText())
+        assertEquals("shm-bytes", File(live.path + "-shm").readText())
+        File(live.path + "-wal").delete()
+        File(live.path + "-shm").delete()
+        assertEquals("original", readMarker(live))
+        assertFalse(onboarding().getBoolean("onboarding_completed", true))
+        assertEquals(6, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
+        assertFalse(journal().exists())
+        assertFalse(rollback.exists())
+    }
+
+    @Test
     fun originalRollback_eachInterruptionFinishesOriginalDatabaseAndPreferences() {
         listOf(
             DatabaseRestoreRecovery.OriginalRestoreStep.BEFORE_MAIN,

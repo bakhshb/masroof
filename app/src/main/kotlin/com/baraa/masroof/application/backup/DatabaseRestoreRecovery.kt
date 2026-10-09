@@ -88,14 +88,14 @@ object DatabaseRestoreRecovery {
         val live = liveDatabase(context)
         live.parentFile?.mkdirs()
         when (val read = readJournalState(live)) {
-            JournalRead.Absent -> recoverWithoutJournal(live)
+            JournalRead.Absent -> recoverWithoutJournal(context, live)
             JournalRead.Corrupt -> recoverCorruptJournal(context, live)
             is JournalRead.Ready -> when (read.journal.stage) {
                 Stage.PREPARED -> recoverPrepared(context, live, read.journal)
                 Stage.OLD_PARKED -> recoverParkedOriginal(context, live, read.journal)
                 Stage.NEW_INSTALLED -> recoverNewInstalled(context, live, read.journal)
                 Stage.ORIGINAL_SELECTED -> finishOriginalSelection(context, live, read.journal)
-                Stage.COMMITTED -> cleanupCommitted(live)
+                Stage.COMMITTED -> cleanupCommitted(context, live)
             }
         }
         journalTempFile(live).delete()
@@ -200,22 +200,23 @@ object DatabaseRestoreRecovery {
                 Stage.NEW_INSTALLED,
                 -> restoreOriginalFiles(context, live, read.journal)
                 Stage.ORIGINAL_SELECTED -> finishOriginalSelection(context, live, read.journal)
-                Stage.COMMITTED -> cleanupCommitted(live)
+                Stage.COMMITTED -> cleanupCommitted(context, live)
             }
         }
     }
 
-    internal fun cleanupCommitted(live: File) {
+    internal fun cleanupCommitted(context: Context, live: File) {
         if (!isSqliteOk(live)) {
-            val rollback = rollbackFile(live)
-            if (isSqliteOk(rollback)) {
-                discardDatabase(live)
-                restoreRollbackOverLive(live)
-            } else {
-                throw IncompleteRestoreException(
-                    "Committed restore has no valid database",
-                )
+            if (!rollbackFile(live).exists() && !hasSidecar(rollbackFile(live))) {
+                reclaimOrphanedPreservedRollback(live)
             }
+            if (rollbackFile(live).exists() || hasSidecar(rollbackFile(live))) {
+                selectOriginalDatabase(context, live)
+                return
+            }
+            throw IncompleteRestoreException(
+                "Committed restore has no valid database",
+            )
         }
         discardDatabase(rollbackFile(live))
         discardDatabase(preservedRollbackFile(live))
@@ -235,7 +236,7 @@ object DatabaseRestoreRecovery {
         journalTempFile(live).delete()
     }
 
-    private fun recoverWithoutJournal(live: File) {
+    private fun recoverWithoutJournal(context: Context, live: File) {
         if (!hasRestoreEvidence(live)) {
             if (!live.exists() || looksLikeSqlite(live)) return
             throw IncompleteRestoreException(
@@ -246,24 +247,26 @@ object DatabaseRestoreRecovery {
             reclaimOrphanedPreservedRollback(live)
             return
         }
-        val rollback = rollbackFile(live)
-        val preserved = preservedRollbackFile(live)
-        if (!live.exists() && !rollback.exists() && !preserved.exists() && !hasSidecar(preserved)) {
-            return
+        if (!rollbackFile(live).exists() && !hasSidecar(rollbackFile(live))) {
+            reclaimOrphanedPreservedRollback(live)
         }
-        if (isSqliteOk(rollback)) {
-            discardDatabase(live)
-            restoreRollbackOverLive(live)
-            return
-        }
-        reclaimOrphanedPreservedRollback(live)
-        if (isSqliteOk(rollbackFile(live))) {
-            discardDatabase(live)
-            restoreRollbackOverLive(live)
+        if (rollbackFile(live).exists() || hasSidecar(rollbackFile(live))) {
+            selectOriginalDatabase(context, live)
             return
         }
         throw IncompleteRestoreException(
             "A database file exists but neither copy is a valid SQLite database",
+        )
+    }
+
+    private fun selectOriginalDatabase(context: Context, live: File) {
+        val preserved = preservedRollbackFile(live)
+        val preservedRollback = preserved.exists() || hasSidecar(preserved)
+        writeJournal(live, Stage.ORIGINAL_SELECTED, preservedRollback)
+        finishOriginalSelection(
+            context,
+            live,
+            Journal(stage = Stage.ORIGINAL_SELECTED, preservedRollback = preservedRollback),
         )
     }
 
@@ -349,7 +352,7 @@ object DatabaseRestoreRecovery {
         if (isSqliteOk(live) && incomingPrefs != null) {
             applyPreferences(context, incomingPrefs)
             writeJournal(live, Stage.COMMITTED, journal.preservedRollback)
-            cleanupCommitted(live)
+            cleanupCommitted(context, live)
             return
         }
         if (isSqliteOk(rollbackFile(live))) {
@@ -435,14 +438,6 @@ object DatabaseRestoreRecovery {
         SIDECARS.forEach { suffix ->
             moveBundlePart(File(preserved.path + suffix), File(rollback.path + suffix))
         }
-    }
-
-    private fun restoreRollbackOverLive(live: File) {
-        val rollback = rollbackFile(live)
-        if (rollback.exists() && !rollback.renameTo(live)) {
-            error("Cannot restore the original database")
-        }
-        moveSidecars(rollback, live)
     }
 
     private fun moveBundlePart(from: File, to: File) {
