@@ -187,8 +187,10 @@ object DatabaseRestoreRecovery {
     }
 
     /**
-     * In-process import failure. A committed import is only cleaned up.
-     * Every earlier stage puts the original database and preferences back.
+     * In-process import failure. A committed import whose live database is
+     * valid is only cleaned up. A committed import whose live database is not
+     * valid selects the original database and its preferences. Every earlier
+     * stage puts the original database and preferences back.
      */
     internal fun failImport(context: Context, live: File) {
         when (val read = readJournalState(live)) {
@@ -206,27 +208,35 @@ object DatabaseRestoreRecovery {
     }
 
     internal fun cleanupCommitted(context: Context, live: File) {
-        // A committed journal whose live file is unusable must not keep the
-        // imported preferences. ORIGINAL_SELECTED restores the original database
-        // and its preference snapshot before cleanup deletes either one.
-        if (!isSqliteOk(live)) {
-            if (!rollbackFile(live).exists() && !hasSidecar(rollbackFile(live))) {
-                reclaimOrphanedPreservedRollback(live)
-            }
-            if (rollbackFile(live).exists() || hasSidecar(rollbackFile(live))) {
-                selectOriginalDatabase(context, live)
-                return
-            }
+        if (isSqliteOk(live)) {
+            discardDatabase(rollbackFile(live))
+            discardDatabase(preservedRollbackFile(live))
+            discardDatabase(incomingFile(live))
+            deleteSnapshots(live)
+            journalFile(live).delete()
+            return
+        }
+        // Imported preferences are already active. Persist ORIGINAL_SELECTED
+        // before renaming .rollback, then finishOriginalSelection restores the
+        // original database and applies its snapshot before either copy is deleted.
+        val recorded = when (val read = readJournalState(live)) {
+            is JournalRead.Ready -> read.journal
+            else -> Journal(stage = Stage.COMMITTED, preservedRollback = false)
+        }
+        val preserved = recorded.preservedRollback ||
+            preservedRollbackFile(live).exists() ||
+            hasSidecar(preservedRollbackFile(live))
+        val rollback = rollbackFile(live)
+        if (!rollback.exists() && !hasSidecar(rollback) && !preserved) {
             throw IncompleteRestoreException(
                 "Committed restore has no valid database",
             )
         }
-        discardDatabase(rollbackFile(live))
-        discardDatabase(preservedRollbackFile(live))
-        discardDatabase(incomingFile(live))
-        originalPrefsFile(live).delete()
-        incomingPrefsFile(live).delete()
-        journalFile(live).delete()
+        restoreOriginalFiles(
+            context,
+            live,
+            recorded.copy(preservedRollback = preserved),
+        )
     }
 
     internal fun deleteRestoreArtifacts(live: File) {
@@ -400,6 +410,7 @@ object DatabaseRestoreRecovery {
      */
     private fun finishOriginalSelection(context: Context, live: File, journal: Journal) {
         signalOriginalRestore(OriginalRestoreStep.BEFORE_MAIN)
+        prepareEmptyRollbackFromPreserved(live, journal)
         val rollback = rollbackFile(live)
         if (rollback.exists()) {
             discardDatabase(live)
@@ -412,12 +423,40 @@ object DatabaseRestoreRecovery {
         signalOriginalRestore(OriginalRestoreStep.AFTER_SHM)
         moveBundlePart(File(rollback.path + "-journal"), File(live.path + "-journal"))
         signalOriginalRestore(OriginalRestoreStep.AFTER_DATABASE)
-        readPreferences(originalPrefsFile(live))?.let { applyPreferences(context, it) }
+        applyOriginalPreferences(context, live)
         signalOriginalRestore(OriginalRestoreStep.AFTER_PREFERENCES)
         discardDatabase(incomingFile(live))
         restorePreservedRollback(live, journal)
         deleteSnapshots(live)
         journalFile(live).delete()
+    }
+
+    /**
+     * Recombine a preserved rollback onto an empty rollback path only while the
+     * live file is still unusable. A resume after the original main file has
+     * already moved must not put that older bundle back over the original.
+     */
+    private fun prepareEmptyRollbackFromPreserved(live: File, journal: Journal) {
+        val rollback = rollbackFile(live)
+        if (rollback.exists() || hasSidecar(rollback) || !journal.preservedRollback) return
+        if (isSqliteOk(live)) return
+        restorePreservedRollback(live, journal)
+    }
+
+    /**
+     * Snapshots are deleted only after this returns. A missing or unreadable
+     * original snapshot fails closed so imported preferences cannot remain
+     * paired with the original database.
+     */
+    private fun applyOriginalPreferences(context: Context, live: File) {
+        val original = originalPrefsFile(live)
+        val incoming = incomingPrefsFile(live)
+        if (!original.exists() && !incoming.exists()) return
+        val snapshot = readPreferences(original)
+            ?: throw IncompleteRestoreException(
+                "Original preference snapshot is required to pair with the original database",
+            )
+        applyPreferences(context, snapshot)
     }
 
     private fun signalOriginalRestore(step: OriginalRestoreStep) {

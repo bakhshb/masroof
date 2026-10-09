@@ -408,6 +408,66 @@ class DatabaseRestoreRecoveryTest {
     }
 
     @Test
+    fun committedInvalidLive_withOnlyPreservedRollback_restoresThatBundleAndOriginalPreferences() {
+        live.writeText("imported-broken")
+        val preserved = File(live.path + ".rollback.preserved")
+        writeDatabase(preserved, "original")
+        File(preserved.path + "-wal").writeText("wal-bytes")
+        DatabaseRestoreRecovery.writeSnapshots(
+            live,
+            preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 6),
+            preferenceSnapshot(onboardingCompleted = true, reparsedSchemaVersion = null),
+        )
+        applyMixedPreferences(onboardingCompleted = true, reparsedSchemaVersion = 1)
+        DatabaseRestoreRecovery.writeJournal(
+            live,
+            DatabaseRestoreRecovery.Stage.COMMITTED,
+            preservedRollback = true,
+        )
+
+        DatabaseRestoreRecovery.cleanupCommitted(context, live)
+
+        assertEquals("wal-bytes", File(live.path + "-wal").readText())
+        File(live.path + "-wal").delete()
+        assertEquals("original", readMarker(live))
+        assertFalse(onboarding().getBoolean("onboarding_completed", true))
+        assertEquals(6, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
+        assertFalse(journal().exists())
+        assertFalse(preserved.exists())
+        assertFalse(File(live.path + ".prefs-original").exists())
+        assertFalse(File(live.path + ".prefs-incoming").exists())
+    }
+
+    @Test
+    fun committedInvalidLive_keepsPreexistingRollbackBesideTheRestoredOriginal() {
+        live.writeText("imported-broken")
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(rollback, "original")
+        val preserved = File(live.path + ".rollback.preserved")
+        writeDatabase(preserved, "previous")
+        DatabaseRestoreRecovery.writeSnapshots(
+            live,
+            preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 6),
+            preferenceSnapshot(onboardingCompleted = true, reparsedSchemaVersion = null),
+        )
+        applyMixedPreferences(onboardingCompleted = true, reparsedSchemaVersion = 1)
+        DatabaseRestoreRecovery.writeJournal(
+            live,
+            DatabaseRestoreRecovery.Stage.COMMITTED,
+            preservedRollback = true,
+        )
+
+        DatabaseRestoreRecovery.cleanupCommitted(context, live)
+
+        assertEquals("original", readMarker(live))
+        assertEquals("previous", readMarker(rollback))
+        assertFalse(preserved.exists())
+        assertFalse(onboarding().getBoolean("onboarding_completed", true))
+        assertEquals(6, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
+        assertFalse(journal().exists())
+    }
+
+    @Test
     fun committedFallback_crashAfterOriginalMainMoves_finishesOriginalRestore() {
         resumeCommittedFallback(stopAfter = DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_MAIN)
     }
@@ -562,16 +622,23 @@ class DatabaseRestoreRecoveryTest {
                     throw DatabaseRestoreRecovery.ProcessTerminated(DatabaseRestoreRecovery.Stage.ORIGINAL_SELECTED)
                 }
             }
-            try {
-                DatabaseRestoreRecovery.recover(context)
-                org.junit.Assert.fail("expected interruption after $stopAfter")
-            } catch (error: DatabaseRestoreRecovery.ProcessTerminated) {
-                assertTrue(journal().readText().startsWith("stage=ORIGINAL_SELECTED"))
-            }
-            DatabaseRestoreRecovery.afterOriginalRestoreStep = null
         }
-
-        DatabaseRestoreRecovery.recover(context)
+        try {
+            DatabaseRestoreRecovery.cleanupCommitted(context, live)
+            if (stopAfter != null) {
+                org.junit.Assert.fail("expected interruption after $stopAfter")
+            }
+        } catch (error: DatabaseRestoreRecovery.ProcessTerminated) {
+            if (stopAfter == null) throw error
+            assertTrue(journal().readText().startsWith("stage=ORIGINAL_SELECTED"))
+            assertTrue(onboarding().getBoolean("onboarding_completed", false))
+            assertEquals(1, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
+            assertTrue(File(live.path + ".prefs-original").exists())
+        }
+        DatabaseRestoreRecovery.afterOriginalRestoreStep = null
+        if (stopAfter != null) {
+            DatabaseRestoreRecovery.recover(context)
+        }
 
         assertEquals("wal-bytes", File(live.path + "-wal").readText())
         assertEquals("shm-bytes", File(live.path + "-shm").readText())
