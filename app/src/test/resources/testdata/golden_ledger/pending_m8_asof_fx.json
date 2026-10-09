@@ -1,9 +1,8 @@
 {
   "id": "m8_asof_fx",
-  "status": "PENDING",
-  "ownerMilestone": "M8",
+  "status": "ACTIVE",
   "periodAnchor": "2026-10-05",
-  "description": "An October 1 USD purchase must not inherit the October 7 merchant exchange rate. Only the dated SMS rate converts, so salary-period spending is 40 SAR and one foreign row stays unconverted. Owner M8 activates this oracle.",
+  "description": "An October 1 USD purchase does not inherit the October 7 merchant exchange rate. Only the dated SMS rate converts, so salary-period spending is 40 SAR and one foreign row stays unconverted.",
   "ownedCards": [
     {"bank": "BANK_ALJAZIRA", "last4": "7271", "type": "CREDIT"}
   ],
@@ -75,12 +74,5 @@
     ],
     "spendingGross": "40.00",
     "excludedOtherCurrencyCount": 1
-  },
-  "knownDefect": {
-    "ownerMilestone": "M8",
-    "signals": {
-      "spendingGross": "80.00",
-      "excludedOtherCurrencyCount": "0"
-    }
   }
 }

@@ -138,6 +138,12 @@
     <string name="settings_app_hub_subtitle">%1$s • %2$s</string>
     <string name="settings_data_backup_section">البيانات والنسخ الاحتياطي</string>
     <string name="settings_data_backup_hub_subtitle">استيراد الرسائل، إعادة التحليل، والنسخ الاحتياطي</string>
+    <string name="settings_fx_rate_correction_title">تصحيح أسعار صرف التاجر القديمة</string>
+    <string name="settings_fx_rate_correction_none">لا توجد أسعار مخزّنة تختلف عن الدليل المؤرخ</string>
+    <string name="settings_fx_rate_correction_subtitle">يمكن تحديث %1$d • %2$d تحتاج متابعة يدوية</string>
+    <string name="settings_fx_rate_correction_confirm_title">تحديث أسعار الصرف المخزّنة؟</string>
+    <string name="settings_fx_rate_correction_confirm_body">يُستبدل سعر التاجر المخزّن بالسعر المؤرخ لـ %1$d عملية. العمليات التي لا يوجد لها سعر مؤرخ تبقى كما هي.</string>
+    <string name="settings_fx_rate_correction_confirm_action">تحديث</string>
     <string name="settings_registry_accounts_hint">اختر بنكًا لإدارة حساباته.</string>
     <string name="settings_registry_cards_hint">اختر بنكًا لإدارة بطاقاته.</string>
     <string name="settings_registry_loans_hint">اختر بنكًا لإدارة قروضه.</string>

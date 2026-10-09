@@ -128,6 +128,22 @@ interface FinancialTransactionRepository {
     ): Boolean
 
     /**
+     * Replaces a complete [com.baraa.masroof.domain.model.ExchangeRateSource.HISTORICAL_MERCHANT]
+     * pair after an explicit user confirmation.
+     *
+     * Returns false when the row is missing, either half is missing, or the stored
+     * source is not historical-merchant. Enrichment must keep using
+     * [updateAppliedExchangeRate], which does not call this method. The default
+     * refuses the write so test doubles stay immutable until a Room implementation
+     * opts in.
+     */
+    suspend fun replaceConfirmedHistoricalMerchantRate(
+        id: String,
+        exchangeRate: java.math.BigDecimal,
+        source: com.baraa.masroof.domain.model.ExchangeRateSource,
+    ): Boolean = false
+
+    /**
      * Removes a transaction when [rawSmsId] is its only linked SMS evidence.
      * Used after reparse when a message is reclassified as non-financial (e.g. OTP).
      */

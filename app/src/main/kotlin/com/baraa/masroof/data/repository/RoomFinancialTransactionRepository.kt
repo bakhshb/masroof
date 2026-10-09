@@ -178,6 +178,17 @@ class RoomFinancialTransactionRepository(
             source = source.name,
         ) > 0
 
+    override suspend fun replaceConfirmedHistoricalMerchantRate(
+        id: String,
+        exchangeRate: BigDecimal,
+        source: ExchangeRateSource,
+    ): Boolean =
+        dao.replaceConfirmedHistoricalMerchantRate(
+            id = id,
+            exchangeRate = exchangeRate.toPlainString(),
+            source = source.name,
+        ) > 0
+
     override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean =
         dao.deleteIfExclusiveRawSmsLink(rawSmsId)
 

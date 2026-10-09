@@ -133,6 +133,12 @@
     <string name="settings_app_hub_subtitle">%1$s • %2$s</string>
     <string name="settings_data_backup_section">Data &amp; backup</string>
     <string name="settings_data_backup_hub_subtitle">SMS import, reparse, and backup</string>
+    <string name="settings_fx_rate_correction_title">Correct old merchant rates</string>
+    <string name="settings_fx_rate_correction_none">No stored merchant rates disagree with the dated evidence</string>
+    <string name="settings_fx_rate_correction_subtitle">%1$d can be updated • %2$d need a manual follow-up</string>
+    <string name="settings_fx_rate_correction_confirm_title">Update stored exchange rates?</string>
+    <string name="settings_fx_rate_correction_confirm_body">Replaces the stored merchant rate with the dated rate for %1$d transaction(s). Rows with no dated rate stay unchanged.</string>
+    <string name="settings_fx_rate_correction_confirm_action">Update</string>
     <string name="settings_registry_accounts_hint">Choose a bank to manage its accounts.</string>
     <string name="settings_registry_cards_hint">Choose a bank to manage its cards.</string>
     <string name="settings_registry_loans_hint">Choose a bank to manage its loans.</string>

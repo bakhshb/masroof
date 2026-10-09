@@ -35,7 +35,34 @@ fun SettingsDataBackupScreen(
     onConfirmPendingImport: () -> Unit,
     onCancelPendingImport: () -> Unit,
     onClearBackupMessage: () -> Unit,
+    onRequestFxRateCorrection: () -> Unit,
+    onConfirmFxRateCorrection: () -> Unit,
+    onDismissFxRateCorrection: () -> Unit,
 ) {
+    if (state.fxRateCorrectionAwaitingConfirm) {
+        AlertDialog(
+            onDismissRequest = onDismissFxRateCorrection,
+            title = { Text(stringResource(R.string.settings_fx_rate_correction_confirm_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.settings_fx_rate_correction_confirm_body,
+                        state.fxRateCorrectionUpdatable,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = onConfirmFxRateCorrection) {
+                    Text(stringResource(R.string.settings_fx_rate_correction_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissFxRateCorrection) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
     if (state.awaitingImportConfirm) {
         AlertDialog(
             onDismissRequest = onCancelPendingImport,
@@ -168,6 +195,27 @@ fun SettingsDataBackupScreen(
                 subtitle = stringResource(R.string.settings_import_subtitle),
                 onClick = onRequestImport,
                 enabled = !state.exportingBackup && !state.importingBackup && !state.reparsingStored,
+            )
+
+            SettingsReparseRow(
+                title = stringResource(R.string.settings_fx_rate_correction_title),
+                subtitle = if (state.fxRateCorrectionUpdatable == 0 && state.fxRateCorrectionManualFollowUp == 0) {
+                    stringResource(R.string.settings_fx_rate_correction_none)
+                } else {
+                    stringResource(
+                        R.string.settings_fx_rate_correction_subtitle,
+                        state.fxRateCorrectionUpdatable,
+                        state.fxRateCorrectionManualFollowUp,
+                    )
+                },
+                icon = MasroofIcons.retry,
+                actionIcon = MasroofIcons.retry,
+                running = state.fxRateCorrectionRunning,
+                enabled = state.fxRateCorrectionUpdatable > 0 &&
+                    !state.fxRateCorrectionRunning &&
+                    !state.reparsingStored &&
+                    !state.importingSms,
+                onRefresh = onRequestFxRateCorrection,
             )
 
             if (state.exportingBackup || state.importingBackup) {

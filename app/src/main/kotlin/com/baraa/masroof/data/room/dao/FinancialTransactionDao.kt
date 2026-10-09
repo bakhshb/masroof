@@ -63,6 +63,27 @@ interface FinancialTransactionDao {
         source: String,
     ): Int
 
+    /**
+     * Confirmed correction only. A complete historical-merchant pair is replaced
+     * as one write. Rows with any other source, or with a missing half, stay put.
+     * Enrichment must keep using [updateAppliedExchangeRate].
+     */
+    @Query(
+        """
+        UPDATE financial_transaction SET
+          appliedExchangeRate = :exchangeRate,
+          exchangeRateSource = :source
+        WHERE id = :id
+          AND appliedExchangeRate IS NOT NULL
+          AND exchangeRateSource = 'HISTORICAL_MERCHANT'
+        """,
+    )
+    suspend fun replaceConfirmedHistoricalMerchantRate(
+        id: String,
+        exchangeRate: String,
+        source: String,
+    ): Int
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertLinkIfAbsent(entity: FinancialTransactionRawSmsLinkEntity): Long
 

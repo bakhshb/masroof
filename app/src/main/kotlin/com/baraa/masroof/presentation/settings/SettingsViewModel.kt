@@ -28,6 +28,8 @@ import com.baraa.masroof.application.settings.CommitmentRecordBuilder
 import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
+import com.baraa.masroof.application.transaction.HistoricalMerchantRateCorrectionReport
+import com.baraa.masroof.application.transaction.HistoricalMerchantRateCorrectionWorkflow
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.Bank
@@ -64,7 +66,9 @@ class SettingsViewModel(
     private val apkInstaller: ApkInstaller,
     private val canInstallPackages: () -> Boolean,
     private val onRequestInstallPermission: () -> Unit = {},
+    private val historicalMerchantRateCorrectionWorkflow: HistoricalMerchantRateCorrectionWorkflow? = null,
 ) : ViewModel() {
+    private var updatableCorrectionIds: List<String> = emptyList()
     private val _uiState = MutableStateFlow(
         SettingsUiState(
             appVersion = appVersion,
@@ -352,6 +356,81 @@ class SettingsViewModel(
                 )
                 _uiState.update { it.copy(reparsingStored = false, error = SettingsError.UPDATE_FAILED) }
             }
+        }
+    }
+
+    fun refreshHistoricalMerchantRateCorrections() {
+        val workflow = historicalMerchantRateCorrectionWorkflow ?: return
+        viewModelScope.launch {
+            try {
+                applyCorrectionReport(workflow.listCandidates())
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (error: Exception) {
+                appLogService.error(
+                    AppLogCategories.SETTINGS,
+                    "Historical merchant rate review failed: ${error.message ?: error::class.java.simpleName}",
+                )
+                _uiState.update { it.copy(error = SettingsError.UPDATE_FAILED) }
+            }
+        }
+    }
+
+    fun requestHistoricalMerchantRateCorrection() {
+        if (updatableCorrectionIds.isEmpty() || _uiState.value.fxRateCorrectionRunning) return
+        _uiState.update { it.copy(fxRateCorrectionAwaitingConfirm = true) }
+    }
+
+    fun dismissHistoricalMerchantRateCorrection() {
+        _uiState.update { it.copy(fxRateCorrectionAwaitingConfirm = false) }
+    }
+
+    fun confirmHistoricalMerchantRateCorrections() {
+        val workflow = historicalMerchantRateCorrectionWorkflow ?: return
+        val ids = updatableCorrectionIds
+        if (ids.isEmpty() || _uiState.value.fxRateCorrectionRunning) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    fxRateCorrectionAwaitingConfirm = false,
+                    fxRateCorrectionRunning = true,
+                    error = null,
+                )
+            }
+            try {
+                val result = workflow.confirm(ids)
+                appLogService.info(
+                    AppLogCategories.SETTINGS,
+                    "Confirmed historical merchant rate correction updated=${result.updated.size} " +
+                        "manual_follow_up=${result.manualFollowUp.size}",
+                )
+                applyCorrectionReport(workflow.listCandidates())
+                _uiState.update { it.copy(fxRateCorrectionRunning = false) }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (error: Exception) {
+                appLogService.error(
+                    AppLogCategories.SETTINGS,
+                    "Historical merchant rate correction failed: ${error.message ?: error::class.java.simpleName}",
+                )
+                _uiState.update {
+                    it.copy(fxRateCorrectionRunning = false, error = SettingsError.UPDATE_FAILED)
+                }
+            }
+        }
+    }
+
+    private fun applyCorrectionReport(report: HistoricalMerchantRateCorrectionReport) {
+        updatableCorrectionIds = report.candidates
+            .filterNot { it.requiresManualFollowUp }
+            .map { it.transactionId }
+        _uiState.update {
+            it.copy(
+                fxRateCorrectionUpdatable = updatableCorrectionIds.size,
+                fxRateCorrectionManualFollowUp = report.candidates.count { candidate ->
+                    candidate.requiresManualFollowUp
+                },
+            )
         }
     }
 

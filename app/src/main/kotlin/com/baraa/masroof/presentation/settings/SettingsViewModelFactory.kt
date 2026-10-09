@@ -36,6 +36,7 @@ class SettingsViewModelFactory(
                 InstallPermissionHelper.canInstallPackages(container.applicationContext)
             },
             onRequestInstallPermission = onRequestInstallPermission,
+            historicalMerchantRateCorrectionWorkflow = container.historicalMerchantRateCorrectionWorkflow,
         ) as T
     }
 }

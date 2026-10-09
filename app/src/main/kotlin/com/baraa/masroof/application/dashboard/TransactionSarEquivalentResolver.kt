@@ -2,16 +2,31 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.assembly.BankTransactionTimePolicy
 import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import java.time.LocalDate
 import java.time.ZoneId
 
+/**
+ * Resolves a foreign amount to SAR.
+ *
+ * Precedence for each transaction:
+ * 1. A complete persisted `(appliedExchangeRate, exchangeRateSource)` pair, used as stored.
+ * 2. The exchange rate on the transaction's own linked parsed event.
+ * 3. A dated merchant rate from [HistoricalExchangeRateIndex] at [FinancialTransaction.occurredAt].
+ * 4. A market rate for the purchase civil date in the bank zone.
+ * 5. No resolution. The row stays unconverted.
+ *
+ * The market civil date uses [FinancialTransaction.occurredAtZone] when it is a real zone id.
+ * Otherwise it uses [BankTransactionTimePolicy] for the linked event's bank. It is not the
+ * handset zone. When neither zone is known, the market rate is unavailable.
+ */
 class TransactionSarEquivalentResolver(
     private val marketRateProvider: ForeignSarMarketRateProvider,
-    private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) {
     suspend fun resolve(
         transactions: List<FinancialTransaction>,
@@ -20,7 +35,11 @@ class TransactionSarEquivalentResolver(
         primaryCurrency: Currency = Currency.SAR,
     ): Map<String, SarEquivalentResolution> {
         val parsedByEventId = parsedRecords.associateBy { it.event.id }
-        val rateIndex = HistoricalExchangeRateIndex.build(parsedRecords, rawSmsById)
+        val rateIndex = HistoricalExchangeRateIndex.build(
+            parsedRecords = parsedRecords,
+            rawSmsById = rawSmsById,
+            persistedZoneIdByEventId = persistedZoneIdByEventId(transactions),
+        )
         val result = mutableMapOf<String, SarEquivalentResolution>()
         for (tx in transactions) {
             if (tx.amount.currency == primaryCurrency) continue
@@ -64,7 +83,7 @@ class TransactionSarEquivalentResolver(
 
             val merchant = tx.merchant
                 ?: tx.linkedParsedEventIds.firstNotNullOfOrNull { parsedByEventId[it]?.event?.merchant }
-            val historicalRate = rateIndex.rateForMerchant(merchant, tx.amount.currency)
+            val historicalRate = rateIndex.rateForMerchant(merchant, tx.amount.currency, tx.occurredAt)
             if (historicalRate != null) {
                 ForeignPurchaseSarConverter.foreignToSar(
                     foreignAmount = tx.amount,
@@ -81,7 +100,7 @@ class TransactionSarEquivalentResolver(
                 continue
             }
 
-            val onDate = tx.occurredAt.atZone(zoneId).toLocalDate()
+            val onDate = marketCivilDate(tx, linkedRecord) ?: continue
             val marketRate = marketRateProvider.rateFor(tx.amount.currency, onDate) ?: continue
             ForeignPurchaseSarConverter.foreignToSar(
                 foreignAmount = tx.amount,
@@ -97,6 +116,34 @@ class TransactionSarEquivalentResolver(
             }
         }
         return result
+    }
+
+    private fun persistedZoneIdByEventId(transactions: List<FinancialTransaction>): Map<String, String> {
+        val zones = linkedMapOf<String, String>()
+        for (tx in transactions) {
+            val zone = tx.occurredAtZone?.takeIf { it.isNotBlank() } ?: continue
+            for (eventId in tx.linkedParsedEventIds) {
+                zones.putIfAbsent(eventId, zone)
+            }
+        }
+        return zones
+    }
+
+    private fun marketCivilDate(tx: FinancialTransaction, linked: ParsedEventRecord?): LocalDate? {
+        val zone = marketZone(tx, linked) ?: return null
+        return tx.occurredAt.atZone(zone).toLocalDate()
+    }
+
+    /**
+     * Stored transaction zone first. Otherwise the linked event's bank policy.
+     * No handset-zone fallback.
+     */
+    private fun marketZone(tx: FinancialTransaction, linked: ParsedEventRecord?): ZoneId? {
+        tx.occurredAtZone?.takeIf { it.isNotBlank() }?.let { id ->
+            runCatching { ZoneId.of(id) }.getOrNull()?.let { return it }
+        }
+        val bank = linked?.event?.bank ?: return null
+        return BankTransactionTimePolicy.fixedZone(bank)
     }
 
     private fun linkedParsedRecord(
