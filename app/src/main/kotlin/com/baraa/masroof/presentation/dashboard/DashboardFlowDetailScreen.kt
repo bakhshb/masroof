@@ -241,6 +241,7 @@ private fun incomeAmount(summary: CurrentAccountSummary, category: FlowIncomeCat
     when (category) {
         FlowIncomeCategory.SALARY -> summary.inflow.salary
         FlowIncomeCategory.EXTERNAL_TRANSFER_IN -> summary.inflow.externalTransfersIn
+        FlowIncomeCategory.ACCOUNT_REFUND -> summary.inflow.accountRefunds
         FlowIncomeCategory.OTHER_INCOME -> summary.inflow.otherIncome
     }
 
@@ -259,5 +260,6 @@ private fun incomeCategoryLabelRes(category: FlowIncomeCategory): Int =
     when (category) {
         FlowIncomeCategory.SALARY -> R.string.dashboard_salary
         FlowIncomeCategory.EXTERNAL_TRANSFER_IN -> R.string.dashboard_external_in_short
+        FlowIncomeCategory.ACCOUNT_REFUND -> R.string.dashboard_account_refunds
         FlowIncomeCategory.OTHER_INCOME -> R.string.dashboard_other_income
     }

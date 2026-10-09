@@ -37,6 +37,7 @@ object CurrentAccountSummaryCalculator {
         var salary = Money.zero(primaryCurrency)
         var otherIncome = Money.zero(primaryCurrency)
         var externalTransfersIn = Money.zero(primaryCurrency)
+        var accountRefunds = Money.zero(primaryCurrency)
         var selfTransfersIn = Money.zero(primaryCurrency)
         var selfTransfersOut = Money.zero(primaryCurrency)
         var creditCardPayments = Money.zero(primaryCurrency)
@@ -61,6 +62,7 @@ object CurrentAccountSummaryCalculator {
                         FlowIncomeCategory.SALARY -> salary += amount
                         FlowIncomeCategory.OTHER_INCOME -> otherIncome += amount
                         FlowIncomeCategory.EXTERNAL_TRANSFER_IN -> externalTransfersIn += amount
+                        FlowIncomeCategory.ACCOUNT_REFUND -> accountRefunds += amount
                     }
 
                     is FlowAssignment.Expense -> when (assignment.category) {
@@ -87,6 +89,7 @@ object CurrentAccountSummaryCalculator {
             otherIncome = otherIncome,
             externalTransfersIn = externalTransfersIn,
             selfTransfersIn = selfTransfersIn,
+            accountRefunds = accountRefunds,
             creditCardPayments = creditCardPayments,
             billPayments = billPayments,
             externalTransfersOut = externalTransfersOut,
