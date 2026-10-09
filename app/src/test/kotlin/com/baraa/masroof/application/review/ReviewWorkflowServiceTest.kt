@@ -3,7 +3,9 @@ package com.baraa.masroof.application.review
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.ingestion.ProcessingRecovery
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
+import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
@@ -25,6 +27,9 @@ import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.ProcessingRetryMode
+import com.baraa.masroof.domain.repository.FinancialTransactionRepository
+import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -1030,6 +1035,88 @@ class ReviewWorkflowServiceTest {
         assertEquals(ReviewStatus.REQUIRED, review.status)
         assertTrue(review.reasons.contains("unknown_message_family"))
         assertEquals(0, ftRepo.listAll().size)
+    }
+
+    @Test
+    fun applyCorrection_nonthrowingConflict_keepsTheCorrectionAndStaysIncomplete() = runBlocking {
+        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+        persistEvent(
+            smsId = "sms-conflict",
+            event = event(
+                id = "pe-conflict",
+                rawSmsId = "sms-conflict",
+                family = MessageFamily.PURCHASE,
+                amount = null,
+                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
+                channel = PurchaseChannel.ONLINE,
+            ),
+        )
+        workflow.refreshReviewQueue()
+        assertEquals(ReviewStatus.REQUIRED, reviewRepo.findByRawSmsId("sms-conflict")!!.status)
+
+        val conflictingLedger = object : FinancialTransactionRepository by ftRepo {
+            override suspend fun save(
+                transaction: com.baraa.masroof.domain.model.FinancialTransaction,
+                rawSmsIds: Collection<String>,
+            ) = FinancialTransactionSaveResult.Conflict(
+                rawSmsId = rawSmsIds.first(),
+                existingTransactionId = "conflict-existing",
+            )
+        }
+        val retries = RoomProcessingRetryRepository(db.processingRetryDao())
+        val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
+        val conflicting = ReviewWorkflowService(
+            reviewRepository = reviewRepo,
+            userCorrectionRepository = correctionRepo,
+            financialTransactionRepository = conflictingLedger,
+            rawSmsRepository = rawRepo,
+            ownershipResolver = OwnershipResolver(
+                RoomAccountRegistryRepository.from(db),
+                RoomCardRegistryRepository.from(db),
+                loans,
+            ),
+            ownershipConfirmationService = confirmation,
+            effectiveParsedEventProvider = effective,
+            parsedEventRepository = parsedRepo,
+            reconciliationService = TransactionReconciliationService(
+                parsedEventRepository = parsedRepo,
+                rawSmsRepository = rawRepo,
+                financialTransactionRepository = conflictingLedger,
+                ownershipResolver = OwnershipResolver(
+                    RoomAccountRegistryRepository.from(db),
+                    RoomCardRegistryRepository.from(db),
+                    loans,
+                ),
+                effectiveParsedEventProvider = effective,
+                reviewRepository = reviewRepo,
+            ),
+            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, conflictingLedger, clock),
+            manualReviewResolutionRepository = RoomManualReviewResolutionRepository(db, conflictingLedger),
+            clock = clock,
+            processingRecovery = ProcessingRecovery(
+                processingRetryRepository = retries,
+                reviewRepository = reviewRepo,
+                ingestionReviewService = IngestionReviewService(reviewRepo, clock),
+                clock = clock,
+            ),
+        )
+
+        val result = conflicting.applyCorrection(
+            reviewId = ReviewIdFactory.fromRawSmsId("sms-conflict"),
+            correctedAmount = money("51.99"),
+        )
+
+        assertTrue(result is ReviewWorkflowResult.Rejected)
+        assertEquals("reconciliation_incomplete", (result as ReviewWorkflowResult.Rejected).reason)
+        assertEquals(money("51.99"), correctionRepo.latestForRawSmsId("sms-conflict")!!.correctedAmount)
+        assertEquals(0, ftRepo.listAll().size)
+        val review = reviewRepo.findByRawSmsId("sms-conflict")!!
+        assertEquals(ReviewStatus.REQUIRED, review.status)
+        assertNull(review.resolutionKind)
+        assertEquals(
+            listOf("sms-conflict"),
+            retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH),
+        )
     }
 
     private suspend fun persistEvent(

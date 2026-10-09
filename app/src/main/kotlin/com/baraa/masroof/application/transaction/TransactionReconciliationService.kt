@@ -90,6 +90,7 @@ class TransactionReconciliationService(
             summary = reconciled.summary.copy(
                 failed = reconciled.summary.failed + release.failedCount,
             ),
+            failedRawSmsIds = reconciled.failedRawSmsIds + release.failedRawSmsIds,
         )
     }
 
@@ -107,8 +108,10 @@ class TransactionReconciliationService(
     }
 
     /**
-     * Reconcile after a newly saved ParsedEvent. Failures are swallowed by callers
-     * that treat P8 as derived processing.
+     * Reconcile after a newly saved ParsedEvent.
+     *
+     * A returned report with [ReconciliationSummary.failed] greater than zero did
+     * not throw. Callers still treat that report as incomplete.
      */
     suspend fun reconcileAfterParsedEvent(event: ParsedEvent): ReconciliationSummary =
         reconcileAfterParsedEventDetailed(event).summary
@@ -381,6 +384,7 @@ class TransactionReconciliationService(
         var ignored = 0
         var alreadyLinked = 0
         var failed = 0
+        val failedRawSmsIds = linkedSetOf<String>()
 
         val unresolvedTransfers = mutableListOf<TransferMatchCandidate>()
         val reviewCandidates = mutableListOf<ReconciliationReviewCandidate>()
@@ -495,7 +499,10 @@ class TransactionReconciliationService(
                                     settledRawSmsIds += event.rawSmsId
                                 }
 
-                                PersistOutcome.Failed -> failed++
+                                PersistOutcome.Failed -> {
+                                    failed++
+                                    failedRawSmsIds += event.rawSmsId
+                                }
                             }
                         }
 
@@ -555,7 +562,10 @@ class TransactionReconciliationService(
                                     settledRawSmsIds += event.rawSmsId
                                 }
 
-                                PersistOutcome.Failed -> failed++
+                                PersistOutcome.Failed -> {
+                                    failed++
+                                    failedRawSmsIds += event.rawSmsId
+                                }
                             }
                         }
 
@@ -640,7 +650,11 @@ class TransactionReconciliationService(
                             settledRawSmsIds += pair.incoming.event.rawSmsId
                         }
 
-                        PersistOutcome.Failed -> failed++
+                        PersistOutcome.Failed -> {
+                            failed++
+                            failedRawSmsIds += pair.outgoing.event.rawSmsId
+                            failedRawSmsIds += pair.incoming.event.rawSmsId
+                        }
                     }
                 }
 
@@ -676,6 +690,8 @@ class TransactionReconciliationService(
                         }
 
                         PersistOutcome.Failed -> {
+                            failed++
+                            failedRawSmsIds += candidate.event.rawSmsId
                             reviewCandidates += ReconciliationReviewCandidate(
                                 rawSmsId = candidate.event.rawSmsId,
                                 kind = ReviewKind.PENDING_MATCH,
@@ -700,12 +716,14 @@ class TransactionReconciliationService(
         assembledSingle += upgraded.assembledSingle
         alreadyLinked += upgraded.alreadyLinked
         failed += upgraded.failed
+        failedRawSmsIds += upgraded.failedRawSmsIds
         settledRawSmsIds += upgraded.settledRawSmsIds
 
         val healedLoans = upgradeStaleFeeFinancingInstallments(records, scope)
         assembledSingle += healedLoans.assembledSingle
         alreadyLinked += healedLoans.alreadyLinked
         failed += healedLoans.failed
+        failedRawSmsIds += healedLoans.failedRawSmsIds
         settledRawSmsIds += healedLoans.settledRawSmsIds
         reviewCandidates.removeAll { it.rawSmsId in settledRawSmsIds }
 
@@ -731,6 +749,7 @@ class TransactionReconciliationService(
                     )
                 },
             settledRawSmsIds = settledRawSmsIds,
+            failedRawSmsIds = failedRawSmsIds,
         )
     }
 
@@ -870,6 +889,7 @@ class TransactionReconciliationService(
         var assembledSingle = 0
         var alreadyLinked = 0
         var failed = 0
+        val failedRawSmsIds = linkedSetOf<String>()
         val settledRawSmsIds = linkedSetOf<String>()
 
         for (pair in pairs) {
@@ -923,11 +943,18 @@ class TransactionReconciliationService(
                             settledRawSmsIds += rawSmsIds
                         }
 
-                        UpgradePersistOutcome.Failed -> failed++
+                        UpgradePersistOutcome.Failed -> {
+                            failed++
+                            failedRawSmsIds += rawSmsIds
+                        }
                     }
                 }
 
-                else -> failed++
+                else -> {
+                    failed++
+                    failedRawSmsIds += outLeg.event.rawSmsId
+                    failedRawSmsIds += inLeg.event.rawSmsId
+                }
             }
         }
 
@@ -936,6 +963,7 @@ class TransactionReconciliationService(
             assembledSingle = assembledSingle,
             alreadyLinked = alreadyLinked,
             failed = failed,
+            failedRawSmsIds = failedRawSmsIds,
             settledRawSmsIds = settledRawSmsIds,
         )
     }
@@ -965,6 +993,7 @@ class TransactionReconciliationService(
         var assembledSingle = 0
         var alreadyLinked = 0
         var failed = 0
+        val failedRawSmsIds = linkedSetOf<String>()
         val settledRawSmsIds = linkedSetOf<String>()
 
         for (existing in staleFees) {
@@ -1011,6 +1040,7 @@ class TransactionReconciliationService(
                 is TransactionAssembler.Outcome.Assembled -> {
                     if (outcome.transaction.type != FinancialTransactionType.LOAN_REPAYMENT) {
                         failed++
+                        failedRawSmsIds += event.rawSmsId
                         continue
                     }
                     val healed = outcome.transaction.copy(id = existing.id)
@@ -1019,10 +1049,14 @@ class TransactionReconciliationService(
                         settledRawSmsIds += event.rawSmsId
                     } else {
                         failed++
+                        failedRawSmsIds += event.rawSmsId
                     }
                 }
 
-                else -> failed++
+                else -> {
+                    failed++
+                    failedRawSmsIds += event.rawSmsId
+                }
             }
         }
 
@@ -1030,6 +1064,7 @@ class TransactionReconciliationService(
             assembledSingle = assembledSingle,
             alreadyLinked = alreadyLinked,
             failed = failed,
+            failedRawSmsIds = failedRawSmsIds,
             settledRawSmsIds = settledRawSmsIds,
         )
     }
@@ -1065,6 +1100,7 @@ class TransactionReconciliationService(
         val assembledSingle: Int = 0,
         val alreadyLinked: Int = 0,
         val failed: Int = 0,
+        val failedRawSmsIds: Set<String> = emptySet(),
         val settledRawSmsIds: Set<String> = emptySet(),
     )
 
@@ -1082,6 +1118,7 @@ class TransactionReconciliationService(
         val releasedRawSmsIds: Set<String> = emptySet(),
         val skippedRawSmsIds: Set<String> = emptySet(),
         val failedCount: Int = 0,
+        val failedRawSmsIds: Set<String> = emptySet(),
     )
 
     /**
@@ -1122,6 +1159,7 @@ class TransactionReconciliationService(
             .toSet()
 
         val released = linkedSetOf<String>()
+        val failedRawSmsIds = linkedSetOf<String>()
         var failed = 0
         for (record in postedSingleLeg) {
             val event = record.event
@@ -1134,12 +1172,14 @@ class TransactionReconciliationService(
                 throw e
             } catch (_: Exception) {
                 failed++
+                failedRawSmsIds += event.rawSmsId
                 continue
             }
             if (deleted) {
                 released += event.rawSmsId
             } else if (ambiguousReleaseStillRequired(event.rawSmsId)) {
                 failed++
+                failedRawSmsIds += event.rawSmsId
             } else {
                 skipped += event.rawSmsId
             }
@@ -1148,6 +1188,7 @@ class TransactionReconciliationService(
             releasedRawSmsIds = released,
             skippedRawSmsIds = skipped,
             failedCount = failed,
+            failedRawSmsIds = failedRawSmsIds,
         )
     }
 

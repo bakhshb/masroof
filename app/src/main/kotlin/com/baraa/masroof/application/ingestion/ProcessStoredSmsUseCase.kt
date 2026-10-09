@@ -6,6 +6,8 @@ import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.sms.ExchangeRateEnrichmentScheduler
+import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
+import com.baraa.masroof.application.transaction.ReconciliationIncompleteException
 import com.baraa.masroof.application.transaction.ReconciliationReport
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankRoutingResult
@@ -33,8 +35,11 @@ import kotlinx.coroutines.CancellationException
  * overlays and survive), re-runs idempotent reconciliation, and upserts review rows by
  * rawSmsId. Failures in derived steps never roll back RawSms/ParsedEvent evidence.
  * Ownership, reconciliation, and review-refresh failures are reported as
- * [SmsIngestionResult.DerivedIncomplete] so live work can retry. Exchange-rate
- * enrichment stays best-effort and does not change that outcome.
+ * [SmsIngestionResult.DerivedIncomplete] so live work can retry. A reconciliation
+ * report with [com.baraa.masroof.application.transaction.ReconciliationSummary.failed]
+ * greater than zero is that same incomplete reconciliation even when the call
+ * returns normally and other rows posted. Exchange-rate enrichment stays
+ * best-effort and does not change that outcome.
  * A direct review write that fails for Unsupported, Invalid, a no-event
  * ReviewRequired, or a `processing_error` review is [SmsIngestionResult.Failed]
  * with [REASON_REVIEW_NOT_PERSISTED]. RawSms stays durable. That result stays
@@ -494,16 +499,37 @@ class ProcessStoredSmsUseCase(
         logOutcome: Boolean,
     ): ReconcileDerivedResult {
         val svc = reconciliation ?: return ReconcileDerivedResult.NotConfigured
-        return try {
-            ReconcileDerivedResult.Ready(svc.reconcileAfterParsedEventDetailed(event))
+        val report = try {
+            svc.reconcileAfterParsedEventDetailed(event)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             // Evidence stays. The live worker retries this stage.
-            ReconcileDerivedResult.Incomplete(
+            return ReconcileDerivedResult.Incomplete(
                 derivedIncomplete(event, details, DerivedProcessingStage.RECONCILIATION, e, logOutcome),
             )
         }
+        val incomplete = ReconciliationCompletionPolicy.incompleteOrNull(
+            report = report,
+            maskedRawSmsId = AppLogFormatting.maskId(report.failedRawSmsIds.firstOrNull() ?: event.rawSmsId),
+        )
+        if (incomplete != null) {
+            // Partial posts and review rows from this pass stay. The worker retries.
+            refreshReviewQueue(event, details, report, logOutcome)?.let { reviewIncomplete ->
+                return ReconcileDerivedResult.Incomplete(reviewIncomplete)
+            }
+            return ReconcileDerivedResult.Incomplete(
+                derivedIncomplete(
+                    event = event,
+                    details = details,
+                    stage = DerivedProcessingStage.RECONCILIATION,
+                    cause = incomplete,
+                    logOutcome = logOutcome,
+                    failureCount = incomplete.failureCount,
+                ),
+            )
+        }
+        return ReconcileDerivedResult.Ready(report)
     }
 
     private fun scheduleExchangeRateEnrichment() {
@@ -541,11 +567,15 @@ class ProcessStoredSmsUseCase(
         stage: DerivedProcessingStage,
         cause: Throwable,
         logOutcome: Boolean,
+        failureCount: Int? = (cause as? ReconciliationIncompleteException)?.failureCount,
     ): SmsIngestionResult.DerivedIncomplete {
         if (logOutcome) {
+            val failures = failureCount?.let { " failures=$it" }.orEmpty()
             appLogService?.error(
                 AppLogCategories.INGEST,
-                "Derived ${stage.name.lowercase()} incomplete (${cause.javaClass.simpleName}); evidence kept for retry",
+                "Derived ${stage.name.lowercase()} incomplete$failures " +
+                    "id=${AppLogFormatting.maskId(event.rawSmsId)} " +
+                    "retry_state=open (${cause.javaClass.simpleName}); evidence kept for retry",
             )
         }
         return SmsIngestionResult.DerivedIncomplete(
@@ -554,6 +584,7 @@ class ProcessStoredSmsUseCase(
             details = details,
             stage = stage,
             cause = cause,
+            failureCount = failureCount,
         )
     }
 
