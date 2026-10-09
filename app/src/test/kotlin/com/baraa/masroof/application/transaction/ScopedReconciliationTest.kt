@@ -365,10 +365,11 @@ class ScopedReconciliationTest {
 
         reconciliation.reconcileAffectedRawSmsIds(listOf("sms-a"))
 
-        val posted = ftDelegate.listAll().single()
-        assertEquals(FinancialTransactionType.SELF_TRANSFER, posted.type)
-        assertEquals(listOf("pe-a"), posted.linkedParsedEventIds)
-        assertEquals(setOf("sms-a"), ftDelegate.listRawSmsIds(posted.id).toSet())
+        assertTrue(
+            "Competing intra-bank counterparts must stay unmatched instead of posting one invented self-transfer",
+            ftDelegate.listAll().isEmpty(),
+        )
+        assertEquals(null, ftDelegate.findByRawSmsId("sms-a"))
         assertEquals(null, ftDelegate.findByRawSmsId("sms-b"))
         assertEquals(null, ftDelegate.findByRawSmsId("sms-d"))
         assertNoGlobalScan()
@@ -408,9 +409,7 @@ class ScopedReconciliationTest {
         )
 
         assertEquals(full.affected, scoped.affected)
-        assertEquals(setOf("sms-local-a"), full.affected.rawSmsIds)
-        assertEquals(listOf("pe-local-a"), full.affected.linkedParsedEventIds)
-        assertEquals(FinancialTransactionType.SELF_TRANSFER, full.affected.type)
+        assertEquals(null, full.affected)
         assertEquals(0, full.multiEvidenceTransfers)
         assertEquals(0, scoped.multiEvidenceTransfers)
         assertEquals(0, scoped.listAllCalls)
@@ -448,6 +447,73 @@ class ScopedReconciliationTest {
 
         assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, ftDelegate.findByRawSmsId("sms-affected")?.type)
         assertEquals(null, ftDelegate.findByRawSmsId("sms-neighbor"))
+    }
+
+    @Test
+    fun scopedReconcile_doesNotUnlinkNearbyLegacySelfTransfer() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
+        val at = Instant.parse("2026-09-02T07:00:00Z")
+        val legacySms = listOf("sms-leg-out-a", "sms-leg-out-b", "sms-leg-in-a", "sms-leg-in-b")
+        val families = listOf(
+            MessageFamily.TRANSFER_OUT,
+            MessageFamily.TRANSFER_OUT,
+            MessageFamily.TRANSFER_IN,
+            MessageFamily.TRANSFER_IN,
+        )
+        legacySms.forEachIndexed { index, smsId ->
+            persistTransfer(
+                smsId = smsId,
+                eventId = "pe-$smsId",
+                at = at.plusSeconds(index.toLong()),
+                family = families[index],
+                source = "3001",
+                destination = "3003",
+                amount = "2000.00",
+            )
+            ftDelegate.save(
+                transaction(
+                    id = "tx-$smsId",
+                    type = FinancialTransactionType.SELF_TRANSFER,
+                    occurredAt = at.plusSeconds(index.toLong()),
+                    eventId = "pe-$smsId",
+                    sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+                ).copy(
+                    amount = Money.of("2000.00", Currency.SAR),
+                    destinationContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3003"),
+                ),
+                listOf(smsId),
+            )
+        }
+        persistTransfer(
+            smsId = "sms-new-unrelated",
+            eventId = "pe-new-unrelated",
+            at = at,
+            family = MessageFamily.TRANSFER_OUT,
+            source = "3001",
+            destination = "9999",
+            amount = "11.00",
+            network = BankNetworkType.INTER_BANK,
+        )
+        parsed.reset()
+        transactions.reset()
+
+        reconciliation.reconcileAffectedRawSmsIds(listOf("sms-new-unrelated"))
+
+        assertEquals(0, parsed.listAllCalls)
+        legacySms.forEach { smsId ->
+            val kept = ftDelegate.findByRawSmsId(smsId)
+            assertEquals("tx-$smsId", kept?.id)
+            assertEquals(FinancialTransactionType.SELF_TRANSFER, kept?.type)
+            assertEquals(Money.of("2000.00", Currency.SAR), kept?.amount)
+            assertEquals(setOf(smsId), ftDelegate.listRawSmsIds(kept!!.id).toSet())
+        }
+
+        reconciliation.repairLegacyTransfersDetailed()
+
+        assertTrue(legacySms.all { ftDelegate.findByRawSmsId(it) == null })
+        assertEquals(5, parsedDelegate.listAll().size)
+        assertTrue(legacySms.all { rawRepo.getById(it) != null })
     }
 
     @Test
@@ -577,15 +643,16 @@ class ScopedReconciliationTest {
                 service.reconcileStoredEventsDetailed()
             }
             val affected = financial.findByRawSmsId("sms-local-a")
-            check(affected != null)
             val multiEvidence = financial.listAll().count { financial.listRawSmsIds(it.id).size > 1 }
             return AmbiguousLocalOutcome(
-                affected = AffectedPosting(
-                    type = affected.type,
-                    amount = affected.amount,
-                    rawSmsIds = financial.listRawSmsIds(affected.id).toSet(),
-                    linkedParsedEventIds = affected.linkedParsedEventIds,
-                ),
+                affected = affected?.let { posted ->
+                    AffectedPosting(
+                        type = posted.type,
+                        amount = posted.amount,
+                        rawSmsIds = financial.listRawSmsIds(posted.id).toSet(),
+                        linkedParsedEventIds = posted.linkedParsedEventIds,
+                    )
+                },
                 multiEvidenceTransfers = multiEvidence,
                 listAllCalls = countedParsed.listAllCalls,
                 globalUnlinkedCalls = countedParsed.globalUnlinkedCalls,
@@ -694,7 +761,7 @@ class ScopedReconciliationTest {
     )
 
     private data class AmbiguousLocalOutcome(
-        val affected: AffectedPosting,
+        val affected: AffectedPosting?,
         val multiEvidenceTransfers: Int,
         val listAllCalls: Int,
         val globalUnlinkedCalls: Int,

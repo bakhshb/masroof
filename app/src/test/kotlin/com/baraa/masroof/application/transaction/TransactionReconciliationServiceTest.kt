@@ -676,23 +676,27 @@ class TransactionReconciliationServiceTest {
                 network = BankNetworkType.INTRA_BANK,
             ),
         )
-        reconciliation.reconcileStoredEvents()
+        val report = reconciliation.reconcileStoredEventsDetailed()
 
-        val posted = ftRepo.listAll()
-        assertEquals(3, posted.size)
-        assertTrue(posted.all { it.type == FinancialTransactionType.SELF_TRANSFER })
-        val original = posted.single { it.id == singleLegId }
-        assertEquals(listOf("pe-amb-self-out"), original.linkedParsedEventIds)
-        assertEquals(setOf("sms-amb-self-out"), ftRepo.listRawSmsIds(original.id).toSet())
+        val original = ftRepo.findByRawSmsId("sms-amb-self-out")
+        assertEquals(singleLegId, original?.id)
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, original?.type)
+        assertEquals(setOf("sms-amb-self-out"), ftRepo.listRawSmsIds(singleLegId).toSet())
+        assertNull(ftRepo.findByRawSmsId("sms-amb-self-in-a"))
+        assertNull(ftRepo.findByRawSmsId("sms-amb-self-in-b"))
         assertEquals(
-            setOf(
-                singleLegId,
-                TransactionIdFactory.fromRawSmsIds(listOf("sms-amb-self-in-a")),
-                TransactionIdFactory.fromRawSmsIds(listOf("sms-amb-self-in-b")),
-            ),
-            posted.map { it.id }.toSet(),
+            setOf("sms-amb-self-in-a", "sms-amb-self-in-b"),
+            report.reviewCandidates.map { it.rawSmsId }.toSet(),
         )
-        assertTrue(posted.all { ftRepo.listRawSmsIds(it.id).size == 1 })
+        assertTrue(report.reviewCandidates.all { it.kind == ReviewKind.PENDING_MATCH })
+        assertTrue(report.reviewCandidates.all { it.reasons == listOf("transfer_pending_match") })
+        assertNull(
+            ftRepo.listAll().find {
+                it.id == TransactionIdFactory.fromRawSmsIds(
+                    listOf("sms-amb-self-in-a", "sms-amb-self-out"),
+                )
+            },
+        )
     }
 
     @Test

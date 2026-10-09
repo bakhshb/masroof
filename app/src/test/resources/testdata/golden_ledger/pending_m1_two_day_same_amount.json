@@ -1,9 +1,8 @@
 {
   "id": "m1_two_day_same_amount",
-  "status": "PENDING",
-  "ownerMilestone": "M1",
+  "status": "ACTIVE",
   "periodAnchor": "2026-09-10",
-  "description": "Two owned 2,000 SAR self-transfers on different days are two movements. Per-account self-transfer out is 4,000 SAR. Owner M1 activates this oracle.",
+  "description": "Two owned 2,000 SAR self-transfers on different days are two movements. Per-account self-transfer out is 4,000 SAR.",
   "ownedAccounts": [
     {"bank": "BANK_ALJAZIRA", "masked": "3001"},
     {"bank": "BANK_ALJAZIRA", "masked": "3002"}
@@ -129,13 +128,5 @@
         "cashPosition": "4000.00"
       }
     ]
-  },
-  "knownDefect": {
-    "ownerMilestone": "M1",
-    "signals": {
-      "displayedRowCount": "1",
-      "account:BANK_ALJAZIRA:3001:selfTransfersOut": "2000.00",
-      "account:BANK_ALJAZIRA:3002:selfTransfersIn": "2000.00"
-    }
   }
 }

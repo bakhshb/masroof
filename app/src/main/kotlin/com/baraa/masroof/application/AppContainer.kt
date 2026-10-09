@@ -2,6 +2,7 @@ package com.baraa.masroof.application
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.work.DelegatingWorkerFactory
 import androidx.work.WorkManager
 import androidx.work.WorkerFactory
@@ -53,6 +54,8 @@ import com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult
 import com.baraa.masroof.application.maintenance.StartupMaintenance
 import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
 import com.baraa.masroof.application.maintenance.StoredSmsReprocessor
+import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
+import com.baraa.masroof.application.maintenance.TransferIntegrityRepairResult
 import okhttp3.OkHttpClient
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -140,6 +143,10 @@ class AppContainer(
         CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val appLogService: AppLogService = AppLogService(appContext)
+
+    /** Keeps a device-test seed invisible to live processing until the review row exists. */
+    suspend fun <R> withDatabaseTransaction(block: suspend () -> R): R =
+        database.withTransaction(block)
 
     private val database: MasroofDatabase =
         Room.databaseBuilder(
@@ -676,11 +683,30 @@ class AppContainer(
         )
     }
 
+    private val transferIntegrityRepairCoordinator: TransferIntegrityRepairCoordinator by lazy {
+        TransferIntegrityRepairCoordinator(
+            prefs = appContext.getSharedPreferences(
+                MaintenancePreferences.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ),
+            appLogService = appLogService,
+            repairStoredTransfers = {
+                val report = transactionReconciliationService.repairLegacyTransfersDetailed()
+                reviewQueueUpdater.applyReport(report)
+                TransferIntegrityRepairResult(failedCount = report.summary.failed)
+            },
+            completionSignal = maintenanceCompletionSignal,
+        )
+    }
+
     /** Emits when background maintenance changed stored data; open screens reload on it. */
     val maintenanceCompletionSignal: MaintenanceCompletionSignal = MaintenanceCompletionSignal()
 
     private val startupMaintenance: StartupMaintenance by lazy {
-        StartupMaintenance(factsBackfill = parsedEventFactsBackfillCoordinator) {
+        StartupMaintenance(
+            factsBackfill = parsedEventFactsBackfillCoordinator,
+            transferIntegrityRepair = transferIntegrityRepairCoordinator,
+        ) {
             ParsedEventFactsBackfillWorker.enqueue(WorkManager.getInstance(appContext))
         }
     }

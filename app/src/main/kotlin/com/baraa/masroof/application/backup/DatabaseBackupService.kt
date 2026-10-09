@@ -2,6 +2,7 @@ package com.baraa.masroof.application.backup
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.Uri
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
@@ -34,6 +35,7 @@ class DatabaseBackupService(
     private val clockEpochMillis: () -> Long = { System.currentTimeMillis() },
     private val restartProcess: () -> Unit = { defaultRestartProcess(appContext) },
     private val beforeValidatedInstall: () -> Unit = {},
+    private val maintenancePreferences: SharedPreferences? = null,
 ) : DatabaseBackupGateway {
     override suspend fun exportTo(destination: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
@@ -129,7 +131,7 @@ class DatabaseBackupService(
                 installValidatedDatabase(validated, liveDb)
                 try {
                     restorePreferences(preferences)
-                    resetParseFactsBackfillMarker()
+                    resetMaintenanceMarkers()
                 } catch (error: Exception) {
                     restoreParkedLive(liveDb)
                     throw error
@@ -233,12 +235,21 @@ class DatabaseBackupService(
         ).commit()
     }
 
-    private fun resetParseFactsBackfillMarker() {
-        appContext.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
+    /**
+     * The restored database may predate the current parse-fact or transfer-integrity
+     * rules. Clearing these markers makes the next launch re-run both repairs.
+     */
+    private fun resetMaintenanceMarkers() {
+        val committed = maintenancePrefs().edit()
             .remove(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION)
+            .remove(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION)
             .commit()
+        check(committed) { "Cannot reset maintenance markers after backup restore" }
     }
+
+    private fun maintenancePrefs(): SharedPreferences =
+        maintenancePreferences
+            ?: appContext.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
 
     private fun writeZip(staging: File, destination: Uri) {
         val output = appContext.contentResolver.openOutputStream(destination)

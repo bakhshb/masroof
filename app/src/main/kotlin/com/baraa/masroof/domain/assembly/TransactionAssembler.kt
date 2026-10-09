@@ -94,6 +94,7 @@ object TransactionAssembler {
         transactionOccurredAt: Instant = receivedAt,
         userConfirmed: Boolean = false,
         occurredAtZone: java.time.ZoneId? = null,
+        deferIntraBankPairing: Boolean = true,
     ): Outcome {
         when (event.messageFamily) {
             MessageFamily.OTP,
@@ -161,7 +162,9 @@ object TransactionAssembler {
 
         return when (classification) {
             is ClassificationResult.Classified -> {
-                if (shouldDeferIntraBankExternal(event, classification.transactionType)) {
+                if (deferIntraBankPairing &&
+                    shouldDeferIntraBankUntilPairing(event, classification.transactionType)
+                ) {
                     return Outcome.PendingMatch
                 }
                 val tx = buildTransaction(
@@ -210,7 +213,10 @@ object TransactionAssembler {
      * as external in/out instead of waiting forever for a counterpart SMS.
      *
      * Pairing still wins when both events are present in the same reconcile pass.
-     * Self-transfer (owned → owned) is unchanged. Local side not OWNED stays pending.
+     * An owned → owned intra-bank leg stays pending while a counterpart is also
+     * unmatched, so ambiguous same-window legs are not posted as four self-transfers.
+     * A lone owned-owned leg may post so a later counterpart can heal it.
+     * Local side not OWNED stays pending.
      */
     fun assembleUnmatchedOwnedTransfer(
         candidate: TransferMatchCandidate,
@@ -234,6 +240,11 @@ object TransactionAssembler {
         if (sourceOwnership == OwnershipStatus.OWNED &&
             destinationOwnership == OwnershipStatus.OWNED
         ) {
+            if (pendingCounterparts.isNotEmpty() &&
+                TransactionMatcher.hasPendingIntraBankCounterpart(candidate, pendingCounterparts)
+            ) {
+                return Outcome.PendingMatch
+            }
             val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, fallbackZone)
             return assembleSingle(
                 event = event,
@@ -243,6 +254,7 @@ object TransactionAssembler {
                 cardOwnership = OwnershipStatus.UNKNOWN,
                 transactionOccurredAt = transactionOccurredAt,
                 occurredAtZone = TransactionTiming.zoneFor(event.bank, fallback = fallbackZone),
+                deferIntraBankPairing = false,
             )
         }
 
@@ -397,17 +409,24 @@ object TransactionAssembler {
         event.sourceAccountRef?.bank == Bank.UNKNOWN ||
             event.destinationAccountRef?.bank == Bank.UNKNOWN
 
-    private fun shouldDeferIntraBankExternal(
+    private fun shouldDeferIntraBankUntilPairing(
         event: ParsedEvent,
         transactionType: FinancialTransactionType,
-    ): Boolean =
-        (event.messageFamily == MessageFamily.TRANSFER_IN ||
-            event.messageFamily == MessageFamily.TRANSFER_OUT) &&
-            event.bankNetworkType == BankNetworkType.INTRA_BANK &&
+    ): Boolean {
+        if (event.messageFamily != MessageFamily.TRANSFER_IN &&
+            event.messageFamily != MessageFamily.TRANSFER_OUT
+        ) {
+            return false
+        }
+        if (transactionType == FinancialTransactionType.SELF_TRANSFER) {
+            return true
+        }
+        return event.bankNetworkType == BankNetworkType.INTRA_BANK &&
             (
                 transactionType == FinancialTransactionType.EXTERNAL_TRANSFER_IN ||
                     transactionType == FinancialTransactionType.EXTERNAL_TRANSFER_OUT
             )
+    }
 
     private fun accountFacts(
         ref: AccountReference?,

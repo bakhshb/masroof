@@ -6,6 +6,7 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -186,6 +187,86 @@ class TransactionAssemblerTest {
         )
         assertTrue(withAccount.transaction.type == FinancialTransactionType.REFUND)
         assertTrue(withAccount.transaction.type != FinancialTransactionType.INCOME)
+    }
+
+    @Test
+    fun ownedOwnedIntraBank_assembleSingle_defersUntilPairing() {
+        val outcome = TransactionAssembler.assembleSingle(
+            event = event(
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("2000.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+                bankNetworkType = BankNetworkType.INTRA_BANK,
+            ),
+            receivedAt = receivedAt,
+            sourceOwnership = OwnershipStatus.OWNED,
+            destinationOwnership = OwnershipStatus.OWNED,
+            cardOwnership = OwnershipStatus.UNKNOWN,
+        )
+        assertTrue(outcome is TransactionAssembler.Outcome.PendingMatch)
+    }
+
+    @Test
+    fun unmatchedOwnedOwned_withPendingCounterpart_staysPending() {
+        val outgoing = transferCandidate(
+            event = event(
+                id = "pe-out",
+                rawSmsId = "sms-out",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("2000.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+                bankNetworkType = BankNetworkType.INTRA_BANK,
+            ),
+            sourceOwnership = OwnershipStatus.OWNED,
+            destinationOwnership = OwnershipStatus.OWNED,
+        )
+        val incoming = transferCandidate(
+            event = event(
+                id = "pe-in",
+                rawSmsId = "sms-in",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("2000.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+                bankNetworkType = BankNetworkType.INTRA_BANK,
+            ),
+            sourceOwnership = OwnershipStatus.OWNED,
+            destinationOwnership = OwnershipStatus.OWNED,
+        )
+        val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
+            candidate = outgoing,
+            pendingCounterparts = listOf(incoming),
+        )
+        assertTrue(outcome is TransactionAssembler.Outcome.PendingMatch)
+    }
+
+    @Test
+    fun unmatchedOwnedOwned_withoutCounterpart_postsSelfTransfer() {
+        val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
+            candidate = transferCandidate(
+                event = event(
+                    family = MessageFamily.TRANSFER_OUT,
+                    amount = money("2000.00"),
+                    source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                    destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+                    bankNetworkType = BankNetworkType.INTRA_BANK,
+                ),
+                sourceOwnership = OwnershipStatus.OWNED,
+                destinationOwnership = OwnershipStatus.OWNED,
+            ),
+        ) as TransactionAssembler.Outcome.Assembled
+
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, outcome.transaction.type)
+        assertEquals(
+            FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            outcome.transaction.sourceContainerId,
+        )
+        assertEquals(
+            FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002"),
+            outcome.transaction.destinationContainerId,
+        )
     }
 
     @Test
@@ -407,9 +488,12 @@ class TransactionAssemblerTest {
         card: CardReference? = null,
         channel: PurchaseChannel? = null,
         status: ParseStatus = ParseStatus.SUCCESS,
+        id: String = "pe-1",
+        rawSmsId: String = "sms-1",
+        bankNetworkType: BankNetworkType? = null,
     ) = ParsedEvent(
-        id = "pe-1",
-        rawSmsId = "sms-1",
+        id = id,
+        rawSmsId = rawSmsId,
         bank = Bank.BANK_ALJAZIRA,
         messageFamily = family,
         direction = MoneyDirection.OUTGOING,
@@ -421,7 +505,7 @@ class TransactionAssemblerTest {
         merchant = null,
         counterparty = null,
         occurredAt = receivedAt,
-        bankNetworkType = null,
+        bankNetworkType = bankNetworkType,
         confidence = Confidence(1.0),
         parseStatus = status,
     )

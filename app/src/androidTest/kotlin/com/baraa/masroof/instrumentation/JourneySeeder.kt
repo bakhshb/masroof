@@ -54,15 +54,15 @@ internal object JourneySeeder {
                 methodName.matchesJourney("startup_reachesFinancialUiWhenMaintenanceIsReady") -> Unit
                 methodName.matchesJourney("dashboard_showsPersistedTransactionAfterReload") -> {
                     awaitReadyForFixtures(container)
-                    seedDashboardTransaction()
+                    container.withDatabaseTransaction { seedDashboardTransaction() }
                 }
                 methodName.matchesJourney("reviewCorrection_persistsChosenTypeAndReloads") -> {
                     awaitReadyForFixtures(container)
-                    seedCorrectionReview()
+                    container.withDatabaseTransaction { seedCorrectionReview() }
                 }
                 methodName.matchesJourney("reviewRestore_persistsRestoredPurchaseAndReloads") -> {
                     awaitReadyForFixtures(container)
-                    seedIgnoredPurchase()
+                    container.withDatabaseTransaction { seedIgnoredPurchase() }
                 }
                 else -> error("No device seed for $methodName")
             }

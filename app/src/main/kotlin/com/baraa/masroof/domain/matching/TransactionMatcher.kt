@@ -9,6 +9,7 @@ import com.baraa.masroof.domain.model.ParsedEvent
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
+import java.util.Locale
 
 /**
  * Facts required for conservative TRANSFER_OUT ↔ TRANSFER_IN matching.
@@ -46,6 +47,14 @@ object TransactionMatcher {
     /** Maximum |t1 − t2| for automatic transfer pairing. */
     val TRANSFER_MATCH_WINDOW: Duration = Duration.ofMinutes(10)
 
+    /**
+     * Pairs transfer legs inside the caller-supplied candidate set.
+     *
+     * Callers pass a receipt or bank-local window, not the whole ledger.
+     * An exact shared reference or equal bank-local time wins over any other
+     * candidate that is merely inside [TRANSFER_MATCH_WINDOW]. Equal best
+     * candidates stay unpaired.
+     */
     fun findMutuallyUniquePairs(
         candidates: List<TransferMatchCandidate>,
     ): List<TransferMatchPair> {
@@ -67,29 +76,88 @@ object TransactionMatcher {
             val outs = group.filter { it.event.messageFamily == MessageFamily.TRANSFER_OUT }
             val inns = group.filter { it.event.messageFamily == MessageFamily.TRANSFER_IN }
             if (outs.isEmpty() || inns.isEmpty()) continue
-
-            val eligibleOutToIn = mutableMapOf<String, MutableList<String>>()
-            val eligibleInToOut = mutableMapOf<String, MutableList<String>>()
-
-            for (o in outs) {
-                for (i in inns) {
-                    if (!compatiblePair(o, i)) continue
-                    eligibleOutToIn.getOrPut(o.event.id) { mutableListOf() }.add(i.event.id)
-                    eligibleInToOut.getOrPut(i.event.id) { mutableListOf() }.add(o.event.id)
-                }
-            }
-
-            for (o in outs) {
-                val inIds = eligibleOutToIn[o.event.id].orEmpty()
-                if (inIds.size != 1) continue
-                val inId = inIds.single()
-                val outIds = eligibleInToOut[inId].orEmpty()
-                if (outIds.size != 1 || outIds.single() != o.event.id) continue
-                val incomingCandidate = inns.first { it.event.id == inId }
-                pairs += TransferMatchPair(o, incomingCandidate)
-            }
+            pairs += uniqueBestPairs(outs, inns)
         }
         return pairs
+    }
+
+    private fun uniqueBestPairs(
+        outs: List<TransferMatchCandidate>,
+        inns: List<TransferMatchCandidate>,
+    ): List<TransferMatchPair> {
+        val edges = mutableListOf<RankedPair>()
+        for (outgoing in outs) {
+            for (incoming in inns) {
+                val rank = pairRank(outgoing, incoming) ?: continue
+                edges += RankedPair(outgoing, incoming, rank)
+            }
+        }
+        if (edges.isEmpty()) return emptyList()
+
+        val bestForOut = edges.groupBy { it.outgoing.event.id }.mapValues { (_, group) ->
+            val best = group.minOf { it.rank }
+            group.filter { it.rank == best }
+        }
+        val bestForIn = edges.groupBy { it.incoming.event.id }.mapValues { (_, group) ->
+            val best = group.minOf { it.rank }
+            group.filter { it.rank == best }
+        }
+
+        val pairs = mutableListOf<TransferMatchPair>()
+        for ((outId, outEdges) in bestForOut) {
+            if (outEdges.size != 1) continue
+            val edge = outEdges.single()
+            val inEdges = bestForIn[edge.incoming.event.id].orEmpty()
+            if (inEdges.size != 1 || inEdges.single().outgoing.event.id != outId) continue
+            pairs += TransferMatchPair(edge.outgoing, edge.incoming)
+        }
+        return pairs
+    }
+
+    /**
+     * Best identity for a compatible pair. Lower ordinal is stronger.
+     * [WINDOW] is only the best rank when nothing more specific is compatible.
+     */
+    private enum class PairRank {
+        REFERENCE,
+        EXACT_LOCAL_TIME,
+        EXACT_RECEIPT,
+        WINDOW,
+    }
+
+    private data class RankedPair(
+        val outgoing: TransferMatchCandidate,
+        val incoming: TransferMatchCandidate,
+        val rank: PairRank,
+    )
+
+    private fun pairRank(
+        outgoing: TransferMatchCandidate,
+        incoming: TransferMatchCandidate,
+    ): PairRank? {
+        if (!compatiblePair(outgoing, incoming)) return null
+        val outRef = normalizedReference(outgoing.transactionReference)
+        val inRef = normalizedReference(incoming.transactionReference)
+        if (outRef.isNotEmpty() && outRef == inRef) return PairRank.REFERENCE
+        val outLocal = outgoing.occurredAtLocal
+        val inLocal = incoming.occurredAtLocal
+        if (outLocal != null && outLocal == inLocal) return PairRank.EXACT_LOCAL_TIME
+        if (outLocal == null && inLocal == null && outgoing.receivedAt == incoming.receivedAt) {
+            return PairRank.EXACT_RECEIPT
+        }
+        return PairRank.WINDOW
+    }
+
+    private fun normalizedReference(value: String?): String =
+        value?.trim()?.lowercase(Locale.ROOT).orEmpty()
+
+    private fun referencesConflict(
+        outgoing: TransferMatchCandidate,
+        incoming: TransferMatchCandidate,
+    ): Boolean {
+        val outRef = normalizedReference(outgoing.transactionReference)
+        val inRef = normalizedReference(incoming.transactionReference)
+        return outRef.isNotEmpty() && inRef.isNotEmpty() && outRef != inRef
     }
 
     fun compatiblePair(
@@ -107,6 +175,7 @@ object TransactionMatcher {
 
         if (outgoing.sourceOwnership != OwnershipStatus.OWNED) return false
         if (incoming.destinationOwnership != OwnershipStatus.OWNED) return false
+        if (referencesConflict(outgoing, incoming)) return false
 
         if (!withinWindow(outgoing, incoming)) return false
         if (!hasStrongBridge(outgoing, incoming)) return false
@@ -194,6 +263,8 @@ object TransactionMatcher {
         val inDestSuffix = inDest.maskedNumber?.trim().orEmpty()
         if (outSourceSuffix.isEmpty() || outDestSuffix.isEmpty()) return false
         if (inSourceSuffix.isEmpty() || inDestSuffix.isEmpty()) return false
+        if (outgoing.bank != incoming.bank) return false
+        if (outSource.bank != inSource.bank || outDest.bank != inDest.bank) return false
 
         return outSourceSuffix == inSourceSuffix && outDestSuffix == inDestSuffix
     }

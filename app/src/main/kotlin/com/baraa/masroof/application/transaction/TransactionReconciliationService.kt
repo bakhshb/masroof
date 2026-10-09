@@ -68,10 +68,29 @@ class TransactionReconciliationService(
     /**
      * Full-history reconciliation for explicit maintenance and recovery.
      * Interactive and incremental callers should use [reconcileAffectedRawSmsIds].
+     *
+     * This pass heals a uniquely proven pair. It does not unlink an already posted
+     * ambiguous self-transfer; that legacy cleanup is [repairLegacyTransfersDetailed].
      */
     suspend fun reconcileStoredEventsDetailed(): ReconciliationReport {
         val records = loadRecords()
         return reconcileRecordsDetailed(records)
+    }
+
+    /**
+     * One-time upgrade entrypoint. Unlinks irreducibly ambiguous posted single-leg
+     * self-transfers, then runs a full reconcile so unique external or self-transfer
+     * legs can heal. Ordinary scoped and full reconciliation do not call this.
+     */
+    suspend fun repairLegacyTransfersDetailed(): ReconciliationReport {
+        val records = loadRecords()
+        val release = releaseAmbiguousPostedSelfTransfers(records)
+        val reconciled = reconcileRecordsDetailed(records)
+        return reconciled.copy(
+            summary = reconciled.summary.copy(
+                failed = reconciled.summary.failed + release.failedCount,
+            ),
+        )
     }
 
     /**
@@ -366,6 +385,7 @@ class TransactionReconciliationService(
         val unresolvedTransfers = mutableListOf<TransferMatchCandidate>()
         val reviewCandidates = mutableListOf<ReconciliationReviewCandidate>()
         val settledRawSmsIds = linkedSetOf<String>()
+        val postedSingleLegCounterparts = mutableListOf<TransferMatchCandidate>()
 
         for (record in records) {
             val event = record.event
@@ -383,14 +403,24 @@ class TransactionReconciliationService(
                     settledRawSmsIds += event.rawSmsId
                     continue
                 }
+                if (review?.status == ReviewStatus.RESOLVED &&
+                    review.resolutionKind == ReviewResolutionKind.USER_EXTERNAL_TRANSFER
+                ) {
+                    alreadyLinked++
+                    settledRawSmsIds += event.rawSmsId
+                    continue
+                }
                 // Explicit "this SMS is financial" decision (e.g. restore from ignored).
-                if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) {
+                if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE ||
+                    review?.resolutionKind == ReviewResolutionKind.USER_CORRECTION
+                ) {
                     userConfirmed = true
                 }
             }
             val linkedBefore = financialTransactionRepository.findByRawSmsId(event.rawSmsId)
             if (linkedBefore != null) {
                 if (
+                    !preservesExplicitUserDecision(event.rawSmsId) &&
                     eventShouldNotProduceTransaction(event) &&
                     financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
                 ) {
@@ -401,6 +431,11 @@ class TransactionReconciliationService(
                 } else {
                     alreadyLinked++
                     settledRawSmsIds += event.rawSmsId
+                    if (linkedBefore.type == FinancialTransactionType.SELF_TRANSFER &&
+                        linkedBefore.linkedParsedEventIds.size == 1
+                    ) {
+                        transferCandidateFor(record)?.let { postedSingleLegCounterparts += it }
+                    }
                     continue
                 }
             }
@@ -622,7 +657,7 @@ class TransactionReconciliationService(
                     candidate = candidate,
                     pendingCounterparts = stillOpen.filter {
                         it.event.rawSmsId != candidate.event.rawSmsId
-                    },
+                    } + postedSingleLegCounterparts,
                     fallbackZone = zoneId,
                 )
             ) {
@@ -672,6 +707,7 @@ class TransactionReconciliationService(
         alreadyLinked += healedLoans.alreadyLinked
         failed += healedLoans.failed
         settledRawSmsIds += healedLoans.settledRawSmsIds
+        reviewCandidates.removeAll { it.rawSmsId in settledRawSmsIds }
 
         val summary = ReconciliationSummary(
             assembledSingle = assembledSingle,
@@ -738,7 +774,7 @@ class TransactionReconciliationService(
             val record: ParsedEventRecord?,
         )
 
-        fun staleLegs(
+        suspend fun staleLegs(
             transactions: List<FinancialTransaction>,
             family: MessageFamily,
         ): List<StaleLeg> =
@@ -751,6 +787,7 @@ class TransactionReconciliationService(
                 if (!TransactionAssembler.isAutomationEligible(event, record?.automationConfirmed == true)) {
                     return@mapNotNull null
                 }
+                if (preservesExplicitUserDecision(event.rawSmsId)) return@mapNotNull null
                 StaleLeg(
                     transaction = transaction,
                     event = event,
@@ -763,6 +800,7 @@ class TransactionReconciliationService(
         for (record in records) {
             val event = record.event
             if (!event.messageFamily.isTransferFamily()) continue
+            if (preservesExplicitUserDecision(event.rawSmsId)) continue
             if (!TransactionAssembler.isAutomationEligible(event, record.automationConfirmed)) continue
             if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) continue
             val leg = StaleLeg(transaction = null, event = event, record = record)
@@ -1040,10 +1078,120 @@ class TransactionReconciliationService(
             is FinancialTransactionSaveResult.Conflict -> PersistOutcome.Failed
         }
 
+    private data class LegacyReleaseResult(
+        val releasedRawSmsIds: Set<String> = emptySet(),
+        val skippedRawSmsIds: Set<String> = emptySet(),
+        val failedCount: Int = 0,
+    )
+
+    /**
+     * Pre-M1 assemblers posted each owned-owned transfer SMS as its own
+     * self-transfer. Upgrade-only: uniquely pairable legs stay for
+     * [upgradeStaleExternalPairs], and irreducibly ambiguous exclusive legs are
+     * unlinked so the following reconcile can put them in PENDING_MATCH.
+     *
+     * A false delete is rechecked. A protected, shared, or already-settled row is
+     * a skip. A row that still needs release counts as a failure. Explicit user
+     * resolutions, two-evidence self-transfers, and lone legs are not touched.
+     */
+    private suspend fun releaseAmbiguousPostedSelfTransfers(
+        records: List<ParsedEventRecord>,
+    ): LegacyReleaseResult {
+        val postedSingleLeg = mutableListOf<ParsedEventRecord>()
+        val skipped = linkedSetOf<String>()
+        for (record in records) {
+            val event = record.event
+            if (!event.messageFamily.isTransferFamily()) continue
+            val linked = financialTransactionRepository.findByRawSmsId(event.rawSmsId) ?: continue
+            if (linked.type != FinancialTransactionType.SELF_TRANSFER) continue
+            if (linked.linkedParsedEventIds.size != 1) continue
+            if (shouldProtectFromAutomaticUnlink(event.rawSmsId)) {
+                skipped += event.rawSmsId
+                continue
+            }
+            postedSingleLeg += record
+        }
+        if (postedSingleLeg.isEmpty()) {
+            return LegacyReleaseResult(skippedRawSmsIds = skipped)
+        }
+
+        val candidates = records.mapNotNull { transferCandidateFor(it) }
+        if (candidates.isEmpty()) return LegacyReleaseResult(skippedRawSmsIds = skipped)
+        val uniquelyPairedEventIds = TransactionMatcher.findMutuallyUniquePairs(candidates)
+            .flatMap { pair -> listOf(pair.outgoing.event.id, pair.incoming.event.id) }
+            .toSet()
+
+        val released = linkedSetOf<String>()
+        var failed = 0
+        for (record in postedSingleLeg) {
+            val event = record.event
+            if (event.id in uniquelyPairedEventIds) continue
+            val candidate = candidates.firstOrNull { it.event.id == event.id } ?: continue
+            if (!TransactionMatcher.hasPendingIntraBankCounterpart(candidate, candidates)) continue
+            val deleted = try {
+                financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                failed++
+                continue
+            }
+            if (deleted) {
+                released += event.rawSmsId
+            } else if (ambiguousReleaseStillRequired(event.rawSmsId)) {
+                failed++
+            } else {
+                skipped += event.rawSmsId
+            }
+        }
+        return LegacyReleaseResult(
+            releasedRawSmsIds = released,
+            skippedRawSmsIds = skipped,
+            failedCount = failed,
+        )
+    }
+
+    /**
+     * True when an exclusive single-leg self-transfer is still posted after a
+     * delete that returned false. Shared links and rows that already moved are skips.
+     */
+    private suspend fun ambiguousReleaseStillRequired(rawSmsId: String): Boolean {
+        if (shouldProtectFromAutomaticUnlink(rawSmsId)) return false
+        val linked = financialTransactionRepository.findByRawSmsId(rawSmsId) ?: return false
+        if (linked.type != FinancialTransactionType.SELF_TRANSFER) return false
+        if (linked.linkedParsedEventIds.size != 1) return false
+        return financialTransactionRepository.listRawSmsIds(linked.id).size == 1
+    }
+
+    /**
+     * A resolved user choice is left as stored. Automatic reconcile and legacy
+     * repair must not delete, unlink, re-pair, or replace that SMS.
+     */
+    private suspend fun preservesExplicitUserDecision(rawSmsId: String): Boolean {
+        val review = reviewRepository?.findByRawSmsId(rawSmsId) ?: return false
+        if (review.status != ReviewStatus.RESOLVED) return false
+        return when (review.resolutionKind) {
+            ReviewResolutionKind.USER_NON_FINANCIAL,
+            ReviewResolutionKind.USER_EXTERNAL_TRANSFER,
+            ReviewResolutionKind.USER_FINANCIAL_TYPE,
+            ReviewResolutionKind.USER_SELF_TRANSFER_PAIR,
+            ReviewResolutionKind.USER_CORRECTION,
+            -> true
+            else -> false
+        }
+    }
+
+    private suspend fun shouldProtectFromAutomaticUnlink(rawSmsId: String): Boolean =
+        preservesExplicitUserDecision(rawSmsId)
+
     private suspend fun observeUnlinkedTransfer(record: ParsedEventRecord): TransferMatchCandidate? {
+        if (financialTransactionRepository.isRawSmsLinked(record.event.rawSmsId)) return null
+        return transferCandidateFor(record)
+    }
+
+    private suspend fun transferCandidateFor(record: ParsedEventRecord): TransferMatchCandidate? {
         val event = record.event
         if (!event.messageFamily.isTransferFamily()) return null
-        if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) return null
         var userConfirmed = record.automationConfirmed
         if (reviewRepository != null) {
             val review = reviewRepository.findByRawSmsId(event.rawSmsId)
@@ -1087,6 +1235,7 @@ class TransactionReconciliationService(
         ) {
             return false
         }
+        if (preservesExplicitUserDecision(event.rawSmsId)) return false
         val linked = financialTransactionRepository.findByRawSmsId(event.rawSmsId) ?: return false
         if (linked.type != FinancialTransactionType.SELF_TRANSFER) return false
         val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: return false

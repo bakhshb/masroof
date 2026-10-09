@@ -90,6 +90,13 @@ val REVIEW_FINANCIAL_TYPE_ACTIONS: List<FinancialTransactionType> = listOf(
     FinancialTransactionType.LOAN_REPAYMENT,
 )
 
+/** Compose test tag for a review-detail financial-type action. Stable across locales. */
+fun reviewResolveTypeTestTag(type: FinancialTransactionType): String =
+    "review_resolve_${type.name}"
+
+/** Compose test tag for restore-as-is on an ignored review. Stable across locales. */
+const val REVIEW_RESTORE_AS_IS_TEST_TAG: String = "review_action_restore"
+
 /** Transfers use dedicated external-transfer / pair actions instead of generic type buttons. */
 val TRANSFER_MESSAGE_FAMILIES: Set<MessageFamily> = setOf(
     MessageFamily.TRANSFER_IN,

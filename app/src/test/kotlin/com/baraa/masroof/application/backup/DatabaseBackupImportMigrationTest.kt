@@ -1,6 +1,7 @@
 package com.baraa.masroof.application.backup
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -9,6 +10,7 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
+import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.room.MasroofDatabase
@@ -49,12 +51,16 @@ class DatabaseBackupImportMigrationTest {
     }
 
     @Test
-    fun importV5Backup_resetsParseFactsBackfillMarker() {
+    fun importV5Backup_resetsParseFactsAndTransferIntegrityMarkers() {
         runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, MasroofDatabase.VERSION)
+            .putInt(
+                MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION,
+                TransferIntegrityRepairCoordinator.CURRENT_VERSION,
+            )
             .commit()
 
         val v5DbFile = createV5DatabaseFile(context)
@@ -73,10 +79,14 @@ class DatabaseBackupImportMigrationTest {
             appVersionName = "test",
             clockEpochMillis = { 1_700_000_000_000L },
             restartProcess = {
+                val maintenance = context.getSharedPreferences(
+                    MaintenancePreferences.PREFS_NAME,
+                    Context.MODE_PRIVATE,
+                )
+                assertEquals(0, maintenance.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0))
                 assertEquals(
                     0,
-                    context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
-                        .getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0),
+                    maintenance.getInt(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, 0),
                 )
                 restartRequested.set(true)
             },
@@ -89,6 +99,53 @@ class DatabaseBackupImportMigrationTest {
 
         backupZip.delete()
         v5DbFile.delete()
+        }
+    }
+
+    @Test
+    fun importBackup_failedMaintenanceMarkerReset_keepsMarkersAndDoesNotRestart() {
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val prefs = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, MasroofDatabase.VERSION)
+                .putInt(
+                    MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION,
+                    TransferIntegrityRepairCoordinator.CURRENT_VERSION,
+                )
+                .commit()
+
+            val v5DbFile = createV5DatabaseFile(context)
+            val backupZip = createBackupZip(v5DbFile)
+            val restartRequested = AtomicBoolean(false)
+            val liveDatabase = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
+                .addMigrations(*MasroofDatabase.ALL_MIGRATIONS)
+                .allowMainThreadQueries()
+                .build()
+            val backupService = DatabaseBackupService(
+                appContext = context,
+                database = liveDatabase,
+                closeDatabase = { liveDatabase.close() },
+                appVersionName = "test",
+                clockEpochMillis = { 1_700_000_000_000L },
+                restartProcess = { restartRequested.set(true) },
+                maintenancePreferences = CommitFailsPreferences(prefs),
+            )
+
+            val outcome = backupService.importFrom(Uri.fromFile(backupZip))
+
+            assertEquals(BackupImportOutcome.Failed, outcome)
+            assertFalse(restartRequested.get())
+            assertEquals(
+                MasroofDatabase.VERSION,
+                prefs.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0),
+            )
+            assertEquals(
+                TransferIntegrityRepairCoordinator.CURRENT_VERSION,
+                prefs.getInt(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, 0),
+            )
+            backupZip.delete()
+            v5DbFile.delete()
         }
     }
 
@@ -304,5 +361,22 @@ class DatabaseBackupImportMigrationTest {
         for (setupEl in database["setupQueries"]?.jsonArray.orEmpty()) {
             db.execSQL(setupEl.jsonPrimitive.content)
         }
+    }
+
+    private class CommitFailsPreferences(
+        private val delegate: SharedPreferences,
+    ) : SharedPreferences by delegate {
+        override fun edit(): SharedPreferences.Editor = CommitFailsEditor(delegate.edit())
+    }
+
+    private class CommitFailsEditor(
+        private val delegate: SharedPreferences.Editor,
+    ) : SharedPreferences.Editor by delegate {
+        override fun remove(key: String): SharedPreferences.Editor {
+            delegate.remove(key)
+            return this
+        }
+
+        override fun commit(): Boolean = false
     }
 }

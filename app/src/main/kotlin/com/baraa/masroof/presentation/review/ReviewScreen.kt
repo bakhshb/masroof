@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -393,7 +394,9 @@ private fun ReviewDetailScreen(
                     enabled = !resolving,
                     icon = MasroofIcons.success,
                     text = stringResource(R.string.review_action_restore),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(REVIEW_RESTORE_AS_IS_TEST_TAG),
                 )
                 REVIEW_FINANCIAL_TYPE_ACTIONS.forEach { type ->
                     IconTextButton(
@@ -494,7 +497,9 @@ private fun ReviewDetailScreen(
                         enabled = !resolving,
                         icon = MasroofIcons.transactionType(type),
                         text = stringResource(type.toUiLabelRes()),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(reviewResolveTypeTestTag(type)),
                     )
                 }
             }

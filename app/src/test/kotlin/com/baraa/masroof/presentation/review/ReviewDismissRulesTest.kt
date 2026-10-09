@@ -1,6 +1,8 @@
 package com.baraa.masroof.presentation.review
 
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,6 +45,14 @@ class ReviewDismissRulesTest {
                 messageFamily = MessageFamily.PURCHASE,
                 reasons = listOf("needs_review"),
             ),
+        )
+    }
+
+    @Test
+    fun resolveTypeTestTag_isLocaleStable() {
+        assertEquals(
+            "review_resolve_EXPENSE",
+            reviewResolveTypeTestTag(FinancialTransactionType.EXPENSE),
         )
     }
 }
