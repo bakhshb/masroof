@@ -50,6 +50,7 @@ class DatabaseRestoreRecoveryTest {
     fun tearDown() {
         DatabaseRestoreRecovery.afterJournalTempDurable = null
         DatabaseRestoreRecovery.afterOriginalRestoreStep = null
+        DatabaseRestoreRecovery.integrityCheckCount = 0
         DatabaseRestoreRecovery.deleteRestoreArtifacts(live)
         if (live.exists()) live.delete()
         context.deleteDatabase(MasroofDatabase.NAME)
@@ -239,6 +240,18 @@ class DatabaseRestoreRecoveryTest {
 
         assertEquals("current", readMarker(live))
         assertEquals("previous", readMarker(File(live.path + ".rollback")))
+    }
+
+    @Test
+    fun normalStartup_doesNotIntegrityCheckTheLiveDatabase() {
+        writeDatabase(live, "current")
+        DatabaseRestoreRecovery.integrityCheckCount = 0
+
+        DatabaseRestoreRecovery.recover(context)
+        DatabaseRestoreRecovery.recover(context)
+
+        assertEquals(0, DatabaseRestoreRecovery.integrityCheckCount)
+        assertEquals("current", readMarker(live))
     }
 
     @Test

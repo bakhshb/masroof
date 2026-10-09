@@ -55,6 +55,9 @@ object DatabaseRestoreRecovery {
      */
     internal var afterOriginalRestoreStep: ((OriginalRestoreStep) -> Unit)? = null
 
+    /** Counts full integrity scans. Normal startup must not increment this. */
+    internal var integrityCheckCount: Int = 0
+
     class ProcessTerminated(stage: Stage) : Error("Database restore terminated after $stage")
 
     class IncompleteRestoreException(message: String) : IllegalStateException(message)
@@ -233,6 +236,12 @@ object DatabaseRestoreRecovery {
     }
 
     private fun recoverWithoutJournal(live: File) {
+        if (!hasRestoreEvidence(live)) {
+            if (!live.exists() || looksLikeSqlite(live)) return
+            throw IncompleteRestoreException(
+                "A database file exists but neither copy is a valid SQLite database",
+            )
+        }
         if (isSqliteOk(live)) {
             reclaimOrphanedPreservedRollback(live)
             return
@@ -504,8 +513,40 @@ object DatabaseRestoreRecovery {
     private fun optionalInt(prefs: android.content.SharedPreferences, key: String): Int? =
         if (prefs.contains(key)) prefs.getInt(key, 0) else null
 
+    private fun hasRestoreEvidence(live: File): Boolean {
+        val rollback = rollbackFile(live)
+        val preserved = preservedRollbackFile(live)
+        val incoming = incomingFile(live)
+        return rollback.exists() || hasSidecar(rollback) ||
+            preserved.exists() || hasSidecar(preserved) ||
+            incoming.exists() || hasSidecar(incoming) ||
+            originalPrefsFile(live).exists() ||
+            incomingPrefsFile(live).exists() ||
+            journalTempFile(live).exists()
+    }
+
+    /** Header only. Does not open SQLite or scan pages. */
+    private fun looksLikeSqlite(file: File): Boolean {
+        if (!file.isFile || file.length() < SQLITE_HEADER.size) return false
+        return try {
+            file.inputStream().use { input ->
+                val header = ByteArray(SQLITE_HEADER.size)
+                var offset = 0
+                while (offset < header.size) {
+                    val read = input.read(header, offset, header.size - offset)
+                    if (read < 0) return false
+                    offset += read
+                }
+                header.contentEquals(SQLITE_HEADER)
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun isSqliteOk(file: File): Boolean {
-        if (!file.isFile || file.length() <= 0L) return false
+        if (!looksLikeSqlite(file)) return false
+        integrityCheckCount += 1
         return try {
             SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
                 db.rawQuery("PRAGMA integrity_check", null).use { cursor ->
@@ -645,6 +686,11 @@ object DatabaseRestoreRecovery {
     private const val ORIGINAL_PREFS_SUFFIX = ".prefs-original"
     private const val INCOMING_PREFS_SUFFIX = ".prefs-incoming"
     private val SIDECARS = listOf("-wal", "-shm", "-journal")
+
+    private val SQLITE_HEADER = byteArrayOf(
+        0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66,
+        0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
+    )
 
     private const val KEY_ONBOARDING_STARTED = "onboarding_started"
     private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
