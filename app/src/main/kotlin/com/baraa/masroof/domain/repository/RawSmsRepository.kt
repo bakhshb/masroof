@@ -23,6 +23,25 @@ interface RawSmsRepository {
     suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms?
 
     /**
+     * Resolves a provider id stored on a RawSms row or only as a live↔inbox alias.
+     * The alias does not change the original row.
+     */
+    suspend fun findByProviderMessageId(providerMessageId: String): RawSms? =
+        findByDeviceMessageId(providerMessageId)
+
+    /** RawSms id already linked to this inbox provider id, if the link is an alias. */
+    suspend fun findProviderAliasRawSmsId(providerMessageId: String): String? = null
+
+    /** Subset of [rawSmsIds] that already have a provider alias. */
+    suspend fun providerAliasRawSmsIds(rawSmsIds: Collection<String>): Set<String> = emptySet()
+
+    /**
+     * Records that [providerMessageId] names the already stored live row [rawSmsId].
+     * Does not update that row. Returns false when the provider id is already taken.
+     */
+    suspend fun rememberProviderAlias(providerMessageId: String, rawSmsId: String): Boolean = false
+
+    /**
      * Every stored RawSms id, oldest receipt first. Used by bulk reprocessing so
      * evidence without a ParsedEvent (Unsupported / Invalid / failed) is retried.
      */

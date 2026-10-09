@@ -25,6 +25,7 @@ import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 import com.baraa.masroof.data.room.entity.ParsedEventEntity
 import com.baraa.masroof.data.room.entity.ProcessingRetryEntity
 import com.baraa.masroof.data.room.entity.RawSmsEntity
+import com.baraa.masroof.data.room.entity.RawSmsProviderAliasEntity
 import com.baraa.masroof.data.room.entity.ReviewItemEntity
 import com.baraa.masroof.data.room.entity.UserCorrectionEntity
 import com.baraa.masroof.data.room.migration.MIGRATION_1_2
@@ -42,6 +43,7 @@ import com.baraa.masroof.data.room.migration.MIGRATION_13_14
 import com.baraa.masroof.data.room.migration.MIGRATION_14_15
 import com.baraa.masroof.data.room.migration.MIGRATION_15_16
 import com.baraa.masroof.data.room.migration.MIGRATION_16_17
+import com.baraa.masroof.data.room.migration.MIGRATION_17_18
 import com.baraa.masroof.data.room.migration.MIGRATION_7_8
 
 /**
@@ -57,12 +59,14 @@ import com.baraa.masroof.data.room.migration.MIGRATION_7_8
  * 13→14 backfill open pause intervals for legacy inactive commitments;
  * 14→15 processing-retry markers;
  * 15→16 transaction timezone provenance;
- * 16→17 query-shape indexes (arrival ordering, typed ranges, batch corrections, card facts).
+ * 16→17 query-shape indexes (arrival ordering, typed ranges, batch corrections, card facts);
+ * 17→18 live↔inbox provider aliases. RawSms rows are not rewritten.
  * Does not use destructive migration.
  */
 @Database(
     entities = [
         RawSmsEntity::class,
+        RawSmsProviderAliasEntity::class,
         ParsedEventEntity::class,
         BankRegistryEntity::class,
         AccountRegistryEntity::class,
@@ -76,7 +80,7 @@ import com.baraa.masroof.data.room.migration.MIGRATION_7_8
         UserCorrectionEntity::class,
         ProcessingRetryEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = true,
 )
 abstract class MasroofDatabase : RoomDatabase() {
@@ -106,16 +110,22 @@ abstract class MasroofDatabase : RoomDatabase() {
 
     companion object {
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 17
+        const val VERSION: Int = 18
+
+        /** Must match app/schemas/.../18.json identityHash. Filled after Room export. */
+        const val IDENTITY_HASH: String = "71f1193767b3aa12bcb6cc6e7ce77147"
+
+        /** Previous production schema (v17). */
+        const val PREVIOUS_VERSION: Int = 17
 
         /** Must match app/schemas/.../17.json identityHash. */
-        const val IDENTITY_HASH: String = "f18e84acb2bf790d0355fdb694267a1a"
+        const val PREVIOUS_IDENTITY_HASH: String = "f18e84acb2bf790d0355fdb694267a1a"
 
-        /** Previous production schema (v16). */
-        const val PREVIOUS_VERSION: Int = 16
+        /** Legacy v16 backups (query-shape indexes). */
+        const val LEGACY_VERSION_16: Int = 16
 
         /** Must match app/schemas/.../16.json identityHash. */
-        const val PREVIOUS_IDENTITY_HASH: String = "9ca34d4e25b5d478101c5b89add2cc70"
+        const val LEGACY_IDENTITY_HASH_16: String = "9ca34d4e25b5d478101c5b89add2cc70"
 
         /** Legacy v15 backups (transaction timezone provenance). */
         const val LEGACY_VERSION_15: Int = 15
@@ -199,6 +209,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             MIGRATION_14_15,
             MIGRATION_15_16,
             MIGRATION_16_17,
+            MIGRATION_17_18,
         )
 
         /** Room versions accepted by [com.baraa.masroof.application.backup.DatabaseBackupService]. */
@@ -214,6 +225,7 @@ abstract class MasroofDatabase : RoomDatabase() {
             LEGACY_VERSION_13 to LEGACY_IDENTITY_HASH_13,
             LEGACY_VERSION_14 to LEGACY_IDENTITY_HASH_14,
             LEGACY_VERSION_15 to LEGACY_IDENTITY_HASH_15,
+            LEGACY_VERSION_16 to LEGACY_IDENTITY_HASH_16,
             PREVIOUS_VERSION to PREVIOUS_IDENTITY_HASH,
             VERSION to IDENTITY_HASH,
         )

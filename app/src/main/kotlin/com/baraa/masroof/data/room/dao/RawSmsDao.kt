@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.baraa.masroof.data.room.entity.RawSmsEntity
+import com.baraa.masroof.data.room.entity.RawSmsProviderAliasEntity
 
 @Dao
 interface RawSmsDao {
@@ -43,6 +44,35 @@ interface RawSmsDao {
 
     @Query("SELECT * FROM raw_sms WHERE dedupeKey = :dedupeKey LIMIT 1")
     suspend fun findByDedupeKey(dedupeKey: String): RawSmsEntity?
+
+    @Query(
+        """
+        SELECT rawSmsId FROM raw_sms_provider_alias
+        WHERE providerMessageId = :providerMessageId
+        LIMIT 1
+        """,
+    )
+    suspend fun findRawSmsIdByProviderAlias(providerMessageId: String): String?
+
+    @Query(
+        """
+        SELECT providerMessageId FROM raw_sms_provider_alias
+        WHERE rawSmsId = :rawSmsId
+        LIMIT 1
+        """,
+    )
+    suspend fun findProviderAliasForRawSms(rawSmsId: String): String?
+
+    @Query(
+        """
+        SELECT rawSmsId FROM raw_sms_provider_alias
+        WHERE rawSmsId IN (:rawSmsIds)
+        """,
+    )
+    suspend fun listAliasedRawSmsIds(rawSmsIds: List<String>): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertProviderAlias(alias: RawSmsProviderAliasEntity): Long
 
     /**
      * Cross-source live↔historical near-duplicate lookup.

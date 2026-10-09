@@ -44,6 +44,8 @@ object SchemaFactsBackfillPolicy {
         put(16, MaintenanceRequirement.BACKGROUND)
         // Index-only. Existing rows stay correct; do not reparse the SMS backlog.
         put(17, MaintenanceRequirement.NOT_REQUIRED)
+        // Provider aliases. Existing RawSms rows stay immutable and already display correctly.
+        put(18, MaintenanceRequirement.NOT_REQUIRED)
     }
 
     /**

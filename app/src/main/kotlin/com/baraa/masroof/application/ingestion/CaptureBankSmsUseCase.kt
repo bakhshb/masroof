@@ -43,6 +43,7 @@ class CaptureBankSmsUseCase(
         val insertOutcome = try {
             insertMutex.withLock {
                 if (hasCrossSourceNearDuplicate(rawSms)) {
+                    claimInboxIdentityOnLiveTwin(rawSms)
                     return@withLock RawSmsInsertResult.AlreadyExists
                 }
                 rawSmsRepository.insertIfAbsent(rawSms)
@@ -81,20 +82,60 @@ class CaptureBankSmsUseCase(
         }
     }
 
+    /**
+     * The first inbox copy of an unidentified live row is that same SMS.
+     * Its provider id is stored as an alias. The RawSms row is not rewritten.
+     * A later inbox message with a different provider id no longer sees that
+     * live row as unidentified, so it is stored as its own RawSms.
+     */
+    private suspend fun claimInboxIdentityOnLiveTwin(incoming: RawSms) {
+        val providerId = incoming.deviceMessageId?.takeIf { it.isNotBlank() } ?: return
+        if (rawSmsRepository.findByProviderMessageId(providerId) != null) return
+        val tight = unidentifiedLiveTwins(incoming, CROSS_SOURCE_RECEIVED_AT_TOLERANCE)
+        val candidates = if (tight.isNotEmpty()) {
+            tight
+        } else {
+            val widened = unidentifiedLiveTwins(incoming, CROSS_SOURCE_UNIQUE_SKEW_TOLERANCE)
+            if (widened.size == 1) widened else emptyList()
+        }
+        val incomingAt = incoming.receivedAt.toEpochMilli()
+        val target = candidates.minWithOrNull(
+            compareBy<RawSms> { kotlin.math.abs(it.receivedAt.toEpochMilli() - incomingAt) }
+                .thenBy { it.id },
+        ) ?: return
+        rawSmsRepository.rememberProviderAlias(providerId, target.id)
+    }
+
     private suspend fun hasCrossSourceNearDuplicate(rawSms: RawSms): Boolean {
-        val lookingForLiveRow = rawSms.deviceMessageId != null
+        val providerId = rawSms.deviceMessageId?.takeIf { it.isNotBlank() }
+        if (providerId != null) {
+            if (rawSmsRepository.findByProviderMessageId(providerId) != null) return true
+            val tight = unidentifiedLiveTwins(rawSms, CROSS_SOURCE_RECEIVED_AT_TOLERANCE)
+            if (tight.isNotEmpty()) return true
+            return unidentifiedLiveTwins(rawSms, CROSS_SOURCE_UNIQUE_SKEW_TOLERANCE).size == 1
+        }
         val tight = crossSourceTwins(
             rawSms = rawSms,
             tolerance = CROSS_SOURCE_RECEIVED_AT_TOLERANCE,
-            lookingForLiveRow = lookingForLiveRow,
+            lookingForLiveRow = false,
         )
         if (tight.isNotEmpty()) return true
-        val widened = crossSourceTwins(
+        return crossSourceTwins(
             rawSms = rawSms,
             tolerance = CROSS_SOURCE_UNIQUE_SKEW_TOLERANCE,
-            lookingForLiveRow = lookingForLiveRow,
+            lookingForLiveRow = false,
+        ).size == 1
+    }
+
+    private suspend fun unidentifiedLiveTwins(rawSms: RawSms, tolerance: Duration): List<RawSms> {
+        val twins = crossSourceTwins(
+            rawSms = rawSms,
+            tolerance = tolerance,
+            lookingForLiveRow = true,
         )
-        return widened.size == 1
+        if (twins.isEmpty()) return emptyList()
+        val aliased = rawSmsRepository.providerAliasRawSmsIds(twins.map { it.id })
+        return twins.filter { it.id !in aliased }
     }
 
     private suspend fun crossSourceTwins(
