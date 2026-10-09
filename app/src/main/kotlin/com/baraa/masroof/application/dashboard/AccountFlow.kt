@@ -19,6 +19,7 @@ data class AccountFlow(
     val salary: Money,
     val otherIncome: Money,
     val externalTransfersIn: Money,
+    val accountRefunds: Money,
     val internalTransfersIn: Money,
     val externalTransfersOut: Money,
     val creditCardPayments: Money,
@@ -29,9 +30,9 @@ data class AccountFlow(
     val internalTransfersOut: Money,
     val loan: Money,
 ) {
-    /** Salary + other income + external transfers in. */
+    /** Salary, other income, external transfers in, and refunds credited to this account. */
     val externalIn: Money
-        get() = salary + otherIncome + externalTransfersIn
+        get() = salary + otherIncome + externalTransfersIn + accountRefunds
 
     /** Six standard outflow categories + loan. */
     val externalOut: Money
@@ -81,6 +82,7 @@ data class AccountFlow(
             salary,
             otherIncome,
             externalTransfersIn,
+            accountRefunds,
             internalTransfersIn,
             externalTransfersOut,
             creditCardPayments,
@@ -100,6 +102,7 @@ data class AccountFlow(
                 salary = Money.zero(currency),
                 otherIncome = Money.zero(currency),
                 externalTransfersIn = Money.zero(currency),
+                accountRefunds = Money.zero(currency),
                 internalTransfersIn = Money.zero(currency),
                 externalTransfersOut = Money.zero(currency),
                 creditCardPayments = Money.zero(currency),
@@ -117,6 +120,7 @@ data class AccountFlow(
                 salary = summary.inflow.salary,
                 otherIncome = summary.inflow.otherIncome,
                 externalTransfersIn = summary.inflow.externalTransfersIn,
+                accountRefunds = summary.inflow.accountRefunds,
                 internalTransfersIn = summary.inflow.selfTransfersIn,
                 externalTransfersOut = summary.outflow.externalTransfersOut,
                 creditCardPayments = summary.outflow.creditCardPayments,
@@ -141,6 +145,7 @@ data class AccountFlow(
             salary = salary + other.salary,
             otherIncome = otherIncome + other.otherIncome,
             externalTransfersIn = externalTransfersIn + other.externalTransfersIn,
+            accountRefunds = accountRefunds + other.accountRefunds,
             internalTransfersIn = internalTransfersIn + other.internalTransfersIn,
             externalTransfersOut = externalTransfersOut + other.externalTransfersOut,
             creditCardPayments = creditCardPayments + other.creditCardPayments,

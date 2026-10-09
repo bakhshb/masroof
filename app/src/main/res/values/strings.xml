@@ -348,6 +348,7 @@
     <string name="dashboard_remaining_formula">وارد %1$s − منصرف %2$s = الباقي</string>
     <string name="dashboard_salary">الراتب</string>
     <string name="dashboard_other_income">دخل آخر</string>
+    <string name="dashboard_account_refunds">استرداد إلى الحساب</string>
     <string name="dashboard_total_inflow">إجمالي الوارد</string>
     <string name="dashboard_total_spent">إجمالي المنصرف</string>
     <string name="dashboard_self_transfer_in">وارد من حساب آخر</string>
