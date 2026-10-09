@@ -2,10 +2,13 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.parsing.model.isCreditCardSms
+import com.baraa.masroof.parsing.model.isDebitCardSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 enum class SelfTransferLeg {
@@ -176,12 +179,88 @@ object AccountFlowClassifier {
                 }
             }
 
-            FinancialTransactionType.REFUND,
+            FinancialTransactionType.REFUND -> classifyRefund(tx, scope, context)
+
             FinancialTransactionType.ADJUSTMENT,
             FinancialTransactionType.UNKNOWN,
             -> emptyList()
         }
     }
+
+    /**
+     * A refund credited to a verified current account is cash inflow.
+     * It is not salary and not ordinary income.
+     * A credit-card refund offsets card liability and does not increase account cash.
+     * A refund with no verified account destination stays unattributed.
+     */
+    private fun classifyRefund(
+        tx: FinancialTransaction,
+        scope: CurrentAccountTransactionScope,
+        context: AccountFlowClassificationContext,
+    ): List<FlowAssignment> {
+        val accountId = verifiedCurrentAccountCredit(tx, scope, context) ?: return emptyList()
+        if (!creditsScopedAccount(scope, accountId)) return emptyList()
+        return listOf(FlowAssignment.Income(FlowIncomeCategory.ACCOUNT_REFUND))
+    }
+
+    private fun verifiedCurrentAccountCredit(
+        tx: FinancialTransaction,
+        scope: CurrentAccountTransactionScope,
+        context: AccountFlowClassificationContext,
+    ): String? {
+        directAccountDestination(tx, context)?.let { return it }
+        return linkedDebitAccount(tx, scope, context)
+    }
+
+    private fun directAccountDestination(
+        tx: FinancialTransaction,
+        context: AccountFlowClassificationContext,
+    ): String? {
+        tx.destinationContainerId?.takeIf { isAccountContainer(it) }?.let { return it }
+        return linkedRecords(tx, context).firstNotNullOfOrNull { record ->
+            record.event.destinationAccountRef?.let(FinancialContainerIdFactory::accountId)
+        }
+    }
+
+    /**
+     * A debit-card refund with a registry link credits that current account.
+     * Credit-card channel and an unlinked card destination do not.
+     */
+    private fun linkedDebitAccount(
+        tx: FinancialTransaction,
+        scope: CurrentAccountTransactionScope,
+        context: AccountFlowClassificationContext,
+    ): String? {
+        val cardId = tx.destinationContainerId?.takeIf { isCardContainer(it) } ?: return null
+        val records = linkedRecords(tx, context)
+        if (records.any { it.details.isCreditCardSms() }) return null
+        val debitCard = cardId in scope.ownedDebitCardContainerIds ||
+            records.any { it.details.isDebitCardSms() }
+        if (!debitCard) return null
+        return scope.debitCardLinkedAccountIds[cardId]
+    }
+
+    private fun creditsScopedAccount(
+        scope: CurrentAccountTransactionScope,
+        accountId: String,
+    ): Boolean {
+        if (scope.ownedContainerIds.isEmpty()) return true
+        if (accountId in scope.ownedContainerIds) return true
+        if (!isAccountContainer(accountId)) return false
+        return accountId.substringAfterLast(':') in scope.ownedAccountLast4s
+    }
+
+    private fun linkedRecords(
+        tx: FinancialTransaction,
+        context: AccountFlowClassificationContext,
+    ): List<ParsedEventRecord> =
+        tx.linkedParsedEventIds.mapNotNull { context.parsedRecordsById[it] }
+
+    private fun isAccountContainer(containerId: String): Boolean =
+        containerId.startsWith("account:")
+
+    private fun isCardContainer(containerId: String): Boolean =
+        containerId.startsWith("card:")
 
     fun resolveBillPaymentTransactionIds(
         transactions: List<FinancialTransaction>,

@@ -27,7 +27,7 @@ data class AccountsSummary(
     val totalRemaining: SignedMoneyAmount?
         get() = fleet.accountSummary()?.remaining
 
-    /** Salary, other income, and external transfers in. Excludes transfers between owned accounts. */
+    /** Salary, other income, external transfers in, and account refunds. Excludes transfers between owned accounts. */
     val totalInflow: Money?
         get() = fleet.externalSummary()?.inflow
 

@@ -31,8 +31,8 @@ class GoldenLedgerOracleTest {
         val scenarios = GoldenLedgerCorpus.loadAll()
         val active = scenarios.filter { it.status == "ACTIVE" }
         val pending = scenarios.filter { it.status == "PENDING" }
-        assertTrue("expected 4 active baselines, was ${active.map { it.id }}", active.size == 4)
-        assertEquals(setOf("M5", "M6", "M8"), pending.map { it.ownerMilestone }.toSet())
+        assertTrue("expected 5 active baselines, was ${active.map { it.id }}", active.size == 5)
+        assertEquals(setOf("M5", "M8"), pending.map { it.ownerMilestone }.toSet())
         active.forEach { scenario ->
             assertNull(scenario.ownerMilestone)
             assertNull(scenario.knownDefect)
@@ -74,8 +74,8 @@ class GoldenLedgerOracleTest {
     }
 
     @Test
-    fun pendingM6_accountRefund_staysExemptUntilOwnerActivates() = runBlocking {
-        assertPending("m6_account_refund")
+    fun accountRefund_matchesOracle_acrossReprocessing() = runBlocking {
+        assertActive("m6_account_refund")
     }
 
     @Test

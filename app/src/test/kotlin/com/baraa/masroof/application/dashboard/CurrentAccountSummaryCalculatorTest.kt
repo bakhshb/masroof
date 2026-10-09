@@ -11,11 +11,17 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.period.FinancialPeriod
+import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 class CurrentAccountSummaryCalculatorTest {
     @Test
@@ -523,6 +529,185 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
+    fun accountRefundAndPurchase_sameSalaryPeriod_netsCashWithoutIncomeOrDoubleCount() {
+        val zone = ZoneId.of("Asia/Riyadh")
+        val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-09-10"))
+        val purchaseAt = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(3_600)
+        val refundAt = purchaseAt.plusSeconds(86_400)
+        val accountId = "account:BANK_ALJAZIRA:3001"
+        val creditCardId = "card:BANK_ALJAZIRA:7271"
+        val purchase = tx(
+            id = "purchase",
+            type = FinancialTransactionType.EXPENSE,
+            amount = "100.00",
+            source = accountId,
+            occurredAt = purchaseAt,
+        )
+        val accountRefund = tx(
+            id = "account-refund",
+            type = FinancialTransactionType.REFUND,
+            amount = "100.00",
+            dest = accountId,
+            occurredAt = refundAt,
+        )
+        val cardRefund = tx(
+            id = "card-refund",
+            type = FinancialTransactionType.REFUND,
+            amount = "25.00",
+            dest = creditCardId,
+            occurredAt = refundAt.plusSeconds(3_600),
+            linked = listOf("evt-card-refund"),
+        )
+        val periodTransactions = listOf(purchase, accountRefund, cardRefund).filter {
+            inSalaryPeriod(it.occurredAt, period, zone)
+        }
+        assertEquals(listOf("purchase", "account-refund", "card-refund"), periodTransactions.map { it.id })
+
+        val summary = summarizeOwned(periodTransactions, accountId)
+        val split = CurrentAccountSummaryCalculator.spendingSplit(
+            transactions = periodTransactions,
+            parsedRecords = listOf(
+                parsedRecord(
+                    id = "evt-card-refund",
+                    family = MessageFamily.REFUND,
+                    cardLast4 = "7271",
+                    cardSmsChannel = CardSmsChannel.CREDIT,
+                ),
+            ),
+            ownedAccountContainerIds = setOf(accountId),
+            ownedAccountLast4s = setOf("3001"),
+        )
+        val grouping = CurrentAccountFlowDetailGrouper.group(
+            transactions = periodTransactions,
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(accountId),
+            ownedAccountLast4s = setOf("3001"),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
+        )
+
+        assertEquals(Money.of("100.00", Currency.SAR), summary.outflow.posPurchases)
+        assertEquals(Money.of("100.00", Currency.SAR), summary.inflow.accountRefunds)
+        assertEquals(Money.zero(Currency.SAR), summary.inflow.salary)
+        assertEquals(Money.zero(Currency.SAR), summary.inflow.otherIncome)
+        assertEquals(Money.zero(Currency.SAR), summary.inflow.externalTransfersIn)
+        assertEquals(SignedMoneyAmount.zero(Currency.SAR), summary.netMovement)
+        assertEquals(SignedMoneyAmount.zero(Currency.SAR), summary.cashPosition().remaining)
+        assertEquals(Money.of("100.00", Currency.SAR), split.totalSpending)
+        assertEquals(
+            SignedMoneyAmount.difference(Money.zero(Currency.SAR), Money.of("25.00", Currency.SAR)),
+            split.creditCardPurchases,
+        )
+        assertEquals(listOf("account-refund"), grouping.income.getValue(FlowIncomeCategory.ACCOUNT_REFUND).map { it.id })
+        assertTrue(grouping.income.getValue(FlowIncomeCategory.SALARY).isEmpty())
+        assertTrue(grouping.income.getValue(FlowIncomeCategory.OTHER_INCOME).isEmpty())
+        assertEquals(
+            summary.inflow.accountRefunds,
+            grouping.income.getValue(FlowIncomeCategory.ACCOUNT_REFUND)
+                .fold(Money.zero(Currency.SAR)) { acc, row -> acc + row.amount },
+        )
+    }
+
+    @Test
+    fun accountRefund_adjacentSalaryPeriod_doesNotChangeCurrentPeriodOrDoubleCount() {
+        val zone = ZoneId.of("Asia/Riyadh")
+        val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-09-10"))
+        val next = FinancialPeriodPolicy.next(period)
+        val accountId = "account:BANK_ALJAZIRA:3001"
+        val purchaseAt = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(3_600)
+        val refundAt = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zone)
+        val purchase = tx(
+            id = "purchase",
+            type = FinancialTransactionType.EXPENSE,
+            amount = "100.00",
+            source = accountId,
+            occurredAt = purchaseAt,
+        )
+        val refund = tx(
+            id = "account-refund",
+            type = FinancialTransactionType.REFUND,
+            amount = "100.00",
+            dest = accountId,
+            occurredAt = refundAt,
+        )
+        assertTrue(inSalaryPeriod(purchase.occurredAt, period, zone))
+        assertTrue(!inSalaryPeriod(refund.occurredAt, period, zone))
+        assertTrue(inSalaryPeriod(refund.occurredAt, next, zone))
+
+        val current = summarizeOwned(listOf(purchase).filter { inSalaryPeriod(it.occurredAt, period, zone) }, accountId)
+        val adjacent = summarizeOwned(listOf(refund).filter { inSalaryPeriod(it.occurredAt, next, zone) }, accountId)
+
+        assertEquals(Money.of("100.00", Currency.SAR), current.outflow.posPurchases)
+        assertEquals(Money.zero(Currency.SAR), current.inflow.accountRefunds)
+        assertEquals(
+            SignedMoneyAmount.difference(Money.zero(Currency.SAR), Money.of("100.00", Currency.SAR)),
+            current.cashPosition().remaining,
+        )
+        assertEquals(Money.zero(Currency.SAR), adjacent.outflow.posPurchases)
+        assertEquals(Money.of("100.00", Currency.SAR), adjacent.inflow.accountRefunds)
+        assertEquals(Money.zero(Currency.SAR), adjacent.inflow.salary)
+        assertEquals(SignedMoneyAmount.of(Money.of("100.00", Currency.SAR)), adjacent.cashPosition().remaining)
+        assertEquals(
+            SignedMoneyAmount.zero(Currency.SAR),
+            current.cashPosition().remaining + adjacent.cashPosition().remaining,
+        )
+        assertEquals(
+            Money.of("100.00", Currency.SAR),
+            current.inflow.accountRefunds + adjacent.inflow.accountRefunds,
+        )
+    }
+
+    @Test
+    fun creditCardRefund_doesNotIncreaseAccountCash_andUnknownDestinationStaysOut() {
+        val accountId = "account:BANK_ALJAZIRA:3001"
+        val creditCardId = "card:BANK_ALJAZIRA:7271"
+        val summary = summarizeOwned(
+            transactions = listOf(
+                tx("pos", FinancialTransactionType.EXPENSE, "100.00", source = accountId),
+                tx("card-refund", FinancialTransactionType.REFUND, "25.00", dest = creditCardId),
+                tx("unknown-refund", FinancialTransactionType.REFUND, "40.00", dest = null, linked = emptyList()),
+            ),
+            accountId = accountId,
+        )
+
+        assertEquals(Money.of("100.00", Currency.SAR), summary.outflow.posPurchases)
+        assertEquals(Money.zero(Currency.SAR), summary.inflow.accountRefunds)
+        assertEquals(Money.zero(Currency.SAR), summary.inflow.salary)
+        assertEquals(Money.zero(Currency.SAR), summary.inflow.otherIncome)
+        assertEquals(
+            SignedMoneyAmount.difference(Money.zero(Currency.SAR), Money.of("100.00", Currency.SAR)),
+            summary.cashPosition().remaining,
+        )
+    }
+
+    @Test
+    fun accountRefund_countedOnceAcrossFleetAccounts() {
+        val accountA = "account:BANK_ALJAZIRA:3001"
+        val accountB = "account:BANK_ALJAZIRA:3002"
+        val transactions = listOf(
+            tx("pos", FinancialTransactionType.EXPENSE, "100.00", source = accountA),
+            tx("refund", FinancialTransactionType.REFUND, "100.00", dest = accountA),
+        )
+        val fleet = CurrentAccountSummaryCalculator.summarize(
+            transactions = transactions,
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(accountA, accountB),
+            ownedAccountLast4s = setOf("3001", "3002"),
+            scopeMode = AccountFlowScopeMode.Fleet,
+        )
+        val summaryA = summarizeOwned(transactions, accountA)
+        val summaryB = summarizeOwned(transactions, accountB)
+
+        assertEquals(Money.of("100.00", Currency.SAR), fleet.inflow.accountRefunds)
+        assertEquals(Money.of("100.00", Currency.SAR), summaryA.inflow.accountRefunds)
+        assertEquals(Money.zero(Currency.SAR), summaryB.inflow.accountRefunds)
+        assertEquals(fleet.inflow.accountRefunds, summaryA.inflow.accountRefunds + summaryB.inflow.accountRefunds)
+        assertEquals(SignedMoneyAmount.zero(Currency.SAR), fleet.cashPosition().remaining)
+        assertEquals(SignedMoneyAmount.zero(Currency.SAR), summaryA.cashPosition().remaining)
+        assertEquals(SignedMoneyAmount.zero(Currency.SAR), summaryB.cashPosition().remaining)
+        assertEquals(Money.of("100.00", Currency.SAR), fleet.outflow.posPurchases)
+    }
+
+    @Test
     fun loanRepayment_countsInAccountOutflow() {
         val owned = "account:bank_aljazira:3001"
         val loanTx = tx(
@@ -549,6 +734,28 @@ class CurrentAccountSummaryCalculatorTest {
         assertEquals(Money.of("3036.11", Currency.SAR), summary.outflow.coreTotal)
     }
 
+    private fun summarizeOwned(
+        transactions: List<FinancialTransaction>,
+        accountId: String,
+    ): CurrentAccountSummary =
+        CurrentAccountSummaryCalculator.summarize(
+            transactions = transactions,
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(accountId),
+            ownedAccountLast4s = setOf(accountId.substringAfterLast(':')),
+            scopeMode = AccountFlowScopeMode.SingleAccount,
+        )
+
+    private fun inSalaryPeriod(
+        instant: Instant,
+        period: FinancialPeriod,
+        zone: ZoneId,
+    ): Boolean {
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val end = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zone)
+        return !instant.isBefore(start) && instant.isBefore(end)
+    }
+
     private fun tx(
         id: String,
         type: FinancialTransactionType,
@@ -556,12 +763,13 @@ class CurrentAccountSummaryCalculatorTest {
         source: String? = null,
         dest: String? = null,
         linked: List<String> = listOf("evt-$id"),
+        occurredAt: Instant = Instant.parse("2026-08-10T12:00:00Z"),
     ): FinancialTransaction =
         FinancialTransaction(
             id = id,
             type = type,
             amount = Money.of(amount, Currency.SAR),
-            occurredAt = Instant.parse("2026-08-10T12:00:00Z"),
+            occurredAt = occurredAt,
             sourceContainerId = source,
             destinationContainerId = dest,
             merchant = null,
@@ -578,6 +786,7 @@ class CurrentAccountSummaryCalculatorTest {
         rawBody: String? = null,
         loanType: com.baraa.masroof.domain.model.LoanType? = null,
         salaryIncomeWording: Boolean? = null,
+        cardSmsChannel: CardSmsChannel? = null,
     ): ParsedEventRecord {
         val event = ParsedEvent(
             id = id,
@@ -602,6 +811,7 @@ class CurrentAccountSummaryCalculatorTest {
             details = ParsedEventDetails(
                 loanType = loanType,
                 salaryIncomeWording = salaryIncomeWording,
+                cardSmsChannel = cardSmsChannel,
             ),
         )
     }

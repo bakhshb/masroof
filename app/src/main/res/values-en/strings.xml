@@ -342,6 +342,7 @@
     <string name="dashboard_remaining_formula">In %1$s − spent %2$s = remaining</string>
     <string name="dashboard_salary">Salary</string>
     <string name="dashboard_other_income">Other income</string>
+    <string name="dashboard_account_refunds">Account refunds</string>
     <string name="dashboard_total_inflow">Total inflow</string>
     <string name="dashboard_total_spent">Total spent</string>
     <string name="dashboard_self_transfer_in">In from another account</string>

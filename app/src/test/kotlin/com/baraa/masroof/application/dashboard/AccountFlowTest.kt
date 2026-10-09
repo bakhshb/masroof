@@ -50,6 +50,42 @@ class AccountFlowTest {
         )
     }
 
+    @Test
+    fun accountRefund_netsPurchaseInAccountAndFleetWithoutIncome() {
+        val purchaseAndRefund = AccountFlow.from(
+            CurrentAccountSummary.of(
+                currency = Currency.SAR,
+                salary = Money.zero(Currency.SAR),
+                otherIncome = Money.zero(Currency.SAR),
+                externalTransfersIn = Money.zero(Currency.SAR),
+                selfTransfersIn = Money.zero(Currency.SAR),
+                creditCardPayments = Money.zero(Currency.SAR),
+                billPayments = Money.zero(Currency.SAR),
+                externalTransfersOut = Money.zero(Currency.SAR),
+                cashWithdrawals = Money.zero(Currency.SAR),
+                posPurchases = Money.of("100", Currency.SAR),
+                fees = Money.zero(Currency.SAR),
+                selfTransfersOut = Money.zero(Currency.SAR),
+                accountRefunds = Money.of("100", Currency.SAR),
+            ),
+        )
+        val untouched = AccountFlow.zero(Currency.SAR)
+
+        assertEquals(Money.of("100.00", Currency.SAR), purchaseAndRefund.accountRefunds)
+        assertEquals(Money.zero(Currency.SAR), purchaseAndRefund.salary)
+        assertEquals(Money.zero(Currency.SAR), purchaseAndRefund.otherIncome)
+        assertEquals(Money.of("100.00", Currency.SAR), purchaseAndRefund.externalIn)
+        assertEquals(Money.of("100.00", Currency.SAR), purchaseAndRefund.posPurchases)
+        assertEquals(SignedMoneyAmount.zero(Currency.SAR), purchaseAndRefund.accountSummary().remaining)
+        assertEquals(SignedMoneyAmount.zero(Currency.SAR), purchaseAndRefund.externalSummary().remaining)
+
+        val fleet = FleetAccountFlow(accounts = listOf(purchaseAndRefund, untouched))
+        assertEquals(Money.of("100.00", Currency.SAR), fleet.combined!!.accountRefunds)
+        assertEquals(Money.of("100.00", Currency.SAR), fleet.combined!!.posPurchases)
+        assertEquals(SignedMoneyAmount.zero(Currency.SAR), fleet.accountSummary()!!.remaining)
+        assertEquals(SignedMoneyAmount.zero(Currency.SAR), fleet.externalSummary()!!.remaining)
+    }
+
     private fun account3001Flow(): AccountFlow =
         AccountFlow.from(
             CurrentAccountSummary.of(
