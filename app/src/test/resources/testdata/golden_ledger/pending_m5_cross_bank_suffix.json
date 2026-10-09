@@ -1,0 +1,125 @@
+{
+  "id": "m5_cross_bank_suffix",
+  "status": "PENDING",
+  "ownerMilestone": "M5",
+  "periodAnchor": "2026-09-10",
+  "description": "AlJazira account 3001 spends 100 SAR and OTHER_BANK account 3001 spends 250 SAR. Fleet outflow is 350 SAR, not 700. Owner M5 activates this oracle.",
+  "ownedAccounts": [
+    {"bank": "BANK_ALJAZIRA", "masked": "3001"},
+    {"bank": "OTHER_BANK", "masked": "3001"}
+  ],
+  "seedRows": [
+    {
+      "providerMessageId": "seed-alj-3001",
+      "sender": "AlJazira",
+      "body": "Anonymized AlJazira account 3001 purchase of 100 SAR.",
+      "receivedAt": "2026-09-02T07:00:00Z",
+      "bank": "BANK_ALJAZIRA",
+      "family": "PURCHASE",
+      "parseStatus": "SUCCESS",
+      "direction": "OUTGOING",
+      "amount": "100.00",
+      "currency": "SAR",
+      "sourceAccount": "3001",
+      "merchant": "TEST_GROCER",
+      "transactionType": "EXPENSE",
+      "occurredAt": "2026-09-02T07:00:00Z"
+    },
+    {
+      "providerMessageId": "seed-other-3001",
+      "sender": "OtherBank",
+      "body": "Anonymized OTHER_BANK account 3001 purchase of 250 SAR.",
+      "receivedAt": "2026-09-03T07:00:00Z",
+      "bank": "OTHER_BANK",
+      "family": "PURCHASE",
+      "parseStatus": "SUCCESS",
+      "direction": "OUTGOING",
+      "amount": "250.00",
+      "currency": "SAR",
+      "sourceAccount": "3001",
+      "merchant": "TEST_OTHER",
+      "transactionType": "EXPENSE",
+      "occurredAt": "2026-09-03T07:00:00Z"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 2,
+    "parsed": [
+      {
+        "family": "PURCHASE",
+        "parseStatus": "SUCCESS",
+        "amount": "100.00",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "sourceAccount": "3001"
+      },
+      {
+        "family": "PURCHASE",
+        "parseStatus": "SUCCESS",
+        "amount": "250.00",
+        "currency": "SAR",
+        "bank": "OTHER_BANK",
+        "sourceAccount": "3001"
+      }
+    ],
+    "transactions": [
+      {
+        "type": "EXPENSE",
+        "amount": "100.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "linkedRawSmsCount": 1
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "250.00",
+        "currency": "SAR",
+        "source": "account:OTHER_BANK:3001",
+        "linkedRawSmsCount": 1
+      }
+    ],
+    "displayedRows": [
+      {
+        "type": "EXPENSE",
+        "amount": "100.00",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "linkedRawSmsCount": 1
+      },
+      {
+        "type": "EXPENSE",
+        "amount": "250.00",
+        "currency": "SAR",
+        "source": "account:OTHER_BANK:3001",
+        "linkedRawSmsCount": 1
+      }
+    ],
+    "accountsFleetInflow": "0.00",
+    "accountsFleetOutflow": "350.00",
+    "accountsFleetRemaining": "-350.00",
+    "spendingGross": "350.00",
+    "excludedOtherCurrencyCount": 0,
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "posPurchases": "100.00",
+        "cashPosition": "-100.00"
+      },
+      {
+        "bank": "OTHER_BANK",
+        "masked": "3001",
+        "posPurchases": "250.00",
+        "cashPosition": "-250.00"
+      }
+    ]
+  },
+  "knownDefect": {
+    "ownerMilestone": "M5",
+    "signals": {
+      "accountsFleetOutflow": "700.00",
+      "account:BANK_ALJAZIRA:3001:posPurchases": "350.00",
+      "account:OTHER_BANK:3001:posPurchases": "350.00"
+    }
+  }
+}
