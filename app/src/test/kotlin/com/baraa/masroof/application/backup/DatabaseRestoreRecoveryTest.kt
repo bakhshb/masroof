@@ -389,6 +389,16 @@ class DatabaseRestoreRecoveryTest {
     }
 
     @Test
+    fun crashAfterMovingRollbackMain_beforeWal_restoresTheWholeBundleAndImportCanStart() {
+        recoverPartialRollbackMove(moveWal = false)
+    }
+
+    @Test
+    fun crashAfterMovingRollbackWal_beforeShm_restoresTheWholeBundleAndImportCanStart() {
+        recoverPartialRollbackMove(moveWal = true)
+    }
+
+    @Test
     fun crashAfterPreservingRollback_beforePrepared_keepsLiveAndPreexistingRollback() {
         writeDatabase(live, "current")
         val rollback = File(live.path + ".rollback")
@@ -439,6 +449,45 @@ class DatabaseRestoreRecoveryTest {
 
         assertEquals("bad-live", live.readText())
         assertFalse(File(live.path + ".rollback").exists())
+    }
+
+    private fun recoverPartialRollbackMove(moveWal: Boolean) {
+        writeDatabase(live, "current")
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(rollback, "previous")
+        val rollbackWal = File(rollback.path + "-wal")
+        val rollbackShm = File(rollback.path + "-shm")
+        rollbackWal.writeText("wal-bytes")
+        rollbackShm.writeText("shm-bytes")
+        val preserved = File(live.path + ".rollback.preserved")
+        assertTrue(rollback.renameTo(preserved))
+        if (moveWal) {
+            assertTrue(rollbackWal.renameTo(File(preserved.path + "-wal")))
+        }
+        DatabaseRestoreRecovery.writeJournal(
+            live,
+            DatabaseRestoreRecovery.Stage.PREPARED,
+            preservedRollback = true,
+        )
+
+        DatabaseRestoreRecovery.recover(context)
+
+        assertEquals("wal-bytes", rollbackWal.readText())
+        assertEquals("shm-bytes", rollbackShm.readText())
+        assertFalse(preserved.exists())
+        assertFalse(File(preserved.path + "-wal").exists())
+        assertFalse(File(preserved.path + "-shm").exists())
+        assertTrue(DatabaseRestoreRecovery.hasPreexistingRollback(live))
+        assertTrue(DatabaseRestoreRecovery.preserveExistingRollback(live))
+        assertFalse(rollback.exists())
+        assertFalse(rollbackWal.exists())
+        assertFalse(rollbackShm.exists())
+        assertEquals("wal-bytes", File(preserved.path + "-wal").readText())
+        assertEquals("shm-bytes", File(preserved.path + "-shm").readText())
+        assertEquals("current", readMarker(live))
+        assertEquals("previous", readMarker(preserved))
+        DatabaseRestoreRecovery.parkOriginal(live)
+        assertEquals("current", readMarker(rollback))
     }
 
     private fun journal(): File = File(live.path + ".restore-journal")

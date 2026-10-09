@@ -354,15 +354,35 @@ object DatabaseRestoreRecovery {
         journalFile(live).delete()
     }
 
+    /**
+     * A crash can move the preexisting rollback main file and its sidecars
+     * separately. Put every preserved part and every part still at the old
+     * path back into one rollback bundle. A part that exists in both places
+     * is left where it is and recovery fails closed.
+     */
     private fun restorePreservedRollback(live: File, journal: Journal) {
         if (!journal.preservedRollback) return
-        val preserved = preservedRollbackFile(live)
-        val rollback = rollbackFile(live)
-        if (rollback.exists() || hasSidecar(rollback)) return
-        if (preserved.exists() && !preserved.renameTo(rollback)) {
-            error("Cannot restore the preexisting rollback")
+        recombineRollbackBundle(preservedRollbackFile(live), rollbackFile(live))
+    }
+
+    private fun recombineRollbackBundle(preserved: File, rollback: File) {
+        if (!preserved.exists() && !hasSidecar(preserved)) return
+        moveBundlePart(preserved, rollback)
+        SIDECARS.forEach { suffix ->
+            moveBundlePart(File(preserved.path + suffix), File(rollback.path + suffix))
         }
-        moveSidecars(preserved, rollback)
+    }
+
+    private fun moveBundlePart(from: File, to: File) {
+        if (!from.exists()) return
+        if (to.exists()) {
+            throw IncompleteRestoreException(
+                "Rollback bundle is split and both copies of ${to.name} exist",
+            )
+        }
+        if (!from.renameTo(to)) {
+            error("Cannot recombine the preexisting rollback")
+        }
     }
 
     private fun restoreRollbackOverLive(live: File) {
