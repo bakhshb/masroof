@@ -108,7 +108,9 @@ class TransactionReconciliationService(
     }
 
     /**
-     * Reconcile after a newly saved ParsedEvent.
+     * Reconcile after a newly saved ParsedEvent using the wider incremental
+     * supplement. Live processing uses [reconcileAffectedRawSmsIds] instead.
+     * Maintenance keeps [reconcileBatchDetailed] for a full-history pass.
      *
      * A returned report with [ReconciliationSummary.failed] greater than zero did
      * not throw. Callers still treat that report as incomplete.

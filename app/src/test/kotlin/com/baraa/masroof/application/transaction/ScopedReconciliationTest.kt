@@ -226,6 +226,30 @@ class ScopedReconciliationTest {
     }
 
     @Test
+    fun unrelatedTransferHistory_doesNotWidenCandidateQueries() = runBlocking {
+        val anchor = Instant.parse("2026-08-04T09:00:00Z")
+        persistTransfer("sms-live", "pe-live", anchor, MessageFamily.TRANSFER_OUT)
+        repeat(40) { index ->
+            persistTransfer(
+                smsId = "sms-old-$index",
+                eventId = "pe-old-$index",
+                at = Instant.parse("2020-01-01T00:00:00Z").plusSeconds(index.toLong()),
+                family = MessageFamily.TRANSFER_OUT,
+            )
+        }
+        parsed.reset()
+        transactions.reset()
+
+        reconciliation.reconcileAffectedRawSmsIds(listOf("sms-live"))
+
+        assertNoGlobalScan()
+        assertTrue(parsed.boundedUnlinkedCalls in 1..4)
+        assertTrue(parsed.boundedLocalCalls in 0..4)
+        assertTrue(transactions.boundedTypeCalls in 0..4)
+        assertTrue(parsed.boundedUnlinkedCalls < 40)
+    }
+
+    @Test
     fun correctedNonTransfer_loadsEffectiveRowsById() = runBlocking {
         persistPurchase(
             smsId = "sms-corrected",

@@ -137,11 +137,20 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 startInclusive: Instant,
                 endExclusive: Instant,
             ): List<ParsedEventRecord> {
+                failReconciliationIfInjected()
+                return parsedRepo.listReceivedBetween(startInclusive, endExclusive)
+            }
+
+            override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
+                failReconciliationIfInjected()
+                return parsedRepo.listByRawSmsIds(rawSmsIds)
+            }
+
+            fun failReconciliationIfInjected() {
                 if (derivedFailures.reconciliationCancels) throw CancellationException("reconciliation cancelled")
                 if (derivedFailures.reconciliationFailuresRemaining.getAndDecrement() > 0) {
                     throw IOException("reconciliation unavailable")
                 }
-                return parsedRepo.listReceivedBetween(startInclusive, endExclusive)
             }
         }
         val discoveryCards = object : CardRegistryRepository by cards {

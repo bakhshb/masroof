@@ -500,7 +500,7 @@ class ProcessStoredSmsUseCase(
     ): ReconcileDerivedResult {
         val svc = reconciliation ?: return ReconcileDerivedResult.NotConfigured
         val report = try {
-            svc.reconcileAfterParsedEventDetailed(event)
+            svc.reconcileAffectedRawSmsIds(listOf(event.rawSmsId))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -17,7 +17,8 @@ import kotlinx.coroutines.CancellationException
  * Android execution adapter for post-capture processing of one durable RawSms.
  *
  * Input is the rawSmsId only. Delegates to [ProcessStoredSmsUseCase]; contains no bank
- * parsing or financial rules. Retrying is safe because stored-SMS processing is idempotent.
+ * parsing or financial rules. Live reconciliation is the bounded affected-id pass.
+ * Retrying is safe because stored-SMS processing is idempotent.
  * Ownership, reconciliation, and review-refresh failures are retried, including a
  * reconciliation report whose failed count is nonzero. A direct review write that
  * fails stays retryable past [MAX_ATTEMPTS] until a review row or a LIVE
