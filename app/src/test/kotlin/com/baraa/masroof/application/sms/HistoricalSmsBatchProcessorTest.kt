@@ -39,6 +39,7 @@ import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
+import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
@@ -177,6 +178,30 @@ class HistoricalSmsBatchProcessorTest {
         assertEquals(1, recoverySchedules)
         assertEquals(1, transactions.awaitingCalls)
         assertEquals(0, db.financialTransactionDao().count())
+    }
+
+    @Test
+    fun nonthrowingConflict_isIncompleteAndKeepsTheHistoricalRetrySet() = runBlocking {
+        transactions.conflictSaves = true
+        val batch = processor().startBatch()
+        val purchase = ingestParsed(batch, purchase("51.99"), "2026-08-02T10:00:00Z", "purchase-conflict")
+        val otp = sms(OTP_BODY, "2026-08-02T11:00:00Z", "otp-conflict")
+        assertTrue(batch.ingest(otp) is SmsIngestionResult.NonFinancial)
+
+        val finished = batch.finish()
+
+        assertEquals(
+            DerivedProcessingStage.RECONCILIATION,
+            (finished as HistoricalBatchDerivedResult.Incomplete).stage,
+        )
+        assertEquals(0, parsedRepo.listAllCalls)
+        assertEquals(
+            listOf(purchase),
+            retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH),
+        )
+        assertEquals(1, recoverySchedules)
+        assertEquals(0, db.financialTransactionDao().count())
+        assertTrue(retries.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty())
     }
 
     @Test
@@ -420,6 +445,20 @@ class HistoricalSmsBatchProcessorTest {
     ) : FinancialTransactionRepository by delegate {
         var awaitingCalls: Int = 0
         var failAwaiting: Boolean = false
+        var conflictSaves: Boolean = false
+
+        override suspend fun save(
+            transaction: FinancialTransaction,
+            rawSmsIds: Collection<String>,
+        ): FinancialTransactionSaveResult {
+            if (conflictSaves) {
+                return FinancialTransactionSaveResult.Conflict(
+                    rawSmsId = rawSmsIds.first(),
+                    existingTransactionId = "conflict-existing",
+                )
+            }
+            return delegate.save(transaction, rawSmsIds)
+        }
 
         override suspend fun listAwaitingAppliedExchangeRate(
             primaryCurrency: Currency,
