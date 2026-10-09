@@ -135,20 +135,54 @@ interface ParsedEventDao {
     @Query("SELECT * FROM parsed_event WHERE cardSmsChannel = 'STATEMENT' ORDER BY id")
     suspend fun listCardStatementFacts(): List<ParsedEventEntity>
 
+    /**
+     * Newest credit/statement row per card bank + last4.
+     *
+     * Order is `occurredAtEpochMillis`, or `raw_sms.receivedAtEpochMillis` when the
+     * event time is missing, then the greatest event id. Lexical ids are not the clock:
+     * `'9'` sorts after `'10'` and must not win when `'10'` happened later.
+     *
+     * `COALESCE` is not sargable. The channel filter uses
+     * `index_parsed_event_cardSmsChannel_cardLast4`; the SMS join uses the raw_sms
+     * primary key. No separate occurred-at index.
+     */
     @Query(
         """
         SELECT * FROM parsed_event
         WHERE id IN (
-            SELECT MAX(id) FROM parsed_event
-            WHERE cardSmsChannel IN ('CREDIT', 'STATEMENT')
-              AND cardLast4 IS NOT NULL
-            GROUP BY cardBankId, cardLast4
+            SELECT MAX(p3.id)
+            FROM parsed_event p3
+            INNER JOIN raw_sms r3 ON r3.id = p3.rawSmsId
+            INNER JOIN (
+                SELECT p2.cardBankId AS cardBankId,
+                       p2.cardLast4 AS cardLast4,
+                       MAX(COALESCE(p2.occurredAtEpochMillis, r2.receivedAtEpochMillis)) AS sortAt
+                FROM parsed_event p2
+                INNER JOIN raw_sms r2 ON r2.id = p2.rawSmsId
+                WHERE p2.cardSmsChannel IN ('CREDIT', 'STATEMENT')
+                  AND p2.cardLast4 IS NOT NULL
+                GROUP BY p2.cardBankId, p2.cardLast4
+            ) chosen
+              ON chosen.cardBankId IS p3.cardBankId
+             AND chosen.cardLast4 = p3.cardLast4
+             AND COALESCE(p3.occurredAtEpochMillis, r3.receivedAtEpochMillis) = chosen.sortAt
+            WHERE p3.cardSmsChannel IN ('CREDIT', 'STATEMENT')
+              AND p3.cardLast4 IS NOT NULL
+            GROUP BY p3.cardBankId, p3.cardLast4
         )
         ORDER BY id
         """,
     )
     suspend fun listLatestCreditCardRowFacts(): List<ParsedEventEntity>
 
+    /**
+     * Latest available-balance row per card bank + last4 strictly before [beforeExclusiveMillis].
+     *
+     * Same clock as [listLatestCreditCardRowFacts]: event time, else SMS receipt time.
+     * The bound is the period end the dashboard already passes, so a past period does
+     * not borrow a newer balance. Rows tied on that instant are all returned, ordered
+     * by event id, and the caller breaks the tie.
+     */
     @Query(
         """
         SELECT pe.* FROM parsed_event pe
@@ -164,10 +198,12 @@ interface ParsedEventDao {
               AND p2.cardLast4 IS NOT NULL
               AND COALESCE(p2.occurredAtEpochMillis, r2.receivedAtEpochMillis) < :beforeExclusiveMillis
             GROUP BY p2.cardBankId, p2.cardLast4
-        ) latest ON latest.cardBankId = pe.cardBankId AND latest.cardLast4 = pe.cardLast4
+        ) latest ON latest.cardBankId IS pe.cardBankId AND latest.cardLast4 = pe.cardLast4
         WHERE pe.cardSmsChannel = 'CREDIT'
           AND pe.availableBalanceDecimal IS NOT NULL
+          AND pe.cardLast4 IS NOT NULL
           AND COALESCE(pe.occurredAtEpochMillis, rs.receivedAtEpochMillis) = latest.latestAt
+          AND COALESCE(pe.occurredAtEpochMillis, rs.receivedAtEpochMillis) < :beforeExclusiveMillis
         ORDER BY pe.id
         """,
     )
@@ -193,20 +229,54 @@ interface ParsedEventDao {
     )
     suspend fun listExchangeRateFacts(): List<ParsedEventEntity>
 
-    /** Callers keep [cardLast4s] under [RoomBatch.MAX_BIND_ARGS] / 2 (bound twice). */
+    /**
+     * Earliest debit-channel row, and earliest debit-source-account row, per event bank + last4.
+     *
+     * Same clock as [listLatestCreditCardRowFacts], with the least event id as the tie-break.
+     * [cardLast4s] is bound once per UNION arm. Callers keep the list under
+     * [RoomBatch.MAX_BIND_ARGS] / 2.
+     */
     @Query(
         """
         SELECT * FROM parsed_event
         WHERE id IN (
-            SELECT MIN(id) FROM parsed_event
-            WHERE cardLast4 IN (:cardLast4s)
-              AND cardSmsChannel = 'DEBIT'
-            GROUP BY bankId, cardLast4
+            SELECT MIN(p3.id)
+            FROM parsed_event p3
+            INNER JOIN raw_sms r3 ON r3.id = p3.rawSmsId
+            INNER JOIN (
+                SELECT p2.bankId AS bankId,
+                       p2.cardLast4 AS cardLast4,
+                       MIN(COALESCE(p2.occurredAtEpochMillis, r2.receivedAtEpochMillis)) AS sortAt
+                FROM parsed_event p2
+                INNER JOIN raw_sms r2 ON r2.id = p2.rawSmsId
+                WHERE p2.cardLast4 IN (:cardLast4s)
+                  AND p2.cardSmsChannel = 'DEBIT'
+                GROUP BY p2.bankId, p2.cardLast4
+            ) chosen
+              ON chosen.bankId IS p3.bankId
+             AND chosen.cardLast4 = p3.cardLast4
+             AND COALESCE(p3.occurredAtEpochMillis, r3.receivedAtEpochMillis) = chosen.sortAt
+            WHERE p3.cardSmsChannel = 'DEBIT'
+            GROUP BY p3.bankId, p3.cardLast4
             UNION
-            SELECT MIN(id) FROM parsed_event
-            WHERE cardLast4 IN (:cardLast4s)
-              AND (debitSourceAccountLast4 IS NOT NULL OR sourceAccountMaskedNumber IS NOT NULL)
-            GROUP BY bankId, cardLast4
+            SELECT MIN(p3.id)
+            FROM parsed_event p3
+            INNER JOIN raw_sms r3 ON r3.id = p3.rawSmsId
+            INNER JOIN (
+                SELECT p2.bankId AS bankId,
+                       p2.cardLast4 AS cardLast4,
+                       MIN(COALESCE(p2.occurredAtEpochMillis, r2.receivedAtEpochMillis)) AS sortAt
+                FROM parsed_event p2
+                INNER JOIN raw_sms r2 ON r2.id = p2.rawSmsId
+                WHERE p2.cardLast4 IN (:cardLast4s)
+                  AND (p2.debitSourceAccountLast4 IS NOT NULL OR p2.sourceAccountMaskedNumber IS NOT NULL)
+                GROUP BY p2.bankId, p2.cardLast4
+            ) chosen
+              ON chosen.bankId IS p3.bankId
+             AND chosen.cardLast4 = p3.cardLast4
+             AND COALESCE(p3.occurredAtEpochMillis, r3.receivedAtEpochMillis) = chosen.sortAt
+            WHERE (p3.debitSourceAccountLast4 IS NOT NULL OR p3.sourceAccountMaskedNumber IS NOT NULL)
+            GROUP BY p3.bankId, p3.cardLast4
         )
         ORDER BY id
         """,
