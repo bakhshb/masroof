@@ -1,9 +1,8 @@
 {
   "id": "m5_cross_bank_suffix",
-  "status": "PENDING",
-  "ownerMilestone": "M5",
+  "status": "ACTIVE",
   "periodAnchor": "2026-09-10",
-  "description": "AlJazira account 3001 spends 100 SAR and OTHER_BANK account 3001 spends 250 SAR. Fleet outflow is 350 SAR, not 700. Owner M5 activates this oracle.",
+  "description": "AlJazira account 3001 spends 100 SAR and OTHER_BANK account 3001 spends 250 SAR. Fleet outflow is 350 SAR. The banks stay separate.",
   "ownedAccounts": [
     {"bank": "BANK_ALJAZIRA", "masked": "3001"},
     {"bank": "OTHER_BANK", "masked": "3001"}
@@ -113,13 +112,5 @@
         "cashPosition": "-250.00"
       }
     ]
-  },
-  "knownDefect": {
-    "ownerMilestone": "M5",
-    "signals": {
-      "accountsFleetOutflow": "700.00",
-      "account:BANK_ALJAZIRA:3001:posPurchases": "350.00",
-      "account:OTHER_BANK:3001:posPurchases": "350.00"
-    }
   }
 }

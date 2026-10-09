@@ -97,7 +97,7 @@ object CreditFacilityOverviewBuilder {
                 )
             }
 
-        val rowByLast4 = overview.cards.associateBy { it.last4 }
+        val rowByBankAndLast4 = overview.cards.associateBy { it.bank to it.last4 }
         val primaryEntries = ownedCredit.filter { it.cardRole == CardRole.PRIMARY }
         val supplementaryEntries = ownedCredit.filter { it.cardRole == CardRole.SUPPLEMENTARY }
         val standaloneEntries = ownedCredit.filter {
@@ -106,16 +106,20 @@ object CreditFacilityOverviewBuilder {
 
         val facilities = buildList {
             for (primaryEntry in primaryEntries) {
-                val primaryRow = rowByLast4[primaryEntry.last4] ?: placeholderRow(primaryEntry, overview)
+                val primaryRow = rowByBankAndLast4[primaryEntry.bank to primaryEntry.last4]
+                    ?: placeholderRow(primaryEntry, overview)
                 val supplements = supplementaryEntries
                     .filter {
                         it.bank == primaryEntry.bank && it.parentCardLast4 == primaryEntry.last4
                     }
-                    .mapNotNull { rowByLast4[it.last4] ?: placeholderRow(it, overview) }
+                    .mapNotNull {
+                        rowByBankAndLast4[it.bank to it.last4] ?: placeholderRow(it, overview)
+                    }
                 add(buildFacility(overview, primaryRow, supplements))
             }
             for (standalone in standaloneEntries) {
-                val row = rowByLast4[standalone.last4] ?: placeholderRow(standalone, overview)
+                val row = rowByBankAndLast4[standalone.bank to standalone.last4]
+                    ?: placeholderRow(standalone, overview)
                 add(buildFacility(overview, row, emptyList()))
             }
             val groupedKeys = (
@@ -127,7 +131,8 @@ object CreditFacilityOverviewBuilder {
                 parentKey !in groupedKeys
             }
             for (orphan in orphanSupplements) {
-                val row = rowByLast4[orphan.last4] ?: placeholderRow(orphan, overview)
+                val row = rowByBankAndLast4[orphan.bank to orphan.last4]
+                    ?: placeholderRow(orphan, overview)
                 add(buildFacility(overview, row, emptyList()))
             }
         }

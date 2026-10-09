@@ -10,6 +10,7 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /**
  * Maps each transaction to card keys (`bankId:last4`) from linked parsed events and card containers.
+ * The bank stays in the key, so the same last4 at two banks never shares a card.
  */
 object CardTransactionInvolvementResolver {
     fun buildIndex(

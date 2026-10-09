@@ -31,13 +31,18 @@ class GoldenLedgerOracleTest {
         val scenarios = GoldenLedgerCorpus.loadAll()
         val active = scenarios.filter { it.status == "ACTIVE" }
         val pending = scenarios.filter { it.status == "PENDING" }
-        assertTrue("expected 5 active baselines, was ${active.map { it.id }}", active.size == 5)
-        assertEquals(setOf("M5", "M8"), pending.map { it.ownerMilestone }.toSet())
+        assertTrue("expected 6 active baselines, was ${active.map { it.id }}", active.size == 6)
+        assertEquals(setOf("M8"), pending.map { it.ownerMilestone }.toSet())
         active.forEach { scenario ->
             assertNull(scenario.ownerMilestone)
             assertNull(scenario.knownDefect)
-            assertTrue(scenario.messages.isNotEmpty())
-            assertTrue(scenario.seedRows.isEmpty())
+            if (scenario.id == "m5_cross_bank_suffix") {
+                assertTrue(scenario.seedRows.isNotEmpty())
+                assertTrue(scenario.messages.isEmpty())
+            } else {
+                assertTrue(scenario.messages.isNotEmpty())
+                assertTrue(scenario.seedRows.isEmpty())
+            }
         }
         pending.forEach { scenario ->
             val owner = scenario.ownerMilestone
@@ -69,8 +74,8 @@ class GoldenLedgerOracleTest {
     }
 
     @Test
-    fun pendingM5_crossBankSuffix_staysExemptUntilOwnerActivates() = runBlocking {
-        assertPending("m5_cross_bank_suffix")
+    fun crossBankSuffix_matchesOracle() = runBlocking {
+        assertActiveSeeded("m5_cross_bank_suffix")
     }
 
     @Test
@@ -106,6 +111,28 @@ class GoldenLedgerOracleTest {
                 afterReprocessing.fingerprint(),
             )
             assertMatches(scenario, afterReprocessing)
+        }
+    }
+
+    /**
+     * OTHER_BANK has no SMS adapter. Reprocessing this fixture through the sole
+     * AlJazira adapter would replace the stored bank. The oracle checks the
+     * posted, bank-qualified ledger twice; the fingerprint must stay put.
+     */
+    private suspend fun assertActiveSeeded(id: String) {
+        val scenario = GoldenLedgerCorpus.load(id)
+        assertEquals("ACTIVE", scenario.status)
+        DashboardLedgerWorld(context()).use { world ->
+            GoldenLedgerRunner.prepare(world, scenario)
+            val first = GoldenLedgerRunner.read(world, scenario)
+            assertMatches(scenario, first)
+            val again = GoldenLedgerRunner.read(world, scenario)
+            assertEquals(
+                "$id projection changed the ledger fingerprint",
+                first.fingerprint(),
+                again.fingerprint(),
+            )
+            assertMatches(scenario, again)
         }
     }
 
