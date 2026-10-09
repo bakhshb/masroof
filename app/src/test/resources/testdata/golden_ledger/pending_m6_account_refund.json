@@ -1,9 +1,8 @@
 {
   "id": "m6_account_refund",
-  "status": "PENDING",
-  "ownerMilestone": "M6",
+  "status": "ACTIVE",
   "periodAnchor": "2026-09-10",
-  "description": "A 100 SAR account purchase and a 100 SAR refund into that account net to 0 SAR cash and are not salary. A 25 SAR credit-card refund does not increase account cash. Owner M6 activates this oracle.",
+  "description": "A 100 SAR account purchase and a 100 SAR refund into that account net to 0 SAR cash and are not salary. A 25 SAR credit-card refund does not increase account cash.",
   "ownedAccounts": [
     {"bank": "BANK_ALJAZIRA", "masked": "3001"}
   ],
@@ -119,12 +118,5 @@
         "cashPosition": "0.00"
       }
     ]
-  },
-  "knownDefect": {
-    "ownerMilestone": "M6",
-    "signals": {
-      "accountsFleetRemaining": "-100.00",
-      "account:BANK_ALJAZIRA:3001:cashPosition": "-100.00"
-    }
   }
 }
