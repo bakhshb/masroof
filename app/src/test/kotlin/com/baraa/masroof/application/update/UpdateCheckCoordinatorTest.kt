@@ -162,7 +162,7 @@ class UpdateCheckCoordinatorTest {
             context = context,
             tokenRepository = object : GitHubTokenRepository {
                 override fun getToken(): String? = null
-                override fun setToken(token: String) = Unit
+                override fun setToken(token: String): Boolean = true
                 override fun clearToken() = Unit
                 override fun hasToken(): Boolean = false
             },

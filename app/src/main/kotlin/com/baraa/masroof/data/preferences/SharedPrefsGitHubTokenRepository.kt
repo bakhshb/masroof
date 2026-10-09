@@ -24,17 +24,19 @@ class SharedPrefsGitHubTokenRepository(
 
     override fun getToken(): String? = synchronized(lock) { readTokenLocked() }
 
-    override fun setToken(token: String) {
+    override fun setToken(token: String): Boolean {
         val trimmed = token.trim()
         if (trimmed.isEmpty()) {
             clearToken()
-            return
+            return !hasToken()
         }
-        synchronized(lock) {
-            val ciphertext = encryptOrNull(trimmed) ?: return
-            if (decryptOrNull(ciphertext) != trimmed) return
+        return synchronized(lock) {
+            val ciphertext = encryptOrNull(trimmed) ?: return@synchronized false
+            if (decryptOrNull(ciphertext) != trimmed) return@synchronized false
             val previous = prefs.getString(KEY_TOKEN_CIPHERTEXT, null)
-            if (!prefs.edit().putString(KEY_TOKEN_CIPHERTEXT, ciphertext).commit()) return
+            if (!prefs.edit().putString(KEY_TOKEN_CIPHERTEXT, ciphertext).commit()) {
+                return@synchronized false
+            }
             val stored = prefs.getString(KEY_TOKEN_CIPHERTEXT, null)
             if (stored != ciphertext || decryptOrNull(stored) != trimmed) {
                 val rollback = prefs.edit()
@@ -44,9 +46,11 @@ class SharedPrefsGitHubTokenRepository(
                     rollback.putString(KEY_TOKEN_CIPHERTEXT, previous)
                 }
                 rollback.commit()
-                return
+                return@synchronized false
             }
             prefs.edit().remove(KEY_TOKEN).commit()
+            decryptOrNull(prefs.getString(KEY_TOKEN_CIPHERTEXT, null).orEmpty()) == trimmed &&
+                !prefs.contains(KEY_TOKEN)
         }
     }
 

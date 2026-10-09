@@ -47,7 +47,7 @@ class SharedPrefsGitHubTokenRepositoryTest {
     fun freshSave_storesCiphertextOnly() {
         val repository = repository(ReversibleEncryptor())
 
-        repository.setToken("  $TOKEN  ")
+        assertTrue(repository.setToken("  $TOKEN  "))
 
         assertEquals(TOKEN, repository.getToken())
         assertTrue(repository.hasToken())
@@ -138,7 +138,7 @@ class SharedPrefsGitHubTokenRepositoryTest {
     fun setToken_dropsUnreadableCiphertextAndDoesNotWritePlaintext() {
         val repository = repository(NonRoundTripEncryptor())
 
-        assertTrue(runCatching { repository.setToken(TOKEN) }.isSuccess)
+        assertFalse(repository.setToken(TOKEN))
 
         assertNull(repository.getToken())
         assertFalse(prefs.contains(SharedPrefsGitHubTokenRepository.KEY_TOKEN))
@@ -149,7 +149,7 @@ class SharedPrefsGitHubTokenRepositoryTest {
     fun encryptFailure_doesNotPersistPlaintextOrThrow() {
         val repository = repository(FailingEncryptor())
 
-        assertTrue(runCatching { repository.setToken(TOKEN) }.isSuccess)
+        assertFalse(repository.setToken(TOKEN))
 
         assertNull(repository.getToken())
         assertFalse(repository.hasToken())

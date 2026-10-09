@@ -22,6 +22,7 @@ internal object SettingsViewModelTestFixtures {
     fun appUpdateService(
         token: String? = null,
         appLogService: AppLogService = appLogService(),
+        persistToken: Boolean = true,
     ): AppUpdateService {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val tokenRepository =
@@ -30,8 +31,10 @@ internal object SettingsViewModelTestFixtures {
 
                 override fun getToken(): String? = storedToken
 
-                override fun setToken(value: String) {
+                override fun setToken(value: String): Boolean {
+                    if (!persistToken) return false
                     storedToken = value
+                    return true
                 }
 
                 override fun clearToken() {
