@@ -1,5 +1,7 @@
 # Masroof v2 — Product Requirements Document (PRD)
 
+> Historical product record. The phases below describe the rewrite as it was specified. They are not an unshipped backlog. Live implementation rules are in `AGENTS.md`.
+
 ## 1. Product Summary
 
 Masroof is a personal Android financial tracking application that reads banking SMS messages on the user's device and converts them into structured financial events and transactions.

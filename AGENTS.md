@@ -46,7 +46,7 @@
 
 **Release CI:** Full tests run in PR/main **CI** only. Do not add `testDebugUnitTest` back to `release.yml`; release verifies green CI then builds the APK.
 
-**Deep reference:** `docs/ARCHITECTURE.md`, `docs/REWRITE_DECISIONS.md`
+**Deep reference:** `docs/ARCHITECTURE.md`, `docs/REWRITE_DECISIONS.md`, and `docs/PRD.md` are historical rewrite records. Follow this file when they disagree.
 
 ## Dashboard calculations
 

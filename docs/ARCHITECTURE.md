@@ -1,5 +1,7 @@
 # Masroof v2 — Architecture Specification
 
+> Historical architecture record. Later milestones implemented this shape. Where this file and `AGENTS.md` disagree, follow `AGENTS.md`.
+
 ## 1. Architecture Goal
 
 Masroof v2 must be a clean, modular Android application where:
