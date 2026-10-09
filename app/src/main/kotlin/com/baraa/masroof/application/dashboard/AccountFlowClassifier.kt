@@ -198,10 +198,20 @@ object AccountFlowClassifier {
         scope: CurrentAccountTransactionScope,
         context: AccountFlowClassificationContext,
     ): List<FlowAssignment> {
+        if (isCreditCardRefund(tx, context)) return emptyList()
         val accountId = verifiedCurrentAccountCredit(tx, scope, context) ?: return emptyList()
         if (!creditsScopedAccount(scope, accountId)) return emptyList()
         return listOf(FlowAssignment.Income(FlowIncomeCategory.ACCOUNT_REFUND))
     }
+
+    /**
+     * Credit-card and statement refunds offset card liability.
+     * An account destination on the same evidence does not make them cash inflow.
+     */
+    private fun isCreditCardRefund(
+        tx: FinancialTransaction,
+        context: AccountFlowClassificationContext,
+    ): Boolean = linkedRecords(tx, context).any { it.details.isCreditCardSms() }
 
     private fun verifiedCurrentAccountCredit(
         tx: FinancialTransaction,

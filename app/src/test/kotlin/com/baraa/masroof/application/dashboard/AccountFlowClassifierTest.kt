@@ -103,6 +103,35 @@ class AccountFlowClassifierTest {
     }
 
     @Test
+    fun refund_creditCardWithAccountDestination_doesNotIncreaseAccountCash() {
+        val tx = tx(
+            "card-refund-account",
+            FinancialTransactionType.REFUND,
+            "25",
+            dest = accountId,
+            linked = listOf("evt-card-account"),
+        )
+        val context = AccountFlowClassifier.buildContext(
+            transactions = listOf(tx),
+            parsedRecords = listOf(
+                parsedRecord(
+                    "evt-card-account",
+                    MessageFamily.REFUND,
+                    destinationLast4 = "3001",
+                    cardLast4 = "7271",
+                    cardSmsChannel = CardSmsChannel.CREDIT,
+                ),
+            ),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            rawSmsById = emptyMap(),
+        )
+
+        assertTrue(AccountFlowClassifier.classify(tx, scope, context).isEmpty())
+        assertTrue(AccountFlowClassifier.classify(tx, fleetScope(), context).isEmpty())
+    }
+
+    @Test
     fun refund_toCreditCard_isExcludedFromAccountCash() {
         val tx = tx("card-refund", FinancialTransactionType.REFUND, "25", dest = cardId)
         val context = AccountFlowClassifier.buildContext(
