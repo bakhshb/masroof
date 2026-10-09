@@ -1,0 +1,86 @@
+{
+  "id": "one_intra_pair",
+  "status": "ACTIVE",
+  "periodAnchor": "2026-09-10",
+  "description": "One owned AlJazira OUT/IN pair is a single self-transfer. Fleet external movement stays zero.",
+  "ownedAccounts": [
+    {"bank": "BANK_ALJAZIRA", "masked": "3001"},
+    {"bank": "BANK_ALJAZIRA", "masked": "3002"}
+  ],
+  "messages": [
+    {
+      "providerMessageId": "inbox-pair-out",
+      "sender": "AlJazira",
+      "body": "حوالة صادرة الى حسابك الجاري\nمن: 3001\nمبلغ: SAR 1,800.55\nإلى: 3002\nفي: 2026-09-03 10:38",
+      "receivedAt": "2026-09-03T07:38:00Z"
+    },
+    {
+      "providerMessageId": "inbox-pair-in",
+      "sender": "AlJazira",
+      "body": "حوالة واردة داخلية\nمبلغ: SAR 1,800.55\nإلى: 3002\nاسم المرسل: TEST_PERSON\nرقم حساب المرسل: 3001\nالبنك المرسل: بنك الجزيرة\nفي: 2026-09-03 10:38",
+      "receivedAt": "2026-09-03T07:38:05Z"
+    }
+  ],
+  "expected": {
+    "rawSmsCount": 2,
+    "parsed": [
+      {
+        "family": "TRANSFER_OUT",
+        "parseStatus": "SUCCESS",
+        "amount": "1800.55",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "sourceAccount": "3001",
+        "destinationAccount": "3002"
+      },
+      {
+        "family": "TRANSFER_IN",
+        "parseStatus": "SUCCESS",
+        "amount": "1800.55",
+        "currency": "SAR",
+        "bank": "BANK_ALJAZIRA",
+        "sourceAccount": "3001",
+        "destinationAccount": "3002"
+      }
+    ],
+    "transactions": [
+      {
+        "type": "SELF_TRANSFER",
+        "amount": "1800.55",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "destination": "account:BANK_ALJAZIRA:3002",
+        "linkedRawSmsCount": 2
+      }
+    ],
+    "displayedRows": [
+      {
+        "type": "SELF_TRANSFER",
+        "amount": "1800.55",
+        "currency": "SAR",
+        "source": "account:BANK_ALJAZIRA:3001",
+        "destination": "account:BANK_ALJAZIRA:3002",
+        "linkedRawSmsCount": 2
+      }
+    ],
+    "accountsFleetInflow": "0.00",
+    "accountsFleetOutflow": "0.00",
+    "accountsFleetRemaining": "0.00",
+    "spendingGross": "0.00",
+    "excludedOtherCurrencyCount": 0,
+    "accounts": [
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3001",
+        "selfTransfersOut": "1800.55",
+        "cashPosition": "-1800.55"
+      },
+      {
+        "bank": "BANK_ALJAZIRA",
+        "masked": "3002",
+        "selfTransfersIn": "1800.55",
+        "cashPosition": "1800.55"
+      }
+    ]
+  }
+}
