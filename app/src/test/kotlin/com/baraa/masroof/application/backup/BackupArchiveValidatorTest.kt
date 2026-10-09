@@ -149,9 +149,10 @@ class BackupArchiveValidatorTest {
             val error = assertThrows(BackupArchiveException::class.java) {
                 BackupArchiveValidator(ZipFixtures.limits(perEntry = 100, total = 200))
                     .extractInto(
-                        ZipFixtures.zipBytes(
-                            BackupPackageFormat.MANIFEST_ENTRY to first,
-                            BackupPackageFormat.MANIFEST_ENTRY to second,
+                        ZipFixtures.duplicateStoredEntries(
+                            BackupPackageFormat.MANIFEST_ENTRY,
+                            first,
+                            second,
                         ).inputStream(),
                         staging,
                     )
@@ -422,9 +423,10 @@ class BoundedZipImportTest {
             )
 
             reject(
-                ZipFixtures.zipBytes(
-                    BackupPackageFormat.MANIFEST_ENTRY to "a".toByteArray(),
-                    BackupPackageFormat.MANIFEST_ENTRY to "b".toByteArray(),
+                ZipFixtures.duplicateStoredEntries(
+                    BackupPackageFormat.MANIFEST_ENTRY,
+                    "a".toByteArray(),
+                    "b".toByteArray(),
                 ),
                 ZipFixtures.limits(perEntry = 1024, total = 4096),
                 BackupArchiveRejection.DUPLICATE_ENTRY,
@@ -551,6 +553,48 @@ private object ZipFixtures {
             zip.write(data)
             zip.closeEntry()
         }
+        return output.toByteArray()
+    }
+
+    /**
+     * ZipOutputStream refuses duplicate names. Import still has to reject an archive
+     * that repeats a canonical local header, so the bytes are written directly.
+     */
+    fun duplicateStoredEntries(name: String, first: ByteArray, second: ByteArray): ByteArray {
+        val output = ByteArrayOutputStream()
+        output.write(storedLocalHeader(name, first))
+        output.write(storedLocalHeader(name, second))
+        return output.toByteArray()
+    }
+
+    private fun storedLocalHeader(name: String, data: ByteArray): ByteArray {
+        val nameBytes = name.toByteArray(Charsets.UTF_8)
+        val crc = CRC32().apply { update(data) }.value
+        val output = ByteArrayOutputStream()
+        fun write16(value: Int) {
+            output.write(value and 0xff)
+            output.write((value shr 8) and 0xff)
+        }
+        fun write32(value: Long) {
+            val bits = value.toInt()
+            output.write(bits and 0xff)
+            output.write((bits shr 8) and 0xff)
+            output.write((bits shr 16) and 0xff)
+            output.write((bits shr 24) and 0xff)
+        }
+        output.write(byteArrayOf(0x50, 0x4b, 0x03, 0x04))
+        write16(20)
+        write16(0)
+        write16(0)
+        write16(0)
+        write16(0)
+        write32(crc)
+        write32(data.size.toLong())
+        write32(data.size.toLong())
+        write16(nameBytes.size)
+        write16(0)
+        output.write(nameBytes)
+        output.write(data)
         return output.toByteArray()
     }
 
