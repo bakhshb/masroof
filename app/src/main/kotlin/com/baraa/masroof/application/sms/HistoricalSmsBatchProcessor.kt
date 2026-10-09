@@ -6,8 +6,12 @@ import com.baraa.masroof.application.ingestion.DerivedProcessingStage
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessingRecovery
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
+import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
+import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
 import com.baraa.masroof.application.transaction.ReconciliationSummary
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.domain.model.LoanType
@@ -42,8 +46,10 @@ sealed interface HistoricalBatchDerivedResult {
  * Live processing stays per message.
  *
  * A correctness-blocking derived failure keeps the captured evidence and marks the affected
- * financial rows in one transaction, then schedules one batch recovery. Exchange-rate
- * enrichment stays best-effort.
+ * financial rows in one transaction, then schedules one batch recovery. A reconciliation
+ * report with a nonzero failed count is that failure even when nothing was thrown: finish
+ * does not return success and does not clear the retry set. Exchange-rate enrichment
+ * stays best-effort.
  */
 class HistoricalSmsBatchProcessor(
     private val capture: CaptureBankSmsUseCase,
@@ -54,6 +60,7 @@ class HistoricalSmsBatchProcessor(
     private val exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null,
     private val processingRecovery: ProcessingRecovery? = null,
     private val batchRecoveryScheduler: HistoricalBatchRecoveryScheduler? = null,
+    private val appLogService: AppLogService? = null,
 ) {
     fun startBatch(): Batch = Batch()
 
@@ -104,8 +111,15 @@ class HistoricalSmsBatchProcessor(
                 reconciliation?.reconcileAffectedRawSmsIds(affectedRawSmsIds())
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 markAffected()
+                logIncomplete(
+                    stage = DerivedProcessingStage.RECONCILIATION,
+                    failureCount = null,
+                    rawSmsId = storedEvents.firstOrNull()?.event?.rawSmsId,
+                    retryState = "marked",
+                    errorClass = e.javaClass.simpleName,
+                )
                 return HistoricalBatchDerivedResult.Incomplete(DerivedProcessingStage.RECONCILIATION)
             }
             if (report != null && reviewQueueUpdater != null) {
@@ -113,13 +127,49 @@ class HistoricalSmsBatchProcessor(
                     reviewQueueUpdater.applyReport(report)
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
                     markAffected()
+                    logIncomplete(
+                        stage = DerivedProcessingStage.REVIEW_UPDATE,
+                        failureCount = report.summary.failed,
+                        rawSmsId = report.failedRawSmsIds.firstOrNull()
+                            ?: storedEvents.firstOrNull()?.event?.rawSmsId,
+                        retryState = "retained",
+                        errorClass = e.javaClass.simpleName,
+                    )
                     return HistoricalBatchDerivedResult.Incomplete(DerivedProcessingStage.REVIEW_UPDATE)
                 }
             }
+            if (report != null && !ReconciliationCompletionPolicy.isComplete(report)) {
+                markAffected()
+                logIncomplete(
+                    stage = DerivedProcessingStage.RECONCILIATION,
+                    failureCount = report.summary.failed,
+                    rawSmsId = report.failedRawSmsIds.firstOrNull()
+                        ?: storedEvents.firstOrNull()?.event?.rawSmsId,
+                    retryState = "marked",
+                    errorClass = "ReconciliationIncompleteException",
+                )
+                return HistoricalBatchDerivedResult.Incomplete(DerivedProcessingStage.RECONCILIATION)
+            }
             clearRecovered()
             return HistoricalBatchDerivedResult.Succeeded(report?.summary)
+        }
+
+        private fun logIncomplete(
+            stage: DerivedProcessingStage,
+            failureCount: Int?,
+            rawSmsId: String?,
+            retryState: String,
+            errorClass: String,
+        ) {
+            val failures = failureCount?.let { " failures=$it" }.orEmpty()
+            val masked = rawSmsId?.let(AppLogFormatting::maskId) ?: "none"
+            appLogService?.error(
+                AppLogCategories.INGEST,
+                "Derived ${stage.name.lowercase()} incomplete$failures id=$masked " +
+                    "retry_state=$retryState ($errorClass)",
+            )
         }
 
         private suspend fun discoverOwnership(): Boolean {

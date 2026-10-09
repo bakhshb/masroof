@@ -10,6 +10,9 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
+import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.transaction.ReconciliationIncompleteException
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
 
@@ -32,6 +35,7 @@ class HistoricalDerivedRecoveryWorker(
     appContext: Context,
     params: WorkerParameters,
     private val recovery: HistoricalDerivedRecovery,
+    private val appLogService: AppLogService? = null,
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result =
         try {
@@ -39,11 +43,24 @@ class HistoricalDerivedRecoveryWorker(
             Result.success()
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logIncomplete(e)
             Result.retry()
         }
 
+    private fun logIncomplete(error: Exception) {
+        val incomplete = error as? ReconciliationIncompleteException
+        val failures = incomplete?.let { " failures=${it.failureCount} id=${it.maskedRawSmsId}" }.orEmpty()
+        val stage = incomplete?.stage ?: "reconciliation"
+        appLogService?.warn(
+            AppLogCategories.SMS,
+            "HistoricalDerivedRecoveryWorker $stage incomplete$failures " +
+                "attempt=${runAttemptCount + 1} retry_state=retained (${error.javaClass.simpleName})",
+        )
+    }
+
     class Factory(
+        private val appLogService: AppLogService? = null,
         private val recovery: () -> HistoricalDerivedRecovery,
     ) : WorkerFactory() {
         override fun createWorker(
@@ -52,7 +69,12 @@ class HistoricalDerivedRecoveryWorker(
             workerParameters: WorkerParameters,
         ): ListenableWorker? =
             if (workerClassName == HistoricalDerivedRecoveryWorker::class.java.name) {
-                HistoricalDerivedRecoveryWorker(appContext, workerParameters, recovery())
+                HistoricalDerivedRecoveryWorker(
+                    appContext,
+                    workerParameters,
+                    recovery(),
+                    appLogService,
+                )
             } else {
                 null
             }
