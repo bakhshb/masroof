@@ -9,6 +9,7 @@ import androidx.work.WorkerParameters
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import kotlinx.coroutines.CancellationException
 
@@ -17,9 +18,10 @@ import kotlinx.coroutines.CancellationException
  *
  * Input is the rawSmsId only. Delegates to [ProcessStoredSmsUseCase]; contains no bank
  * parsing or financial rules. Retrying is safe because stored-SMS processing is idempotent.
- * Ownership, reconciliation, and review-refresh failures are retried. A direct
- * review write that fails stays retryable past [MAX_ATTEMPTS] until a review row
- * or a LIVE processing-retry marker exists. Exchange-rate enrichment failure is not.
+ * Ownership, reconciliation, and review-refresh failures are retried, including a
+ * reconciliation report whose failed count is nonzero. A direct review write that
+ * fails stays retryable past [MAX_ATTEMPTS] until a review row or a LIVE
+ * processing-retry marker exists. Exchange-rate enrichment failure is not.
  */
 class LiveSmsProcessingWorker(
     appContext: Context,
@@ -42,7 +44,10 @@ class LiveSmsProcessingWorker(
         }
 
         return when (outcome) {
-            is SmsIngestionResult.DerivedIncomplete -> retryDerivedOrGiveUp(outcome.rawSmsId)
+            is SmsIngestionResult.DerivedIncomplete -> {
+                logDerivedIncomplete(outcome)
+                retryDerivedOrGiveUp(outcome.rawSmsId)
+            }
             is SmsIngestionResult.Failed -> when (outcome.message) {
                 ProcessStoredSmsUseCase.REASON_RAW_SMS_NOT_FOUND -> Result.failure()
                 ProcessStoredSmsUseCase.REASON_REVIEW_NOT_PERSISTED -> Result.retry()
@@ -67,6 +72,18 @@ class LiveSmsProcessingWorker(
             logUnexpectedFailure(stage = "record_exhausted_derived", e)
             Result.retry()
         }
+    }
+
+    private fun logDerivedIncomplete(outcome: SmsIngestionResult.DerivedIncomplete) {
+        val failures = outcome.failureCount?.let { " failures=$it" }.orEmpty()
+        val retryState = if (runAttemptCount + 1 < MAX_ATTEMPTS) "retry" else "exhausted"
+        appLogService?.warn(
+            AppLogCategories.SMS,
+            "LiveSmsProcessingWorker derived ${outcome.stage.name.lowercase()} incomplete$failures " +
+                "id=${AppLogFormatting.maskId(outcome.rawSmsId)} " +
+                "attempt=${runAttemptCount + 1} retry_state=$retryState " +
+                "(${outcome.cause?.javaClass?.simpleName ?: "none"})",
+        )
     }
 
     private fun logUnexpectedFailure(stage: String, error: Exception) {

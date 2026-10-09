@@ -48,6 +48,8 @@ sealed interface SmsIngestionResult {
         val details: ParsedEventDetails,
         val stage: DerivedProcessingStage,
         val cause: Throwable? = null,
+        /** Nonthrowing reconciliation failures. Null when the stage threw. */
+        val failureCount: Int? = null,
     ) : SmsIngestionResult
 
     data class ReviewRequired(

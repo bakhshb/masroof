@@ -38,6 +38,7 @@ import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
+import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
@@ -68,6 +69,31 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
     private val clock = InstantClock { Instant.parse("2026-08-11T12:00:00Z") }
     val processingRetryRepo = RoomProcessingRetryRepository(db.processingRetryDao())
     val appLog = AppLogService(context)
+
+    /**
+     * Nonthrowing [FinancialTransactionSaveResult.Conflict] results. Reconciliation
+     * counts these as [com.baraa.masroof.application.transaction.ReconciliationSummary.failed]
+     * without throwing.
+     */
+    val nonthrowingSaveConflicts = AtomicInteger(0)
+
+    /** Times reconciliation was handed a whole-history parsed-event load. */
+    val reconciliationListAllCalls = AtomicInteger(0)
+
+    val ledgerUnderTest: FinancialTransactionRepository = object : FinancialTransactionRepository by ftRepo {
+        override suspend fun save(
+            transaction: FinancialTransaction,
+            rawSmsIds: Collection<String>,
+        ): FinancialTransactionSaveResult {
+            if (nonthrowingSaveConflicts.getAndDecrement() > 0) {
+                return FinancialTransactionSaveResult.Conflict(
+                    rawSmsId = rawSmsIds.firstOrNull().orEmpty(),
+                    existingTransactionId = "conflict-existing",
+                )
+            }
+            return ftRepo.save(transaction, rawSmsIds)
+        }
+    }
     val parseCalls = AtomicInteger(0)
     private val cards = RoomCardRegistryRepository.from(db)
 
@@ -102,6 +128,11 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         appLogService: com.baraa.masroof.application.logging.AppLogService? = null,
     ): ProcessStoredSmsUseCase {
         val parsedForReconcile = object : ParsedEventRepository by parsedRepo {
+            override suspend fun listAll(): List<ParsedEventRecord> {
+                reconciliationListAllCalls.incrementAndGet()
+                return parsedRepo.listAll()
+            }
+
             override suspend fun listReceivedBetween(
                 startInclusive: Instant,
                 endExclusive: Instant,
@@ -176,7 +207,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             reconciliation = TransactionReconciliationService(
                 parsedEventRepository = parsedForReconcile,
                 rawSmsRepository = rawRepo,
-                financialTransactionRepository = ftRepo,
+                financialTransactionRepository = ledgerUnderTest,
                 ownershipResolver = OwnershipResolver(
                     RoomAccountRegistryRepository.from(db),
                     cards,
@@ -218,6 +249,11 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         reviewRepository: ReviewRepository = reviewRepo,
     ): HistoricalSmsBatchProcessor {
         val parsedForBatch = object : ParsedEventRepository by parsedRepo {
+            override suspend fun listAll(): List<ParsedEventRecord> {
+                reconciliationListAllCalls.incrementAndGet()
+                return parsedRepo.listAll()
+            }
+
             override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
                 if (reconciliationFails) throw IOException("batch reconciliation unavailable")
                 return parsedRepo.listByRawSmsIds(rawSmsIds)
@@ -234,7 +270,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             reconciliation = TransactionReconciliationService(
                 parsedEventRepository = parsedForBatch,
                 rawSmsRepository = rawRepo,
-                financialTransactionRepository = ftRepo,
+                financialTransactionRepository = ledgerUnderTest,
                 ownershipResolver = OwnershipResolver(
                     RoomAccountRegistryRepository.from(db),
                     cards,
@@ -255,6 +291,11 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
     /** One batch derived pass over historical retry rows. Does not reparse SMS text. */
     fun derivedRecovery(reconciliationFails: Boolean = false): HistoricalDerivedRecovery {
         val parsedForBatch = object : ParsedEventRepository by parsedRepo {
+            override suspend fun listAll(): List<ParsedEventRecord> {
+                reconciliationListAllCalls.incrementAndGet()
+                return parsedRepo.listAll()
+            }
+
             override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
                 if (reconciliationFails) throw IOException("batch reconciliation unavailable")
                 return parsedRepo.listByRawSmsIds(rawSmsIds)
@@ -266,7 +307,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             reconciliation = TransactionReconciliationService(
                 parsedEventRepository = parsedForBatch,
                 rawSmsRepository = rawRepo,
-                financialTransactionRepository = ftRepo,
+                financialTransactionRepository = ledgerUnderTest,
                 ownershipResolver = OwnershipResolver(
                     RoomAccountRegistryRepository.from(db),
                     cards,
