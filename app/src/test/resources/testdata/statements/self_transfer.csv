@@ -1,0 +1,4 @@
+# masroof-statement-v1
+bankId,accountMasked,bookedAt,direction,amount,currency,description,reference
+BANK_ALJAZIRA,3001,2026-03-12,DEBIT,150.00,SAR,TO OWN 3002,ST-1
+BANK_ALJAZIRA,3002,2026-03-12,CREDIT,150.00,SAR,FROM OWN 3001,ST-1

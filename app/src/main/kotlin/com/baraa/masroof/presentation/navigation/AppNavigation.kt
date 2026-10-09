@@ -58,6 +58,7 @@ internal fun resolvePendingDestination(
         is SettingsDestination.BankHub,
         SettingsDestination.App,
         SettingsDestination.DataBackup,
+        SettingsDestination.StatementReconciliation,
         SettingsDestination.Hub,
         SettingsDestination.About,
         SettingsDestination.Logs,

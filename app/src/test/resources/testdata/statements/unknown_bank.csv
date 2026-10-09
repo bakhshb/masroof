@@ -1,0 +1,3 @@
+# masroof-statement-v1
+bankId,accountMasked,bookedAt,direction,amount,currency,description
+UNKNOWN,3001,2026-03-01,DEBIT,1.00,SAR,GROCERY ANON

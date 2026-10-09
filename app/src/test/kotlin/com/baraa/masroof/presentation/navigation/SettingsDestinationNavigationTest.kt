@@ -19,6 +19,10 @@ class SettingsDestinationNavigationTest {
         )
         assertEquals(SettingsDestination.App, decodeSettingsDestination("app"))
         assertEquals(SettingsDestination.DataBackup, decodeSettingsDestination("data_backup"))
+        assertEquals(
+            SettingsDestination.StatementReconciliation,
+            decodeSettingsDestination("statement_reconciliation"),
+        )
         assertEquals(SettingsDestination.DesignCatalog, decodeSettingsDestination("design_catalog"))
     }
 

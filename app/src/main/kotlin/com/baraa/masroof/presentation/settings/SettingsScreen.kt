@@ -36,10 +36,13 @@ import com.baraa.masroof.presentation.navigation.pushSettingsDestination
 import com.baraa.masroof.presentation.navigation.replaceSettingsStack
 import com.baraa.masroof.presentation.navigation.replaceSettingsTop
 import com.baraa.masroof.presentation.navigation.resolvePendingDestination
+import com.baraa.masroof.presentation.statement.StatementReconciliationRoute
+import com.baraa.masroof.presentation.statement.StatementReconciliationViewModel
 
 @Composable
 fun SettingsRoute(
     viewModel: SettingsViewModel,
+    statementReconciliationViewModel: StatementReconciliationViewModel,
     reviewRequiredCount: Int,
     onBack: () -> Unit,
     onOpenReview: () -> Unit,
@@ -123,6 +126,7 @@ fun SettingsRoute(
             onOpenReview = onOpenReview,
             onOpenApp = { navigateTo(SettingsDestination.App) },
             onOpenDataBackup = { navigateTo(SettingsDestination.DataBackup) },
+            onOpenStatementReconciliation = { navigateTo(SettingsDestination.StatementReconciliation) },
             onOpenAbout = { navigateTo(SettingsDestination.About) },
         )
 
@@ -305,6 +309,11 @@ fun SettingsRoute(
             onSelectTheme = viewModel::setThemeMode,
         )
 
+        SettingsDestination.StatementReconciliation -> StatementReconciliationRoute(
+            viewModel = statementReconciliationViewModel,
+            onBack = { popOrExit() },
+        )
+
         SettingsDestination.DataBackup -> SettingsDataBackupScreen(
             state = state,
             onBack = { popOrExit() },
@@ -406,6 +415,7 @@ private fun SettingsHubScreen(
     onOpenReview: () -> Unit,
     onOpenApp: () -> Unit,
     onOpenDataBackup: () -> Unit,
+    onOpenStatementReconciliation: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
     MasroofSecondaryScaffold(
@@ -488,6 +498,13 @@ private fun SettingsHubScreen(
                 title = stringResource(R.string.settings_data_backup_section),
                 subtitle = stringResource(R.string.settings_data_backup_hub_subtitle),
                 onClick = onOpenDataBackup,
+            )
+
+            SettingsNavRow(
+                icon = MasroofIcons.recentTransactions,
+                title = stringResource(R.string.settings_statement_reconciliation_title),
+                subtitle = stringResource(R.string.settings_statement_reconciliation_subtitle),
+                onClick = onOpenStatementReconciliation,
             )
 
             SettingsNavRow(

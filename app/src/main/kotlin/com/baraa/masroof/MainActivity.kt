@@ -50,6 +50,8 @@ import com.baraa.masroof.presentation.review.ReviewViewModel
 import com.baraa.masroof.presentation.review.ReviewViewModelFactory
 import com.baraa.masroof.presentation.settings.SettingsViewModel
 import com.baraa.masroof.presentation.settings.SettingsViewModelFactory
+import com.baraa.masroof.presentation.statement.StatementReconciliationViewModel
+import com.baraa.masroof.presentation.statement.StatementReconciliationViewModelFactory
 import com.baraa.masroof.presentation.theme.MasroofSpacing
 import com.baraa.masroof.presentation.theme.MasroofTheme
 import com.baraa.masroof.presentation.locale.AppLocaleContext
@@ -96,6 +98,10 @@ class MainActivity : ComponentActivity() {
                 startActivity(InstallPermissionHelper.buildManageUnknownSourcesIntent(this))
             },
         )
+    }
+
+    private val statementReconciliationViewModel: StatementReconciliationViewModel by viewModels {
+        StatementReconciliationViewModelFactory(container.statementReconciliationWorkflow)
     }
 
     private val notificationCenterViewModel: NotificationCenterViewModel by viewModels {
@@ -230,6 +236,7 @@ class MainActivity : ComponentActivity() {
                         dashboardViewModel = dashboardViewModel,
                         reviewViewModel = reviewViewModel,
                         settingsViewModel = settingsViewModel,
+                        statementReconciliationViewModel = statementReconciliationViewModel,
                         notificationCenterViewModel = notificationCenterViewModel,
                         onRequestPermissions = {
                             permissionLauncher.launch(OnboardingPermissionPolicy.REQUIRED_SMS_PERMISSIONS)
