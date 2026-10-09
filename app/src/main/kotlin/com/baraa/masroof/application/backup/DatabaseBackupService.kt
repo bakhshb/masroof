@@ -36,16 +36,19 @@ class DatabaseBackupService(
     private val restartProcess: () -> Unit = { defaultRestartProcess(appContext) },
     private val beforeValidatedInstall: () -> Unit = {},
     private val maintenancePreferences: SharedPreferences? = null,
+    /**
+     * Production export tries `VACUUM INTO` when the device SQLite supports it.
+     * Tests set this to false to exercise the minSdk 26 quiesce path on a newer SQLite.
+     */
+    private val onlineBackupEnabled: Boolean = true,
 ) : DatabaseBackupGateway {
     override suspend fun exportTo(destination: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            checkpointWal()
             val staging = createStagingDir("export")
             try {
                 val dbCopy = File(staging, BackupPackageFormat.DATABASE_ENTRY)
-                val liveDb = appContext.getDatabasePath(MasroofDatabase.NAME)
-                require(liveDb.exists()) { "Database file missing" }
-                liveDb.copyTo(dbCopy, overwrite = true)
+                writeConsistentSnapshot(dbCopy)
+                verifyIsolatedSnapshot(dbCopy)
 
                 val exportedAt = clockEpochMillis()
                 val manifest = BackupManifest(
@@ -152,6 +155,206 @@ class DatabaseBackupService(
             BackupImportOutcome.Failed
         } finally {
             staging.deleteRecursively()
+        }
+    }
+
+    /**
+     * Point-in-time copy used by export. `VACUUM INTO` (SQLite's online backup API) is used
+     * when this device's SQLite is new enough to support it. minSdk 26's SQLite has no online
+     * backup entry point, so that path quiesces writers, truncates the WAL, and copies the
+     * main file while the exclusive lock is held. The live database is not closed or replaced.
+     */
+    private fun writeConsistentSnapshot(destination: File) {
+        val source = database.openHelper.writableDatabase
+        val sourcePath = source.path ?: appContext.getDatabasePath(MasroofDatabase.NAME).path
+        check(File(sourcePath).isFile) { "Database file missing" }
+        destination.parentFile?.mkdirs()
+        check(!destination.exists() || destination.delete()) { "Cannot replace snapshot destination" }
+        deleteSidecarFiles(destination)
+        val wroteOnline = onlineBackupEnabled && writeOnlineBackupIfSupported(sourcePath, destination)
+        if (!wroteOnline) {
+            writeQuiescedSnapshot(sourcePath, destination)
+        }
+        makeSnapshotSidecarFree(destination)
+        check(destination.isFile && destination.length() > 0L) { "Snapshot file was not written" }
+        check(!File(destination.path + "-wal").let { it.exists() && it.length() > 0L }) {
+            "Snapshot still depends on a WAL sidecar"
+        }
+    }
+
+    private fun writeOnlineBackupIfSupported(sourcePath: String, destination: File): Boolean {
+        val raw = openSnapshotConnection(sourcePath)
+        try {
+            if (!supportsOnlineBackup(raw)) return false
+            readSnapshotString(raw, "PRAGMA busy_timeout = $SNAPSHOT_BUSY_TIMEOUT_MS")
+            try {
+                executeVacuumInto(raw, destination)
+            } catch (error: android.database.SQLException) {
+                if (destination.exists()) destination.delete()
+                deleteSidecarFiles(destination)
+                if (isOnlineBackupUnsupported(error)) return false
+                throw error
+            } catch (error: IllegalStateException) {
+                if (destination.exists()) destination.delete()
+                deleteSidecarFiles(destination)
+                if (isOnlineBackupUnsupported(error)) return false
+                throw error
+            }
+            check(destination.isFile && destination.length() > 0L) {
+                "Online backup produced no snapshot file"
+            }
+            return true
+        } finally {
+            raw.close()
+        }
+    }
+
+    /**
+     * Checkpoint first, then take the write lock and copy only if the WAL is still empty.
+     * A writer that lands between those steps is detected and the attempt is repeated.
+     * The copy itself runs while writers are blocked, so an automatic checkpoint cannot
+     * tear the pages being read.
+     */
+    private fun writeQuiescedSnapshot(sourcePath: String, destination: File) {
+        val raw = openSnapshotConnection(sourcePath)
+        try {
+            readSnapshotString(raw, "PRAGMA busy_timeout = $SNAPSHOT_BUSY_TIMEOUT_MS")
+            var last = "no attempt"
+            repeat(CHECKPOINT_ATTEMPTS) {
+                if (!checkpointFully(raw)) {
+                    last = "checkpoint incomplete"
+                    Thread.sleep(CHECKPOINT_RETRY_MS)
+                    return@repeat
+                }
+                if (!beginExclusiveTransaction(raw)) {
+                    last = "writers still active"
+                    Thread.sleep(CHECKPOINT_RETRY_MS)
+                    return@repeat
+                }
+                try {
+                    val wal = File("$sourcePath-wal")
+                    val walBytes = if (wal.exists()) wal.length() else 0L
+                    if (walBytes > 0L) {
+                        last = "wal bytes=$walBytes after checkpoint"
+                        return@repeat
+                    }
+                    File(sourcePath).copyTo(destination, overwrite = true)
+                    return
+                } finally {
+                    raw.endTransaction()
+                }
+            }
+            error("Could not copy a quiescent snapshot ($last)")
+        } finally {
+            raw.close()
+        }
+    }
+
+    private fun beginExclusiveTransaction(raw: SQLiteDatabase): Boolean {
+        return try {
+            raw.beginTransaction()
+            true
+        } catch (error: android.database.sqlite.SQLiteException) {
+            val message = error.message.orEmpty()
+            if (!message.contains("locked", ignoreCase = true) &&
+                !message.contains("busy", ignoreCase = true)
+            ) {
+                throw error
+            }
+            false
+        }
+    }
+
+    private fun checkpointFully(raw: SQLiteDatabase): Boolean {
+        return try {
+            raw.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { cursor ->
+                if (!cursor.moveToFirst()) return false
+                val busy = cursor.getInt(0)
+                val log = cursor.getInt(1)
+                val checkpointed = cursor.getInt(2)
+                busy == 0 && log == checkpointed
+            }
+        } catch (error: android.database.sqlite.SQLiteException) {
+            val message = error.message.orEmpty()
+            if (!message.contains("locked", ignoreCase = true) &&
+                !message.contains("busy", ignoreCase = true)
+            ) {
+                throw error
+            }
+            false
+        }
+    }
+
+    private fun makeSnapshotSidecarFree(destination: File) {
+        val raw = openSnapshotConnection(destination.path)
+        try {
+            val mode = readSnapshotString(raw, "PRAGMA journal_mode = DELETE")
+            check(
+                mode.equals("delete", ignoreCase = true) ||
+                    mode.equals("truncate", ignoreCase = true) ||
+                    mode.equals("persist", ignoreCase = true),
+            ) { "Snapshot journal mode is $mode" }
+        } finally {
+            raw.close()
+        }
+        deleteSidecarFiles(destination)
+    }
+
+    private fun executeVacuumInto(raw: SQLiteDatabase, destination: File) {
+        val sql = "VACUUM INTO ${sqlStringLiteral(destination.absolutePath)}"
+        try {
+            raw.execSQL(sql)
+        } catch (error: IllegalStateException) {
+            if (!error.message.orEmpty().contains("rawQuery", ignoreCase = true)) throw error
+            raw.rawQuery(sql, null).use { cursor -> cursor.moveToFirst() }
+        }
+    }
+
+    private fun supportsOnlineBackup(raw: SQLiteDatabase): Boolean {
+        val version = readSnapshotString(raw, "SELECT sqlite_version()")
+        val parts = version.split('.')
+        val major = parts.getOrNull(0)?.toIntOrNull() ?: 0
+        val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        return major > 3 || (major == 3 && minor >= ONLINE_BACKUP_MIN_MINOR)
+    }
+
+    private fun isOnlineBackupUnsupported(error: Exception): Boolean {
+        val message = error.message.orEmpty()
+        return message.contains("syntax", ignoreCase = true) ||
+            message.contains("not authorized", ignoreCase = true) ||
+            message.contains("no such", ignoreCase = true)
+    }
+
+    private fun openSnapshotConnection(path: String): SQLiteDatabase =
+        SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READWRITE)
+
+    private fun readSnapshotString(db: SQLiteDatabase, sql: String): String =
+        db.rawQuery(sql, null).use { cursor ->
+            check(cursor.moveToFirst()) { "SQLite returned no row" }
+            cursor.getString(0)
+        }
+
+    private fun sqlStringLiteral(value: String): String = "'${value.replace("'", "''")}'"
+
+    /**
+     * Checks the isolated snapshot only. A failure here leaves the live database and
+     * preferences untouched; staging is deleted and export returns a failed result.
+     */
+    private fun verifyIsolatedSnapshot(dbFile: File) {
+        check(dbFile.isFile && dbFile.length() > 0L) { "Snapshot file missing" }
+        SQLiteDatabase.openDatabase(
+            dbFile.path,
+            null,
+            SQLiteDatabase.OPEN_READONLY,
+        ).use { snapshot ->
+            snapshot.rawQuery("PRAGMA integrity_check", null).use { cursor ->
+                check(cursor.moveToFirst() && cursor.getString(0) == "ok" && !cursor.moveToNext()) {
+                    "Snapshot failed integrity_check"
+                }
+            }
+            snapshot.rawQuery("PRAGMA foreign_key_check", null).use { cursor ->
+                check(!cursor.moveToFirst()) { "Snapshot failed foreign_key_check" }
+            }
         }
     }
 
@@ -407,6 +610,11 @@ class DatabaseBackupService(
             BackupPackageFormat.DATABASE_ENTRY,
             BackupPackageFormat.PREFERENCES_ENTRY,
         )
+
+        private const val ONLINE_BACKUP_MIN_MINOR: Int = 27
+        private const val SNAPSHOT_BUSY_TIMEOUT_MS: Int = 10_000
+        private const val CHECKPOINT_ATTEMPTS: Int = 40
+        private const val CHECKPOINT_RETRY_MS: Long = 25L
 
         // Mirror SharedPrefsOnboardingPreferencesRepository private keys for backup I/O.
         private const val KEY_ONBOARDING_STARTED = "onboarding_started"
