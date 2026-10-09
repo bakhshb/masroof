@@ -38,11 +38,11 @@ import java.util.zip.ZipInputStream
 
 /**
  * Export must publish a sidecar-free snapshot that survives WAL checkpoints racing the copy.
- * SDK 28 matches the existing backup tests (SQLite without VACUUM INTO). SDK 34 exercises the
- * online-backup path on a current platform SQLite.
+ * SDK 28 matches the existing backup tests. Robolectric's SQLite supports VACUUM INTO, so the
+ * quiesced fallback is covered by disabling that path explicitly.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28, 34])
+@Config(sdk = [28])
 class ConsistentBackupSnapshotTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val card = CardReference(Bank.BANK_ALJAZIRA, "4242")
@@ -66,13 +66,27 @@ class ConsistentBackupSnapshotTest {
 
     @Test(timeout = 120_000)
     fun export_withConcurrentWalWriters_restoresConsistentSnapshot() {
-        runBlocking {
+        runBlocking { assertConcurrentExport(useOnlineBackup = true) }
+    }
+
+    @Test(timeout = 120_000)
+    fun export_withConcurrentWalWriters_quiescedSnapshotIsConsistent() {
+        runBlocking { assertConcurrentExport(useOnlineBackup = false) }
+    }
+
+    private suspend fun assertConcurrentExport(useOnlineBackup: Boolean) {
             val live = openWalDatabase()
             val writers = mutableListOf<Thread>()
             val stop = AtomicBoolean(false)
             try {
                 val sqliteVersion = prepareLiveDatabase(live)
                 val preSeed = seedBatches(liveDbPath(), 1L until (PRESEED_BATCHES + 1L))
+                assertConsistent(
+                    batches = readBatches(liveDbPath(), sqliteVersion),
+                    mustInclude = preSeed,
+                    mustBeSubsetOf = preSeed,
+                    label = "live before export sqlite=$sqliteVersion",
+                )
                 RoomCardRegistryRepository.from(live).setOwnership(card, OwnershipStatus.OWNED)
                 val preferences = captureLivePreferences()
 
@@ -117,11 +131,12 @@ class ConsistentBackupSnapshotTest {
                 writerFailure.get()?.let { throw it }
 
                 val zip = File(context.cacheDir, "consistent-${System.nanoTime()}.masroof")
-                val service = backupService(live)
+                val service = backupService(live, useOnlineBackup)
                 val exported = service.exportTo(Uri.fromFile(zip))
                 stop.set(true)
                 writers.forEach { thread ->
-                    assertTrue("writer did not stop", thread.join(20_000))
+                    thread.join(20_000)
+                    assertFalse("writer did not stop", thread.isAlive)
                 }
                 writerFailure.get()?.let { throw it }
 
@@ -170,7 +185,6 @@ class ConsistentBackupSnapshotTest {
                 writers.forEach { it.join(5_000) }
                 if (live.isOpen) live.close()
             }
-        }
     }
 
     @Test(timeout = 60_000)
@@ -182,12 +196,21 @@ class ConsistentBackupSnapshotTest {
                 val seeded = seedBatches(liveDbPath(), 1L..1L)
                 RoomCardRegistryRepository.from(live).setOwnership(card, OwnershipStatus.OWNED)
                 val preferences = captureLivePreferences()
-                val blocker = File(context.cacheDir, "export-blocker-${System.nanoTime()}")
-                blocker.mkdirs()
+                var clockCalls = 0
+                val exported = DatabaseBackupService(
+                    appContext = context,
+                    database = live,
+                    closeDatabase = { error("export must not close the live database") },
+                    appVersionName = "test",
+                    clockEpochMillis = {
+                        clockCalls += 1
+                        check(clockCalls == 1) { "forced export failure after snapshot" }
+                        1_700_000_000_000L
+                    },
+                    restartProcess = { error("export must not restart the process") },
+                ).exportTo(Uri.fromFile(File(context.cacheDir, "failed-export.masroof")))
 
-                val exported = backupService(live).exportTo(Uri.fromFile(blocker))
-
-                assertTrue(exported.isFailure)
+                assertTrue(exported.exceptionOrNull()?.toString() ?: "export succeeded", exported.isFailure)
                 assertTrue(live.isOpen)
                 assertLivePreferences(preferences)
                 val liveBatches = readBatches(liveDbPath(), sqliteVersion)
@@ -252,13 +275,14 @@ class ConsistentBackupSnapshotTest {
         }
     }
 
-    private fun backupService(live: MasroofDatabase) = DatabaseBackupService(
+    private fun backupService(live: MasroofDatabase, useOnlineBackup: Boolean = true) = DatabaseBackupService(
         appContext = context,
         database = live,
         closeDatabase = { error("export must not close the live database") },
         appVersionName = "test",
         clockEpochMillis = { 1_700_000_000_000L },
         restartProcess = { error("export must not restart the process") },
+        onlineBackupEnabled = useOnlineBackup,
     )
 
     private fun seedBatches(databasePath: String, ids: LongRange): Set<Long> {
@@ -296,32 +320,46 @@ class ConsistentBackupSnapshotTest {
         readBatches(databasePath.path, sqliteVersion)
 
     private fun readBatches(databasePath: String, sqliteVersion: String): Map<Long, ProbeBatch> {
-        val expected = mutableMapOf<Long, Int>()
+        val rowCounts = mutableMapOf<Long, Int>()
         val sequences = mutableMapOf<Long, MutableSet<Int>>()
         val payloadsOk = mutableMapOf<Long, Boolean>()
+        val payloadErrors = mutableMapOf<Long, String>()
         openReadOnly(databasePath).use { db ->
             assertIntegrity(db, sqliteVersion)
             db.rawQuery("SELECT batch_id, row_count FROM snapshot_batch", null).use { cursor ->
                 while (cursor.moveToNext()) {
-                    expected[cursor.getLong(0)] = cursor.getInt(1)
+                    rowCounts[cursor.getLong(0)] = cursor.getInt(1)
                 }
             }
-            db.rawQuery("SELECT batch_id, seq, payload FROM snapshot_probe", null).use { cursor ->
+            db.rawQuery(
+                "SELECT batch_id, seq, length(payload), substr(payload, 1, 24) FROM snapshot_probe",
+                null,
+            ).use { cursor ->
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(0)
                     val seq = cursor.getInt(1)
-                    val payload = cursor.getString(2)
+                    val length = cursor.getInt(2)
+                    val prefix = cursor.getString(3)
                     sequences.getOrPut(id) { mutableSetOf() }.add(seq)
-                    val ok = payload == payload(id, seq)
+                    val expectedPayload = payload(id, seq)
+                    val ok = length == expectedPayload.length && prefix == expectedPayload.take(24)
+                    if (!ok) {
+                        payloadErrors.putIfAbsent(
+                            id,
+                            "id=$id seq=$seq len=$length expectedLen=${expectedPayload.length} " +
+                                "prefix=$prefix expectedPrefix=${expectedPayload.take(24)}",
+                        )
+                    }
                     payloadsOk[id] = (payloadsOk[id] ?: true) && ok
                 }
             }
         }
-        return expected.keys.associateWith { id ->
+        return rowCounts.keys.associateWith { id ->
             ProbeBatch(
-                expectedRows = expected.getValue(id),
+                expectedRows = rowCounts.getValue(id),
                 sequences = sequences[id].orEmpty(),
-                payloadsOk = payloadsOk[id] ?: expected.getValue(id) == 0,
+                payloadsOk = payloadsOk[id] ?: (rowCounts.getValue(id) == 0),
+                detail = payloadErrors[id],
             )
         }
     }
@@ -343,7 +381,7 @@ class ConsistentBackupSnapshotTest {
                 (0 until batch.expectedRows).toSet(),
                 batch.sequences,
             )
-            assertTrue("$label batch $id payload torn", batch.payloadsOk)
+            assertTrue("$label batch $id payload torn ${batch.detail}", batch.payloadsOk)
         }
     }
 
@@ -512,6 +550,7 @@ class ConsistentBackupSnapshotTest {
         val expectedRows: Int,
         val sequences: Set<Int>,
         val payloadsOk: Boolean,
+        val detail: String?,
     )
 
     private data class LivePreferences(

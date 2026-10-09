@@ -36,6 +36,11 @@ class DatabaseBackupService(
     private val restartProcess: () -> Unit = { defaultRestartProcess(appContext) },
     private val beforeValidatedInstall: () -> Unit = {},
     private val maintenancePreferences: SharedPreferences? = null,
+    /**
+     * Production export tries `VACUUM INTO` when the device SQLite supports it.
+     * Tests set this to false to exercise the minSdk 26 quiesce path on a newer SQLite.
+     */
+    private val onlineBackupEnabled: Boolean = true,
 ) : DatabaseBackupGateway {
     override suspend fun exportTo(destination: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
@@ -166,7 +171,8 @@ class DatabaseBackupService(
         destination.parentFile?.mkdirs()
         check(!destination.exists() || destination.delete()) { "Cannot replace snapshot destination" }
         deleteSidecarFiles(destination)
-        if (!writeOnlineBackupIfSupported(sourcePath, destination)) {
+        val wroteOnline = onlineBackupEnabled && writeOnlineBackupIfSupported(sourcePath, destination)
+        if (!wroteOnline) {
             writeQuiescedSnapshot(sourcePath, destination)
         }
         makeSnapshotSidecarFree(destination)
@@ -203,67 +209,80 @@ class DatabaseBackupService(
         }
     }
 
+    /**
+     * Checkpoint first, then take the write lock and copy only if the WAL is still empty.
+     * A writer that lands between those steps is detected and the attempt is repeated.
+     * The copy itself runs while writers are blocked, so an automatic checkpoint cannot
+     * tear the pages being read.
+     */
     private fun writeQuiescedSnapshot(sourcePath: String, destination: File) {
         val raw = openSnapshotConnection(sourcePath)
         try {
             readSnapshotString(raw, "PRAGMA busy_timeout = $SNAPSHOT_BUSY_TIMEOUT_MS")
-            acquireRetainedExclusiveLock(raw)
-            try {
-                checkpointFully(raw)
-                val wal = File("$sourcePath-wal")
-                check(!wal.exists() || wal.length() == 0L) {
-                    "Refusing snapshot; WAL sidecar still has ${wal.length()} bytes"
+            var last = "no attempt"
+            repeat(CHECKPOINT_ATTEMPTS) {
+                if (!checkpointFully(raw)) {
+                    last = "checkpoint incomplete"
+                    Thread.sleep(CHECKPOINT_RETRY_MS)
+                    return@repeat
                 }
-                File(sourcePath).copyTo(destination, overwrite = true)
-            } finally {
-                releaseExclusiveLock(raw)
+                if (!beginExclusiveTransaction(raw)) {
+                    last = "writers still active"
+                    Thread.sleep(CHECKPOINT_RETRY_MS)
+                    return@repeat
+                }
+                try {
+                    val wal = File("$sourcePath-wal")
+                    val walBytes = if (wal.exists()) wal.length() else 0L
+                    if (walBytes > 0L) {
+                        last = "wal bytes=$walBytes after checkpoint"
+                        return@repeat
+                    }
+                    File(sourcePath).copyTo(destination, overwrite = true)
+                    return
+                } finally {
+                    raw.endTransaction()
+                }
             }
+            error("Could not copy a quiescent snapshot ($last)")
         } finally {
             raw.close()
         }
     }
 
-    /**
-     * `locking_mode=EXCLUSIVE` keeps the write lock after COMMIT, so the checkpoint and the
-     * file copy cannot race a new commit or an automatic checkpoint.
-     */
-    private fun acquireRetainedExclusiveLock(raw: SQLiteDatabase) {
-        val mode = readSnapshotString(raw, "PRAGMA locking_mode = EXCLUSIVE")
-        check(mode.equals("exclusive", ignoreCase = true)) {
-            "SQLite did not enable exclusive locking"
-        }
-        raw.beginTransaction()
-        try {
-            raw.setTransactionSuccessful()
-        } finally {
-            raw.endTransaction()
-        }
-        val retained = readSnapshotString(raw, "PRAGMA locking_mode")
-        check(retained.equals("exclusive", ignoreCase = true)) {
-            "Exclusive lock was not retained for the snapshot copy"
+    private fun beginExclusiveTransaction(raw: SQLiteDatabase): Boolean {
+        return try {
+            raw.beginTransaction()
+            true
+        } catch (error: android.database.sqlite.SQLiteException) {
+            val message = error.message.orEmpty()
+            if (!message.contains("locked", ignoreCase = true) &&
+                !message.contains("busy", ignoreCase = true)
+            ) {
+                throw error
+            }
+            false
         }
     }
 
-    private fun releaseExclusiveLock(raw: SQLiteDatabase) {
-        readSnapshotString(raw, "PRAGMA locking_mode = NORMAL")
-        // SQLite drops the retained exclusive lock on the next read or write.
-        readSnapshotString(raw, "SELECT 1")
-    }
-
-    private fun checkpointFully(raw: SQLiteDatabase) {
-        var last = "no attempt"
-        repeat(CHECKPOINT_ATTEMPTS) {
+    private fun checkpointFully(raw: SQLiteDatabase): Boolean {
+        return try {
             raw.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { cursor ->
-                check(cursor.moveToFirst()) { "wal_checkpoint returned no row" }
+                if (!cursor.moveToFirst()) return false
                 val busy = cursor.getInt(0)
                 val log = cursor.getInt(1)
                 val checkpointed = cursor.getInt(2)
-                last = "busy=$busy, log=$log, checkpointed=$checkpointed"
-                if (busy == 0 && log == checkpointed) return
+                busy == 0 && log == checkpointed
             }
-            Thread.sleep(CHECKPOINT_RETRY_MS)
+        } catch (error: android.database.sqlite.SQLiteException) {
+            val message = error.message.orEmpty()
+            if (!message.contains("locked", ignoreCase = true) &&
+                !message.contains("busy", ignoreCase = true)
+            ) {
+                throw error
+            }
+            false
         }
-        error("wal_checkpoint(TRUNCATE) incomplete ($last)")
     }
 
     private fun makeSnapshotSidecarFree(destination: File) {
