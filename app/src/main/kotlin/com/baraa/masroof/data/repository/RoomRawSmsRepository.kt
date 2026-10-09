@@ -1,8 +1,8 @@
 package com.baraa.masroof.data.repository
 
-import android.database.sqlite.SQLiteException
 import com.baraa.masroof.data.room.dao.RawSmsDao
 import com.baraa.masroof.data.room.dao.RoomBatch
+import com.baraa.masroof.data.room.entity.RawSmsProviderAliasEntity
 import com.baraa.masroof.data.room.mapper.RawSmsMapper
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
@@ -31,6 +31,7 @@ class RoomRawSmsRepository(
             ?: return RawSmsInsertResult.AlreadyExists
         val existing = dao.findByDedupeKey(entity.dedupeKey) ?: return RawSmsInsertResult.AlreadyExists
         val storedProviderId = existing.deviceMessageId?.takeIf { it.isNotBlank() }
+            ?: dao.findProviderAliasForRawSms(existing.id)
             ?: return RawSmsInsertResult.AlreadyExists
         if (storedProviderId == incomingProviderId) {
             return RawSmsInsertResult.AlreadyExists
@@ -56,12 +57,27 @@ class RoomRawSmsRepository(
     override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? =
         dao.findByDeviceMessageId(deviceMessageId)?.let(RawSmsMapper::toDomain)
 
-    override suspend fun adoptDeviceMessageIdIfAbsent(id: String, deviceMessageId: String): Boolean =
-        try {
-            dao.adoptDeviceMessageIdIfAbsent(id, deviceMessageId) == 1
-        } catch (error: SQLiteException) {
-            false
-        }
+    override suspend fun findByProviderMessageId(providerMessageId: String): RawSms? {
+        findByDeviceMessageId(providerMessageId)?.let { return it }
+        val rawSmsId = dao.findRawSmsIdByProviderAlias(providerMessageId) ?: return null
+        return getById(rawSmsId)
+    }
+
+    override suspend fun findProviderAliasRawSmsId(providerMessageId: String): String? =
+        dao.findRawSmsIdByProviderAlias(providerMessageId)
+
+    override suspend fun providerAliasRawSmsIds(rawSmsIds: Collection<String>): Set<String> {
+        if (rawSmsIds.isEmpty()) return emptySet()
+        return RoomBatch.query(rawSmsIds) { chunk -> dao.listAliasedRawSmsIds(chunk) }.toSet()
+    }
+
+    override suspend fun rememberProviderAlias(providerMessageId: String, rawSmsId: String): Boolean =
+        dao.insertProviderAlias(
+            RawSmsProviderAliasEntity(
+                providerMessageId = providerMessageId,
+                rawSmsId = rawSmsId,
+            ),
+        ) != -1L
 
     override suspend fun listIdsByReceivedAt(): List<String> = dao.listIdsByReceivedAt()
 

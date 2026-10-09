@@ -199,12 +199,11 @@ class CaptureBankSmsUseCaseTest {
         assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
         assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(historical))
         assertEquals(1, db.rawSmsDao().count())
-        val stored = rawRepo.getById(liveRow.id)
-        assertEquals(liveRow.id, stored?.id)
-        assertEquals(liveRow.body, stored?.body)
-        assertEquals("42", stored?.deviceMessageId)
+        assertEquals(liveRow, rawRepo.getById(liveRow.id))
+        assertEquals(liveRow.id, rawRepo.findByProviderMessageId("42")?.id)
         assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(historical))
         assertEquals(1, db.rawSmsDao().count())
+        assertEquals(liveRow, rawRepo.getById(liveRow.id))
     }
 
     @Test
@@ -235,8 +234,11 @@ class CaptureBankSmsUseCaseTest {
                 useCase.capture(sms)
             }
             assertEquals("order $order", before + 2, db.rawSmsDao().count())
-            assertNotNull("order $order missing $providerA", rawRepo.findByDeviceMessageId(providerA))
-            assertNotNull("order $order missing $providerB", rawRepo.findByDeviceMessageId(providerB))
+            assertNotNull("order $order missing $providerA", rawRepo.findByProviderMessageId(providerA))
+            assertNotNull("order $order missing $providerB", rawRepo.findByProviderMessageId(providerB))
+            if (order.first() == "live") {
+                assertEquals("order $order rewrote the live row", liveRow, rawRepo.getById(liveRow.id))
+            }
             assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(first))
             assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(second))
             assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(liveRow))
@@ -381,10 +383,8 @@ class CaptureBankSmsUseCaseTest {
         assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
         assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(historical))
         assertEquals(1, db.rawSmsDao().count())
-        val stored = rawRepo.getById(liveRow.id)
-        assertEquals(liveRow.id, stored?.id)
-        assertEquals(liveRow.body, stored?.body)
-        assertEquals("42", stored?.deviceMessageId)
+        assertEquals(liveRow, rawRepo.getById(liveRow.id))
+        assertEquals(liveRow.id, rawRepo.findByProviderMessageId("42")?.id)
     }
 
     @Test
@@ -418,10 +418,8 @@ class CaptureBankSmsUseCaseTest {
         )
         assertEquals(BankSmsCaptureResult.Duplicate, capture().capture(inboxCopy))
         assertEquals(1, db.rawSmsDao().count())
-        val stored = rawRepo.getById(liveRow.id)
-        assertEquals(liveRow.id, stored?.id)
-        assertEquals(liveRow.body, stored?.body)
-        assertEquals("42", stored?.deviceMessageId)
+        assertEquals(liveRow, rawRepo.getById(liveRow.id))
+        assertEquals(liveRow.id, rawRepo.findByProviderMessageId("42")?.id)
     }
 
     @Test
