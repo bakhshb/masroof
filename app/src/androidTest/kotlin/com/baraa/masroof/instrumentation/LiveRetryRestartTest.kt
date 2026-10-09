@@ -1,60 +1,103 @@
 package com.baraa.masroof.instrumentation
 
-import android.os.SystemClock
+import android.content.Context
+import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
+import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
-import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
+import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.sms.LiveSmsIntake
 import com.baraa.masroof.application.sms.LiveSmsProcessingWorker
-import com.baraa.masroof.application.sms.WorkManagerLiveSmsWorkScheduler
+import com.baraa.masroof.application.sms.LiveSmsWorkScheduler
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.aljazira.AlJaziraSmsAdapter
+import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
+import com.baraa.masroof.data.repository.RoomCardRegistryRepository
+import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
+import com.baraa.masroof.data.repository.RoomParsedEventRepository
+import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
+import com.baraa.masroof.data.repository.RoomRawSmsRepository
+import com.baraa.masroof.data.repository.RoomReviewRepository
+import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
+import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
+import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.model.LoanReference
+import com.baraa.masroof.domain.model.LoanRegistryEntry
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
+import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
+import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Instant
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Device proof of M17: a nonthrowing reconciliation failure stays retryable across a
- * worker restart, and the replay posts the movement once.
+ * Device proof of M17. The database is private to this test so the application
+ * process's own startup worker cannot post the same SMS.
  *
- * The failing attempts run the real [LiveSmsProcessingWorker] against the app database.
- * Restart is the production startup call [LiveSmsIntake.schedulePendingProcessing],
- * which enqueues a new worker. That worker is created by the application WorkManager
- * factory, not the failed in-memory instance.
+ * The final [LiveSmsProcessingWorker] attempt fails, leaves a LIVE retry row, and
+ * posts nothing. A new [LiveSmsIntake], as after process start, discovers that row.
+ * A new worker instance then replays it into one transaction and clears the marker.
  */
 @RunWith(AndroidJUnit4::class)
 class LiveRetryRestartTest {
+    private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
+    private val dbName = "live-retry-restart.db"
+    private lateinit var db: MasroofDatabase
+
+    @Before
+    fun openDatabase() {
+        context.deleteDatabase(dbName)
+        db = Room.databaseBuilder(context, MasroofDatabase::class.java, dbName)
+            .addMigrations(*MasroofDatabase.ALL_MIGRATIONS)
+            .allowMainThreadQueries()
+            .build()
+    }
+
+    @After
+    fun closeDatabase() {
+        if (::db.isInitialized) db.close()
+        context.deleteDatabase(dbName)
+    }
+
     @Test(timeout = 120_000)
     fun failedFinancialProcessing_survivesWorkerRestart_andReplaysOnce() = runBlocking {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val app = context.applicationContext as MasroofApplication
-        val container = app.container
+        val rawRepo = RoomRawSmsRepository(db.rawSmsDao())
+        val parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
+        val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
+        val reviewRepo = RoomReviewRepository(db.reviewItemDao())
+        val retryRepo = RoomProcessingRetryRepository(db.processingRetryDao())
+        val cards = RoomCardRegistryRepository.from(db)
+        val accounts = RoomAccountRegistryRepository.from(db)
+        val clock = InstantClock { Instant.parse("2026-08-11T12:00:00Z") }
+        val appLog = AppLogService(context)
+        val registry = BankSmsRegistry(listOf(AlJaziraSmsAdapter()))
+        cards.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "7271"), OwnershipStatus.OWNED)
         val conflicts = AtomicInteger(Int.MAX_VALUE)
-        val ledger = object : FinancialTransactionRepository by container.financialTransactionRepository {
+        val failingLedger = object : FinancialTransactionRepository by ftRepo {
             override suspend fun save(
                 transaction: FinancialTransaction,
                 rawSmsIds: Collection<String>,
@@ -65,94 +108,95 @@ class LiveRetryRestartTest {
                         existingTransactionId = "device-conflict",
                     )
                 }
-                return container.financialTransactionRepository.save(transaction, rawSmsIds)
+                return ftRepo.save(transaction, rawSmsIds)
             }
         }
-        val registry = BankSmsRegistry(listOf(AlJaziraSmsAdapter()))
-        container.cardRegistryRepository.setOwnership(
-            CardReference(Bank.BANK_ALJAZIRA, "7271"),
-            OwnershipStatus.OWNED,
-        )
         val raw = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord(
-                providerMessageId = null,
-                sender = "AlJazira",
-                body = PURCHASE_BODY,
-                receivedAt = Instant.parse("2026-08-03T14:32:00Z"),
-            ),
+            ProviderSmsRecord(null, "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:32:00Z")),
         )
-        val captured = CaptureBankSmsUseCase(container.rawSmsRepository, registry).capture(raw)
+        val captured = CaptureBankSmsUseCase(rawRepo, registry).capture(raw)
         assertTrue(captured is com.baraa.masroof.application.ingestion.BankSmsCaptureResult.Captured)
-        val failing = processStored(container, registry, ledger)
-        val exhausted = worker(
-            context,
-            raw.id,
-            attempt = LiveSmsProcessingWorker.MAX_ATTEMPTS - 1,
-            processStored = failing,
-        ).doWork()
-        assertEquals(androidx.work.ListenableWorker.Result.failure(), exhausted)
-        assertNull(container.financialTransactionRepository.findByRawSmsId(raw.id))
-        assertEquals(
-            listOf(raw.id),
-            container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE),
-        )
 
+        val exhausted = worker(
+            raw.id,
+            LiveSmsProcessingWorker.MAX_ATTEMPTS - 1,
+            processStored(rawRepo, parsedRepo, failingLedger, reviewRepo, retryRepo, cards, accounts, clock, appLog, registry),
+        ).doWork()
+        assertEquals(ListenableWorker.Result.failure(), exhausted)
+        assertNull(ftRepo.findByRawSmsId(raw.id))
+        assertEquals(listOf(raw.id), retryRepo.listRetryableRawSmsIds(ProcessingRetryMode.LIVE))
+
+        val scheduled = mutableListOf<String>()
         val restarted = LiveSmsIntake(
-            captureBankSms = CaptureBankSmsUseCase(container.rawSmsRepository, registry),
-            scheduler = WorkManagerLiveSmsWorkScheduler { WorkManager.getInstance(context) },
-            rawSmsRepository = container.rawSmsRepository,
-            reviewRepository = container.reviewRepository,
-            processingRetryRepository = container.processingRetryRepository,
-            appLogService = container.appLogService,
+            captureBankSms = CaptureBankSmsUseCase(rawRepo, registry),
+            scheduler = LiveSmsWorkScheduler { scheduled += it },
+            rawSmsRepository = rawRepo,
+            reviewRepository = reviewRepo,
+            processingRetryRepository = retryRepo,
+            appLogService = appLog,
         )
         assertEquals(1, restarted.schedulePendingProcessing())
-        val replay = awaitFinishedWork(
-            WorkManager.getInstance(context),
-            WorkManagerLiveSmsWorkScheduler.uniqueWorkName(raw.id),
-        )
-        assertEquals(WorkInfo.State.SUCCEEDED, replay.state)
+        assertEquals(listOf(raw.id), scheduled)
 
-        val posted = container.financialTransactionRepository.findByRawSmsId(raw.id)
-        assertNotNull(posted)
-        assertEquals(listOf(raw.id), container.financialTransactionRepository.listRawSmsIds(posted!!.id))
-        assertTrue(container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty())
-        val linked = container.financialTransactionRepository.listAll().count { transaction ->
-            container.financialTransactionRepository.listRawSmsIds(transaction.id).contains(raw.id)
-        }
-        assertEquals(1, linked)
+        conflicts.set(0)
+        val replay = worker(
+            raw.id,
+            attempt = 0,
+            processStored(rawRepo, parsedRepo, failingLedger, reviewRepo, retryRepo, cards, accounts, clock, appLog, registry),
+        ).doWork()
+        assertEquals(ListenableWorker.Result.success(), replay)
+        val posted = ftRepo.findByRawSmsId(raw.id)
+        assertTrue(posted != null)
+        assertEquals(listOf(raw.id), ftRepo.listRawSmsIds(posted!!.id))
+        assertEquals(1, db.financialTransactionDao().count())
+        assertTrue(retryRepo.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty())
     }
 
     private fun processStored(
-        container: com.baraa.masroof.application.AppContainer,
-        registry: BankSmsRegistry,
+        rawRepo: RoomRawSmsRepository,
+        parsedRepo: RoomParsedEventRepository,
         ledger: FinancialTransactionRepository,
-    ): ProcessStoredSmsUseCase =
-        ProcessStoredSmsUseCase(
-            rawSmsRepository = container.rawSmsRepository,
-            parsedEventRepository = container.parsedEventRepository,
+        reviewRepo: RoomReviewRepository,
+        retryRepo: RoomProcessingRetryRepository,
+        cards: RoomCardRegistryRepository,
+        accounts: RoomAccountRegistryRepository,
+        clock: InstantClock,
+        appLog: AppLogService,
+        registry: BankSmsRegistry,
+    ): ProcessStoredSmsUseCase {
+        val loans = EmptyLoanRegistry
+        val resolver = OwnershipResolver(accounts, cards, loans)
+        val ingestionReview = IngestionReviewService(reviewRepo, clock)
+        return ProcessStoredSmsUseCase(
+            rawSmsRepository = rawRepo,
+            parsedEventRepository = parsedRepo,
             bankSmsRegistry = registry,
-            ownershipDiscovery = container.ownershipDiscoveryService,
+            ownershipDiscovery = OwnershipDiscoveryService(accounts, cards, loans),
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = container.parsedEventRepository,
-                rawSmsRepository = container.rawSmsRepository,
+                parsedEventRepository = parsedRepo,
+                rawSmsRepository = rawRepo,
                 financialTransactionRepository = ledger,
-                ownershipResolver = container.ownershipResolver,
-                effectiveParsedEventProvider = container.effectiveParsedEventProvider,
-                reviewRepository = container.reviewRepository,
+                ownershipResolver = resolver,
+                effectiveParsedEventProvider = EffectiveParsedEventProvider(
+                    parsedRepo,
+                    RoomUserCorrectionRepository(db.userCorrectionDao()),
+                ),
+                reviewRepository = reviewRepo,
             ),
-            reviewQueueUpdater = ReviewQueueUpdater(
-                container.reviewRepository,
-                container.financialTransactionRepository,
-                container.clock,
+            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ledger, clock),
+            ingestionReviewService = ingestionReview,
+            appLogService = appLog,
+            processingRecovery = com.baraa.masroof.application.ingestion.ProcessingRecovery(
+                processingRetryRepository = retryRepo,
+                reviewRepository = reviewRepo,
+                ingestionReviewService = ingestionReview,
+                clock = clock,
             ),
-            ingestionReviewService = container.ingestionReviewService,
-            appLogService = container.appLogService,
-            processingRecovery = container.processingRecovery,
-            reviewRepository = container.reviewRepository,
+            reviewRepository = reviewRepo,
         )
+    }
 
     private fun worker(
-        context: android.content.Context,
         rawSmsId: String,
         attempt: Int,
         processStored: ProcessStoredSmsUseCase,
@@ -163,16 +207,13 @@ class LiveRetryRestartTest {
             .setWorkerFactory(LiveSmsProcessingWorker.Factory({ processStored }, null))
             .build()
 
-    private fun awaitFinishedWork(workManager: WorkManager, uniqueName: String): WorkInfo {
-        val deadline = SystemClock.elapsedRealtime() + TimeUnit.SECONDS.toMillis(60)
-        var latest: WorkInfo? = null
-        while (SystemClock.elapsedRealtime() < deadline) {
-            val infos = workManager.getWorkInfosForUniqueWork(uniqueName).get(5, TimeUnit.SECONDS)
-            latest = infos.maxByOrNull { it.runAttemptCount }
-            if (latest != null && latest.state.isFinished) return latest
-            SystemClock.sleep(250)
-        }
-        error("Work $uniqueName did not finish. Last state=${latest?.state}")
+    private object EmptyLoanRegistry : LoanRegistryRepository {
+        override suspend fun observe(reference: LoanReference, rawSmsId: String) = Unit
+        override suspend fun setOwnership(reference: LoanReference, status: OwnershipStatus) = Unit
+        override suspend fun resolve(reference: LoanReference): OwnershipStatus = OwnershipStatus.UNKNOWN
+        override suspend fun get(reference: LoanReference): LoanRegistryEntry? = null
+        override suspend fun listAll(): List<LoanRegistryEntry> = emptyList()
+        override suspend fun updateDisplayName(reference: LoanReference, displayName: String?) = Unit
     }
 
     private companion object {
