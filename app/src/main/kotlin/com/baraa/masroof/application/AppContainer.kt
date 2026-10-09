@@ -2,6 +2,7 @@ package com.baraa.masroof.application
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.work.DelegatingWorkerFactory
 import androidx.work.WorkManager
 import androidx.work.WorkerFactory
@@ -142,6 +143,10 @@ class AppContainer(
         CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val appLogService: AppLogService = AppLogService(appContext)
+
+    /** Keeps a device-test seed invisible to live processing until the review row exists. */
+    suspend fun <R> withDatabaseTransaction(block: suspend () -> R): R =
+        database.withTransaction(block)
 
     private val database: MasroofDatabase =
         Room.databaseBuilder(
