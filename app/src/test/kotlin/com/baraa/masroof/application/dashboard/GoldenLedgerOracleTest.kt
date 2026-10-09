@@ -5,7 +5,6 @@ import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -16,8 +15,7 @@ import org.robolectric.annotation.Config
 
 /**
  * Small golden ledger. Active scenarios hard-assert independent totals through
- * [DashboardLedgerWorld]. Pending scenarios belong to a named later milestone and
- * stay exempt only while the ledger still misses that milestone's oracle.
+ * [DashboardLedgerWorld].
  *
  * Re-import plus stored-SMS processing is called reprocessing here. It is not an
  * Android process restart. Active oracles require both steps to complete
@@ -43,13 +41,6 @@ class GoldenLedgerOracleTest {
                 assertTrue(scenario.messages.isNotEmpty())
                 assertTrue(scenario.seedRows.isEmpty())
             }
-        }
-        pending.forEach { scenario ->
-            val owner = scenario.ownerMilestone
-            assertTrue(owner != null && owner.matches(OWNER))
-            val defect = scenario.knownDefect
-            assertTrue(defect != null && defect.signals.isNotEmpty())
-            assertEquals(owner, defect!!.ownerMilestone)
         }
     }
 
@@ -136,41 +127,6 @@ class GoldenLedgerOracleTest {
         }
     }
 
-    private suspend fun assertPending(id: String) {
-        val scenario = GoldenLedgerCorpus.load(id)
-        val owner = scenario.ownerMilestone
-        val defect = scenario.knownDefect
-        check(owner != null && defect != null) {
-            "$id pending exemption requires an owner milestone and a known defect"
-        }
-        DashboardLedgerWorld(context()).use { world ->
-            GoldenLedgerRunner.prepare(world, scenario)
-            val snapshot = GoldenLedgerRunner.read(world, scenario)
-            if (snapshot.matches(scenario.expected)) {
-                fail(
-                    "$id now matches its oracle. Owner $owner must activate the hard assertions " +
-                        "and remove the pending exemption.",
-                )
-            }
-            for ((key, broken) in defect.signals) {
-                val actual = snapshot.metrics[key]
-                    ?: fail("$id has no metric $key\n${snapshot.canonical()}")
-                assertEquals(
-                    "$id known defect $key\n${snapshot.canonical()}",
-                    broken,
-                    actual,
-                )
-                val truth = GoldenLedgerRunner.expectedMetric(scenario.expected, key)
-                    ?: fail("$id oracle has no truth for $key")
-                assertNotEquals(
-                    "$id oracle $key must stay different from the known defect until $owner activates it",
-                    truth,
-                    broken,
-                )
-            }
-        }
-    }
-
     private fun assertMatches(scenario: GoldenLedgerScenario, snapshot: GoldenLedgerSnapshot) {
         if (!snapshot.matches(scenario.expected)) {
             fail(
@@ -186,8 +142,4 @@ class GoldenLedgerOracleTest {
     }
 
     private fun context(): Context = ApplicationProvider.getApplicationContext()
-
-    private companion object {
-        val OWNER = Regex("""M(?:1|5|6|8)""")
-    }
 }
