@@ -329,6 +329,10 @@ class AppContainer(
             manualReviewResolutionRepository = manualReviewResolutionRepository,
             clock = clock,
             appLogService = appLogService,
+            processingRecovery = processingRecovery,
+            onHistoricalRetry = {
+                HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
+            },
         )
 
     val reviewOwnershipWorkflow: ReviewOwnershipWorkflow =
@@ -444,6 +448,10 @@ class AppContainer(
             clock = clock,
             appLogService = appLogService,
             reviewQueueUpdater = reviewQueueUpdater,
+            processingRecovery = processingRecovery,
+            onHistoricalRetry = {
+                HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
+            },
         )
 
     private val alJaziraSmsAdapter: AlJaziraSmsAdapter =
@@ -505,6 +513,7 @@ class AppContainer(
             reconciliation = transactionReconciliationService,
             reviewQueueUpdater = reviewQueueUpdater,
             rawSmsRepository = rawSmsRepository,
+            appLogService = appLogService,
         )
 
     val liveSmsIntake: LiveSmsIntake =
@@ -528,7 +537,12 @@ class AppContainer(
                     PendingExchangeRateEnricher { exchangeRateEnrichmentWorkflow.enrichPending() }
                 },
             )
-            addFactory(HistoricalDerivedRecoveryWorker.Factory { historicalDerivedRecovery })
+            addFactory(
+                HistoricalDerivedRecoveryWorker.Factory(
+                    recovery = { historicalDerivedRecovery },
+                    appLogService = appLogService,
+                ),
+            )
             addFactory(ParsedEventFactsBackfillWorker.Factory { parsedEventFactsBackfillCoordinator })
         }
 
@@ -549,6 +563,7 @@ class AppContainer(
                 batchRecoveryScheduler = {
                     HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
                 },
+                appLogService = appLogService,
             ),
             appLogService = appLogService,
         )

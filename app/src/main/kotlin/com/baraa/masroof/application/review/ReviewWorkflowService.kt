@@ -1,9 +1,13 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.application.ingestion.ProcessingRecovery
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
+import com.baraa.masroof.application.transaction.ReconciliationIncompleteException
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
+import kotlinx.coroutines.CancellationException
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.assembly.TransactionTiming
@@ -58,6 +62,8 @@ class ReviewWorkflowService(
     private val clock: InstantClock,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val appLogService: AppLogService? = null,
+    private val processingRecovery: ProcessingRecovery? = null,
+    private val onHistoricalRetry: (() -> Unit)? = null,
     private val newCorrectionId: () -> String = {
         UserCorrectionIdFactory.create(UUID.randomUUID().toString())
     },
@@ -71,8 +77,31 @@ class ReviewWorkflowService(
      * at most the affected RawSms ids, then reload that queue without a second sweep.
      */
     suspend fun refreshReviewQueue() {
-        val report = reconciliationService.reconcileStoredEventsDetailed()
-        reviewQueueUpdater.applyReport(report)
+        val report = try {
+            reconciliationService.reconcileStoredEventsDetailed()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            throw incomplete(emptyList(), failureCount = 1)
+        }
+        try {
+            reviewQueueUpdater.applyReport(report)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            val failedIds = report.failedRawSmsIds
+            retainHistoricalRetry(failedIds, failureCount = report.summary.failed.coerceAtLeast(1))
+            throw incomplete(
+                failedIds,
+                report.summary.failed.coerceAtLeast(1),
+                ReconciliationCompletionPolicy.STAGE_REVIEW_UPDATE,
+            )
+        }
+        if (!ReconciliationCompletionPolicy.isComplete(report)) {
+            val failedIds = report.failedRawSmsIds
+            retainHistoricalRetry(failedIds, report.summary.failed)
+            throw incomplete(failedIds, report.summary.failed)
+        }
     }
 
     /**
@@ -91,8 +120,31 @@ class ReviewWorkflowService(
             is OwnershipChange.Loan ->
                 parsedEventRepository.listRawSmsIdsReferencingLoan(change.loan)
         }
-        val report = reconciliationService.reconcileAffectedRawSmsIds(rawSmsIds)
-        reviewQueueUpdater.applyReport(report)
+        val report = try {
+            reconciliationService.reconcileAffectedRawSmsIds(rawSmsIds)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            retainHistoricalRetry(rawSmsIds, failureCount = rawSmsIds.size.coerceAtLeast(1))
+            throw incomplete(rawSmsIds, rawSmsIds.size.coerceAtLeast(1))
+        }
+        try {
+            reviewQueueUpdater.applyReport(report)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            retainHistoricalRetry(rawSmsIds, failureCount = report.summary.failed.coerceAtLeast(1))
+            throw incomplete(
+                rawSmsIds,
+                report.summary.failed.coerceAtLeast(1),
+                ReconciliationCompletionPolicy.STAGE_REVIEW_UPDATE,
+            )
+        }
+        if (!ReconciliationCompletionPolicy.isComplete(report)) {
+            val failedIds = report.failedRawSmsIds.ifEmpty { rawSmsIds.toSet() }
+            retainHistoricalRetry(failedIds, report.summary.failed)
+            throw incomplete(failedIds, report.summary.failed)
+        }
     }
 
     suspend fun listRequiredReviews(): List<ReviewItem> =
@@ -139,8 +191,28 @@ class ReviewWorkflowService(
         )
         userCorrectionRepository.save(correction)
 
-        val report = reconciliationService.reconcileAffectedRawSmsIds(listOf(review.rawSmsId))
-        reviewQueueUpdater.applyReport(report)
+        val scope = listOf(review.rawSmsId)
+        val report = try {
+            reconciliationService.reconcileAffectedRawSmsIds(scope)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            retainHistoricalRetry(scope, failureCount = 1)
+            return ReviewWorkflowResult.Rejected("reconciliation_incomplete")
+        }
+        try {
+            reviewQueueUpdater.applyReport(report)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            retainHistoricalRetry(scope, failureCount = report.summary.failed.coerceAtLeast(1))
+            return ReviewWorkflowResult.Rejected("review_update_incomplete")
+        }
+        if (!ReconciliationCompletionPolicy.isComplete(report)) {
+            val failedIds = report.failedRawSmsIds.ifEmpty { scope.toSet() }
+            retainHistoricalRetry(failedIds, report.summary.failed)
+            return ReviewWorkflowResult.Rejected("reconciliation_incomplete")
+        }
 
         val updated = reviewRepository.findByRawSmsId(review.rawSmsId)
             ?: return ReviewWorkflowResult.Rejected("review_missing_after_refresh")
@@ -489,6 +561,54 @@ class ReviewWorkflowService(
             zoneId = zoneId,
         )
         return occurredAt to zone.id
+    }
+
+    /**
+     * Keeps an already saved manual decision and records the failed RawSms ids for
+     * one historical recovery pass. Does not reopen a non-financial resolution.
+     */
+    private suspend fun retainHistoricalRetry(rawSmsIds: Collection<String>, failureCount: Int) {
+        logIncomplete(
+            stage = ReconciliationCompletionPolicy.STAGE_RECONCILIATION,
+            failureCount = failureCount,
+            rawSmsIds = rawSmsIds,
+            retryState = "historical_batch",
+        )
+        val recovery = processingRecovery ?: return
+        if (!recovery.markExhaustedBatch(rawSmsIds.toList())) return
+        val schedule = onHistoricalRetry ?: return
+        try {
+            schedule()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // The retry set is durable. Startup enqueues the one batch worker.
+        }
+    }
+
+    private fun incomplete(
+        rawSmsIds: Collection<String>,
+        failureCount: Int,
+        stage: String = ReconciliationCompletionPolicy.STAGE_RECONCILIATION,
+    ): ReconciliationIncompleteException =
+        ReconciliationIncompleteException(
+            failureCount = failureCount,
+            maskedRawSmsId = AppLogFormatting.maskId(rawSmsIds.firstOrNull { it.isNotBlank() } ?: "none"),
+            stage = stage,
+        )
+
+    private fun logIncomplete(
+        stage: String,
+        failureCount: Int,
+        rawSmsIds: Collection<String>,
+        retryState: String,
+    ) {
+        val masked = AppLogFormatting.maskId(rawSmsIds.firstOrNull { it.isNotBlank() } ?: "none")
+        appLogService?.error(
+            AppLogCategories.REVIEW,
+            "Derived $stage incomplete failures=$failureCount affected=${rawSmsIds.size} " +
+                "id=$masked retry_state=$retryState",
+        )
     }
 
     private fun logReviewAction(action: String, reviewId: String) {
