@@ -14,10 +14,30 @@ class RoomRawSmsRepository(
     /**
      * Duplicate protection is atomic via SQLite unique constraints + IGNORE.
      * Expected duplicates return [RawSmsInsertResult.AlreadyExists] without throwing.
+     *
+     * The shared `dedupeKey` is sender + receipt instant + body hash. That key
+     * still collapses a live row and an inbox row whose clocks agree, and any
+     * replay that lacks a distinct provider id. Two non-null provider ids are
+     * different messages even at the same instant: the later row is stored
+     * under a provider-qualified key so the unique index does not discard it.
      */
     override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult {
-        val rowId = dao.insertIfAbsent(RawSmsMapper.toEntity(rawSms))
-        return if (rowId == -1L) {
+        val entity = RawSmsMapper.toEntity(rawSms)
+        if (dao.insertIfAbsent(entity) != -1L) {
+            return RawSmsInsertResult.Inserted
+        }
+        val incomingProviderId = rawSms.deviceMessageId?.takeIf { it.isNotBlank() }
+            ?: return RawSmsInsertResult.AlreadyExists
+        val existing = dao.findByDedupeKey(entity.dedupeKey) ?: return RawSmsInsertResult.AlreadyExists
+        val storedProviderId = existing.deviceMessageId?.takeIf { it.isNotBlank() }
+            ?: return RawSmsInsertResult.AlreadyExists
+        if (storedProviderId == incomingProviderId) {
+            return RawSmsInsertResult.AlreadyExists
+        }
+        val distinguished = entity.copy(
+            dedupeKey = providerQualifiedDedupeKey(entity.dedupeKey, incomingProviderId),
+        )
+        return if (dao.insertIfAbsent(distinguished) == -1L) {
             RawSmsInsertResult.AlreadyExists
         } else {
             RawSmsInsertResult.Inserted
@@ -68,4 +88,7 @@ class RoomRawSmsRepository(
             toMillis = toInclusive.toEpochMilli(),
             requireDeviceMessageIdNull = lookingForLiveRow,
         ).map(RawSmsMapper::toDomain)
+
+    private fun providerQualifiedDedupeKey(baseKey: String, providerMessageId: String): String =
+        "$baseKey|$providerMessageId"
 }

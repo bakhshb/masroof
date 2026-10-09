@@ -88,16 +88,136 @@ class RoomRawSmsRepositoryTest {
         assertTrue(repo.listIdsAwaitingProcessing().isEmpty())
     }
 
-    private fun raw(id: String, at: String, body: String = "body-$id"): RawSms {
-        return RawSms(
-            id = id,
-            sender = "AlJazira",
+    @Test
+    fun insertIfAbsent_twoProviderIds_sameInstantAndBody_bothPersist() = runBlocking {
+        val at = "2026-08-03T14:32:00.000Z"
+        val body = "identical-notice"
+        val first = evidence("android-sms:10", at, deviceMessageId = "10", body = body)
+        val second = evidence("android-sms:11", at, deviceMessageId = "11", body = body)
+        val third = evidence("android-sms:12", at, deviceMessageId = "12", body = body)
+
+        assertEquals(RawSmsInsertResult.Inserted, repo.insertIfAbsent(first))
+        assertEquals(RawSmsInsertResult.Inserted, repo.insertIfAbsent(second))
+        assertEquals(RawSmsInsertResult.Inserted, repo.insertIfAbsent(third))
+        assertEquals(RawSmsInsertResult.AlreadyExists, repo.insertIfAbsent(first))
+        assertEquals(RawSmsInsertResult.AlreadyExists, repo.insertIfAbsent(second))
+        assertEquals(first, repo.getById(first.id))
+        assertEquals(second, repo.getById(second.id))
+        assertEquals(third, repo.getById(third.id))
+        assertEquals(listOf(first.id, second.id, third.id), repo.listIdsByReceivedAt())
+    }
+
+    @Test
+    fun insertIfAbsent_sameInstantLiveAndInbox_collapsesToTheFirstRow() = runBlocking {
+        val at = "2026-08-03T14:32:00.000Z"
+        val body = "identical-notice"
+        val live = evidence("android-sms-live:1", at, deviceMessageId = null, body = body)
+        val inbox = evidence("android-sms:42", at, deviceMessageId = "42", body = body)
+
+        assertEquals(RawSmsInsertResult.Inserted, repo.insertIfAbsent(live))
+        assertEquals(RawSmsInsertResult.AlreadyExists, repo.insertIfAbsent(inbox))
+        assertEquals(live, repo.getById(live.id))
+        assertEquals(listOf(live.id), repo.listIdsByReceivedAt())
+    }
+
+    @Test
+    fun insertIfAbsent_sameInstantInboxThenLive_collapsesToTheInboxRow() = runBlocking {
+        val at = "2026-08-03T14:32:00.000Z"
+        val body = "identical-notice"
+        val inbox = evidence("android-sms:42", at, deviceMessageId = "42", body = body)
+        val live = evidence("android-sms-live:1", at, deviceMessageId = null, body = body)
+
+        assertEquals(RawSmsInsertResult.Inserted, repo.insertIfAbsent(inbox))
+        assertEquals(RawSmsInsertResult.AlreadyExists, repo.insertIfAbsent(live))
+        assertEquals(inbox, repo.getById(inbox.id))
+        assertEquals(listOf(inbox.id), repo.listIdsByReceivedAt())
+    }
+
+    @Test
+    fun listCrossSourceNearDuplicates_matchesOnlyTheOppositeSourceInsideInclusiveBounds() = runBlocking {
+        val body = "same-body"
+        val liveEarly = evidence("live-early", "2026-08-03T14:00:00.000Z", deviceMessageId = null, body = body)
+        val liveMiddle = evidence("live-middle", "2026-08-03T14:00:01.000Z", deviceMessageId = null, body = body)
+        val liveLate = evidence("live-late", "2026-08-03T14:00:02.000Z", deviceMessageId = null, body = body)
+        val inbox = evidence("android-sms:9", "2026-08-03T14:00:01.500Z", deviceMessageId = "9", body = body)
+        val otherSender = evidence(
+            "android-sms:other",
+            "2026-08-03T14:00:01.000Z",
+            deviceMessageId = "other",
             body = body,
-            receivedAt = Instant.parse(at),
-            deviceMessageId = id,
-            bodyHash = SmsBodyHasher.sha256Hex(body),
+            sender = "OtherBank",
+        )
+        val otherBody = evidence(
+            "live-other-body",
+            "2026-08-03T14:00:01.000Z",
+            deviceMessageId = null,
+            body = "different-body",
+        )
+        listOf(liveEarly, liveMiddle, liveLate, inbox, otherSender, otherBody).forEach {
+            assertEquals(RawSmsInsertResult.Inserted, repo.insertIfAbsent(it))
+        }
+
+        val from = Instant.parse("2026-08-03T14:00:00.000Z")
+        val to = Instant.parse("2026-08-03T14:00:02.000Z")
+        assertEquals(
+            listOf(liveEarly.id, liveMiddle.id),
+            repo.listCrossSourceNearDuplicates(
+                sender = "AlJazira",
+                bodyHash = liveEarly.bodyHash,
+                fromInclusive = from,
+                toInclusive = to,
+                lookingForLiveRow = true,
+            ).map { it.id },
+        )
+        assertEquals(
+            listOf(inbox.id),
+            repo.listCrossSourceNearDuplicates(
+                sender = "AlJazira",
+                bodyHash = liveEarly.bodyHash,
+                fromInclusive = from,
+                toInclusive = to,
+                lookingForLiveRow = false,
+            ).map { it.id },
+        )
+        assertEquals(
+            listOf(liveMiddle.id),
+            repo.listCrossSourceNearDuplicates(
+                sender = "AlJazira",
+                bodyHash = liveEarly.bodyHash,
+                fromInclusive = from.plusMillis(1),
+                toInclusive = to.minusMillis(1),
+                lookingForLiveRow = true,
+            ).map { it.id },
+        )
+        assertEquals(
+            listOf(liveLate.id),
+            repo.listCrossSourceNearDuplicates(
+                sender = "AlJazira",
+                bodyHash = liveEarly.bodyHash,
+                fromInclusive = liveLate.receivedAt,
+                toInclusive = liveLate.receivedAt,
+                lookingForLiveRow = true,
+            ).map { it.id },
         )
     }
+
+    private fun raw(id: String, at: String, body: String = "body-$id"): RawSms =
+        evidence(id = id, at = at, deviceMessageId = id, body = body)
+
+    private fun evidence(
+        id: String,
+        at: String,
+        deviceMessageId: String?,
+        body: String = "body-$id",
+        sender: String = "AlJazira",
+    ): RawSms = RawSms(
+        id = id,
+        sender = sender,
+        body = body,
+        receivedAt = Instant.parse(at),
+        deviceMessageId = deviceMessageId,
+        bodyHash = SmsBodyHasher.sha256Hex(body),
+    )
 
     private companion object {
         val PURCHASE_BODY = """

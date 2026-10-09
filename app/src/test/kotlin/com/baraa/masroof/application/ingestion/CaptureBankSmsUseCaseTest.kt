@@ -23,6 +23,8 @@ import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
+import com.baraa.masroof.sms.receiver.LiveReceiptTimestamp
+import com.baraa.masroof.sms.receiver.ReceivedSmsAssembler
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -187,6 +189,222 @@ class CaptureBankSmsUseCaseTest {
     }
 
     @Test
+    fun liveThenInbox_exactProviderInstant_isOneRow() = runBlocking {
+        val at = "2026-08-03T14:32:00.000Z"
+        val liveRow = live(PURCHASE_BODY, at)
+        val historical = inbox("42", at)
+        val useCase = capture()
+
+        assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(historical))
+        assertEquals(1, db.rawSmsDao().count())
+        assertEquals(liveRow, rawRepo.getById(liveRow.id))
+    }
+
+    @Test
+    fun inboxThenLive_exactProviderInstant_isOneRow() = runBlocking {
+        val at = "2026-08-03T14:32:00.000Z"
+        val historical = inbox("42", at)
+        val liveRow = live(PURCHASE_BODY, at)
+        val useCase = capture()
+
+        assertTrue(useCase.capture(historical) is BankSmsCaptureResult.Captured)
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(liveRow))
+        assertEquals(1, db.rawSmsDao().count())
+        assertEquals(historical, rawRepo.getById(historical.id))
+    }
+
+    @Test
+    fun inboxThenLive_withinFiveSeconds_isOneRow() = runBlocking {
+        val historical = inbox("42", "2026-08-03T14:32:00.000Z")
+        val liveRow = live(PURCHASE_BODY, "2026-08-03T14:32:05.000Z")
+        val useCase = capture()
+
+        assertTrue(useCase.capture(historical) is BankSmsCaptureResult.Captured)
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(liveRow))
+        assertEquals(1, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun crossSourceTwin_atTwoMinuteSkew_isDuplicate_andOneMillisecondBeyondStaysSeparate() = runBlocking {
+        val base = Instant.parse("2026-08-03T14:32:00.000Z")
+        val useCase = capture()
+        val liveRow = live(PURCHASE_BODY, base.toString())
+        val atBoundary = inbox("42", base.plusSeconds(120).toString())
+
+        assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(atBoundary))
+        assertEquals(1, db.rawSmsDao().count())
+
+        val outside = inbox("43", base.plusSeconds(120).plusMillis(1).toString())
+        assertTrue(useCase.capture(outside) is BankSmsCaptureResult.Captured)
+        assertEquals(2, db.rawSmsDao().count())
+        assertEquals(outside, rawRepo.getById(outside.id))
+    }
+
+    @Test
+    fun inboxThenLive_uniqueSkewWithinTwoMinutes_isOneRow() = runBlocking {
+        val historical = inbox("42", "2026-08-03T14:32:00.000Z")
+        val liveRow = live(PURCHASE_BODY, "2026-08-03T14:33:30.000Z")
+        val useCase = capture()
+
+        assertTrue(useCase.capture(historical) is BankSmsCaptureResult.Captured)
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(liveRow))
+        assertEquals(1, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun twoIdentifiedNotices_oneSecondApart_bothPersist() = runBlocking {
+        val first = inbox("10", "2026-08-03T14:32:00.000Z")
+        val second = inbox("11", "2026-08-03T14:32:01.000Z")
+        val useCase = capture()
+
+        assertTrue(useCase.capture(first) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(second) is BankSmsCaptureResult.Captured)
+        assertEquals(2, db.rawSmsDao().count())
+        assertEquals(first, rawRepo.getById(first.id))
+        assertEquals(second, rawRepo.getById(second.id))
+    }
+
+    @Test
+    fun twoIdentifiedNotices_sameInstant_bothPersist() = runBlocking {
+        val at = "2026-08-03T14:32:00.000Z"
+        val first = inbox("10", at)
+        val second = inbox("11", at)
+        val useCase = capture()
+
+        assertTrue(useCase.capture(first) is BankSmsCaptureResult.Captured)
+        assertTrue(
+            "distinct inbox ids at one instant must not be discarded",
+            useCase.capture(second) is BankSmsCaptureResult.Captured,
+        )
+        assertEquals(2, db.rawSmsDao().count())
+        assertEquals(first, rawRepo.getById(first.id))
+        assertEquals(second, rawRepo.getById(second.id))
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(second))
+        assertEquals(2, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun twoIdentifiedNotices_andTheirLiveCopies_withinFiveSeconds_remainTwoRows() = runBlocking {
+        val firstInbox = inbox("10", "2026-08-03T14:32:00.000Z")
+        val secondInbox = inbox("11", "2026-08-03T14:32:04.000Z")
+        val firstLive = live(PURCHASE_BODY, "2026-08-03T14:32:00.000Z")
+        val secondLive = live(PURCHASE_BODY, "2026-08-03T14:32:04.000Z")
+        val useCase = capture()
+
+        assertTrue(useCase.capture(firstLive) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(secondLive) is BankSmsCaptureResult.Captured)
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(firstInbox))
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(secondInbox))
+        assertEquals(2, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun twoLiveNotices_oneSecondApart_bothPersist() = runBlocking {
+        val first = live(PURCHASE_BODY, "2026-08-03T14:32:00.000Z")
+        val second = live(PURCHASE_BODY, "2026-08-03T14:32:01.000Z")
+        val useCase = capture()
+
+        assertTrue(useCase.capture(first) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(second) is BankSmsCaptureResult.Captured)
+        assertEquals(2, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun differentSenders_sameBodyWithinFiveSeconds_staySeparate() = runBlocking {
+        val aljazira = live(PURCHASE_BODY, "2026-08-03T14:32:00.000Z")
+        val bankAljazira = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("77", "BankAlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:32:02.000Z")),
+        )
+        val useCase = capture()
+
+        assertTrue(useCase.capture(aljazira) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(bankAljazira) is BankSmsCaptureResult.Captured)
+        assertEquals(2, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun multipartLiveAndInbox_withinPartSkew_isOneRow() = runBlocking {
+        val earliest = Instant.parse("2026-08-03T14:32:00.000Z")
+        val laterPart = earliest.plusSeconds(30)
+        val liveRow = multipartLive(earliest.toEpochMilli(), laterPart.toEpochMilli())
+        val historical = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("42", "AlJazira", liveRow.body, laterPart),
+        )
+        val useCase = capture()
+
+        assertEquals(earliest, liveRow.receivedAt)
+        assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(historical))
+        assertEquals(1, db.rawSmsDao().count())
+        assertEquals(liveRow, rawRepo.getById(liveRow.id))
+    }
+
+    @Test
+    fun twoMultipartNotices_differentProviderIds_nearInTime_bothPersist() = runBlocking {
+        val earliest = Instant.parse("2026-08-03T14:32:00.000Z")
+        val assembled = multipartLive(earliest.toEpochMilli(), earliest.plusSeconds(1).toEpochMilli())
+        val first = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("11", "AlJazira", assembled.body, earliest),
+        )
+        val second = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("12", "AlJazira", assembled.body, earliest.plusSeconds(2)),
+        )
+        val useCase = capture()
+
+        assertTrue(useCase.capture(first) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(second) is BankSmsCaptureResult.Captured)
+        assertEquals(2, db.rawSmsDao().count())
+        assertEquals(first, rawRepo.getById(first.id))
+        assertEquals(second, rawRepo.getById(second.id))
+    }
+
+    @Test
+    fun multipartReplay_andRestartedCapture_stayOneRow() = runBlocking {
+        val earliest = Instant.parse("2026-08-03T14:32:00.000Z")
+        val liveRow = multipartLive(earliest.toEpochMilli(), earliest.plusMillis(400).toEpochMilli())
+        assertTrue(capture().capture(liveRow) is BankSmsCaptureResult.Captured)
+
+        assertEquals(BankSmsCaptureResult.Duplicate, capture().capture(liveRow))
+        val inboxCopy = AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord("42", "AlJazira", liveRow.body, earliest.plusSeconds(2)),
+        )
+        assertEquals(BankSmsCaptureResult.Duplicate, capture().capture(inboxCopy))
+        assertEquals(1, db.rawSmsDao().count())
+        assertEquals(liveRow, rawRepo.getById(liveRow.id))
+    }
+
+    @Test
+    fun sameProviderId_replaysAsDuplicate_andKeepsOriginalEvidence() = runBlocking {
+        val original = inbox("42", "2026-08-03T14:32:00.000Z")
+        val rewritten = original.copy(
+            id = "android-sms:other",
+            body = original.body + "\nchanged",
+            receivedAt = original.receivedAt.plusSeconds(30),
+            bodyHash = "different-body-hash",
+        )
+        val useCase = capture()
+
+        assertTrue(useCase.capture(original) is BankSmsCaptureResult.Captured)
+        assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(rewritten))
+        assertEquals(1, db.rawSmsDao().count())
+        assertEquals(original, rawRepo.getById(original.id))
+        assertNull(rawRepo.getById(rewritten.id))
+    }
+
+    @Test
+    fun differentProviderIds_areNotReplaysOfEachOther() = runBlocking {
+        val first = inbox("42", "2026-08-03T14:32:00.000Z")
+        val second = inbox("43", "2026-08-03T14:32:00.000Z").copy(body = first.body + "\nsecond")
+        val useCase = capture()
+
+        assertTrue(useCase.capture(first) is BankSmsCaptureResult.Captured)
+        assertTrue(useCase.capture(second) is BankSmsCaptureResult.Captured)
+        assertEquals(2, db.rawSmsDao().count())
+    }
+
+    @Test
     fun ambiguousRoute_isCapturedWithItsRoute_andLeftForProcessing() = runBlocking {
         val registry = BankSmsRegistry(listOf(AlJaziraSmsAdapter(), LookalikeAdapter()))
         val raw = live(PURCHASE_BODY, "2026-08-03T14:32:00Z")
@@ -219,6 +437,45 @@ class CaptureBankSmsUseCaseTest {
 
     private fun live(body: String, at: String): RawSms =
         AndroidSmsMapper.toRawSms(ProviderSmsRecord(null, "AlJazira", body, Instant.parse(at)))
+
+    private fun inbox(providerMessageId: String, at: String, body: String = PURCHASE_BODY): RawSms =
+        AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord(providerMessageId, "AlJazira", body, Instant.parse(at)),
+        )
+
+    /**
+     * One logical SMS joined from PDU parts. Receipt time is the earliest valid
+     * part timestamp, matching [com.baraa.masroof.sms.receiver.IncomingSmsReceiver].
+     */
+    private fun multipartLive(earliestPartMillis: Long, laterPartMillis: Long): RawSms {
+        val splitAt = PURCHASE_BODY.length / 2
+        val assembled = ReceivedSmsAssembler.assemble(
+            listOf(
+                ReceivedSmsAssembler.Part(
+                    sender = "AlJazira",
+                    body = PURCHASE_BODY.substring(0, splitAt),
+                    providerTimestampMillis = earliestPartMillis,
+                ),
+                ReceivedSmsAssembler.Part(
+                    sender = "AlJazira",
+                    body = PURCHASE_BODY.substring(splitAt),
+                    providerTimestampMillis = laterPartMillis,
+                ),
+            ),
+        )!!
+        val receivedAt = LiveReceiptTimestamp.resolve(
+            providerTimestampsMillis = assembled.providerTimestampsMillis,
+            deviceNow = Instant.ofEpochMilli(laterPartMillis + 60_000L),
+        )
+        return AndroidSmsMapper.toRawSms(
+            ProviderSmsRecord(
+                providerMessageId = null,
+                sender = assembled.sender,
+                body = assembled.body,
+                receivedAt = receivedAt,
+            ),
+        )
+    }
 
     private class LookalikeAdapter : BankSmsAdapter {
         override val bank: Bank = Bank("LOOKALIKE_BANK")
