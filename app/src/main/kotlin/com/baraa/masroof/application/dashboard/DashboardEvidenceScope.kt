@@ -68,12 +68,14 @@ interface DashboardEvidenceSource {
  * Each lookup mirrors exactly one calculator rule, bounded by kind (and by time where
  * the rule allows):
  * - statements: every statement SMS (`CreditCardOverviewBuilder` statement cycles)
- * - credit-card identity: newest credit/statement SMS per card (card list)
- * - available balances: latest per card before the period end (balance snapshot)
+ * - credit-card identity: newest credit/statement SMS per card bank + last4
+ *   (`occurredAt`, else RawSms `receivedAt`, then greatest event id)
+ * - available balances: latest per card before the period end on that same clock,
+ *   so a past period does not borrow a newer balance
  * - financing installments with a loan type (`LoanOverviewBuilder`)
  * - merchant exchange rates (`HistoricalExchangeRateIndex`)
- * - first debit-channel / debit-source-account SMS per registry card
- *   (`CardRegistryDebitClassifier`, `DebitLinkedAccountInferrer`)
+ * - earliest debit-channel row and earliest debit-source-account row per registry
+ *   card bank + last4 (`CardRegistryDebitClassifier`, `DebitLinkedAccountInferrer`)
  *
  * Every rule that scans "all" records therefore sees each row that can change its result,
  * so projections equal the former whole-history load. Never call `listAll()` here.
