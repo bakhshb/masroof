@@ -583,6 +583,75 @@ class IntraBankSelfTransferReconciliationTest {
     }
 
     @Test
+    fun userExternalTransfer_isNotReplacedByAutomaticOrLegacyRepair() = runBlocking {
+        ownBothAccounts()
+        persistPair("chosen", "2026-09-02 10:00", "2026-09-02T07:00:00Z")
+        seedPostedExternal("sms-chosen-out", "chosen-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT)
+        seedPostedExternal("sms-chosen-in", "chosen-in", FinancialTransactionType.EXTERNAL_TRANSFER_IN)
+        val chosenId = ftRepo.findByRawSmsId("sms-chosen-out")!!.id
+        val now = Instant.parse("2026-09-02T12:00:00Z")
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-chosen-out",
+            kind = ReviewKind.PENDING_MATCH,
+            reasons = listOf("manual_resolution"),
+            now = now,
+        )
+        reviewRepo.markResolved(
+            id = ReviewIdFactory.fromRawSmsId("sms-chosen-out"),
+            resolutionKind = ReviewResolutionKind.USER_EXTERNAL_TRANSFER,
+            resolvedAt = now,
+            resolvedTransactionId = chosenId,
+        )
+
+        reconcileAndApplyReviews()
+        repairAndApplyReviews()
+
+        val kept = ftRepo.findByRawSmsId("sms-chosen-out")
+        assertEquals(chosenId, kept?.id)
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, kept?.type)
+        assertEquals(setOf("sms-chosen-out"), ftRepo.listRawSmsIds(chosenId).toSet())
+        val review = reviewRepo.findByRawSmsId("sms-chosen-out")
+        assertEquals(ReviewStatus.RESOLVED, review?.status)
+        assertEquals(ReviewResolutionKind.USER_EXTERNAL_TRANSFER, review?.resolutionKind)
+        assertTrue(ftRepo.listAll().none { it.type == FinancialTransactionType.SELF_TRANSFER && "sms-chosen-out" in ftRepo.listRawSmsIds(it.id) })
+    }
+
+    @Test
+    fun userNonFinancial_isNotRepostedOrReopenedByLegacyRepair() = runBlocking {
+        ownBothAccounts()
+        persistSameMinuteAmbiguousLegs()
+        seedPostedSingleLegSelf("sms-out-a", "out-a")
+        seedPostedSingleLegSelf("sms-out-b", "out-b")
+        seedPostedSingleLegSelf("sms-in-a", "in-a")
+        seedPostedSingleLegSelf("sms-in-b", "in-b")
+        val ignoredId = ftRepo.findByRawSmsId("sms-out-a")!!.id
+        val now = Instant.parse("2026-09-02T12:00:00Z")
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-out-a",
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf("manual_resolution"),
+            now = now,
+        )
+        reviewRepo.markResolved(
+            id = ReviewIdFactory.fromRawSmsId("sms-out-a"),
+            resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
+            resolvedAt = now,
+            resolvedTransactionId = null,
+        )
+
+        reconcileAndApplyReviews()
+        repairAndApplyReviews()
+
+        val kept = ftRepo.findByRawSmsId("sms-out-a")
+        assertEquals(ignoredId, kept?.id)
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, kept?.type)
+        val review = reviewRepo.findByRawSmsId("sms-out-a")
+        assertEquals(ReviewStatus.RESOLVED, review?.status)
+        assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, review?.resolutionKind)
+        assertEquals(setOf("sms-out-b", "sms-in-a", "sms-in-b"), reviewRepo.listRequired().map { it.rawSmsId }.toSet())
+    }
+
+    @Test
     fun repairLegacyTransfers_onCleanLedger_postsNothing() = runBlocking {
         val report = reconciliation.repairLegacyTransfersDetailed()
         assertEquals(0, report.summary.failed)

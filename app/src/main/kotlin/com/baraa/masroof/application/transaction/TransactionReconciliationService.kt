@@ -403,14 +403,24 @@ class TransactionReconciliationService(
                     settledRawSmsIds += event.rawSmsId
                     continue
                 }
+                if (review?.status == ReviewStatus.RESOLVED &&
+                    review.resolutionKind == ReviewResolutionKind.USER_EXTERNAL_TRANSFER
+                ) {
+                    alreadyLinked++
+                    settledRawSmsIds += event.rawSmsId
+                    continue
+                }
                 // Explicit "this SMS is financial" decision (e.g. restore from ignored).
-                if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) {
+                if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE ||
+                    review?.resolutionKind == ReviewResolutionKind.USER_CORRECTION
+                ) {
                     userConfirmed = true
                 }
             }
             val linkedBefore = financialTransactionRepository.findByRawSmsId(event.rawSmsId)
             if (linkedBefore != null) {
                 if (
+                    !preservesExplicitUserDecision(event.rawSmsId) &&
                     eventShouldNotProduceTransaction(event) &&
                     financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
                 ) {
@@ -764,7 +774,7 @@ class TransactionReconciliationService(
             val record: ParsedEventRecord?,
         )
 
-        fun staleLegs(
+        suspend fun staleLegs(
             transactions: List<FinancialTransaction>,
             family: MessageFamily,
         ): List<StaleLeg> =
@@ -777,6 +787,7 @@ class TransactionReconciliationService(
                 if (!TransactionAssembler.isAutomationEligible(event, record?.automationConfirmed == true)) {
                     return@mapNotNull null
                 }
+                if (preservesExplicitUserDecision(event.rawSmsId)) return@mapNotNull null
                 StaleLeg(
                     transaction = transaction,
                     event = event,
@@ -789,6 +800,7 @@ class TransactionReconciliationService(
         for (record in records) {
             val event = record.event
             if (!event.messageFamily.isTransferFamily()) continue
+            if (preservesExplicitUserDecision(event.rawSmsId)) continue
             if (!TransactionAssembler.isAutomationEligible(event, record.automationConfirmed)) continue
             if (financialTransactionRepository.isRawSmsLinked(event.rawSmsId)) continue
             val leg = StaleLeg(transaction = null, event = event, record = record)
@@ -1151,17 +1163,26 @@ class TransactionReconciliationService(
         return financialTransactionRepository.listRawSmsIds(linked.id).size == 1
     }
 
-    private suspend fun shouldProtectFromAutomaticUnlink(rawSmsId: String): Boolean {
+    /**
+     * A resolved user choice is left as stored. Automatic reconcile and legacy
+     * repair must not delete, unlink, re-pair, or replace that SMS.
+     */
+    private suspend fun preservesExplicitUserDecision(rawSmsId: String): Boolean {
         val review = reviewRepository?.findByRawSmsId(rawSmsId) ?: return false
+        if (review.status != ReviewStatus.RESOLVED) return false
         return when (review.resolutionKind) {
+            ReviewResolutionKind.USER_NON_FINANCIAL,
+            ReviewResolutionKind.USER_EXTERNAL_TRANSFER,
             ReviewResolutionKind.USER_FINANCIAL_TYPE,
             ReviewResolutionKind.USER_SELF_TRANSFER_PAIR,
-            ReviewResolutionKind.USER_EXTERNAL_TRANSFER,
             ReviewResolutionKind.USER_CORRECTION,
             -> true
             else -> false
         }
     }
+
+    private suspend fun shouldProtectFromAutomaticUnlink(rawSmsId: String): Boolean =
+        preservesExplicitUserDecision(rawSmsId)
 
     private suspend fun observeUnlinkedTransfer(record: ParsedEventRecord): TransferMatchCandidate? {
         if (financialTransactionRepository.isRawSmsLinked(record.event.rawSmsId)) return null
@@ -1214,6 +1235,7 @@ class TransactionReconciliationService(
         ) {
             return false
         }
+        if (preservesExplicitUserDecision(event.rawSmsId)) return false
         val linked = financialTransactionRepository.findByRawSmsId(event.rawSmsId) ?: return false
         if (linked.type != FinancialTransactionType.SELF_TRANSFER) return false
         val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: return false
