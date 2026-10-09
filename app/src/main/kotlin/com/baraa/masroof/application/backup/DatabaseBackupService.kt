@@ -132,7 +132,7 @@ class DatabaseBackupService(
             dbFile.copyTo(incoming, overwrite = false)
             try {
                 openMigrateAndValidate(incoming)
-                val preservedRollback = DatabaseRestoreRecovery.preserveExistingRollback(liveDb)
+                val preservedRollback = DatabaseRestoreRecovery.hasPreexistingRollback(liveDb)
                 DatabaseRestoreRecovery.writeSnapshots(
                     live = liveDb,
                     original = DatabaseRestoreRecovery.capturePreferences(appContext),
@@ -143,6 +143,9 @@ class DatabaseBackupService(
                     DatabaseRestoreRecovery.Stage.PREPARED,
                     preservedRollback,
                 )
+                if (preservedRollback) {
+                    DatabaseRestoreRecovery.preserveExistingRollback(liveDb)
+                }
                 afterRestoreStage(DatabaseRestoreRecovery.Stage.PREPARED)
                 beforeValidatedInstall()
                 if (!incoming.isFile) {

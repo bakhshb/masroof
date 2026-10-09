@@ -389,6 +389,44 @@ class DatabaseRestoreRecoveryTest {
     }
 
     @Test
+    fun crashAfterPreservingRollback_beforePrepared_keepsLiveAndPreexistingRollback() {
+        writeDatabase(live, "current")
+        val rollback = File(live.path + ".rollback")
+        writeDatabase(rollback, "previous")
+        assertTrue(DatabaseRestoreRecovery.preserveExistingRollback(live))
+        assertFalse(rollback.exists())
+        assertTrue(File(live.path + ".rollback.preserved").exists())
+        assertFalse(journal().exists())
+
+        DatabaseRestoreRecovery.recover(context)
+
+        assertEquals("current", readMarker(live))
+        assertEquals("previous", readMarker(rollback))
+        assertFalse(File(live.path + ".rollback.preserved").exists())
+    }
+
+    @Test
+    fun corruptJournal_keepsOriginalLiveDatabaseWithOriginalPreferences() {
+        writeDatabase(live, "original")
+        DatabaseRestoreRecovery.writeSnapshots(
+            live,
+            preferenceSnapshot(onboardingCompleted = false, reparsedSchemaVersion = 3),
+            preferenceSnapshot(onboardingCompleted = true, reparsedSchemaVersion = null),
+        )
+        applyMixedPreferences(onboardingCompleted = true, reparsedSchemaVersion = 1)
+        journal().writeText("stage=PREPA")
+        assertFalse(File(live.path + ".rollback").exists())
+
+        DatabaseRestoreRecovery.recover(context)
+
+        assertEquals("original", readMarker(live))
+        assertFalse(onboarding().getBoolean("onboarding_completed", true))
+        assertEquals(3, maintenance().getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, -1))
+        assertFalse(journal().exists())
+        assertFalse(File(live.path + ".rollback").exists())
+    }
+
+    @Test
     fun missingJournal_whenLiveFileIsNotSqlite_failsClosed() {
         live.writeText("bad-live")
 

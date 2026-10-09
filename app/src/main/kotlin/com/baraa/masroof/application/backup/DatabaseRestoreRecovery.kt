@@ -130,6 +130,11 @@ object DatabaseRestoreRecovery {
         writeDurable(incomingPrefsFile(live), encodePreferences(incoming))
     }
 
+    internal fun hasPreexistingRollback(live: File): Boolean {
+        val rollback = rollbackFile(live)
+        return rollback.exists() || hasSidecar(rollback)
+    }
+
     internal fun preserveExistingRollback(live: File): Boolean {
         val rollback = rollbackFile(live)
         if (!rollback.exists() && !hasSidecar(rollback)) return false
@@ -209,12 +214,22 @@ object DatabaseRestoreRecovery {
     }
 
     private fun recoverWithoutJournal(live: File) {
+        if (isSqliteOk(live)) {
+            reclaimOrphanedPreservedRollback(live)
+            return
+        }
         val rollback = rollbackFile(live)
-        val liveOk = isSqliteOk(live)
-        val rollbackOk = isSqliteOk(rollback)
-        if (!live.exists() && !rollback.exists()) return
-        if (liveOk) return
-        if (rollbackOk) {
+        val preserved = preservedRollbackFile(live)
+        if (!live.exists() && !rollback.exists() && !preserved.exists() && !hasSidecar(preserved)) {
+            return
+        }
+        if (isSqliteOk(rollback)) {
+            discardDatabase(live)
+            restoreRollbackOverLive(live)
+            return
+        }
+        reclaimOrphanedPreservedRollback(live)
+        if (isSqliteOk(rollbackFile(live))) {
             discardDatabase(live)
             restoreRollbackOverLive(live)
             return
@@ -225,9 +240,9 @@ object DatabaseRestoreRecovery {
     }
 
     /**
-     * A torn journal is not a commit marker. The original database and its
-     * preference snapshot stay together when that copy is still valid.
-     * Otherwise the surviving database is paired with the incoming snapshot.
+     * A torn journal is not a commit marker. A parked rollback is restored
+     * with the original preference snapshot. A live database that was never
+     * parked keeps that snapshot and does not receive imported preferences.
      */
     private fun recoverCorruptJournal(context: Context, live: File) {
         val rollbackOk = isSqliteOk(rollbackFile(live))
@@ -242,16 +257,41 @@ object DatabaseRestoreRecovery {
                         hasSidecar(preservedRollbackFile(live)),
                 ),
             )
-            liveOk -> {
-                readPreferences(incomingPrefsFile(live))?.let { applyPreferences(context, it) }
-                discardDatabase(rollbackFile(live))
-                deleteSnapshots(live)
-                journalFile(live).delete()
-            }
+            liveOk -> recoverUnparkedLive(context, live)
             else -> throw IncompleteRestoreException(
                 "Restore journal is unreadable and neither database is valid",
             )
         }
+    }
+
+    /**
+     * No parked rollback means the live file was not replaced. It stays the
+     * original database and must keep the original preference snapshot.
+     * Imported preferences are applied only after NEW_INSTALLED is durable.
+     */
+    private fun recoverUnparkedLive(context: Context, live: File) {
+        reclaimOrphanedPreservedRollback(live)
+        val originalPrefs = readPreferences(originalPrefsFile(live))
+        if (originalPrefs != null) {
+            applyPreferences(context, originalPrefs)
+            discardDatabase(incomingFile(live))
+            deleteSnapshots(live)
+            journalFile(live).delete()
+            return
+        }
+        if (readPreferences(incomingPrefsFile(live)) != null) {
+            throw IncompleteRestoreException(
+                "Unreadable journal cannot pair the live database with imported preferences",
+            )
+        }
+        journalFile(live).delete()
+    }
+
+    private fun reclaimOrphanedPreservedRollback(live: File) {
+        restorePreservedRollback(
+            live,
+            Journal(stage = Stage.PREPARED, preservedRollback = true),
+        )
     }
 
     private fun recoverPrepared(context: Context, live: File, journal: Journal) {
