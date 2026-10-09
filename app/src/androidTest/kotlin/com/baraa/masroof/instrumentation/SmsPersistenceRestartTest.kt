@@ -569,7 +569,9 @@ class SmsPersistenceRestartTest {
         assertEquals(ReviewStatus.REQUIRED, review!!.status)
         assertNull(review.resolutionKind)
         assertNull(review.resolvedTransactionId)
-        assertTrue(review.reasons.contains(IngestionReviewService.REASON_PARSE_REVIEW_REQUIRED))
+        // UNKNOWN family is reviewed by reconciliation as unknown_message_family.
+        // parse_review_required is only for a ReviewRequired parse that has no event.
+        assertTrue(review.reasons.contains("unknown_message_family"))
         return review.id
     }
 
