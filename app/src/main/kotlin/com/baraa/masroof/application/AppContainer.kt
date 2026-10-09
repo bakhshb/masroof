@@ -64,6 +64,7 @@ import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.aljazira.AlJaziraBankDetector
 import com.baraa.masroof.bank.aljazira.AlJaziraParsingPipeline
 import com.baraa.masroof.bank.aljazira.AlJaziraSmsAdapter
+import com.baraa.masroof.data.preferences.AndroidKeystoreGitHubTokenEncryptor
 import com.baraa.masroof.data.preferences.SharedPrefsDashboardLayoutPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsGitHubTokenRepository
 import com.baraa.masroof.data.preferences.SharedPrefsNotificationPreferencesRepository
@@ -618,10 +619,11 @@ class AppContainer(
 
     val githubTokenRepository: com.baraa.masroof.application.update.GitHubTokenRepository =
         SharedPrefsGitHubTokenRepository(
-            appContext.getSharedPreferences(
+            prefs = appContext.getSharedPreferences(
                 SharedPrefsGitHubTokenRepository.PREFS_NAME,
                 Context.MODE_PRIVATE,
             ),
+            encryptor = AndroidKeystoreGitHubTokenEncryptor(),
         )
 
     val pendingUpdateStore: PendingUpdateStore by lazy {
