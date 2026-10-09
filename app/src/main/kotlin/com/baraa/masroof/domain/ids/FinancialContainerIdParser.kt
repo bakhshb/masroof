@@ -26,6 +26,23 @@ object FinancialContainerIdParser {
         return containerId.substringAfterLast(':').trim().takeIf { it.isNotEmpty() }
     }
 
+    /**
+     * `account:<bankId>:<masked>` is bank-qualified. A suffix with no bank segment,
+     * such as `account:3001`, is a legacy unqualified id.
+     */
+    fun accountBankId(containerId: String?): String? {
+        if (containerId.isNullOrBlank() || !containerId.startsWith("account:")) return null
+        val body = containerId.removePrefix("account:")
+        val separator = body.indexOf(':')
+        if (separator <= 0 || separator >= body.lastIndex) return null
+        val bankId = body.substring(0, separator).trim()
+        val masked = body.substring(separator + 1).trim()
+        if (bankId.isEmpty() || masked.isEmpty()) return null
+        return bankId
+    }
+
+    fun isBankQualifiedAccountId(containerId: String?): Boolean = accountBankId(containerId) != null
+
     fun accountContainerIdsFromContainers(
         sourceContainerId: String?,
         destinationContainerId: String?,

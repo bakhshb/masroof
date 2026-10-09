@@ -1,6 +1,7 @@
 package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -178,9 +179,21 @@ data class CurrentAccountTransactionScope(
 
     private fun matchesOwnedContainer(containerId: String): Boolean {
         if (containerId in ownedContainerIds) return true
-        if (!containerId.startsWith("account:")) return false
-        val last4 = containerId.substringAfterLast(':')
-        return last4 in ownedAccountLast4s
+        val masked = FinancialContainerIdParser.accountMaskedNumber(containerId) ?: return false
+        val bankId = FinancialContainerIdParser.accountBankId(containerId)
+        if (bankId != null) {
+            return ownedContainerIds.any { ownedId ->
+                val ownedBank = FinancialContainerIdParser.accountBankId(ownedId) ?: return@any false
+                val ownedMasked = FinancialContainerIdParser.accountMaskedNumber(ownedId) ?: return@any false
+                ownedBank.equals(bankId, ignoreCase = true) && ownedMasked == masked
+            }
+        }
+        val owners = ownedContainerIds.filter { ownedId ->
+            val ownedMasked = FinancialContainerIdParser.accountMaskedNumber(ownedId) ?: return@filter false
+            ownedMasked == masked ||
+                (masked.length == 4 && ownedMasked.length > masked.length && ownedMasked.endsWith(masked))
+        }
+        return owners.size == 1
     }
 
     private fun accountIdFromSmsBody(
