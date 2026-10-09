@@ -359,7 +359,7 @@ class BoundedZipImportTest {
             escape.delete()
             absolute.delete()
 
-            fun reject(
+            suspend fun reject(
                 bytes: ByteArray,
                 limits: BackupArchiveLimits,
                 category: BackupArchiveRejection,
