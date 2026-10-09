@@ -1,7 +1,8 @@
 # Masroof rewrite — accepted decisions (P0)
 
-These decisions are recorded during the clean baseline phase. They are **not**
-implemented yet; they guide Phase P1+ work.
+> Historical decision record. The decisions below were accepted for the rewrite and later milestones implemented them. This file is not a claim that the work is still unshipped. Live rules are in `AGENTS.md`.
+
+These decisions were recorded during the clean baseline phase. They guided the rewrite. The decisions themselves stay as accepted.
 
 ## 1. Package identity
 
