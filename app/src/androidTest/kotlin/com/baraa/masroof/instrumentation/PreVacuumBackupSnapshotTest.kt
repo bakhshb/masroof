@@ -20,6 +20,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,9 +56,13 @@ class PreVacuumBackupSnapshotTest {
         var writer: Thread? = null
         try {
             val sqliteVersion = sqliteVersion(live)
+            assumeTrue(
+                "Pre-3.27 snapshot proof runs on API 26-28. This device is API ${Build.VERSION.SDK_INT} sqlite $sqliteVersion.",
+                Build.VERSION.SDK_INT in 26..28,
+            )
             assertTrue(
                 "API ${Build.VERSION.SDK_INT} sqlite $sqliteVersion must be older than 3.27",
-                sqliteBefore327(sqliteVersion) && Build.VERSION.SDK_INT in 26..28,
+                sqliteBefore327(sqliteVersion),
             )
             live.openHelper.writableDatabase.execSQL(
                 """
