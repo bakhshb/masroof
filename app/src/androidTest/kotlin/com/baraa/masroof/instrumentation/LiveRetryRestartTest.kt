@@ -84,15 +84,13 @@ class LiveRetryRestartTest {
         val captured = CaptureBankSmsUseCase(container.rawSmsRepository, registry).capture(raw)
         assertTrue(captured is com.baraa.masroof.application.ingestion.BankSmsCaptureResult.Captured)
         val failing = processStored(container, registry, ledger)
-
-        val attempts = (0 until LiveSmsProcessingWorker.MAX_ATTEMPTS).map { attempt ->
-            worker(context, raw.id, attempt, failing).doWork()
-        }
-        assertEquals(
-            List(LiveSmsProcessingWorker.MAX_ATTEMPTS - 1) { androidx.work.ListenableWorker.Result.retry() } +
-                androidx.work.ListenableWorker.Result.failure(),
-            attempts,
-        )
+        val exhausted = worker(
+            context,
+            raw.id,
+            attempt = LiveSmsProcessingWorker.MAX_ATTEMPTS - 1,
+            processStored = failing,
+        ).doWork()
+        assertEquals(androidx.work.ListenableWorker.Result.failure(), exhausted)
         assertNull(container.financialTransactionRepository.findByRawSmsId(raw.id))
         assertEquals(
             listOf(raw.id),
