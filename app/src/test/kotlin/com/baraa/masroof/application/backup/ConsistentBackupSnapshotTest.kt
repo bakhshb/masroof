@@ -38,8 +38,9 @@ import java.util.zip.ZipInputStream
 
 /**
  * Export must publish a sidecar-free snapshot that survives WAL checkpoints racing the copy.
- * SDK 28 matches the existing backup tests. Robolectric's SQLite supports VACUUM INTO, so the
- * quiesced fallback is covered by disabling that path explicitly.
+ * SDK 28 matches the existing backup tests. Robolectric's SQLite supports VACUUM INTO.
+ * The quiesced fallback is also covered here by disabling that path, and on a real
+ * API 26–28 device by [com.baraa.masroof.instrumentation.PreVacuumBackupSnapshotTest].
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -167,15 +168,39 @@ class ConsistentBackupSnapshotTest {
                     )
 
                     val afterExport = seedBatches(liveDbPath(), POST_EXPORT_ID..POST_EXPORT_ID).single()
-                    val liveBatches = readBatches(liveDbPath(), sqliteVersion)
-                    assertConsistent(
-                        batches = liveBatches,
-                        mustInclude = preSeed + committed + afterExport,
-                        mustBeSubsetOf = preSeed + committed + afterExport,
-                        label = "live sqlite=$sqliteVersion",
-                    )
                     assertFalse(snapshotBatches.containsKey(afterExport))
-                    assertEquals(OwnershipStatus.OWNED, RoomCardRegistryRepository.from(live).get(card)!!.ownership)
+                    val restartRequested = AtomicBoolean(false)
+                    val importer = DatabaseBackupService(
+                        appContext = context,
+                        database = live,
+                        closeDatabase = { if (live.isOpen) live.close() },
+                        appVersionName = "test",
+                        clockEpochMillis = { 1_700_000_000_000L },
+                        restartProcess = { restartRequested.set(true) },
+                        onlineBackupEnabled = useOnlineBackup,
+                    )
+                    val outcome = importer.importFrom(Uri.fromFile(zip))
+                    assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
+                    assertTrue(restartRequested.get())
+                    assertFalse(live.isOpen)
+                    val reopened = openWalDatabase()
+                    try {
+                        assertEquals(
+                            OwnershipStatus.OWNED,
+                            RoomCardRegistryRepository.from(reopened).get(card)!!.ownership,
+                        )
+                        val importedBatches = readBatches(liveDbPath(), sqliteVersion)
+                        assertConsistent(
+                            batches = importedBatches,
+                            mustInclude = preSeed,
+                            mustBeSubsetOf = preSeed + committed,
+                            label = "reopened room sqlite=$sqliteVersion online=$useOnlineBackup",
+                        )
+                        assertFalse(importedBatches.containsKey(afterExport))
+                        assertLivePreferences(preferences)
+                    } finally {
+                        if (reopened.isOpen) reopened.close()
+                    }
                 } finally {
                     snapshot.parentFile?.deleteRecursively()
                     zip.delete()
