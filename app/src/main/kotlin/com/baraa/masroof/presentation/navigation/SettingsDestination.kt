@@ -39,6 +39,8 @@ sealed interface SettingsDestination {
 
     data object DataBackup : SettingsDestination
 
+    data object StatementReconciliation : SettingsDestination
+
     data object About : SettingsDestination
 
     data object Logs : SettingsDestination
@@ -61,6 +63,7 @@ fun SettingsDestination.encode(): String =
         is SettingsDestination.BankLoans -> "bank:$bankId:loans"
         SettingsDestination.App -> "app"
         SettingsDestination.DataBackup -> "data_backup"
+        SettingsDestination.StatementReconciliation -> "statement_reconciliation"
         SettingsDestination.About -> "about"
         SettingsDestination.Logs -> "logs"
         SettingsDestination.DesignCatalog -> "design_catalog"
@@ -80,6 +83,7 @@ fun decodeSettingsDestination(encoded: String): SettingsDestination {
     if (encoded == "banks") return SettingsDestination.Banks
     if (encoded == "app") return SettingsDestination.App
     if (encoded == "data_backup") return SettingsDestination.DataBackup
+    if (encoded == "statement_reconciliation") return SettingsDestination.StatementReconciliation
     if (encoded == "about") return SettingsDestination.About
     if (encoded == "logs") return SettingsDestination.Logs
     if (encoded == "design_catalog") return SettingsDestination.DesignCatalog

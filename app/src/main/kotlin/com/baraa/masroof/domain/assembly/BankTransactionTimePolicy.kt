@@ -16,6 +16,9 @@ import java.time.ZoneId
  * A bank without a fixed zone keeps the zone stored on its first transaction.
  * [fallback] is only for the first resolution of such a bank. A new bank adds
  * its zone here, not on its adapter.
+ *
+ * Opt-in statement reconciliation uses this same map for offset-less CSV
+ * `bookedAt` values. Do not add a second bank-to-zone table for statements.
  */
 object BankTransactionTimePolicy {
     val ALJAZIRA: ZoneId = ZoneId.of("Asia/Riyadh")

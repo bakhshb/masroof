@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.collectAsState
@@ -50,6 +51,8 @@ import com.baraa.masroof.presentation.review.ReviewViewModel
 import com.baraa.masroof.presentation.review.ReviewViewModelFactory
 import com.baraa.masroof.presentation.settings.SettingsViewModel
 import com.baraa.masroof.presentation.settings.SettingsViewModelFactory
+import com.baraa.masroof.presentation.statement.StatementReconciliationViewModel
+import com.baraa.masroof.presentation.statement.StatementReconciliationViewModelFactory
 import com.baraa.masroof.presentation.theme.MasroofSpacing
 import com.baraa.masroof.presentation.theme.MasroofTheme
 import com.baraa.masroof.presentation.locale.AppLocaleContext
@@ -98,6 +101,10 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val statementReconciliationViewModel: StatementReconciliationViewModel by viewModels {
+        StatementReconciliationViewModelFactory(container.statementReconciliationWorkflow)
+    }
+
     private val notificationCenterViewModel: NotificationCenterViewModel by viewModels {
         NotificationCenterViewModelFactory(
             container = container,
@@ -108,7 +115,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            var startupOutcome by remember { mutableStateOf<StartupMaintenanceOutcome?>(null) }
+            var startupOutcome by rememberSaveable {
+                mutableStateOf<StartupMaintenanceOutcome?>(null)
+            }
             var startupRetrying by remember { mutableStateOf(false) }
             val startupScope = rememberCoroutineScope()
             LaunchedEffect(Unit) {
@@ -230,6 +239,7 @@ class MainActivity : ComponentActivity() {
                         dashboardViewModel = dashboardViewModel,
                         reviewViewModel = reviewViewModel,
                         settingsViewModel = settingsViewModel,
+                        statementReconciliationViewModel = statementReconciliationViewModel,
                         notificationCenterViewModel = notificationCenterViewModel,
                         onRequestPermissions = {
                             permissionLauncher.launch(OnboardingPermissionPolicy.REQUIRED_SMS_PERMISSIONS)

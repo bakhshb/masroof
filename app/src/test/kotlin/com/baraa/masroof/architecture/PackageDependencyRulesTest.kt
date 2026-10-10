@@ -211,6 +211,42 @@ class PackageDependencyRulesTest {
     }
 
     @Test
+    fun domain_statement_doesNotDependOnOuterLayers() {
+        assertPackagesDoNotImport(
+            packages = listOf("domain/statement"),
+            forbiddenImports = outerLayerImports,
+        )
+    }
+
+    @Test
+    fun statementReconciliation_readsLedgerWithoutWritingIt() {
+        val files = listOf(
+            "StatementReconciliationService.kt",
+            "ImportStatementUseCase.kt",
+            "StatementReconciliationWorkflow.kt",
+        ).map { File(sourceRoot, "application/statement/$it") }
+        val writes = listOf(
+            ".save(",
+            ".update(",
+            ".updateAppliedExchangeRate(",
+            ".deleteIfExclusiveRawSmsLink(",
+            ".unlinkRawSms(",
+            ".linkRawSmsIfAbsent(",
+            ".replaceExclusiveStaleLinks(",
+        )
+        files.forEach { file ->
+            assertTrue("${file.path} must exist", file.isFile)
+            val source = file.readText()
+            writes.forEach { call ->
+                assertFalse(
+                    "${file.path} must not call '$call'",
+                    source.contains(call),
+                )
+            }
+        }
+    }
+
+    @Test
     fun domain_loan_hasNoProductionSources() {
         val productionSources = kotlinFilesIn("domain/loan")
         assertTrue(

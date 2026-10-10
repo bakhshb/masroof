@@ -39,6 +39,7 @@ import com.baraa.masroof.presentation.review.ReviewRoute
 import com.baraa.masroof.presentation.review.ReviewViewModel
 import com.baraa.masroof.presentation.settings.SettingsRoute
 import com.baraa.masroof.presentation.settings.SettingsViewModel
+import com.baraa.masroof.presentation.statement.StatementReconciliationViewModel
 
 /**
  * Minimal root composition: onboarding while incomplete, dashboard + review after HOME.
@@ -49,6 +50,7 @@ fun MasroofRoot(
     dashboardViewModel: DashboardViewModel,
     reviewViewModel: ReviewViewModel,
     settingsViewModel: SettingsViewModel,
+    statementReconciliationViewModel: StatementReconciliationViewModel,
     notificationCenterViewModel: NotificationCenterViewModel,
     onRequestPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
@@ -375,6 +377,7 @@ fun MasroofRoot(
             }
             HomeDestination.Settings -> SettingsRoute(
                 viewModel = settingsViewModel,
+                statementReconciliationViewModel = statementReconciliationViewModel,
                 reviewRequiredCount = dashboardState.summary?.reviewRequiredCount ?: 0,
                 pendingLaunch = pendingSettingsLaunch,
                 onPendingLaunchConsumed = { pendingSettingsLaunch = null },
