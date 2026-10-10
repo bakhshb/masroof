@@ -1085,7 +1085,7 @@ Likewise, the financial domain should be testable without Android, SMS APIs, Roo
 
 ## 31. Financial invariants
 
-M18 checks these rules against persisted rows. Dashboard money totals stay in the golden ledger projection (`GoldenLedgerRunner` over `DashboardLedgerWorld`). The pending `m8_asof_fx` oracle stays exempt until milestone M8 activates it. Sequences use fixed seeds and name the seed when an assertion fails. They do not sleep.
+M18 checks these rules against persisted rows. Dashboard money totals stay in the golden ledger projection (`GoldenLedgerRunner` over `DashboardLedgerWorld`). The `m8_asof_fx` oracle is active: an October 1 purchase does not inherit a later merchant rate. Sequences use fixed seeds and name the seed when an assertion fails. They do not sleep.
 
 1. A recognized captured bank financial SMS ends as a posted movement, a REQUIRED review, or a durable `processing_retry` row. Informational families (`OTP`, `NON_FINANCIAL`, `BALANCE_NOTICE`) and an explicit `USER_NON_FINANCIAL` resolution stay terminal and unposted. An unrecognized sender is outside bank capture and is not part of that coverage.
 2. An SMS-derived posted transaction has at least one RawSms link, every link still exists, and each RawSms links to at most one posted movement.
@@ -1097,4 +1097,4 @@ AlJazira wall clocks use `Asia/Riyadh` through `BankTransactionTimePolicy`, the 
 
 Fault injection is deterministic and hits one boundary at a time: after RawSms capture, after ParsedEvent save, before and after transactional link replace, before and after review upsert, and before clearing recovery state. A thrown failure at that boundary leaves the SMS durable. A nonthrowing `FinancialTransactionSaveResult.Conflict` that makes `ReconciliationSummary.failed > 0` is incomplete under `ReconciliationCompletionPolicy`, not success. When the fault is removed, replay applies the financial outcome once: no lost SMS, no orphan financial row, and no forgotten review.
 
-Seeds used by the invariant suite: `20261009` and `20261010` (golden order and its reverse), `151515` (live/inbox twin), `180055` (inside the matcher window), `200011` (after the matcher window), `909090` (unresolvable tie), `808080` (SAR/USD separation and the untouched M8 structure check), `20261018` (fault matrix), `20261019` (manual replay).
+Seeds used by the invariant suite: `20261009` and `20261010` (golden order and its reverse), `151515` (live/inbox twin), `180055` (inside the matcher window), `200011` (after the matcher window), `909090` (unresolvable tie), `808080` (SAR/USD separation and the active M8 as-of check), `20261018` (fault matrix), `20261019` (manual replay).

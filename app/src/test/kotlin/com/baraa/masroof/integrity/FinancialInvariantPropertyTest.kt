@@ -288,10 +288,10 @@ class FinancialInvariantPropertyTest {
     }
 
     @Test
-    fun pendingM8_keepsStoredCurrency_andDoesNotUseThePendingOracle() = runBlocking {
+    fun asOfFx_keepsStoredUsd_andMatchesTheActiveOracle() = runBlocking {
         val scenario = GoldenLedgerCorpus.load("m8_asof_fx")
-        assertEquals("PENDING", scenario.status)
-        assertEquals("M8", scenario.ownerMilestone)
+        assertEquals("ACTIVE", scenario.status)
+        assertNull(scenario.ownerMilestone)
         val seed = IntegritySeeds.CURRENCY
         DashboardLedgerWorld(context()).use { world ->
             GoldenLedgerRunner.prepare(world, scenario)
@@ -305,11 +305,11 @@ class FinancialInvariantPropertyTest {
                 "seed=$seed m8 type",
                 stored.all { it.type == FinancialTransactionType.EXPENSE },
             )
-            assertFinancialInvariants(world, seed, "pending_m8_structure")
+            assertFinancialInvariants(world, seed, "asof_fx_structure")
             val snapshot = GoldenLedgerRunner.read(world, scenario)
             assertTrue(
-                "seed=$seed m8 must stay pending until its owner activates the oracle",
-                scenario.knownDefect!!.signals.any { (key, broken) -> snapshot.metrics[key] == broken },
+                "seed=$seed m8 diverged from the active oracle\n${snapshot.canonical()}",
+                snapshot.matches(scenario.expected),
             )
         }
     }
