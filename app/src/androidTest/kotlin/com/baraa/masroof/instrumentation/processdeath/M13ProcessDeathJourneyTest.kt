@@ -30,6 +30,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -278,6 +280,12 @@ class M13ProcessDeathJourneyTest {
     fun resumeHistoricalAfterParsed() = runBlocking {
         val rawSmsId = JourneyNote.read(filesDir()).rawSmsId
         awaitStartup()
+        val completed = withTimeout(90_000) {
+            WorkManager.getInstance(targetContext()).getWorkInfosForUniqueWorkFlow(
+                com.baraa.masroof.application.sms.HistoricalDerivedRecoveryWorker.UNIQUE_WORK_NAME,
+            ).first { work -> work.isNotEmpty() && work.all { it.state.isFinished } }
+        }
+        assertTrue(completed.all { it.state == WorkInfo.State.SUCCEEDED })
         assertPostedOnce(rawSmsId)
         assertTrue(app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).isEmpty())
         assertTrue(WorkManager.getInstance(targetContext()).getWorkInfosForUniqueWork(
