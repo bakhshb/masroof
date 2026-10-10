@@ -686,4 +686,5 @@
     <string name="review_error_parsed_missing">بيانات التحليل غير متوفرة — جرّب إعادة الاستيراد</string>
     <string name="review_error_not_transfer">هذه العملية ليست حوالة</string>
     <string name="startup_maintenance_blocked">تعذر تجهيز البيانات المالية بأمان. أعد المحاولة قبل عرض الملخص المالي.</string>
+    <string name="settings_export_reenter_passphrase">تعذّر إكمال التصدير لأن عبارة المرور لم تعد متاحة. أدخلها مجددًا وابدأ التصدير مرة أخرى.</string>
 </resources>

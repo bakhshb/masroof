@@ -4,7 +4,6 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 object CurrentAccountSummaryCalculator {
@@ -15,7 +14,6 @@ object CurrentAccountSummaryCalculator {
         sarEquivalents: Map<String, Money> = emptyMap(),
         ownedAccountContainerIds: Set<String> = emptySet(),
         ownedAccountLast4s: Set<String> = emptySet(),
-        rawSmsById: Map<String, RawSms> = emptyMap(),
         scopeMode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
         debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): CurrentAccountSummary {
@@ -24,7 +22,6 @@ object CurrentAccountSummaryCalculator {
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
-            rawSmsById = rawSmsById,
         )
         val scope = CurrentAccountTransactionScope(
             ownedContainerIds = ownedAccountContainerIds,
@@ -108,7 +105,6 @@ object CurrentAccountSummaryCalculator {
         sarEquivalents: Map<String, Money> = emptyMap(),
         ownedAccountContainerIds: Set<String> = emptySet(),
         ownedAccountLast4s: Set<String> = emptySet(),
-        rawSmsById: Map<String, RawSms> = emptyMap(),
         debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): SpendingSplitSummary {
         val currentAccount = summarize(
@@ -118,7 +114,6 @@ object CurrentAccountSummaryCalculator {
             sarEquivalents = sarEquivalents,
             ownedAccountContainerIds = ownedAccountContainerIds,
             ownedAccountLast4s = ownedAccountLast4s,
-            rawSmsById = rawSmsById,
             debitCardScope = debitCardScope,
         )
 

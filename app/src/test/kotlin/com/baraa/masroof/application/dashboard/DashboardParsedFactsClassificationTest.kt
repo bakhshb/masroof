@@ -16,7 +16,6 @@ import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.fixtures.AlJaziraFixtureLoader
 import com.baraa.masroof.parsing.fixtures.AlJaziraFixtureParseHarness
@@ -25,7 +24,6 @@ import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.Instant
@@ -34,7 +32,7 @@ import java.time.ZoneId
 
 /**
  * Account, card, bill, and cash-withdrawal totals come from persisted parse facts.
- * Replacing the stored SMS body must not move those totals.
+ * These calculation APIs require no raw SMS bodies.
  */
 class DashboardParsedFactsClassificationTest {
     private val zoneId = ZoneId.of("Asia/Riyadh")
@@ -42,25 +40,23 @@ class DashboardParsedFactsClassificationTest {
     private val salaryPeriod = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
 
     @Test
-    fun fixtureCorpus_blankSmsBody_matchesRealSmsBodyTotals() {
-        val mismatches = mutableListOf<String>()
+    fun fixtureCorpus_persistedFactsKeepSummaryAndDetailTotalsConsistent() {
         for (fixture in AlJaziraFixtureLoader.loadAllFromClasspath()) {
             val record = AlJaziraFixtureParseHarness.parseRecord(fixture, occurredAt)
             val tx = assemble(record) ?: continue
-            val withBody = movement(record, tx, fixture.body)
-            val withoutBody = movement(record, tx, rawBody = null)
-            if (withBody != withoutBody) {
-                mismatches += fixture.id
+            val summary = CurrentAccountSummaryCalculator.summarize(listOf(tx), listOf(record))
+            val details = CurrentAccountFlowDetailGrouper.group(listOf(tx), listOf(record))
+            fun total(rows: List<FinancialTransaction>): Money = rows.fold(Money.zero(Currency.SAR)) { sum, row ->
+                sum + (TransactionAmountResolver.effectiveAmount(row, Currency.SAR, emptyMap())
+                    ?: Money.zero(Currency.SAR))
             }
+            assertEquals(fixture.id, summary.inflow.coreTotal, total(details.income.values.flatten()))
+            assertEquals(fixture.id, summary.outflow.coreTotal, total(details.expense.values.flatten()))
         }
-        assertTrue(
-            "SMS body changed account/card/bill/cash totals for: ${mismatches.joinToString()}",
-            mismatches.isEmpty(),
-        )
     }
 
     @Test
-    fun movementFixtures_keepCashBucketsWhenSmsBodyIsBlank() {
+    fun movementFixtures_keepCashBucketsFromPersistedFacts() {
         assertBucket("bill_payment_ar_001", bill = "210.00")
         assertBucket("card_payment_ar_001", creditCard = "802.62")
         assertBucket("card_payment_ar_tasdid_001", creditCard = "15000.00")
@@ -79,7 +75,7 @@ class DashboardParsedFactsClassificationTest {
         assertNull(record.details.debitSourceAccountLast4)
         assertEquals(CardSmsChannel.DEBIT, record.details.cardSmsChannel)
         val tx = requireNotNull(assemble(record))
-        val blank = movement(record, tx, rawBody = null)
+        val blank = movement(record, tx)
         assertEquals(Money.of("127.00", Currency.SAR), blank.account.outflow.posPurchases)
         assertEquals(BigDecimal("127.00"), blank.madaByCard["BANK_ALJAZIRA:8219"]?.amount)
         assertEquals(Money.zero(Currency.SAR), blank.account.outflow.billPayments)
@@ -124,19 +120,18 @@ class DashboardParsedFactsClassificationTest {
             categoryId = null,
             linkedParsedEventIds = listOf(record.event.id),
         )
-        val blank = movement(record, tx, rawBody = null)
+        val blank = movement(record, tx)
         assertEquals(Money.of("120.00", Currency.SAR), blank.account.outflow.posPurchases)
         assertEquals(Money.zero(Currency.SAR), blank.account.outflow.billPayments)
     }
 
     @Test
-    fun purchaseFamily_ignoresBillWordingLeftInTheSmsBody() {
+    fun purchaseFamily_ignoresBillWordingInDisplayCounterparty() {
         val record = AlJaziraFixtureParseHarness.parseRecord("purchase_pos_ar_debit_001", occurredAt)
         val tx = requireNotNull(assemble(record))
         val misleading = movement(
-            record,
+            record.copy(event = record.event.copy(counterparty = "سداد فاتورة سداد بطاقة سحب نقدي")),
             tx,
-            rawBody = "سداد فاتورة\nالمفوتر: STC\nسداد بطاقة\nسحب نقدي",
         )
         assertEquals(Money.of("120.00", Currency.SAR), misleading.account.outflow.posPurchases)
         assertEquals(Money.zero(Currency.SAR), misleading.account.outflow.billPayments)
@@ -157,7 +152,7 @@ class DashboardParsedFactsClassificationTest {
     ) {
         val record = AlJaziraFixtureParseHarness.parseRecord(fixtureId, occurredAt)
         val tx = requireNotNull(assemble(record)) { fixtureId }
-        val blank = movement(record, tx, rawBody = null)
+        val blank = movement(record, tx)
         val outflow = blank.account.outflow
         assertEquals(fixtureId, Money.of(bill, Currency.SAR), outflow.billPayments)
         assertEquals(fixtureId, Money.of(creditCard, Currency.SAR), outflow.creditCardPayments)
@@ -188,7 +183,6 @@ class DashboardParsedFactsClassificationTest {
     private fun movement(
         record: ParsedEventRecord,
         tx: FinancialTransaction,
-        rawBody: String?,
     ): Movement {
         val ownedIds = setOfNotNull(
             record.event.sourceAccountRef?.let(FinancialContainerIdFactory::accountId),
@@ -203,24 +197,11 @@ class DashboardParsedFactsClassificationTest {
             FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
         )
         val debitScope = debitScope(record)
-        val rawSmsById = rawBody?.let { body ->
-            mapOf(
-                record.event.rawSmsId to RawSms(
-                    id = record.event.rawSmsId,
-                    sender = "AlJazira",
-                    body = body,
-                    receivedAt = occurredAt,
-                    deviceMessageId = record.event.id,
-                    bodyHash = record.event.id,
-                ),
-            )
-        }.orEmpty()
         val account = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(tx),
             parsedRecords = listOf(record),
             ownedAccountContainerIds = ownedIds,
             ownedAccountLast4s = ownedIds.map { it.substringAfterLast(':') }.toSet(),
-            rawSmsById = rawSmsById,
             debitCardScope = debitScope,
         )
         val mada = if (debitScope.ownedDebitCardContainerIds.isEmpty()) {
@@ -231,7 +212,6 @@ class DashboardParsedFactsClassificationTest {
                 debitCards = debitCards(record),
                 transactions = listOf(tx),
                 parsedRecords = listOf(record),
-                rawSmsById = rawSmsById,
                 primaryCurrency = Currency.SAR,
                 sarEquivalents = emptyMap(),
                 ownedAccountContainerIds = ownedIds,

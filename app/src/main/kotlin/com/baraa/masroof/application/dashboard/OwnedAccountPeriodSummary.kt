@@ -5,7 +5,6 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 data class OwnedAccountPeriodSummary(
@@ -21,7 +20,6 @@ object OwnedAccountPeriodSummaryCalculator {
         parsedRecords: List<ParsedEventRecord>,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
-        rawSmsById: Map<String, RawSms>,
         debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): List<OwnedAccountPeriodSummary> =
         ownedAccounts.mapNotNull { account ->
@@ -37,7 +35,6 @@ object OwnedAccountPeriodSummaryCalculator {
                 sarEquivalents = sarEquivalents,
                 ownedAccountContainerIds = setOf(containerId),
                 ownedAccountLast4s = last4s,
-                rawSmsById = rawSmsById,
                 scopeMode = AccountFlowScopeMode.SingleAccount,
                 debitCardScope = debitCardScope,
             )

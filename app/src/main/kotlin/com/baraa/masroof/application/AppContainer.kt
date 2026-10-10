@@ -842,6 +842,11 @@ class AppContainer(
         }
     }
 
+    /** Test barrier: initial pending scheduling must finish before a capture halt is armed. */
+    suspend fun awaitPostStartupBackgroundWorkForTesting() {
+        checkNotNull(startupMaintenanceJob) { "Startup maintenance has not been launched" }.join()
+    }
+
     /** Returns the safety outcome of the initial startup maintenance attempt. */
     suspend fun awaitStartupMaintenance(): StartupMaintenanceOutcome =
         startupMaintenanceCompletion.await()

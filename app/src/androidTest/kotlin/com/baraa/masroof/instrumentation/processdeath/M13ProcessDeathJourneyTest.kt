@@ -61,7 +61,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class M13ProcessDeathJourneyTest {
     @Before
-    fun requireEmulator() {
+    fun requireEmulator() = runBlocking {
         assertFalse(
             evidence("Robolectric is not process-death evidence"),
             Build.FINGERPRINT.equals("robolectric", ignoreCase = true),
@@ -72,6 +72,12 @@ class M13ProcessDeathJourneyTest {
             Build.MODEL.contains("sdk", ignoreCase = true) ||
             Build.MODEL.contains("Emulator", ignoreCase = true)
         assertTrue(evidence("emulator-only; no physical device"), emulator)
+        assertEquals(
+            evidence("startup maintenance succeeded before the journey"),
+            com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome.READY,
+            app().container.awaitStartupMaintenance(),
+        )
+        app().container.awaitPostStartupBackgroundWorkForTesting()
     }
 
     @Test(timeout = 120_000)

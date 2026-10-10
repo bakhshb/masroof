@@ -121,6 +121,19 @@ class AppContainerStartupMaintenanceTest {
         assertTrue(backfillWork().isEmpty())
     }
 
+    @Test
+    fun postStartupBarrier_finishesBeforeNewCaptureCanBeScheduledByStartup() = runBlocking<Unit> {
+        recordLastReparsedVersion(MasroofDatabase.VERSION)
+        container.runStartupMaintenance()
+        assertEquals(
+            StartupMaintenanceOutcome.READY,
+            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() },
+        )
+        withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitPostStartupBackgroundWorkForTesting() }
+        // Joining again is immediate; there is no delayed startup scheduling left.
+        withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitPostStartupBackgroundWorkForTesting() }
+    }
+
     private fun backfillWork(): List<WorkInfo> =
         workManager.getWorkInfosForUniqueWork(ParsedEventFactsBackfillWorker.UNIQUE_WORK_NAME).get()
 

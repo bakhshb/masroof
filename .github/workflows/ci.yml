@@ -160,6 +160,8 @@ jobs:
             echo "sdk.dir=${SDK_DIR}" > local.properties
             ./gradlew :app:installDebug :app:installDebugAndroidTest --stacktrace
             bash scripts/m13-process-death.sh
+            bash scripts/m13-process-death.sh
+            bash scripts/m13-process-death.sh
 
   # API 34 process death. The script force-stops the app from the runner, then
   # starts a new instrumentation process. It does not use clearPackageData.
@@ -200,6 +202,8 @@ jobs:
             SDK_DIR="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
             echo "sdk.dir=${SDK_DIR}" > local.properties
             ./gradlew :app:installDebug :app:installDebugAndroidTest --stacktrace
+            bash scripts/m13-process-death.sh
+            bash scripts/m13-process-death.sh
             bash scripts/m13-process-death.sh
 
   # API 30's SQLite already has VACUUM INTO. This job runs the pre-3.27 fallback

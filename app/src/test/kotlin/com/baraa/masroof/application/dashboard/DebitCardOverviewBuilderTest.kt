@@ -15,7 +15,6 @@ import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -65,16 +64,6 @@ class DebitCardOverviewBuilderTest {
                 rawBody = "سحب نقدي\nبطاقة مدى: 2210",
             ),
         )
-        val rawSmsById = parsedRecords.associate { record ->
-            record.event.rawSmsId to RawSms(
-                id = record.event.rawSmsId,
-                sender = "AlJazira",
-                body = record.event.counterparty.orEmpty(),
-                receivedAt = Instant.parse("2026-08-05T11:05:00Z"),
-                deviceMessageId = record.event.id,
-                bodyHash = record.event.id,
-            )
-        }
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "2210",
@@ -91,7 +80,6 @@ class DebitCardOverviewBuilderTest {
             debitCards = listOf(debit),
             transactions = listOf(pos, cash),
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
@@ -138,16 +126,6 @@ class DebitCardOverviewBuilderTest {
                 rawBody = "استرداد\nبطاقة مدى: 2210",
             ),
         )
-        val rawSmsById = parsedRecords.associate { record ->
-            record.event.rawSmsId to RawSms(
-                id = record.event.rawSmsId,
-                sender = "AlJazira",
-                body = record.event.counterparty.orEmpty(),
-                receivedAt = Instant.parse("2026-08-05T11:05:00Z"),
-                deviceMessageId = record.event.id,
-                bodyHash = record.event.id,
-            )
-        }
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "2210",
@@ -164,7 +142,6 @@ class DebitCardOverviewBuilderTest {
             debitCards = listOf(debit),
             transactions = listOf(pos, refund),
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
@@ -203,16 +180,6 @@ class DebitCardOverviewBuilderTest {
                 rawBody = body,
             ),
         )
-        val rawSmsById = parsedRecords.associate { record ->
-            record.event.rawSmsId to RawSms(
-                id = record.event.rawSmsId,
-                sender = "AlJazira",
-                body = body,
-                receivedAt = Instant.parse("2026-08-02T17:41:00Z"),
-                deviceMessageId = record.event.id,
-                bodyHash = record.event.id,
-            )
-        }
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",
@@ -229,7 +196,6 @@ class DebitCardOverviewBuilderTest {
             debitCards = listOf(debit),
             transactions = listOf(cash),
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
@@ -260,16 +226,6 @@ class DebitCardOverviewBuilderTest {
                 rawBody = "سداد فاتورة\nبطاقة مدى: 2210",
             ),
         )
-        val rawSmsById = parsedRecords.associate { record ->
-            record.event.rawSmsId to RawSms(
-                id = record.event.rawSmsId,
-                sender = "AlJazira",
-                body = record.event.counterparty.orEmpty(),
-                receivedAt = Instant.parse("2026-08-05T11:05:00Z"),
-                deviceMessageId = record.event.id,
-                bodyHash = record.event.id,
-            )
-        }
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "2210",
@@ -286,7 +242,6 @@ class DebitCardOverviewBuilderTest {
             debitCards = listOf(debit),
             transactions = listOf(billPayment),
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),

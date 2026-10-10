@@ -6,7 +6,7 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.parsing.model.isCreditCardSms
 import com.baraa.masroof.parsing.model.isDebitCardSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -28,7 +28,6 @@ sealed interface FlowAssignment {
 
 data class AccountFlowClassificationContext(
     val parsedRecordsById: Map<String, ParsedEventRecord>,
-    val rawSmsById: Map<String, RawSms>,
     val billPaymentTxIds: Set<String>,
     val primaryCurrency: Currency,
     val sarEquivalents: Map<String, Money>,
@@ -253,10 +252,13 @@ object AccountFlowClassifier {
         scope: CurrentAccountTransactionScope,
         accountId: String,
     ): Boolean {
+        val bankId = FinancialContainerIdParser.accountBankId(accountId) ?: return false
+        val masked = FinancialContainerIdParser.accountMaskedNumber(accountId) ?: return false
         if (scope.ownedContainerIds.isEmpty()) return true
-        if (accountId in scope.ownedContainerIds) return true
-        if (!isAccountContainer(accountId)) return false
-        return accountId.substringAfterLast(':') in scope.ownedAccountLast4s
+        return scope.ownedContainerIds.any { ownedId ->
+            FinancialContainerIdParser.accountBankId(ownedId)?.equals(bankId, ignoreCase = true) == true &&
+                FinancialContainerIdParser.accountMaskedNumber(ownedId) == masked
+        }
     }
 
     private fun linkedRecords(
@@ -287,11 +289,9 @@ object AccountFlowClassifier {
         parsedRecords: List<ParsedEventRecord>,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
-        rawSmsById: Map<String, RawSms>,
     ): AccountFlowClassificationContext =
         AccountFlowClassificationContext(
             parsedRecordsById = parsedRecords.associateBy { it.event.id },
-            rawSmsById = rawSmsById,
             billPaymentTxIds = resolveBillPaymentTransactionIds(transactions, parsedRecords),
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,

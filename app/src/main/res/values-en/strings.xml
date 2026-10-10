@@ -678,4 +678,5 @@
     <string name="review_error_parsed_missing">Parsed data unavailable — try re-import</string>
     <string name="review_error_not_transfer">This transaction is not a transfer</string>
     <string name="startup_maintenance_blocked">Financial data could not be prepared safely. Retry before opening the financial summary.</string>
+    <string name="settings_export_reenter_passphrase">Export could not finish because the passphrase is no longer available. Enter it again and start a new export.</string>
 </resources>

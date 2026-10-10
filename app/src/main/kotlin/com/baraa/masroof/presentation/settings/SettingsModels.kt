@@ -191,6 +191,7 @@ enum class LogMessage {
 }
 
 enum class BackupMessage {
+    EXPORT_REENTER_PASSPHRASE,
     EXPORT_SUCCESS,
     EXPORT_FAILED,
     IMPORT_FAILED,

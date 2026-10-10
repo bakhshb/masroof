@@ -106,6 +106,7 @@ fun SettingsDataBackupScreen(
     }
     state.backupMessage?.let { message ->
         val text = when (message) {
+            BackupMessage.EXPORT_REENTER_PASSPHRASE -> stringResource(R.string.settings_export_reenter_passphrase)
             BackupMessage.EXPORT_SUCCESS -> stringResource(R.string.settings_export_success)
             BackupMessage.EXPORT_FAILED -> stringResource(R.string.settings_export_failed)
             BackupMessage.IMPORT_FAILED -> stringResource(R.string.settings_import_failed)

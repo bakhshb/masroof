@@ -12,7 +12,6 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -38,9 +37,6 @@ class AccountFlowClassifierTest {
             parsedRecords = listOf(parsedRecord("evt-1", MessageFamily.TRANSFER_IN)),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
-            rawSmsById = mapOf(
-                "sms-evt-1" to rawSms("sms-evt-1", "evt-1", "حوالة واردة راتب"),
-            ),
         )
 
         val result = AccountFlowClassifier.classify(tx, scope, context)
@@ -91,7 +87,6 @@ class AccountFlowClassifierTest {
             ),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
-            rawSmsById = mapOf("sms-evt-refund" to rawSms("sms-evt-refund", "evt-refund", "استرداد مبلغ راتب")),
         )
 
         val result = AccountFlowClassifier.classify(tx, scope, context)
@@ -124,7 +119,6 @@ class AccountFlowClassifierTest {
             ),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
-            rawSmsById = emptyMap(),
         )
 
         assertTrue(AccountFlowClassifier.classify(tx, scope, context).isEmpty())
@@ -146,7 +140,6 @@ class AccountFlowClassifierTest {
             ),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
-            rawSmsById = emptyMap(),
         )
 
         assertTrue(AccountFlowClassifier.classify(tx, scope, context).isEmpty())
@@ -185,7 +178,6 @@ class AccountFlowClassifierTest {
             ),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
-            rawSmsById = emptyMap(),
         )
         val debitScope = scope.copy(
             ownedDebitCardContainerIds = setOf(debitCardId),
@@ -232,7 +224,6 @@ class AccountFlowClassifierTest {
             parsedRecords = listOf(parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT)),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
-            rawSmsById = emptyMap(),
         )
 
         val result = AccountFlowClassifier.classify(tx, scope, context)
@@ -243,6 +234,58 @@ class AccountFlowClassifierTest {
         )
     }
 
+    @Test
+    fun refund_sameSuffixInDifferentBank_isExcludedFromSelectedAccountAndFleet() {
+        val refund = tx("foreign-refund", FinancialTransactionType.REFUND, "100", dest = "account:OTHER_BANK:3001")
+        assertTrue(AccountFlowClassifier.classify(refund, scope, emptyContext()).isEmpty())
+        assertTrue(AccountFlowClassifier.classify(refund, fleetScope(), emptyContext()).isEmpty())
+        val summary = CurrentAccountSummaryCalculator.summarize(
+            transactions = listOf(refund),
+            parsedRecords = emptyList(),
+            ownedAccountContainerIds = setOf(accountId),
+            ownedAccountLast4s = setOf("3001"),
+        )
+        assertEquals(Money.zero(Currency.SAR), summary.inflow.accountRefunds)
+    }
+
+    @Test
+    fun refund_persistedForeignAccountFact_doesNotMatchOwnedSuffix() {
+        val refund = tx("fact-refund", FinancialTransactionType.REFUND, "100", linked = listOf("foreign"))
+        val original = parsedRecord("foreign", MessageFamily.REFUND, destinationLast4 = "3001")
+        val foreign = original.copy(event = original.event.copy(
+            bank = Bank("OTHER_BANK"),
+            destinationAccountRef = AccountReference(Bank("OTHER_BANK"), "3001"),
+        ))
+        val context = emptyContext().copy(parsedRecordsById = mapOf("foreign" to foreign))
+        assertTrue(AccountFlowClassifier.classify(refund, scope, context).isEmpty())
+    }
+
+    @Test
+    fun refund_debitCardLinkedToForeignSameSuffix_doesNotCreditSelectedAccount() {
+        val debitCard = "card:OTHER_BANK:2210"
+        val refund = tx("foreign-card", FinancialTransactionType.REFUND, "20", dest = debitCard)
+        val linkedScope = scope.copy(
+            ownedDebitCardContainerIds = setOf(debitCard),
+            debitCardLinkedAccountIds = mapOf(debitCard to "account:OTHER_BANK:3001"),
+        )
+        assertTrue(AccountFlowClassifier.classify(refund, linkedScope, emptyContext()).isEmpty())
+    }
+
+    @Test
+    fun refund_bankIdentityCaseDifference_isStillTheSameAccount() {
+        val refund = tx("same-bank", FinancialTransactionType.REFUND, "20", dest = "account:BANK_ALJAZIRA:3001")
+        assertEquals(
+            listOf(FlowAssignment.Income(FlowIncomeCategory.ACCOUNT_REFUND)),
+            AccountFlowClassifier.classify(refund, scope, emptyContext()),
+        )
+    }
+
+    @Test
+    fun refund_unqualifiedDestination_cannotCertifyBankIdentity() {
+        val refund = tx("legacy", FinancialTransactionType.REFUND, "20", dest = "account:3001")
+        assertTrue(AccountFlowClassifier.classify(refund, scope, emptyContext()).isEmpty())
+    }
+
     private fun fleetScope() = CurrentAccountTransactionScope(
         ownedContainerIds = setOf(accountId),
         ownedAccountLast4s = setOf("3001"),
@@ -251,7 +294,6 @@ class AccountFlowClassifierTest {
 
     private fun emptyContext() = AccountFlowClassificationContext(
         parsedRecordsById = emptyMap(),
-        rawSmsById = emptyMap(),
         billPaymentTxIds = emptySet(),
         primaryCurrency = Currency.SAR,
         sarEquivalents = emptyMap(),
@@ -306,12 +348,4 @@ class AccountFlowClassifierTest {
         details = ParsedEventDetails(cardSmsChannel = cardSmsChannel),
     )
 
-    private fun rawSms(id: String, deviceMessageId: String, body: String) = RawSms(
-        id = id,
-        sender = "Bank",
-        body = body,
-        receivedAt = Instant.parse("2026-08-01T12:00:00Z"),
-        deviceMessageId = deviceMessageId,
-        bodyHash = id,
-    )
 }

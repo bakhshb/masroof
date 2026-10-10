@@ -877,7 +877,10 @@ class SettingsViewModel(
 
     fun exportBackup(uri: Uri) {
         if (_uiState.value.exportingBackup || _uiState.value.importingBackup) return
-        val passphrase = pendingExportPassphrase ?: return
+        val passphrase = pendingExportPassphrase ?: run {
+            _uiState.update { it.copy(backupMessage = BackupMessage.EXPORT_REENTER_PASSPHRASE) }
+            return
+        }
         pendingExportPassphrase = null
         viewModelScope.launch {
             _uiState.update { it.copy(exportingBackup = true, backupMessage = null, error = null) }

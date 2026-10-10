@@ -10,7 +10,6 @@ import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.CardSmsChannel
@@ -73,16 +72,6 @@ class CurrentAccountSummaryCalculatorTest {
                     salaryIncomeWording = true,
                 ),
             ),
-            rawSmsById = mapOf(
-                "sms-evt-salary" to RawSms(
-                    id = "sms-evt-salary",
-                    sender = "AlJazira",
-                    body = "حوالة واردة راتب\nمبلغ: SAR 3,191.68",
-                    receivedAt = Instant.parse("2026-07-27T01:12:00Z"),
-                    deviceMessageId = "evt-salary",
-                    bodyHash = "evt-salary",
-                ),
-            ),
         )
 
         assertEquals(Money.of("3191.68", Currency.SAR), summary.inflow.salary)
@@ -134,16 +123,6 @@ class CurrentAccountSummaryCalculatorTest {
             ),
             ownedAccountContainerIds = setOf(owned),
             ownedAccountLast4s = setOf("3001"),
-            rawSmsById = mapOf(
-                "sms-evt-fee-bill" to RawSms(
-                    id = "sms-evt-fee-bill",
-                    sender = "AlJazira",
-                    body = "سداد فاتورة\nالمفوتر: STC",
-                    receivedAt = Instant.parse("2026-08-10T12:00:00Z"),
-                    deviceMessageId = "evt-fee-bill",
-                    bodyHash = "evt-fee-bill",
-                ),
-            ),
         )
         assertEquals(Money.of("120.00", Currency.SAR), summary.outflow.billPayments)
         assertEquals(Money.zero(Currency.SAR), summary.outflow.fees)
@@ -178,7 +157,6 @@ class CurrentAccountSummaryCalculatorTest {
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(owned),
             ownedAccountLast4s = setOf("3478"),
-            rawSmsById = emptyMap(),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.zero(Currency.SAR), summary.outflow.cashWithdrawals)
@@ -340,22 +318,11 @@ class CurrentAccountSummaryCalculatorTest {
                 rawBody = "سداد فاتورة\nالمفوتر: TEST",
             ),
         )
-        val rawSmsById = parsedRecords.associate { record ->
-            record.event.rawSmsId to RawSms(
-                id = record.event.rawSmsId,
-                sender = "AlJazira",
-                body = record.event.counterparty.orEmpty(),
-                receivedAt = Instant.parse("2026-08-10T12:00:00Z"),
-                deviceMessageId = record.event.id,
-                bodyHash = record.event.id,
-            )
-        }
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(cardPay, cash, bill),
             parsedRecords = parsedRecords,
             ownedAccountContainerIds = setOf(owned),
             ownedAccountLast4s = setOf("3001"),
-            rawSmsById = rawSmsById,
         )
         assertEquals(Money.of("802.62", Currency.SAR), summary.outflow.creditCardPayments)
         assertEquals(Money.of("500.00", Currency.SAR), summary.outflow.cashWithdrawals)
@@ -400,22 +367,11 @@ class CurrentAccountSummaryCalculatorTest {
                 rawBody = "شراء من نقاط البيع\nبطاقة مدى: 2210\nخصمت من حساب: 3001",
             ),
         )
-        val rawSmsById = parsedRecords.associate { record ->
-            record.event.rawSmsId to RawSms(
-                id = record.event.rawSmsId,
-                sender = "AlJazira",
-                body = record.event.counterparty.orEmpty(),
-                receivedAt = Instant.parse("2026-08-01T11:05:00Z"),
-                deviceMessageId = record.event.id,
-                bodyHash = record.event.id,
-            )
-        }
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(pos),
             parsedRecords = parsedRecords,
             ownedAccountContainerIds = setOf(owned),
             ownedAccountLast4s = setOf("3001"),
-            rawSmsById = rawSmsById,
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.of("120.00", Currency.SAR), summary.outflow.posPurchases)
@@ -512,16 +468,6 @@ class CurrentAccountSummaryCalculatorTest {
             ),
             ownedAccountContainerIds = setOf(owned),
             ownedAccountLast4s = setOf("3001"),
-            rawSmsById = mapOf(
-                "sms-evt-fee-loan" to RawSms(
-                    id = "sms-evt-fee-loan",
-                    sender = "AlJazira",
-                    body = "خصم: قسط تمويل\nمن: 3001\nلـ: تمويل شخصي",
-                    receivedAt = Instant.parse("2026-08-27T01:10:00Z"),
-                    deviceMessageId = "evt-fee-loan",
-                    bodyHash = "evt-fee-loan",
-                ),
-            ),
         )
         assertEquals(Money.of("3036.11", Currency.SAR), summary.outflow.loanRepayments)
         assertEquals(Money.zero(Currency.SAR), summary.outflow.fees)

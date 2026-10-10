@@ -94,7 +94,10 @@ class DatabaseBackupEncryptionTest {
                     closeDatabase = { if (live.isOpen) live.close() },
                     appVersionName = "test",
                     clockEpochMillis = { 1_700_000_000_000L },
-                    restartProcess = { restartRequested.set(true) },
+                    restartProcess = {
+                        assertNoBackupStaging()
+                        restartRequested.set(true)
+                    },
                     kdfIterations = TEST_KDF_ITERATIONS,
                 ).importFrom(Uri.fromFile(destination), passphrase.copyOf())
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
@@ -188,7 +191,10 @@ class DatabaseBackupEncryptionTest {
                     closeDatabase = { if (live.isOpen) live.close() },
                     appVersionName = "test",
                     clockEpochMillis = { 1_700_000_000_000L },
-                    restartProcess = { restartRequested.set(true) },
+                    restartProcess = {
+                        assertNoBackupStaging()
+                        restartRequested.set(true)
+                    },
                 ).importFrom(Uri.fromFile(zip), confirmLegacyPlaintext = true)
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, confirmed)
                 assertTrue(restartRequested.get())
@@ -369,6 +375,34 @@ class DatabaseBackupEncryptionTest {
             } finally {
                 if (live.isOpen) live.close()
             }
+        }
+    }
+
+    @Test
+    fun restoreFailureAfterIncomingCopy_removesIncomingAndExtractedStaging() = runBlocking {
+        val live = openDatabase()
+        try {
+            insertProbe(live)
+            val archive = File(context.cacheDir, "cleanup-failure.masroof")
+            assertTrue(service(live).exportTo(Uri.fromFile(archive), passphrase.copyOf()).isSuccess)
+            val importer = DatabaseBackupService(
+                appContext = context,
+                database = live,
+                closeDatabase = { live.close() },
+                appVersionName = "test",
+                restartProcess = { error("failure must not restart") },
+                beforeValidatedInstall = { error("injected install failure") },
+                kdfIterations = TEST_KDF_ITERATIONS,
+            )
+            assertEquals(BackupImportOutcome.Failed, importer.importFrom(Uri.fromFile(archive), passphrase.copyOf()))
+            assertNoBackupStaging()
+            val incoming = DatabaseRestoreRecovery.incomingFile(context.getDatabasePath(MasroofDatabase.NAME))
+            assertFalse(incoming.exists())
+            listOf("-wal", "-shm", "-journal").forEach { suffix ->
+                assertFalse(File(incoming.path + suffix).exists())
+            }
+        } finally {
+            if (live.isOpen) live.close()
         }
     }
 
