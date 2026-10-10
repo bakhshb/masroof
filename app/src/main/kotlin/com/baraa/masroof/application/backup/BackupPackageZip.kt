@@ -16,7 +16,7 @@ import java.util.zip.ZipInputStream
  * before the caller may replace the live database. Partial files stay in
  * [staging], which the caller deletes.
  */
-internal object BackupPackageZip {
+object BackupPackageZip {
     const val MAX_ENTRIES: Int = 3
     const val MAX_UNCOMPRESSED_BYTES_PER_ENTRY: Long = 64L * 1024 * 1024
     const val MAX_TOTAL_UNCOMPRESSED_BYTES: Long = 64L * 1024 * 1024

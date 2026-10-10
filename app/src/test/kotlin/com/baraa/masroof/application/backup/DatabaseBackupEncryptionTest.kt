@@ -306,7 +306,7 @@ class DatabaseBackupEncryptionTest {
         db.execSQL("INSERT INTO sms_probe (body) VALUES (?)", arrayOf(SMS_FIXTURE))
     }
 
-    private fun legacyZip(): File {
+    private suspend fun legacyZip(): File {
         val sourceName = "legacy-source"
         context.deleteDatabase(sourceName)
         val source = Room.databaseBuilder(context, MasroofDatabase::class.java, sourceName)
