@@ -1,3 +1,5 @@
 # masroof-statement-v1
+# periodStart=2026-03-01
+# periodEnd=2026-03-31
 bankId,accountMasked,bookedAt,direction,amount,currency,description
 UNKNOWN,3001,2026-03-01,DEBIT,1.00,SAR,GROCERY ANON

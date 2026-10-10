@@ -5,6 +5,7 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.statement.BankStatementEntry
 import com.baraa.masroof.domain.statement.StatementAccountBalance
+import com.baraa.masroof.domain.statement.StatementCoverage
 import com.baraa.masroof.domain.statement.StatementComparisonStatus
 import com.baraa.masroof.domain.statement.StatementDirection
 import java.math.BigDecimal
@@ -23,6 +24,8 @@ import java.time.LocalDate
  */
 data class StatementReconciliationReport(
     val formatVersion: Int,
+    /** Declared file coverage. Not the first and last movement dates. */
+    val coverage: StatementCoverage,
     val counts: StatementReconciliationCounts,
     val statementLines: List<StatementLineComparison>,
     val ledgerLines: List<LedgerLineComparison>,

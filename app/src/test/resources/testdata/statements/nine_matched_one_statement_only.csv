@@ -1,4 +1,6 @@
 # masroof-statement-v1
+# periodStart=2026-03-01
+# periodEnd=2026-03-31
 bankId,accountMasked,bookedAt,direction,amount,currency,description,reference,openingBalance,openingBalanceCurrency,closingBalance,closingBalanceCurrency
 BANK_ALJAZIRA,3001,2026-03-01,DEBIT,25.50,SAR,GROCERY ANON,REF-01,10000.00,SAR,9000.00,SAR
 BANK_ALJAZIRA,3001,2026-03-02,DEBIT,10.00,SAR,FEE ANON,REF-02,,,,

@@ -95,7 +95,9 @@ class StatementReconciliationServiceTest {
 
         val total = report.total("BANK_ALJAZIRA", "3001", Currency.SAR)
         assertEquals(LocalDate.parse("2026-03-01"), total.periodStart)
-        assertEquals(LocalDate.parse("2026-03-10"), total.periodEnd)
+        assertEquals(LocalDate.parse("2026-03-31"), total.periodEnd)
+        assertEquals(LocalDate.parse("2026-03-01"), report.coverage.periodStart)
+        assertEquals(LocalDate.parse("2026-03-31"), report.coverage.periodEnd)
         assertMoney("591.25", total.matchedDebit)
         assertMoney("5175.00", total.matchedCredit)
         assertMoney("999.99", total.statementOnlyDebit)
@@ -214,6 +216,8 @@ class StatementReconciliationServiceTest {
     fun deviceJourneyFixture_showsMatchedStatementOnlyLedgerOnlyAndAmbiguous() = runBlocking {
         val csv = """
             # masroof-statement-v1
+            # periodStart=2026-04-01
+            # periodEnd=2026-04-30
             bankId,accountMasked,bookedAt,direction,amount,currency,description,reference
             BANK_ALJAZIRA,3001,2026-04-02,DEBIT,12.00,SAR,MATCHED ANON,REF-M
             BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON A,
@@ -285,7 +289,15 @@ class StatementReconciliationServiceTest {
         )
         val ledger = RecordingLedger(rows)
         val report = StatementReconciliationService(ledger).compare(
-            ParsedBankStatement(formatVersion = 1, entries = listOf(entry), balances = emptyList()),
+            ParsedBankStatement(
+                formatVersion = 1,
+                coverage = com.baraa.masroof.domain.statement.StatementCoverage(
+                    LocalDate.parse("2026-05-01"),
+                    LocalDate.parse("2026-05-01"),
+                ),
+                entries = listOf(entry),
+                balances = emptyList(),
+            ),
         )
         assertEquals(0, ledger.mutations)
         assertTrue(report.statementLines.all { it.status == StatementComparisonStatus.UNSUPPORTED })
@@ -459,13 +471,88 @@ class StatementReconciliationServiceTest {
         assertEquals(0, ledger.rangeReads)
     }
 
-    private fun statementCsv(vararg rows: String): String {
+    @Test
+    fun coverageIncludesLedgerMovementBetweenStatementRows() = runBlocking {
+        val report = marchCoverage(
+            posted("march-27", FinancialTransactionType.EXPENSE, "8.00", local("2026-03-27T12:00:00"), StatementDirection.DEBIT),
+        )
+        assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("march-27").status)
+        assertEquals(1, report.counts.ledgerOnly)
+    }
+
+    @Test
+    fun coverageIncludesLedgerMovementOnPeriodEnd() = runBlocking {
+        val report = marchCoverage(
+            posted("march-31", FinancialTransactionType.EXPENSE, "8.00", local("2026-03-31T23:00:00"), StatementDirection.DEBIT),
+        )
+        assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("march-31").status)
+    }
+
+    @Test
+    fun coverageExcludesLedgerMovementOnTheFollowingDay() = runBlocking {
+        val ledger = RecordingLedger(
+            listOf(
+                posted("april-1", FinancialTransactionType.EXPENSE, "8.00", local("2026-04-01T00:00:00"), StatementDirection.DEBIT),
+            ),
+        )
+        val report = compared(ledger, acceptedText(marchStatement()))
+        assertTrue(report.ledgerLines.none { it.transactionId == "april-1" })
+        assertEquals(0, report.counts.ledgerOnly)
+    }
+
+    @Test
+    fun statementRowOutsideDeclaredCoverage_isRejectedBeforeTheLedgerIsRead() = runBlocking {
+        val csv = statementCsv(
+            "BANK_ALJAZIRA,3001,2026-04-02,DEBIT,10.00,SAR,OUTSIDE",
+            periodStart = "2026-03-01",
+            periodEnd = "2026-03-31",
+        )
+        val ledger = RecordingLedger(emptyList())
+        val result = ImportStatementUseCase(parser, StatementReconciliationService(ledger))
+            .import(ByteArrayInputStream(csv.toByteArray()), known, owned)
+        assertEquals(StatementImportResult.Rejected(StatementRejection.OUT_OF_RANGE), result)
+        assertEquals(0, ledger.rangeReads)
+        assertEquals(0, ledger.mutations)
+    }
+
+    @Test
+    fun totalsUseTheDeclaredCoverageDates() = runBlocking {
+        val report = marchCoverage(
+            posted("march-27", FinancialTransactionType.EXPENSE, "8.00", local("2026-03-27T12:00:00"), StatementDirection.DEBIT),
+        )
+        assertEquals(LocalDate.parse("2026-03-01"), report.coverage.periodStart)
+        assertEquals(LocalDate.parse("2026-03-31"), report.coverage.periodEnd)
+        val total = report.total("BANK_ALJAZIRA", "3001", Currency.SAR)
+        assertEquals(LocalDate.parse("2026-03-01"), total.periodStart)
+        assertEquals(LocalDate.parse("2026-03-31"), total.periodEnd)
+        assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("march-27").status)
+    }
+
+    private fun marchStatement(): String = statementCsv(
+        "BANK_ALJAZIRA,3001,2026-03-05,DEBIT,10.00,SAR,EARLY",
+        "BANK_ALJAZIRA,3001,2026-03-20,DEBIT,11.00,SAR,LATE",
+        periodStart = "2026-03-01",
+        periodEnd = "2026-03-31",
+    )
+
+    private suspend fun marchCoverage(vararg rows: FinancialTransaction): StatementReconciliationReport {
+        val ledger = RecordingLedger(rows.toList())
+        return compared(ledger, acceptedText(marchStatement()))
+    }
+
+    private fun statementCsv(
+        vararg rows: String,
+        periodStart: String = "2026-01-01",
+        periodEnd: String = "2026-12-31",
+    ): String {
         val padded = rows.map { row ->
             if (row.split(',').size == 7) "$row," else row
         }
         return (
             listOf(
                 "# masroof-statement-v1",
+                "# periodStart=$periodStart",
+                "# periodEnd=$periodEnd",
                 "bankId,accountMasked,bookedAt,direction,amount,currency,description,reference",
             ) + padded
         ).joinToString("\n") + "\n"

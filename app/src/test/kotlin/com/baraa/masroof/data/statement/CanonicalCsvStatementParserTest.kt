@@ -23,6 +23,8 @@ class CanonicalCsvStatementParserTest {
         assertEquals(10, statement.entries.size)
         assertEquals(Money.of("10000.00", Currency.SAR), statement.balances.single().opening)
         assertEquals(Money.of("9000.00", Currency.SAR), statement.balances.single().closing)
+        assertEquals("2026-03-01", statement.coverage.periodStart.toString())
+        assertEquals("2026-03-31", statement.coverage.periodEnd.toString())
         assertEquals("2026-03-09", statement.entries[8].bookedDate.toString())
         assertEquals("MISSING ANON", statement.entries.last().description)
     }
@@ -124,8 +126,55 @@ class CanonicalCsvStatementParserTest {
     private fun StatementParseResult.reason(): StatementRejection =
         (this as StatementParseResult.Rejected).reason
 
-    private fun csv(header: String, row: String) =
-        ByteArrayInputStream("$header\n$row\n".toByteArray(Charsets.UTF_8))
+    @Test
+    fun rowOutsideDeclaredCoverage_isRejected() {
+        assertEquals(
+            StatementRejection.OUT_OF_RANGE,
+            parser.parse(
+                covered(
+                    "bankId,accountMasked,bookedAt,direction,amount,currency,description",
+                    "BANK_ALJAZIRA,3001,2026-04-02,DEBIT,1.00,SAR,GROCERY ANON",
+                    periodStart = "2026-03-01",
+                    periodEnd = "2026-03-31",
+                ),
+                known,
+            ).reason(),
+        )
+    }
+
+    @Test
+    fun missingCoverageDirectives_areRejected() {
+        assertEquals(
+            StatementRejection.AMBIGUOUS_HEADER,
+            parser.parse(
+                ByteArrayInputStream(
+                    """
+                    # masroof-statement-v1
+                    bankId,accountMasked,bookedAt,direction,amount,currency,description
+                    BANK_ALJAZIRA,3001,2026-03-01,DEBIT,1.00,SAR,GROCERY ANON
+                    """.trimIndent().toByteArray(Charsets.UTF_8),
+                ),
+                known,
+            ).reason(),
+        )
+    }
+
+    private fun csv(header: String, row: String) = covered(header, row)
+
+    private fun covered(
+        header: String,
+        row: String,
+        periodStart: String = "2026-03-01",
+        periodEnd: String = "2026-03-31",
+    ) = ByteArrayInputStream(
+        """
+        # masroof-statement-v1
+        # periodStart=$periodStart
+        # periodEnd=$periodEnd
+        $header
+        $row
+        """.trimIndent().toByteArray(Charsets.UTF_8),
+    )
 
     private fun fixture(name: String) = statementFixture(name).inputStream()
 }

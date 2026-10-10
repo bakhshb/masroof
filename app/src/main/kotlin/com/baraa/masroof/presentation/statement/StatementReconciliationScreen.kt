@@ -37,6 +37,7 @@ import com.baraa.masroof.presentation.theme.MasroofSpacing
 
 const val STATEMENT_RECONCILIATION_PICK_TAG: String = "statement_reconciliation_pick"
 const val STATEMENT_COUNTS_HEADER_TAG: String = "statement_counts_header"
+const val STATEMENT_COVERAGE_TAG: String = "statement_coverage"
 
 fun statementOutcomeTag(status: StatementComparisonStatus): String =
     "statement_outcome_${status.name}"
@@ -142,6 +143,16 @@ private fun ReportBody(state: StatementReconciliationUiState) {
     )
     MasroofCard {
         Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
+            Text(
+                text = stringResource(
+                    R.string.settings_statement_coverage,
+                    state.coverageStart,
+                    state.coverageEnd,
+                ),
+                modifier = Modifier.testTag(STATEMENT_COVERAGE_TAG),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             CountRow(
                 R.string.settings_statement_matched,
                 state.matchedCount,

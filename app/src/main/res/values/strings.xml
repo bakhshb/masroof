@@ -150,6 +150,7 @@
     <string name="settings_statement_reconciliation_limits">لا يُقرأ PDF ولا يُستخدم اتصال أو بيانات دخول بنكية. النتيجة تخص هذا الملف فقط وتبقى في الذاكرة.</string>
     <string name="settings_statement_pick_file">اختيار ملف CSV</string>
     <string name="settings_statement_counts">الملخص</string>
+    <string name="settings_statement_coverage">فترة الكشف %1$s – %2$s</string>
     <string name="settings_statement_totals">الإجماليات حسب العملة</string>
     <string name="settings_statement_matched">مطابقة</string>
     <string name="settings_statement_statement_only">في الكشف فقط</string>

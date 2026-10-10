@@ -11,7 +11,10 @@ import java.time.LocalDateTime
  *
  * The contract lives here so the screen cannot invent columns. A file is one
  * UTF-8 comma-separated table. The optional first record is the directive
- * `# masroof-statement-v1`. The header row names columns; order does not matter.
+ * `# masroof-statement-v1`. The next directives are required and are the only
+ * coverage period: `# periodStart=YYYY-MM-DD` and `# periodEnd=YYYY-MM-DD`.
+ * Coverage is not taken from the first or last movement. The header row names
+ * columns; order does not matter.
  *
  * Required headers: `bankId`, `accountMasked`, `bookedAt`, `direction`,
  * `amount`, `currency`, `description`.
@@ -42,6 +45,10 @@ import java.time.LocalDateTime
  * with at most two non-zero fractional digits. `currency` is an ISO code the
  * app already models. Spreadsheet formulas are rejected and never evaluated.
  *
+ * Every movement date must fall inside that inclusive coverage period. A row
+ * outside it is rejected. Ledger rows for the statement accounts are compared
+ * across the whole period, including days with no statement movement.
+ *
  * Opening and closing balances are optional exact decimals with their own ISO
  * currency. They are repeated facts for one bank account, not movement lines.
  * This comparison does not rebuild a running balance from SMS.
@@ -54,6 +61,8 @@ import java.time.LocalDateTime
 object CanonicalStatementFormat {
     const val VERSION: Int = 1
     const val VERSION_DIRECTIVE: String = "# masroof-statement-v1"
+    const val PERIOD_START_DIRECTIVE: String = "# periodStart="
+    const val PERIOD_END_DIRECTIVE: String = "# periodEnd="
     const val MAX_BYTES: Long = 1_048_576L
     const val MAX_DATA_ROWS: Int = 5_000
     const val MAX_AMOUNT_PLAIN: String = "1000000000.00"
@@ -116,6 +125,16 @@ data class BankStatementEntry(
     val reference: String?,
 )
 
+/** Inclusive civil coverage of one statement file. Not derived from movement dates. */
+data class StatementCoverage(
+    val periodStart: LocalDate,
+    val periodEnd: LocalDate,
+) {
+    init {
+        require(!periodEnd.isBefore(periodStart)) { "Coverage period ends before it starts" }
+    }
+}
+
 data class StatementAccountBalance(
     val bank: Bank,
     val accountMasked: String,
@@ -125,6 +144,7 @@ data class StatementAccountBalance(
 
 data class ParsedBankStatement(
     val formatVersion: Int,
+    val coverage: StatementCoverage,
     val entries: List<BankStatementEntry>,
     val balances: List<StatementAccountBalance>,
 )

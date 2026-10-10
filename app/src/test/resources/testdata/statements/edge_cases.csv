@@ -1,4 +1,6 @@
 # masroof-statement-v1
+# periodStart=2026-04-02
+# periodEnd=2026-04-11
 bankId,accountMasked,bookedAt,direction,amount,currency,description,reference
 BANK_ALJAZIRA,3001,2026-04-02,DEBIT,12.00,SAR,BOUNDARY MATCH,B-1
 BANK_ALJAZIRA,3001,2026-04-02T23:30:00,DEBIT,13.00,SAR,BOUNDARY LATE,B-2

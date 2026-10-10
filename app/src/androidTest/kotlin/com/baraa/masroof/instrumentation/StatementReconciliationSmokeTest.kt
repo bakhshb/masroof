@@ -688,6 +688,8 @@ class StatementReconciliationSmokeTest {
         )
         val ANON_CSV: String = """
             # masroof-statement-v1
+            # periodStart=2026-04-01
+            # periodEnd=2026-04-30
             bankId,accountMasked,bookedAt,direction,amount,currency,description,reference
             BANK_ALJAZIRA,3001,2026-04-02,DEBIT,12.00,SAR,MATCHED ANON,REF-M
             BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON A,

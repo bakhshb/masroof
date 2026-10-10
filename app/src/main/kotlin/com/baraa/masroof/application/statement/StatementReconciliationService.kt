@@ -32,18 +32,19 @@ class StatementReconciliationService(
         if (statement.entries.isEmpty()) {
             return emptyReport(statement)
         }
-        val periodByAccount = statement.entries.groupBy { accountKey(it.bank, it.accountMasked) }
-            .mapValues { (_, lines) ->
-                lines.minOf { it.bookedDate } to lines.maxOf { it.bookedDate }
-            }
-        val start = statement.entries.minOf { it.bookedDate }
-            .minusDays(StatementMatchPolicy.BOOKING_WINDOW_DAYS + StatementMatchPolicy.QUERY_SUPERSET_PADDING_DAYS)
+        val coverage = statement.coverage
+        val period = coverage.periodStart to coverage.periodEnd
+        val periodByAccount = statement.entries
+            .map { accountKey(it.bank, it.accountMasked) }
+            .distinct()
+            .associateWith { period }
+        val padding = StatementMatchPolicy.BOOKING_WINDOW_DAYS + StatementMatchPolicy.QUERY_SUPERSET_PADDING_DAYS
+        val start = coverage.periodStart
+            .minusDays(padding)
             .atStartOfDay(ZoneOffset.UTC)
             .toInstant()
-        val end = statement.entries.maxOf { it.bookedDate }
-            .plusDays(
-                StatementMatchPolicy.BOOKING_WINDOW_DAYS + StatementMatchPolicy.QUERY_SUPERSET_PADDING_DAYS + 1,
-            )
+        val end = coverage.periodEnd
+            .plusDays(padding + 1)
             .atStartOfDay(ZoneOffset.UTC)
             .toInstant()
         val posted = financialTransactionRepository.listOccurredBetween(start, end)
@@ -70,6 +71,7 @@ class StatementReconciliationService(
             statementLines = emptyList(),
             ledgerLines = emptyList(),
             totals = emptyList(),
+            coverage = statement.coverage,
             balances = statement.balances,
             balanceCheck = balanceCheck(statement),
             matchedFleetPaymentCount = 0,
@@ -278,6 +280,7 @@ class StatementReconciliationService(
         )
         return StatementReconciliationReport(
             formatVersion = statement.formatVersion,
+            coverage = statement.coverage,
             counts = counts,
             statementLines = statementLines,
             ledgerLines = ledgerLines,

@@ -7,6 +7,7 @@ import com.baraa.masroof.domain.statement.BankStatementEntry
 import com.baraa.masroof.domain.statement.CanonicalStatementFormat
 import com.baraa.masroof.domain.statement.ParsedBankStatement
 import com.baraa.masroof.domain.statement.StatementAccountBalance
+import com.baraa.masroof.domain.statement.StatementCoverage
 import com.baraa.masroof.domain.statement.StatementDirection
 import com.baraa.masroof.domain.statement.StatementParseResult
 import com.baraa.masroof.domain.statement.StatementParser
@@ -58,20 +59,39 @@ class CanonicalCsvStatementParser : StatementParser {
         if (records.isEmpty()) fail(StatementRejection.UNRECOGNIZED)
 
         var cursor = 0
-        if (records[cursor].size == 1) {
+        var sawVersion = false
+        var periodStart: LocalDate? = null
+        var periodEnd: LocalDate? = null
+        while (cursor < records.size && isDirective(records[cursor])) {
             val directive = records[cursor][0].trim()
-            if (directive.startsWith("#")) {
-                if (directive != CanonicalStatementFormat.VERSION_DIRECTIVE) {
-                    fail(StatementRejection.UNRECOGNIZED)
+            when {
+                directive == CanonicalStatementFormat.VERSION_DIRECTIVE -> {
+                    if (sawVersion) fail(StatementRejection.UNRECOGNIZED)
+                    sawVersion = true
                 }
-                cursor += 1
+                directive.startsWith(CanonicalStatementFormat.PERIOD_START_DIRECTIVE) -> {
+                    if (periodStart != null) fail(StatementRejection.AMBIGUOUS_HEADER)
+                    periodStart = parseCoverageDate(directive.removePrefix(CanonicalStatementFormat.PERIOD_START_DIRECTIVE))
+                }
+                directive.startsWith(CanonicalStatementFormat.PERIOD_END_DIRECTIVE) -> {
+                    if (periodEnd != null) fail(StatementRejection.AMBIGUOUS_HEADER)
+                    periodEnd = parseCoverageDate(directive.removePrefix(CanonicalStatementFormat.PERIOD_END_DIRECTIVE))
+                }
+                else -> fail(StatementRejection.UNRECOGNIZED)
             }
+            cursor += 1
         }
         if (cursor >= records.size) fail(StatementRejection.UNRECOGNIZED)
         val headerRecord = records[cursor]
         rejectUnsupportedSeparator(headerRecord)
         val headers = headerRecord.map { it.trim() }
         validateHeaders(headers)
+        val coverageStart = periodStart
+        val coverageEnd = periodEnd
+        if (coverageStart == null || coverageEnd == null || coverageEnd.isBefore(coverageStart)) {
+            fail(StatementRejection.AMBIGUOUS_HEADER)
+        }
+        val coverage = StatementCoverage(coverageStart, coverageEnd)
         val headerIndex = headers.withIndex().associate { it.value to it.index }
         cursor += 1
 
@@ -96,13 +116,30 @@ class CanonicalCsvStatementParser : StatementParser {
                 knownBankIds = knownBankIds,
                 seen = seen,
                 balances = balances,
+                coverage = coverage,
             )
         }
         return ParsedBankStatement(
             formatVersion = CanonicalStatementFormat.VERSION,
+            coverage = coverage,
             entries = entries,
             balances = balances.values.map { it.build() },
         )
+    }
+
+    private fun isDirective(record: List<String>): Boolean =
+        record.size == 1 && record[0].trim().startsWith("#")
+
+    private fun parseCoverageDate(raw: String): LocalDate {
+        val text = raw.trim()
+        if (!DATE.matches(text)) fail(StatementRejection.AMBIGUOUS_HEADER)
+        val date = try {
+            LocalDate.parse(text)
+        } catch (error: DateTimeParseException) {
+            fail(StatementRejection.AMBIGUOUS_HEADER)
+        }
+        if (date.year !in YEAR_MIN..YEAR_MAX) fail(StatementRejection.OUT_OF_RANGE)
+        return date
     }
 
     private fun rejectUnsupportedSeparator(headerRecord: List<String>) {
@@ -137,6 +174,7 @@ class CanonicalCsvStatementParser : StatementParser {
         knownBankIds: Set<String>,
         seen: MutableSet<MovementKey>,
         balances: MutableMap<String, BalanceBuilder>,
+        coverage: StatementCoverage,
     ): BankStatementEntry {
         val bankId = cell(record, headerIndex, "bankId")
         if (!BANK_ID.matches(bankId) || bankId == Bank.UNKNOWN.id || bankId !in knownBankIds) {
@@ -147,6 +185,9 @@ class CanonicalCsvStatementParser : StatementParser {
         if (!ACCOUNT_MASKED.matches(accountMasked)) fail(StatementRejection.OUT_OF_RANGE)
         val bookedRaw = cell(record, headerIndex, "bookedAt")
         val booked = parseBookedAt(bookedRaw)
+        if (booked.date.isBefore(coverage.periodStart) || booked.date.isAfter(coverage.periodEnd)) {
+            fail(StatementRejection.OUT_OF_RANGE)
+        }
         val direction = when (cell(record, headerIndex, "direction")) {
             "DEBIT" -> StatementDirection.DEBIT
             "CREDIT" -> StatementDirection.CREDIT

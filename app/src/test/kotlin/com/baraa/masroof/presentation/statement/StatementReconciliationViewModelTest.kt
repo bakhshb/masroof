@@ -10,6 +10,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.statement.BankStatementEntry
 import com.baraa.masroof.domain.statement.StatementComparisonStatus
+import com.baraa.masroof.domain.statement.StatementCoverage
 import com.baraa.masroof.domain.statement.StatementDirection
 import com.baraa.masroof.domain.statement.StatementRejection
 import java.math.BigDecimal
@@ -46,6 +47,8 @@ class StatementReconciliationViewModelTest {
         assertEquals("20.00 USD", state.totals.single { it.currencyCode == "USD" }.matchedDebit)
         assertEquals("MISSING ANON", state.statementOnlyLines.single().title)
         assertEquals("GROCERY ANON", state.matchedLines.single().title)
+        assertEquals("2026-03-01", state.coverageStart)
+        assertEquals("2026-03-31", state.coverageEnd)
         assertTrue(state.balanceUnsupported)
     }
 
@@ -64,6 +67,10 @@ class StatementReconciliationViewModelTest {
         )
         return StatementReconciliationReport(
             formatVersion = 1,
+            coverage = StatementCoverage(
+                LocalDate.parse("2026-03-01"),
+                LocalDate.parse("2026-03-31"),
+            ),
             counts = StatementReconciliationCounts(
                 matched = 9,
                 statementOnly = 1,

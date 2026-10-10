@@ -145,6 +145,7 @@
     <string name="settings_statement_reconciliation_limits">No PDF, bank connection, or credentials. The result is only for this file and stays in memory.</string>
     <string name="settings_statement_pick_file">Choose CSV file</string>
     <string name="settings_statement_counts">Summary</string>
+    <string name="settings_statement_coverage">Coverage period %1$s – %2$s</string>
     <string name="settings_statement_totals">Totals by currency</string>
     <string name="settings_statement_matched">Matched</string>
     <string name="settings_statement_statement_only">Statement only</string>

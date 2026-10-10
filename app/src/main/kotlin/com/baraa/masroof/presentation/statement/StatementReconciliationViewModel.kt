@@ -33,6 +33,8 @@ data class StatementReconciliationUiState(
     val matchedFleetPaymentCount: Int = 0,
     val matchedSelfTransferCount: Int = 0,
     val balanceUnsupported: Boolean = false,
+    val coverageStart: String = "",
+    val coverageEnd: String = "",
     val totals: List<StatementTotalUi> = emptyList(),
     val matchedLines: List<StatementLineUi> = emptyList(),
     val statementOnlyLines: List<StatementLineUi> = emptyList(),
@@ -81,6 +83,8 @@ fun statementReconciliationUiState(result: StatementImportResult): StatementReco
                 matchedFleetPaymentCount = report.matchedFleetPaymentCount,
                 matchedSelfTransferCount = report.matchedSelfTransferCount,
                 balanceUnsupported = report.balanceCheck == StatementComparisonStatus.UNSUPPORTED,
+                coverageStart = report.coverage.periodStart.toString(),
+                coverageEnd = report.coverage.periodEnd.toString(),
                 totals = report.totals.map { it.toUi() },
                 matchedLines = report.statementLines
                     .filter { it.status == StatementComparisonStatus.MATCHED }
