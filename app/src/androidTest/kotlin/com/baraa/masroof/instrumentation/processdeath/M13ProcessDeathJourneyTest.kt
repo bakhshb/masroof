@@ -1,5 +1,6 @@
 package com.baraa.masroof.instrumentation.processdeath
 
+import android.content.ComponentName
 import android.Manifest
 import android.os.Build
 import android.provider.Telephony
@@ -22,12 +23,8 @@ import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
-import com.baraa.masroof.sms.receiver.DebugSmsPduExtra
 import java.io.File
-import java.io.FileInputStream
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
-import kotlin.concurrent.thread
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -44,8 +41,11 @@ import org.junit.runner.RunWith
 /**
  * Emulator-only process death. There is no physical device.
  *
- * Each arm method plants `filesDir/m13-halt-after`, delivers a real
- * `SMS_RECEIVED` broadcast to the manifest receiver, and returns
+ * Each arm method plants `filesDir/m13-halt-after` and sends an explicit
+ * `SMS_RECEIVED` intent to [com.baraa.masroof.sms.receiver.IncomingSmsReceiver].
+ * The platform forbids the app and `adb` from sending that protected broadcast,
+ * so the debug manifest lets this app deliver it. The receiver still uses
+ * `getMessagesFromIntent`, then WorkManager. The test returns
  * while the receiver or [com.baraa.masroof.application.sms.LiveSmsProcessingWorker]
  * is parked after the durable write. The CI runner then runs
  * `adb shell am force-stop com.baraa.masroof` from outside this process.
@@ -60,8 +60,6 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class M13ProcessDeathJourneyTest {
-    private val broadcastOutput = AtomicReference("")
-
     @Before
     fun requireEmulator() {
         assertFalse(
@@ -325,7 +323,7 @@ class M13ProcessDeathJourneyTest {
             if (ids.size == 1) return ids.single()
             delay(50)
         }
-        error(evidence("RawSms was not captured from the SMS_RECEIVED broadcast; broadcastCompleted=${broadcastCompleted()}"))
+        error(evidence("RawSms was not captured from IncomingSmsReceiver"))
     }
 
     private suspend fun waitForPurchase(rawSmsId: String) {
@@ -374,7 +372,7 @@ class M13ProcessDeathJourneyTest {
             if (marker.isFile && marker.readText().trim() == stage) return
             Thread.sleep(50)
         }
-        error(evidence("halt marker $stage did not appear; broadcastCompleted=${broadcastCompleted()}"))
+        error(evidence("halt marker $stage did not appear"))
     }
 
     private fun awaitFile(marker: File) {
@@ -399,13 +397,8 @@ class M13ProcessDeathJourneyTest {
         check(messages.all { it.displayOriginatingAddress == SENDER }) {
             evidence("getMessagesFromIntent originating address was not the AlJazira sender")
         }
-        val hex = GsmSmsDeliverPdu.hexList(SENDER, body)
-        val command = "am broadcast -a android.provider.Telephony.SMS_RECEIVED " +
-            "-n $PACKAGE/.sms.receiver.IncomingSmsReceiver " +
-            "--es format 3gpp --es ${DebugSmsPduExtra.EXTRA_PDU_HEX} $hex"
-        thread(name = "m13-sms-broadcast", isDaemon = true) {
-            broadcastOutput.set(shell(command))
-        }
+        intent.component = ComponentName(PACKAGE, "$PACKAGE.sms.receiver.IncomingSmsReceiver")
+        targetContext().sendBroadcast(intent)
     }
 
     private fun grantSmsPermissions() {
@@ -414,17 +407,6 @@ class M13ProcessDeathJourneyTest {
             runCatching { automation.grantRuntimePermission(PACKAGE, permission) }
         }
     }
-
-    private fun shell(command: String): String {
-        val parcel = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
-        return try {
-            FileInputStream(parcel.fileDescriptor).bufferedReader().use { reader -> reader.readText() }
-        } finally {
-            parcel.close()
-        }
-    }
-
-    private fun broadcastCompleted(): Boolean = broadcastOutput.get().contains("Broadcast completed")
 
     private fun app(): MasroofApplication =
         targetContext().applicationContext as MasroofApplication
