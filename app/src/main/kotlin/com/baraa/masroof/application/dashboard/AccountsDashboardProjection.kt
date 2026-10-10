@@ -61,7 +61,6 @@ object AccountsDashboardProjection {
                 transactionAccountInvolvement = AccountTransactionInvolvementResolver.buildIndex(
                     transactions = transactions,
                     parsedRecords = parsedRecords,
-                    rawSmsById = rawSmsById,
                     ownedAccounts = ownedAccounts,
                 ),
             )

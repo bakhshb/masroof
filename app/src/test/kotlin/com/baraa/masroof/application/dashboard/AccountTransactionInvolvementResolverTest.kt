@@ -6,7 +6,6 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -15,7 +14,6 @@ import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
@@ -45,23 +43,11 @@ class AccountTransactionInvolvementResolverTest {
             id = "evt-cash",
             family = MessageFamily.WITHDRAWAL,
             sourceLast4 = "3001",
-            rawBody = "سحب نقدي\nمن حساب: 3001",
-        )
-        val rawSmsById = mapOf(
-            "sms-evt-cash" to RawSms(
-                id = "sms-evt-cash",
-                sender = "AlJazira",
-                body = "سحب نقدي\nمن حساب: 3001",
-                receivedAt = Instant.parse("2026-08-02T20:15:00Z"),
-                deviceMessageId = "1",
-                bodyHash = "h",
-            ),
         )
 
         val index = AccountTransactionInvolvementResolver.buildIndex(
             transactions = listOf(tx),
             parsedRecords = listOf(record),
-            rawSmsById = rawSmsById,
             ownedAccounts = listOf(owned),
         )
 
@@ -78,14 +64,6 @@ class AccountTransactionInvolvementResolverTest {
             lastSeenRawSmsId = null,
         )
         val containerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
-        val body = """
-            سحب نقدي داخلي صراف الي
-            بطاقة 8219:مدى
-            حساب رقم: 3001
-            بمبلغ: SAR 2,200.00
-            مكان السحب: جــدة - 7225
-            في: 2026-08-02 17:41
-        """.trimIndent()
         val tx = tx(
             id = "cash-atm",
             type = FinancialTransactionType.CASH_WITHDRAWAL,
@@ -97,23 +75,11 @@ class AccountTransactionInvolvementResolverTest {
             id = "evt-cash-atm",
             family = MessageFamily.WITHDRAWAL,
             sourceLast4 = "3001",
-            rawBody = body,
-        )
-        val rawSmsById = mapOf(
-            "sms-evt-cash-atm" to RawSms(
-                id = "sms-evt-cash-atm",
-                sender = "AlJazira",
-                body = body,
-                receivedAt = Instant.parse("2026-08-02T17:41:00Z"),
-                deviceMessageId = "1",
-                bodyHash = "h",
-            ),
         )
 
         val index = AccountTransactionInvolvementResolver.buildIndex(
             transactions = listOf(tx),
             parsedRecords = listOf(record),
-            rawSmsById = rawSmsById,
             ownedAccounts = listOf(owned),
         )
 
@@ -141,7 +107,6 @@ class AccountTransactionInvolvementResolverTest {
         val index = AccountTransactionInvolvementResolver.buildIndex(
             transactions = listOf(tx),
             parsedRecords = emptyList(),
-            rawSmsById = emptyMap(),
             ownedAccounts = listOf(owned),
         )
 

@@ -74,7 +74,7 @@ object DebitCardSpendClassifier {
                     )
         }
         if (fromAccountFlow) return true
-        // Google Pay / wallet Mada POS often omits "خصمت من حساب"; source is card-only.
+        // Google Pay / wallet Mada POS often has no source account; the source container is the card.
         return isCardAttributedDebitSpend(tx, context)
     }
 
@@ -115,31 +115,14 @@ object DebitCardSpendClassifier {
             return true
         }
         return linkedRecords(tx, context).any { record ->
-            when (record.event.messageFamily) {
-                MessageFamily.BILL_PAYMENT,
-                MessageFamily.CARD_PAYMENT,
-                -> true
-                else -> isBillPaymentSms(smsBody(record, context))
-            }
+            record.event.messageFamily == MessageFamily.BILL_PAYMENT ||
+                record.event.messageFamily == MessageFamily.CARD_PAYMENT
         }
     }
-
-    private fun isBillPaymentSms(body: String): Boolean =
-        body.contains("سداد فاتورة") ||
-            body.contains("سداد بطاقة") ||
-            (
-                body.contains("تسديد") &&
-                    (body.contains("بطاقة ائتمان") || body.contains("بطاقة إئتمان"))
-                )
 
     private fun linkedRecords(
         tx: FinancialTransaction,
         context: AccountFlowClassificationContext,
     ): List<ParsedEventRecord> =
         tx.linkedParsedEventIds.mapNotNull { context.parsedRecordsById[it] }
-
-    private fun smsBody(
-        record: ParsedEventRecord,
-        context: AccountFlowClassificationContext,
-    ): String = context.rawSmsById[record.event.rawSmsId]?.body.orEmpty()
 }
