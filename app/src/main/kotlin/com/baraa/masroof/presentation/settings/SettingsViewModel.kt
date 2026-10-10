@@ -57,7 +57,7 @@ class SettingsViewModel(
     private val databaseBackupService: DatabaseBackupGateway,
     private val refreshReviewQueue: suspend () -> Unit,
     private val reconcileOwnershipChange: suspend (ReviewWorkflowService.OwnershipChange) -> Unit = {},
-    private val reparseStoredEvents: suspend () -> Int,
+    private val reparseStoredEvents: suspend () -> com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult,
     private val importSmsFromInbox: suspend () -> HistoricalImportResult,
     private val permissionStateProvider: () -> Boolean,
     private val appVersion: String,
@@ -340,7 +340,9 @@ class SettingsViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(reparsingStored = true, error = null) }
             try {
-                val count = reparseStoredEvents()
+                val reparsed = reparseStoredEvents()
+                check(reparsed.succeeded) { "Manual reparse incomplete: ${reparsed.failedCount} messages failed" }
+                val count = reparsed.refreshedCount
                 refreshReviewQueue()
                 val snapshot = settingsRegistryWorkflow.loadSnapshot()
                 applyRegistries(

@@ -166,7 +166,7 @@ class AlJaziraFixtureCorpusTest {
                     AlJaziraFixture.serializer(),
                     file.readText(),
                 )
-                val relative = file.relativeTo(root).path
+                val relative = file.relativeTo(root).invariantSeparatorsPath
                 when (fixture.expected.messageFamily) {
                     "PURCHASE" -> assertTrue(relative.startsWith("purchase/"))
                     "TRANSFER_IN" -> assertTrue(relative.startsWith("transfer_in/"))

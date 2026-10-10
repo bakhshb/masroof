@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.dao.RawSmsDao
 import com.baraa.masroof.data.room.dao.RoomBatch
 import com.baraa.masroof.data.room.entity.RawSmsProviderAliasEntity
@@ -11,6 +12,7 @@ import java.time.Instant
 
 class RoomRawSmsRepository(
     private val dao: RawSmsDao,
+    private val accessGate: DatabaseAccessGate = DatabaseAccessGate(),
 ) : RawSmsRepository {
     /**
      * Duplicate protection is atomic via SQLite unique constraints + IGNORE.
@@ -22,66 +24,77 @@ class RoomRawSmsRepository(
      * different messages even at the same instant: the later row is stored
      * under a provider-qualified key so the unique index does not discard it.
      */
-    override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult {
+    override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult = accessGate.withAccess {
         val entity = RawSmsMapper.toEntity(rawSms)
         if (dao.insertIfAbsent(entity) != -1L) {
-            return RawSmsInsertResult.Inserted
+            return@withAccess RawSmsInsertResult.Inserted
         }
         val incomingProviderId = rawSms.deviceMessageId?.takeIf { it.isNotBlank() }
-            ?: return RawSmsInsertResult.AlreadyExists
-        val existing = dao.findByDedupeKey(entity.dedupeKey) ?: return RawSmsInsertResult.AlreadyExists
+            ?: return@withAccess RawSmsInsertResult.AlreadyExists
+        val existing = dao.findByDedupeKey(entity.dedupeKey) ?: return@withAccess RawSmsInsertResult.AlreadyExists
         val storedProviderId = existing.deviceMessageId?.takeIf { it.isNotBlank() }
             ?: dao.findProviderAliasForRawSms(existing.id)
-            ?: return RawSmsInsertResult.AlreadyExists
+            ?: return@withAccess RawSmsInsertResult.AlreadyExists
         if (storedProviderId == incomingProviderId) {
-            return RawSmsInsertResult.AlreadyExists
+            return@withAccess RawSmsInsertResult.AlreadyExists
         }
         val distinguished = entity.copy(
             dedupeKey = providerQualifiedDedupeKey(entity.dedupeKey, incomingProviderId),
         )
-        return if (dao.insertIfAbsent(distinguished) == -1L) {
+        return@withAccess if (dao.insertIfAbsent(distinguished) == -1L) {
             RawSmsInsertResult.AlreadyExists
         } else {
             RawSmsInsertResult.Inserted
         }
     }
 
-    override suspend fun getById(id: String): RawSms? =
+    override suspend fun getById(id: String): RawSms? = accessGate.withAccess {
         dao.getById(id)?.let(RawSmsMapper::toDomain)
+    }
 
-    override suspend fun getByIds(ids: Collection<String>): List<RawSms> =
+    override suspend fun getByIds(ids: Collection<String>): List<RawSms> = accessGate.withAccess {
         RoomBatch.query(ids) { chunk -> dao.getByIds(chunk) }.map(RawSmsMapper::toDomain)
+    }
 
-    override suspend fun existsById(id: String): Boolean = dao.existsById(id)
+    override suspend fun existsById(id: String): Boolean = accessGate.withAccess {
+        dao.existsById(id)
+    }
 
-    override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? =
+    override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? = accessGate.withAccess {
         dao.findByDeviceMessageId(deviceMessageId)?.let(RawSmsMapper::toDomain)
-
-    override suspend fun findByProviderMessageId(providerMessageId: String): RawSms? {
-        findByDeviceMessageId(providerMessageId)?.let { return it }
-        val rawSmsId = dao.findRawSmsIdByProviderAlias(providerMessageId) ?: return null
-        return getById(rawSmsId)
     }
 
-    override suspend fun findProviderAliasRawSmsId(providerMessageId: String): String? =
+    override suspend fun findByProviderMessageId(providerMessageId: String): RawSms? = accessGate.withAccess {
+        findByDeviceMessageId(providerMessageId)?.let { return@withAccess it }
+        val rawSmsId = dao.findRawSmsIdByProviderAlias(providerMessageId) ?: return@withAccess null
+        return@withAccess getById(rawSmsId)
+    }
+
+    override suspend fun findProviderAliasRawSmsId(providerMessageId: String): String? = accessGate.withAccess {
         dao.findRawSmsIdByProviderAlias(providerMessageId)
-
-    override suspend fun providerAliasRawSmsIds(rawSmsIds: Collection<String>): Set<String> {
-        if (rawSmsIds.isEmpty()) return emptySet()
-        return RoomBatch.query(rawSmsIds) { chunk -> dao.listAliasedRawSmsIds(chunk) }.toSet()
     }
 
-    override suspend fun rememberProviderAlias(providerMessageId: String, rawSmsId: String): Boolean =
+    override suspend fun providerAliasRawSmsIds(rawSmsIds: Collection<String>): Set<String> = accessGate.withAccess {
+        if (rawSmsIds.isEmpty()) return@withAccess emptySet()
+        return@withAccess RoomBatch.query(rawSmsIds) { chunk -> dao.listAliasedRawSmsIds(chunk) }.toSet()
+    }
+
+    override suspend fun rememberProviderAlias(providerMessageId: String, rawSmsId: String): Boolean = accessGate.withAccess {
         dao.insertProviderAlias(
             RawSmsProviderAliasEntity(
                 providerMessageId = providerMessageId,
                 rawSmsId = rawSmsId,
             ),
         ) != -1L
+    }
 
-    override suspend fun listIdsByReceivedAt(): List<String> = dao.listIdsByReceivedAt()
+    override suspend fun listIdsByReceivedAt(): List<String> = accessGate.withAccess {
+        dao.listIdsByReceivedAt()
+    }
 
-    override suspend fun listIdsAwaitingProcessing(): List<String> = dao.listIdsAwaitingProcessing()
+    override suspend fun listIdsAwaitingProcessing(): List<String> = accessGate.withAccess {
+        dao.listIdsAwaitingProcessing()
+    }
 
     override suspend fun findCrossSourceNearDuplicate(
         sender: String,
@@ -89,7 +102,7 @@ class RoomRawSmsRepository(
         fromInclusive: Instant,
         toInclusive: Instant,
         lookingForLiveRow: Boolean,
-    ): RawSms? =
+    ): RawSms? = accessGate.withAccess {
         dao.findCrossSourceNearDuplicate(
             sender = sender,
             bodyHash = bodyHash,
@@ -97,6 +110,7 @@ class RoomRawSmsRepository(
             toMillis = toInclusive.toEpochMilli(),
             requireDeviceMessageIdNull = lookingForLiveRow,
         )?.let(RawSmsMapper::toDomain)
+    }
 
     override suspend fun listCrossSourceNearDuplicates(
         sender: String,
@@ -104,7 +118,7 @@ class RoomRawSmsRepository(
         fromInclusive: Instant,
         toInclusive: Instant,
         lookingForLiveRow: Boolean,
-    ): List<RawSms> =
+    ): List<RawSms> = accessGate.withAccess {
         dao.listCrossSourceNearDuplicates(
             sender = sender,
             bodyHash = bodyHash,
@@ -112,6 +126,7 @@ class RoomRawSmsRepository(
             toMillis = toInclusive.toEpochMilli(),
             requireDeviceMessageIdNull = lookingForLiveRow,
         ).map(RawSmsMapper::toDomain)
+    }
 
     private fun providerQualifiedDedupeKey(baseKey: String, providerMessageId: String): String =
         "$baseKey|$providerMessageId"

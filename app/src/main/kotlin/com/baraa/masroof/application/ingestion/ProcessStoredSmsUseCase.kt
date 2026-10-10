@@ -82,15 +82,16 @@ class ProcessStoredSmsUseCase(
         rawSms: RawSms,
         route: BankRoutingResult,
         logOutcome: Boolean = true,
-    ): SmsIngestionResult = processRouted(rawSms, route, logOutcome, deriveImmediately = false)
+    ): SmsIngestionResult = processRouted(rawSms, route, logOutcome, deriveImmediately = false, historicalBatch = true)
 
     private suspend fun processRouted(
         rawSms: RawSms,
         route: BankRoutingResult,
         logOutcome: Boolean,
         deriveImmediately: Boolean,
+        historicalBatch: Boolean = false,
     ): SmsIngestionResult = when (route) {
-        is BankRoutingResult.Matched -> parseAndPersist(rawSms, route.adapter, logOutcome, deriveImmediately)
+        is BankRoutingResult.Matched -> parseAndPersist(rawSms, route.adapter, logOutcome, deriveImmediately, historicalBatch)
         is BankRoutingResult.Ambiguous -> holdAmbiguousRoute(rawSms, route, logOutcome)
         is BankRoutingResult.SuspectedBank -> holdSuspectedRoute(rawSms, route, logOutcome)
         is BankRoutingResult.NotMatched -> SmsIngestionResult.NotRelevant(reason = route.reason)
@@ -226,6 +227,7 @@ class ProcessStoredSmsUseCase(
         adapter: BankSmsAdapter,
         logOutcome: Boolean,
         deriveImmediately: Boolean,
+        historicalBatch: Boolean = false,
     ): SmsIngestionResult {
         val parseResult = try {
             adapter.parse(
@@ -253,7 +255,7 @@ class ProcessStoredSmsUseCase(
         }
 
         return try {
-            mapAndSave(rawSms, parseResult, logOutcome, deriveImmediately)
+            mapAndSave(rawSms, parseResult, logOutcome, deriveImmediately, historicalBatch)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -285,9 +287,10 @@ class ProcessStoredSmsUseCase(
         parseResult: ParseResult,
         logOutcome: Boolean,
         deriveImmediately: Boolean,
+        historicalBatch: Boolean,
     ): SmsIngestionResult {
         suspend fun save(event: ParsedEvent, details: ParsedEventDetails, outcome: String) =
-            saveEvent(rawSms, event, details, outcome, logOutcome, deriveImmediately)
+            saveEvent(rawSms, event, details, outcome, logOutcome, deriveImmediately, historicalBatch)
 
         return when (parseResult) {
             is ParseResult.Success -> {
@@ -396,8 +399,13 @@ class ProcessStoredSmsUseCase(
         outcome: String,
         logOutcome: Boolean,
         deriveImmediately: Boolean,
+        historicalBatch: Boolean,
     ): SmsIngestionResult.DerivedIncomplete? {
-        parsedEventRepository.save(event, details)
+        if (historicalBatch) {
+            parsedEventRepository.saveForHistoricalBatch(event, details, rawSms.receivedAt)
+        } else {
+            parsedEventRepository.save(event, details)
+        }
         debugProcessHalt.afterDurableWrite(DebugProcessHalt.PARSED)
         val incomplete = if (deriveImmediately) {
             afterParsedEvent(event, details, logOutcome)

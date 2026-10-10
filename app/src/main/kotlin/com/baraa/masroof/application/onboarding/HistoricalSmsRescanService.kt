@@ -22,9 +22,12 @@ class HistoricalSmsRescanService(
             )
 
         val result = container.historicalSmsScanner.scan(receivedAfter)
-        if (result.failure == null) {
-            container.reparseAllStoredEvents()
-        }
-        return result.toHistoricalImportResult()
+        val imported = result.toHistoricalImportResult()
+        if (result.failure != null) return imported
+        val reparsed = container.reparseAllStoredEvents()
+        return if (reparsed.succeeded) imported else imported.copy(
+            failed = imported.failed + reparsed.failedCount,
+            failure = HistoricalImportFailure.ProcessingIncomplete("reparse"),
+        )
     }
 }

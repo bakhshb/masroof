@@ -134,6 +134,18 @@ class AppContainerStartupMaintenanceTest {
         withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitPostStartupBackgroundWorkForTesting() }
     }
 
+    @Test
+    fun successfulRetry_updatesTheAuthorityReadByRecreatedActivities() = runBlocking {
+        recordLastReparsedVersion(MasroofDatabase.VERSION)
+        prefs().edit().putString(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, "invalid-type").commit()
+        container.runStartupMaintenance()
+        assertEquals(StartupMaintenanceOutcome.BLOCKED, container.awaitStartupMaintenance())
+        prefs().edit().remove(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION).commit()
+        assertEquals(StartupMaintenanceOutcome.READY, container.retryStartupMaintenance())
+        assertEquals(StartupMaintenanceOutcome.READY, container.awaitStartupMaintenance())
+        assertEquals(StartupMaintenanceOutcome.READY, container.awaitStartupMaintenance())
+    }
+
     private fun backfillWork(): List<WorkInfo> =
         workManager.getWorkInfosForUniqueWork(ParsedEventFactsBackfillWorker.UNIQUE_WORK_NAME).get()
 

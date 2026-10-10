@@ -162,6 +162,7 @@ jobs:
             bash scripts/m13-process-death.sh
             bash scripts/m13-process-death.sh
             bash scripts/m13-process-death.sh
+            bash scripts/audit-device-regressions.sh
 
   # API 34 process death. The script force-stops the app from the runner, then
   # starts a new instrumentation process. It does not use clearPackageData.
@@ -205,6 +206,7 @@ jobs:
             bash scripts/m13-process-death.sh
             bash scripts/m13-process-death.sh
             bash scripts/m13-process-death.sh
+            bash scripts/audit-device-regressions.sh
 
   # API 30's SQLite already has VACUUM INTO. This job runs the pre-3.27 fallback
   # on API 28, where the platform SQLite is older than 3.27.

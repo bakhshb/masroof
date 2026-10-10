@@ -14,9 +14,12 @@ import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
 import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
+import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -32,7 +35,7 @@ class DatabaseBackupService(
     private val appVersionName: String,
     private val appLogService: AppLogService? = null,
     private val clockEpochMillis: () -> Long = { System.currentTimeMillis() },
-    private val restartProcess: () -> Unit = { defaultRestartProcess(appContext) },
+    private val restartProcess: (() -> Unit)? = null,
     private val beforeValidatedInstall: () -> Unit = {},
     private val afterRestoreStage: (DatabaseRestoreRecovery.Stage) -> Unit = {},
     private val maintenancePreferences: SharedPreferences? = null,
@@ -48,7 +51,9 @@ class DatabaseBackupService(
     private val archiveLimits: BackupArchiveLimits = BackupArchiveLimits.PRODUCTION,
     /** Production uses [BackupEnvelope.DEFAULT_ITERATIONS]. Tests inject a lower count. */
     private val kdfIterations: Int = BackupEnvelope.DEFAULT_ITERATIONS,
+    private val databaseAccessGate: DatabaseAccessGate = DatabaseAccessGate(),
 ) : DatabaseBackupGateway {
+    private val operationMutex = Mutex()
     init {
         require(kdfIterations in 1..BackupEnvelope.MAX_ITERATIONS) {
             "KDF iteration count is outside the supported range"
@@ -57,50 +62,56 @@ class DatabaseBackupService(
     }
     override suspend fun exportTo(destination: Uri, passphrase: CharArray): Result<Unit> =
         withContext(Dispatchers.IO) {
-            val secret = passphrase.copyOf()
-            passphrase.fill('\u0000')
-            try {
-                if (secret.isEmpty()) {
-                    logExportFailure(BackupFailureCategory.PASSPHRASE_REQUIRED)
-                    return@withContext Result.failure(
-                        BackupFailureException(BackupFailureCategory.PASSPHRASE_REQUIRED),
-                    )
-                }
-                runCatching {
-                    val staging = createStagingDir("export")
-                    try {
-                        val dbCopy = File(staging, BackupPackageFormat.DATABASE_ENTRY)
-                        writeConsistentSnapshot(dbCopy)
-                        verifyIsolatedSnapshot(dbCopy)
-
-                        val exportedAt = clockEpochMillis()
-                        val manifest = BackupManifest(
-                            formatVersion = BackupPackageFormat.FORMAT_VERSION,
-                            appVersionName = appVersionName,
-                            roomVersion = MasroofDatabase.VERSION,
-                            identityHash = MasroofDatabase.IDENTITY_HASH,
-                            exportedAtEpochMillis = exportedAt,
-                        )
-                        File(staging, BackupPackageFormat.MANIFEST_ENTRY)
-                            .writeText(BackupPackageCodec.encodeManifest(manifest))
-                        File(staging, BackupPackageFormat.PREFERENCES_ENTRY)
-                            .writeText(BackupPackageCodec.encodePreferences(capturePreferences()))
-
-                        writeEncryptedPackage(staging, destination, secret)
-                    } finally {
-                        SensitiveFileCleanup.delete(staging)
-                    }
-                }.onSuccess {
-                    appLogService?.info(AppLogCategories.BACKUP, "Database export succeeded")
-                }.onFailure { error ->
-                    logExportFailure(
-                        (error as? BackupFailureException)?.category ?: BackupFailureCategory.EXPORT_FAILED,
-                    )
-                }
-            } finally {
-                secret.fill('\u0000')
+            operationMutex.withLock {
+                databaseAccessGate.withAccess { exportOnIo(destination, passphrase) }
             }
         }
+
+    private fun exportOnIo(destination: Uri, passphrase: CharArray): Result<Unit> {
+        val secret = passphrase.copyOf()
+        passphrase.fill('\u0000')
+        return try {
+            if (secret.isEmpty()) {
+                logExportFailure(BackupFailureCategory.PASSPHRASE_REQUIRED)
+                return Result.failure(
+                    BackupFailureException(BackupFailureCategory.PASSPHRASE_REQUIRED),
+                )
+            }
+            runCatching {
+                val staging = createStagingDir("export")
+                try {
+                    val dbCopy = File(staging, BackupPackageFormat.DATABASE_ENTRY)
+                    writeConsistentSnapshot(dbCopy)
+                    verifyIsolatedSnapshot(dbCopy)
+
+                    val exportedAt = clockEpochMillis()
+                    val manifest = BackupManifest(
+                        formatVersion = BackupPackageFormat.FORMAT_VERSION,
+                        appVersionName = appVersionName,
+                        roomVersion = MasroofDatabase.VERSION,
+                        identityHash = MasroofDatabase.IDENTITY_HASH,
+                        exportedAtEpochMillis = exportedAt,
+                    )
+                    File(staging, BackupPackageFormat.MANIFEST_ENTRY)
+                        .writeText(BackupPackageCodec.encodeManifest(manifest))
+                    File(staging, BackupPackageFormat.PREFERENCES_ENTRY)
+                        .writeText(BackupPackageCodec.encodePreferences(capturePreferences()))
+
+                    writeEncryptedPackage(staging, destination, secret)
+                } finally {
+                    SensitiveFileCleanup.delete(staging)
+                }
+            }.onSuccess {
+                appLogService?.info(AppLogCategories.BACKUP, "Database export succeeded")
+            }.onFailure { error ->
+                logExportFailure(
+                    (error as? BackupFailureException)?.category ?: BackupFailureCategory.EXPORT_FAILED,
+                )
+            }
+        } finally {
+            secret.fill('\u0000')
+        }
+    }
 
     override suspend fun inspect(source: Uri): BackupPackageKind = withContext(Dispatchers.IO) {
         runCatching {
@@ -122,12 +133,20 @@ class DatabaseBackupService(
         passphrase: CharArray,
         confirmLegacyPlaintext: Boolean,
     ): BackupImportOutcome = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            databaseAccessGate.withRestore { importOnIo(source, passphrase, confirmLegacyPlaintext) }
+        }
+    }
+
+    private fun importOnIo(source: Uri, passphrase: CharArray, confirmLegacyPlaintext: Boolean): BackupImportOutcome {
         val secret = passphrase.copyOf()
         passphrase.fill('\u0000')
         var staging: File? = null
-        try {
+        var closed = false
+        var restartAttempted = false
+        return try {
             val raw = appContext.contentResolver.openInputStream(source)
-                ?: return@withContext loggedImport(
+                ?: return loggedImport(
                     BackupImportOutcome.Failed,
                     BackupFailureCategory.IMPORT_FAILED,
                 )
@@ -177,9 +196,9 @@ class DatabaseBackupService(
                 }
             }
             if (legacyPlaintext && !confirmLegacyPlaintext) {
-                return@withContext BackupImportOutcome.LegacyConfirmationRequired
+                return BackupImportOutcome.LegacyConfirmationRequired
             }
-            val packageDir = staging ?: return@withContext loggedImport(
+            val packageDir = staging ?: return loggedImport(
                 BackupImportOutcome.InvalidPackage,
                 BackupFailureCategory.INVALID_PACKAGE,
             )
@@ -187,12 +206,12 @@ class DatabaseBackupService(
             val dbFile = File(packageDir, BackupPackageFormat.DATABASE_ENTRY)
             val prefsFile = File(packageDir, BackupPackageFormat.PREFERENCES_ENTRY)
             if (!manifestFile.exists() || !dbFile.exists() || !prefsFile.exists()) {
-                return@withContext BackupImportOutcome.InvalidPackage
+                return BackupImportOutcome.InvalidPackage
             }
 
             val manifest = runCatching {
                 BackupPackageCodec.decodeManifest(manifestFile.readText())
-            }.getOrElse { return@withContext BackupImportOutcome.InvalidPackage }
+            }.getOrElse { return BackupImportOutcome.InvalidPackage }
 
             val importableVersions = MasroofDatabase.IMPORTABLE_BACKUP_VERSIONS
             if (!BackupPackageCodec.validateManifestForImport(
@@ -202,7 +221,7 @@ class DatabaseBackupService(
                     importableVersions = importableVersions,
                 )
             ) {
-                return@withContext BackupImportOutcome.InvalidPackage
+                return BackupImportOutcome.InvalidPackage
             }
 
             val expectedDbIdentityHash = BackupPackageCodec.expectedIdentityHashForImport(
@@ -210,18 +229,20 @@ class DatabaseBackupService(
                 targetRoomVersion = MasroofDatabase.VERSION,
                 targetIdentityHash = MasroofDatabase.IDENTITY_HASH,
                 importableVersions = importableVersions,
-            ) ?: return@withContext BackupImportOutcome.InvalidPackage
+            ) ?: return BackupImportOutcome.InvalidPackage
 
             val identityFromDb = readIdentityHash(dbFile)
             if (identityFromDb != expectedDbIdentityHash) {
-                return@withContext BackupImportOutcome.InvalidPackage
+                return BackupImportOutcome.InvalidPackage
             }
 
             val preferences = runCatching {
                 BackupPackageCodec.decodePreferences(prefsFile.readText())
-            }.getOrElse { return@withContext BackupImportOutcome.InvalidPackage }
+            }.getOrElse { return BackupImportOutcome.InvalidPackage }
 
             checkpointWal()
+            databaseAccessGate.retire()
+            closed = true
             closeDatabase()
 
             val liveDb = appContext.getDatabasePath(MasroofDatabase.NAME)
@@ -280,7 +301,8 @@ class DatabaseBackupService(
                 DatabaseRestoreRecovery.cleanupCommitted(appContext, liveDb)
                 SensitiveFileCleanup.delete(packageDir)
                 secret.fill('\u0000')
-                restartProcess()
+                restartAttempted = true
+                restart(BackupImportOutcome.SuccessNeedsRestart)
                 appLogService?.info(AppLogCategories.BACKUP, "Database import succeeded; restart required")
                 BackupImportOutcome.SuccessNeedsRestart
             } catch (error: Exception) {
@@ -299,8 +321,18 @@ class DatabaseBackupService(
             BackupImportOutcome.Failed
         } finally {
             secret.fill('\u0000')
-            staging?.let(SensitiveFileCleanup::delete)
+            try {
+                staging?.let(SensitiveFileCleanup::delete)
+            } finally {
+                // A failed install may have closed Room too. Never reuse that process instance.
+                if (closed && !restartAttempted) restart(BackupImportOutcome.Failed)
+            }
         }
+    }
+
+    private fun restart(outcome: BackupImportOutcome) {
+        val restartOverride = restartProcess
+        if (restartOverride != null) restartOverride() else defaultRestartProcess(appContext, outcome == BackupImportOutcome.Failed)
     }
 
     /**
@@ -557,7 +589,7 @@ class DatabaseBackupService(
             Context.MODE_PRIVATE,
         )
 
-        onboarding.edit().apply {
+        val onboardingCommitted = onboarding.edit().apply {
             putBoolean(KEY_ONBOARDING_STARTED, snapshot.onboardingStarted)
             putBoolean(KEY_ONBOARDING_COMPLETED, snapshot.onboardingCompleted)
             putBoolean(KEY_IMPORT_COMPLETED, snapshot.historicalImportCompleted)
@@ -568,19 +600,22 @@ class DatabaseBackupService(
                 putLong(KEY_IMPORT_START_EPOCH_MILLIS, start)
             }
         }.commit()
+        check(onboardingCommitted) { "Cannot restore onboarding preferences" }
 
-        locale.edit().putString(
+        val localeCommitted = locale.edit().putString(
             SharedPrefsAppLocaleRepository.KEY_LANGUAGE_TAG,
             when (snapshot.languageTag) {
                 AppLocale.TAG_EN -> AppLocale.TAG_EN
                 else -> AppLocale.TAG_AR
             },
         ).commit()
+        check(localeCommitted) { "Cannot restore locale preferences" }
 
-        theme.edit().putString(
+        val themeCommitted = theme.edit().putString(
             SharedPrefsThemePreferencesRepository.KEY_THEME_MODE,
             ThemeMode.fromStorage(snapshot.themeMode).name,
         ).commit()
+        check(themeCommitted) { "Cannot restore theme preferences" }
     }
 
     /**
@@ -768,9 +803,11 @@ class DatabaseBackupService(
     }
 
     companion object {
-        internal fun defaultRestartProcess(appContext: Context) {
+        const val EXTRA_RESTORE_FAILED = "com.baraa.masroof.restore_failed"
+        internal fun defaultRestartProcess(appContext: Context, failed: Boolean = false) {
             val launchIntent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
                 ?: return
+            launchIntent.putExtra(EXTRA_RESTORE_FAILED, failed)
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             appContext.startActivity(launchIntent)
             Runtime.getRuntime().exit(0)

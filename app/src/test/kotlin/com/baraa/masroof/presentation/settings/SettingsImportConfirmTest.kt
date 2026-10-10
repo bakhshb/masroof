@@ -164,7 +164,7 @@ class SettingsImportConfirmTest {
             },
             databaseBackupService = backup,
             refreshReviewQueue = {},
-            reparseStoredEvents = { 0 },
+            reparseStoredEvents = { com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(0, 0) },
             importSmsFromInbox = { com.baraa.masroof.application.onboarding.HistoricalImportResult() },
             permissionStateProvider = { true },
             appVersion = SettingsViewModelTestFixtures.APP_VERSION,

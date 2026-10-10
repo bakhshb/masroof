@@ -24,7 +24,7 @@ class SettingsViewModelFactory(
             reconcileOwnershipChange = { change ->
                 container.reviewWorkflowService.reconcileOwnershipChange(change)
             },
-            reparseStoredEvents = { container.reparseAllStoredEvents().refreshedCount },
+            reparseStoredEvents = { container.reparseAllStoredEvents() },
             importSmsFromInbox = { HistoricalSmsRescanService(container).rescan() },
             permissionStateProvider = permissionStateProvider,
             appVersion = appVersion,

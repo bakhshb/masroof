@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.room.dao.AccountRegistryDao
 import com.baraa.masroof.data.room.entity.AccountRegistryEntity
@@ -14,11 +15,12 @@ import com.baraa.masroof.domain.repository.AccountRegistryRepository
 class RoomAccountRegistryRepository(
     private val dao: AccountRegistryDao,
     private val bankRegistryDao: com.baraa.masroof.data.room.dao.BankRegistryDao,
+    private val accessGate: DatabaseAccessGate = DatabaseAccessGate(),
 ) : AccountRegistryRepository {
-    override suspend fun observe(reference: AccountReference, rawSmsId: String) {
-        if (!RegistryIdentity.isKnownBank(reference.bank)) return
+    override suspend fun observe(reference: AccountReference, rawSmsId: String): Unit = accessGate.withAccess<Unit> {
+        if (!RegistryIdentity.isKnownBank(reference.bank)) return@withAccess
         val masked = reference.maskedNumber?.trim().orEmpty()
-        if (masked.isEmpty()) return
+        if (masked.isEmpty()) return@withAccess
 
         bankRegistryDao.insertIfAbsent(
             com.baraa.masroof.data.room.entity.BankRegistryEntity(bankId = reference.bank.id),
@@ -39,7 +41,7 @@ class RoomAccountRegistryRepository(
         )
     }
 
-    override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) {
+    override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus): Unit = accessGate.withAccess<Unit> {
         RegistryIdentity.requireKnownBank(reference.bank, "AccountRegistry.setOwnership")
         val masked = reference.maskedNumber?.trim().orEmpty()
         require(masked.isNotEmpty()) { "maskedNumber required to set ownership" }
@@ -58,26 +60,27 @@ class RoomAccountRegistryRepository(
         )
     }
 
-    override suspend fun resolve(reference: AccountReference): OwnershipStatus {
-        val entry = findRegistryEntry(reference) ?: return OwnershipStatus.UNKNOWN
-        return OwnershipStatus.valueOf(entry.ownershipStatus)
+    override suspend fun resolve(reference: AccountReference): OwnershipStatus = accessGate.withAccess {
+        val entry = findRegistryEntry(reference) ?: return@withAccess OwnershipStatus.UNKNOWN
+        return@withAccess OwnershipStatus.valueOf(entry.ownershipStatus)
     }
 
-    override suspend fun get(reference: AccountReference): AccountRegistryEntry? {
-        return findRegistryEntry(reference)?.let(RegistryMapper::toAccountEntry)
+    override suspend fun get(reference: AccountReference): AccountRegistryEntry? = accessGate.withAccess {
+        return@withAccess findRegistryEntry(reference)?.let(RegistryMapper::toAccountEntry)
     }
 
-    override suspend fun listAll(): List<AccountRegistryEntry> =
+    override suspend fun listAll(): List<AccountRegistryEntry> = accessGate.withAccess {
         dao.listAll().map(RegistryMapper::toAccountEntry)
+    }
 
-    override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) {
+    override suspend fun updateDisplayName(reference: AccountReference, displayName: String?): Unit = accessGate.withAccess<Unit> {
         RegistryIdentity.requireKnownBank(reference.bank, "AccountRegistry.updateDisplayName")
         val masked = reference.maskedNumber?.trim().orEmpty()
         require(masked.isNotEmpty()) { "maskedNumber required" }
         dao.updateDisplayName(reference.bank.id, masked, displayName?.trim()?.ifEmpty { null })
     }
 
-    override suspend fun updateAccountType(reference: AccountReference, accountType: com.baraa.masroof.domain.model.AccountType) {
+    override suspend fun updateAccountType(reference: AccountReference, accountType: com.baraa.masroof.domain.model.AccountType): Unit = accessGate.withAccess<Unit> {
         RegistryIdentity.requireKnownBank(reference.bank, "AccountRegistry.updateAccountType")
         val masked = reference.maskedNumber?.trim().orEmpty()
         require(masked.isNotEmpty()) { "maskedNumber required" }
@@ -137,10 +140,11 @@ class RoomAccountRegistryRepository(
     }
 
     companion object {
-        fun from(database: MasroofDatabase): RoomAccountRegistryRepository =
+        fun from(database: MasroofDatabase, accessGate: DatabaseAccessGate = DatabaseAccessGate()): RoomAccountRegistryRepository =
             RoomAccountRegistryRepository(
                 dao = database.accountRegistryDao(),
                 bankRegistryDao = database.bankRegistryDao(),
+                accessGate = accessGate,
             )
     }
 }

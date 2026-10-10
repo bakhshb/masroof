@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.data.room.DatabaseAccessGate
 import androidx.room.withTransaction
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.room.mapper.ReviewItemMapper
@@ -20,6 +21,7 @@ import java.time.Instant
 class RoomManualReviewResolutionRepository(
     private val database: MasroofDatabase,
     private val financialTransactionRepository: FinancialTransactionRepository,
+    private val accessGate: DatabaseAccessGate = DatabaseAccessGate(),
 ) : ManualReviewResolutionRepository {
     private val reviewDao = database.reviewItemDao()
 
@@ -29,7 +31,7 @@ class RoomManualReviewResolutionRepository(
         reviewId: String,
         resolutionKind: ReviewResolutionKind,
         resolvedAt: Instant,
-    ): ManualReviewResolutionResult =
+    ): ManualReviewResolutionResult = accessGate.withAccess {
         try {
             database.withTransaction {
                 when (
@@ -61,6 +63,7 @@ class RoomManualReviewResolutionRepository(
         } catch (e: ReviewResolutionRollback) {
             ManualReviewResolutionResult.Failed(e.reason)
         }
+    }
 
     override suspend fun persistPairResolution(
         transaction: FinancialTransaction,
@@ -69,7 +72,7 @@ class RoomManualReviewResolutionRepository(
         secondReviewId: String,
         resolutionKind: ReviewResolutionKind,
         resolvedAt: Instant,
-    ): ManualReviewResolutionResult =
+    ): ManualReviewResolutionResult = accessGate.withAccess {
         try {
             database.withTransaction {
                 when (
@@ -107,6 +110,7 @@ class RoomManualReviewResolutionRepository(
         } catch (e: ReviewResolutionRollback) {
             ManualReviewResolutionResult.Failed(e.reason)
         }
+    }
 
     private suspend fun resolveRequiredOrRollback(
         reviewId: String,

@@ -237,7 +237,7 @@ class DatabaseBackupImportMigrationTest {
             val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
 
             assertEquals(BackupImportOutcome.Failed, outcome)
-            assertFalse(restartRequested.get())
+            assertTrue(restartRequested.get())
             assertFalse(
                 context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE)
                     .getBoolean("onboarding_completed", false),

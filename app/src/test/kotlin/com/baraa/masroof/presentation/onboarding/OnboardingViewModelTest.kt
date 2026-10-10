@@ -30,6 +30,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -485,6 +486,25 @@ AccountRegistryEntry.forTest(
         restartVm.reloadFromCurrentState()
         advanceUntilIdle()
         assertEquals(LocalDate.parse("2026-08-03"), restartVm.uiState.value.selectedImportDate)
+    }
+
+    @Test
+    fun resumeDuringRetainedImport_preservesScanningAndDoesNotLaunchADuplicate() = runTest {
+        val fixture = Fixture(permissionGranted = true, gateway = FakeImportGateway(blockFirstCall = true))
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        fixture.vm.startImport()
+        runCurrent()
+        assertEquals(OnboardingStep.IMPORTING, fixture.vm.uiState.value.step)
+        fixture.vm.reloadFromCurrentState()
+        runCurrent()
+        assertEquals(OnboardingStep.IMPORTING, fixture.vm.uiState.value.step)
+        assertEquals(ImportState.Scanning, fixture.vm.uiState.value.importState)
+        fixture.vm.startImport()
+        assertEquals(1, fixture.gateway.calls)
+        fixture.gateway.completeBlockedCall()
+        advanceUntilIdle()
+        assertEquals(OnboardingStep.OWNERSHIP, fixture.vm.uiState.value.step)
     }
 
     private class Fixture(

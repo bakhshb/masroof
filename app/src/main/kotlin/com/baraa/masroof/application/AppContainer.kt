@@ -89,6 +89,8 @@ import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
+import com.baraa.masroof.data.room.DatabaseAccessGate
+import com.baraa.masroof.data.repository.RoomTransactionIgnoreRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.statement.CanonicalCsvStatementParser
 import com.baraa.masroof.domain.model.Bank
@@ -129,7 +131,8 @@ import com.baraa.masroof.application.sms.WorkManagerExchangeRateEnrichmentSchedu
 import com.baraa.masroof.application.sms.WorkManagerLiveSmsWorkScheduler
 import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -161,7 +164,9 @@ class AppContainer(
 
     /** Keeps a device-test seed invisible to live processing until the review row exists. */
     suspend fun <R> withDatabaseTransaction(block: suspend () -> R): R =
-        database.withTransaction(block)
+        databaseAccessGate.withAccess { database.withTransaction(block) }
+
+    val databaseAccessGate: DatabaseAccessGate = DatabaseAccessGate()
 
     private val database: MasroofDatabase =
         databaseRestoreRecovered.let {
@@ -175,43 +180,44 @@ class AppContainer(
         }
 
     val rawSmsRepository: RawSmsRepository =
-        RoomRawSmsRepository(database.rawSmsDao())
+        RoomRawSmsRepository(database.rawSmsDao(), accessGate = databaseAccessGate)
 
     val parsedEventRepository: ParsedEventRepository =
-        RoomParsedEventRepository(database.parsedEventDao())
+        RoomParsedEventRepository(database.parsedEventDao(), accessGate = databaseAccessGate)
 
     val accountRegistryRepository: AccountRegistryRepository =
-        RoomAccountRegistryRepository.from(database)
+        RoomAccountRegistryRepository.from(database, databaseAccessGate)
 
     val cardRegistryRepository: CardRegistryRepository =
-        RoomCardRegistryRepository.from(database)
+        RoomCardRegistryRepository.from(database, databaseAccessGate)
 
     val bankRegistryRepository: BankRegistryRepository =
-        RoomBankRegistryRepository(database.bankRegistryDao())
+        RoomBankRegistryRepository(database.bankRegistryDao(), accessGate = databaseAccessGate)
 
     val creditFacilityRepository: CreditFacilityRepository =
-        RoomCreditFacilityRepository(database.creditFacilityDao())
+        RoomCreditFacilityRepository(database.creditFacilityDao(), accessGate = databaseAccessGate)
 
     val loanRegistryRepository: LoanRegistryRepository =
-        RoomLoanRegistryRepository.from(database)
+        RoomLoanRegistryRepository.from(database, databaseAccessGate)
 
     val commitmentRepository: CommitmentRepository =
-        RoomCommitmentRepository.from(database)
+        RoomCommitmentRepository.from(database, databaseAccessGate)
 
     val financialTransactionRepository: FinancialTransactionRepository =
         RoomFinancialTransactionRepository(
             dao = database.financialTransactionDao(),
             parsedEventDao = database.parsedEventDao(),
+            accessGate = databaseAccessGate,
         )
 
     val reviewRepository: ReviewRepository =
-        RoomReviewRepository(database.reviewItemDao())
+        RoomReviewRepository(database.reviewItemDao(), accessGate = databaseAccessGate)
 
     val processingRetryRepository: ProcessingRetryRepository =
-        RoomProcessingRetryRepository(database.processingRetryDao())
+        RoomProcessingRetryRepository(database.processingRetryDao(), accessGate = databaseAccessGate)
 
     val userCorrectionRepository: UserCorrectionRepository =
-        RoomUserCorrectionRepository(database.userCorrectionDao())
+        RoomUserCorrectionRepository(database.userCorrectionDao(), accessGate = databaseAccessGate)
 
     val applicationContext: Context get() = appContext
 
@@ -329,6 +335,7 @@ class AppContainer(
         RoomManualReviewResolutionRepository(
             database = database,
             financialTransactionRepository = financialTransactionRepository,
+            accessGate = databaseAccessGate,
         )
 
     val reviewWorkflowService: ReviewWorkflowService =
@@ -407,8 +414,9 @@ class AppContainer(
 
     val transactionIgnoreService: TransactionIgnoreService =
         TransactionIgnoreService(
-            financialTransactionRepository = financialTransactionRepository,
-            reviewRepository = reviewRepository,
+            persistence = RoomTransactionIgnoreRepository(database, databaseAccessGate, afterDelete = {
+                debugProcessHaltProbe.afterDurableWrite(DebugProcessHalt.IGNORE_PENDING)
+            }),
             clock = clock,
             appLogService = appLogService,
         )
@@ -609,24 +617,25 @@ class AppContainer(
     val smsDataSource: SmsDataSource =
         AndroidSmsDataSource(appContext.contentResolver)
 
-    val historicalSmsScanner: HistoricalSmsScanner =
-        HistoricalSmsScanner(
-            dataSource = smsDataSource,
-            batchProcessor = HistoricalSmsBatchProcessor(
-                capture = captureBankSmsUseCase,
-                processStored = processStoredSmsUseCase,
-                ownershipDiscovery = ownershipDiscoveryService,
-                reconciliation = transactionReconciliationService,
-                reviewQueueUpdater = reviewQueueUpdater,
-                exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
-                processingRecovery = processingRecovery,
-                batchRecoveryScheduler = {
-                    HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
-                },
-                appLogService = appLogService,
-            ),
-            appLogService = appLogService,
-        )
+    val historicalSmsBatchProcessor: HistoricalSmsBatchProcessor = HistoricalSmsBatchProcessor(
+        capture = captureBankSmsUseCase,
+        processStored = processStoredSmsUseCase,
+        ownershipDiscovery = ownershipDiscoveryService,
+        reconciliation = transactionReconciliationService,
+        reviewQueueUpdater = reviewQueueUpdater,
+        exchangeRateEnrichment = exchangeRateEnrichmentWorkflow,
+        processingRecovery = processingRecovery,
+        batchRecoveryScheduler = {
+            HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
+        },
+        appLogService = appLogService,
+    )
+
+    val historicalSmsScanner: HistoricalSmsScanner = HistoricalSmsScanner(
+        dataSource = smsDataSource,
+        batchProcessor = historicalSmsBatchProcessor,
+        appLogService = appLogService,
+    )
 
     /**
      * Discovers ownership candidates from all already-persisted ParsedEvents.
@@ -686,6 +695,7 @@ class AppContainer(
             appContext = appContext,
             database = database,
             closeDatabase = { database.close() },
+            databaseAccessGate = databaseAccessGate,
             appVersionName = BuildConfig.VERSION_NAME,
             appLogService = appLogService,
         )
@@ -787,7 +797,7 @@ class AppContainer(
         }
     }
 
-    private val startupMaintenanceCompletion = CompletableDeferred<StartupMaintenanceOutcome>()
+    private val startupMaintenanceOutcome = kotlinx.coroutines.flow.MutableStateFlow<StartupMaintenanceOutcome?>(null)
     private var startupMaintenanceJob: Job? = null
 
     /**
@@ -796,9 +806,7 @@ class AppContainer(
     fun runStartupMaintenance() {
         startupMaintenanceJob = applicationScope.launch {
             val outcome = runStartupMaintenanceAttempt()
-            if (!startupMaintenanceCompletion.isCompleted) {
-                startupMaintenanceCompletion.complete(outcome)
-            }
+            startupMaintenanceOutcome.value = outcome
             if (outcome == StartupMaintenanceOutcome.READY) {
                 runPostStartupBackgroundWork()
             }
@@ -808,6 +816,7 @@ class AppContainer(
     /** Retry a previously blocked startup maintenance attempt from the gated UI. */
     suspend fun retryStartupMaintenance(): StartupMaintenanceOutcome {
         val outcome = runStartupMaintenanceAttempt()
+        startupMaintenanceOutcome.value = outcome
         if (outcome == StartupMaintenanceOutcome.READY) {
             runPostStartupBackgroundWork()
         }
@@ -849,5 +858,5 @@ class AppContainer(
 
     /** Returns the safety outcome of the initial startup maintenance attempt. */
     suspend fun awaitStartupMaintenance(): StartupMaintenanceOutcome =
-        startupMaintenanceCompletion.await()
+        startupMaintenanceOutcome.filterNotNull().first()
 }

@@ -51,6 +51,16 @@ class OnboardingViewModel(
     fun reloadFromCurrentState() {
         viewModelScope.launch {
             val permissionGranted = permissionStateProvider()
+            if (importJob?.isActive == true) {
+                _uiState.update {
+                    it.copy(
+                        permissionGranted = permissionGranted,
+                        step = if (permissionGranted) OnboardingStep.IMPORTING else OnboardingStep.PERMISSION,
+                        importState = ImportState.Scanning,
+                    )
+                }
+                return@launch
+            }
             val started = onboardingPrefs.isOnboardingStarted()
             val completed = onboardingPrefs.isOnboardingCompleted()
             val savedEpoch = onboardingPrefs.getHistoricalImportStartEpochMillis()

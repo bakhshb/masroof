@@ -27,6 +27,46 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 class BackupArchiveValidatorTest {
+    @Suppress("DEPRECATION", "removal")
+    @Test
+    fun partialDatabaseIsZeroedBeforeUnlink_onLimitAndCrcFailures() {
+        val cases = listOf(
+            ZipFixtures.zipBytes(BackupPackageFormat.DATABASE_ENTRY to ByteArray(20_000) { 77 }) to
+                BackupArchiveLimits(3, 8, 100_000),
+            ZipFixtures.storedZipBytes(BackupPackageFormat.DATABASE_ENTRY, ByteArray(20_000) { 77 }).also {
+                val payloadOffset = 30 + BackupPackageFormat.DATABASE_ENTRY.toByteArray().size
+                it[payloadOffset] = 78
+            } to BackupArchiveLimits(3, 100_000, 100_000),
+        )
+        cases.forEach { (archive, limits) ->
+            withStaging { staging ->
+                val target = File(staging, BackupPackageFormat.DATABASE_ENTRY)
+                val old = System.getSecurityManager()
+                var checked = false
+                System.setSecurityManager(object : SecurityManager() {
+                    override fun checkPermission(permission: java.security.Permission) = Unit
+                    override fun checkDelete(file: String) {
+                        if (file == target.path && target.exists()) {
+                            val bytes = target.readBytes()
+                            assertTrue("the rejection wrote a sensitive prefix", bytes.isNotEmpty())
+                            assertTrue("every byte must be zero before unlink", bytes.all { it.toInt() == 0 })
+                            checked = true
+                        }
+                    }
+                })
+                try {
+                    assertThrows(BackupArchiveException::class.java) {
+                        BackupArchiveValidator(limits).extractInto(archive.inputStream(), staging)
+                    }
+                    assertTrue(checked)
+                    assertFalse(target.exists())
+                } finally {
+                    System.setSecurityManager(old)
+                }
+            }
+        }
+    }
+
     @Test
     fun productionLimits_areThreeEntriesAnd256Mebibytes() {
         val mebibyte = 1024L * 1024L

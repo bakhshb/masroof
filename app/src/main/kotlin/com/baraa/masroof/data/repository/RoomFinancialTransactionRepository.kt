@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.data.room.ExchangeRatePairWrite
 import com.baraa.masroof.data.room.dao.FinancialTransactionDao
@@ -19,18 +20,20 @@ class RoomFinancialTransactionRepository(
     private val dao: FinancialTransactionDao,
     private val parsedEventDao: ParsedEventDao,
     private val batchChunkSize: Int = RoomBatch.MAX_BIND_ARGS,
+    private val accessGate: DatabaseAccessGate = DatabaseAccessGate(),
 ) : FinancialTransactionRepository {
     override suspend fun save(
         transaction: FinancialTransaction,
         rawSmsIds: Collection<String>,
-    ): FinancialTransactionSaveResult =
+    ): FinancialTransactionSaveResult = accessGate.withAccess {
         persist(transaction, rawSmsIds, dao::saveAtomic)
+    }
 
     override suspend fun replaceExclusiveStaleLinks(
         transaction: FinancialTransaction,
         rawSmsIds: Collection<String>,
         staleRawSmsIds: Collection<String>,
-    ): FinancialTransactionSaveResult =
+    ): FinancialTransactionSaveResult = accessGate.withAccess {
         persist(
             transaction = transaction,
             rawSmsIds = rawSmsIds,
@@ -42,6 +45,7 @@ class RoomFinancialTransactionRepository(
                 )
             },
         )
+    }
 
     private suspend fun persist(
         transaction: FinancialTransaction,
@@ -72,30 +76,31 @@ class RoomFinancialTransactionRepository(
         }
     }
 
-    override suspend fun getById(id: String): FinancialTransaction? {
-        val entity = dao.getById(id) ?: return null
-        return reconstructBatch(listOf(entity)).single()
+    override suspend fun getById(id: String): FinancialTransaction? = accessGate.withAccess {
+        val entity = dao.getById(id) ?: return@withAccess null
+        return@withAccess reconstructBatch(listOf(entity)).single()
     }
 
-    override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? {
-        val link = dao.findLinkByRawSmsId(rawSmsId) ?: return null
-        return getById(link.transactionId)
+    override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = accessGate.withAccess {
+        val link = dao.findLinkByRawSmsId(rawSmsId) ?: return@withAccess null
+        return@withAccess getById(link.transactionId)
     }
 
-    override suspend fun listAll(): List<FinancialTransaction> =
+    override suspend fun listAll(): List<FinancialTransaction> = accessGate.withAccess {
         reconstructBatch(dao.listAll())
+    }
 
-    override suspend fun listByTypes(types: Collection<FinancialTransactionType>): List<FinancialTransaction> {
-        if (types.isEmpty()) return emptyList()
-        return reconstructBatch(dao.listByTypes(types.map { it.name }))
+    override suspend fun listByTypes(types: Collection<FinancialTransactionType>): List<FinancialTransaction> = accessGate.withAccess {
+        if (types.isEmpty()) return@withAccess emptyList()
+        return@withAccess reconstructBatch(dao.listByTypes(types.map { it.name }))
     }
 
     override suspend fun listByTypesOccurredSince(
         types: Collection<FinancialTransactionType>,
         startInclusive: Instant,
-    ): List<FinancialTransaction> {
-        if (types.isEmpty()) return emptyList()
-        return reconstructBatch(
+    ): List<FinancialTransaction> = accessGate.withAccess {
+        if (types.isEmpty()) return@withAccess emptyList()
+        return@withAccess reconstructBatch(
             dao.listByTypesOccurredSince(
                 types = types.map { it.name },
                 startInclusiveEpochMillis = startInclusive.toEpochMilli(),
@@ -107,9 +112,9 @@ class RoomFinancialTransactionRepository(
         types: Collection<FinancialTransactionType>,
         startInclusive: Instant,
         endExclusive: Instant,
-    ): List<FinancialTransaction> {
-        if (types.isEmpty() || !startInclusive.isBefore(endExclusive)) return emptyList()
-        return reconstructBatch(
+    ): List<FinancialTransaction> = accessGate.withAccess {
+        if (types.isEmpty() || !startInclusive.isBefore(endExclusive)) return@withAccess emptyList()
+        return@withAccess reconstructBatch(
             dao.listByTypesOccurredBetween(
                 types = types.map { it.name },
                 startInclusiveEpochMillis = startInclusive.toEpochMilli(),
@@ -118,39 +123,44 @@ class RoomFinancialTransactionRepository(
         )
     }
 
-    override suspend fun listAwaitingAppliedExchangeRate(primaryCurrency: Currency): List<FinancialTransaction> =
+    override suspend fun listAwaitingAppliedExchangeRate(primaryCurrency: Currency): List<FinancialTransaction> = accessGate.withAccess {
         reconstructBatch(dao.listAwaitingAppliedExchangeRate(primaryCurrency.name))
+    }
 
     override suspend fun listOccurredBetween(
         startInclusive: Instant,
         endExclusive: Instant,
-    ): List<FinancialTransaction> =
+    ): List<FinancialTransaction> = accessGate.withAccess {
         reconstructBatch(
             dao.listOccurredBetween(
                 startInclusiveEpochMillis = startInclusive.toEpochMilli(),
                 endExclusiveEpochMillis = endExclusive.toEpochMilli(),
             ),
         )
+    }
 
-    override suspend fun isRawSmsLinked(rawSmsId: String): Boolean =
+    override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = accessGate.withAccess {
         dao.findLinkByRawSmsId(rawSmsId) != null
+    }
 
-    override suspend fun listRawSmsIds(transactionId: String): List<String> =
+    override suspend fun listRawSmsIds(transactionId: String): List<String> = accessGate.withAccess {
         dao.listRawSmsIdsForTransaction(transactionId)
+    }
 
-    override suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> =
+    override suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> = accessGate.withAccess {
         RoomBatch.query(transactionIds) { chunk -> dao.listRawSmsIdsForTransactions(chunk) }.toSortedSet()
+    }
 
-    override suspend fun update(transaction: FinancialTransaction): Boolean {
+    override suspend fun update(transaction: FinancialTransaction): Boolean = accessGate.withAccess {
         val entity = FinancialTransactionMapper.toEntity(transaction)
-        val existing = dao.getById(entity.id) ?: return false
+        val existing = dao.getById(entity.id) ?: return@withAccess false
         val (rate, source) = ExchangeRatePairWrite.storedOrIncoming(
             storedRate = existing.appliedExchangeRate,
             storedSource = existing.exchangeRateSource,
             incomingRate = entity.appliedExchangeRate,
             incomingSource = entity.exchangeRateSource,
         )
-        return dao.updateTransaction(
+        return@withAccess dao.updateTransaction(
             id = entity.id,
             type = entity.type,
             amountDecimal = entity.amountDecimal,
@@ -171,33 +181,37 @@ class RoomFinancialTransactionRepository(
         id: String,
         exchangeRate: BigDecimal,
         source: ExchangeRateSource,
-    ): Boolean =
+    ): Boolean = accessGate.withAccess {
         dao.updateAppliedExchangeRate(
             id = id,
             exchangeRate = exchangeRate.toPlainString(),
             source = source.name,
         ) > 0
+    }
 
     override suspend fun replaceConfirmedHistoricalMerchantRate(
         id: String,
         exchangeRate: BigDecimal,
         source: ExchangeRateSource,
-    ): Boolean =
+    ): Boolean = accessGate.withAccess {
         dao.replaceConfirmedHistoricalMerchantRate(
             id = id,
             exchangeRate = exchangeRate.toPlainString(),
             source = source.name,
         ) > 0
+    }
 
-    override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean =
+    override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = accessGate.withAccess {
         dao.deleteIfExclusiveRawSmsLink(rawSmsId)
+    }
 
-    override suspend fun unlinkRawSms(rawSmsId: String): Boolean =
+    override suspend fun unlinkRawSms(rawSmsId: String): Boolean = accessGate.withAccess {
         dao.unlinkRawSms(rawSmsId)
+    }
 
-    override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean {
-        if (dao.findLinkByRawSmsId(rawSmsId) != null) return false
-        return dao.insertLinkIfAbsent(
+    override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = accessGate.withAccess {
+        if (dao.findLinkByRawSmsId(rawSmsId) != null) return@withAccess false
+        return@withAccess dao.insertLinkIfAbsent(
             FinancialTransactionRawSmsLinkEntity(rawSmsId = rawSmsId, transactionId = transactionId),
         ) != -1L
     }

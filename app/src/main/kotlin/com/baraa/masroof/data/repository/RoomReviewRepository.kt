@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.dao.ReviewItemDao
 import com.baraa.masroof.data.room.mapper.ReviewItemMapper
 import com.baraa.masroof.domain.ids.ReviewIdFactory
@@ -13,31 +14,38 @@ import java.time.Instant
 
 class RoomReviewRepository(
     private val dao: ReviewItemDao,
+    private val accessGate: DatabaseAccessGate = DatabaseAccessGate(),
 ) : ReviewRepository {
-    override suspend fun getById(id: String): ReviewItem? =
+    override suspend fun getById(id: String): ReviewItem? = accessGate.withAccess {
         dao.getById(id)?.let(ReviewItemMapper::toDomain)
+    }
 
-    override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? =
+    override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? = accessGate.withAccess {
         dao.findByRawSmsId(rawSmsId)?.let(ReviewItemMapper::toDomain)
+    }
 
-    override suspend fun listRequired(): List<ReviewItem> =
+    override suspend fun listRequired(): List<ReviewItem> = accessGate.withAccess {
         dao.listByStatus(ReviewStatus.REQUIRED.name).map(ReviewItemMapper::toDomain)
+    }
 
-    override suspend fun listIgnored(): List<ReviewItem> =
+    override suspend fun listIgnored(): List<ReviewItem> = accessGate.withAccess {
         dao.listIgnored().map(ReviewItemMapper::toDomain)
+    }
 
-    override suspend fun listAll(): List<ReviewItem> =
+    override suspend fun listAll(): List<ReviewItem> = accessGate.withAccess {
         dao.listAll().map(ReviewItemMapper::toDomain)
+    }
 
-    override suspend fun listRetryableProcessingErrorRawSmsIds(): List<String> =
+    override suspend fun listRetryableProcessingErrorRawSmsIds(): List<String> = accessGate.withAccess {
         dao.listRawSmsIdsForRequiredReason(RETRYABLE_PROCESSING_ERROR_REASON)
+    }
 
     override suspend fun upsertRequired(
         rawSmsId: String,
         kind: ReviewKind,
         reasons: List<String>,
         now: Instant,
-    ): ReviewItem {
+    ): ReviewItem = accessGate.withAccess {
         val id = ReviewIdFactory.fromRawSmsId(rawSmsId)
         val existingReasons = findByRawSmsId(rawSmsId)?.reasons.orEmpty()
         val sortedReasons = ExplicitBankSelection.mergePreservedSelection(existingReasons, reasons)
@@ -55,7 +63,7 @@ class RoomReviewRepository(
                 resolvedTransactionId = null,
             ),
         )
-        return ReviewItemMapper.toDomain(dao.upsertRequiredAtomic(entity))
+        return@withAccess ReviewItemMapper.toDomain(dao.upsertRequiredAtomic(entity))
     }
 
     override suspend fun markResolved(
@@ -63,7 +71,7 @@ class RoomReviewRepository(
         resolutionKind: ReviewResolutionKind,
         resolvedAt: Instant,
         resolvedTransactionId: String?,
-    ): ReviewItem? {
+    ): ReviewItem? = accessGate.withAccess {
         val updated = dao.markResolvedAtomic(
             id = id,
             status = ReviewStatus.RESOLVED.name,
@@ -72,7 +80,7 @@ class RoomReviewRepository(
             resolvedTransactionId = resolvedTransactionId,
             updatedAtEpochMillis = resolvedAt.toEpochMilli(),
         )
-        return updated?.let(ReviewItemMapper::toDomain)
+        return@withAccess updated?.let(ReviewItemMapper::toDomain)
     }
 
     private companion object {

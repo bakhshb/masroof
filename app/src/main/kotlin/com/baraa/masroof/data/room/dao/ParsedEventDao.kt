@@ -291,6 +291,24 @@ interface ParsedEventDao {
      * Replace the current parse result for a RawSms (same or new event id).
      * Deletes any existing row for [entity.rawSmsId], then inserts [entity].
      */
+    @Query(
+        """
+        INSERT OR REPLACE INTO processing_retry (rawSmsId, createdAtEpochMillis, mode)
+        SELECT :rawSmsId, :requiredAt, 'HISTORICAL_BATCH'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM review_item
+            WHERE rawSmsId = :rawSmsId AND resolutionKind = 'USER_NON_FINANCIAL'
+        )
+        """,
+    )
+    suspend fun markHistoricalIntent(rawSmsId: String, requiredAt: Long)
+
+    @Transaction
+    suspend fun replaceForHistoricalBatch(entity: ParsedEventEntity, requiredAt: Long) {
+        replaceForRawSms(entity)
+        if (entity.parseStatus != "NON_FINANCIAL") markHistoricalIntent(entity.rawSmsId, requiredAt)
+    }
+
     @Transaction
     suspend fun replaceForRawSms(entity: ParsedEventEntity) {
         deleteByRawSmsId(entity.rawSmsId)

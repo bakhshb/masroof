@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.room.dao.CardRegistryDao
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
@@ -18,11 +19,12 @@ import com.baraa.masroof.domain.repository.CardRegistryRepository
 class RoomCardRegistryRepository(
     private val dao: CardRegistryDao,
     private val bankRegistryDao: com.baraa.masroof.data.room.dao.BankRegistryDao,
+    private val accessGate: DatabaseAccessGate = DatabaseAccessGate(),
 ) : CardRegistryRepository {
-    override suspend fun observe(reference: CardReference, rawSmsId: String) {
-        if (!RegistryIdentity.isKnownBank(reference.bank)) return
+    override suspend fun observe(reference: CardReference, rawSmsId: String): Unit = accessGate.withAccess<Unit> {
+        if (!RegistryIdentity.isKnownBank(reference.bank)) return@withAccess
         val last4 = reference.last4?.trim().orEmpty()
-        if (last4.isEmpty()) return
+        if (last4.isEmpty()) return@withAccess
 
         bankRegistryDao.insertIfAbsent(
             com.baraa.masroof.data.room.entity.BankRegistryEntity(bankId = reference.bank.id),
@@ -41,7 +43,7 @@ class RoomCardRegistryRepository(
         )
     }
 
-    override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus) {
+    override suspend fun setOwnership(reference: CardReference, status: OwnershipStatus): Unit = accessGate.withAccess<Unit> {
         RegistryIdentity.requireKnownBank(reference.bank, "CardRegistry.setOwnership")
         val last4 = reference.last4?.trim().orEmpty()
         require(last4.isNotEmpty()) { "last4 required to set ownership" }
@@ -59,25 +61,26 @@ class RoomCardRegistryRepository(
         )
     }
 
-    override suspend fun resolve(reference: CardReference): OwnershipStatus {
-        if (!RegistryIdentity.isKnownBank(reference.bank)) return OwnershipStatus.UNKNOWN
+    override suspend fun resolve(reference: CardReference): OwnershipStatus = accessGate.withAccess {
+        if (!RegistryIdentity.isKnownBank(reference.bank)) return@withAccess OwnershipStatus.UNKNOWN
         val last4 = reference.last4?.trim().orEmpty()
-        if (last4.isEmpty()) return OwnershipStatus.UNKNOWN
-        val entry = dao.get(reference.bank.id, last4) ?: return OwnershipStatus.UNKNOWN
-        return OwnershipStatus.valueOf(entry.ownershipStatus)
+        if (last4.isEmpty()) return@withAccess OwnershipStatus.UNKNOWN
+        val entry = dao.get(reference.bank.id, last4) ?: return@withAccess OwnershipStatus.UNKNOWN
+        return@withAccess OwnershipStatus.valueOf(entry.ownershipStatus)
     }
 
-    override suspend fun get(reference: CardReference): CardRegistryEntry? {
-        if (!RegistryIdentity.isKnownBank(reference.bank)) return null
+    override suspend fun get(reference: CardReference): CardRegistryEntry? = accessGate.withAccess {
+        if (!RegistryIdentity.isKnownBank(reference.bank)) return@withAccess null
         val last4 = reference.last4?.trim().orEmpty()
-        if (last4.isEmpty()) return null
-        return dao.get(reference.bank.id, last4)?.let(RegistryMapper::toCardEntry)
+        if (last4.isEmpty()) return@withAccess null
+        return@withAccess dao.get(reference.bank.id, last4)?.let(RegistryMapper::toCardEntry)
     }
 
-    override suspend fun listAll(): List<CardRegistryEntry> =
+    override suspend fun listAll(): List<CardRegistryEntry> = accessGate.withAccess {
         dao.listAll().map(RegistryMapper::toCardEntry)
+    }
 
-    override suspend fun updateDisplayName(reference: CardReference, displayName: String?) {
+    override suspend fun updateDisplayName(reference: CardReference, displayName: String?): Unit = accessGate.withAccess<Unit> {
         val last4 = requireLast4(reference)
         requireExisting(reference.bank.id, last4)
         requireUpdated(
@@ -85,19 +88,19 @@ class RoomCardRegistryRepository(
         )
     }
 
-    override suspend fun updateCardNetwork(reference: CardReference, network: CardNetwork?) {
+    override suspend fun updateCardNetwork(reference: CardReference, network: CardNetwork?): Unit = accessGate.withAccess<Unit> {
         val last4 = requireLast4(reference)
         requireExisting(reference.bank.id, last4)
         requireUpdated(dao.updateCardNetwork(reference.bank.id, last4, network?.name))
     }
 
-    override suspend fun updateCardType(reference: CardReference, cardType: CardType?) {
+    override suspend fun updateCardType(reference: CardReference, cardType: CardType?): Unit = accessGate.withAccess<Unit> {
         val last4 = requireLast4(reference)
         requireExisting(reference.bank.id, last4)
         requireUpdated(dao.updateCardType(reference.bank.id, last4, cardType?.name))
     }
 
-    override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) {
+    override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference): Unit = accessGate.withAccess<Unit> {
         val last4 = requireLast4(card)
         RegistryIdentity.requireKnownBank(account.bank, "CardRegistry.linkDebitToAccount")
         require(card.bank == account.bank) { "cross_bank_link" }
@@ -114,7 +117,7 @@ class RoomCardRegistryRepository(
         requireExisting(card.bank.id, last4)
     }
 
-    override suspend fun markAsDebit(reference: CardReference) {
+    override suspend fun markAsDebit(reference: CardReference): Unit = accessGate.withAccess<Unit> {
         val last4 = requireLast4(reference)
         requireExisting(reference.bank.id, last4)
         dao.markDebitAtomic(
@@ -125,7 +128,7 @@ class RoomCardRegistryRepository(
         requireExisting(reference.bank.id, last4)
     }
 
-    override suspend fun setPrimaryCard(reference: CardReference) {
+    override suspend fun setPrimaryCard(reference: CardReference): Unit = accessGate.withAccess<Unit> {
         val last4 = requireLast4(reference)
         val existing = requireExisting(reference.bank.id, last4)
         if (existing.cardType == CardType.DEBIT.name) {
@@ -135,7 +138,7 @@ class RoomCardRegistryRepository(
         requireExisting(reference.bank.id, last4)
     }
 
-    override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) {
+    override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String): Unit = accessGate.withAccess<Unit> {
         val last4 = requireLast4(reference)
         val parentLast4 = primaryLast4.trim()
         require(parentLast4.isNotEmpty()) { "primaryLast4 required" }
@@ -148,7 +151,7 @@ class RoomCardRegistryRepository(
         requireExisting(reference.bank.id, last4)
     }
 
-    override suspend fun clearCardRole(reference: CardReference) {
+    override suspend fun clearCardRole(reference: CardReference): Unit = accessGate.withAccess<Unit> {
         val last4 = requireLast4(reference)
         requireExisting(reference.bank.id, last4)
         dao.clearFacilityRoleAtomic(reference.bank.id, last4)
@@ -174,10 +177,11 @@ class RoomCardRegistryRepository(
     }
 
     companion object {
-        fun from(database: MasroofDatabase): RoomCardRegistryRepository =
+        fun from(database: MasroofDatabase, accessGate: DatabaseAccessGate = DatabaseAccessGate()): RoomCardRegistryRepository =
             RoomCardRegistryRepository(
                 dao = database.cardRegistryDao(),
                 bankRegistryDao = database.bankRegistryDao(),
+                accessGate = accessGate,
             )
     }
 }
