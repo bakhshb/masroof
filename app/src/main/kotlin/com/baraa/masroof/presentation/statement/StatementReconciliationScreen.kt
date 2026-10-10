@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
+import com.baraa.masroof.domain.statement.StatementComparisonStatus
 import com.baraa.masroof.domain.statement.StatementRejection
 import com.baraa.masroof.presentation.common.MasroofAmountRole
 import com.baraa.masroof.presentation.common.MasroofAmountText
@@ -35,6 +36,16 @@ import com.baraa.masroof.presentation.theme.MasroofIconSizes
 import com.baraa.masroof.presentation.theme.MasroofSpacing
 
 const val STATEMENT_RECONCILIATION_PICK_TAG: String = "statement_reconciliation_pick"
+const val STATEMENT_COUNTS_HEADER_TAG: String = "statement_counts_header"
+
+fun statementOutcomeTag(status: StatementComparisonStatus): String =
+    "statement_outcome_${status.name}"
+
+fun statementSectionTag(status: StatementComparisonStatus): String =
+    "statement_section_${status.name}"
+
+fun statementLineTag(status: StatementComparisonStatus, index: Int): String =
+    "statement_line_${status.name}_$index"
 
 @Composable
 fun StatementReconciliationRoute(
@@ -125,14 +136,37 @@ fun StatementReconciliationScreen(
 
 @Composable
 private fun ReportBody(state: StatementReconciliationUiState) {
-    MasroofSectionHeader(title = stringResource(R.string.settings_statement_counts))
+    MasroofSectionHeader(
+        title = stringResource(R.string.settings_statement_counts),
+        modifier = Modifier.testTag(STATEMENT_COUNTS_HEADER_TAG),
+    )
     MasroofCard {
         Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
-            CountRow(R.string.settings_statement_matched, state.matchedCount)
-            CountRow(R.string.settings_statement_statement_only, state.statementOnlyCount)
-            CountRow(R.string.settings_statement_ledger_only, state.ledgerOnlyCount)
-            CountRow(R.string.settings_statement_ambiguous, state.ambiguousCount)
-            CountRow(R.string.settings_statement_unsupported, state.unsupportedCount)
+            CountRow(
+                R.string.settings_statement_matched,
+                state.matchedCount,
+                StatementComparisonStatus.MATCHED,
+            )
+            CountRow(
+                R.string.settings_statement_statement_only,
+                state.statementOnlyCount,
+                StatementComparisonStatus.STATEMENT_ONLY,
+            )
+            CountRow(
+                R.string.settings_statement_ledger_only,
+                state.ledgerOnlyCount,
+                StatementComparisonStatus.LEDGER_ONLY,
+            )
+            CountRow(
+                R.string.settings_statement_ambiguous,
+                state.ambiguousCount,
+                StatementComparisonStatus.AMBIGUOUS,
+            )
+            CountRow(
+                R.string.settings_statement_unsupported,
+                state.unsupportedCount,
+                StatementComparisonStatus.UNSUPPORTED,
+            )
             CountRow(R.string.settings_statement_fleet_payments, state.matchedFleetPaymentCount)
             CountRow(R.string.settings_statement_self_transfers, state.matchedSelfTransferCount)
         }
@@ -166,18 +200,46 @@ private fun ReportBody(state: StatementReconciliationUiState) {
             }
         }
     }
-    LineSection(R.string.settings_statement_statement_only, state.statementOnlyLines)
-    LineSection(R.string.settings_statement_ledger_only, state.ledgerOnlyLines)
-    LineSection(R.string.settings_statement_ambiguous, state.ambiguousLines)
-    LineSection(R.string.settings_statement_unsupported, state.unsupportedLines)
+    LineSection(
+        R.string.settings_statement_matched,
+        StatementComparisonStatus.MATCHED,
+        state.matchedLines,
+    )
+    LineSection(
+        R.string.settings_statement_statement_only,
+        StatementComparisonStatus.STATEMENT_ONLY,
+        state.statementOnlyLines,
+    )
+    LineSection(
+        R.string.settings_statement_ledger_only,
+        StatementComparisonStatus.LEDGER_ONLY,
+        state.ledgerOnlyLines,
+    )
+    LineSection(
+        R.string.settings_statement_ambiguous,
+        StatementComparisonStatus.AMBIGUOUS,
+        state.ambiguousLines,
+    )
+    LineSection(
+        R.string.settings_statement_unsupported,
+        StatementComparisonStatus.UNSUPPORTED,
+        state.unsupportedLines,
+    )
 }
 
 @Composable
-private fun LineSection(titleRes: Int, lines: List<StatementLineUi>) {
+private fun LineSection(
+    titleRes: Int,
+    status: StatementComparisonStatus,
+    lines: List<StatementLineUi>,
+) {
     if (lines.isEmpty()) return
-    MasroofSectionHeader(title = stringResource(titleRes))
-    lines.forEach { line ->
-        MasroofCard {
+    MasroofSectionHeader(
+        title = stringResource(titleRes) + " " + status.name,
+        modifier = Modifier.testTag(statementSectionTag(status)),
+    )
+    lines.forEachIndexed { index, line ->
+        MasroofCard(modifier = Modifier.testTag(statementLineTag(status, index))) {
             Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
                 Text(
                     text = line.title,
@@ -196,11 +258,14 @@ private fun LineSection(titleRes: Int, lines: List<StatementLineUi>) {
 }
 
 @Composable
-private fun CountRow(labelRes: Int, count: Int) {
+private fun CountRow(labelRes: Int, count: Int, status: StatementComparisonStatus? = null) {
+    val label = stringResource(labelRes)
+    val value = if (status == null) "$label $count" else "$label ${status.name} $count"
     Text(
-        text = stringResource(labelRes) + " " + count,
+        text = value,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurface,
+        modifier = if (status == null) Modifier else Modifier.testTag(statementOutcomeTag(status)),
     )
 }
 

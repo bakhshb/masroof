@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.collectAsState
@@ -114,7 +115,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            var startupOutcome by remember { mutableStateOf<StartupMaintenanceOutcome?>(null) }
+            var startupOutcome by rememberSaveable {
+                mutableStateOf<StartupMaintenanceOutcome?>(null)
+            }
             var startupRetrying by remember { mutableStateOf(false) }
             val startupScope = rememberCoroutineScope()
             LaunchedEffect(Unit) {

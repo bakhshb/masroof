@@ -20,7 +20,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Screen state model. An emulator smoke of the settings route was not run locally.
+ * Screen state model. The emulator journey is StatementReconciliationSmokeTest.
  */
 class StatementReconciliationViewModelTest {
     @Test
@@ -45,6 +45,7 @@ class StatementReconciliationViewModelTest {
         assertEquals("591.25 SAR", state.totals.single { it.currencyCode == "SAR" }.matchedDebit)
         assertEquals("20.00 USD", state.totals.single { it.currencyCode == "USD" }.matchedDebit)
         assertEquals("MISSING ANON", state.statementOnlyLines.single().title)
+        assertEquals("GROCERY ANON", state.matchedLines.single().title)
         assertTrue(state.balanceUnsupported)
     }
 
@@ -71,6 +72,12 @@ class StatementReconciliationViewModelTest {
                 unsupported = 0,
             ),
             statementLines = listOf(
+                StatementLineComparison(
+                    entry = missing.copy(description = "GROCERY ANON", lineNumber = 1),
+                    status = StatementComparisonStatus.MATCHED,
+                    ledgerTransactionId = "posted-0",
+                    ledgerType = null,
+                ),
                 StatementLineComparison(
                     entry = missing,
                     status = StatementComparisonStatus.STATEMENT_ONLY,
