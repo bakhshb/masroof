@@ -201,6 +201,41 @@ class StatementReconciliationServiceTest {
     }
 
     @Test
+    fun deviceJourneyFixture_showsMatchedStatementOnlyLedgerOnlyAndAmbiguous() = runBlocking {
+        val csv = """
+            # masroof-statement-v1
+            bankId,accountMasked,bookedAt,direction,amount,currency,description,reference
+            BANK_ALJAZIRA,3001,2026-04-02,DEBIT,12.00,SAR,MATCHED ANON,REF-M
+            BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON A,REF-A1
+            BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON B,REF-A2
+            BANK_ALJAZIRA,3001,2026-04-11,DEBIT,4.00,SAR,STATEMENT ONLY ANON,REF-S
+        """.trimIndent() + "\n"
+        val rows = listOf(
+            posted("m19-matched", FinancialTransactionType.EXPENSE, "12.00", local("2026-04-02T12:00:00"), StatementDirection.DEBIT),
+            posted("m19-ambiguous-a", FinancialTransactionType.EXPENSE, "5.00", local("2026-04-10T09:00:00"), StatementDirection.DEBIT),
+            posted("m19-ambiguous-b", FinancialTransactionType.EXPENSE, "5.00", local("2026-04-10T18:00:00"), StatementDirection.DEBIT),
+            posted("m19-ledger-only", FinancialTransactionType.EXPENSE, "7.00", local("2026-04-11T12:00:00"), StatementDirection.DEBIT),
+        )
+        val ledger = RecordingLedger(rows)
+        val result = ImportStatementUseCase(parser, StatementReconciliationService(ledger))
+            .import(ByteArrayInputStream(csv.toByteArray()), known)
+        val report = (result as StatementImportResult.Compared).report
+        assertEquals(0, ledger.mutations)
+        assertEquals(1, report.counts.matched)
+        assertEquals(1, report.counts.statementOnly)
+        assertEquals(1, report.counts.ledgerOnly)
+        assertEquals(4, report.counts.ambiguous)
+        assertEquals(0, report.counts.unsupported)
+        assertEquals(StatementComparisonStatus.MATCHED, report.line("MATCHED ANON").status)
+        assertEquals(StatementComparisonStatus.STATEMENT_ONLY, report.line("STATEMENT ONLY ANON").status)
+        assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("m19-ledger-only").status)
+        assertEquals(StatementComparisonStatus.AMBIGUOUS, report.line("AMBIGUOUS ANON A").status)
+        assertEquals(StatementComparisonStatus.AMBIGUOUS, report.line("AMBIGUOUS ANON B").status)
+        assertEquals(StatementComparisonStatus.AMBIGUOUS, report.ledger("m19-ambiguous-a").status)
+        assertEquals(StatementComparisonStatus.AMBIGUOUS, report.ledger("m19-ambiguous-b").status)
+    }
+
+    @Test
     fun conflictingStoredZones_stayUnsupported() = runBlocking {
         val entry = BankStatementEntry(
             lineNumber = 1,

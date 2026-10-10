@@ -108,6 +108,17 @@ jobs:
             # notPackage in app/build.gradle.kts keeps M13 process-death phases out of
             # this clearPackageData=true suite.
             ./gradlew connectedDebugAndroidTest --stacktrace
+            mkdir -p m19-statement-screenshots
+            adb pull /sdcard/m19-statement-screenshots/. m19-statement-screenshots || true
+            find m19-statement-screenshots -name 'm19-*.png' | grep -q .
+
+      - name: Upload statement reconciliation screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m19-statement-screenshots
+          path: m19-statement-screenshots
+          if-no-files-found: warn
 
   # API 30 process death. Separate from emulator-smoke so clearPackageData=true
   # cannot wipe the database between the halt and the restarted process.
