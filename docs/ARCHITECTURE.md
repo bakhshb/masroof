@@ -1080,3 +1080,21 @@ Avoid:
 A developer or AI coding agent should be able to modify the Bank AlJazira parser without touching the financial domain.
 
 Likewise, the financial domain should be testable without Android, SMS APIs, Room, or Compose.
+
+---
+
+## 31. Financial invariants
+
+M18 checks these rules against persisted rows. Dashboard money totals stay in the golden ledger projection (`GoldenLedgerRunner` over `DashboardLedgerWorld`). The `m8_asof_fx` oracle is active: an October 1 purchase does not inherit a later merchant rate. Sequences use fixed seeds and name the seed when an assertion fails. They do not sleep.
+
+1. A recognized captured bank financial SMS ends as a posted movement, a REQUIRED review, or a durable `processing_retry` row. Informational families (`OTP`, `NON_FINANCIAL`, `BALANCE_NOTICE`) and an explicit `USER_NON_FINANCIAL` resolution stay terminal and unposted. An unrecognized sender is outside bank capture and is not part of that coverage.
+2. An SMS-derived posted transaction has at least one RawSms link, every link still exists, and each RawSms links to at most one posted movement.
+3. `Money` arithmetic requires one currency. A stored movement keeps the parsed currency unless a user correction supplies a new amount. SAR fleet and spending totals do not add a foreign magnitude onto a SAR magnitude. Unconverted foreign rows stay in `excludedOtherCurrencyCount`.
+4. A verified self-transfer is fleet-neutral: it is not salary, other income, or outside spending. Distinct same-amount movements stay distinct, including a pair outside `TransactionMatcher.TRANSFER_MATCH_WINDOW` (10 minutes) and two owned pairs on different days. An unresolvable same-minute tie stays REQUIRED `PENDING_MATCH` and unposted.
+5. `USER_NON_FINANCIAL`, `USER_EXTERNAL_TRANSFER`, `USER_SELF_TRANSFER_PAIR`, `USER_FINANCIAL_TYPE`, and an approved user correction survive reparse, reconciliation replay, and legacy transfer repair. A later incomplete reconcile does not rewrite a stored manual decision.
+
+AlJazira wall clocks use `Asia/Riyadh` through `BankTransactionTimePolicy`, the only bank-to-zone map. Pairing uses that instant. Other banks keep the zone stored on first assembly.
+
+Fault injection is deterministic and hits one boundary at a time: after RawSms capture, after ParsedEvent save, before and after transactional link replace, before and after review upsert, and before clearing recovery state. A thrown failure at that boundary leaves the SMS durable. A nonthrowing `FinancialTransactionSaveResult.Conflict` that makes `ReconciliationSummary.failed > 0` is incomplete under `ReconciliationCompletionPolicy`, not success. When the fault is removed, replay applies the financial outcome once: no lost SMS, no orphan financial row, and no forgotten review.
+
+Seeds used by the invariant suite: `20261009` and `20261010` (golden order and its reverse), `151515` (live/inbox twin), `180055` (inside the matcher window), `200011` (after the matcher window), `909090` (unresolvable tie), `808080` (SAR/USD separation and the active M8 as-of check), `20261018` (fault matrix), `20261019` (manual replay).
