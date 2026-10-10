@@ -119,6 +119,7 @@ class PreVacuumBackupSnapshotTest {
             writerFailure.get()?.let { throw it }
 
             val zip = File(context.cacheDir, "pre-vacuum-${System.nanoTime()}.masroof")
+            val passphrase = "pre-vacuum-passphrase".toCharArray()
             val exported = runBlocking {
                 DatabaseBackupService(
                     appContext = context,
@@ -127,7 +128,8 @@ class PreVacuumBackupSnapshotTest {
                     appVersionName = "test",
                     clockEpochMillis = { 1_700_000_000_000L },
                     restartProcess = { error("export must not restart the process") },
-                ).exportTo(Uri.fromFile(zip))
+                    kdfIterations = 4_096,
+                ).exportTo(Uri.fromFile(zip), passphrase.copyOf())
             }
             stop.set(true)
             writer.join(20_000)
@@ -145,7 +147,7 @@ class PreVacuumBackupSnapshotTest {
                     appVersionName = "test",
                     clockEpochMillis = { 1_700_000_000_000L },
                     restartProcess = { restartRequested.set(true) },
-                ).importFrom(Uri.fromFile(zip))
+                ).importFrom(Uri.fromFile(zip), passphrase.copyOf())
             }
             assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
             assertTrue(restartRequested.get())

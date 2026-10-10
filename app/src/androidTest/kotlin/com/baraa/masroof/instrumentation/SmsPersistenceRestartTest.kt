@@ -455,7 +455,8 @@ class SmsPersistenceRestartTest {
                     appVersionName = "m13-emulator",
                     clockEpochMillis = { 1_700_000_000_000L },
                     restartProcess = { secondRestart.incrementAndGet() },
-                ).importFrom(Uri.fromFile(packageZip))
+                    kdfIterations = RESTORE_KDF_ITERATIONS,
+                ).importFrom(Uri.fromFile(packageZip), restorePassphrase())
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, second)
             } finally {
                 if (reopened.isOpen) reopened.close()
@@ -507,7 +508,8 @@ class SmsPersistenceRestartTest {
             appVersionName = "m13-emulator",
             clockEpochMillis = { 1_700_000_000_000L },
             restartProcess = { error("export must not restart the process") },
-        ).exportTo(Uri.fromFile(packageZip))
+            kdfIterations = RESTORE_KDF_ITERATIONS,
+        ).exportTo(Uri.fromFile(packageZip), restorePassphrase())
         assertTrue(exported.exceptionOrNull()?.let { "export failed: ${it.javaClass.simpleName}" } ?: "export failed", exported.isSuccess)
         session.checkpointAndClose()
         return posted
@@ -551,7 +553,8 @@ class SmsPersistenceRestartTest {
                 clockEpochMillis = { 1_700_000_000_000L },
                 restartProcess = onRestart,
                 afterRestoreStage = afterStage,
-            ).importFrom(Uri.fromFile(packageZip))
+                kdfIterations = RESTORE_KDF_ITERATIONS,
+            ).importFrom(Uri.fromFile(packageZip), restorePassphrase())
         } finally {
             if (liveDatabase.isOpen) liveDatabase.close()
         }
@@ -724,6 +727,12 @@ class SmsPersistenceRestartTest {
         "emulator instrumentation API ${Build.VERSION.SDK_INT}: $detail"
 
     private fun masked(id: String): String = AppLogFormatting.maskId(id)
+
+    private fun restorePassphrase(): CharArray = "m13-restore-passphrase".toCharArray()
+
+    private companion object {
+        const val RESTORE_KDF_ITERATIONS: Int = 4_096
+    }
 }
 
 private enum class Halt {

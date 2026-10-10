@@ -95,7 +95,7 @@ class DatabaseBackupImportMigrationTest {
             },
         )
 
-        val outcome = backupService.importFrom(Uri.fromFile(backupZip))
+        val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
 
         assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
         assertTrue(restartRequested.get())
@@ -135,7 +135,7 @@ class DatabaseBackupImportMigrationTest {
                 maintenancePreferences = CommitFailsPreferences(prefs),
             )
 
-            val outcome = backupService.importFrom(Uri.fromFile(backupZip))
+            val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
 
             assertEquals(BackupImportOutcome.Failed, outcome)
             assertFalse(restartRequested.get())
@@ -176,7 +176,7 @@ class DatabaseBackupImportMigrationTest {
             restartProcess = { restartRequested.set(true) },
         )
 
-        val outcome = backupService.importFrom(Uri.fromFile(backupZip))
+        val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
 
         assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
         assertTrue(restartRequested.get())
@@ -234,7 +234,7 @@ class DatabaseBackupImportMigrationTest {
                 beforeValidatedInstall = { check(validated.delete()) },
             )
 
-            val outcome = backupService.importFrom(Uri.fromFile(backupZip))
+            val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
 
             assertEquals(BackupImportOutcome.Failed, outcome)
             assertFalse(restartRequested.get())
@@ -302,7 +302,7 @@ class DatabaseBackupImportMigrationTest {
                     },
                 )
                 try {
-                    backupService.importFrom(Uri.fromFile(backupZip))
+                    backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
                     org.junit.Assert.fail("expected termination at $stage")
                 } catch (error: DatabaseRestoreRecovery.ProcessTerminated) {
                     assertEquals(stage.name, error.message?.substringAfterLast(' '))

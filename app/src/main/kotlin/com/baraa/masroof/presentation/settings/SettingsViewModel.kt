@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.backup.BackupImportOutcome
+import com.baraa.masroof.application.backup.BackupPackageKind
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
@@ -81,6 +82,8 @@ class SettingsViewModel(
     private val _logEntries = MutableStateFlow(appLogService.readAll())
     val logEntries: StateFlow<List<com.baraa.masroof.application.logging.AppLogEntry>> = _logEntries.asStateFlow()
     private var pendingImportUri: Uri? = null
+    private var pendingLegacyImport: Boolean = false
+    private var pendingExportPassphrase: CharArray? = null
 
     fun refreshLogs() {
         _logEntries.value = appLogService.readAll()
@@ -746,30 +749,140 @@ class SettingsViewModel(
         _uiState.update { it.copy(backupMessage = null) }
     }
 
+    fun onExportPassphraseChange(value: String) {
+        _uiState.update { it.copy(exportPassphrase = value) }
+    }
+
+    fun onImportPassphraseChange(value: String) {
+        _uiState.update { it.copy(importPassphrase = value) }
+    }
+
+    /**
+     * Copies the export passphrase out of view state and clears the field.
+     * Returns false when the field is empty. Call [abandonPreparedExport] if the
+     * user dismisses the destination picker.
+     */
+    fun prepareExport(): Boolean {
+        if (_uiState.value.exportingBackup || _uiState.value.importingBackup) return false
+        val current = _uiState.value.exportPassphrase
+        if (current.isEmpty()) {
+            _uiState.update { it.copy(backupMessage = BackupMessage.PASSPHRASE_REQUIRED) }
+            return false
+        }
+        abandonPreparedExport()
+        pendingExportPassphrase = current.toCharArray()
+        _uiState.update { it.copy(exportPassphrase = "", backupMessage = null) }
+        return true
+    }
+
+    fun abandonPreparedExport() {
+        pendingExportPassphrase?.fill('\u0000')
+        pendingExportPassphrase = null
+    }
+
     fun offerImport(uri: Uri) {
         if (_uiState.value.exportingBackup || _uiState.value.importingBackup) return
-        pendingImportUri = uri
-        _uiState.update { it.copy(awaitingImportConfirm = true, backupMessage = null) }
+        viewModelScope.launch {
+            _uiState.update { it.copy(importingBackup = true, backupMessage = null) }
+            try {
+                when (databaseBackupService.inspect(uri)) {
+                    BackupPackageKind.LEGACY_PLAINTEXT -> {
+                        pendingImportUri = uri
+                        pendingLegacyImport = true
+                        _uiState.update {
+                            it.copy(
+                                importingBackup = false,
+                                awaitingLegacyImportConfirm = true,
+                                awaitingImportConfirm = false,
+                            )
+                        }
+                    }
+                    BackupPackageKind.ENCRYPTED -> {
+                        if (_uiState.value.importPassphrase.isEmpty()) {
+                            _uiState.update {
+                                it.copy(
+                                    importingBackup = false,
+                                    backupMessage = BackupMessage.PASSPHRASE_REQUIRED,
+                                )
+                            }
+                        } else {
+                            pendingImportUri = uri
+                            pendingLegacyImport = false
+                            _uiState.update {
+                                it.copy(
+                                    importingBackup = false,
+                                    awaitingImportConfirm = true,
+                                    awaitingLegacyImportConfirm = false,
+                                )
+                            }
+                        }
+                    }
+                    BackupPackageKind.UNRECOGNIZED ->
+                        _uiState.update {
+                            it.copy(
+                                importingBackup = false,
+                                backupMessage = BackupMessage.IMPORT_INVALID,
+                            )
+                        }
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(importingBackup = false, backupMessage = BackupMessage.IMPORT_FAILED)
+                }
+            }
+        }
     }
 
     fun cancelPendingImport() {
         pendingImportUri = null
-        _uiState.update { it.copy(awaitingImportConfirm = false) }
+        pendingLegacyImport = false
+        _uiState.update {
+            it.copy(awaitingImportConfirm = false, awaitingLegacyImportConfirm = false)
+        }
     }
 
     fun confirmPendingImport() {
         val uri = pendingImportUri ?: return
+        val legacy = pendingLegacyImport
+        val passphrase = if (legacy) {
+            CharArray(0)
+        } else {
+            _uiState.value.importPassphrase.toCharArray()
+        }
+        if (!legacy && passphrase.isEmpty()) {
+            pendingImportUri = null
+            pendingLegacyImport = false
+            _uiState.update {
+                it.copy(
+                    awaitingImportConfirm = false,
+                    awaitingLegacyImportConfirm = false,
+                    backupMessage = BackupMessage.PASSPHRASE_REQUIRED,
+                )
+            }
+            return
+        }
         pendingImportUri = null
-        _uiState.update { it.copy(awaitingImportConfirm = false) }
-        importBackup(uri)
+        pendingLegacyImport = false
+        _uiState.update {
+            it.copy(
+                awaitingImportConfirm = false,
+                awaitingLegacyImportConfirm = false,
+                importPassphrase = if (legacy) it.importPassphrase else "",
+            )
+        }
+        importBackup(uri, passphrase, legacy)
     }
 
     fun exportBackup(uri: Uri) {
         if (_uiState.value.exportingBackup || _uiState.value.importingBackup) return
+        val passphrase = pendingExportPassphrase ?: return
+        pendingExportPassphrase = null
         viewModelScope.launch {
             _uiState.update { it.copy(exportingBackup = true, backupMessage = null, error = null) }
             try {
-                databaseBackupService.exportTo(uri).getOrThrow()
+                databaseBackupService.exportTo(uri, passphrase).getOrThrow()
                 _uiState.update {
                     it.copy(exportingBackup = false, backupMessage = BackupMessage.EXPORT_SUCCESS)
                 }
@@ -779,16 +892,28 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(exportingBackup = false, backupMessage = BackupMessage.EXPORT_FAILED)
                 }
+            } finally {
+                passphrase.fill('\u0000')
             }
         }
     }
 
-    fun importBackup(uri: Uri) {
+    fun importBackup(
+        uri: Uri,
+        passphrase: CharArray = CharArray(0),
+        confirmLegacyPlaintext: Boolean = false,
+    ) {
         if (_uiState.value.exportingBackup || _uiState.value.importingBackup) return
         viewModelScope.launch {
             _uiState.update { it.copy(importingBackup = true, backupMessage = null, error = null) }
             try {
-                when (databaseBackupService.importFrom(uri)) {
+                when (
+                    databaseBackupService.importFrom(
+                        source = uri,
+                        passphrase = passphrase,
+                        confirmLegacyPlaintext = confirmLegacyPlaintext,
+                    )
+                ) {
                     BackupImportOutcome.SuccessNeedsRestart -> {
                         // Process restarts inside the service after a successful restore.
                     }
@@ -806,6 +931,23 @@ class SettingsViewModel(
                                 backupMessage = BackupMessage.IMPORT_FAILED,
                             )
                         }
+                    BackupImportOutcome.LegacyConfirmationRequired -> {
+                        pendingImportUri = uri
+                        pendingLegacyImport = true
+                        _uiState.update {
+                            it.copy(
+                                importingBackup = false,
+                                awaitingLegacyImportConfirm = true,
+                            )
+                        }
+                    }
+                    BackupImportOutcome.AuthenticationFailed ->
+                        _uiState.update {
+                            it.copy(
+                                importingBackup = false,
+                                backupMessage = BackupMessage.IMPORT_AUTH_FAILED,
+                            )
+                        }
                 }
             } catch (ce: CancellationException) {
                 throw ce
@@ -813,6 +955,8 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(importingBackup = false, backupMessage = BackupMessage.IMPORT_FAILED)
                 }
+            } finally {
+                passphrase.fill('\u0000')
             }
         }
     }

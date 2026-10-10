@@ -5,16 +5,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
@@ -30,6 +35,8 @@ fun SettingsDataBackupScreen(
     onClearSmsImportMessage: () -> Unit,
     onRequestSmsPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    onExportPassphraseChange: (String) -> Unit,
+    onImportPassphraseChange: (String) -> Unit,
     onRequestExport: () -> Unit,
     onRequestImport: () -> Unit,
     onConfirmPendingImport: () -> Unit,
@@ -63,6 +70,23 @@ fun SettingsDataBackupScreen(
             },
         )
     }
+    if (state.awaitingLegacyImportConfirm) {
+        AlertDialog(
+            onDismissRequest = onCancelPendingImport,
+            title = { Text(stringResource(R.string.settings_import_legacy_title)) },
+            text = { Text(stringResource(R.string.settings_import_legacy_body)) },
+            confirmButton = {
+                TextButton(onClick = onConfirmPendingImport) {
+                    Text(stringResource(R.string.settings_import_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onCancelPendingImport) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
     if (state.awaitingImportConfirm) {
         AlertDialog(
             onDismissRequest = onCancelPendingImport,
@@ -86,6 +110,8 @@ fun SettingsDataBackupScreen(
             BackupMessage.EXPORT_FAILED -> stringResource(R.string.settings_export_failed)
             BackupMessage.IMPORT_FAILED -> stringResource(R.string.settings_import_failed)
             BackupMessage.IMPORT_INVALID -> stringResource(R.string.settings_import_invalid)
+            BackupMessage.PASSPHRASE_REQUIRED -> stringResource(R.string.settings_backup_passphrase_required)
+            BackupMessage.IMPORT_AUTH_FAILED -> stringResource(R.string.settings_import_auth_failed)
         }
         AlertDialog(
             onDismissRequest = onClearBackupMessage,
@@ -181,12 +207,48 @@ fun SettingsDataBackupScreen(
                 onRefresh = onReparseStored,
             )
 
+            OutlinedTextField(
+                value = state.exportPassphrase,
+                onValueChange = onExportPassphraseChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.settings_export_passphrase_label)) },
+                supportingText = {
+                    Text(
+                        stringResource(R.string.settings_export_passphrase_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                singleLine = true,
+                enabled = !state.exportingBackup && !state.importingBackup,
+            )
+
             SettingsNavRow(
                 icon = MasroofIcons.export,
                 title = stringResource(R.string.settings_export_title),
                 subtitle = stringResource(R.string.settings_export_subtitle),
                 onClick = onRequestExport,
                 enabled = !state.exportingBackup && !state.importingBackup && !state.reparsingStored,
+            )
+
+            OutlinedTextField(
+                value = state.importPassphrase,
+                onValueChange = onImportPassphraseChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.settings_import_passphrase_label)) },
+                supportingText = {
+                    Text(
+                        stringResource(R.string.settings_import_passphrase_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                singleLine = true,
+                enabled = !state.exportingBackup && !state.importingBackup,
             )
 
             SettingsNavRow(

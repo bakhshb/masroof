@@ -187,6 +187,8 @@ class MainActivity : ComponentActivity() {
                     ) { uri: Uri? ->
                         if (uri != null) {
                             settingsViewModel.exportBackup(uri)
+                        } else {
+                            settingsViewModel.abandonPreparedExport()
                         }
                     }
 
@@ -240,8 +242,10 @@ class MainActivity : ComponentActivity() {
                             recreate()
                         },
                         onRequestExport = {
-                            val name = BackupPackageFormat.defaultExportFileName(System.currentTimeMillis())
-                            exportLauncher.launch(name)
+                            if (settingsViewModel.prepareExport()) {
+                                val name = BackupPackageFormat.defaultExportFileName(System.currentTimeMillis())
+                                exportLauncher.launch(name)
+                            }
                         },
                         onRequestImport = {
                             importLauncher.launch(arrayOf("*/*"))

@@ -17,6 +17,7 @@ import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -41,59 +42,150 @@ class DatabaseBackupService(
      */
     private val onlineBackupEnabled: Boolean = true,
     /**
-     * Uncompressed ZIP caps applied before the live database is closed.
+     * Uncompressed ZIP caps from M4, applied before the live database is closed.
      * Tests inject a smaller [BackupArchiveLimits] to prove a zip bomb stops.
      */
     private val archiveLimits: BackupArchiveLimits = BackupArchiveLimits.PRODUCTION,
+    /** Production uses [BackupEnvelope.DEFAULT_ITERATIONS]. Tests inject a lower count. */
+    private val kdfIterations: Int = BackupEnvelope.DEFAULT_ITERATIONS,
 ) : DatabaseBackupGateway {
-    override suspend fun exportTo(destination: Uri): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            val staging = createStagingDir("export")
-            try {
-                val dbCopy = File(staging, BackupPackageFormat.DATABASE_ENTRY)
-                writeConsistentSnapshot(dbCopy)
-                verifyIsolatedSnapshot(dbCopy)
-
-                val exportedAt = clockEpochMillis()
-                val manifest = BackupManifest(
-                    formatVersion = BackupPackageFormat.FORMAT_VERSION,
-                    appVersionName = appVersionName,
-                    roomVersion = MasroofDatabase.VERSION,
-                    identityHash = MasroofDatabase.IDENTITY_HASH,
-                    exportedAtEpochMillis = exportedAt,
-                )
-                File(staging, BackupPackageFormat.MANIFEST_ENTRY)
-                    .writeText(BackupPackageCodec.encodeManifest(manifest))
-                File(staging, BackupPackageFormat.PREFERENCES_ENTRY)
-                    .writeText(BackupPackageCodec.encodePreferences(capturePreferences()))
-
-                writeZip(staging, destination)
-            } finally {
-                staging.deleteRecursively()
-            }
-        }.onSuccess {
-            appLogService?.info(AppLogCategories.BACKUP, "Database export succeeded")
-        }.onFailure { error ->
-            appLogService?.error(
-                AppLogCategories.BACKUP,
-                "Database export failed: ${error.message ?: error::class.java.simpleName}",
-            )
+    init {
+        require(kdfIterations in 1..BackupEnvelope.MAX_ITERATIONS) {
+            "KDF iteration count is outside the supported range"
         }
+        sweepAbandonedStaging()
+    }
+    override suspend fun exportTo(destination: Uri, passphrase: CharArray): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val secret = passphrase.copyOf()
+            passphrase.fill('\u0000')
+            try {
+                if (secret.isEmpty()) {
+                    logExportFailure(BackupFailureCategory.PASSPHRASE_REQUIRED)
+                    return@withContext Result.failure(
+                        BackupFailureException(BackupFailureCategory.PASSPHRASE_REQUIRED),
+                    )
+                }
+                runCatching {
+                    val staging = createStagingDir("export")
+                    try {
+                        val dbCopy = File(staging, BackupPackageFormat.DATABASE_ENTRY)
+                        writeConsistentSnapshot(dbCopy)
+                        verifyIsolatedSnapshot(dbCopy)
+
+                        val exportedAt = clockEpochMillis()
+                        val manifest = BackupManifest(
+                            formatVersion = BackupPackageFormat.FORMAT_VERSION,
+                            appVersionName = appVersionName,
+                            roomVersion = MasroofDatabase.VERSION,
+                            identityHash = MasroofDatabase.IDENTITY_HASH,
+                            exportedAtEpochMillis = exportedAt,
+                        )
+                        File(staging, BackupPackageFormat.MANIFEST_ENTRY)
+                            .writeText(BackupPackageCodec.encodeManifest(manifest))
+                        File(staging, BackupPackageFormat.PREFERENCES_ENTRY)
+                            .writeText(BackupPackageCodec.encodePreferences(capturePreferences()))
+
+                        writeEncryptedPackage(staging, destination, secret)
+                    } finally {
+                        staging.deleteRecursively()
+                    }
+                }.onSuccess {
+                    appLogService?.info(AppLogCategories.BACKUP, "Database export succeeded")
+                }.onFailure { error ->
+                    logExportFailure(
+                        (error as? BackupFailureException)?.category ?: BackupFailureCategory.EXPORT_FAILED,
+                    )
+                }
+            } finally {
+                secret.fill('\u0000')
+            }
+        }
+
+    override suspend fun inspect(source: Uri): BackupPackageKind = withContext(Dispatchers.IO) {
+        runCatching {
+            val raw = appContext.contentResolver.openInputStream(source) ?: return@withContext BackupPackageKind.UNRECOGNIZED
+            raw.use { stream ->
+                val peek = ByteArray(BackupEnvelope.HEADER_SIZE)
+                val read = readPrefix(stream, peek)
+                when {
+                    BackupPackageFormat.looksLikeZip(peek, read) -> BackupPackageKind.LEGACY_PLAINTEXT
+                    BackupEnvelope.looksLikeEnvelope(peek, read) -> BackupPackageKind.ENCRYPTED
+                    else -> BackupPackageKind.UNRECOGNIZED
+                }
+            }
+        }.getOrDefault(BackupPackageKind.UNRECOGNIZED)
     }
 
-    override suspend fun importFrom(source: Uri): BackupImportOutcome = withContext(Dispatchers.IO) {
-        val staging = createStagingDir("import")
+    override suspend fun importFrom(
+        source: Uri,
+        passphrase: CharArray,
+        confirmLegacyPlaintext: Boolean,
+    ): BackupImportOutcome = withContext(Dispatchers.IO) {
+        val secret = passphrase.copyOf()
+        passphrase.fill('\u0000')
+        var staging: File? = null
         try {
-            // Reject a bad archive before closeDatabase() or restore recovery.
-            try {
-                unzipTo(source, staging)
-            } catch (error: BackupArchiveException) {
-                appLogService?.error(AppLogCategories.BACKUP, error.category.logMessage())
-                return@withContext BackupImportOutcome.InvalidPackage
+            val raw = appContext.contentResolver.openInputStream(source)
+                ?: return@withContext loggedImport(
+                    BackupImportOutcome.Failed,
+                    BackupFailureCategory.IMPORT_FAILED,
+                )
+            var legacyPlaintext = false
+            BufferedInputStream(raw).use { buffered ->
+                buffered.mark(BackupEnvelope.PEEK_MARK)
+                val peek = ByteArray(BackupEnvelope.HEADER_SIZE)
+                val read = readPrefix(buffered, peek)
+                buffered.reset()
+                when {
+                    BackupEnvelope.looksLikeEnvelope(peek, read) -> {
+                        val directory = createStagingDir("import")
+                        staging = directory
+                        val plainZip = createOwnerOnlyFile(directory, "decrypted-package.zip")
+                        try {
+                            FileOutputStream(plainZip).use { plain ->
+                                BackupEnvelope.decrypt(
+                                    input = buffered,
+                                    output = plain,
+                                    passphrase = secret,
+                                    maxPlaintextBytes = archiveLimits.maxTotalUncompressedBytes,
+                                )
+                            }
+                        } catch (error: BackupFailureException) {
+                            wipeFile(plainZip)
+                            plainZip.delete()
+                            throw error
+                        }
+                        try {
+                            FileInputStream(plainZip).use { plain ->
+                                extractValidated(plain, directory)
+                            }
+                        } finally {
+                            wipeFile(plainZip)
+                            plainZip.delete()
+                        }
+                    }
+                    else -> {
+                        // Plaintext ZIPs and unrecognized bytes share M4's validator.
+                        // A ZIP that passes validation still needs explicit legacy
+                        // confirmation before the live database is closed.
+                        legacyPlaintext = BackupPackageFormat.looksLikeZip(peek, read)
+                        val directory = createStagingDir("import")
+                        staging = directory
+                        extractValidated(buffered, directory)
+                    }
+                }
             }
-            val manifestFile = File(staging, BackupPackageFormat.MANIFEST_ENTRY)
-            val dbFile = File(staging, BackupPackageFormat.DATABASE_ENTRY)
-            val prefsFile = File(staging, BackupPackageFormat.PREFERENCES_ENTRY)
+            if (legacyPlaintext && !confirmLegacyPlaintext) {
+                return@withContext BackupImportOutcome.LegacyConfirmationRequired
+            }
+            val packageDir = staging ?: return@withContext loggedImport(
+                BackupImportOutcome.InvalidPackage,
+                BackupFailureCategory.INVALID_PACKAGE,
+            )
+            val manifestFile = File(packageDir, BackupPackageFormat.MANIFEST_ENTRY)
+            val dbFile = File(packageDir, BackupPackageFormat.DATABASE_ENTRY)
+            val prefsFile = File(packageDir, BackupPackageFormat.PREFERENCES_ENTRY)
             if (!manifestFile.exists() || !dbFile.exists() || !prefsFile.exists()) {
                 return@withContext BackupImportOutcome.InvalidPackage
             }
@@ -194,14 +286,18 @@ class DatabaseBackupService(
                 DatabaseRestoreRecovery.failImport(appContext, liveDb)
                 throw error
             }
+        } catch (error: BackupArchiveException) {
+            appLogService?.error(AppLogCategories.BACKUP, error.category.logMessage())
+            BackupImportOutcome.InvalidPackage
+        } catch (error: BackupFailureException) {
+            logImportFailure(error.category)
+            importOutcome(error.category)
         } catch (error: Exception) {
-            appLogService?.error(
-                AppLogCategories.BACKUP,
-                "Database import failed: ${error.message ?: error::class.java.simpleName}",
-            )
+            logImportFailure(BackupFailureCategory.IMPORT_FAILED)
             BackupImportOutcome.Failed
         } finally {
-            staging.deleteRecursively()
+            secret.fill('\u0000')
+            staging?.deleteRecursively()
         }
     }
 
@@ -501,27 +597,33 @@ class DatabaseBackupService(
         maintenancePreferences
             ?: appContext.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
 
-    private fun writeZip(staging: File, destination: Uri) {
+    private fun writeEncryptedPackage(staging: File, destination: Uri, passphrase: CharArray) {
         val output = appContext.contentResolver.openOutputStream(destination)
-            ?: error("Cannot open export destination")
-        ZipOutputStream(BufferedOutputStream(output)).use { zip ->
-            listOf(
-                BackupPackageFormat.MANIFEST_ENTRY,
-                BackupPackageFormat.DATABASE_ENTRY,
-                BackupPackageFormat.PREFERENCES_ENTRY,
-            ).forEach { name ->
-                val file = File(staging, name)
-                zip.putNextEntry(ZipEntry(name))
-                FileInputStream(file).use { input -> input.copyTo(zip) }
-                zip.closeEntry()
+            ?: throw BackupFailureException(BackupFailureCategory.EXPORT_FAILED)
+        output.use { raw ->
+            BackupEnvelope.encrypt(
+                output = raw,
+                passphrase = passphrase,
+                iterations = kdfIterations,
+            ) { encrypted ->
+                ZipOutputStream(encrypted).use { zip ->
+                    listOf(
+                        BackupPackageFormat.MANIFEST_ENTRY,
+                        BackupPackageFormat.DATABASE_ENTRY,
+                        BackupPackageFormat.PREFERENCES_ENTRY,
+                    ).forEach { name ->
+                        val file = File(staging, name)
+                        zip.putNextEntry(ZipEntry(name))
+                        FileInputStream(file).use { input -> input.copyTo(zip) }
+                        zip.closeEntry()
+                    }
+                }
             }
         }
     }
 
-    private fun unzipTo(source: Uri, staging: File) {
+    private fun extractValidated(input: java.io.InputStream, staging: File) {
         try {
-            val input = appContext.contentResolver.openInputStream(source)
-                ?: throw BackupArchiveException(BackupArchiveRejection.MALFORMED)
             BackupArchiveValidator(archiveLimits).extractInto(input, staging)
         } catch (error: BackupArchiveException) {
             throw error
@@ -530,7 +632,92 @@ class DatabaseBackupService(
         }
     }
 
+    private fun wipeFile(file: File) {
+        if (!file.isFile) return
+        runCatching {
+            FileOutputStream(file).use { output ->
+                val zeros = ByteArray(8192)
+                var remaining = file.length()
+                while (remaining > 0) {
+                    val count = minOf(zeros.size.toLong(), remaining).toInt()
+                    output.write(zeros, 0, count)
+                    remaining -= count
+                }
+                output.fd.sync()
+            }
+        }
+    }
+
+    private fun createOwnerOnlyFile(directory: File, name: String): File {
+        val file = File(directory, name)
+        check(!file.exists() || file.delete()) { "Cannot replace staging file" }
+        check(file.createNewFile()) { "Cannot create staging file" }
+        file.setReadable(false, false)
+        file.setWritable(false, false)
+        file.setExecutable(false, false)
+        file.setReadable(true, true)
+        file.setWritable(true, true)
+        return file
+    }
+
+    private fun readPrefix(input: java.io.InputStream, dest: ByteArray): Int {
+        var offset = 0
+        while (offset < dest.size) {
+            val read = input.read(dest, offset, dest.size - offset)
+            if (read < 0) break
+            offset += read
+        }
+        return offset
+    }
+
+    private fun loggedImport(
+        outcome: BackupImportOutcome,
+        category: BackupFailureCategory,
+    ): BackupImportOutcome {
+        logImportFailure(category)
+        return outcome
+    }
+
+    private fun importOutcome(category: BackupFailureCategory): BackupImportOutcome = when (category) {
+        BackupFailureCategory.AUTHENTICATION_FAILED,
+        BackupFailureCategory.PASSPHRASE_REQUIRED,
+        -> BackupImportOutcome.AuthenticationFailed
+        BackupFailureCategory.ARCHIVE_REJECTED,
+        BackupFailureCategory.ENVELOPE_TOO_LARGE,
+        BackupFailureCategory.INVALID_ENVELOPE,
+        BackupFailureCategory.INVALID_PACKAGE,
+        -> BackupImportOutcome.InvalidPackage
+        BackupFailureCategory.EXPORT_FAILED,
+        BackupFailureCategory.IMPORT_FAILED,
+        -> BackupImportOutcome.Failed
+    }
+
+    private fun logExportFailure(category: BackupFailureCategory) {
+        appLogService?.error(
+            AppLogCategories.BACKUP,
+            "Database export failed: ${category.logToken}",
+        )
+    }
+
+    private fun logImportFailure(category: BackupFailureCategory) {
+        appLogService?.error(
+            AppLogCategories.BACKUP,
+            "Database import failed: ${category.logToken}",
+        )
+    }
+
+    private fun sweepAbandonedStaging() {
+        appContext.cacheDir.listFiles()?.forEach { dir ->
+            if (!dir.isDirectory || !dir.name.startsWith("masroof-backup-")) return@forEach
+            dir.walkBottomUp().forEach { file ->
+                if (file.isFile) wipeFile(file)
+                file.delete()
+            }
+        }
+    }
+
     private fun createStagingDir(label: String): File {
+        sweepAbandonedStaging()
         val dir = File(appContext.cacheDir, "masroof-backup-$label-${clockEpochMillis()}")
         if (dir.exists()) dir.deleteRecursively()
         check(dir.mkdirs()) { "Cannot create staging directory" }

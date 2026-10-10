@@ -2,6 +2,7 @@ package com.baraa.masroof.presentation.settings
 
 import android.net.Uri
 import com.baraa.masroof.application.backup.BackupImportOutcome
+import com.baraa.masroof.application.backup.BackupPackageKind
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
@@ -52,7 +53,9 @@ class SettingsImportConfirmTest {
     fun offerImport_asksForConfirm_withoutImporting() = runTest {
         val backup = RecordingBackupGateway()
         val vm = viewModel(backup)
+        vm.onImportPassphraseChange("secret")
         vm.offerImport(Uri.parse("content://backup/copy.masroof"))
+        advanceUntilIdle()
         assertTrue(vm.uiState.value.awaitingImportConfirm)
         assertEquals(0, backup.importCalls)
     }
@@ -61,7 +64,9 @@ class SettingsImportConfirmTest {
     fun cancelPendingImport_doesNotImport() = runTest {
         val backup = RecordingBackupGateway()
         val vm = viewModel(backup)
+        vm.onImportPassphraseChange("secret")
         vm.offerImport(Uri.parse("content://backup/copy.masroof"))
+        advanceUntilIdle()
         vm.cancelPendingImport()
         assertFalse(vm.uiState.value.awaitingImportConfirm)
         assertEquals(0, backup.importCalls)
@@ -71,12 +76,28 @@ class SettingsImportConfirmTest {
     fun confirmPendingImport_runsImport() = runTest {
         val backup = RecordingBackupGateway()
         val vm = viewModel(backup)
+        vm.onImportPassphraseChange("secret")
         vm.offerImport(Uri.parse("content://backup/copy.masroof"))
+        advanceUntilIdle()
         vm.confirmPendingImport()
         advanceUntilIdle()
         assertFalse(vm.uiState.value.awaitingImportConfirm)
+        assertEquals("", vm.uiState.value.importPassphrase)
         assertEquals(1, backup.importCalls)
         assertEquals(BackupMessage.IMPORT_INVALID, vm.uiState.value.backupMessage)
+    }
+
+    @Test
+    fun cancelLegacyImport_doesNotImport() = runTest {
+        val backup = RecordingBackupGateway(kind = BackupPackageKind.LEGACY_PLAINTEXT)
+        val vm = viewModel(backup)
+        vm.offerImport(Uri.parse("content://backup/legacy.masroof"))
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.awaitingLegacyImportConfirm)
+        assertEquals(0, backup.importCalls)
+        vm.cancelPendingImport()
+        assertFalse(vm.uiState.value.awaitingLegacyImportConfirm)
+        assertEquals(0, backup.importCalls)
     }
 
     private fun viewModel(backup: DatabaseBackupGateway): SettingsViewModel =
@@ -110,12 +131,20 @@ class SettingsImportConfirmTest {
             canInstallPackages = { true },
         )
 
-    private class RecordingBackupGateway : DatabaseBackupGateway {
+    private class RecordingBackupGateway(
+        private val kind: BackupPackageKind = BackupPackageKind.ENCRYPTED,
+    ) : DatabaseBackupGateway {
         var importCalls: Int = 0
 
-        override suspend fun exportTo(destination: Uri): Result<Unit> = Result.success(Unit)
+        override suspend fun exportTo(destination: Uri, passphrase: CharArray): Result<Unit> = Result.success(Unit)
 
-        override suspend fun importFrom(source: Uri): BackupImportOutcome {
+        override suspend fun inspect(source: Uri): BackupPackageKind = kind
+
+        override suspend fun importFrom(
+            source: Uri,
+            passphrase: CharArray,
+            confirmLegacyPlaintext: Boolean,
+        ): BackupImportOutcome {
             importCalls++
             return BackupImportOutcome.InvalidPackage
         }
