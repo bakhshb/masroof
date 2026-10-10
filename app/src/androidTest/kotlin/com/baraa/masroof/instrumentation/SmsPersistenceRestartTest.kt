@@ -290,8 +290,7 @@ class SmsPersistenceRestartTest {
         assertEquals(ListenableWorker.Result.success(), session.runWorker(captured.rawSmsId))
         val posted = session.postedPurchase(captured.rawSmsId)
         val ignored = TransactionIgnoreService(
-            financialTransactionRepository = session.ftRepo,
-            reviewRepository = session.reviewRepo,
+            persistence = com.baraa.masroof.data.repository.RoomTransactionIgnoreRepository(session.database),
             clock = session.clock,
             appLogService = session.appLog,
         ).ignore(posted.transactionId)

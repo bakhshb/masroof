@@ -138,10 +138,10 @@ class BackupArchiveValidator(
             zip.closeEntry()
             return entryWritten
         } catch (error: BackupArchiveException) {
-            destination.delete()
+            SensitiveFileCleanup.delete(destination)
             throw error
         } catch (ignored: Exception) {
-            destination.delete()
+            SensitiveFileCleanup.delete(destination)
             throw BackupArchiveException(BackupArchiveRejection.MALFORMED, alreadyWrittenTotal)
         }
     }

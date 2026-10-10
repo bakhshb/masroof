@@ -51,6 +51,16 @@ class OnboardingViewModel(
     fun reloadFromCurrentState() {
         viewModelScope.launch {
             val permissionGranted = permissionStateProvider()
+            if (importJob?.isActive == true) {
+                _uiState.update {
+                    it.copy(
+                        permissionGranted = permissionGranted,
+                        step = if (permissionGranted) OnboardingStep.IMPORTING else OnboardingStep.PERMISSION,
+                        importState = ImportState.Scanning,
+                    )
+                }
+                return@launch
+            }
             val started = onboardingPrefs.isOnboardingStarted()
             val completed = onboardingPrefs.isOnboardingCompleted()
             val savedEpoch = onboardingPrefs.getHistoricalImportStartEpochMillis()
@@ -321,7 +331,13 @@ class OnboardingViewModel(
                         }
                     }
                     is ImportState.ProviderError -> {
-                        _uiState.update { it.copy(error = OnboardingError.SMS_PROVIDER_ERROR) }
+                        _uiState.update {
+                            it.copy(error = if (state.result.failure is HistoricalImportFailure.ProcessingIncomplete) {
+                                OnboardingError.IMPORT_FAILED
+                            } else {
+                                OnboardingError.SMS_PROVIDER_ERROR
+                            })
+                        }
                     }
                     else -> {
                         _uiState.update { it.copy(error = OnboardingError.IMPORT_FAILED) }

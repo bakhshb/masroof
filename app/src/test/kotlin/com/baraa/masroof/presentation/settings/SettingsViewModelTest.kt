@@ -628,11 +628,22 @@ class SettingsViewModelTest {
         override suspend fun listActive(): List<Commitment> = listAll().filter { it.active }
     }
 
+    @Test
+    fun incompleteManualReparse_releasesBusyStateAndShowsFailure() = runTest {
+        val vm = viewModel(reparseResult = com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(3, 1))
+        vm.reparseStoredMessages()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.reparsingStored)
+        assertEquals(SettingsError.UPDATE_FAILED, vm.uiState.value.error)
+    }
+
     private fun viewModel(
         cards: CardRegistryRepository = FakeCardRegistry(),
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
         loans: LoanRegistryRepository = FakeLoanRegistry(),
         themeMode: ThemeMode = ThemeMode.SYSTEM,
+        reparseResult: com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult =
+            com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(0, 0),
         onRefreshReviewQueue: () -> Unit = {},
         onReconcileOwnership: (com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange) -> Unit = {},
         appUpdateService: com.baraa.masroof.application.update.AppUpdateService =
@@ -658,7 +669,7 @@ class SettingsViewModelTest {
             databaseBackupService = FakeDatabaseBackupGateway(),
             refreshReviewQueue = { onRefreshReviewQueue() },
             reconcileOwnershipChange = { onReconcileOwnership(it) },
-            reparseStoredEvents = { 0 },
+            reparseStoredEvents = { reparseResult },
             importSmsFromInbox = { com.baraa.masroof.application.onboarding.HistoricalImportResult() },
             permissionStateProvider = { true },
             appVersion = SettingsViewModelTestFixtures.APP_VERSION,

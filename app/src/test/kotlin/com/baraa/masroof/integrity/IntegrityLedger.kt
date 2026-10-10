@@ -121,6 +121,18 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
             world.parsedRepo.save(event, details)
         }
 
+        override suspend fun saveForHistoricalBatch(
+            event: com.baraa.masroof.domain.model.ParsedEvent,
+            details: ParsedEventDetails,
+            requiredAt: Instant,
+        ) {
+            if (consume(faults.parsedSaveFailures)) {
+                faults.parsedSaveFailures -= 1
+                throw IOException("after raw sms capture")
+            }
+            world.parsedRepo.saveForHistoricalBatch(event, details, requiredAt)
+        }
+
         override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
             if (faults.parsedReadFailures > 0) {
                 faults.parsedReadFailures -= 1

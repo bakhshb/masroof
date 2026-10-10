@@ -24,10 +24,14 @@ import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import java.io.File
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -249,6 +253,71 @@ class M13ProcessDeathJourneyTest {
             app().container.financialTransactionRepository.findByRawSmsId(rawSmsId),
         )
         assertEquals(evidence("no posted transaction"), 0, app().container.financialTransactionRepository.listAll().size)
+    }
+
+    @Test(timeout = 120_000)
+    fun armHistoricalAfterParsed() = runBlocking {
+        ownAlJaziraCard()
+        arm(DebugProcessHalt.PARSED)
+        val raw = com.baraa.masroof.sms.mapper.AndroidSmsMapper.toRawSms(
+            "historical-process-death", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:32:00Z").toEpochMilli(),
+        )
+        app().container.applicationScope.launch {
+            val batch = app().container.historicalSmsBatchProcessor.startBatch()
+            batch.ingest(raw)
+            batch.finish()
+        }
+        awaitHalt(DebugProcessHalt.PARSED)
+        assertNotNull(app().container.parsedEventRepository.findByRawSmsId(raw.id))
+        assertNull(app().container.financialTransactionRepository.findByRawSmsId(raw.id))
+        assertEquals(listOf(raw.id), app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH))
+        assertTrue(app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty())
+        JourneyNote.write(filesDir(), raw.id)
+        DebugProcessHalt.scheduleResume(filesDir())
+    }
+
+    @Test(timeout = 120_000)
+    fun resumeHistoricalAfterParsed() = runBlocking {
+        val rawSmsId = JourneyNote.read(filesDir()).rawSmsId
+        awaitStartup()
+        val completed = withTimeout(90_000) {
+            WorkManager.getInstance(targetContext()).getWorkInfosForUniqueWorkFlow(
+                com.baraa.masroof.application.sms.HistoricalDerivedRecoveryWorker.UNIQUE_WORK_NAME,
+            ).first { work -> work.isNotEmpty() && work.all { it.state.isFinished } }
+        }
+        assertTrue(completed.all { it.state == WorkInfo.State.SUCCEEDED })
+        assertPostedOnce(rawSmsId)
+        assertTrue(app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).isEmpty())
+        assertTrue(WorkManager.getInstance(targetContext()).getWorkInfosForUniqueWork(
+            WorkManagerLiveSmsWorkScheduler.uniqueWorkName(rawSmsId),
+        ).get().isEmpty())
+    }
+
+    @Test(timeout = 120_000)
+    fun armInsideIgnoreTransaction() = runBlocking {
+        ownAlJaziraCard()
+        sendBankSms(PURCHASE_BODY)
+        val rawSmsId = waitForSingleRawSms()
+        waitForPurchase(rawSmsId)
+        waitUntilLiveWorkSettled(rawSmsId)
+        val transactionId = postedId(rawSmsId)
+        arm(DebugProcessHalt.IGNORE_PENDING)
+        app().container.applicationScope.launch { app().container.transactionIgnoreService.ignore(transactionId) }
+        awaitHalt(DebugProcessHalt.IGNORE_PENDING)
+        JourneyNote.write(filesDir(), rawSmsId, transactionId = transactionId)
+        DebugProcessHalt.scheduleResume(filesDir())
+    }
+
+    @Test(timeout = 120_000)
+    fun resumeInsideIgnoreTransaction() = runBlocking {
+        val note = JourneyNote.read(filesDir())
+        awaitStartup()
+        assertPostedOnce(note.rawSmsId, note.transactionId)
+        assertFalse(app().container.reviewRepository.findByRawSmsId(note.rawSmsId)?.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL)
+        assertTrue(app().container.transactionIgnoreService.ignore(note.transactionId!!) is IgnoreResult.Success)
+        app().container.reconcileStoredEvents()
+        assertNull(app().container.financialTransactionRepository.findByRawSmsId(note.rawSmsId))
+        assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, app().container.reviewRepository.findByRawSmsId(note.rawSmsId)!!.resolutionKind)
     }
 
     private suspend fun armFinancial(stage: String) {

@@ -25,6 +25,7 @@ data class HistoricalImportResult(
 
 sealed interface HistoricalImportFailure {
     data object PermissionDenied : HistoricalImportFailure
+    data class ProcessingIncomplete(val stage: String) : HistoricalImportFailure
     data class ProviderError(val message: String) : HistoricalImportFailure
 }
 
@@ -42,8 +43,11 @@ enum class HistoricalImportUserOutcome {
 fun HistoricalImportResult.userOutcome(): HistoricalImportUserOutcome =
     when (failure) {
         HistoricalImportFailure.PermissionDenied -> HistoricalImportUserOutcome.PERMISSION_DENIED
-        is HistoricalImportFailure.ProviderError -> HistoricalImportUserOutcome.FAILED
+        is HistoricalImportFailure.ProviderError,
+        is HistoricalImportFailure.ProcessingIncomplete,
+        -> HistoricalImportUserOutcome.FAILED
         null -> when {
+            failed > 0 -> HistoricalImportUserOutcome.FAILED
             scanned == 0 -> HistoricalImportUserOutcome.NO_MESSAGES
             notRelevant == scanned -> HistoricalImportUserOutcome.NO_BANK_SMS
             parsed > 0 -> HistoricalImportUserOutcome.OK
@@ -70,6 +74,7 @@ fun SmsScanResult.toHistoricalImportResult() = HistoricalImportResult(
     failure = when (val scanFailure = failure) {
         null -> null
         SmsScanFailure.PermissionDenied -> HistoricalImportFailure.PermissionDenied
+        is SmsScanFailure.DerivedIncomplete -> HistoricalImportFailure.ProcessingIncomplete(scanFailure.stage.name.lowercase())
         is SmsScanFailure.ProviderError -> HistoricalImportFailure.ProviderError(scanFailure.message)
     },
 )

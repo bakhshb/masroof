@@ -26,6 +26,7 @@ object DebugProcessHalt {
     const val HOLD_RECONCILE_FILE_NAME: String = "m13-hold-reconcile"
     const val RECONCILE_HELD_MARKER_FILE_NAME: String = "m13-reconcile-held"
 
+    const val IGNORE_PENDING = "IGNORE_PENDING"
     const val CAPTURE: String = "CAPTURE"
     const val PARSED: String = "PARSED"
     const val RECONCILED: String = "RECONCILED"

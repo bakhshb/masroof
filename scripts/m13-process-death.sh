@@ -52,5 +52,7 @@ journey armAfterReview resumeAfterReview
 journey armRequiredReview resumeRequiredReview
 journey armUserNonFinancial resumeUserNonFinancial
 journey armLiveRetry resumeLiveRetry
+journey armHistoricalAfterParsed resumeHistoricalAfterParsed
+journey armInsideIgnoreTransaction resumeInsideIgnoreTransaction
 
 echo "M13 process-death journeys passed on API $(adb shell getprop ro.build.version.sdk | tr -d '\r')"

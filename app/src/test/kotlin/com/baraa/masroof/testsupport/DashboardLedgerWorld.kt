@@ -124,6 +124,11 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
     )
     private val reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, importClock)
 
+    private val processingRecovery = com.baraa.masroof.application.ingestion.ProcessingRecovery(
+        com.baraa.masroof.data.repository.RoomProcessingRetryRepository(db.processingRetryDao()),
+        reviewRepo, IngestionReviewService(reviewRepo, importClock), importClock,
+    )
+
     val captureBankSms = CaptureBankSmsUseCase(rawRepo, registry)
 
     fun processStoredSms(exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null) =
@@ -134,6 +139,7 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
             ownershipDiscovery = discovery,
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
+            processingRecovery = processingRecovery,
             ingestionReviewService = IngestionReviewService(reviewRepo, importClock),
             exchangeRateEnrichmentScheduler = exchangeRateEnrichment?.let { workflow ->
                 com.baraa.masroof.application.sms.ImmediateExchangeRateEnrichmentScheduler(
@@ -162,6 +168,7 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
             ownershipDiscovery = discovery,
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
+            processingRecovery = processingRecovery,
             exchangeRateEnrichment = exchangeRateEnrichment,
         ).startBatch()
         rows.forEach { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
@@ -179,6 +186,7 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
             ownershipDiscovery = discovery,
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
+            processingRecovery = processingRecovery,
         ).startBatch()
         val ingest = rows.map { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
         return LedgerImportOutcome(

@@ -113,6 +113,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent.getBooleanExtra(com.baraa.masroof.application.backup.DatabaseBackupService.EXTRA_RESTORE_FAILED, false)) {
+            intent.removeExtra(com.baraa.masroof.application.backup.DatabaseBackupService.EXTRA_RESTORE_FAILED)
+            android.widget.Toast.makeText(this, R.string.settings_import_failed, android.widget.Toast.LENGTH_LONG).show()
+        }
         setContent {
             var startupOutcome by rememberStartupMaintenanceOutcome(container::awaitStartupMaintenance) { outcome ->
                 startupFinancialReady = outcome == StartupMaintenanceOutcome.READY

@@ -865,52 +865,8 @@ class DashboardViewModelTest {
                 ),
             ),
             ignoreService = TransactionIgnoreService(
-                financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
-                    override suspend fun save(
-                        transaction: FinancialTransaction,
-                        rawSmsIds: Collection<String>,
-                    ) = com.baraa.masroof.domain.repository.FinancialTransactionSaveResult.Saved
-
-                    override suspend fun getById(id: String) = null
-                    override suspend fun findByRawSmsId(rawSmsId: String) = null
-                    override suspend fun listAll() = emptyList<FinancialTransaction>()
-                    override suspend fun listOccurredBetween(
-                        startInclusive: java.time.Instant,
-                        endExclusive: java.time.Instant,
-                    ) = emptyList<FinancialTransaction>()
-
-                    override suspend fun isRawSmsLinked(rawSmsId: String) = false
-                    override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
-                    override suspend fun update(transaction: FinancialTransaction) = false
-                    override suspend fun updateAppliedExchangeRate(
-                        id: String,
-                        exchangeRate: java.math.BigDecimal,
-                        source: com.baraa.masroof.domain.model.ExchangeRateSource,
-                    ) = false
-                    override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
-                override suspend fun unlinkRawSms(rawSmsId: String) = false
-
-                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
-                },
-                reviewRepository = object : com.baraa.masroof.domain.repository.ReviewRepository {
-                    override suspend fun getById(id: String) = null
-                    override suspend fun findByRawSmsId(rawSmsId: String) = null
-                    override suspend fun listRequired() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
-                    override suspend fun listIgnored() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
-                    override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
-                    override suspend fun upsertRequired(
-                        rawSmsId: String,
-                        kind: com.baraa.masroof.domain.model.ReviewKind,
-                        reasons: List<String>,
-                        now: java.time.Instant,
-                    ) = error("unused")
-
-                    override suspend fun markResolved(
-                        id: String,
-                        resolutionKind: com.baraa.masroof.domain.model.ReviewResolutionKind,
-                        resolvedAt: java.time.Instant,
-                        resolvedTransactionId: String?,
-                    ) = null
+                persistence = com.baraa.masroof.domain.repository.TransactionIgnoreRepository { _, _ ->
+                    com.baraa.masroof.domain.repository.TransactionIgnoreOutcome.Rejected("transaction_not_found")
                 },
                 clock = com.baraa.masroof.sms.time.InstantClock.System,
             ),

@@ -152,7 +152,7 @@ class RecognizedSmsOutcomeInvariantTest {
         val failure = runCatching { batch.finish() }.exceptionOrNull()
         assertTrue(failure is IOException)
         assertEquals(0, scheduled.get())
-        assertTrue(harness.processingRetryRepo.listRetryableRawSmsIds().isEmpty())
+        assertEquals(listOf(first.id, second.id), harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH))
         assertTrue(harness.parsedRepo.findByRawSmsId(first.id) != null)
         assertTrue(harness.parsedRepo.findByRawSmsId(second.id) != null)
         assertEquals(listOf(listOf(first.id, second.id)), marked)

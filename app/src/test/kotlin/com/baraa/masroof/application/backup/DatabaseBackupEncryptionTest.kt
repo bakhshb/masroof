@@ -390,7 +390,7 @@ class DatabaseBackupEncryptionTest {
                 database = live,
                 closeDatabase = { live.close() },
                 appVersionName = "test",
-                restartProcess = { error("failure must not restart") },
+                restartProcess = { assertNoBackupStaging() },
                 beforeValidatedInstall = { error("injected install failure") },
                 kdfIterations = TEST_KDF_ITERATIONS,
             )
@@ -403,6 +403,77 @@ class DatabaseBackupEncryptionTest {
             }
         } finally {
             if (live.isOpen) live.close()
+        }
+    }
+
+    @Test
+    fun everyPreferenceCommitFailure_restoresOriginalPairBeforeRequestingFreshProcess() = runBlocking {
+        listOf("onboarding_prefs", "app_locale_prefs", "theme_prefs").forEach { preferenceName ->
+            resetStorage()
+            val live = openDatabase()
+            try {
+                insertProbe(live)
+                val archive = File(context.cacheDir, "failed-preference.masroof")
+                assertTrue(service(live).exportTo(Uri.fromFile(archive), passphrase.copyOf()).isSuccess)
+                live.openHelper.writableDatabase.execSQL("UPDATE sms_probe SET body = 'original-after-backup'")
+                context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE).edit()
+                    .putBoolean("onboarding_completed", true).commit()
+                context.getSharedPreferences("app_locale_prefs", Context.MODE_PRIVATE).edit()
+                    .putString("language_tag", "en").commit()
+                context.getSharedPreferences("theme_prefs", Context.MODE_PRIVATE).edit()
+                    .putString("theme_mode", "DARK").commit()
+                var restarted = false
+                val failingContext = FailOncePreferenceContext(context, preferenceName)
+                val importer = DatabaseBackupService(
+                    failingContext, live, { live.close() }, "test",
+                    restartProcess = { assertNoBackupStaging(); restarted = true }, kdfIterations = TEST_KDF_ITERATIONS,
+                )
+                assertEquals(BackupImportOutcome.Failed, importer.importFrom(Uri.fromFile(archive), passphrase.copyOf()))
+                assertTrue("commit failure was exercised for $preferenceName", failingContext.failed)
+                assertTrue("old Room cannot be reused", restarted)
+                val reopened = openDatabase()
+                try {
+                    reopened.openHelper.readableDatabase.query("SELECT body FROM sms_probe").use { cursor ->
+                        assertTrue(cursor.moveToFirst())
+                        assertEquals("original-after-backup", cursor.getString(0))
+                    }
+                    assertTrue(context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE)
+                        .getBoolean("onboarding_completed", false))
+                    assertEquals("en", context.getSharedPreferences("app_locale_prefs", Context.MODE_PRIVATE)
+                        .getString("language_tag", null))
+                    assertEquals("DARK", context.getSharedPreferences("theme_prefs", Context.MODE_PRIVATE)
+                        .getString("theme_mode", null))
+                    assertFalse(File(context.getDatabasePath(MasroofDatabase.NAME).path + ".restore-journal").exists())
+                } finally {
+                    reopened.close()
+                }
+            } finally {
+                live.close()
+            }
+        }
+    }
+
+    private class FailOncePreferenceContext(base: Context, private val target: String) : android.content.ContextWrapper(base) {
+        var failed = false
+        override fun getSharedPreferences(name: String, mode: Int): android.content.SharedPreferences {
+            val delegate = super.getSharedPreferences(name, mode)
+            if (name != target) return delegate
+            return object : android.content.SharedPreferences by delegate {
+                override fun edit(): android.content.SharedPreferences.Editor {
+                    val editor = delegate.edit()
+                    return object : android.content.SharedPreferences.Editor by editor {
+                        override fun putBoolean(key: String?, value: Boolean) = apply { editor.putBoolean(key, value) }
+                        override fun putString(key: String?, value: String?) = apply { editor.putString(key, value) }
+                        override fun putLong(key: String?, value: Long) = apply { editor.putLong(key, value) }
+                        override fun putInt(key: String?, value: Int) = apply { editor.putInt(key, value) }
+                        override fun remove(key: String?) = apply { editor.remove(key) }
+                        override fun commit(): Boolean {
+                            if (!failed) { failed = true; return false }
+                            return editor.commit()
+                        }
+                    }
+                }
+            }
         }
     }
 

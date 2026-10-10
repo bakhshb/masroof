@@ -11,6 +11,10 @@ import com.baraa.masroof.sms.datasource.SmsPermissionException
 import com.baraa.masroof.sms.datasource.SmsProviderException
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import java.time.Instant
+import com.baraa.masroof.application.ingestion.DerivedProcessingStage
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Operational summary of a historical inbox scan (not financial domain state).
@@ -33,6 +37,7 @@ data class SmsScanResult(
 
 sealed interface SmsScanFailure {
     data object PermissionDenied : SmsScanFailure
+    data class DerivedIncomplete(val stage: DerivedProcessingStage) : SmsScanFailure
 
     data class ProviderError(
         val message: String,
@@ -52,8 +57,13 @@ class HistoricalSmsScanner(
     private val dataSource: SmsDataSource,
     private val batchProcessor: HistoricalSmsBatchProcessor,
     private val appLogService: AppLogService? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    suspend fun scan(receivedAfter: Instant? = null): SmsScanResult {
+    suspend fun scan(receivedAfter: Instant? = null): SmsScanResult = withContext(ioDispatcher) {
+        scanOnDispatcher(receivedAfter)
+    }
+
+    private suspend fun scanOnDispatcher(receivedAfter: Instant?): SmsScanResult {
         appLogService?.info(
             AppLogCategories.SCAN,
             "Historical scan started${receivedAfter?.let { " after $it" } ?: ""}",
@@ -159,8 +169,11 @@ class HistoricalSmsScanner(
             return finishAfterFailure(SmsScanFailure.ProviderError(e.message ?: "provider_error"))
         }
 
-        batch.finish()
-        val result = snapshot(failure = null)
+        val derived = batch.finish()
+        val failure = (derived as? HistoricalBatchDerivedResult.Incomplete)?.let {
+            SmsScanFailure.DerivedIncomplete(it.stage)
+        }
+        val result = snapshot(failure)
         logScanFinished(result)
         return result
     }

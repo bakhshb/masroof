@@ -30,6 +30,11 @@ import java.time.LocalDateTime
 interface ParsedEventRepository {
     suspend fun save(event: ParsedEvent, details: ParsedEventDetails = ParsedEventDetails())
 
+    /** Room commits parse evidence and HISTORICAL_BATCH intent together; in-memory doubles may save only. */
+    suspend fun saveForHistoricalBatch(event: ParsedEvent, details: ParsedEventDetails, requiredAt: Instant) {
+        save(event, details)
+    }
+
     suspend fun getById(id: String): ParsedEventRecord?
 
     suspend fun findByRawSmsId(rawSmsId: String): ParsedEventRecord?

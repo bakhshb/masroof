@@ -63,8 +63,7 @@ class TransactionIgnoreServiceTest {
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
         val clock = InstantClock { Instant.parse("2026-08-02T12:00:00Z") }
         service = TransactionIgnoreService(
-            financialTransactionRepository = ftRepo,
-            reviewRepository = reviewRepo,
+            persistence = com.baraa.masroof.data.repository.RoomTransactionIgnoreRepository(db),
             clock = clock,
         )
         reconciliation = TransactionReconciliationService(
@@ -140,6 +139,25 @@ class TransactionIgnoreServiceTest {
         val result = service.ignore("tx-pair")
         assertTrue(result is IgnoreResult.Rejected)
         assertEquals("paired_transaction_not_supported", (result as IgnoreResult.Rejected).reason)
+    }
+
+    @Test
+    fun failureAfterDelete_rollsBackMovementLinksAndIgnoreDecision() = runBlocking {
+        persistExpense("sms-atomic-ignore", "120.00")
+        val id = TransactionIdFactory.fromRawSmsIds(listOf("sms-atomic-ignore"))
+        val failing = TransactionIgnoreService(
+            persistence = com.baraa.masroof.data.repository.RoomTransactionIgnoreRepository(db, afterDelete = {
+                error("injected failure inside ignore transaction")
+            }),
+            clock = InstantClock { Instant.parse("2026-08-02T12:00:00Z") },
+        )
+        assertEquals(IgnoreResult.Rejected("ignore_failed"), failing.ignore(id))
+        org.junit.Assert.assertNotNull(ftRepo.getById(id))
+        assertEquals(listOf("sms-atomic-ignore"), ftRepo.listRawSmsIds(id))
+        assertNull(reviewRepo.findByRawSmsId("sms-atomic-ignore"))
+        assertTrue(service.ignore(id) is IgnoreResult.Success)
+        reconciliation.reconcileStoredEvents()
+        assertNull(ftRepo.getById(id))
     }
 
     private suspend fun persistExpense(smsId: String, amount: String) {

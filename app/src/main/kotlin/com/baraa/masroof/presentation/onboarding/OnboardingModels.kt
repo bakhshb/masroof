@@ -76,7 +76,11 @@ enum class OnboardingError {
 
 internal fun HistoricalImportResult.toImportState(): ImportState =
     when (failure) {
-        null -> ImportState.Completed(this)
+        null -> if (failed == 0) ImportState.Completed(this) else ImportState.ProviderError(
+            copy(failure = HistoricalImportFailure.ProcessingIncomplete("parse")),
+        )
         HistoricalImportFailure.PermissionDenied -> ImportState.PermissionError(this)
-        is HistoricalImportFailure.ProviderError -> ImportState.ProviderError(this)
+        is HistoricalImportFailure.ProviderError,
+        is HistoricalImportFailure.ProcessingIncomplete,
+        -> ImportState.ProviderError(this)
     }
