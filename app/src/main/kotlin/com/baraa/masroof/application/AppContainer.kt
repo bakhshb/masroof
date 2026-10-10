@@ -25,6 +25,7 @@ import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
 import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
+import com.baraa.masroof.application.transaction.HistoricalMerchantRateCorrectionWorkflow
 import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyncer
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
@@ -422,9 +423,19 @@ class AppContainer(
             marketRateProvider = FrankfurterForeignSarRateProvider(updateHttpClient),
         )
 
-    /** Sole writer of applied exchange rates; dashboard loads stay read-only. */
+    /** Writer of missing applied exchange rates; dashboard loads stay read-only. */
     val exchangeRateEnrichmentWorkflow: ExchangeRateEnrichmentWorkflow =
         ExchangeRateEnrichmentWorkflow(
+            financialTransactionRepository = financialTransactionRepository,
+            parsedEventRepository = parsedEventRepository,
+            rawSmsRepository = rawSmsRepository,
+            sarEquivalentResolver = sarEquivalentResolver,
+            appLogService = appLogService,
+        )
+
+    /** Confirmed replacement of a frozen historical-merchant rate. Does not run during enrichment. */
+    val historicalMerchantRateCorrectionWorkflow: HistoricalMerchantRateCorrectionWorkflow =
+        HistoricalMerchantRateCorrectionWorkflow(
             financialTransactionRepository = financialTransactionRepository,
             parsedEventRepository = parsedEventRepository,
             rawSmsRepository = rawSmsRepository,

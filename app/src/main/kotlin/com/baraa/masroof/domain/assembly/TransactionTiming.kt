@@ -51,4 +51,24 @@ object TransactionTiming {
         zoneId: ZoneId,
     ): Instant? =
         candidates.map { effectiveOccurredAt(it, zoneId) }.minOrNull()
+
+    /**
+     * Instant of an offset-less SMS wall clock.
+     *
+     * [BankTransactionTimePolicy] supplies a bank with a fixed zone. Any other bank
+     * uses the zone already stored for it. Returns null when neither is known, so
+     * the caller does not reinterpret the wall clock with the handset zone.
+     */
+    fun bankLocalInstant(
+        bank: Bank,
+        occurredAtLocal: LocalDateTime,
+        persistedZoneId: String? = null,
+    ): Instant? {
+        val zone = BankTransactionTimePolicy.fixedZone(bank)
+            ?: persistedZoneId?.takeIf { it.isNotBlank() }?.let { id ->
+                runCatching { ZoneId.of(id) }.getOrNull()
+            }
+            ?: return null
+        return occurredAtLocal.atZone(zone).toInstant()
+    }
 }

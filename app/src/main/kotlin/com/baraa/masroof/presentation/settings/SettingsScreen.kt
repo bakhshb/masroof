@@ -99,6 +99,9 @@ fun SettingsRoute(
         if (destination == SettingsDestination.About || destination == SettingsDestination.Logs) {
             viewModel.refreshLogs()
         }
+        if (destination == SettingsDestination.DataBackup) {
+            viewModel.refreshHistoricalMerchantRateCorrections()
+        }
     }
 
     BackHandler {
@@ -315,6 +318,9 @@ fun SettingsRoute(
             onConfirmPendingImport = viewModel::confirmPendingImport,
             onCancelPendingImport = viewModel::cancelPendingImport,
             onClearBackupMessage = viewModel::clearBackupMessage,
+            onRequestFxRateCorrection = viewModel::requestHistoricalMerchantRateCorrection,
+            onConfirmFxRateCorrection = viewModel::confirmHistoricalMerchantRateCorrections,
+            onDismissFxRateCorrection = viewModel::dismissHistoricalMerchantRateCorrection,
         )
 
         SettingsDestination.About -> SettingsAboutScreen(

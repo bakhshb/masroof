@@ -10,13 +10,19 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.util.TimeZone
 
 class TransactionSarEquivalentResolverTest {
     private val noMarketRate = ForeignSarMarketRateProvider { _, _ -> null }
@@ -293,6 +299,165 @@ class TransactionSarEquivalentResolverTest {
         assertEquals(ExchangeRateSource.SMS, resolution.source)
     }
 
+    @Test
+    fun octoberPurchase_doesNotInheritALaterMerchantRate_inEitherEvidenceOrder() = runBlocking {
+        val october1 = purchase(
+            id = "tx-oct1",
+            eventId = "pe-oct1",
+            at = riyadh("2026-10-01T10:00"),
+        )
+        val october7 = purchase(
+            id = "tx-oct7",
+            eventId = "pe-oct7",
+            at = riyadh("2026-10-07T10:00"),
+        )
+        val october8 = purchase(
+            id = "tx-oct8",
+            eventId = "pe-oct8",
+            at = riyadh("2026-10-08T10:00"),
+        )
+        val records = listOf(
+            record(october1, rate = null),
+            record(october7, rate = BigDecimal("4.00")),
+            record(october8, rate = null),
+        )
+        val rawSms = records.associate { record ->
+            record.event.rawSmsId to raw(
+                record.event.rawSmsId,
+                "body",
+                Instant.parse("2026-10-01T07:00:00Z"),
+            )
+        }
+        val resolver = TransactionSarEquivalentResolver(noMarketRate)
+
+        val forward = resolver.resolve(listOf(october1, october7, october8), records, rawSms)
+        val reversed = resolver.resolve(listOf(october8, october1, october7), records.asReversed(), rawSms)
+
+        assertNull(forward["tx-oct1"])
+        assertNull(reversed["tx-oct1"])
+        assertEquals(ExchangeRateSource.SMS, forward["tx-oct7"]!!.source)
+        assertEquals(BigDecimal("4.00"), forward["tx-oct7"]!!.exchangeRate)
+        assertEquals(Money.of("40.00", Currency.SAR), forward["tx-oct7"]!!.sarAmount)
+        assertEquals(forward["tx-oct7"], reversed["tx-oct7"])
+        assertEquals(ExchangeRateSource.HISTORICAL_MERCHANT, forward["tx-oct8"]!!.source)
+        assertEquals(BigDecimal("4.00"), forward["tx-oct8"]!!.exchangeRate)
+        assertEquals(Money.of("40.00", Currency.SAR), forward["tx-oct8"]!!.sarAmount)
+        assertEquals(forward["tx-oct8"], reversed["tx-oct8"])
+    }
+
+    @Test
+    fun completePair_isUsedWhenTheDatedRateWouldDiffer() = runBlocking {
+        val transaction = purchase(
+            id = "tx-frozen",
+            eventId = "pe-frozen",
+            at = riyadh("2026-10-08T10:00"),
+        ).copy(
+            appliedExchangeRate = BigDecimal("9.99"),
+            exchangeRateSource = ExchangeRateSource.HISTORICAL_MERCHANT,
+        )
+        val evidence = record(
+            purchase(id = "tx-rate", eventId = "pe-rate", at = riyadh("2026-10-07T10:00")),
+            rate = BigDecimal("4.00"),
+        )
+        val resolver = TransactionSarEquivalentResolver(noMarketRate)
+        val resolution = resolver.resolve(
+            transactions = listOf(transaction),
+            parsedRecords = listOf(record(transaction, rate = null), evidence),
+            rawSmsById = emptyMap(),
+        )["tx-frozen"]
+
+        assertNotNull(resolution)
+        assertEquals(BigDecimal("9.99"), resolution!!.exchangeRate)
+        assertEquals(ExchangeRateSource.HISTORICAL_MERCHANT, resolution.source)
+    }
+
+    @Test
+    fun marketRate_usesTheBankZoneNotTheHandsetZone() = runBlocking {
+        val previous = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        try {
+            var seen: LocalDate? = null
+            val transaction = purchase(
+                id = "tx-late",
+                eventId = "pe-late",
+                at = Instant.parse("2026-10-01T22:30:00Z"),
+            ).copy(occurredAtZone = "Asia/Riyadh")
+            val resolver = TransactionSarEquivalentResolver { _, date ->
+                seen = date
+                BigDecimal("3.75")
+            }
+            val resolution = resolver.resolve(
+                transactions = listOf(transaction),
+                parsedRecords = listOf(record(transaction, rate = null)),
+                rawSmsById = emptyMap(),
+            )["tx-late"]
+
+            assertEquals(LocalDate.parse("2026-10-02"), seen)
+            assertEquals(ExchangeRateSource.MARKET, resolution!!.source)
+            assertEquals(BigDecimal("3.75"), resolution.exchangeRate)
+        } finally {
+            TimeZone.setDefault(previous)
+        }
+    }
+
+    @Test
+    fun marketRate_usesAlJaziraPolicyWhenTheTransactionHasNoZone() = runBlocking {
+        val previous = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        try {
+            var seen: LocalDate? = null
+            val transaction = purchase(
+                id = "tx-late",
+                eventId = "pe-late",
+                at = Instant.parse("2026-10-01T22:30:00Z"),
+            ).copy(occurredAtZone = null)
+            val resolver = TransactionSarEquivalentResolver { _, date ->
+                seen = date
+                BigDecimal("3.75")
+            }
+            resolver.resolve(
+                transactions = listOf(transaction),
+                parsedRecords = listOf(record(transaction, rate = null)),
+                rawSmsById = emptyMap(),
+            )
+
+            assertEquals(LocalDate.parse("2026-10-02"), seen)
+        } finally {
+            TimeZone.setDefault(previous)
+        }
+    }
+
+    private fun riyadh(local: String): Instant =
+        LocalDateTime.parse(local).atZone(ZoneId.of("Asia/Riyadh")).toInstant()
+
+    private fun purchase(id: String, eventId: String, at: Instant) = FinancialTransaction(
+        id = id,
+        type = FinancialTransactionType.EXPENSE,
+        amount = Money.of("10.00", Currency.USD),
+        occurredAt = at,
+        sourceContainerId = "card:bank_aljazira:7271",
+        destinationContainerId = null,
+        merchant = "TEST_FX_SHOP",
+        counterparty = null,
+        categoryId = null,
+        linkedParsedEventIds = listOf(eventId),
+        occurredAtZone = "Asia/Riyadh",
+    )
+
+    private fun record(transaction: FinancialTransaction, rate: BigDecimal?) = ParsedEventRecord(
+        event = parsedEvent(
+            id = transaction.linkedParsedEventIds.single(),
+            rawSmsId = "sms-${transaction.id}",
+            family = MessageFamily.PURCHASE,
+            merchant = transaction.merchant ?: "TEST_FX_SHOP",
+            amount = transaction.amount,
+        ).copy(occurredAt = null),
+        details = ParsedEventDetails(
+            exchangeRate = rate,
+            occurredAtLocal = LocalDateTime.ofInstant(transaction.occurredAt, ZoneId.of("Asia/Riyadh")),
+        ),
+    )
+
     private fun parsedEvent(
         id: String,
         rawSmsId: String,
@@ -318,11 +483,15 @@ class TransactionSarEquivalentResolverTest {
         parseStatus = ParseStatus.SUCCESS,
     )
 
-    private fun raw(id: String, body: String) = RawSms(
+    private fun raw(
+        id: String,
+        body: String,
+        receivedAt: Instant = Instant.parse("2026-08-17T15:23:00Z"),
+    ) = RawSms(
         id = id,
         sender = "AlJazira",
         body = body,
-        receivedAt = Instant.parse("2026-08-17T15:23:00Z"),
+        receivedAt = receivedAt,
         deviceMessageId = id,
         bodyHash = "hash-$id",
     )

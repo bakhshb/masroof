@@ -236,7 +236,7 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
         financialTransactionRepository: FinancialTransactionRepository = WriteRejectingFinancialTransactionRepository(ftRepo),
         marketRateProvider: ForeignSarMarketRateProvider = NO_MARKET_RATE,
     ): DashboardService {
-        val resolver = TransactionSarEquivalentResolver(marketRateProvider, zone)
+        val resolver = TransactionSarEquivalentResolver(marketRateProvider)
         return DashboardService(
             financialTransactionRepository = financialTransactionRepository,
             reviewRepository = reviewRepo,
@@ -270,7 +270,7 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
             loanRegistryRepository = loans,
             commitmentRepository = commitments,
             appLocaleRepository = localeRepository,
-            sarEquivalentResolver = TransactionSarEquivalentResolver(marketRateProvider, zone),
+            sarEquivalentResolver = TransactionSarEquivalentResolver(marketRateProvider),
             evidenceSource = DashboardEvidenceScope(financialTransactionRepository, parsedRepo, rawRepo),
             zoneId = zone,
             clock = clock,
@@ -284,7 +284,7 @@ class DashboardLedgerWorld(context: Context) : AutoCloseable {
             financialTransactionRepository = financialTransactionRepository,
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
-            sarEquivalentResolver = TransactionSarEquivalentResolver(marketRateProvider, zone),
+            sarEquivalentResolver = TransactionSarEquivalentResolver(marketRateProvider),
         )
 
     override fun close() {
@@ -620,6 +620,12 @@ class WriteRejectingFinancialTransactionRepository(
         exchangeRate: BigDecimal,
         source: ExchangeRateSource,
     ): Boolean = rejected("updateAppliedExchangeRate")
+
+    override suspend fun replaceConfirmedHistoricalMerchantRate(
+        id: String,
+        exchangeRate: BigDecimal,
+        source: ExchangeRateSource,
+    ): Boolean = rejected("replaceConfirmedHistoricalMerchantRate")
 
     override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean =
         rejected("deleteIfExclusiveRawSmsLink")

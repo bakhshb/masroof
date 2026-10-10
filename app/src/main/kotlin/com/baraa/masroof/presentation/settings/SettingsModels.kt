@@ -175,6 +175,10 @@ data class SettingsUiState(
     val updateMessage: AppUpdateMessage? = null,
     val exportingLogs: Boolean = false,
     val logMessage: LogMessage? = null,
+    val fxRateCorrectionUpdatable: Int = 0,
+    val fxRateCorrectionManualFollowUp: Int = 0,
+    val fxRateCorrectionRunning: Boolean = false,
+    val fxRateCorrectionAwaitingConfirm: Boolean = false,
 )
 
 enum class LogMessage {

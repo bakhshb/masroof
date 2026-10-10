@@ -192,6 +192,7 @@ class PackageDependencyRulesTest {
             ".save(",
             ".update(",
             ".updateAppliedExchangeRate(",
+            ".replaceConfirmedHistoricalMerchantRate(",
             ".replaceExclusiveStaleLinks(",
             ".deleteIfExclusiveRawSmsLink(",
             ".unlinkRawSms(",
