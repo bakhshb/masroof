@@ -39,9 +39,14 @@ android {
         buildConfigField("String", "GITHUB_REPO", "\"$githubRepo\"")
         buildConfigField("boolean", "ENABLE_DESIGN_CATALOG", "false")
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.baraa.masroof.instrumentation.MasroofAndroidTestRunner"
         // Orchestrator clears app data before each device smoke so journeys do not leak.
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
+        // Two-phase process-death tests share the database across am instrument
+        // invocations. clearPackageData=true would wipe that database, so the
+        // orchestrated suite never runs them. scripts/m13-process-death.sh does.
+        testInstrumentationRunnerArguments["notPackage"] =
+            "com.baraa.masroof.instrumentation.processdeath"
     }
 
     signingConfigs {

@@ -5,6 +5,8 @@ import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.sms.DebugProcessHalt
+import com.baraa.masroof.application.sms.DebugProcessHaltProbe
 import com.baraa.masroof.application.sms.ExchangeRateEnrichmentScheduler
 import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
 import com.baraa.masroof.application.transaction.ReconciliationIncompleteException
@@ -61,6 +63,7 @@ class ProcessStoredSmsUseCase(
     private val exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler? = null,
     private val processingRecovery: ProcessingRecovery? = null,
     private val reviewRepository: ReviewRepository? = null,
+    private val debugProcessHalt: DebugProcessHaltProbe = DebugProcessHaltProbe.NONE,
 ) {
     /** Processes evidence captured in this same attempt, reusing the capture's [route]. */
     suspend fun process(
@@ -395,6 +398,7 @@ class ProcessStoredSmsUseCase(
         deriveImmediately: Boolean,
     ): SmsIngestionResult.DerivedIncomplete? {
         parsedEventRepository.save(event, details)
+        debugProcessHalt.afterDurableWrite(DebugProcessHalt.PARSED)
         val incomplete = if (deriveImmediately) {
             afterParsedEvent(event, details, logOutcome)
         } else {
@@ -403,6 +407,9 @@ class ProcessStoredSmsUseCase(
         if (incomplete == null && deriveImmediately) {
             processingRecovery?.clear(event.rawSmsId)
         }
+        // Marker is written only after clear() was skipped, so a reader that sees it
+        // observes the processing-retry row that this attempt left in place.
+        debugProcessHalt.markIfReconcileHeld()
         if (logOutcome) {
             logParsedOutcome(rawSms, event.messageFamily, outcome)
         }
@@ -498,6 +505,21 @@ class ProcessStoredSmsUseCase(
         details: ParsedEventDetails,
         logOutcome: Boolean,
     ): ReconcileDerivedResult {
+        if (debugProcessHalt.holdReconcileIncomplete()) {
+            return ReconcileDerivedResult.Incomplete(
+                derivedIncomplete(
+                    event = event,
+                    details = details,
+                    stage = DerivedProcessingStage.RECONCILIATION,
+                    cause = ReconciliationIncompleteException(
+                        failureCount = 1,
+                        maskedRawSmsId = AppLogFormatting.maskId(event.rawSmsId),
+                    ),
+                    logOutcome = logOutcome,
+                    failureCount = 1,
+                ),
+            )
+        }
         val svc = reconciliation ?: return ReconcileDerivedResult.NotConfigured
         val report = try {
             svc.reconcileAffectedRawSmsIds(listOf(event.rawSmsId))
@@ -509,6 +531,7 @@ class ProcessStoredSmsUseCase(
                 derivedIncomplete(event, details, DerivedProcessingStage.RECONCILIATION, e, logOutcome),
             )
         }
+        debugProcessHalt.afterDurableWrite(DebugProcessHalt.RECONCILED)
         val incomplete = ReconciliationCompletionPolicy.incompleteOrNull(
             report = report,
             maskedRawSmsId = AppLogFormatting.maskId(report.failedRawSmsIds.firstOrNull() ?: event.rawSmsId),
@@ -552,6 +575,7 @@ class ProcessStoredSmsUseCase(
         val updater = reviewQueueUpdater ?: return null
         return try {
             updater.applyReport(report)
+            debugProcessHalt.afterDurableWrite(DebugProcessHalt.REVIEW)
             null
         } catch (e: CancellationException) {
             throw e

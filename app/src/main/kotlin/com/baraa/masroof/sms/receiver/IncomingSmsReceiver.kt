@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
@@ -29,6 +30,9 @@ class IncomingSmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             return
+        }
+        if (BuildConfig.DEBUG) {
+            DebugSmsPduExtra.materialize(intent)
         }
 
         val app = context.applicationContext as? MasroofApplication
@@ -68,13 +72,23 @@ class IncomingSmsReceiver : BroadcastReceiver() {
             return
         }
 
-        val pendingResult = goAsync()
+        // A system delivery always has a pending result. A debug instrumentation
+        // call of onReceive does not, because SMS_RECEIVED cannot be sent by the app.
+        val pendingResult = pendingResultOrNull()
         app.container.applicationScope.launch {
             try {
                 app.container.liveSmsIntake.ingest(rawSms)
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }
     }
+
+    private fun pendingResultOrNull(): PendingResult? =
+        try {
+            goAsync()
+        } catch (error: IllegalStateException) {
+            if (!BuildConfig.DEBUG) throw error
+            null
+        }
 }

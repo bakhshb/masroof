@@ -27,6 +27,7 @@ class LiveSmsIntake(
     private val processingRetryRepository: ProcessingRetryRepository,
     private val appLogService: AppLogService,
     private val batchRecoveryScheduler: HistoricalBatchRecoveryScheduler? = null,
+    private val debugProcessHalt: DebugProcessHaltProbe = DebugProcessHaltProbe.NONE,
 ) {
     suspend fun ingest(rawSms: RawSms): BankSmsCaptureResult {
         appLogService.info(
@@ -35,6 +36,8 @@ class LiveSmsIntake(
         )
         val result = captureBankSms.capture(rawSms)
         if (result is BankSmsCaptureResult.Captured) {
+            // Park before scheduling so a killed process still has only the RawSms row.
+            debugProcessHalt.afterDurableWrite(DebugProcessHalt.CAPTURE)
             schedule(result.rawSmsId)
         }
         return result
