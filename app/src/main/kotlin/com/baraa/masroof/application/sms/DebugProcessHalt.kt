@@ -22,6 +22,7 @@ import java.util.concurrent.locks.LockSupport
 object DebugProcessHalt {
     const val REQUEST_FILE_NAME: String = "m13-halt-after"
     const val MARKER_FILE_NAME: String = "m13-halted"
+    const val RESUME_FILE_NAME: String = "m13-resume-next"
     const val HOLD_RECONCILE_FILE_NAME: String = "m13-hold-reconcile"
     const val RECONCILE_HELD_MARKER_FILE_NAME: String = "m13-reconcile-held"
 
@@ -60,6 +61,24 @@ object DebugProcessHalt {
         if (!BuildConfig.DEBUG) return
         File(filesDir, REQUEST_FILE_NAME).delete()
         File(filesDir, MARKER_FILE_NAME).delete()
+    }
+
+    /** The arm phase plants this so the next process can drop the halt before startup. */
+    fun scheduleResume(filesDir: File) {
+        if (!BuildConfig.DEBUG) return
+        File(filesDir, RESUME_FILE_NAME).writeText("resume")
+    }
+
+    /**
+     * Deletes the halt request when [RESUME_FILE_NAME] is present.
+     * Call before startup maintenance. No-op when the resume file is absent.
+     */
+    fun consumeScheduledResume(filesDir: File) {
+        if (!BuildConfig.DEBUG) return
+        val resume = File(filesDir, RESUME_FILE_NAME)
+        if (!resume.isFile) return
+        resume.delete()
+        clearRequest(filesDir)
     }
 }
 

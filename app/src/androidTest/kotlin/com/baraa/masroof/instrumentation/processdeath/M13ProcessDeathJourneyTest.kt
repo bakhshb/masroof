@@ -88,6 +88,7 @@ class M13ProcessDeathJourneyTest {
             app().container.rawSmsRepository.listIdsAwaitingProcessing(),
         )
         JourneyNote.write(filesDir(), rawSmsId)
+        DebugProcessHalt.scheduleResume(filesDir())
     }
 
     @Test(timeout = 120_000)
@@ -107,6 +108,7 @@ class M13ProcessDeathJourneyTest {
         assertEquals(evidence("parse succeeded"), ParseStatus.SUCCESS, parsed.event.parseStatus)
         assertNull(evidence("reconcile has not posted"), app().container.financialTransactionRepository.findByRawSmsId(rawSmsId))
         JourneyNote.write(filesDir(), rawSmsId)
+        DebugProcessHalt.scheduleResume(filesDir())
     }
 
     @Test(timeout = 120_000)
@@ -122,6 +124,7 @@ class M13ProcessDeathJourneyTest {
         val rawSmsId = singleRawSmsId()
         assertPurchase(rawSmsId)
         JourneyNote.write(filesDir(), rawSmsId, transactionId = postedId(rawSmsId))
+        DebugProcessHalt.scheduleResume(filesDir())
     }
 
     @Test(timeout = 120_000)
@@ -137,6 +140,7 @@ class M13ProcessDeathJourneyTest {
         val rawSmsId = singleRawSmsId()
         assertPurchase(rawSmsId)
         JourneyNote.write(filesDir(), rawSmsId, transactionId = postedId(rawSmsId))
+        DebugProcessHalt.scheduleResume(filesDir())
     }
 
     @Test(timeout = 120_000)
@@ -154,6 +158,7 @@ class M13ProcessDeathJourneyTest {
         val rawSmsId = singleRawSmsId()
         val reviewId = assertRequiredReview(rawSmsId)
         JourneyNote.write(filesDir(), rawSmsId, reviewId = reviewId)
+        DebugProcessHalt.scheduleResume(filesDir())
     }
 
     @Test(timeout = 120_000)
@@ -181,6 +186,7 @@ class M13ProcessDeathJourneyTest {
         assertEquals(evidence("USER_NON_FINANCIAL"), ReviewResolutionKind.USER_NON_FINANCIAL, review.resolutionKind)
         assertNull(evidence("ignore removes the transaction"), app().container.financialTransactionRepository.findByRawSmsId(rawSmsId))
         JourneyNote.write(filesDir(), rawSmsId, reviewId = review.id)
+        DebugProcessHalt.scheduleResume(filesDir())
     }
 
     @Test(timeout = 120_000)
@@ -217,6 +223,7 @@ class M13ProcessDeathJourneyTest {
         )
         assertNull(evidence("exhausted retry has not posted"), app().container.financialTransactionRepository.findByRawSmsId(rawSmsId))
         JourneyNote.write(filesDir(), rawSmsId)
+        DebugProcessHalt.scheduleResume(filesDir())
     }
 
     @Test(timeout = 120_000)
@@ -409,9 +416,11 @@ class M13ProcessDeathJourneyTest {
     }
 
     private fun shell(command: String): String {
-        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        automation.executeShellCommand(command).use { parcel ->
+        val parcel = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        return try {
             FileInputStream(parcel.fileDescriptor).bufferedReader().use { reader -> reader.readText() }
+        } finally {
+            parcel.close()
         }
     }
 

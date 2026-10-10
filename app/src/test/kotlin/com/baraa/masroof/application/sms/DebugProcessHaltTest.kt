@@ -59,6 +59,23 @@ class DebugProcessHaltTest {
     }
 
     @Test
+    fun scheduledResumeClearsTheHaltBeforeStartup() {
+        val dir = tempDir()
+        File(dir, DebugProcessHalt.REQUEST_FILE_NAME).writeText(DebugProcessHalt.PARSED)
+        File(dir, DebugProcessHalt.MARKER_FILE_NAME).writeText(DebugProcessHalt.PARSED)
+        File(dir, DebugProcessHalt.HOLD_RECONCILE_FILE_NAME).writeText("hold")
+        DebugProcessHalt.scheduleResume(dir)
+        DebugProcessHalt.consumeScheduledResume(dir)
+        assertNull(DebugProcessHalt.requestedStage(dir))
+        assertFalse(File(dir, DebugProcessHalt.RESUME_FILE_NAME).exists())
+        assertTrue(DebugProcessHalt.holdReconcileRequested(dir))
+        DebugProcessHalt.scheduleResume(dir)
+        File(dir, DebugProcessHalt.REQUEST_FILE_NAME).writeText(DebugProcessHalt.REVIEW)
+        DebugProcessHalt.consumeScheduledResume(dir)
+        assertFalse(File(dir, DebugProcessHalt.REQUEST_FILE_NAME).exists())
+    }
+
+    @Test
     fun clearRequestLeavesTheReconcileHold() {
         val dir = tempDir()
         File(dir, DebugProcessHalt.REQUEST_FILE_NAME).writeText(DebugProcessHalt.REVIEW)
