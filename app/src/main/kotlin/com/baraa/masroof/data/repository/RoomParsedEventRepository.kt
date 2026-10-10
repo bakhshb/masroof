@@ -71,6 +71,11 @@ class RoomParsedEventRepository(
             .sortedBy { it.id }
             .map(ParsedEventMapper::toRecord)
 
+    override suspend fun listByIds(ids: Collection<String>): List<ParsedEventRecord> =
+        RoomBatch.query(ids) { chunk -> dao.listByIds(chunk) }
+            .sortedBy { it.id }
+            .map(ParsedEventMapper::toRecord)
+
     override suspend fun listRawSmsIdsReferencingAccount(account: AccountReference): List<String> {
         val masked = account.maskedNumber ?: return emptyList()
         return dao.listRawSmsIdsReferencingAccount(account.bank.id, masked)

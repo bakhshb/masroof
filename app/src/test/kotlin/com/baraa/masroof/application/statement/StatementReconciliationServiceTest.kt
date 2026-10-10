@@ -16,6 +16,7 @@ import com.baraa.masroof.domain.statement.ParsedBankStatement
 import com.baraa.masroof.domain.statement.StatementComparisonStatus
 import com.baraa.masroof.domain.statement.StatementDirection
 import com.baraa.masroof.domain.statement.StatementParseResult
+import com.baraa.masroof.domain.statement.StatementMatchPolicy
 import com.baraa.masroof.domain.statement.StatementRejection
 import java.io.ByteArrayInputStream
 import java.math.BigDecimal
@@ -32,7 +33,13 @@ import org.junit.Test
 class StatementReconciliationServiceTest {
     private val zone = ZoneId.of("Asia/Riyadh")
     private val known = setOf("BANK_ALJAZIRA", "D360")
+    private val owned = setOf(
+        StatementMatchPolicy.QualifiedAccount(Bank.BANK_ALJAZIRA, "3001"),
+        StatementMatchPolicy.QualifiedAccount(Bank.BANK_ALJAZIRA, "3002"),
+        StatementMatchPolicy.QualifiedAccount(Bank("D360"), "3001"),
+    )
     private val parser = CanonicalCsvStatementParser()
+    private val ledgerReferences = linkedMapOf<String, Set<String>>()
 
     @Test
     fun nineMovements_matchNineLedgerRows_andLeaveTheTenthStatementOnly() = runBlocking {
@@ -57,6 +64,7 @@ class StatementReconciliationServiceTest {
                 at = instant(entry),
                 direction = entry.direction,
                 merchant = "DIFFERENT",
+                reference = entry.reference,
             )
         } + posted(
             id = "outside",
@@ -118,6 +126,7 @@ class StatementReconciliationServiceTest {
                 occurredAtZone = zone.id,
             ),
         )
+        ledgerReferences["self-1"] = setOf(StatementMatchPolicy.normalizeReference("ST-1"))
         val ledger = RecordingLedger(rows)
         val report = compared(ledger, statement)
 
@@ -153,16 +162,17 @@ class StatementReconciliationServiceTest {
         assertEquals(before, ledger.rows.size)
         assertEquals(StatementComparisonStatus.MATCHED, report.line("BOUNDARY MATCH").status)
         assertEquals("boundary-match", report.line("BOUNDARY MATCH").ledgerTransactionId)
-        assertEquals(StatementComparisonStatus.MATCHED, report.line("BOUNDARY LATE").status)
-        assertEquals("boundary-late", report.line("BOUNDARY LATE").ledgerTransactionId)
+        assertEquals(StatementComparisonStatus.STATEMENT_ONLY, report.line("BOUNDARY LATE").status)
+        assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("boundary-late").status)
         assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("next-midnight").status)
         assertEquals(StatementComparisonStatus.STATEMENT_ONLY, report.line("OPPOSITE DIR").status)
         assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("opposite").status)
         assertEquals("usd", report.line("USD PURCHASE").ledgerTransactionId)
         assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("sar-not-usd").status)
-        assertEquals(StatementComparisonStatus.AMBIGUOUS, report.line("REF COLLISION A").status)
-        assertEquals(StatementComparisonStatus.AMBIGUOUS, report.line("REF COLLISION B").status)
-        assertEquals(StatementComparisonStatus.AMBIGUOUS, report.ledger("ref-one").status)
+        assertEquals(StatementComparisonStatus.MATCHED, report.line("REF COLLISION A").status)
+        assertEquals("ref-one", report.line("REF COLLISION A").ledgerTransactionId)
+        assertEquals(StatementComparisonStatus.STATEMENT_ONLY, report.line("REF COLLISION B").status)
+        assertEquals(StatementComparisonStatus.MATCHED, report.ledger("ref-one").status)
         assertEquals("fee", report.line("FEE EDGE").ledgerTransactionId)
         assertEquals(FinancialTransactionType.FEE, report.line("FEE EDGE").ledgerType)
         assertEquals("refund", report.line("REFUND EDGE").ledgerTransactionId)
@@ -179,14 +189,14 @@ class StatementReconciliationServiceTest {
         assertTrue(report.statementLines.none { it.status == StatementComparisonStatus.MATCHED && it.ledgerTransactionId == null })
 
         val sar = report.total("BANK_ALJAZIRA", "3001", Currency.SAR)
-        assertMoney("54.00", sar.matchedDebit)
+        assertMoney("74.00", sar.matchedDebit)
         assertMoney("8.00", sar.matchedCredit)
-        assertMoney("4.00", sar.statementOnlyDebit)
+        assertMoney("50.00", sar.statementOnlyDebit)
         assertMoney("12.00", sar.statementOnlyCredit)
-        assertMoney("64.00", sar.ledgerOnlyDebit)
+        assertMoney("77.00", sar.ledgerOnlyDebit)
         assertMoney("0.00", sar.ledgerOnlyCredit)
-        assertMoney("76.00", sar.ambiguousStatementDebit)
-        assertMoney("43.00", sar.ambiguousLedgerDebit)
+        assertMoney("10.00", sar.ambiguousStatementDebit)
+        assertMoney("10.00", sar.ambiguousLedgerDebit)
         val usd = report.total("BANK_ALJAZIRA", "3001", Currency.USD)
         assertMoney("20.00", usd.matchedDebit)
         assertMoney("0.00", usd.matchedCredit)
@@ -206,19 +216,23 @@ class StatementReconciliationServiceTest {
             # masroof-statement-v1
             bankId,accountMasked,bookedAt,direction,amount,currency,description,reference
             BANK_ALJAZIRA,3001,2026-04-02,DEBIT,12.00,SAR,MATCHED ANON,REF-M
-            BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON A,REF-A1
-            BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON B,REF-A2
+            BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON A,
+            BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON B,
             BANK_ALJAZIRA,3001,2026-04-11,DEBIT,4.00,SAR,STATEMENT ONLY ANON,REF-S
         """.trimIndent() + "\n"
         val rows = listOf(
-            posted("m19-matched", FinancialTransactionType.EXPENSE, "12.00", local("2026-04-02T12:00:00"), StatementDirection.DEBIT),
+            posted("m19-matched", FinancialTransactionType.EXPENSE, "12.00", local("2026-04-02T12:00:00"), StatementDirection.DEBIT, reference = "REF-M"),
             posted("m19-ambiguous-a", FinancialTransactionType.EXPENSE, "5.00", local("2026-04-10T09:00:00"), StatementDirection.DEBIT),
             posted("m19-ambiguous-b", FinancialTransactionType.EXPENSE, "5.00", local("2026-04-10T18:00:00"), StatementDirection.DEBIT),
             posted("m19-ledger-only", FinancialTransactionType.EXPENSE, "7.00", local("2026-04-11T12:00:00"), StatementDirection.DEBIT),
         )
         val ledger = RecordingLedger(rows)
-        val result = ImportStatementUseCase(parser, StatementReconciliationService(ledger))
-            .import(ByteArrayInputStream(csv.toByteArray()), known)
+        val result = ImportStatementUseCase(
+            parser,
+            StatementReconciliationService(ledger) { transactions ->
+                transactions.associate { it.id to ledgerReferences[it.id].orEmpty() }
+            },
+        ).import(ByteArrayInputStream(csv.toByteArray()), known, owned)
         val report = (result as StatementImportResult.Compared).report
         assertEquals(0, ledger.mutations)
         assertEquals(1, report.counts.matched)
@@ -288,10 +302,149 @@ class StatementReconciliationServiceTest {
         assertRejected(statementFixture("duplicate_rows.csv").inputStream(), StatementRejection.DUPLICATE_ROW)
     }
 
+    @Test
+    fun sameDayAmount_withDistantBookingTime_isNotMatched() = runBlocking {
+        val csv = statementCsv(
+            "BANK_ALJAZIRA,3001,2026-04-02T09:00:00,DEBIT,12.00,SAR,MORNING ANON",
+        )
+        val ledger = RecordingLedger(
+            listOf(
+                posted(
+                    "evening",
+                    FinancialTransactionType.EXPENSE,
+                    "12.00",
+                    local("2026-04-02T18:00:00"),
+                    StatementDirection.DEBIT,
+                ),
+            ),
+        )
+        val report = compared(ledger, acceptedText(csv))
+        assertEquals(0, ledger.mutations)
+        assertEquals(StatementComparisonStatus.STATEMENT_ONLY, report.line("MORNING ANON").status)
+        assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("evening").status)
+        assertEquals(0, report.counts.matched)
+    }
+
+    @Test
+    fun referenceMismatch_isNotMatched() = runBlocking {
+        val csv = statementCsv(
+            "BANK_ALJAZIRA,3001,2026-04-02T09:00:00,DEBIT,12.00,SAR,REF ANON,REF-1",
+        )
+        val ledger = RecordingLedger(
+            listOf(
+                posted(
+                    "other-ref",
+                    FinancialTransactionType.EXPENSE,
+                    "12.00",
+                    local("2026-04-02T09:00:00"),
+                    StatementDirection.DEBIT,
+                    reference = "REF-2",
+                ),
+            ),
+        )
+        val report = compared(ledger, acceptedText(csv))
+        assertEquals(StatementComparisonStatus.STATEMENT_ONLY, report.line("REF ANON").status)
+        assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("other-ref").status)
+        assertEquals(0, report.counts.matched)
+    }
+
+    @Test
+    fun suppliedReference_withoutLedgerReference_isNotMatched() = runBlocking {
+        val csv = statementCsv(
+            "BANK_ALJAZIRA,3001,2026-04-02,DEBIT,12.00,SAR,UNBACKED ANON,REF-1",
+        )
+        val ledger = RecordingLedger(
+            listOf(
+                posted(
+                    "no-ref",
+                    FinancialTransactionType.EXPENSE,
+                    "12.00",
+                    local("2026-04-02T12:00:00"),
+                    StatementDirection.DEBIT,
+                ),
+            ),
+        )
+        val report = compared(ledger, acceptedText(csv))
+        assertEquals(StatementComparisonStatus.STATEMENT_ONLY, report.line("UNBACKED ANON").status)
+        assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("no-ref").status)
+        assertEquals(0, report.counts.matched)
+    }
+
+    @Test
+    fun closeBookingTime_andSameReference_stillMatch() = runBlocking {
+        val csv = statementCsv(
+            "BANK_ALJAZIRA,3001,2026-04-02T09:00:00,DEBIT,12.00,SAR,CLOSE ANON,REF-1",
+        )
+        val ledger = RecordingLedger(
+            listOf(
+                posted(
+                    "close",
+                    FinancialTransactionType.EXPENSE,
+                    "12.00",
+                    local("2026-04-02T09:05:00"),
+                    StatementDirection.DEBIT,
+                    reference = "ref-1",
+                ),
+            ),
+        )
+        val report = compared(ledger, acceptedText(csv))
+        assertEquals(StatementComparisonStatus.MATCHED, report.line("CLOSE ANON").status)
+        assertEquals("close", report.line("CLOSE ANON").ledgerTransactionId)
+    }
+
+    @Test
+    fun externalAccount_isRejectedBeforeTheLedgerIsRead() = runBlocking {
+        val csv = statementCsv(
+            "BANK_ALJAZIRA,3001,2026-04-02,DEBIT,12.00,SAR,EXTERNAL ANON",
+        )
+        val ledger = RecordingLedger(emptyList())
+        val result = ImportStatementUseCase(parser, StatementReconciliationService(ledger))
+            .import(ByteArrayInputStream(csv.toByteArray()), known, emptySet())
+        assertEquals(StatementImportResult.Rejected(StatementRejection.UNOWNED_ACCOUNT), result)
+        assertEquals(0, ledger.rangeReads)
+        assertEquals(0, ledger.mutations)
+    }
+
+    @Test
+    fun sameSuffixOnAnotherBank_doesNotAuthorizeTheAccount() = runBlocking {
+        val aljazira = statementCsv(
+            "BANK_ALJAZIRA,3001,2026-04-02,DEBIT,12.00,SAR,ALJAZIRA ANON",
+        )
+        val otherLedger = RecordingLedger(emptyList())
+        val otherBank = ImportStatementUseCase(parser, StatementReconciliationService(otherLedger))
+            .import(
+                ByteArrayInputStream(aljazira.toByteArray()),
+                known,
+                setOf(StatementMatchPolicy.QualifiedAccount(Bank("D360"), "3001")),
+            )
+        val longerLedger = RecordingLedger(emptyList())
+        val longer = ImportStatementUseCase(parser, StatementReconciliationService(longerLedger))
+            .import(
+                ByteArrayInputStream(aljazira.toByteArray()),
+                known,
+                setOf(StatementMatchPolicy.QualifiedAccount(Bank.BANK_ALJAZIRA, "99883001")),
+            )
+        assertEquals(StatementImportResult.Rejected(StatementRejection.UNOWNED_ACCOUNT), otherBank)
+        assertEquals(StatementImportResult.Rejected(StatementRejection.UNOWNED_ACCOUNT), longer)
+        assertEquals(0, otherLedger.rangeReads)
+        assertEquals(0, longerLedger.rangeReads)
+
+        val ownedExact = setOf(StatementMatchPolicy.QualifiedAccount(Bank("D360"), "3001"))
+        val d360 = statementCsv(
+            "D360,3001,2026-04-02,DEBIT,12.00,SAR,D360 ANON",
+        )
+        val ledger = RecordingLedger(emptyList())
+        val accepted = ImportStatementUseCase(parser, StatementReconciliationService(ledger))
+            .import(ByteArrayInputStream(d360.toByteArray()), known, ownedExact)
+        assertTrue(accepted is StatementImportResult.Compared)
+        assertEquals(1, ledger.rangeReads)
+        assertEquals(0, ledger.mutations)
+    }
+
     private suspend fun assertRejected(stream: ByteArrayInputStream, reason: StatementRejection) {
         val ledger = RecordingLedger(edgeLedger())
         val result = ImportStatementUseCase(parser, StatementReconciliationService(ledger))
-            .import(stream, known)
+            .import(stream, known, owned)
         assertEquals(StatementImportResult.Rejected(reason), result)
         assertEquals(0, ledger.mutations)
         assertEquals(0, ledger.rangeReads)
@@ -300,11 +453,28 @@ class StatementReconciliationServiceTest {
     private suspend fun assertRejected(stream: java.io.FileInputStream, reason: StatementRejection) {
         val ledger = RecordingLedger(emptyList())
         val result = ImportStatementUseCase(parser, StatementReconciliationService(ledger))
-            .import(stream, known)
+            .import(stream, known, owned)
         assertEquals(StatementImportResult.Rejected(reason), result)
         assertEquals(0, ledger.mutations)
         assertEquals(0, ledger.rangeReads)
     }
+
+    private fun statementCsv(vararg rows: String): String {
+        val padded = rows.map { row ->
+            if (row.split(',').size == 7) "$row," else row
+        }
+        return (
+            listOf(
+                "# masroof-statement-v1",
+                "bankId,accountMasked,bookedAt,direction,amount,currency,description,reference",
+            ) + padded
+        ).joinToString("\n") + "\n"
+    }
+
+    private fun acceptedText(csv: String): ParsedBankStatement =
+        parser.parse(ByteArrayInputStream(csv.toByteArray()), known).let { parsed ->
+            (parsed as StatementParseResult.Accepted).statement
+        }
 
     private fun accepted(name: String): ParsedBankStatement =
         parser.parse(statementFixture(name).inputStream(), known).let { parsed ->
@@ -312,20 +482,22 @@ class StatementReconciliationServiceTest {
         }
 
     private suspend fun compared(ledger: RecordingLedger, statement: ParsedBankStatement) =
-        StatementReconciliationService(ledger).compare(statement)
+        StatementReconciliationService(ledger) { transactions ->
+            transactions.associate { it.id to ledgerReferences[it.id].orEmpty() }
+        }.compare(statement)
 
     private fun edgeLedger(): List<FinancialTransaction> = listOf(
-        posted("boundary-match", FinancialTransactionType.EXPENSE, "12.00", local("2026-04-02T23:59:59"), StatementDirection.DEBIT),
+        posted("boundary-match", FinancialTransactionType.EXPENSE, "12.00", local("2026-04-02T23:59:59"), StatementDirection.DEBIT, reference = "B-1"),
         posted("next-midnight", FinancialTransactionType.EXPENSE, "12.00", local("2026-04-03T00:00:00"), StatementDirection.DEBIT),
-        posted("boundary-late", FinancialTransactionType.EXPENSE, "13.00", local("2026-04-02T01:00:00"), StatementDirection.DEBIT),
-        posted("next-day", FinancialTransactionType.EXPENSE, "14.00", local("2026-04-03T12:00:00"), StatementDirection.DEBIT),
-        posted("opposite", FinancialTransactionType.EXPENSE, "12.00", local("2026-04-04T12:00:00"), StatementDirection.DEBIT),
-        posted("usd", FinancialTransactionType.EXPENSE, "20.00", local("2026-04-05T12:00:00"), StatementDirection.DEBIT, Currency.USD),
+        posted("boundary-late", FinancialTransactionType.EXPENSE, "13.00", local("2026-04-02T01:00:00"), StatementDirection.DEBIT, reference = "B-2"),
+        posted("next-day", FinancialTransactionType.EXPENSE, "14.00", local("2026-04-03T12:00:00"), StatementDirection.DEBIT, reference = "B-3"),
+        posted("opposite", FinancialTransactionType.EXPENSE, "12.00", local("2026-04-04T12:00:00"), StatementDirection.DEBIT, reference = "B-4"),
+        posted("usd", FinancialTransactionType.EXPENSE, "20.00", local("2026-04-05T12:00:00"), StatementDirection.DEBIT, Currency.USD, reference = "B-5"),
         posted("sar-not-usd", FinancialTransactionType.EXPENSE, "20.00", local("2026-04-05T12:00:00"), StatementDirection.DEBIT),
-        posted("ref-one", FinancialTransactionType.EXPENSE, "33.00", local("2026-04-06T12:00:00"), StatementDirection.DEBIT),
-        posted("fee", FinancialTransactionType.FEE, "7.00", local("2026-04-07T12:00:00"), StatementDirection.DEBIT),
-        posted("refund", FinancialTransactionType.REFUND, "8.00", local("2026-04-08T12:00:00"), StatementDirection.CREDIT),
-        posted("purchase", FinancialTransactionType.EXPENSE, "8.00", local("2026-04-08T12:00:00"), StatementDirection.DEBIT),
+        posted("ref-one", FinancialTransactionType.EXPENSE, "33.00", local("2026-04-06T12:00:00"), StatementDirection.DEBIT, reference = "REF-A"),
+        posted("fee", FinancialTransactionType.FEE, "7.00", local("2026-04-07T12:00:00"), StatementDirection.DEBIT, reference = "FEE-1"),
+        posted("refund", FinancialTransactionType.REFUND, "8.00", local("2026-04-08T12:00:00"), StatementDirection.CREDIT, reference = "RF-1"),
+        posted("purchase", FinancialTransactionType.EXPENSE, "8.00", local("2026-04-08T12:00:00"), StatementDirection.DEBIT, reference = "PU-1"),
         posted(
             "d360",
             FinancialTransactionType.EXPENSE,
@@ -334,6 +506,7 @@ class StatementReconciliationServiceTest {
             StatementDirection.DEBIT,
             bank = Bank("D360"),
             zoneId = "Asia/Riyadh",
+            reference = "D-1",
         ),
         posted("aljazira-same-suffix", FinancialTransactionType.EXPENSE, "20.00", local("2026-04-09T12:00:00"), StatementDirection.DEBIT),
         posted("amb-a", FinancialTransactionType.EXPENSE, "5.00", local("2026-04-10T09:00:00"), StatementDirection.DEBIT),
@@ -352,7 +525,10 @@ class StatementReconciliationServiceTest {
         accountMasked: String = "3001",
         zoneId: String? = zone.id,
         merchant: String? = "DIFFERENT",
+        reference: String? = null,
     ): FinancialTransaction {
+        val normalized = StatementMatchPolicy.normalizeReference(reference)
+        if (normalized.isNotEmpty()) ledgerReferences[id] = setOf(normalized)
         val container = FinancialContainerIdFactory.accountId(bank, accountMasked)
         return FinancialTransaction(
             id = id,

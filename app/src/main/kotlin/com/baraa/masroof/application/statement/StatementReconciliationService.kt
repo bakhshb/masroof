@@ -12,8 +12,10 @@ import com.baraa.masroof.domain.statement.ParsedBankStatement
 import com.baraa.masroof.domain.statement.StatementComparisonStatus
 import com.baraa.masroof.domain.statement.StatementDirection
 import com.baraa.masroof.domain.statement.StatementMatchPolicy
+import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 /**
@@ -24,6 +26,7 @@ import java.time.ZoneOffset
  */
 class StatementReconciliationService(
     private val financialTransactionRepository: FinancialTransactionRepository,
+    private val referencesFor: suspend (List<FinancialTransaction>) -> Map<String, Set<String>> = { emptyMap() },
 ) {
     suspend fun compare(statement: ParsedBankStatement): StatementReconciliationReport {
         if (statement.entries.isEmpty()) {
@@ -44,11 +47,12 @@ class StatementReconciliationService(
             .atStartOfDay(ZoneOffset.UTC)
             .toInstant()
         val posted = financialTransactionRepository.listOccurredBetween(start, end)
+        val referencesByTransaction = referencesFor(posted)
         val storedZones = storedZonesByBank(posted)
         val statementZones = statement.entries.map { it.bank }.distinct().associateWith { bank ->
             StatementMatchPolicy.zoneForStatementBank(bank, storedZones[bank].orEmpty())
         }
-        val ledgerSides = projectLedger(posted, statementZones, periodByAccount)
+        val ledgerSides = projectLedger(posted, statementZones, periodByAccount, referencesByTransaction)
         val statementSides = statement.entries.map { entry ->
             StatementSide(
                 entry = entry,
@@ -87,15 +91,18 @@ class StatementReconciliationService(
         posted: List<FinancialTransaction>,
         statementZones: Map<Bank, java.time.ZoneId?>,
         periodByAccount: Map<String, Pair<LocalDate, LocalDate>>,
+        referencesByTransaction: Map<String, Set<String>>,
     ): List<LedgerSide> {
         val sides = mutableListOf<LedgerSide>()
         posted.forEach { transaction ->
+            val references = referencesByTransaction[transaction.id].orEmpty()
             sides += side(
                 transaction = transaction,
                 containerId = transaction.sourceContainerId,
                 endpoint = StatementMatchPolicy.AccountEndpoint.SOURCE,
                 statementZones = statementZones,
                 periodByAccount = periodByAccount,
+                references = references,
             )
             sides += side(
                 transaction = transaction,
@@ -103,6 +110,7 @@ class StatementReconciliationService(
                 endpoint = StatementMatchPolicy.AccountEndpoint.DESTINATION,
                 statementZones = statementZones,
                 periodByAccount = periodByAccount,
+                references = references,
             )
         }
         return sides
@@ -114,6 +122,7 @@ class StatementReconciliationService(
         endpoint: StatementMatchPolicy.AccountEndpoint,
         statementZones: Map<Bank, java.time.ZoneId?>,
         periodByAccount: Map<String, Pair<LocalDate, LocalDate>>,
+        references: Set<String>,
     ): List<LedgerSide> {
         val account = StatementMatchPolicy.qualifiedAccount(containerId) ?: return emptyList()
         val key = accountKey(account.bank, account.accountMasked)
@@ -122,7 +131,8 @@ class StatementReconciliationService(
         val zone = StatementMatchPolicy.zoneForPostedMovement(account.bank, transaction.occurredAtZone)
         val bankComparable = statementZones[account.bank] != null
         if (zone == null || direction == null || !bankComparable) {
-            val civilDate = zone?.let { transaction.occurredAt.atZone(it).toLocalDate() }
+            val localDateTime = zone?.let { transaction.occurredAt.atZone(it).toLocalDateTime() }
+            val civilDate = localDateTime?.toLocalDate()
             if (civilDate != null && !inPeriod(civilDate, period)) return emptyList()
             return listOf(
                 LedgerSide(
@@ -131,11 +141,14 @@ class StatementReconciliationService(
                     accountMasked = account.accountMasked,
                     direction = direction ?: StatementDirection.DEBIT,
                     civilDate = civilDate,
+                    localDateTime = localDateTime,
+                    references = references,
                     comparable = false,
                 ),
             )
         }
-        val civilDate = transaction.occurredAt.atZone(zone).toLocalDate()
+        val localDateTime = transaction.occurredAt.atZone(zone).toLocalDateTime()
+        val civilDate = localDateTime.toLocalDate()
         if (!inPeriod(civilDate, period)) return emptyList()
         return listOf(
             LedgerSide(
@@ -144,6 +157,8 @@ class StatementReconciliationService(
                 accountMasked = account.accountMasked,
                 direction = direction,
                 civilDate = civilDate,
+                localDateTime = localDateTime,
+                references = references,
                 comparable = true,
             ),
         )
@@ -191,12 +206,15 @@ class StatementReconciliationService(
 
     private fun compatible(entry: BankStatementEntry, side: LedgerSide): Boolean {
         val civilDate = side.civilDate ?: return false
+        val localDateTime = side.localDateTime ?: return false
         return entry.bank == side.bank &&
             entry.accountMasked == side.accountMasked &&
             entry.direction == side.direction &&
             entry.amount.currency == side.transaction.amount.currency &&
             entry.amount == side.transaction.amount &&
-            StatementMatchPolicy.datesMatch(entry.bookedDate, civilDate)
+            StatementMatchPolicy.datesMatch(entry.bookedDate, civilDate) &&
+            StatementMatchPolicy.bookingTimesCompatible(entry.bookedAtTime, localDateTime) &&
+            StatementMatchPolicy.referenceSupported(entry.reference, side.references)
     }
 
     private fun buildReport(
@@ -366,6 +384,8 @@ class StatementReconciliationService(
         val accountMasked: String,
         val direction: StatementDirection,
         val civilDate: LocalDate?,
+        val localDateTime: LocalDateTime?,
+        val references: Set<String>,
         val comparable: Boolean,
     )
 
@@ -387,4 +407,30 @@ class StatementReconciliationService(
         val accountMasked: String,
         val currency: Currency,
     )
+}
+
+/**
+ * References carried by the parsed events already linked to each posted row.
+ * A transaction with no linked reference is an empty set, which cannot support
+ * a statement line that supplies one.
+ */
+suspend fun statementLedgerReferences(
+    parsedEventRepository: ParsedEventRepository,
+    transactions: List<FinancialTransaction>,
+): Map<String, Set<String>> {
+    val ids = transactions.flatMap { it.linkedParsedEventIds }.distinct()
+    val byEvent = if (ids.isEmpty()) {
+        emptyMap()
+    } else {
+        parsedEventRepository.listByIds(ids).associate { record ->
+            record.event.id to StatementMatchPolicy.normalizeReference(record.details.transactionReference)
+        }
+    }
+    return transactions.associate { transaction ->
+        val references = transaction.linkedParsedEventIds
+            .map { byEvent[it].orEmpty() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+        transaction.id to references
+    }
 }

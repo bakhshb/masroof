@@ -104,6 +104,10 @@ interface ParsedEventDao {
     @Query("SELECT * FROM parsed_event WHERE rawSmsId IN (:rawSmsIds)")
     suspend fun listByRawSmsIds(rawSmsIds: List<String>): List<ParsedEventEntity>
 
+    /** Callers keep [ids] under [RoomBatch.MAX_BIND_ARGS]. */
+    @Query("SELECT * FROM parsed_event WHERE id IN (:ids)")
+    suspend fun listByIds(ids: List<String>): List<ParsedEventEntity>
+
     @Query(
         """
         SELECT rawSmsId FROM parsed_event

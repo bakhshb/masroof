@@ -169,6 +169,7 @@
     <string name="settings_statement_rejection_bank">The bank id is unknown</string>
     <string name="settings_statement_rejection_formula">The file contains a spreadsheet formula, which is not run</string>
     <string name="settings_statement_rejection_unreadable">The file could not be read</string>
+    <string name="settings_statement_rejection_unowned">The account is not an owned account registered for that bank</string>
     <string name="settings_registry_accounts_hint">Choose a bank to manage its accounts.</string>
     <string name="settings_registry_cards_hint">Choose a bank to manage its cards.</string>
     <string name="settings_registry_loans_hint">Choose a bank to manage its loans.</string>

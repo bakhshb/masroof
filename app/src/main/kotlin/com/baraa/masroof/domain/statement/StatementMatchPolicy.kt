@@ -5,8 +5,11 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.Locale
 
 enum class StatementComparisonStatus {
     MATCHED,
@@ -22,8 +25,9 @@ enum class StatementComparisonStatus {
  * Booking window: the statement line's civil date in the bank zone, expanded by
  * [BOOKING_WINDOW_DAYS] on each side. Zero means the ledger movement must fall
  * on that same local day, `[date 00:00, next date 00:00)`. A date-only
- * `bookedAt` is that civil date. A date-time uses its civil date; the clock
- * time does not widen the window.
+ * `bookedAt` is that civil date. When the statement also supplies a clock time,
+ * the ledger's bank-local time must fall inside [BOOKING_TIME_WINDOW]. A same-day
+ * amount with a clearly different clock is not a match.
  *
  * Zone: [BankTransactionTimePolicy] only. AlJazira is `Asia/Riyadh`. A bank
  * without a fixed zone uses the single distinct `occurredAtZone` already stored
@@ -32,9 +36,11 @@ enum class StatementComparisonStatus {
  * The device zone is not a match key.
  *
  * A match requires the same bank, the same qualified account suffix, the same
- * direction, the same currency, and an equal amount. Description and reference
- * never force a match and never collapse two movements. One statement line
- * pairs with one ledger side only. Any collision is ambiguous.
+ * direction, the same currency, and an equal amount. Description never forces a
+ * match. A supplied statement reference matches only when the ledger side has
+ * exactly one comparable reference and it is the same value. A supplied
+ * reference with no ledger reference, or a different one, is not a match.
+ * One statement line pairs with one ledger side only. Any collision is ambiguous.
  *
  * A self-transfer exposes two sides of one posted transaction: debit on the
  * source account and credit on the destination account. Each side may match
@@ -42,6 +48,12 @@ enum class StatementComparisonStatus {
  */
 object StatementMatchPolicy {
     const val BOOKING_WINDOW_DAYS: Int = 0
+
+    /**
+     * Maximum |statement clock − ledger bank-local clock| when the statement
+     * line includes a time. Date-only lines do not use this window.
+     */
+    val BOOKING_TIME_WINDOW: Duration = Duration.ofMinutes(10)
 
     /** Read superset around civil dates so a non-fixed zone can still be loaded. Not a match window. */
     const val QUERY_SUPERSET_PADDING_DAYS: Long = 2
@@ -101,6 +113,31 @@ object StatementMatchPolicy {
         val start = statementDate.minusDays(window)
         val end = statementDate.plusDays(window)
         return !ledgerDate.isBefore(start) && !ledgerDate.isAfter(end)
+    }
+
+    /**
+     * Date-only statement lines stay on [datesMatch]. A supplied clock must sit
+     * within [BOOKING_TIME_WINDOW] of the ledger's bank-local time.
+     */
+    fun bookingTimesCompatible(statementTime: LocalDateTime?, ledgerLocal: LocalDateTime): Boolean {
+        if (statementTime == null) return true
+        return Duration.between(statementTime, ledgerLocal).abs() <= BOOKING_TIME_WINDOW
+    }
+
+    fun normalizeReference(value: String?): String =
+        value?.trim()?.lowercase(Locale.ROOT).orEmpty()
+
+    /**
+     * A blank statement reference adds no constraint. A supplied reference is
+     * supported only by exactly one non-blank ledger reference with the same
+     * normalized value. Missing or conflicting ledger references do not match.
+     */
+    fun referenceSupported(statementReference: String?, ledgerReferences: Set<String>): Boolean {
+        val wanted = normalizeReference(statementReference)
+        if (wanted.isEmpty()) return true
+        val comparable = ledgerReferences.map(::normalizeReference).filter { it.isNotEmpty() }.toSet()
+        if (comparable.size != 1) return false
+        return comparable.single() == wanted
     }
 
     /**

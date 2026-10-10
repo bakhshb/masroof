@@ -27,6 +27,7 @@ import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.application.statement.ImportStatementUseCase
 import com.baraa.masroof.application.statement.StatementReconciliationService
 import com.baraa.masroof.application.statement.StatementReconciliationWorkflow
+import com.baraa.masroof.application.statement.statementLedgerReferences
 import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
 import com.baraa.masroof.application.transaction.HistoricalMerchantRateCorrectionWorkflow
 import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyncer
@@ -91,6 +92,8 @@ import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.statement.CanonicalCsvStatementParser
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.statement.StatementMatchPolicy
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
@@ -495,6 +498,9 @@ class AppContainer(
                 parser = CanonicalCsvStatementParser(),
                 reconciliation = StatementReconciliationService(
                     financialTransactionRepository = financialTransactionRepository,
+                    referencesFor = { transactions ->
+                        statementLedgerReferences(parsedEventRepository, transactions)
+                    },
                 ),
             ),
             knownBankIds = {
@@ -502,6 +508,14 @@ class AppContainer(
                 val accounts = accountRegistryRepository.listAll().map { it.bank.id }
                 (registered + accounts)
                     .filter { it.isNotBlank() && it != Bank.UNKNOWN.id }
+                    .toSet()
+            },
+            ownedAccounts = {
+                accountRegistryRepository.listAll()
+                    .asSequence()
+                    .filter { it.ownership == OwnershipStatus.OWNED }
+                    .filter { it.bank != Bank.UNKNOWN && it.maskedNumber.isNotBlank() }
+                    .map { StatementMatchPolicy.QualifiedAccount(it.bank, it.maskedNumber.trim()) }
                     .toSet()
             },
         )

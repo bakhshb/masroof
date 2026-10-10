@@ -36,7 +36,10 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
+import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -130,6 +133,10 @@ class StatementReconciliationSmokeTest {
     private fun seedLedgerAndEvidence() {
         runBlocking(Dispatchers.IO) {
             val container = application().container
+            container.accountRegistryRepository.setOwnership(
+                AccountReference(Bank.BANK_ALJAZIRA, ACCOUNT),
+                OwnershipStatus.OWNED,
+            )
             container.withDatabaseTransaction {
                 val account = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, ACCOUNT)
                 SEEDED.forEach { row ->
@@ -162,6 +169,9 @@ class StatementReconciliationSmokeTest {
                             bankNetworkType = null,
                             confidence = Confidence(1.0),
                             parseStatus = ParseStatus.SUCCESS,
+                        ),
+                        ParsedEventDetails(
+                            transactionReference = if (row.transactionId == "m19-matched") "REF-M" else null,
                         ),
                     )
                     val saved = container.financialTransactionRepository.save(
@@ -680,8 +690,8 @@ class StatementReconciliationSmokeTest {
             # masroof-statement-v1
             bankId,accountMasked,bookedAt,direction,amount,currency,description,reference
             BANK_ALJAZIRA,3001,2026-04-02,DEBIT,12.00,SAR,MATCHED ANON,REF-M
-            BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON A,REF-A1
-            BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON B,REF-A2
+            BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON A,
+            BANK_ALJAZIRA,3001,2026-04-10,DEBIT,5.00,SAR,AMBIGUOUS ANON B,
             BANK_ALJAZIRA,3001,2026-04-11,DEBIT,4.00,SAR,STATEMENT ONLY ANON,REF-S
         """.trimIndent() + "\n"
     }

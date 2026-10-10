@@ -48,6 +48,16 @@ interface ParsedEventRepository {
         rawSmsIds.distinct().mapNotNull { findByRawSmsId(it) }.sortedBy { it.event.id }
 
     /**
+     * Parse rows whose event id is in [ids], ordered by event id.
+     * In-memory defaults may scan. Room implementations chunk the lookup.
+     */
+    suspend fun listByIds(ids: Collection<String>): List<ParsedEventRecord> {
+        if (ids.isEmpty()) return emptyList()
+        val wanted = ids.toSet()
+        return listAll().filter { it.event.id in wanted }.sortedBy { it.event.id }
+    }
+
+    /**
      * RawSms ids whose source or destination account is exactly [account].
      *
      * This is the evidence whose [com.baraa.masroof.domain.ownership.OwnershipResolver]

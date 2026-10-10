@@ -296,5 +296,6 @@ private fun rejectionText(state: StatementReconciliationUiState): String? {
         StatementRejection.UNKNOWN_BANK -> stringResource(R.string.settings_statement_rejection_bank)
         StatementRejection.FORMULA -> stringResource(R.string.settings_statement_rejection_formula)
         StatementRejection.UNREADABLE -> stringResource(R.string.settings_statement_rejection_unreadable)
+        StatementRejection.UNOWNED_ACCOUNT -> stringResource(R.string.settings_statement_rejection_unowned)
     }
 }

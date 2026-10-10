@@ -30,8 +30,13 @@ import java.time.LocalDateTime
  * `bookedAt` is an offset-less ISO-8601 local date (`YYYY-MM-DD`) or local
  * date-time (`YYYY-MM-DDTHH:MM:SS` with optional fraction). It is civil time in
  * [com.baraa.masroof.domain.assembly.BankTransactionTimePolicy]. AlJazira is
- * `Asia/Riyadh`. An offset or `Z` is rejected. The time of day does not widen
- * the booking window; matching uses the civil date. See [StatementMatchPolicy].
+ * `Asia/Riyadh`. An offset or `Z` is rejected. A date-only value matches that
+ * civil date. A date-time also requires the ledger clock to fall inside
+ * [StatementMatchPolicy.BOOKING_TIME_WINDOW].
+ *
+ * `reference`, when present, matches only a ledger side that carries exactly
+ * that one comparable reference. It does not match a same-day amount whose
+ * ledger reference is missing or different. See [StatementMatchPolicy].
  *
  * `direction` is `DEBIT` or `CREDIT`. `amount` is a non-negative exact decimal
  * with at most two non-zero fractional digits. `currency` is an ISO code the
@@ -92,6 +97,7 @@ enum class StatementRejection {
     UNKNOWN_BANK,
     FORMULA,
     UNREADABLE,
+    UNOWNED_ACCOUNT,
 }
 
 /**
