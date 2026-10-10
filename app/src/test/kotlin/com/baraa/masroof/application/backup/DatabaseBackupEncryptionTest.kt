@@ -285,8 +285,10 @@ class DatabaseBackupEncryptionTest {
                 insertProbe(live)
                 val before = digest(context.getDatabasePath(MasroofDatabase.NAME))
                 val closed = AtomicBoolean(false)
+                val logs = AppLogService(context).also { it.clear() }
                 val importer = service(
                     live,
+                    logs = logs,
                     closeDatabase = { closed.set(true) },
                     archiveLimits = BackupArchiveLimits(
                         maxEntries = 3,
@@ -305,6 +307,10 @@ class DatabaseBackupEncryptionTest {
                 File(abandoned, "decrypted-package.zip").writeBytes(byteArrayOf(1, 2, 3, 4))
                 val outcome = importer.importFrom(Uri.fromFile(envelope), passphrase.copyOf())
                 assertEquals(BackupImportOutcome.InvalidPackage, outcome)
+                assertEquals(
+                    "Database import failed: ${BackupFailureCategory.ENVELOPE_TOO_LARGE.logToken}",
+                    logs.readAll().single().message,
+                )
                 assertFalse(closed.get())
                 assertTrue(live.isOpen)
                 assertEquals(before, digest(context.getDatabasePath(MasroofDatabase.NAME)))
@@ -325,13 +331,17 @@ class DatabaseBackupEncryptionTest {
                 insertProbe(live)
                 val before = digest(context.getDatabasePath(MasroofDatabase.NAME))
                 val closed = AtomicBoolean(false)
+                val logs = AppLogService(context).also { it.clear() }
+                // The decrypted ZIP stays under the streaming cap. The uncompressed
+                // entry exceeds M4's per-entry limit, so the archive validator rejects it.
                 val importer = service(
                     live,
+                    logs = logs,
                     closeDatabase = { closed.set(true) },
                     archiveLimits = BackupArchiveLimits(
                         maxEntries = 3,
                         maxUncompressedBytesPerEntry = 64,
-                        maxTotalUncompressedBytes = 64,
+                        maxTotalUncompressedBytes = 64 * 1024,
                     ),
                 )
                 val envelope = File(context.cacheDir, "encrypted-bomb.masroof")
@@ -344,8 +354,13 @@ class DatabaseBackupEncryptionTest {
                         }
                     }
                 }
+                assertTrue(envelope.length() < 64 * 1024)
                 val outcome = importer.importFrom(Uri.fromFile(envelope), passphrase.copyOf())
                 assertEquals(BackupImportOutcome.InvalidPackage, outcome)
+                assertEquals(
+                    BackupArchiveRejection.ENTRY_TOO_LARGE.logMessage(),
+                    logs.readAll().single().message,
+                )
                 assertFalse(closed.get())
                 assertTrue(live.isOpen)
                 assertEquals(before, digest(context.getDatabasePath(MasroofDatabase.NAME)))

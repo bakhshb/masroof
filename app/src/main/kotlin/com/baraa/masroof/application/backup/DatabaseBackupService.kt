@@ -131,19 +131,13 @@ class DatabaseBackupService(
                     BackupImportOutcome.Failed,
                     BackupFailureCategory.IMPORT_FAILED,
                 )
+            var legacyPlaintext = false
             BufferedInputStream(raw).use { buffered ->
                 buffered.mark(BackupEnvelope.PEEK_MARK)
                 val peek = ByteArray(BackupEnvelope.HEADER_SIZE)
                 val read = readPrefix(buffered, peek)
                 buffered.reset()
                 when {
-                    BackupPackageFormat.looksLikeZip(peek, read) && !confirmLegacyPlaintext ->
-                        return@withContext BackupImportOutcome.LegacyConfirmationRequired
-                    BackupPackageFormat.looksLikeZip(peek, read) -> {
-                        val directory = createStagingDir("import")
-                        staging = directory
-                        extractValidated(buffered, directory)
-                    }
                     BackupEnvelope.looksLikeEnvelope(peek, read) -> {
                         val directory = createStagingDir("import")
                         staging = directory
@@ -171,11 +165,19 @@ class DatabaseBackupService(
                             plainZip.delete()
                         }
                     }
-                    else -> return@withContext loggedImport(
-                        BackupImportOutcome.InvalidPackage,
-                        BackupFailureCategory.INVALID_PACKAGE,
-                    )
+                    else -> {
+                        // Plaintext ZIPs and unrecognized bytes share M4's validator.
+                        // A ZIP that passes validation still needs explicit legacy
+                        // confirmation before the live database is closed.
+                        legacyPlaintext = BackupPackageFormat.looksLikeZip(peek, read)
+                        val directory = createStagingDir("import")
+                        staging = directory
+                        extractValidated(buffered, directory)
+                    }
                 }
+            }
+            if (legacyPlaintext && !confirmLegacyPlaintext) {
+                return@withContext BackupImportOutcome.LegacyConfirmationRequired
             }
             val packageDir = staging ?: return@withContext loggedImport(
                 BackupImportOutcome.InvalidPackage,
@@ -284,6 +286,9 @@ class DatabaseBackupService(
                 DatabaseRestoreRecovery.failImport(appContext, liveDb)
                 throw error
             }
+        } catch (error: BackupArchiveException) {
+            appLogService?.error(AppLogCategories.BACKUP, error.category.logMessage())
+            BackupImportOutcome.InvalidPackage
         } catch (error: BackupFailureException) {
             logImportFailure(error.category)
             importOutcome(error.category)
@@ -621,10 +626,9 @@ class DatabaseBackupService(
         try {
             BackupArchiveValidator(archiveLimits).extractInto(input, staging)
         } catch (error: BackupArchiveException) {
-            appLogService?.error(AppLogCategories.BACKUP, error.category.logMessage())
-            throw BackupFailureException(BackupFailureCategory.ARCHIVE_REJECTED)
+            throw error
         } catch (ignored: Exception) {
-            throw BackupFailureException(BackupFailureCategory.ARCHIVE_REJECTED)
+            throw BackupArchiveException(BackupArchiveRejection.MALFORMED)
         }
     }
 
