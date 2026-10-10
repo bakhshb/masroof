@@ -61,10 +61,14 @@ class DatabaseBackupService(
         sweepAbandonedStaging()
     }
     override suspend fun exportTo(destination: Uri, passphrase: CharArray): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            operationMutex.withLock {
-                databaseAccessGate.withAccess { exportOnIo(destination, passphrase) }
+        try {
+            withContext(Dispatchers.IO) {
+                operationMutex.withLock {
+                    databaseAccessGate.withAccess { exportOnIo(destination, passphrase) }
+                }
             }
+        } finally {
+            passphrase.fill('\u0000')
         }
 
     private fun exportOnIo(destination: Uri, passphrase: CharArray): Result<Unit> {
@@ -132,10 +136,14 @@ class DatabaseBackupService(
         source: Uri,
         passphrase: CharArray,
         confirmLegacyPlaintext: Boolean,
-    ): BackupImportOutcome = withContext(Dispatchers.IO) {
-        operationMutex.withLock {
-            databaseAccessGate.withRestore { importOnIo(source, passphrase, confirmLegacyPlaintext) }
+    ): BackupImportOutcome = try {
+        withContext(Dispatchers.IO) {
+            operationMutex.withLock {
+                databaseAccessGate.withRestore { importOnIo(source, passphrase, confirmLegacyPlaintext) }
+            }
         }
+    } finally {
+        passphrase.fill('\u0000')
     }
 
     private fun importOnIo(source: Uri, passphrase: CharArray, confirmLegacyPlaintext: Boolean): BackupImportOutcome {

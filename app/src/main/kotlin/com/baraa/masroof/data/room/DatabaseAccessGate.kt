@@ -80,4 +80,4 @@ class DatabaseAccessGate {
     }
 }
 
-class DatabaseRestartRequiredException : IllegalStateException("Database instance requires process restart")
+class DatabaseRestartRequiredException : kotlinx.coroutines.CancellationException("Database instance requires process restart")

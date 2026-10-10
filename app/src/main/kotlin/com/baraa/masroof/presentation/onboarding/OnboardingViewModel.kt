@@ -331,7 +331,13 @@ class OnboardingViewModel(
                         }
                     }
                     is ImportState.ProviderError -> {
-                        _uiState.update { it.copy(error = OnboardingError.SMS_PROVIDER_ERROR) }
+                        _uiState.update {
+                            it.copy(error = if (state.result.failure is HistoricalImportFailure.ProcessingIncomplete) {
+                                OnboardingError.IMPORT_FAILED
+                            } else {
+                                OnboardingError.SMS_PROVIDER_ERROR
+                            })
+                        }
                     }
                     else -> {
                         _uiState.update { it.copy(error = OnboardingError.IMPORT_FAILED) }

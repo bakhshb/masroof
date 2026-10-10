@@ -41,6 +41,6 @@ class RoomCommitmentRepository(
 
     companion object {
         fun from(database: MasroofDatabase, accessGate: DatabaseAccessGate = DatabaseAccessGate()): RoomCommitmentRepository =
-            RoomCommitmentRepository(dao = database.commitmentDao())
+            RoomCommitmentRepository(dao = database.commitmentDao(), accessGate = accessGate)
     }
 }

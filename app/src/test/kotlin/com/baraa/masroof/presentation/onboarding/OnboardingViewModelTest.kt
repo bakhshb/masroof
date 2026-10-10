@@ -507,6 +507,20 @@ AccountRegistryEntry.forTest(
         assertEquals(OnboardingStep.OWNERSHIP, fixture.vm.uiState.value.step)
     }
 
+    @Test
+    fun partialParseFailures_doNotCompleteHistoricalOnboardingImport() = runTest {
+        val fixture = Fixture(permissionGranted = true, gateway = FakeImportGateway(
+            initialResult = com.baraa.masroof.application.onboarding.HistoricalImportResult(scanned = 2, parsed = 1, failed = 1),
+        ))
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        fixture.vm.startImport()
+        advanceUntilIdle()
+        assertFalse(fixture.prefs.isHistoricalImportCompleted())
+        assertEquals(OnboardingError.IMPORT_FAILED, fixture.vm.uiState.value.error)
+        assertTrue(fixture.vm.uiState.value.importState is ImportState.ProviderError)
+    }
+
     private class Fixture(
         now: Instant = Instant.parse("2026-08-11T08:00:00Z"),
         permissionGranted: Boolean = true,
