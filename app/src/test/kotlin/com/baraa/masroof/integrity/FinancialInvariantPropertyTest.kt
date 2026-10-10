@@ -28,7 +28,7 @@ import org.robolectric.annotation.Config
 /**
  * Persisted-ledger invariants over the golden corpus and seeded import orders.
  * Totals come from [GoldenLedgerRunner], which reads the dashboard projection.
- * The pending M8 as-of rate oracle is not activated here.
+ * The M8 as-of rate oracle is active and is included with the other golden scenarios.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -36,7 +36,7 @@ class FinancialInvariantPropertyTest {
     @Test
     fun activeGoldenScenarios_matchOracle_inMoreThanOneOrder() = runBlocking {
         val active = GoldenLedgerCorpus.loadAll().filter { it.status == "ACTIVE" }
-        assertEquals(6, active.size)
+        assertEquals(7, active.size)
         for (scenario in active) {
             val orders = if (scenario.messages.isEmpty()) {
                 listOf(IntegritySeeds.FORWARD to emptyList())
