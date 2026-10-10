@@ -100,6 +100,50 @@ class SettingsImportConfirmTest {
         assertEquals(0, backup.importCalls)
     }
 
+    @Test
+    fun export_afterProcessRecreation_failsClosedWithExplicitRetryMessage() = runTest {
+        val backup = RecordingBackupGateway()
+        val old = viewModel(backup)
+        old.onExportPassphraseChange("secret")
+        assertTrue(old.prepareExport())
+        assertEquals("", old.uiState.value.exportPassphrase)
+        val recreated = viewModel(backup)
+        recreated.exportBackup(Uri.parse("content://backup/result.masroof"))
+        advanceUntilIdle()
+        assertEquals(0, backup.exportCalls)
+        assertEquals(BackupMessage.EXPORT_REENTER_PASSPHRASE, recreated.uiState.value.backupMessage)
+        assertFalse(recreated.uiState.value.exportingBackup)
+    }
+
+    @Test
+    fun export_retainedViewModel_consumesPhraseOnceAndWipesIt() = runTest {
+        val backup = RecordingBackupGateway()
+        val vm = viewModel(backup)
+        vm.onExportPassphraseChange("secret")
+        assertTrue(vm.prepareExport())
+        vm.exportBackup(Uri.parse("content://backup/result.masroof"))
+        advanceUntilIdle()
+        assertEquals(1, backup.exportCalls)
+        assertEquals(BackupMessage.EXPORT_SUCCESS, vm.uiState.value.backupMessage)
+        assertTrue(backup.exportPhrase!!.all { it == '\u0000' })
+        vm.exportBackup(Uri.parse("content://backup/result.masroof"))
+        assertEquals(1, backup.exportCalls)
+        assertEquals(BackupMessage.EXPORT_REENTER_PASSPHRASE, vm.uiState.value.backupMessage)
+    }
+
+    @Test
+    fun export_cancelledPicker_discardsSecretAndRequiresNewPreparation() = runTest {
+        val backup = RecordingBackupGateway()
+        val vm = viewModel(backup)
+        vm.onExportPassphraseChange("secret")
+        assertTrue(vm.prepareExport())
+        vm.abandonPreparedExport()
+        vm.exportBackup(Uri.parse("content://backup/result.masroof"))
+        advanceUntilIdle()
+        assertEquals(0, backup.exportCalls)
+        assertEquals(BackupMessage.EXPORT_REENTER_PASSPHRASE, vm.uiState.value.backupMessage)
+    }
+
     private fun viewModel(backup: DatabaseBackupGateway): SettingsViewModel =
         SettingsViewModel(
             settingsRegistryWorkflow = SettingsViewModelTestSupport.settingsRegistryWorkflow(
@@ -136,7 +180,14 @@ class SettingsImportConfirmTest {
     ) : DatabaseBackupGateway {
         var importCalls: Int = 0
 
-        override suspend fun exportTo(destination: Uri, passphrase: CharArray): Result<Unit> = Result.success(Unit)
+        var exportCalls = 0
+        var exportPhrase: CharArray? = null
+
+        override suspend fun exportTo(destination: Uri, passphrase: CharArray): Result<Unit> {
+            exportCalls++
+            exportPhrase = passphrase
+            return Result.success(Unit)
+        }
 
         override suspend fun inspect(source: Uri): BackupPackageKind = kind
 

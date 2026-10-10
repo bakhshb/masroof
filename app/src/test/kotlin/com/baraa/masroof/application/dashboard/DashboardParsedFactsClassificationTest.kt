@@ -220,7 +220,6 @@ class DashboardParsedFactsClassificationTest {
             parsedRecords = listOf(record),
             ownedAccountContainerIds = ownedIds,
             ownedAccountLast4s = ownedIds.map { it.substringAfterLast(':') }.toSet(),
-            rawSmsById = rawSmsById,
             debitCardScope = debitScope,
         )
         val mada = if (debitScope.ownedDebitCardContainerIds.isEmpty()) {
@@ -231,7 +230,6 @@ class DashboardParsedFactsClassificationTest {
                 debitCards = debitCards(record),
                 transactions = listOf(tx),
                 parsedRecords = listOf(record),
-                rawSmsById = rawSmsById,
                 primaryCurrency = Currency.SAR,
                 sarEquivalents = emptyMap(),
                 ownedAccountContainerIds = ownedIds,

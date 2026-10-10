@@ -22,12 +22,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
+import com.baraa.masroof.presentation.startup.rememberStartupMaintenanceOutcome
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.collectAsState
@@ -115,15 +114,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            var startupOutcome by rememberSaveable {
-                mutableStateOf<StartupMaintenanceOutcome?>(null)
+            var startupOutcome by rememberStartupMaintenanceOutcome(container::awaitStartupMaintenance) { outcome ->
+                startupFinancialReady = outcome == StartupMaintenanceOutcome.READY
             }
             var startupRetrying by remember { mutableStateOf(false) }
             val startupScope = rememberCoroutineScope()
-            LaunchedEffect(Unit) {
-                startupOutcome = container.awaitStartupMaintenance()
-                startupFinancialReady = startupOutcome == StartupMaintenanceOutcome.READY
-            }
             if (startupOutcome != StartupMaintenanceOutcome.READY) {
                 MasroofTheme(darkTheme = isSystemInDarkTheme()) {
                     MasroofScreenBackground(modifier = Modifier.fillMaxSize()) {

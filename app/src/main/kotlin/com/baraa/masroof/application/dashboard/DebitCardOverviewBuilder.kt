@@ -6,7 +6,6 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -30,7 +29,6 @@ object DebitCardOverviewBuilder {
         debitCards: List<CardRegistryEntry>,
         transactions: List<FinancialTransaction>,
         parsedRecords: List<ParsedEventRecord>,
-        rawSmsById: Map<String, RawSms>,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         ownedAccountContainerIds: Set<String>,
@@ -65,7 +63,6 @@ object DebitCardOverviewBuilder {
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
-            rawSmsById = rawSmsById,
         )
         val debitSpendInvolvement = mutableMapOf<String, MutableSet<String>>()
 

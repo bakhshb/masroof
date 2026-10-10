@@ -61,7 +61,6 @@ class CardsDashboardProjection(
             debitCards = cardRegistry,
             transactions = transactions,
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             ownedAccountContainerIds = ownedAccountContainerIds,

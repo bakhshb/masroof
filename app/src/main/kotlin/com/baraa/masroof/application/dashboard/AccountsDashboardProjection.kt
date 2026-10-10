@@ -19,7 +19,6 @@ object AccountsDashboardProjection {
                 parsedRecords = parsedRecords,
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
-                rawSmsById = rawSmsById,
                 debitCardScope = debitCardScope,
             )
             AccountsDashboardSection(
@@ -30,7 +29,6 @@ object AccountsDashboardProjection {
                     sarEquivalents = sarEquivalents,
                     ownedAccountContainerIds = ownedAccountContainerIds,
                     ownedAccountLast4s = ownedAccountLast4s,
-                    rawSmsById = rawSmsById,
                     debitCardScope = debitCardScope,
                 ),
                 spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
@@ -40,7 +38,6 @@ object AccountsDashboardProjection {
                     sarEquivalents = sarEquivalents,
                     ownedAccountContainerIds = ownedAccountContainerIds,
                     ownedAccountLast4s = ownedAccountLast4s,
-                    rawSmsById = rawSmsById,
                     debitCardScope = debitCardScope,
                 ),
                 perAccount = perAccount,
@@ -55,7 +52,6 @@ object AccountsDashboardProjection {
                     sarEquivalents = sarEquivalents,
                     ownedAccountContainerIds = ownedAccountContainerIds,
                     ownedAccountLast4s = ownedAccountLast4s,
-                    rawSmsById = rawSmsById,
                     debitCardScope = debitCardScope,
                 ),
                 transactionAccountInvolvement = AccountTransactionInvolvementResolver.buildIndex(

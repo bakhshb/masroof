@@ -3,7 +3,6 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 enum class FlowExpenseCategory {
@@ -64,7 +63,6 @@ object CurrentAccountFlowDetailGrouper {
         sarEquivalents: Map<String, Money> = emptyMap(),
         ownedAccountContainerIds: Set<String> = emptySet(),
         ownedAccountLast4s: Set<String> = emptySet(),
-        rawSmsById: Map<String, RawSms> = emptyMap(),
         scopeMode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
         debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): CurrentAccountFlowDetailGrouping {
@@ -73,7 +71,6 @@ object CurrentAccountFlowDetailGrouper {
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
-            rawSmsById = rawSmsById,
         )
         val scope = CurrentAccountTransactionScope(
             ownedContainerIds = ownedAccountContainerIds,

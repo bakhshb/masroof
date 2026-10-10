@@ -245,8 +245,8 @@ object DatabaseRestoreRecovery {
         discardDatabase(rollbackFile(live))
         discardDatabase(preservedRollbackFile(live))
         discardDatabase(incomingFile(live))
-        originalPrefsFile(live).delete()
-        incomingPrefsFile(live).delete()
+        SensitiveFileCleanup.delete(originalPrefsFile(live))
+        SensitiveFileCleanup.delete(incomingPrefsFile(live))
         journalFile(live).delete()
         journalTempFile(live).delete()
     }
@@ -591,7 +591,7 @@ object DatabaseRestoreRecovery {
         if (!looksLikeSqlite(file)) return false
         integrityCheckCount += 1
         val scratchDir = File(file.parentFile, file.name + ".integrity-check")
-        scratchDir.deleteRecursively()
+        SensitiveFileCleanup.delete(scratchDir)
         if (!scratchDir.mkdirs()) return false
         return try {
             val scratch = File(scratchDir, file.name)
@@ -608,7 +608,7 @@ object DatabaseRestoreRecovery {
         } catch (_: Exception) {
             false
         } finally {
-            scratchDir.deleteRecursively()
+            SensitiveFileCleanup.delete(scratchDir)
         }
     }
 
@@ -707,17 +707,17 @@ object DatabaseRestoreRecovery {
     }
 
     private fun deleteSnapshots(live: File) {
-        originalPrefsFile(live).delete()
-        incomingPrefsFile(live).delete()
+        SensitiveFileCleanup.delete(originalPrefsFile(live))
+        SensitiveFileCleanup.delete(incomingPrefsFile(live))
     }
 
     private fun discardDatabase(file: File) {
         deleteSidecars(file)
-        if (file.exists()) file.delete()
+        SensitiveFileCleanup.delete(file)
     }
 
     private fun deleteSidecars(file: File) {
-        SIDECARS.forEach { suffix -> File(file.path + suffix).delete() }
+        SIDECARS.forEach { suffix -> SensitiveFileCleanup.delete(File(file.path + suffix)) }
     }
 
     private fun hasSidecar(file: File): Boolean = SIDECARS.any { File(file.path + it).exists() }
@@ -727,7 +727,7 @@ object DatabaseRestoreRecovery {
             val source = File(from.path + suffix)
             if (!source.exists()) return@forEach
             val dest = File(to.path + suffix)
-            if (dest.exists()) dest.delete()
+            SensitiveFileCleanup.delete(dest)
             check(source.renameTo(dest)) { "Cannot move database sidecar $suffix" }
         }
     }

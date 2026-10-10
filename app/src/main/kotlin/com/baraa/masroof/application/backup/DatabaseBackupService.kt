@@ -88,7 +88,7 @@ class DatabaseBackupService(
 
                         writeEncryptedPackage(staging, destination, secret)
                     } finally {
-                        staging.deleteRecursively()
+                        SensitiveFileCleanup.delete(staging)
                     }
                 }.onSuccess {
                     appLogService?.info(AppLogCategories.BACKUP, "Database export succeeded")
@@ -230,8 +230,8 @@ class DatabaseBackupService(
             DatabaseRestoreRecovery.recover(appContext)
             val incoming = DatabaseRestoreRecovery.incomingFile(liveDb)
             discardDatabaseFiles(incoming)
-            dbFile.copyTo(incoming, overwrite = false)
             try {
+                dbFile.copyTo(incoming, overwrite = false)
                 openMigrateAndValidate(incoming)
                 val preservedRollback = DatabaseRestoreRecovery.hasPreexistingRollback(liveDb)
                 DatabaseRestoreRecovery.writeSnapshots(
@@ -278,6 +278,8 @@ class DatabaseBackupService(
                 )
                 afterRestoreStage(DatabaseRestoreRecovery.Stage.COMMITTED)
                 DatabaseRestoreRecovery.cleanupCommitted(appContext, liveDb)
+                SensitiveFileCleanup.delete(packageDir)
+                secret.fill('\u0000')
                 restartProcess()
                 appLogService?.info(AppLogCategories.BACKUP, "Database import succeeded; restart required")
                 BackupImportOutcome.SuccessNeedsRestart
@@ -297,7 +299,7 @@ class DatabaseBackupService(
             BackupImportOutcome.Failed
         } finally {
             secret.fill('\u0000')
-            staging?.deleteRecursively()
+            staging?.let(SensitiveFileCleanup::delete)
         }
     }
 
@@ -312,7 +314,7 @@ class DatabaseBackupService(
         val sourcePath = source.path ?: appContext.getDatabasePath(MasroofDatabase.NAME).path
         check(File(sourcePath).isFile) { "Database file missing" }
         destination.parentFile?.mkdirs()
-        check(!destination.exists() || destination.delete()) { "Cannot replace snapshot destination" }
+        SensitiveFileCleanup.delete(destination)
         deleteSidecarFiles(destination)
         val wroteOnline = onlineBackupEnabled && writeOnlineBackupIfSupported(sourcePath, destination)
         if (!wroteOnline) {
@@ -333,12 +335,12 @@ class DatabaseBackupService(
             try {
                 executeVacuumInto(raw, destination)
             } catch (error: android.database.SQLException) {
-                if (destination.exists()) destination.delete()
+                SensitiveFileCleanup.delete(destination)
                 deleteSidecarFiles(destination)
                 if (isOnlineBackupUnsupported(error)) return false
                 throw error
             } catch (error: IllegalStateException) {
-                if (destination.exists()) destination.delete()
+                SensitiveFileCleanup.delete(destination)
                 deleteSidecarFiles(destination)
                 if (isOnlineBackupUnsupported(error)) return false
                 throw error
@@ -632,25 +634,11 @@ class DatabaseBackupService(
         }
     }
 
-    private fun wipeFile(file: File) {
-        if (!file.isFile) return
-        runCatching {
-            FileOutputStream(file).use { output ->
-                val zeros = ByteArray(8192)
-                var remaining = file.length()
-                while (remaining > 0) {
-                    val count = minOf(zeros.size.toLong(), remaining).toInt()
-                    output.write(zeros, 0, count)
-                    remaining -= count
-                }
-                output.fd.sync()
-            }
-        }
-    }
+    private fun wipeFile(file: File) = SensitiveFileCleanup.wipe(file)
 
     private fun createOwnerOnlyFile(directory: File, name: String): File {
         val file = File(directory, name)
-        check(!file.exists() || file.delete()) { "Cannot replace staging file" }
+        SensitiveFileCleanup.delete(file)
         check(file.createNewFile()) { "Cannot create staging file" }
         file.setReadable(false, false)
         file.setWritable(false, false)
@@ -709,25 +697,22 @@ class DatabaseBackupService(
     private fun sweepAbandonedStaging() {
         appContext.cacheDir.listFiles()?.forEach { dir ->
             if (!dir.isDirectory || !dir.name.startsWith("masroof-backup-")) return@forEach
-            dir.walkBottomUp().forEach { file ->
-                if (file.isFile) wipeFile(file)
-                file.delete()
-            }
+            SensitiveFileCleanup.delete(dir)
         }
     }
 
     private fun createStagingDir(label: String): File {
         sweepAbandonedStaging()
         val dir = File(appContext.cacheDir, "masroof-backup-$label-${clockEpochMillis()}")
-        if (dir.exists()) dir.deleteRecursively()
+        SensitiveFileCleanup.delete(dir)
         check(dir.mkdirs()) { "Cannot create staging directory" }
         return dir
     }
 
     private fun deleteSidecarFiles(dbFile: File) {
-        File(dbFile.path + "-wal").delete()
-        File(dbFile.path + "-shm").delete()
-        File(dbFile.path + "-journal").delete()
+        SensitiveFileCleanup.delete(File(dbFile.path + "-wal"))
+        SensitiveFileCleanup.delete(File(dbFile.path + "-shm"))
+        SensitiveFileCleanup.delete(File(dbFile.path + "-journal"))
     }
 
     /**
@@ -762,7 +747,7 @@ class DatabaseBackupService(
 
     private fun discardDatabaseFiles(dbFile: File) {
         deleteSidecarFiles(dbFile)
-        if (dbFile.exists()) dbFile.delete()
+        SensitiveFileCleanup.delete(dbFile)
     }
 
     private fun readIdentityHash(dbFile: File): String? {
