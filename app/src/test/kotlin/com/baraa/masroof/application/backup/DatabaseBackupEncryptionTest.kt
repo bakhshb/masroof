@@ -220,7 +220,8 @@ class DatabaseBackupEncryptionTest {
                 val importer = service(
                     live,
                     closeDatabase = { closed.set(true) },
-                    zipLimits = BackupPackageZip.Limits(
+                    archiveLimits = BackupArchiveLimits(
+                        maxEntries = 3,
                         maxUncompressedBytesPerEntry = 32,
                         maxTotalUncompressedBytes = 32,
                     ),
@@ -276,11 +277,91 @@ class DatabaseBackupEncryptionTest {
         }
     }
 
+    @Test
+    fun oversizedAuthenticatedEnvelope_stopsWhileDecrypting_andLeavesTheLiveDatabaseOpen() {
+        runBlocking {
+            val live = openDatabase()
+            try {
+                insertProbe(live)
+                val before = digest(context.getDatabasePath(MasroofDatabase.NAME))
+                val closed = AtomicBoolean(false)
+                val importer = service(
+                    live,
+                    closeDatabase = { closed.set(true) },
+                    archiveLimits = BackupArchiveLimits(
+                        maxEntries = 3,
+                        maxUncompressedBytesPerEntry = 32,
+                        maxTotalUncompressedBytes = 32,
+                    ),
+                )
+                val envelope = File(context.cacheDir, "oversized-envelope.masroof")
+                FileOutputStream(envelope).use { output ->
+                    BackupEnvelope.encrypt(output, passphrase.copyOf(), TEST_KDF_ITERATIONS) { plain ->
+                        plain.write(ByteArray(256) { it.toByte() })
+                    }
+                }
+                val abandoned = File(context.cacheDir, "masroof-backup-import-killed")
+                abandoned.mkdirs()
+                File(abandoned, "decrypted-package.zip").writeBytes(byteArrayOf(1, 2, 3, 4))
+                val outcome = importer.importFrom(Uri.fromFile(envelope), passphrase.copyOf())
+                assertEquals(BackupImportOutcome.InvalidPackage, outcome)
+                assertFalse(closed.get())
+                assertTrue(live.isOpen)
+                assertEquals(before, digest(context.getDatabasePath(MasroofDatabase.NAME)))
+                assertFalse(abandoned.exists())
+                assertNoBackupStaging()
+                envelope.delete()
+            } finally {
+                if (live.isOpen) live.close()
+            }
+        }
+    }
+
+    @Test
+    fun encryptedCompressionBomb_isRejectedByTheArchiveValidator() {
+        runBlocking {
+            val live = openDatabase()
+            try {
+                insertProbe(live)
+                val before = digest(context.getDatabasePath(MasroofDatabase.NAME))
+                val closed = AtomicBoolean(false)
+                val importer = service(
+                    live,
+                    closeDatabase = { closed.set(true) },
+                    archiveLimits = BackupArchiveLimits(
+                        maxEntries = 3,
+                        maxUncompressedBytesPerEntry = 64,
+                        maxTotalUncompressedBytes = 64,
+                    ),
+                )
+                val envelope = File(context.cacheDir, "encrypted-bomb.masroof")
+                FileOutputStream(envelope).use { output ->
+                    BackupEnvelope.encrypt(output, passphrase.copyOf(), TEST_KDF_ITERATIONS) { plain ->
+                        ZipOutputStream(plain).use { zip ->
+                            zip.putNextEntry(ZipEntry(BackupPackageFormat.MANIFEST_ENTRY))
+                            zip.write(ByteArray(8 * 1024))
+                            zip.closeEntry()
+                        }
+                    }
+                }
+                val outcome = importer.importFrom(Uri.fromFile(envelope), passphrase.copyOf())
+                assertEquals(BackupImportOutcome.InvalidPackage, outcome)
+                assertFalse(closed.get())
+                assertTrue(live.isOpen)
+                assertEquals(before, digest(context.getDatabasePath(MasroofDatabase.NAME)))
+                assertNoBackupStaging()
+                envelope.delete()
+            } finally {
+                if (live.isOpen) live.close()
+            }
+        }
+    }
+
     private fun service(
         database: MasroofDatabase,
         logs: AppLogService? = null,
         closeDatabase: () -> Unit = { error("live database must stay open") },
-        zipLimits: BackupPackageZip.Limits = BackupPackageZip.Limits(),
+        archiveLimits: BackupArchiveLimits = BackupArchiveLimits.PRODUCTION,
     ) = DatabaseBackupService(
         appContext = context,
         database = database,
@@ -290,7 +371,7 @@ class DatabaseBackupEncryptionTest {
         clockEpochMillis = { 1_700_000_000_000L },
         restartProcess = { error("unexpected restart") },
         kdfIterations = TEST_KDF_ITERATIONS,
-        zipLimits = zipLimits,
+        archiveLimits = archiveLimits,
     )
 
     private fun openDatabase(): MasroofDatabase =

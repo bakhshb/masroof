@@ -93,7 +93,12 @@ object BackupEnvelope {
         }
     }
 
-    fun decrypt(input: InputStream, output: OutputStream, passphrase: CharArray) {
+    fun decrypt(
+        input: InputStream,
+        output: OutputStream,
+        passphrase: CharArray,
+        maxPlaintextBytes: Long = Long.MAX_VALUE,
+    ) {
         if (passphrase.isEmpty()) {
             throw BackupFailureException(BackupFailureCategory.PASSPHRASE_REQUIRED)
         }
@@ -123,24 +128,54 @@ object BackupEnvelope {
             )
             cipher.updateAAD(header)
             val buffer = ByteArray(8192)
+            var plaintextWritten = 0L
+            var ciphertextRead = 0L
+            val maxCiphertextBytes = if (maxPlaintextBytes == Long.MAX_VALUE) {
+                Long.MAX_VALUE
+            } else {
+                maxPlaintextBytes + (GCM_TAG_BITS / 8)
+            }
             while (true) {
                 val read = input.read(buffer)
                 if (read < 0) break
+                ciphertextRead += read
+                if (ciphertextRead > maxCiphertextBytes) {
+                    throw BackupFailureException(BackupFailureCategory.ENVELOPE_TOO_LARGE)
+                }
                 val chunk = cipher.update(buffer, 0, read)
-                if (chunk != null && chunk.isNotEmpty()) output.write(chunk)
+                if (chunk != null && chunk.isNotEmpty()) {
+                    plaintextWritten = writeBoundedPlaintext(output, chunk, plaintextWritten, maxPlaintextBytes)
+                }
             }
             val tail = try {
                 cipher.doFinal()
+            } catch (error: BackupFailureException) {
+                throw error
             } catch (error: GeneralSecurityException) {
                 throw BackupFailureException(BackupFailureCategory.AUTHENTICATION_FAILED)
             }
-            if (tail != null && tail.isNotEmpty()) output.write(tail)
+            if (tail != null && tail.isNotEmpty()) {
+                writeBoundedPlaintext(output, tail, plaintextWritten, maxPlaintextBytes)
+            }
         } finally {
             password.fill('\u0000')
             encoded?.fill(0)
             salt.fill(0)
             iv.fill(0)
         }
+    }
+
+    private fun writeBoundedPlaintext(
+        output: OutputStream,
+        chunk: ByteArray,
+        alreadyWritten: Long,
+        maxPlaintextBytes: Long,
+    ): Long {
+        if (alreadyWritten > maxPlaintextBytes || chunk.size.toLong() > maxPlaintextBytes - alreadyWritten) {
+            throw BackupFailureException(BackupFailureCategory.ENVELOPE_TOO_LARGE)
+        }
+        output.write(chunk)
+        return alreadyWritten + chunk.size
     }
 
     private fun deriveKey(passphrase: CharArray, salt: ByteArray, iterations: Int): javax.crypto.SecretKey {

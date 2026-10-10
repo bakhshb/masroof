@@ -42,6 +42,7 @@ enum class BackupFailureCategory(val logToken: String) {
     AUTHENTICATION_FAILED("authentication_failed"),
     INVALID_ENVELOPE("invalid_envelope"),
     ARCHIVE_REJECTED("archive_rejected"),
+    ENVELOPE_TOO_LARGE("envelope_too_large"),
     INVALID_PACKAGE("invalid_package"),
     EXPORT_FAILED("export_failed"),
     IMPORT_FAILED("import_failed"),
@@ -62,6 +63,16 @@ object BackupPackageFormat {
     const val MANIFEST_ENTRY: String = "manifest.json"
     const val DATABASE_ENTRY: String = "masroof.db"
     const val PREFERENCES_ENTRY: String = "preferences.json"
+
+    private val ZIP_LOCAL_HEADER: ByteArray = byteArrayOf(0x50, 0x4b, 0x03, 0x04)
+
+    fun looksLikeZip(prefix: ByteArray, length: Int): Boolean {
+        if (length < ZIP_LOCAL_HEADER.size) return false
+        return prefix[0] == ZIP_LOCAL_HEADER[0] &&
+            prefix[1] == ZIP_LOCAL_HEADER[1] &&
+            prefix[2] == ZIP_LOCAL_HEADER[2] &&
+            prefix[3] == ZIP_LOCAL_HEADER[3]
+    }
 
     fun defaultExportFileName(exportedAtEpochMillis: Long): String =
         "masroof-backup-$exportedAtEpochMillis.$FILE_EXTENSION"

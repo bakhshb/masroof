@@ -53,6 +53,7 @@ class DatabaseBackupService(
         require(kdfIterations in 1..BackupEnvelope.MAX_ITERATIONS) {
             "KDF iteration count is outside the supported range"
         }
+        sweepAbandonedStaging()
     }
     override suspend fun exportTo(destination: Uri, passphrase: CharArray): Result<Unit> =
         withContext(Dispatchers.IO) {
@@ -108,7 +109,7 @@ class DatabaseBackupService(
                 val peek = ByteArray(BackupEnvelope.HEADER_SIZE)
                 val read = readPrefix(stream, peek)
                 when {
-                    BackupPackageZip.looksLikeZip(peek, read) -> BackupPackageKind.LEGACY_PLAINTEXT
+                    BackupPackageFormat.looksLikeZip(peek, read) -> BackupPackageKind.LEGACY_PLAINTEXT
                     BackupEnvelope.looksLikeEnvelope(peek, read) -> BackupPackageKind.ENCRYPTED
                     else -> BackupPackageKind.UNRECOGNIZED
                 }
@@ -136,9 +137,9 @@ class DatabaseBackupService(
                 val read = readPrefix(buffered, peek)
                 buffered.reset()
                 when {
-                    BackupPackageZip.looksLikeZip(peek, read) && !confirmLegacyPlaintext ->
+                    BackupPackageFormat.looksLikeZip(peek, read) && !confirmLegacyPlaintext ->
                         return@withContext BackupImportOutcome.LegacyConfirmationRequired
-                    BackupPackageZip.looksLikeZip(peek, read) -> {
+                    BackupPackageFormat.looksLikeZip(peek, read) -> {
                         val directory = createStagingDir("import")
                         staging = directory
                         extractValidated(buffered, directory)
@@ -149,7 +150,12 @@ class DatabaseBackupService(
                         val plainZip = createOwnerOnlyFile(directory, "decrypted-package.zip")
                         try {
                             FileOutputStream(plainZip).use { plain ->
-                                BackupEnvelope.decrypt(buffered, plain, secret)
+                                BackupEnvelope.decrypt(
+                                    input = buffered,
+                                    output = plain,
+                                    passphrase = secret,
+                                    maxPlaintextBytes = archiveLimits.maxTotalUncompressedBytes,
+                                )
                             }
                         } catch (error: BackupFailureException) {
                             wipeFile(plainZip)
@@ -673,6 +679,7 @@ class DatabaseBackupService(
         BackupFailureCategory.PASSPHRASE_REQUIRED,
         -> BackupImportOutcome.AuthenticationFailed
         BackupFailureCategory.ARCHIVE_REJECTED,
+        BackupFailureCategory.ENVELOPE_TOO_LARGE,
         BackupFailureCategory.INVALID_ENVELOPE,
         BackupFailureCategory.INVALID_PACKAGE,
         -> BackupImportOutcome.InvalidPackage
@@ -695,7 +702,18 @@ class DatabaseBackupService(
         )
     }
 
+    private fun sweepAbandonedStaging() {
+        appContext.cacheDir.listFiles()?.forEach { dir ->
+            if (!dir.isDirectory || !dir.name.startsWith("masroof-backup-")) return@forEach
+            dir.walkBottomUp().forEach { file ->
+                if (file.isFile) wipeFile(file)
+                file.delete()
+            }
+        }
+    }
+
     private fun createStagingDir(label: String): File {
+        sweepAbandonedStaging()
         val dir = File(appContext.cacheDir, "masroof-backup-$label-${clockEpochMillis()}")
         if (dir.exists()) dir.deleteRecursively()
         check(dir.mkdirs()) { "Cannot create staging directory" }
