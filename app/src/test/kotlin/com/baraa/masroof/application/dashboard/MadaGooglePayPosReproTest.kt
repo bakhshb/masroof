@@ -11,7 +11,6 @@ import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.SmsParseInput
@@ -106,16 +105,6 @@ class MadaGooglePayPosReproTest {
 
         val tx = assembled.transaction.copy(occurredAt = Instant.parse("2026-08-03T10:24:00Z"))
         val parsedRecord = ParsedEventRecord(event = parsed.event, details = parsed.details)
-        val rawSmsById = mapOf(
-            "sms-google-pay" to RawSms(
-                id = "sms-google-pay",
-                sender = "AlJazira",
-                body = googlePayBody,
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-                deviceMessageId = "1",
-                bodyHash = "h",
-            ),
-        )
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",
@@ -173,16 +162,6 @@ class MadaGooglePayPosReproTest {
 
         val tx = assembled.transaction.copy(occurredAt = Instant.parse("2026-08-03T10:24:00Z"))
         val parsedRecord = ParsedEventRecord(event = parsed.event, details = parsed.details)
-        val rawSmsById = mapOf(
-            "sms-google-pay" to RawSms(
-                id = "sms-google-pay",
-                sender = "AlJazira",
-                body = googlePayBody,
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-                deviceMessageId = "1",
-                bodyHash = "h",
-            ),
-        )
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",
@@ -241,16 +220,6 @@ class MadaGooglePayPosReproTest {
 
         val tx = assembled.transaction.copy(occurredAt = Instant.parse("2026-08-03T10:24:00Z"))
         val parsedRecord = ParsedEventRecord(event = parsed.event, details = parsed.details)
-        val rawSmsById = mapOf(
-            "sms-credit-google-pay" to RawSms(
-                id = "sms-credit-google-pay",
-                sender = "AlJazira",
-                body = creditGooglePayBody,
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-                deviceMessageId = "2",
-                bodyHash = "h2",
-            ),
-        )
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",

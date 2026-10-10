@@ -10,7 +10,6 @@ import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.CardSmsChannel
@@ -319,16 +318,6 @@ class CurrentAccountSummaryCalculatorTest {
                 rawBody = "سداد فاتورة\nالمفوتر: TEST",
             ),
         )
-        val rawSmsById = parsedRecords.associate { record ->
-            record.event.rawSmsId to RawSms(
-                id = record.event.rawSmsId,
-                sender = "AlJazira",
-                body = record.event.counterparty.orEmpty(),
-                receivedAt = Instant.parse("2026-08-10T12:00:00Z"),
-                deviceMessageId = record.event.id,
-                bodyHash = record.event.id,
-            )
-        }
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(cardPay, cash, bill),
             parsedRecords = parsedRecords,
@@ -378,16 +367,6 @@ class CurrentAccountSummaryCalculatorTest {
                 rawBody = "شراء من نقاط البيع\nبطاقة مدى: 2210\nخصمت من حساب: 3001",
             ),
         )
-        val rawSmsById = parsedRecords.associate { record ->
-            record.event.rawSmsId to RawSms(
-                id = record.event.rawSmsId,
-                sender = "AlJazira",
-                body = record.event.counterparty.orEmpty(),
-                receivedAt = Instant.parse("2026-08-01T11:05:00Z"),
-                deviceMessageId = record.event.id,
-                bodyHash = record.event.id,
-            )
-        }
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(pos),
             parsedRecords = parsedRecords,
