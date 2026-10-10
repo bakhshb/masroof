@@ -6,6 +6,7 @@ import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.domain.repository.TransactionIgnoreOutcome
 import com.baraa.masroof.domain.repository.TransactionIgnoreRepository
 import com.baraa.masroof.sms.time.InstantClock
+import kotlinx.coroutines.CancellationException
 
 sealed interface IgnoreResult {
     data object Success : IgnoreResult
@@ -19,14 +20,20 @@ class TransactionIgnoreService(
     private val appLogService: AppLogService? = null,
 ) {
     suspend fun ignore(transactionId: String): IgnoreResult =
-        when (val result = persistence.ignoreSingle(transactionId, clock.now())) {
-            TransactionIgnoreOutcome.Ignored -> {
-                appLogService?.info(
-                    AppLogCategories.TRANSACTION,
-                    "Ignored transaction ${AppLogFormatting.maskId(transactionId)}",
-                )
-                IgnoreResult.Success
+        try {
+            when (val result = persistence.ignoreSingle(transactionId, clock.now())) {
+                TransactionIgnoreOutcome.Ignored -> {
+                    appLogService?.info(
+                        AppLogCategories.TRANSACTION,
+                        "Ignored transaction ${AppLogFormatting.maskId(transactionId)}",
+                    )
+                    IgnoreResult.Success
+                }
+                is TransactionIgnoreOutcome.Rejected -> IgnoreResult.Rejected(result.reason)
             }
-            is TransactionIgnoreOutcome.Rejected -> IgnoreResult.Rejected(result.reason)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            IgnoreResult.Rejected("ignore_failed")
         }
 }

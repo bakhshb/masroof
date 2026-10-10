@@ -127,6 +127,8 @@ class DeterministicProcessingFaultMatrixTest {
             val again = ledger.reconciliation.reconcileStoredEventsDetailed()
             assertTrue("seed=$seed second replay", ReconciliationCompletionPolicy.isComplete(again))
             assertEquals("seed=$seed duplicate movement", healed.id, world.ftRepo.listAll().single().id)
+            // Parse now journals an unfinished historical batch. Complete its review/clear boundary too.
+            ledger.derivedRecovery().recoverPending()
             assertFinancialInvariants(world, seed, "before_link_replace")
         }
     }
@@ -151,6 +153,8 @@ class DeterministicProcessingFaultMatrixTest {
             val report = ledger.reconciliation.reconcileStoredEventsDetailed()
             assertTrue("seed=$seed replay incomplete", ReconciliationCompletionPolicy.isComplete(report))
             assertEquals("seed=$seed duplicate after replay", committed.id, world.ftRepo.listAll().single().id)
+            // Parse now journals an unfinished historical batch. Complete its review/clear boundary too.
+            ledger.derivedRecovery().recoverPending()
             assertFinancialInvariants(world, seed, "after_link_replace")
         }
     }

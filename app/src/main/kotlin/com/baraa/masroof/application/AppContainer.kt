@@ -688,6 +688,7 @@ class AppContainer(
             startupMaintenanceJob?.join()
         }
         applicationScope.cancel()
+        databaseAccessGate.retire()
         database.close()
     }
 

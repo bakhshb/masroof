@@ -151,14 +151,10 @@ class TransactionIgnoreServiceTest {
             }),
             clock = InstantClock { Instant.parse("2026-08-02T12:00:00Z") },
         )
-        try {
-            failing.ignore(id)
-            org.junit.Assert.fail("must fail")
-        } catch (_: IllegalStateException) {
-            org.junit.Assert.assertNotNull(ftRepo.getById(id))
-            assertEquals(listOf("sms-atomic-ignore"), ftRepo.listRawSmsIds(id))
-            assertNull(reviewRepo.findByRawSmsId("sms-atomic-ignore"))
-        }
+        assertEquals(IgnoreResult.Rejected("ignore_failed"), failing.ignore(id))
+        org.junit.Assert.assertNotNull(ftRepo.getById(id))
+        assertEquals(listOf("sms-atomic-ignore"), ftRepo.listRawSmsIds(id))
+        assertNull(reviewRepo.findByRawSmsId("sms-atomic-ignore"))
         assertTrue(service.ignore(id) is IgnoreResult.Success)
         reconciliation.reconcileStoredEvents()
         assertNull(ftRepo.getById(id))

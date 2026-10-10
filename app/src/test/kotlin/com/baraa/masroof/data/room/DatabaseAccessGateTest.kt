@@ -14,6 +14,16 @@ import org.junit.Test
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class DatabaseAccessGateTest {
     @Test
+    fun retiredAccess_cancelsObsoleteJobsWithoutFailingTheirParent() = runTest {
+        val gate = DatabaseAccessGate()
+        gate.retire()
+        val obsolete = launch { gate.withAccess { error("must not reach old Room") } }
+        obsolete.join()
+        assertTrue(obsolete.isCancelled)
+        assertTrue(coroutineContext[kotlinx.coroutines.Job]!!.isActive)
+    }
+
+    @Test
     fun restoreDrainsExistingAccess_andRejectsQueuedOldProcessAccessAfterRetirement() = runTest {
         val gate = DatabaseAccessGate()
         val release = CompletableDeferred<Unit>()

@@ -106,7 +106,7 @@ class DatabaseBackupImportMigrationTest {
     }
 
     @Test
-    fun importBackup_failedMaintenanceMarkerReset_keepsMarkersAndDoesNotRestart() {
+    fun importBackup_failedMaintenanceMarkerReset_keepsMarkersAndRequestsFreshProcess() {
         runBlocking {
             val context = ApplicationProvider.getApplicationContext<Context>()
             val prefs = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
@@ -138,7 +138,7 @@ class DatabaseBackupImportMigrationTest {
             val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
 
             assertEquals(BackupImportOutcome.Failed, outcome)
-            assertFalse(restartRequested.get())
+            assertTrue(restartRequested.get())
             assertEquals(
                 MasroofDatabase.VERSION,
                 prefs.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0),

@@ -152,6 +152,7 @@ class DatabaseBackupService(
         var staging: File? = null
         var closed = false
         var restartAttempted = false
+        var handledFailure = false
         return try {
             val raw = appContext.contentResolver.openInputStream(source)
                 ?: return loggedImport(
@@ -319,22 +320,22 @@ class DatabaseBackupService(
                 throw error
             }
         } catch (error: BackupArchiveException) {
+            handledFailure = true
             appLogService?.error(AppLogCategories.BACKUP, error.category.logMessage())
             BackupImportOutcome.InvalidPackage
         } catch (error: BackupFailureException) {
+            handledFailure = true
             logImportFailure(error.category)
             importOutcome(error.category)
         } catch (error: Exception) {
+            handledFailure = true
             logImportFailure(BackupFailureCategory.IMPORT_FAILED)
             BackupImportOutcome.Failed
         } finally {
             secret.fill('\u0000')
-            try {
-                staging?.let(SensitiveFileCleanup::delete)
-            } finally {
-                // A failed install may have closed Room too. Never reuse that process instance.
-                if (closed && !restartAttempted) restart(BackupImportOutcome.Failed)
-            }
+            staging?.let(SensitiveFileCleanup::delete)
+            // A failed install may have closed Room too. Clean sensitive bytes before a fresh process.
+            if (closed && handledFailure && !restartAttempted) restart(BackupImportOutcome.Failed)
         }
     }
 

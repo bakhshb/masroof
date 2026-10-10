@@ -269,7 +269,7 @@ class HistoricalSmsBatchProcessorTest {
         val failure = runCatching { batch.finish() }.exceptionOrNull()
         assertTrue(failure is IOException)
         assertEquals(0, recoverySchedules)
-        assertTrue(retries.listRetryableRawSmsIds().isEmpty())
+        assertEquals(listOf(first, second), retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH))
         assertEquals(0, transactions.awaitingCalls)
 
         retries.failMark = false
