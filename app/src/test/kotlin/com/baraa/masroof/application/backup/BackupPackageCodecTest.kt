@@ -186,6 +186,12 @@ class BackupPackageCodecTest {
     }
 
     @Test
+    fun formatVersion_remainsTheLegacyZipManifest() {
+        assertEquals(1, BackupPackageFormat.FORMAT_VERSION)
+        assertTrue(BackupEnvelope.DEFAULT_ITERATIONS >= 100_000)
+    }
+
+    @Test
     fun defaultExportFileName_usesExtension() {
         assertTrue(
             BackupPackageFormat.defaultExportFileName(99)

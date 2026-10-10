@@ -47,6 +47,7 @@ import java.util.zip.ZipInputStream
 class ConsistentBackupSnapshotTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val card = CardReference(Bank.BANK_ALJAZIRA, "4242")
+    private val passphrase = "snapshot-passphrase".toCharArray()
 
     @Before
     fun resetAppStorage() {
@@ -133,7 +134,7 @@ class ConsistentBackupSnapshotTest {
 
                 val zip = File(context.cacheDir, "consistent-${System.nanoTime()}.masroof")
                 val service = backupService(live, useOnlineBackup)
-                val exported = service.exportTo(Uri.fromFile(zip))
+                val exported = service.exportTo(Uri.fromFile(zip), passphrase.copyOf())
                 stop.set(true)
                 writers.forEach { thread ->
                     thread.join(20_000)
@@ -145,7 +146,8 @@ class ConsistentBackupSnapshotTest {
                 assertTrue(live.isOpen)
                 assertLivePreferences(preferences)
 
-                val snapshot = unzipDatabase(zip)
+                val plainZip = decryptEnvelope(zip)
+                val snapshot = unzipDatabase(plainZip)
                 try {
                     val snapshotBatches = readBatches(snapshot, sqliteVersion)
                     assertConsistent(
@@ -164,7 +166,7 @@ class ConsistentBackupSnapshotTest {
                             BackupPackageFormat.DATABASE_ENTRY,
                             BackupPackageFormat.PREFERENCES_ENTRY,
                         ),
-                        zipEntryNames(zip),
+                        zipEntryNames(plainZip),
                     )
 
                     val afterExport = seedBatches(liveDbPath(), POST_EXPORT_ID..POST_EXPORT_ID).single()
@@ -179,7 +181,7 @@ class ConsistentBackupSnapshotTest {
                         restartProcess = { restartRequested.set(true) },
                         onlineBackupEnabled = useOnlineBackup,
                     )
-                    val outcome = importer.importFrom(Uri.fromFile(zip))
+                    val outcome = importer.importFrom(Uri.fromFile(zip), passphrase.copyOf())
                     assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
                     assertTrue(restartRequested.get())
                     assertFalse(live.isOpen)
@@ -203,6 +205,7 @@ class ConsistentBackupSnapshotTest {
                     }
                 } finally {
                     snapshot.parentFile?.deleteRecursively()
+                    plainZip.delete()
                     zip.delete()
                 }
             } finally {
@@ -233,7 +236,10 @@ class ConsistentBackupSnapshotTest {
                         1_700_000_000_000L
                     },
                     restartProcess = { error("export must not restart the process") },
-                ).exportTo(Uri.fromFile(File(context.cacheDir, "failed-export.masroof")))
+                ).exportTo(
+                    Uri.fromFile(File(context.cacheDir, "failed-export.masroof")),
+                    passphrase.copyOf(),
+                )
 
                 assertTrue(exported.exceptionOrNull()?.toString() ?: "export succeeded", exported.isFailure)
                 assertTrue(live.isOpen)
@@ -308,6 +314,7 @@ class ConsistentBackupSnapshotTest {
         clockEpochMillis = { 1_700_000_000_000L },
         restartProcess = { error("export must not restart the process") },
         onlineBackupEnabled = useOnlineBackup,
+        kdfIterations = TEST_KDF_ITERATIONS,
     )
 
     private fun seedBatches(databasePath: String, ids: LongRange): Set<Long> {
@@ -461,6 +468,16 @@ class ConsistentBackupSnapshotTest {
             }
         }
 
+    private fun decryptEnvelope(envelope: File): File {
+        val zip = File(context.cacheDir, "snapshot-plain-${System.nanoTime()}.zip")
+        envelope.inputStream().use { input ->
+            zip.outputStream().use { output ->
+                BackupEnvelope.decrypt(input, output, passphrase.copyOf())
+            }
+        }
+        return zip
+    }
+
     private fun unzipDatabase(zip: File): File {
         val dir = File(context.cacheDir, "snapshot-unzip-${System.nanoTime()}")
         check(dir.mkdirs())
@@ -594,5 +611,6 @@ class ConsistentBackupSnapshotTest {
         const val WRITER_COUNT = 2
         const val WRITER_ID_START = 10_000L
         const val POST_EXPORT_ID = 9_000_000L
+        const val TEST_KDF_ITERATIONS = 4_096
     }
 }

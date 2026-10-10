@@ -3,6 +3,7 @@ package com.baraa.masroof.presentation.onboarding
 import com.baraa.masroof.presentation.theme.MasroofIconSizes
 import com.baraa.masroof.presentation.theme.MasroofSpacing
 
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,12 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.Bank
@@ -64,6 +69,9 @@ fun OnboardingRoute(
         onRequestPermissions = onRequestPermissions,
         onOpenAppSettings = onOpenAppSettings,
         onRequestRestoreBackup = onRequestRestoreBackup,
+        onRestorePassphraseChange = viewModel::onRestorePassphraseChange,
+        onConfirmLegacyRestore = viewModel::confirmLegacyRestore,
+        onCancelLegacyRestore = viewModel::cancelLegacyRestore,
         onClearBackupError = viewModel::clearBackupError,
         onSelectDateOption = viewModel::selectDateOption,
         onSelectCustomDate = viewModel::selectCustomDate,
@@ -84,6 +92,9 @@ private fun OnboardingScreen(
     onRequestPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onRequestRestoreBackup: () -> Unit,
+    onRestorePassphraseChange: (String) -> Unit,
+    onConfirmLegacyRestore: () -> Unit,
+    onCancelLegacyRestore: () -> Unit,
     onClearBackupError: () -> Unit,
     onSelectDateOption: (ImportDateOption) -> Unit,
     onSelectCustomDate: (LocalDate) -> Unit,
@@ -100,9 +111,14 @@ private fun OnboardingScreen(
             OnboardingStep.WELCOME -> WelcomeStep(
                 modifier = Modifier.fillMaxSize().padding(MasroofSpacing.screenPaddingLarge),
                 restoringBackup = state.restoringBackup,
+                restorePassphrase = state.restorePassphrase,
+                awaitingLegacyRestoreConfirm = state.awaitingLegacyRestoreConfirm,
                 error = state.error,
                 onStart = onStart,
                 onRequestRestoreBackup = onRequestRestoreBackup,
+                onRestorePassphraseChange = onRestorePassphraseChange,
+                onConfirmLegacyRestore = onConfirmLegacyRestore,
+                onCancelLegacyRestore = onCancelLegacyRestore,
                 onClearBackupError = onClearBackupError,
             )
             OnboardingStep.PERMISSION -> PermissionStep(
@@ -138,20 +154,44 @@ private fun OnboardingScreen(
 private fun WelcomeStep(
     modifier: Modifier,
     restoringBackup: Boolean,
+    restorePassphrase: String,
+    awaitingLegacyRestoreConfirm: Boolean,
     error: OnboardingError?,
     onStart: () -> Unit,
     onRequestRestoreBackup: () -> Unit,
+    onRestorePassphraseChange: (String) -> Unit,
+    onConfirmLegacyRestore: () -> Unit,
+    onCancelLegacyRestore: () -> Unit,
     onClearBackupError: () -> Unit,
 ) {
+    if (awaitingLegacyRestoreConfirm) {
+        AlertDialog(
+            onDismissRequest = onCancelLegacyRestore,
+            title = { Text(stringResource(R.string.settings_import_legacy_title)) },
+            text = { Text(stringResource(R.string.settings_import_legacy_body)) },
+            confirmButton = {
+                TextButton(onClick = onConfirmLegacyRestore) {
+                    Text(stringResource(R.string.settings_import_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onCancelLegacyRestore) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
     if (error == OnboardingError.BACKUP_RESTORE_FAILED ||
-        error == OnboardingError.BACKUP_RESTORE_INVALID
+        error == OnboardingError.BACKUP_RESTORE_INVALID ||
+        error == OnboardingError.BACKUP_PASSPHRASE_REQUIRED
     ) {
-        val message = if (error == OnboardingError.BACKUP_RESTORE_INVALID) {
-            stringResource(R.string.onboarding_restore_invalid)
-        } else {
-            stringResource(R.string.onboarding_restore_failed)
+        val message = when (error) {
+            OnboardingError.BACKUP_RESTORE_INVALID -> stringResource(R.string.onboarding_restore_invalid)
+            OnboardingError.BACKUP_PASSPHRASE_REQUIRED ->
+                stringResource(R.string.settings_backup_passphrase_required)
+            else -> stringResource(R.string.onboarding_restore_failed)
         }
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = onClearBackupError,
             title = { Text(stringResource(R.string.onboarding_restore_backup)) },
             text = { Text(message) },
@@ -212,6 +252,24 @@ private fun WelcomeStep(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(MasroofSpacing.sectionHeaderGap))
+        OutlinedTextField(
+            value = restorePassphrase,
+            onValueChange = onRestorePassphraseChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.settings_import_passphrase_label)) },
+            supportingText = {
+                Text(
+                    stringResource(R.string.settings_import_passphrase_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            singleLine = true,
+            enabled = !restoringBackup,
         )
         Spacer(Modifier.height(MasroofSpacing.sectionHeaderGap))
         IconTextButtonOutlined(

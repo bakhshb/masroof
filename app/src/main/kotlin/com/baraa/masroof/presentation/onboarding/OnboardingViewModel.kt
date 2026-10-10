@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.net.Uri
 import com.baraa.masroof.application.backup.BackupImportOutcome
+import com.baraa.masroof.application.backup.BackupPackageKind
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportFailure
@@ -41,6 +42,7 @@ class OnboardingViewModel(
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
     private var importJob: Job? = null
+    private var pendingRestoreUri: Uri? = null
 
     init {
         reloadFromCurrentState()
@@ -97,7 +99,8 @@ class OnboardingViewModel(
     fun clearBackupError() {
         _uiState.update {
             if (it.error == OnboardingError.BACKUP_RESTORE_FAILED ||
-                it.error == OnboardingError.BACKUP_RESTORE_INVALID
+                it.error == OnboardingError.BACKUP_RESTORE_INVALID ||
+                it.error == OnboardingError.BACKUP_PASSPHRASE_REQUIRED
             ) {
                 it.copy(error = null)
             } else {
@@ -106,14 +109,69 @@ class OnboardingViewModel(
         }
     }
 
+    fun onRestorePassphraseChange(value: String) {
+        _uiState.update { it.copy(restorePassphrase = value) }
+    }
+
     fun restoreBackup(uri: Uri) {
         if (_uiState.value.restoringBackup) return
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(restoringBackup = true, error = null)
-            }
             try {
-                when (databaseBackupService.importFrom(uri)) {
+                when (databaseBackupService.inspect(uri)) {
+                    BackupPackageKind.LEGACY_PLAINTEXT -> {
+                        pendingRestoreUri = uri
+                        _uiState.update {
+                            it.copy(awaitingLegacyRestoreConfirm = true, error = null)
+                        }
+                    }
+                    BackupPackageKind.ENCRYPTED -> {
+                        val passphrase = _uiState.value.restorePassphrase
+                        if (passphrase.isEmpty()) {
+                            _uiState.update { it.copy(error = OnboardingError.BACKUP_PASSPHRASE_REQUIRED) }
+                        } else {
+                            val secret = passphrase.toCharArray()
+                            _uiState.update { it.copy(restorePassphrase = "") }
+                            importRestore(uri, secret, confirmLegacyPlaintext = false)
+                        }
+                    }
+                    BackupPackageKind.UNRECOGNIZED ->
+                        _uiState.update { it.copy(error = OnboardingError.BACKUP_RESTORE_INVALID) }
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {
+                _uiState.update { it.copy(error = OnboardingError.BACKUP_RESTORE_FAILED) }
+            }
+        }
+    }
+
+    fun confirmLegacyRestore() {
+        val uri = pendingRestoreUri ?: return
+        pendingRestoreUri = null
+        _uiState.update { it.copy(awaitingLegacyRestoreConfirm = false) }
+        importRestore(uri, CharArray(0), confirmLegacyPlaintext = true)
+    }
+
+    fun cancelLegacyRestore() {
+        pendingRestoreUri = null
+        _uiState.update { it.copy(awaitingLegacyRestoreConfirm = false) }
+    }
+
+    private fun importRestore(
+        uri: Uri,
+        passphrase: CharArray,
+        confirmLegacyPlaintext: Boolean,
+    ) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(restoringBackup = true, error = null) }
+            try {
+                when (
+                    databaseBackupService.importFrom(
+                        source = uri,
+                        passphrase = passphrase,
+                        confirmLegacyPlaintext = confirmLegacyPlaintext,
+                    )
+                ) {
                     BackupImportOutcome.SuccessNeedsRestart -> Unit
                     BackupImportOutcome.InvalidPackage ->
                         _uiState.update {
@@ -123,6 +181,22 @@ class OnboardingViewModel(
                             )
                         }
                     BackupImportOutcome.Failed ->
+                        _uiState.update {
+                            it.copy(
+                                restoringBackup = false,
+                                error = OnboardingError.BACKUP_RESTORE_FAILED,
+                            )
+                        }
+                    BackupImportOutcome.LegacyConfirmationRequired -> {
+                        pendingRestoreUri = uri
+                        _uiState.update {
+                            it.copy(
+                                restoringBackup = false,
+                                awaitingLegacyRestoreConfirm = true,
+                            )
+                        }
+                    }
+                    BackupImportOutcome.AuthenticationFailed ->
                         _uiState.update {
                             it.copy(
                                 restoringBackup = false,
@@ -139,6 +213,8 @@ class OnboardingViewModel(
                         error = OnboardingError.BACKUP_RESTORE_FAILED,
                     )
                 }
+            } finally {
+                passphrase.fill('\u0000')
             }
         }
     }

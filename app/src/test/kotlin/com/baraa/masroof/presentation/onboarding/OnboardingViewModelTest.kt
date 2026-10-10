@@ -2,6 +2,7 @@ package com.baraa.masroof.presentation.onboarding
 
 import com.baraa.masroof.application.onboarding.ImportDatePolicy
 import com.baraa.masroof.application.backup.BackupImportOutcome
+import com.baraa.masroof.application.backup.BackupPackageKind
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -535,9 +536,16 @@ AccountRegistryEntry.forTest(
     ) : DatabaseBackupGateway {
         var lastImportUri: android.net.Uri? = null
 
-        override suspend fun exportTo(destination: android.net.Uri): Result<Unit> = Result.success(Unit)
+        override suspend fun exportTo(destination: android.net.Uri, passphrase: CharArray): Result<Unit> =
+            Result.success(Unit)
 
-        override suspend fun importFrom(source: android.net.Uri): BackupImportOutcome {
+        override suspend fun inspect(source: android.net.Uri): BackupPackageKind = BackupPackageKind.UNRECOGNIZED
+
+        override suspend fun importFrom(
+            source: android.net.Uri,
+            passphrase: CharArray,
+            confirmLegacyPlaintext: Boolean,
+        ): BackupImportOutcome {
             lastImportUri = source
             return outcome
         }

@@ -313,6 +313,8 @@ fun SettingsRoute(
             onClearSmsImportMessage = viewModel::clearSmsImportMessage,
             onRequestSmsPermission = onRequestSmsPermission,
             onOpenAppSettings = onOpenAppSettings,
+            onExportPassphraseChange = viewModel::onExportPassphraseChange,
+            onImportPassphraseChange = viewModel::onImportPassphraseChange,
             onRequestExport = onRequestExport,
             onRequestImport = onRequestImport,
             onConfirmPendingImport = viewModel::confirmPendingImport,

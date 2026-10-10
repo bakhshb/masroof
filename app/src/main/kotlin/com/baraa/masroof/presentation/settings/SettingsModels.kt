@@ -166,6 +166,9 @@ data class SettingsUiState(
     val exportingBackup: Boolean = false,
     val importingBackup: Boolean = false,
     val awaitingImportConfirm: Boolean = false,
+    val awaitingLegacyImportConfirm: Boolean = false,
+    val exportPassphrase: String = "",
+    val importPassphrase: String = "",
     val backupMessage: BackupMessage? = null,
     val error: SettingsError? = null,
     val githubTokenConfigured: Boolean = false,
@@ -192,6 +195,8 @@ enum class BackupMessage {
     EXPORT_FAILED,
     IMPORT_FAILED,
     IMPORT_INVALID,
+    PASSPHRASE_REQUIRED,
+    IMPORT_AUTH_FAILED,
 }
 
 enum class SmsImportMessage {

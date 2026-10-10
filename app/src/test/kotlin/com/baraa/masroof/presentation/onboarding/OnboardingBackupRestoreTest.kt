@@ -2,6 +2,7 @@ package com.baraa.masroof.presentation.onboarding
 
 import android.net.Uri
 import com.baraa.masroof.application.backup.BackupImportOutcome
+import com.baraa.masroof.application.backup.BackupPackageKind
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -93,9 +94,17 @@ class OnboardingBackupRestoreTest {
 
     private class FakeBackupGateway(
         private val outcome: BackupImportOutcome,
+        private val kind: BackupPackageKind = BackupPackageKind.UNRECOGNIZED,
     ) : DatabaseBackupGateway {
-        override suspend fun exportTo(destination: Uri): Result<Unit> = Result.success(Unit)
-        override suspend fun importFrom(source: Uri): BackupImportOutcome = outcome
+        override suspend fun exportTo(destination: Uri, passphrase: CharArray): Result<Unit> = Result.success(Unit)
+
+        override suspend fun inspect(source: Uri): BackupPackageKind = kind
+
+        override suspend fun importFrom(
+            source: Uri,
+            passphrase: CharArray,
+            confirmLegacyPlaintext: Boolean,
+        ): BackupImportOutcome = outcome
     }
 
     private class EmptyAccountRepo : AccountRegistryRepository {

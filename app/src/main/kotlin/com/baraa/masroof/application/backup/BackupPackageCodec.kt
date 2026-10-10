@@ -3,7 +3,9 @@ package com.baraa.masroof.application.backup
 import kotlinx.serialization.json.Json
 
 /**
- * Pure encode/decode helpers for the .masroof ZIP payload (no Android APIs).
+ * Pure encode/decode helpers for the inner ZIP payload (no Android APIs).
+ * New exports wrap that ZIP in [BackupEnvelope]. [BackupPackageFormat.FORMAT_VERSION]
+ * stays 1 so a confirmed legacy plaintext ZIP still validates.
  */
 object BackupPackageCodec {
     val json: Json = Json {

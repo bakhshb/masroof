@@ -54,6 +54,8 @@ data class OnboardingUiState(
     val ownedCardsCount: Int = 0,
     val reviewRequiredCount: Int = 0,
     val restoringBackup: Boolean = false,
+    val restorePassphrase: String = "",
+    val awaitingLegacyRestoreConfirm: Boolean = false,
     val error: OnboardingError? = null,
 ) {
     val hasUnknownCandidates: Boolean =
@@ -69,6 +71,7 @@ enum class OnboardingError {
     INVALID_FUTURE_DATE,
     BACKUP_RESTORE_FAILED,
     BACKUP_RESTORE_INVALID,
+    BACKUP_PASSPHRASE_REQUIRED,
 }
 
 internal fun HistoricalImportResult.toImportState(): ImportState =
