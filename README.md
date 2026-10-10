@@ -1,5 +1,7 @@
 # Masroof
 
+**Languages:** **English** | [العربية](README_AR.md)
+
 Masroof is a local-first Android personal finance app that converts supported banking SMS messages into a structured financial ledger.
 
 The project is designed around **financial correctness, traceability, and recovery**. Original SMS evidence is preserved, parsing is separated from transaction posting, ambiguous cases stay reviewable instead of being guessed, and failed financial processing remains retryable rather than disappearing silently.
