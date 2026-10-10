@@ -236,6 +236,7 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
             rawSmsRepository = world.rawRepo,
             parsedEventRepository = parsed,
             bankSmsRegistry = registry,
+            ingestionReviewService = IngestionReviewService(reviews, clock),
         ),
         ownershipDiscovery = discovery,
         reconciliation = reconciliation,
