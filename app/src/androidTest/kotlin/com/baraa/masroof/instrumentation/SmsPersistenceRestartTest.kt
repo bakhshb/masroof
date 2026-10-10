@@ -109,6 +109,11 @@ private val SQLITE_HEADER: ByteArray = byteArrayOf(
 /**
  * Emulator instrumentation for M13. This is not a physical handset.
  *
+ * Real process death is [com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest]:
+ * the manifest receiver, WorkManager, `am force-stop`, and the next process's
+ * [com.baraa.masroof.MasroofApplication] startup. This class keeps the in-process
+ * Room restart coverage and is not that acceptance evidence.
+ *
  * The SMS database file is private to the test, matching [LiveRetryRestartTest],
  * so the application process cannot post the same message. Journeys use
  * [LiveSmsIntake], a durable [RawSms] row, [WorkManagerLiveSmsWorkScheduler]'s

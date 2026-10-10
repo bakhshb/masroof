@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import com.baraa.masroof.BuildConfig
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
@@ -29,6 +30,9 @@ class IncomingSmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             return
+        }
+        if (BuildConfig.DEBUG) {
+            DebugSmsPduExtra.materialize(intent)
         }
 
         val app = context.applicationContext as? MasroofApplication

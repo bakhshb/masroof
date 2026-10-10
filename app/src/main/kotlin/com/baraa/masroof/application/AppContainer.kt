@@ -108,6 +108,7 @@ import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.ingestion.ProcessingRecovery
+import com.baraa.masroof.application.sms.DebugProcessHaltProbe
 import com.baraa.masroof.application.sms.HistoricalDerivedRecovery
 import com.baraa.masroof.application.sms.HistoricalDerivedRecoveryWorker
 import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
@@ -490,6 +491,9 @@ class AppContainer(
             appLogService = appLogService,
         )
 
+    private val debugProcessHaltProbe: DebugProcessHaltProbe =
+        DebugProcessHaltProbe(appContext.filesDir)
+
     val processStoredSmsUseCase: ProcessStoredSmsUseCase =
         ProcessStoredSmsUseCase(
             rawSmsRepository = rawSmsRepository,
@@ -505,6 +509,7 @@ class AppContainer(
             },
             processingRecovery = processingRecovery,
             reviewRepository = reviewRepository,
+            debugProcessHalt = debugProcessHaltProbe,
         )
 
     val explicitBankSelectionWorkflow: ExplicitBankSelectionWorkflow =
@@ -545,6 +550,7 @@ class AppContainer(
             batchRecoveryScheduler = {
                 HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
             },
+            debugProcessHalt = debugProcessHaltProbe,
         )
 
     val workerFactory: WorkerFactory =
