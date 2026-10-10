@@ -17,13 +17,11 @@ import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 class DatabaseBackupService(
@@ -42,6 +40,11 @@ class DatabaseBackupService(
      * Tests set this to false to exercise the minSdk 26 quiesce path on a newer SQLite.
      */
     private val onlineBackupEnabled: Boolean = true,
+    /**
+     * Uncompressed ZIP caps applied before the live database is closed.
+     * Tests inject a smaller [BackupArchiveLimits] to prove a zip bomb stops.
+     */
+    private val archiveLimits: BackupArchiveLimits = BackupArchiveLimits.PRODUCTION,
 ) : DatabaseBackupGateway {
     override suspend fun exportTo(destination: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
@@ -81,7 +84,13 @@ class DatabaseBackupService(
     override suspend fun importFrom(source: Uri): BackupImportOutcome = withContext(Dispatchers.IO) {
         val staging = createStagingDir("import")
         try {
-            unzipTo(source, staging)
+            // Reject a bad archive before closeDatabase() or restore recovery.
+            try {
+                unzipTo(source, staging)
+            } catch (error: BackupArchiveException) {
+                appLogService?.error(AppLogCategories.BACKUP, error.category.logMessage())
+                return@withContext BackupImportOutcome.InvalidPackage
+            }
             val manifestFile = File(staging, BackupPackageFormat.MANIFEST_ENTRY)
             val dbFile = File(staging, BackupPackageFormat.DATABASE_ENTRY)
             val prefsFile = File(staging, BackupPackageFormat.PREFERENCES_ENTRY)
@@ -510,19 +519,14 @@ class DatabaseBackupService(
     }
 
     private fun unzipTo(source: Uri, staging: File) {
-        val input = appContext.contentResolver.openInputStream(source)
-            ?: error("Cannot open import source")
-        ZipInputStream(BufferedInputStream(input)).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                val name = entry.name.substringAfterLast('/').substringAfterLast('\\')
-                if (name in ALLOWED_ENTRIES && !entry.isDirectory) {
-                    val outFile = File(staging, name)
-                    FileOutputStream(outFile).use { output -> zip.copyTo(output) }
-                }
-                zip.closeEntry()
-                entry = zip.nextEntry
-            }
+        try {
+            val input = appContext.contentResolver.openInputStream(source)
+                ?: throw BackupArchiveException(BackupArchiveRejection.MALFORMED)
+            BackupArchiveValidator(archiveLimits).extractInto(input, staging)
+        } catch (error: BackupArchiveException) {
+            throw error
+        } catch (ignored: Exception) {
+            throw BackupArchiveException(BackupArchiveRejection.MALFORMED)
         }
     }
 
@@ -599,12 +603,6 @@ class DatabaseBackupService(
             appContext.startActivity(launchIntent)
             Runtime.getRuntime().exit(0)
         }
-
-        private val ALLOWED_ENTRIES = setOf(
-            BackupPackageFormat.MANIFEST_ENTRY,
-            BackupPackageFormat.DATABASE_ENTRY,
-            BackupPackageFormat.PREFERENCES_ENTRY,
-        )
 
         private const val ONLINE_BACKUP_MIN_MINOR: Int = 27
         private const val SNAPSHOT_BUSY_TIMEOUT_MS: Int = 10_000
