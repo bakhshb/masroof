@@ -143,6 +143,27 @@ class CanonicalCsvStatementParserTest {
     }
 
     @Test
+    fun directivesOnlyStatement_namesTheAccountAndHasNoMovements() {
+        val parsed = parser.parse(
+            ByteArrayInputStream(
+                """
+                # masroof-statement-v1
+                # bankId=BANK_ALJAZIRA
+                # accountMasked=3001
+                # periodStart=2026-03-01
+                # periodEnd=2026-03-31
+                """.trimIndent().toByteArray(Charsets.UTF_8),
+            ),
+            known,
+        ) as StatementParseResult.Accepted
+        assertTrue(parsed.statement.entries.isEmpty())
+        assertEquals("BANK_ALJAZIRA", parsed.statement.accounts.single().bank.id)
+        assertEquals("3001", parsed.statement.accounts.single().accountMasked)
+        assertEquals("2026-03-01", parsed.statement.coverage.periodStart.toString())
+        assertEquals("2026-03-31", parsed.statement.coverage.periodEnd.toString())
+    }
+
+    @Test
     fun missingCoverageDirectives_areRejected() {
         assertEquals(
             StatementRejection.AMBIGUOUS_HEADER,

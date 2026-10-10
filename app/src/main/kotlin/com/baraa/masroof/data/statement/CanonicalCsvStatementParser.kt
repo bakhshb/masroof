@@ -8,6 +8,7 @@ import com.baraa.masroof.domain.statement.CanonicalStatementFormat
 import com.baraa.masroof.domain.statement.ParsedBankStatement
 import com.baraa.masroof.domain.statement.StatementAccountBalance
 import com.baraa.masroof.domain.statement.StatementCoverage
+import com.baraa.masroof.domain.statement.StatementMatchPolicy
 import com.baraa.masroof.domain.statement.StatementDirection
 import com.baraa.masroof.domain.statement.StatementParseResult
 import com.baraa.masroof.domain.statement.StatementParser
@@ -62,6 +63,8 @@ class CanonicalCsvStatementParser : StatementParser {
         var sawVersion = false
         var periodStart: LocalDate? = null
         var periodEnd: LocalDate? = null
+        var pendingBankId: String? = null
+        val declaredAccounts = linkedSetOf<StatementMatchPolicy.QualifiedAccount>()
         while (cursor < records.size && isDirective(records[cursor])) {
             val directive = records[cursor][0].trim()
             when {
@@ -77,21 +80,36 @@ class CanonicalCsvStatementParser : StatementParser {
                     if (periodEnd != null) fail(StatementRejection.AMBIGUOUS_HEADER)
                     periodEnd = parseCoverageDate(directive.removePrefix(CanonicalStatementFormat.PERIOD_END_DIRECTIVE))
                 }
+                directive.startsWith(CanonicalStatementFormat.BANK_ID_DIRECTIVE) -> {
+                    if (pendingBankId != null) fail(StatementRejection.AMBIGUOUS_HEADER)
+                    pendingBankId = parseDirectiveBankId(
+                        directive.removePrefix(CanonicalStatementFormat.BANK_ID_DIRECTIVE),
+                        knownBankIds,
+                    )
+                }
+                directive.startsWith(CanonicalStatementFormat.ACCOUNT_MASKED_DIRECTIVE) -> {
+                    val bankId = pendingBankId ?: fail(StatementRejection.AMBIGUOUS_HEADER)
+                    val masked = parseDirectiveAccount(
+                        directive.removePrefix(CanonicalStatementFormat.ACCOUNT_MASKED_DIRECTIVE),
+                    )
+                    val account = StatementMatchPolicy.QualifiedAccount(Bank.fromId(bankId), masked)
+                    if (!declaredAccounts.add(account)) fail(StatementRejection.AMBIGUOUS_HEADER)
+                    pendingBankId = null
+                }
                 else -> fail(StatementRejection.UNRECOGNIZED)
             }
             cursor += 1
         }
-        if (cursor >= records.size) fail(StatementRejection.UNRECOGNIZED)
+        if (pendingBankId != null) fail(StatementRejection.AMBIGUOUS_HEADER)
+        if (cursor >= records.size) {
+            if (declaredAccounts.isEmpty()) fail(StatementRejection.AMBIGUOUS_HEADER)
+            return statementWithoutRows(requireCoverage(periodStart, periodEnd), declaredAccounts)
+        }
         val headerRecord = records[cursor]
         rejectUnsupportedSeparator(headerRecord)
         val headers = headerRecord.map { it.trim() }
         validateHeaders(headers)
-        val coverageStart = periodStart
-        val coverageEnd = periodEnd
-        if (coverageStart == null || coverageEnd == null || coverageEnd.isBefore(coverageStart)) {
-            fail(StatementRejection.AMBIGUOUS_HEADER)
-        }
-        val coverage = StatementCoverage(coverageStart, coverageEnd)
+        val coverage = requireCoverage(periodStart, periodEnd)
         val headerIndex = headers.withIndex().associate { it.value to it.index }
         cursor += 1
 
@@ -117,14 +135,49 @@ class CanonicalCsvStatementParser : StatementParser {
                 seen = seen,
                 balances = balances,
                 coverage = coverage,
+                declaredAccounts = declaredAccounts,
             )
         }
+        if (entries.isEmpty() && declaredAccounts.isEmpty()) fail(StatementRejection.AMBIGUOUS_HEADER)
         return ParsedBankStatement(
             formatVersion = CanonicalStatementFormat.VERSION,
             coverage = coverage,
+            accounts = declaredAccounts.toList(),
             entries = entries,
             balances = balances.values.map { it.build() },
         )
+    }
+
+    private fun requireCoverage(periodStart: LocalDate?, periodEnd: LocalDate?): StatementCoverage {
+        if (periodStart == null || periodEnd == null || periodEnd.isBefore(periodStart)) {
+            fail(StatementRejection.AMBIGUOUS_HEADER)
+        }
+        return StatementCoverage(periodStart, periodEnd)
+    }
+
+    private fun statementWithoutRows(
+        coverage: StatementCoverage,
+        accounts: Set<StatementMatchPolicy.QualifiedAccount>,
+    ): ParsedBankStatement = ParsedBankStatement(
+        formatVersion = CanonicalStatementFormat.VERSION,
+        coverage = coverage,
+        accounts = accounts.toList(),
+        entries = emptyList(),
+        balances = emptyList(),
+    )
+
+    private fun parseDirectiveBankId(raw: String, knownBankIds: Set<String>): String {
+        val bankId = raw.trim()
+        if (!BANK_ID.matches(bankId) || bankId == Bank.UNKNOWN.id || bankId !in knownBankIds) {
+            fail(StatementRejection.UNKNOWN_BANK)
+        }
+        return bankId
+    }
+
+    private fun parseDirectiveAccount(raw: String): String {
+        val masked = raw.trim()
+        if (!ACCOUNT_MASKED.matches(masked)) fail(StatementRejection.OUT_OF_RANGE)
+        return masked
     }
 
     private fun isDirective(record: List<String>): Boolean =
@@ -175,6 +228,7 @@ class CanonicalCsvStatementParser : StatementParser {
         seen: MutableSet<MovementKey>,
         balances: MutableMap<String, BalanceBuilder>,
         coverage: StatementCoverage,
+        declaredAccounts: Set<StatementMatchPolicy.QualifiedAccount>,
     ): BankStatementEntry {
         val bankId = cell(record, headerIndex, "bankId")
         if (!BANK_ID.matches(bankId) || bankId == Bank.UNKNOWN.id || bankId !in knownBankIds) {
@@ -183,6 +237,11 @@ class CanonicalCsvStatementParser : StatementParser {
         val bank = Bank.fromId(bankId)
         val accountMasked = cell(record, headerIndex, "accountMasked")
         if (!ACCOUNT_MASKED.matches(accountMasked)) fail(StatementRejection.OUT_OF_RANGE)
+        if (declaredAccounts.isNotEmpty() &&
+            StatementMatchPolicy.QualifiedAccount(bank, accountMasked) !in declaredAccounts
+        ) {
+            fail(StatementRejection.AMBIGUOUS_HEADER)
+        }
         val bookedRaw = cell(record, headerIndex, "bookedAt")
         val booked = parseBookedAt(bookedRaw)
         if (booked.date.isBefore(coverage.periodStart) || booked.date.isAfter(coverage.periodEnd)) {

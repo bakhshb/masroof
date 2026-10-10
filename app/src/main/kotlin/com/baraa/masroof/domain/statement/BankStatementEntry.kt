@@ -13,8 +13,9 @@ import java.time.LocalDateTime
  * UTF-8 comma-separated table. The optional first record is the directive
  * `# masroof-statement-v1`. The next directives are required and are the only
  * coverage period: `# periodStart=YYYY-MM-DD` and `# periodEnd=YYYY-MM-DD`.
- * Coverage is not taken from the first or last movement. The header row names
- * columns; order does not matter.
+ * Coverage is not taken from the first or last movement. A file with no
+ * movement rows names its account with `# bankId=` and `# accountMasked=`.
+ * The header row names columns; order does not matter. Movement rows are optional.
  *
  * Required headers: `bankId`, `accountMasked`, `bookedAt`, `direction`,
  * `amount`, `currency`, `description`.
@@ -63,6 +64,8 @@ object CanonicalStatementFormat {
     const val VERSION_DIRECTIVE: String = "# masroof-statement-v1"
     const val PERIOD_START_DIRECTIVE: String = "# periodStart="
     const val PERIOD_END_DIRECTIVE: String = "# periodEnd="
+    const val BANK_ID_DIRECTIVE: String = "# bankId="
+    const val ACCOUNT_MASKED_DIRECTIVE: String = "# accountMasked="
     const val MAX_BYTES: Long = 1_048_576L
     const val MAX_DATA_ROWS: Int = 5_000
     const val MAX_AMOUNT_PLAIN: String = "1000000000.00"
@@ -145,6 +148,11 @@ data class StatementAccountBalance(
 data class ParsedBankStatement(
     val formatVersion: Int,
     val coverage: StatementCoverage,
+    /**
+     * Accounts named by `# bankId` / `# accountMasked` directives.
+     * Empty when every account is named by a movement row.
+     */
+    val accounts: List<StatementMatchPolicy.QualifiedAccount> = emptyList(),
     val entries: List<BankStatementEntry>,
     val balances: List<StatementAccountBalance>,
 )

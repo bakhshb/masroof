@@ -29,12 +29,10 @@ class StatementReconciliationService(
     private val referencesFor: suspend (List<FinancialTransaction>) -> Map<String, Set<String>> = { emptyMap() },
 ) {
     suspend fun compare(statement: ParsedBankStatement): StatementReconciliationReport {
-        if (statement.entries.isEmpty()) {
-            return emptyReport(statement)
-        }
         val coverage = statement.coverage
         val period = coverage.periodStart to coverage.periodEnd
-        val periodByAccount = statement.entries
+        val accounts = comparisonAccounts(statement)
+        val periodByAccount = accounts
             .map { accountKey(it.bank, it.accountMasked) }
             .distinct()
             .associateWith { period }
@@ -50,7 +48,7 @@ class StatementReconciliationService(
         val posted = financialTransactionRepository.listOccurredBetween(start, end)
         val referencesByTransaction = referencesFor(posted)
         val storedZones = storedZonesByBank(posted)
-        val statementZones = statement.entries.map { it.bank }.distinct().associateWith { bank ->
+        val statementZones = accounts.map { it.bank }.distinct().associateWith { bank ->
             StatementMatchPolicy.zoneForStatementBank(bank, storedZones[bank].orEmpty())
         }
         val ledgerSides = projectLedger(posted, statementZones, periodByAccount, referencesByTransaction)
@@ -64,19 +62,14 @@ class StatementReconciliationService(
         return buildReport(statement, paired, periodByAccount)
     }
 
-    private fun emptyReport(statement: ParsedBankStatement): StatementReconciliationReport =
-        StatementReconciliationReport(
-            formatVersion = statement.formatVersion,
-            counts = StatementReconciliationCounts(0, 0, 0, 0, 0),
-            statementLines = emptyList(),
-            ledgerLines = emptyList(),
-            totals = emptyList(),
-            coverage = statement.coverage,
-            balances = statement.balances,
-            balanceCheck = balanceCheck(statement),
-            matchedFleetPaymentCount = 0,
-            matchedSelfTransferCount = 0,
-        )
+    private fun comparisonAccounts(
+        statement: ParsedBankStatement,
+    ): List<StatementMatchPolicy.QualifiedAccount> {
+        if (statement.accounts.isNotEmpty()) return statement.accounts
+        return statement.entries
+            .map { StatementMatchPolicy.QualifiedAccount(it.bank, it.accountMasked.trim()) }
+            .distinct()
+    }
 
     private fun storedZonesByBank(posted: List<FinancialTransaction>): Map<Bank, Set<String?>> {
         val zones = linkedMapOf<Bank, MutableSet<String?>>()

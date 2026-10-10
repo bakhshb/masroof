@@ -47,9 +47,10 @@ internal fun accountsAreExactOwned(
         .filter { it.bank != Bank.UNKNOWN && it.accountMasked.isNotBlank() }
         .map { StatementMatchPolicy.QualifiedAccount(it.bank, it.accountMasked.trim()) }
         .toSet()
-    val mentioned = statement.entries.map { StatementMatchPolicy.QualifiedAccount(it.bank, it.accountMasked.trim()) } +
+    val mentioned = statement.accounts.map { StatementMatchPolicy.QualifiedAccount(it.bank, it.accountMasked.trim()) } +
+        statement.entries.map { StatementMatchPolicy.QualifiedAccount(it.bank, it.accountMasked.trim()) } +
         statement.balances.map { StatementMatchPolicy.QualifiedAccount(it.bank, it.accountMasked.trim()) }
-    return mentioned.all { it in owned }
+    return mentioned.isNotEmpty() && mentioned.all { it in owned }
 }
 
 sealed interface StatementImportResult {

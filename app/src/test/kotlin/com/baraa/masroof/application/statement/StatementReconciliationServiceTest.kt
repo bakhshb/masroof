@@ -516,6 +516,83 @@ class StatementReconciliationServiceTest {
     }
 
     @Test
+    fun zeroMovementStatement_withEmptyLedger_isACleanComparison() = runBlocking {
+        val ledger = RecordingLedger(emptyList())
+        val report = compared(ledger, acceptedText(zeroRowStatement()))
+        assertEquals(1, ledger.rangeReads)
+        assertEquals(0, ledger.mutations)
+        assertEquals(0, report.counts.matched)
+        assertEquals(0, report.counts.statementOnly)
+        assertEquals(0, report.counts.ledgerOnly)
+        assertEquals(0, report.counts.ambiguous)
+        assertTrue(report.statementLines.isEmpty())
+        assertTrue(report.ledgerLines.isEmpty())
+        assertEquals(LocalDate.parse("2026-03-01"), report.coverage.periodStart)
+        assertEquals(LocalDate.parse("2026-03-31"), report.coverage.periodEnd)
+    }
+
+    @Test
+    fun zeroMovementStatement_includesLedgerMovementInsideCoverage() = runBlocking {
+        val ledger = RecordingLedger(
+            listOf(
+                posted(
+                    "march-15",
+                    FinancialTransactionType.EXPENSE,
+                    "250.00",
+                    local("2026-03-15T12:00:00"),
+                    StatementDirection.DEBIT,
+                ),
+            ),
+        )
+        val report = compared(ledger, acceptedText(zeroRowStatement()))
+        assertEquals(1, ledger.rangeReads)
+        assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("march-15").status)
+        assertEquals(1, report.counts.ledgerOnly)
+        assertMoney("250.00", report.total("BANK_ALJAZIRA", "3001", Currency.SAR).ledgerOnlyDebit)
+        assertEquals(LocalDate.parse("2026-03-01"), report.coverage.periodStart)
+        assertEquals(LocalDate.parse("2026-03-31"), report.coverage.periodEnd)
+    }
+
+    @Test
+    fun zeroMovementStatement_excludesLedgerMovementOutsideCoverage() = runBlocking {
+        val ledger = RecordingLedger(
+            listOf(
+                posted(
+                    "april-1",
+                    FinancialTransactionType.EXPENSE,
+                    "250.00",
+                    local("2026-04-01T00:00:00"),
+                    StatementDirection.DEBIT,
+                ),
+            ),
+        )
+        val report = compared(ledger, acceptedText(zeroRowStatement()))
+        assertEquals(1, ledger.rangeReads)
+        assertTrue(report.ledgerLines.none { it.transactionId == "april-1" })
+        assertEquals(0, report.counts.ledgerOnly)
+    }
+
+    @Test
+    fun zeroMovementStatement_requiresAnExactOwnedAccount() = runBlocking {
+        val ledger = RecordingLedger(
+            listOf(
+                posted(
+                    "march-15",
+                    FinancialTransactionType.EXPENSE,
+                    "250.00",
+                    local("2026-03-15T12:00:00"),
+                    StatementDirection.DEBIT,
+                ),
+            ),
+        )
+        val result = ImportStatementUseCase(parser, StatementReconciliationService(ledger))
+            .import(ByteArrayInputStream(zeroRowStatement().toByteArray()), known, emptySet())
+        assertEquals(StatementImportResult.Rejected(StatementRejection.UNOWNED_ACCOUNT), result)
+        assertEquals(0, ledger.rangeReads)
+        assertEquals(0, ledger.mutations)
+    }
+
+    @Test
     fun totalsUseTheDeclaredCoverageDates() = runBlocking {
         val report = marchCoverage(
             posted("march-27", FinancialTransactionType.EXPENSE, "8.00", local("2026-03-27T12:00:00"), StatementDirection.DEBIT),
@@ -527,6 +604,14 @@ class StatementReconciliationServiceTest {
         assertEquals(LocalDate.parse("2026-03-31"), total.periodEnd)
         assertEquals(StatementComparisonStatus.LEDGER_ONLY, report.ledger("march-27").status)
     }
+
+    private fun zeroRowStatement(): String = """
+        # masroof-statement-v1
+        # bankId=BANK_ALJAZIRA
+        # accountMasked=3001
+        # periodStart=2026-03-01
+        # periodEnd=2026-03-31
+    """.trimIndent() + "\n"
 
     private fun marchStatement(): String = statementCsv(
         "BANK_ALJAZIRA,3001,2026-03-05,DEBIT,10.00,SAR,EARLY",
