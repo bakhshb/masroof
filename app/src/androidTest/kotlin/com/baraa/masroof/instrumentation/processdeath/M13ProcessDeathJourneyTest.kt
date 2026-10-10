@@ -1,6 +1,5 @@
 package com.baraa.masroof.instrumentation.processdeath
 
-import android.content.ComponentName
 import android.Manifest
 import android.os.Build
 import android.provider.Telephony
@@ -9,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.baraa.masroof.MasroofApplication
+import com.baraa.masroof.sms.receiver.IncomingSmsReceiver
 import com.baraa.masroof.application.sms.DebugProcessHalt
 import com.baraa.masroof.application.sms.WorkManagerLiveSmsWorkScheduler
 import com.baraa.masroof.application.transaction.IgnoreResult
@@ -41,11 +41,11 @@ import org.junit.runner.RunWith
 /**
  * Emulator-only process death. There is no physical device.
  *
- * Each arm method plants `filesDir/m13-halt-after` and sends an explicit
- * `SMS_RECEIVED` intent to [com.baraa.masroof.sms.receiver.IncomingSmsReceiver].
- * The platform forbids the app and `adb` from sending that protected broadcast,
- * so the debug manifest lets this app deliver it. The receiver still uses
- * `getMessagesFromIntent`, then WorkManager. The test returns
+ * Each arm method plants `filesDir/m13-halt-after` and calls
+ * [IncomingSmsReceiver.onReceive] with the same `SMS_RECEIVED` PDU intent the
+ * platform would deliver. The platform rejects that protected broadcast from
+ * the app and from `adb`. The receiver still uses `getMessagesFromIntent`,
+ * then WorkManager. The test returns
  * while the receiver or [com.baraa.masroof.application.sms.LiveSmsProcessingWorker]
  * is parked after the durable write. The CI runner then runs
  * `adb shell am force-stop com.baraa.masroof` from outside this process.
@@ -397,8 +397,7 @@ class M13ProcessDeathJourneyTest {
         check(messages.all { it.displayOriginatingAddress == SENDER }) {
             evidence("getMessagesFromIntent originating address was not the AlJazira sender")
         }
-        intent.component = ComponentName(PACKAGE, "$PACKAGE.sms.receiver.IncomingSmsReceiver")
-        targetContext().sendBroadcast(intent)
+        IncomingSmsReceiver().onReceive(targetContext().applicationContext, intent)
     }
 
     private fun grantSmsPermissions() {

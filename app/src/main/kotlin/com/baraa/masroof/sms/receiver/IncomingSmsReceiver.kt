@@ -72,13 +72,23 @@ class IncomingSmsReceiver : BroadcastReceiver() {
             return
         }
 
-        val pendingResult = goAsync()
+        // A system delivery always has a pending result. A debug instrumentation
+        // call of onReceive does not, because SMS_RECEIVED cannot be sent by the app.
+        val pendingResult = pendingResultOrNull()
         app.container.applicationScope.launch {
             try {
                 app.container.liveSmsIntake.ingest(rawSms)
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }
     }
+
+    private fun pendingResultOrNull(): PendingResult? =
+        try {
+            goAsync()
+        } catch (error: IllegalStateException) {
+            if (!BuildConfig.DEBUG) throw error
+            null
+        }
 }
