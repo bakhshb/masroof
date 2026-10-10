@@ -77,12 +77,10 @@ class CardsDashboardProjection(
                 debitSpendingByCardKey = debitSpend.spendingByCardKey,
                 debitSalaryPeriodLabel = debitSpend.salaryPeriodLabel ?: creditCardsFlat.salaryPeriodLabel,
                 parsedRecords = parsedRecords,
-                rawSmsById = rawSmsById,
             ),
             transactionCardInvolvement = CardTransactionInvolvementResolver.buildIndex(
                 transactions = transactions,
                 parsedRecords = parsedRecords,
-                rawSmsById = rawSmsById,
             ),
             transactionDebitSpendInvolvement = debitSpend.transactionDebitSpendInvolvement,
         )

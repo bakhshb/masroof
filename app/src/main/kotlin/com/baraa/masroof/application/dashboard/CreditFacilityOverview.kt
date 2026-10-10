@@ -5,7 +5,6 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardRole
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 data class CreditFacilityOverview(
@@ -53,14 +52,12 @@ object CreditFacilityOverviewBuilder {
         debitSpendingByCardKey: Map<String, SignedMoneyAmount> = emptyMap(),
         debitSalaryPeriodLabel: String? = overview.salaryPeriodLabel,
         parsedRecords: List<ParsedEventRecord> = emptyList(),
-        rawSmsById: Map<String, RawSms> = emptyMap(),
     ): CreditFacilitiesOverview {
         val ownedCredit = registryCards.filter {
             it.ownership.isOwned() &&
                 CardRegistryDebitClassifier.isCreditRegistryEntry(
                     it,
                     parsedRecords = parsedRecords,
-                    rawSmsById = rawSmsById,
                 )
         }
         val debitCards = registryCards
@@ -69,7 +66,6 @@ object CreditFacilityOverviewBuilder {
                     CardRegistryDebitClassifier.isDebitRegistryEntry(
                         it,
                         parsedRecords = parsedRecords,
-                        rawSmsById = rawSmsById,
                     )
             }
             .map { entry ->
@@ -82,7 +78,6 @@ object CreditFacilityOverviewBuilder {
                         entry = entry,
                         registryAccounts = registryAccounts,
                         parsedRecords = parsedRecords,
-                        rawSmsById = rawSmsById,
                     ),
                     linkedAccountMaskedNumber = entry.linkedAccountMaskedNumber
                         ?: DebitLinkedAccountInferrer.inferAccountLast4(
@@ -209,7 +204,6 @@ object CreditFacilityOverviewBuilder {
         entry: CardRegistryEntry,
         registryAccounts: List<com.baraa.masroof.domain.model.AccountRegistryEntry>,
         parsedRecords: List<ParsedEventRecord>,
-        rawSmsById: Map<String, RawSms>,
     ): String? {
         val masked = entry.linkedAccountMaskedNumber
             ?: DebitLinkedAccountInferrer.inferAccountLast4(

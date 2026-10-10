@@ -150,7 +150,6 @@ class DashboardProjectionBuilder(
             debitCardScope = DebitCardScopeFactory.fromRegistry(
                 cards = cardRegistry,
                 parsedRecords = evidence.parsedRecords,
-                rawSmsById = evidence.rawSmsById,
                 registryAccounts = ownedAccounts,
             ),
             displayLocale = AppLocale.displayLocale(appLocaleRepository.getLanguageTag()),

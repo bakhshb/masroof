@@ -220,16 +220,6 @@ class CreditFacilityOverviewBuilderTest {
                 ),
             ),
         )
-        val rawSmsById = mapOf(
-            "sms-pos" to com.baraa.masroof.domain.model.RawSms(
-                id = "sms-pos",
-                sender = "AlJazira",
-                body = body,
-                receivedAt = java.time.Instant.parse("2026-08-03T10:24:00Z"),
-                deviceMessageId = "evt-pos",
-                bodyHash = "evt-pos",
-            ),
-        )
         val registryAccounts = listOf(
             com.baraa.masroof.domain.model.AccountRegistryEntry.forTest(
                 bank = Bank.BANK_ALJAZIRA,
@@ -256,7 +246,6 @@ class CreditFacilityOverviewBuilderTest {
             ),
             registryAccounts = registryAccounts,
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
         )
 
         assertEquals("Current", facilities.debitCards.single().linkedAccountLabel)

@@ -96,34 +96,16 @@ class CardTransactionInvolvementResolverTest {
             source = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
             linked = listOf("evt-atm"),
         )
-        val body = """
-            سحب نقدي داخلي صراف الي
-            بطاقة 8219:مدى
-            حساب رقم: 3001
-            بمبلغ: SAR 2,200.00
-            في: 2026-08-02 17:41
-        """.trimIndent()
         val parsedRecords = listOf(
             parsedRecordWithoutCardRef(
                 id = "evt-atm",
                 rawSmsId = "sms-atm",
             ),
         )
-        val rawSmsById = mapOf(
-            "sms-atm" to com.baraa.masroof.domain.model.RawSms(
-                id = "sms-atm",
-                sender = "AlJazira",
-                body = body,
-                receivedAt = Instant.parse("2026-08-02T17:41:00Z"),
-                deviceMessageId = "1",
-                bodyHash = "h",
-            ),
-        )
 
         val index = CardTransactionInvolvementResolver.buildIndex(
             transactions = listOf(txWithParsedRef),
             parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
         )
 
         assertEquals(emptySet<String>(), index["atm"])
