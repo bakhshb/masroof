@@ -169,6 +169,27 @@ class BetaContainer(
         runBlocking { BetaAssetRegistry(database).all() }
     }
 
+    /** Explicit resolved Beta input only. Evidence import/comparison never calls this API. */
+    fun postFinancial(input: com.baraa.masroof.lab.finance.classification.FinancialClassificationInput) = lock.withLock {
+        check(!closed)
+        runBlocking { com.baraa.masroof.lab.beta.data.RoomBetaFinancialLedger(database).post(input) }
+    }
+
+    fun postFinancial(transfer: com.baraa.masroof.lab.finance.matching.MatchedSelfTransfer) = lock.withLock {
+        check(!closed)
+        runBlocking { com.baraa.masroof.lab.beta.data.RoomBetaFinancialLedger(database).post(transfer) }
+    }
+
+    fun financialPosting(key: com.baraa.masroof.lab.finance.posting.PostingKey) = lock.withLock {
+        check(!closed)
+        runBlocking { com.baraa.masroof.lab.beta.data.RoomBetaFinancialLedger(database).read(key) }
+    }
+
+    fun financialHistory(key: com.baraa.masroof.lab.finance.posting.PostingKey) = lock.withLock {
+        check(!closed)
+        runBlocking { com.baraa.masroof.lab.beta.data.RoomBetaFinancialLedger(database).history(key) }
+    }
+
     fun markerCount(): Int = lock.withLock {
         check(!closed)
         runBlocking { database.shellMarkerDao().count() }

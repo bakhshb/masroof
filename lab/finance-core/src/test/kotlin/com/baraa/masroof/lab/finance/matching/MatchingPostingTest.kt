@@ -187,6 +187,22 @@ class MatchingPostingTest {
             authority = CorrectionAuthority.USER_FINANCIAL_TYPE, appliedFx = updated)) is FinancialPostingResult.Applied)
     }
 
+    @Test fun aRetainedFxPairCannotBeReusedForAnotherNativeCurrencyEvenByNewManualDecision() = runBlocking {
+        val ledger = InMemoryFinancialPostingLedger()
+        val original = direct().copy(amount = Money.of("25", Currency.USD),
+            appliedFx = AppliedFx(java.math.BigDecimal("3.750000000001"), "confirmed-usd-rate"))
+        assertTrue(ledger.post(original) is FinancialPostingResult.Applied)
+        for (currency in listOf(Currency.EUR, Currency.SAR)) {
+            for (authority in listOf(CorrectionAuthority.NONE, CorrectionAuthority.USER_FINANCIAL_TYPE)) {
+                assertEquals(FinancialPostingResult.Conflict(PostingConflict.IMMUTABLE_FX), ledger.post(original.copy(
+                    revision = PostingRevision(1, 0), authority = authority, amount = Money.of("25", currency))))
+            }
+        }
+        assertTrue(ledger.post(original.copy(revision = PostingRevision(0, 2), amount = Money.of("30", Currency.USD))) is FinancialPostingResult.Applied)
+        assertTrue(ledger.post(original.copy(revision = PostingRevision(1, 0), authority = CorrectionAuthority.USER_FINANCIAL_TYPE,
+            amount = Money.of("25", Currency.EUR), appliedFx = AppliedFx(java.math.BigDecimal("4.100000000001"), "confirmed-eur-rate"))) is FinancialPostingResult.Applied)
+    }
+
     @Test fun equalRevisionNeedsCompleteIdenticalPayloadNotJustTransactionKey() = runBlocking {
         val ledger = InMemoryFinancialPostingLedger()
         val original = direct()

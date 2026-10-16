@@ -1,5 +1,11 @@
 # M8.2 — Conservative ownership, matching and atomic posting contract
 
+This document records the initial pure-contract increment. The subsequent Beta-only durable adapter,
+schema 4→5 and recovery verification are described in [M8_DURABLE_LEDGER.md](M8_DURABLE_LEDGER.md).
+The in-memory reference remains available and shares its financial preparation/replacement policy
+with that adapter, including the documented currency-bound FX safety guard. Runtime adoption and
+full end-to-end acceptance remain open.
+
 This increment adds a pure Finance Core API under `lab/finance-core`. It does not adopt a new runtime,
 create a Room ledger, change a schema, touch production data, or delete legacy code. The in-memory
 adapter is an executable reference contract for a future durable Beta adapter. M8.2 remains in progress

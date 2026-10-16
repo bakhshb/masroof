@@ -1,0 +1,760 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "53b6e6742ac182af5b3717b1d56a2520",
+    "entities": [
+      {
+        "tableName": "beta_shell_marker",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `note` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_asset",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `bankId` TEXT NOT NULL, `localId` TEXT NOT NULL, `kind` TEXT NOT NULL, `last4` TEXT, `parentLocalId` TEXT, `creditCardRole` TEXT, PRIMARY KEY(`environment`, `bankId`, `localId`), FOREIGN KEY(`environment`, `bankId`, `parentLocalId`) REFERENCES `beta_asset`(`environment`, `bankId`, `localId`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localId",
+            "columnName": "localId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "last4",
+            "columnName": "last4",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "parentLocalId",
+            "columnName": "parentLocalId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "creditCardRole",
+            "columnName": "creditCardRole",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "bankId",
+            "localId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_asset_environment_bankId_parentLocalId",
+            "unique": false,
+            "columnNames": [
+              "environment",
+              "bankId",
+              "parentLocalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_asset_environment_bankId_parentLocalId` ON `${TABLE_NAME}` (`environment`, `bankId`, `parentLocalId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_asset",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "environment",
+              "bankId",
+              "parentLocalId"
+            ],
+            "referencedColumns": [
+              "environment",
+              "bankId",
+              "localId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_asset_alias",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `bankId` TEXT NOT NULL, `assetLocalId` TEXT NOT NULL, `kind` TEXT NOT NULL, `value` TEXT NOT NULL, `evidenceId` TEXT NOT NULL, PRIMARY KEY(`environment`, `bankId`, `assetLocalId`, `kind`, `value`, `evidenceId`), FOREIGN KEY(`environment`, `bankId`, `assetLocalId`) REFERENCES `beta_asset`(`environment`, `bankId`, `localId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetLocalId",
+            "columnName": "assetLocalId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceId",
+            "columnName": "evidenceId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "bankId",
+            "assetLocalId",
+            "kind",
+            "value",
+            "evidenceId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_asset_alias_environment_bankId_assetLocalId",
+            "unique": false,
+            "columnNames": [
+              "environment",
+              "bankId",
+              "assetLocalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_asset_alias_environment_bankId_assetLocalId` ON `${TABLE_NAME}` (`environment`, `bankId`, `assetLocalId`)"
+          },
+          {
+            "name": "index_beta_asset_alias_environment_bankId_kind_value",
+            "unique": false,
+            "columnNames": [
+              "environment",
+              "bankId",
+              "kind",
+              "value"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_asset_alias_environment_bankId_kind_value` ON `${TABLE_NAME}` (`environment`, `bankId`, `kind`, `value`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_asset",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "environment",
+              "bankId",
+              "assetLocalId"
+            ],
+            "referencedColumns": [
+              "environment",
+              "bankId",
+              "localId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_bank_selection",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`bankId` TEXT NOT NULL, `state` TEXT NOT NULL, PRIMARY KEY(`bankId`))",
+        "fields": [
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "bankId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_raw_evidence",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `namespace` TEXT NOT NULL, `providerId` TEXT NOT NULL, `origin` TEXT NOT NULL, `sender` TEXT NOT NULL, `body` TEXT NOT NULL, `receivedAt` TEXT NOT NULL, `timeSource` TEXT NOT NULL, `capturedAt` TEXT NOT NULL, `captureRoute` TEXT NOT NULL, `captureSelections` TEXT NOT NULL, `historyBanks` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namespace",
+            "columnName": "namespace",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerId",
+            "columnName": "providerId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sender",
+            "columnName": "sender",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "body",
+            "columnName": "body",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receivedAt",
+            "columnName": "receivedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timeSource",
+            "columnName": "timeSource",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capturedAt",
+            "columnName": "capturedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "captureRoute",
+            "columnName": "captureRoute",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "captureSelections",
+            "columnName": "captureSelections",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "historyBanks",
+            "columnName": "historyBanks",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_raw_evidence_namespace_providerId",
+            "unique": true,
+            "columnNames": [
+              "namespace",
+              "providerId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_beta_raw_evidence_namespace_providerId` ON `${TABLE_NAME}` (`namespace`, `providerId`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_evidence_outcome",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rawId` TEXT NOT NULL, `disposition` TEXT NOT NULL, `route` TEXT NOT NULL, `reasons` TEXT NOT NULL, `baselineJson` TEXT NOT NULL, `candidateJson` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, `attempts` INTEGER NOT NULL, PRIMARY KEY(`rawId`), FOREIGN KEY(`rawId`) REFERENCES `beta_raw_evidence`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "rawId",
+            "columnName": "rawId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "disposition",
+            "columnName": "disposition",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "route",
+            "columnName": "route",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reasons",
+            "columnName": "reasons",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baselineJson",
+            "columnName": "baselineJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateJson",
+            "columnName": "candidateJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "rawId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": [
+          {
+            "table": "beta_raw_evidence",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "rawId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_evidence_retry",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rawId` TEXT NOT NULL, `stage` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `code` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`rawId`), FOREIGN KEY(`rawId`) REFERENCES `beta_raw_evidence`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "rawId",
+            "columnName": "rawId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stage",
+            "columnName": "stage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "code",
+            "columnName": "code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "rawId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": [
+          {
+            "table": "beta_raw_evidence",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "rawId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_evidence_decision",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rawId` TEXT NOT NULL, `revision` INTEGER NOT NULL, `decision` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`rawId`), FOREIGN KEY(`rawId`) REFERENCES `beta_raw_evidence`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "rawId",
+            "columnName": "rawId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "decision",
+            "columnName": "decision",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "rawId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": [
+          {
+            "table": "beta_raw_evidence",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "rawId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_ledger_current",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `transactionId` TEXT NOT NULL, `correction` INTEGER NOT NULL, `interpretation` INTEGER NOT NULL, `payload` TEXT NOT NULL, PRIMARY KEY(`environment`, `transactionId`))",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correction",
+            "columnName": "correction",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "interpretation",
+            "columnName": "interpretation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "transactionId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_ledger_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `transactionId` TEXT NOT NULL, `correction` INTEGER NOT NULL, `interpretation` INTEGER NOT NULL, `payload` TEXT NOT NULL, PRIMARY KEY(`environment`, `transactionId`, `correction`, `interpretation`), FOREIGN KEY(`environment`, `transactionId`) REFERENCES `beta_ledger_current`(`environment`, `transactionId`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correction",
+            "columnName": "correction",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "interpretation",
+            "columnName": "interpretation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "transactionId",
+            "correction",
+            "interpretation"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": [
+          {
+            "table": "beta_ledger_current",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "environment",
+              "transactionId"
+            ],
+            "referencedColumns": [
+              "environment",
+              "transactionId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_ledger_evidence_claim",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `evidenceId` TEXT NOT NULL, `transactionId` TEXT NOT NULL, PRIMARY KEY(`environment`, `evidenceId`), FOREIGN KEY(`environment`, `transactionId`) REFERENCES `beta_ledger_current`(`environment`, `transactionId`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceId",
+            "columnName": "evidenceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "evidenceId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_ledger_evidence_claim_environment_transactionId",
+            "unique": false,
+            "columnNames": [
+              "environment",
+              "transactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_ledger_evidence_claim_environment_transactionId` ON `${TABLE_NAME}` (`environment`, `transactionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_ledger_current",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "environment",
+              "transactionId"
+            ],
+            "referencedColumns": [
+              "environment",
+              "transactionId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_ledger_proof_claim",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `kind` TEXT NOT NULL, `issuer` TEXT NOT NULL, `reference` TEXT NOT NULL, `transactionId` TEXT NOT NULL, PRIMARY KEY(`environment`, `kind`, `issuer`, `reference`), FOREIGN KEY(`environment`, `transactionId`) REFERENCES `beta_ledger_current`(`environment`, `transactionId`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "issuer",
+            "columnName": "issuer",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reference",
+            "columnName": "reference",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "kind",
+            "issuer",
+            "reference"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_ledger_proof_claim_environment_transactionId",
+            "unique": false,
+            "columnNames": [
+              "environment",
+              "transactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_ledger_proof_claim_environment_transactionId` ON `${TABLE_NAME}` (`environment`, `transactionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_ledger_current",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "environment",
+              "transactionId"
+            ],
+            "referencedColumns": [
+              "environment",
+              "transactionId"
+            ]
+          }
+        ]
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '53b6e6742ac182af5b3717b1d56a2520')"
+    ]
+  }
+}

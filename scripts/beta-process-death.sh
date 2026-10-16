@@ -31,4 +31,9 @@ case "$permission_output" in *"OK (1 test)"*) ;; *) exit 1 ;; esac
 
 journey armDuringComparison resumeDuringComparison
 journey armAfterComparisonBeforeCheckpoint resumeAfterComparisonBeforeCheckpoint
-echo "Beta permission dialog and process-death journeys passed"
+
+# The ledger phases are excluded from emulator-smoke and run exactly once here.
+CLASS="com.baraa.masroof.lab.beta.processdeath.BetaLedgerProcessDeathTest"
+journey armBeforeCommit resumeBeforeCommit
+journey armAfterCommit resumeAfterCommit
+echo "Beta permission dialog, evidence and durable-ledger process-death journeys passed"
