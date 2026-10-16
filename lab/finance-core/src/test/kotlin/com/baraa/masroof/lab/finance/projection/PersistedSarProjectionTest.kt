@@ -161,10 +161,32 @@ class PersistedSarProjectionTest {
     }
 
     @Test fun returnedFinancialMapsCannotBeMutated() {
-        val row = available(input())
+        val mutableAssets = input().assets.toMutableMap()
+        val mutableEvidence = input().evidenceIds.toMutableSet()
+        val mutableReasons = mutableSetOf<ReviewReason>()
+        val callerInput = input().copy(assets = mutableAssets, evidenceIds = mutableEvidence, unresolved = mutableReasons)
+        val inputs = mutableListOf(callerInput)
+        val row = available(callerInput)
+        val period = SarPeriodProjector.project(Environment.BETA, period, inputs)
+        mutableAssets.clear(); mutableEvidence.clear(); mutableReasons += ReviewReason.OWNERSHIP; inputs.clear()
+        assertEquals(5, row.native.input.assets.size)
+        assertEquals(setOf("e-purchase"), row.native.input.evidenceIds)
+        assertTrue(row.native.input.unresolved.isEmpty())
+        assertEquals(1, period.includedCount)
         assertThrows(UnsupportedOperationException::class.java) {
             (row.metrics as MutableMap).clear() }
-        val period = SarPeriodProjector.project(Environment.BETA, period, listOf(input()))
+        assertThrows(UnsupportedOperationException::class.java) {
+            (row.accountMovements as MutableList).clear() }
+        assertThrows(UnsupportedOperationException::class.java) {
+            (row.native.metrics as MutableMap).clear() }
+        assertThrows(UnsupportedOperationException::class.java) {
+            (row.native.accountMovements as MutableList).clear() }
+        assertThrows(UnsupportedOperationException::class.java) {
+            (row.native.input.assets as MutableMap).clear() }
+        assertThrows(UnsupportedOperationException::class.java) {
+            (row.native.input.evidenceIds as MutableSet).clear() }
+        assertThrows(UnsupportedOperationException::class.java) {
+            (row.native.input.unresolved as MutableSet).clear() }
         assertThrows(UnsupportedOperationException::class.java) {
             (period.totals as MutableMap).clear() }
     }

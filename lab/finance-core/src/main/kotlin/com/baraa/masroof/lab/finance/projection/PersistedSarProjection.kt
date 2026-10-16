@@ -38,8 +38,11 @@ sealed interface SarRowProjection {
 object PersistedSarProjection {
     fun project(input: FinancialClassificationInput, fee: LinkedInternationalFee? = null): SarRowProjection {
         fun blocked(reason: SarProjectionBlocker) = SarRowProjection.Unavailable(input.key, reason)
-        val native = FinancialImpactClassifier.classify(input)
-        if (native !is FinancialClassification.Classified) return blocked(SarProjectionBlocker.FINANCIAL_REVIEW)
+        val classified = FinancialImpactClassifier.classify(freezeProjectionInput(input))
+        if (classified !is FinancialClassification.Classified) return blocked(SarProjectionBlocker.FINANCIAL_REVIEW)
+        val native = classified.copy(input = freezeProjectionInput(classified.input),
+            metrics = Collections.unmodifiableMap(LinkedHashMap(classified.metrics)),
+            accountMovements = Collections.unmodifiableList(ArrayList(classified.accountMovements)))
         val facts = native.input
         val sar = if (facts.amount.currency == Currency.SAR) facts.amount else {
             val fx = facts.appliedFx ?: return blocked(SarProjectionBlocker.MISSING_APPLIED_FX)
@@ -87,14 +90,16 @@ data class SarPeriodProjection(
 object SarPeriodProjector {
     fun project(environment: Environment, period: DisplayPeriod, inputs: List<FinancialClassificationInput>,
         fees: List<LinkedInternationalFee> = emptyList()): SarPeriodProjection {
-        require(inputs.all { it.key.environment == environment }) { "Mixed environment snapshot" }
-        require(inputs.map { it.key }.distinct().size == inputs.size) { "Supply one current revision per key" }
-        val evidence = inputs.flatMap { it.evidenceIds }
+        val snapshot = inputs.toList().map(::freezeProjectionInput)
+        val feeSnapshot = fees.toList()
+        require(snapshot.all { it.key.environment == environment }) { "Mixed environment snapshot" }
+        require(snapshot.map { it.key }.distinct().size == snapshot.size) { "Supply one current revision per key" }
+        val evidence = snapshot.flatMap { it.evidenceIds }
         require(evidence.distinct().size == evidence.size) { "Evidence claimed by multiple current postings" }
-        require(fees.map { it.key }.distinct().size == fees.size) { "Ambiguous fee facts" }
-        require(fees.all { it.key.environment == environment && inputs.any { input -> input.key == it.key } })
-        val feesByKey = fees.associateBy { it.key }
-        val rows = inputs.filter { it.time.instant >= period.from && it.time.instant < period.until }
+        require(feeSnapshot.map { it.key }.distinct().size == feeSnapshot.size) { "Ambiguous fee facts" }
+        require(feeSnapshot.all { it.key.environment == environment && snapshot.any { input -> input.key == it.key } })
+        val feesByKey = feeSnapshot.associateBy { it.key }
+        val rows = snapshot.filter { it.time.instant >= period.from && it.time.instant < period.until }
             .map { PersistedSarProjection.project(it, feesByKey[it.key]) }
         val available = rows.filterIsInstance<SarRowProjection.Available>()
         val unavailable = rows.filterIsInstance<SarRowProjection.Unavailable>().associate { it.key to it.reason }
@@ -111,3 +116,9 @@ object SarPeriodProjector {
             Collections.unmodifiableMap(facilities), Collections.unmodifiableMap(loans))
     }
 }
+
+private fun freezeProjectionInput(input: FinancialClassificationInput) = input.copy(
+    assets = Collections.unmodifiableMap(LinkedHashMap(input.assets)),
+    evidenceIds = Collections.unmodifiableSet(LinkedHashSet(input.evidenceIds)),
+    unresolved = Collections.unmodifiableSet(LinkedHashSet(input.unresolved)),
+)
