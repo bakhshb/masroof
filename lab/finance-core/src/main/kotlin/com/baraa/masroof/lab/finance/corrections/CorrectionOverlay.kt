@@ -140,7 +140,8 @@ object CorrectionOverlays {
             overlay.original, overlay.metadata, overlay.history, overlay.financial, overlay.suppressed,
             observation, overlay.safetyHold || observation.safety != ObservationSafety.ORDINARY)
         if (next.suppressed) return if (next.safetyHold) CorrectionResult.Applied(next,
-            CorrectionDisposition.FINANCIAL_REVIEW, FinancialClassification.Review(immutableSet(setOf(ReviewReason.VALIDATION))), null)
+            CorrectionDisposition.FINANCIAL_REVIEW, FinancialClassification.Review(immutableSet(
+                base.unresolved + (next.financial?.unresolved ?: emptySet()) + ReviewReason.VALIDATION)), null)
         else CorrectionResult.Applied(next, CorrectionDisposition.SUPPRESSED, null, null)
         val selected = next.financial ?: base.copy(authority = CorrectionAuthority.METADATA_ONLY)
         val selectedIds = listOfNotNull((selected.source as? FinancialEndpoint.Owned)?.id,

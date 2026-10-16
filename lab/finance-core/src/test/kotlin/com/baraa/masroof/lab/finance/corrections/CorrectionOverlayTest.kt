@@ -102,9 +102,9 @@ class CorrectionOverlayTest {
 
     @Test fun suppressionCannotHideAnUnresolvedSafetyReview() {
         for (safety in ObservationSafety.entries.filter { it != ObservationSafety.ORDINARY }) {
-            val result = apply(observe(safety = safety), FinancialDecision.SuppressAsNonFinancial)
+            val result = apply(observe(input().copy(unresolved = setOf(ReviewReason.OWNERSHIP)), safety), FinancialDecision.SuppressAsNonFinancial)
             assertEquals(CorrectionDisposition.FINANCIAL_REVIEW, result.disposition)
-            assertEquals(setOf(ReviewReason.VALIDATION), (result.classification as FinancialClassification.Review).reasons)
+            assertEquals(setOf(ReviewReason.VALIDATION, ReviewReason.OWNERSHIP), (result.classification as FinancialClassification.Review).reasons)
             assertNull(result.effectiveInput)
         }
     }
