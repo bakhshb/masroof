@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="beta_entry_title">الدخول إلى البيئة التجريبية</string>
+    <string name="beta_entry_subtitle">مصروف Beta — قاعدة فارغة ومستقلة</string>
+    <string name="beta_title">مصروف Beta</string>
+    <string name="beta_badge">BETA</string>
+    <string name="beta_empty_body">بيئة تحت الاختبار. تبدأ فارغة ولا تنسخ قاعدة مصروف الأساسي ولا تفضيلاته.</string>
+    <string name="beta_evidence_count">رسائل في قاعدة التجربة: %1$d</string>
+    <string name="beta_return">العودة إلى مصروف الأساسي</string>
+    <string name="beta_reset">إعادة ضبط البيئة التجريبية</string>
+    <string name="beta_backup">نسخ البيئة التجريبية</string>
+    <string name="beta_restore">استعادة البيئة التجريبية</string>
+    <string name="beta_restore_missing">لا توجد نسخة تجريبية للاستعادة.</string>
+</resources>

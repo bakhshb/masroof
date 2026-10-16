@@ -41,6 +41,15 @@
         </activity>
 
         <!--
+            Masroof Beta is an in-app shell. No launcher, view action, or deep link.
+            Developer settings starts it with an explicit intent.
+        -->
+        <activity
+            android:name=".presentation.beta.BetaActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Masroof" />
+
+        <!--
             SMS_RECEIVED is a protected broadcast; exported=true is required for
             the platform to deliver it to this app when RECEIVE_SMS is granted.
         -->

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="beta_entry_title">Enter the beta environment</string>
+    <string name="beta_entry_subtitle">Masroof Beta — empty, separate database</string>
+    <string name="beta_title">Masroof Beta</string>
+    <string name="beta_badge">BETA</string>
+    <string name="beta_empty_body">Environment under test. It starts empty and does not copy the main Masroof database or its preferences.</string>
+    <string name="beta_evidence_count">Messages in the beta database: %1$d</string>
+    <string name="beta_return">Return to main Masroof</string>
+    <string name="beta_reset">Reset the beta environment</string>
+    <string name="beta_backup">Back up the beta environment</string>
+    <string name="beta_restore">Restore the beta environment</string>
+    <string name="beta_restore_missing">There is no beta backup to restore.</string>
+</resources>

@@ -18,6 +18,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.locale.AppLocale
@@ -25,6 +26,7 @@ import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
+import com.baraa.masroof.presentation.beta.BetaEntry
 import com.baraa.masroof.presentation.debug.DesignCatalogScreen
 import com.baraa.masroof.presentation.navigation.SettingsDestination
 import com.baraa.masroof.presentation.navigation.SettingsLaunchRequest
@@ -383,7 +385,12 @@ fun SettingsRoute(
             onBack = { popOrExit() },
         )
         SettingsDestination.DeveloperSettings -> if (com.baraa.masroof.BuildConfig.ENABLE_PARSING_LAB) {
-            SettingsDeveloperScreen(onBack = { popOrExit() }, onOpenLab = { navigateTo(SettingsDestination.ParsingLab) })
+            val betaContext = LocalContext.current
+            SettingsDeveloperScreen(
+                onBack = { popOrExit() },
+                onOpenLab = { navigateTo(SettingsDestination.ParsingLab) },
+                onOpenBeta = { BetaEntry.open(betaContext) },
+            )
         } else {
             LaunchedEffect(Unit) { popOrExit() }
         }

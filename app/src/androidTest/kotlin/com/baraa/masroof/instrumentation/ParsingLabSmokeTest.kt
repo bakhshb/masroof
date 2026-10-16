@@ -43,7 +43,11 @@ class ParsingLabSmokeTest {
                         onSaveGithubToken = {}, onClearGithubToken = {}, onSelectUpdateChannel = {},
                         onCheckForUpdates = {}, onDownloadUpdate = {}, onInstallUpdate = {}, onClearUpdateMessage = {},
                     )
-                    "developer" -> SettingsDeveloperScreen(onBack = { screen = "about" }, onOpenLab = { screen = "lab" })
+                    "developer" -> SettingsDeveloperScreen(
+                        onBack = { screen = "about" },
+                        onOpenLab = { screen = "lab" },
+                        onOpenBeta = {},
+                    )
                     else -> ParsingLabEntry(onBack = { screen = "developer" })
                 }
             }

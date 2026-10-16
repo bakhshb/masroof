@@ -14,11 +14,21 @@ import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.theme.MasroofSpacing
 
 @Composable
-fun SettingsDeveloperScreen(onBack: () -> Unit, onOpenLab: () -> Unit) {
+fun SettingsDeveloperScreen(
+    onBack: () -> Unit,
+    onOpenLab: () -> Unit,
+    onOpenBeta: () -> Unit,
+) {
     MasroofSecondaryScaffold(title = stringResource(R.string.settings_developer_title), onBack = onBack,
         backContentDescription = stringResource(R.string.settings_back)) { contentModifier ->
         Column(contentModifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
             MasroofCard {
+                MasroofReferenceNavigationRow(
+                    stringResource(R.string.beta_entry_title),
+                    stringResource(R.string.beta_entry_subtitle),
+                    MasroofIcons.settings,
+                    onOpenBeta,
+                )
                 MasroofReferenceNavigationRow(stringResource(R.string.settings_parsing_lab_title),
                     stringResource(R.string.settings_parsing_lab_hint), MasroofIcons.periodHint, onOpenLab, divider = false)
             }
