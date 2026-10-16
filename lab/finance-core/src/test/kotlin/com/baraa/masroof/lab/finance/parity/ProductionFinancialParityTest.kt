@@ -14,6 +14,7 @@ import com.baraa.masroof.lab.finance.classification.*
 import com.baraa.masroof.lab.finance.dashboard.FlowBucket
 import com.baraa.masroof.lab.finance.dashboard.SummaryMetric
 import com.baraa.masroof.lab.finance.posting.*
+import com.baraa.masroof.lab.finance.projection.*
 import com.baraa.masroof.lab.finance.value.*
 import java.math.BigDecimal
 import java.nio.file.Files
@@ -215,7 +216,7 @@ class ProductionFinancialParityTest {
         }
     }
 
-    @Test fun originalFxConversionIsExecutableButNativeCandidateGapRemainsExplicit() {
+    @Test fun originalFxConversionMatchesPersistedCandidateWithoutChangingNativeFacts() {
         // Original approved converter fixtures; no new conversion implementation in this harness.
         data class FxCase(val name: String, val amount: String, val currency: Currency, val rate: String, val fee: String?)
         val cases = listOf(FxCase("usd-purchase", "23", Currency.USD, "3.756957", "1.99"),
@@ -226,7 +227,7 @@ class ProductionFinancialParityTest {
             "Coverage inventory only; completed JUnit results determine assertion status",
             "Oracle provenance: parity/oracle-sha256.properties; original code, test-only",
             "20 cases: 11 monthly metrics per-case and aggregate; account flow buckets; stored-INCOME precedence; loan precedence; zero and negative totals",
-            "FX_AGGREGATE_PARITY: BLOCKED_NATIVE_ONLY_CANDIDATE")
+            "FX_PERSISTED_RATE_PARITY: FOUR_ORIGINAL_CONVERTER_CASES; native facts retained")
         cases.forEach { fx ->
             val refund = fx.name.contains("refund")
             val case = Case(fx.name, if (refund) FinancialType.REFUND else FinancialType.EXPENSE, fx.amount,
@@ -236,17 +237,53 @@ class ProductionFinancialParityTest {
                 BigDecimal(fx.rate), fx.fee?.let { OldMoney.of(it, OldCurrency.SAR) })!!
             val old = monthly(listOf(case), mapOf(case.name to converted))
             val new = candidate(case)
+            val projection = PersistedSarProjection.project(input(case), fx.fee?.let {
+                LinkedInternationalFee(input(case).key, input(case).revision, "event-${case.name}", Money.of(it, Currency.SAR))
+            }) as SarRowProjection.Available
             assertEquals(fx.currency, new.input.amount.currency)
             assertEquals(case.fx, new.input.appliedFx)
             assertEquals(OldCurrency.SAR, old.currency)
             assertEquals(fx.currency, new.metrics.getValue(SummaryMetric.SPENDING_NET).currency)
+            assertEquals(0, converted.amount.compareTo(projection.sarAmount.amount))
+            oldMetrics(old).forEach { (key, expected) ->
+                assertEquals("${case.name} $key", 0, expected.compareTo(projection.metrics.getValue(key).amount))
+            }
+            assertEquals(new, projection.native)
             assertEquals(0, monthly(listOf(case)).spendingGross.amount.signum())
             assertEquals(1, monthly(listOf(case)).excludedOtherCurrencyCount)
-            report += "${fx.name}: reference_sar=${if (refund) old.refunds.amount else old.spendingGross.amount}; candidate_native=${new.input.amount.amount} ${fx.currency}; BLOCKED"
+            report += "${fx.name}: reference_sar=${if (refund) old.refunds.amount else old.spendingGross.amount}; candidate_sar=${projection.sarAmount.amount}; native=${new.input.amount.amount} ${fx.currency}"
         }
-        report += "REMAINING: durable Beta ledger, correction overlays/reconciliation, full credit facility/loan/dashboard totals, FX precedence/fees and real-holdout/performance approval"
+        report += "ADDITIONAL_JUNIT: mixed native/foreign 11 monthly metrics, fees/refunds/loan/settlement; zero/negative totals; source precedence; period boundaries; missing FX unavailable"
+        report += "REMAINING: durable ledger/correction integration, actual enrichment/market/historical lookup parity, statement due/outstanding balances, full facility/loan/dashboard projections and real-holdout/performance approval"
         val output = Path.of(System.getProperty("m8.parity.report"))
         Files.createDirectories(output.parent)
         Files.writeString(output, report.joinToString("\n", postfix = "\n"))
+    }
+
+    @Test fun mixedCurrencyPeriodCrossRunsAllMonthlyMetricsIncludingFeesLoansAndCreditSettlements() {
+        val cases = fixtures().flatMap { original -> listOf(original, original.copy(
+            name = "usd-${original.name}", currency = Currency.USD,
+            fx = AppliedFx(BigDecimal("3.756957"), "SMS"))) }
+        val fees = cases.filter { it.currency != Currency.SAR }.map { case ->
+            LinkedInternationalFee(input(case).key, input(case).revision, "event-${case.name}", Money.of("1.99", Currency.SAR)) }
+        val equivalents = cases.filter { it.currency != Currency.SAR }.associate { case -> case.name to
+            ForeignPurchaseSarConverter.foreignToSar(oldTransaction(case).amount, case.fx!!.rateToSar,
+                if (case.type == FinancialType.REFUND) null else OldMoney.of("1.99", OldCurrency.SAR))!! }
+        fun verify(selected: List<Case>) {
+            val keys = selected.map { input(it).key }.toSet()
+            val actual = SarPeriodProjector.project(Environment.BETA,
+                com.baraa.masroof.lab.finance.dashboard.DisplayPeriod(time.minusSeconds(1), time.plusSeconds(1),
+                    ZoneId.of("Asia/Riyadh"), com.baraa.masroof.lab.finance.dashboard.PeriodKind.SELECTED, null),
+                selected.map(::input), fees.filter { it.key in keys })
+            assertTrue(actual.unavailable.isEmpty())
+            oldMetrics(monthly(selected, equivalents)).forEach { (metric, expected) ->
+                assertEquals("$metric ${selected.map { it.name }}", 0,
+                    expected.compareTo(actual.totals!!.getValue(metric).amount))
+            }
+        }
+        cases.forEach { verify(listOf(it)) }
+        verify(cases)
+        verify(emptyList())
+        verify(cases.filter { it.type == FinancialType.REFUND })
     }
 }
