@@ -81,7 +81,7 @@ class BetaDashboardScreenTest {
         }
         compose.waitForIdle()
     }
-    private fun route(value: String) { compose.onNodeWithTag("dash-route-$value").performScrollTo().performClick() }
+    private fun route(value: String) { compose.onNodeWithTag("dash-routes").performScrollTo(); compose.onNodeWithTag("dash-route-$value").performScrollTo().performClick() }
     private fun screenshot(name: String) {
         compose.waitForIdle()
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
@@ -98,7 +98,7 @@ class BetaDashboardScreenTest {
         val workflow = workflow()
         compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) { BetaDashboardPanel(workflow) } } }
         waitLoaded()
-        compose.onAllNodesWithText("42.35 SAR").assertCountEquals(1)
+        compose.onNode(hasText("42.35 SAR") and hasAnyAncestor(hasTestTag("dash-summary-spending"))).assertExists()
         route("ACCOUNTS")
         compose.onNodeWithTag("dash-asset-BANK_ALJAZIRA-synthetic-account").performScrollTo().performClick()
         compose.onNodeWithTag("dash-detail-back").assertExists()
@@ -144,7 +144,7 @@ class BetaDashboardScreenTest {
             LocalContext provides arabicContext, LocalConfiguration provides arabic) {
             Column(Modifier.verticalScroll(rememberScrollState())) { BetaDashboardPanel(workflow) }
         } } }
-        waitLoaded(); compose.onAllNodesWithText("42.35 SAR").assertCountEquals(1)
+        waitLoaded(); compose.onNode(hasText("42.35 SAR") and hasAnyAncestor(hasTestTag("dash-summary-spending"))).assertExists()
         fail.set(true)
         compose.onNodeWithTag("dash-month-previous").performScrollTo().performClick()
         compose.waitUntil(15000) { compose.onAllNodesWithTag("dash-error").fetchSemanticsNodes().isNotEmpty() }
@@ -154,7 +154,7 @@ class BetaDashboardScreenTest {
         compose.onNodeWithTag("dash-month").assertTextEquals("2026-09")
         compose.onAllNodesWithText("42.35 SAR").assertCountEquals(0)
         compose.onNodeWithTag("dash-month-next").performScrollTo().performClick(); waitLoaded()
-        compose.onAllNodesWithText("42.35 SAR").assertCountEquals(1)
+        compose.onNode(hasText("42.35 SAR") and hasAnyAncestor(hasTestTag("dash-summary-spending"))).assertExists()
     }
 
     @Test fun removedQualifiedSelectionDoesNotOpenSameLocalIdAtAnotherBank() = runBlocking {

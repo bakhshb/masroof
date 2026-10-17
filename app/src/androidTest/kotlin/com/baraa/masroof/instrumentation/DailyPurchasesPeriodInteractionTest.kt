@@ -203,7 +203,7 @@ class DailyPurchasesPeriodInteractionTest {
     private fun assertAverageLine(trend: DailySpendingTrend, dark: Boolean) {
         val bitmap = compose.onNodeWithTag("daily-expenses-chart").captureToImage().asAndroidBitmap()
         val density = bitmap.height / MasroofReference.chartHeight.value
-        val range = MasroofLineChart.referenceRange(trend.points.map { it.spending.amount } + trend.averageDailySpending.amount)
+        val range = com.baraa.masroof.ui.components.MasroofLineChart.referenceRange(trend.points.map { it.spending.amount } + trend.averageDailySpending.amount)
         val plotHeight = bitmap.height - (MasroofReference.chartTop.value + MasroofReference.chartBottom.value) * density
         val fraction = trend.averageDailySpending.amount.subtract(range.minimum).toFloat() / range.span.toFloat()
         val y = MasroofReference.chartTop.value * density + plotHeight * (1 - fraction)

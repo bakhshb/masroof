@@ -1,17 +1,4 @@
 package com.baraa.masroof.presentation.common
 
-enum class MasroofCardAccent {
-    None,
-    Account,
-    Credit,
-    Liability,
-    Inflow,
-    Outflow,
-}
-
-enum class MasroofMoneyRowStyle {
-    Inflow,
-    Outflow,
-    Highlight,
-    Neutral,
-}
+typealias MasroofCardAccent = com.baraa.masroof.ui.components.MasroofCardAccent
+typealias MasroofMoneyRowStyle = com.baraa.masroof.ui.components.MasroofMoneyRowStyle

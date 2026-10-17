@@ -48,7 +48,9 @@ class BetaDashboardExplorationActivityTest {
             // A dismissed dialog may leave its Android window focused after its nodes disappear.
             compose.waitUntil(15000) { var focused = false; scenario.onActivity { focused = it.window.decorView.hasWindowFocus() }; focused }
             compose.waitUntil(15000) {
-                runCatching { compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled(); true }.getOrDefault(false)
+                // The route strip scrolls horizontally inside the vertically scrolling shell.
+                // Bring its row into the viewport before scrolling to a particular chip.
+                runCatching { compose.onNodeWithTag("dash-routes").performScrollTo(); compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertIsEnabled(); true }.getOrDefault(false)
             }
             compose.onNodeWithTag(tag).performClick()
             compose.waitUntil(15000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().singleOrNull()?.config?.getOrNull(SemanticsProperties.Selected) == true }

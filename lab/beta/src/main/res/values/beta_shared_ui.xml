@@ -1,0 +1,13 @@
+<resources>
+    <string name="beta_home_remaining">صافي حركة الحسابات</string>
+    <string name="beta_home_inflow">الوارد</string>
+    <string name="beta_home_outflow">الصادر</string>
+    <string name="beta_nav_home">الرئيسية</string>
+    <string name="beta_chart_day_axis">اليوم</string>
+    <string name="beta_chart_previous_point">النقطة السابقة</string>
+    <string name="beta_chart_next_point">النقطة التالية</string>
+    <string name="beta_chart_average_announcement">المتوسط %1$s</string>
+    <string name="beta_nav_transactions">الحركات</string>
+    <string name="beta_nav_review">المراجعة</string>
+    <string name="beta_nav_settings">الإعدادات</string>
+</resources>

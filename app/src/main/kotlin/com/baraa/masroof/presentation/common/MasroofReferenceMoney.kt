@@ -10,21 +10,9 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import com.baraa.masroof.ui.theme.MasroofReference
 
-/** Typography only; no monetary parsing or arithmetic happens in the UI. */
 @Composable
 fun MasroofReferenceMoney(value: String, modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.displayMedium,
-    color: Color = MaterialTheme.colorScheme.onSurface) {
-    val display = com.baraa.masroof.application.locale.AppDigits.display(value)
-    val amount = Regex("[+-]?[0-9][0-9,.]*").find(display)
-    val annotated = buildAnnotatedString {
-        if (amount == null) append(display) else {
-            val unit = SpanStyle(fontSize = MasroofReference.unit.fontSize,
-                fontWeight = MasroofReference.unit.fontWeight)
-            withStyle(unit) { append(display.substring(0, amount.range.first)) }
-            append(amount.value)
-            withStyle(unit) { append(display.substring(amount.range.last + 1)) }
-        }
-    }
-    MasroofText(annotated, modifier, style = style, color = color)
-}
+    color: Color = MaterialTheme.colorScheme.onSurface) =
+    com.baraa.masroof.ui.components.MasroofReferenceMoney(
+        com.baraa.masroof.application.locale.AppDigits.display(value), modifier, style, color)

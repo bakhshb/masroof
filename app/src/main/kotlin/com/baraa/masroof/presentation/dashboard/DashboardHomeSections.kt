@@ -28,24 +28,14 @@ fun DashboardHeroCard(
     modifier: Modifier = Modifier,
 ) {
     val unavailable = stringResource(R.string.dashboard_value_unavailable)
-    com.baraa.masroof.presentation.common.MasroofHeroCard(
-        title = stringResource(R.string.dashboard_hero_remaining_title),
-        value = accountsFleet.totalRemaining?.let { formatLocalizedMoney(it) } ?: unavailable,
-        role = com.baraa.masroof.ui.theme.MasroofHeroRole.Brand,
-        modifier = modifier,
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(Modifier.clickable(onClick = onIncome), verticalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.heroFooterGap)) {
-                Text(stringResource(R.string.reference_inflow_short), style = MaterialTheme.typography.bodySmall)
-                Text(accountsFleet.totalInflow?.let { formatLocalizedMoney(it) } ?: unavailable, style = com.baraa.masroof.ui.theme.MasroofReference.heroFooterValue)
-            }
-            Column(Modifier.clickable(onClick = onOutflow), horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.heroFooterGap)) {
-                Text(stringResource(R.string.reference_outflow_short), style = MaterialTheme.typography.bodySmall)
-                Text(accountsFleet.totalOutflow?.let { formatLocalizedMoney(it) } ?: unavailable, style = com.baraa.masroof.ui.theme.MasroofReference.heroFooterValue)
-            }
-        }
-    }
+    val state = ProductionDashboardVisualMapper.hero(
+        stringResource(R.string.dashboard_hero_remaining_title),
+        accountsFleet.totalRemaining?.let { formatLocalizedMoney(it) } ?: unavailable,
+        stringResource(R.string.reference_inflow_short),
+        accountsFleet.totalInflow?.let { formatLocalizedMoney(it) } ?: unavailable,
+        stringResource(R.string.reference_outflow_short),
+        accountsFleet.totalOutflow?.let { formatLocalizedMoney(it) } ?: unavailable)
+    com.baraa.masroof.ui.dashboard.DashboardHomeHero(state, MasroofIcons.appLogo, onIncome, onOutflow, modifier)
 }
 
 @Composable

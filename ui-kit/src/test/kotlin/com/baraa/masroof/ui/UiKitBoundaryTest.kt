@@ -9,7 +9,7 @@ class UiKitBoundaryTest {
     @Test fun displayModuleCannotReachBusinessDataOrOtherProjects() {
         val build = File("build.gradle.kts").readText()
         assertFalse("UI kit must not depend on any application project", build.contains("project("))
-        val forbidden = Regex("com\\.baraa\\.masroof\\.(?:application|data|domain|bank|parsing|sms|lab)\\.|androidx\\.room|android\\.database")
+        val forbidden = Regex("com\\.baraa\\.masroof\\.(?:application|data|domain|bank|parsing|sms|lab|presentation|core)\\.|androidx\\.room|android\\.database")
         val sources = File("src/main/kotlin").walkTopDown().filter { it.extension == "kt" }.toList()
         assertTrue(sources.isNotEmpty())
         sources.forEach { file ->

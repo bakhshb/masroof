@@ -1,0 +1,118 @@
+{
+  "base": "5e9ec27fdc8c997c1d3a0079fdd4b2122b8d897b",
+  "milestone": "M2.UI.2/M2.UI.3",
+  "moves": [
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofOutlineIcons.kt",
+      "target": "ui-kit/src/main/kotlin/com/baraa/masroof/ui/components/MasroofOutlineIcons.kt",
+      "baseSha256": "7ffd5e5285a4480c7fe99d556af91b5162dd00ccf5d70e0b90c1970da965f458",
+      "currentSha256": "57130922a08205abdb2d0d2e832efdc00bc4832d391f731b562080dccf198d8f"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofDesignModels.kt",
+      "target": "ui-kit/src/main/kotlin/com/baraa/masroof/ui/components/MasroofDesignModels.kt",
+      "baseSha256": "798ecd9402ebfb156da8c4a57e4097574519262296717813759de96205cbf067",
+      "currentSha256": "7f3444bbe2803953d0634fe1bef42b964bdb2d64dc816112495f420858feaeb2"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofBottomNavigation.kt",
+      "target": "ui-kit/src/main/kotlin/com/baraa/masroof/ui/components/MasroofBottomNavigation.kt",
+      "baseSha256": "55b6c6dcf1875222328a86ca389f58ee1c2b61cd4fd125387886989728aca329",
+      "currentSha256": "8f210fcbe4cf7a19cb33a8026759186ca5e8cb839ff2918f05c135805dc1bcb8"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofShortcutStrip.kt",
+      "target": "ui-kit/src/main/kotlin/com/baraa/masroof/ui/components/MasroofShortcutStrip.kt",
+      "baseSha256": "6d2dd6d71b55f03bce950faa6c848bc0e5b314894640036326b051ce7268474f",
+      "currentSha256": "30efa55ea7dbeb9b444722a33cbf87711ac3b4ba04567e1957371007414e5614"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofLineChartComponents.kt",
+      "target": "ui-kit/src/main/kotlin/com/baraa/masroof/ui/components/MasroofLineChartComponents.kt",
+      "baseSha256": "4b6a5aa5895bc28b0f9592836a780b19b2863a6dd72cb81807dfa19403d3703e",
+      "currentSha256": "36268bb9f492b9b4b0f4c2931c37a54a6b5160585e3183b6c635b5cd0f9dd6cc"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofReferenceMoney.kt",
+      "target": "ui-kit/src/main/kotlin/com/baraa/masroof/ui/components/MasroofReferenceMoney.kt",
+      "baseSha256": "e9bdd6cb75edb21cda46357235f986883d3f83259dc35d6ea3d45561f8025174",
+      "currentSha256": "8eff17d043c2a4205737c1cdaec0423d5163871dd74bc0bd1bae969c74bda169"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofApprovedComponents.kt",
+      "target": "ui-kit/src/main/kotlin/com/baraa/masroof/ui/components/MasroofHeroCard.kt",
+      "baseSha256": "c8787779636b3fd11cb3fd7501dc2f7bb804a3da841f977c565e553d7182dc74",
+      "currentSha256": "ea86f93917fbd9e839650cc12d31d07122e4024dd7e08b6df2a1076417de0bd1"
+    }
+  ],
+  "protected": [
+    {
+      "path": "app/src/main/kotlin/com/baraa/masroof/application",
+      "baseTree": "ddf281e4ddec3e1cc0d1169977d21c2834b192eb",
+      "unchanged": true
+    },
+    {
+      "path": "app/src/main/kotlin/com/baraa/masroof/data",
+      "baseTree": "731842cbfc8dcf440492f7d845ddcdf5bd1c0ed3",
+      "unchanged": true
+    },
+    {
+      "path": "app/src/main/kotlin/com/baraa/masroof/bank",
+      "baseTree": "c2014036bfe2f37eb3e73b918418b6f785341373",
+      "unchanged": true
+    },
+    {
+      "path": "app/src/main/kotlin/com/baraa/masroof/parsing",
+      "baseTree": "1462e94bbc07e84a0ca9d959cda54933d90bfc82",
+      "unchanged": true
+    },
+    {
+      "path": "app/src/main/kotlin/com/baraa/masroof/sms",
+      "baseTree": "2660d6c4e1a823734c70e79d1f18f06f6bf1d744",
+      "unchanged": true
+    },
+    {
+      "path": "app/schemas",
+      "baseTree": "b37f92767e5485d851e861604e9791e59b769d3a",
+      "unchanged": true
+    },
+    {
+      "path": "app/src/test/resources",
+      "baseTree": "d4624d3450e46c211b1f50e94b6bd47b2650b003",
+      "unchanged": true
+    },
+    {
+      "path": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application",
+      "baseTree": "258e71678f7bd365f0f7ada58bf79d826263a580",
+      "unchanged": true
+    },
+    {
+      "path": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/data",
+      "baseTree": "c8dc46ab4978aa79091a60ca7508f0a37b35a19f",
+      "unchanged": true
+    },
+    {
+      "path": "lab/beta/schemas",
+      "baseTree": "9cc0b47b9c5149f14ceeb5573afca546cd75ffba",
+      "unchanged": true
+    },
+    {
+      "path": "lab/finance-core/src",
+      "baseTree": "2df8d4a37690a1c39d5ce7c1df594dce859ca838",
+      "unchanged": true
+    },
+    {
+      "path": "lab/bank-engine/src",
+      "baseTree": "a8d17dc72a5761c994e8ea71b770d20ce4972878",
+      "unchanged": true
+    },
+    {
+      "path": "lab/engine/src",
+      "baseTree": "d8f27c1ce54814ca27c63f4ac9f8a83c4895360f",
+      "unchanged": true
+    }
+  ],
+  "databaseVersion": 10,
+  "noM6": true,
+  "noUserDataReset": true
+}

@@ -74,6 +74,8 @@ class BetaActivity : ComponentActivity() {
                 var approvalOpen by rememberSaveable { mutableStateOf(false) }
                 var reviewOpen by rememberSaveable { mutableStateOf(false) }
                 var settingsOpen by rememberSaveable { mutableStateOf(false) }
+                var dashboardTab by rememberSaveable { mutableStateOf("HOME") }
+                var dashboardRequest by rememberSaveable { mutableIntStateOf(0) }
                 var historyOpen by rememberSaveable { mutableStateOf(false) }
                 var editBank by rememberSaveable { mutableStateOf<String?>(null) }
                 var editId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -124,7 +126,10 @@ class BetaActivity : ComponentActivity() {
                     )
                 } else BetaShell(
                     showMaintenanceActions = false,
-                    dashboard = { BetaDashboardPanel(dashboardWorkflow, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, onBusyChanged = { historyBusy = it }) },
+                    selectedHomeTab = dashboardTab,
+                    onOpenHome = { if (!busy && !historyBusy) { dashboardTab = "HOME"; dashboardRequest++ } },
+                    onOpenTransactions = { if (!busy && !historyBusy) { dashboardTab = "TRANSACTIONS"; dashboardRequest++ } },
+                    dashboard = { BetaDashboardPanel(dashboardWorkflow, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, requestedRoute = if (dashboardTab == "TRANSACTIONS") "TRANSACTIONS" else "OVERVIEW", routeRequest = dashboardRequest, onPrimaryTabChanged = { dashboardTab = it }, onBusyChanged = { historyBusy = it }) },
                     onOpenDiscovery = { if (!busy) { discoveryOpen = true; historyOpen = false; reviewOpen = false; approvalOpen = false; settingsOpen = false; editBank = null } },
                     onOpenHistory = { if (!busy) { historyOpen = true; discoveryOpen = false; reviewOpen = false; approvalOpen = false; settingsOpen = false; editBank = null } },
                     onOpenApproval = { if (!busy) { approvalOpen = true; historyOpen = false; reviewOpen = false; discoveryOpen = false; settingsOpen = false; editBank = null } },

@@ -25,18 +25,26 @@ import java.time.YearMonth
 @Composable
 fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     controls: BetaDashboardControls = UnavailableBetaDashboardControls,
-    preferences: BetaDashboardViewPreferencesWorkflow? = null, onBusyChanged: (Boolean) -> Unit = {}) {
+    preferences: BetaDashboardViewPreferencesWorkflow? = null, requestedRoute: String? = null, routeRequest: Int = 0, onPrimaryTabChanged: (String) -> Unit = {}, onBusyChanged: (Boolean) -> Unit = {}) {
     var controlsBusy by remember { mutableStateOf(false) }
     val interactive = enabled && !controlsBusy
     var selectedTransaction by rememberSaveable { mutableStateOf<String?>(null) }
     var monthText by rememberSaveable { mutableStateOf(workflow.currentMonth().toString()) }
-    var route by rememberSaveable { mutableStateOf("OVERVIEW") }
+    var route by rememberSaveable { mutableStateOf(requestedRoute ?: "OVERVIEW") }
+    var lastRouteRequest by rememberSaveable { mutableIntStateOf(routeRequest) }
     var selectedBank by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var retry by remember { mutableIntStateOf(0) }
     var result by remember { mutableStateOf<DashboardProduction?>(null) }
     var loading by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(route) { onPrimaryTabChanged(if (route == "TRANSACTIONS") "TRANSACTIONS" else "HOME") }
+    LaunchedEffect(routeRequest) {
+        if (lastRouteRequest != routeRequest && requestedRoute != null) {
+            route = requestedRoute; selectedId = null; selectedBank = null; selectedTransaction = null
+            lastRouteRequest = routeRequest
+        }
+    }
     val month = YearMonth.parse(monthText)
     var visibleRows by rememberSaveable(route, monthText) { mutableIntStateOf(20) }
     LaunchedEffect(workflow, monthText, retry) {
@@ -63,7 +71,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
             TextButton(enabled = interactive && !loading, onClick = { monthText = month.plusMonths(1).toString() }, modifier = Modifier.testTag("dash-month-next")) { Text(stringResource(R.string.beta_dash_next)) }
         }
         if (selectedId == null && selectedTransaction == null) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(BetaSpacing.section)) {
+            Row(Modifier.testTag("dash-routes").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(BetaSpacing.section)) {
                 dashboardRoutes.forEach { (key, label) ->
                     FilterChip(selected = route == key, enabled = interactive, onClick = { route = key },
                         label = { Text(stringResource(label)) }, modifier = Modifier.testTag("dash-route-$key"))
@@ -121,8 +129,19 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
                     selected?.let { BetaDashboardTransactions(snapshot, BetaDashboardExplorer.transactions(snapshot, asset = it), interactive, { key -> selectedTransaction = key.transactionId }, complete = DashboardSection.CURRENT_LEDGER !in read.unavailableSections && DashboardSection.RUNTIME_SOURCE !in read.unavailableSections) }
                 } else when (route) {
                     "OVERVIEW" -> {
-                        DashCard(stringResource(R.string.beta_dash_summary), hero = true) {
-                            DashValue(R.string.beta_dash_spending, amount(read.financialSummary?.metrics?.get(SummaryMetric.SPENDING_NET)))
+                        com.baraa.masroof.ui.dashboard.DashboardHomeHero(
+                            BetaDashboardVisualMapper.hero(read, stringResource(R.string.beta_home_remaining),
+                                stringResource(R.string.beta_home_inflow), stringResource(R.string.beta_home_outflow),
+                                stringResource(R.string.beta_dash_unavailable), androidx.compose.ui.platform.LocalConfiguration.current.locales[0].toLanguageTag()),
+                            com.baraa.masroof.ui.components.MasroofOutlineIcons.Wallet,
+                            onIncome = { route = "ACCOUNTS" }, onOutflow = { route = "ACCOUNTS" }, enabled = interactive)
+                        com.baraa.masroof.ui.components.MasroofShortcutStrip(listOf(
+                            com.baraa.masroof.ui.components.MasroofShortcutItem(stringResource(R.string.beta_dash_accounts), com.baraa.masroof.ui.components.MasroofOutlineIcons.Landmark, com.baraa.masroof.ui.components.MasroofCardAccent.Account) { route = "ACCOUNTS" },
+                            com.baraa.masroof.ui.components.MasroofShortcutItem(stringResource(R.string.beta_dash_cards), com.baraa.masroof.ui.components.MasroofOutlineIcons.CreditCard, com.baraa.masroof.ui.components.MasroofCardAccent.Credit) { route = "CARDS" },
+                            com.baraa.masroof.ui.components.MasroofShortcutItem(stringResource(R.string.beta_dash_loans), com.baraa.masroof.ui.components.MasroofOutlineIcons.HandCoins, com.baraa.masroof.ui.components.MasroofCardAccent.Liability) { route = "LOANS" },
+                            com.baraa.masroof.ui.components.MasroofShortcutItem(stringResource(R.string.beta_dash_commitments), com.baraa.masroof.ui.components.MasroofOutlineIcons.CalendarCheck, com.baraa.masroof.ui.components.MasroofCardAccent.Liability) { route = "COMMITMENTS" }), enabled = interactive)
+                        DashCard(stringResource(R.string.beta_dash_summary)) {
+                            DashValue(R.string.beta_dash_spending, amount(read.financialSummary?.metrics?.get(SummaryMetric.SPENDING_NET)), Modifier.testTag("dash-summary-spending"))
                             DashValue(R.string.beta_dash_income, amount(read.financialSummary?.metrics?.get(SummaryMetric.INCOME)))
                             DashValue(R.string.beta_dash_net, amount(read.financialSummary?.metrics?.get(SummaryMetric.NET_CASH_FLOW)))
                         }
@@ -214,26 +233,17 @@ private val dashboardRoutes = listOf("OVERVIEW" to R.string.beta_dash_summary, "
     "CARDS" to R.string.beta_dash_cards, "LOANS" to R.string.beta_dash_loans, "COMMITMENTS" to R.string.beta_dash_commitments,
     "ANALYSIS" to R.string.beta_dash_analysis, "TRANSACTIONS" to R.string.beta_transaction_title, "CONFIGURATION" to R.string.beta_controls_title)
 
-@Composable private fun DashCard(title: String, hero: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    if (!hero) {
-        com.baraa.masroof.ui.components.MasroofCard {
-            Column(verticalArrangement = Arrangement.spacedBy(BetaSpacing.section)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                content()
-            }
-        }
-        return
-    }
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-        Column(Modifier.padding(BetaSpacing.screen), verticalArrangement = Arrangement.spacedBy(BetaSpacing.section)) {
-            Text(title, style = if (hero) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium)
+@Composable private fun DashCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    com.baraa.masroof.ui.components.MasroofCard {
+        Column(verticalArrangement = Arrangement.spacedBy(BetaSpacing.section)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
             content()
         }
     }
 }
-@Composable private fun DashValue(label: Int, value: String) {
+@Composable private fun DashValue(label: Int, value: String, modifier: Modifier = Modifier) {
     // Stacked text also fits split-screen and large font without clipped currency values.
-    Column { Text(stringResource(label), style = MaterialTheme.typography.labelLarge); Text(value, style = MaterialTheme.typography.titleLarge) }
+    Column(modifier) { Text(stringResource(label), style = MaterialTheme.typography.labelLarge); Text(value, style = MaterialTheme.typography.titleLarge) }
 }
 @Composable private fun amount(value: SignedAmount?): String = value?.let { "${it.amount.toPlainString()} ${it.currency.name}" } ?: stringResource(R.string.beta_dash_unavailable)
 @Composable private fun amount(value: Money?): String = value?.let { "${it.amount.toPlainString()} ${it.currency.name}" } ?: stringResource(R.string.beta_dash_unavailable)

@@ -36,29 +36,15 @@ fun MasroofHeroCard(
     guidance: String? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
-    val (background, foreground) = approvedHeroColors(role)
-    Surface(modifier.fillMaxWidth(), shape = MasroofCardShape, color = background, contentColor = foreground) {
-        Column(Modifier.padding(MasroofReference.heroPadding)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
-                MasroofGuidanceLabel(title, guidance, Modifier.weight(1f), style = MasroofReference.pair, contentColor = foreground)
-                Icon(if (role == MasroofHeroRole.Card) MasroofIcons.cardPayment else MasroofIcons.appLogo,
-                    null, Modifier.size(MasroofReference.icon), tint = foreground)
-            }
-            Spacer(Modifier.height(MasroofSpacing.carouselGap))
-            MasroofReferenceMoney(value, style = MaterialTheme.typography.displayMedium, color = foreground)
-            subtitle?.takeIf { it.isNotBlank() }?.let {
-                Spacer(Modifier.height(MasroofSpacing.inlineGap))
-                Text(it, style = MaterialTheme.typography.labelSmall, color = foreground)
-            }
-            if (footer != null) {
-                Spacer(Modifier.height(MasroofSpacing.cardInnerPadding))
-                HorizontalDivider(color = foreground.copy(alpha = MasroofOpacity.divider))
-                Spacer(Modifier.height(MasroofReference.shortcutVertical))
-                footer()
-            }
-        }
-    }
+    com.baraa.masroof.ui.components.MasroofHeroCard(
+        title = com.baraa.masroof.application.locale.AppDigits.display(title),
+        value = com.baraa.masroof.application.locale.AppDigits.display(value),
+        subtitle = subtitle?.let(com.baraa.masroof.application.locale.AppDigits::display),
+        role = role, modifier = modifier,
+        icon = if (role == MasroofHeroRole.Card) MasroofIcons.cardPayment else MasroofIcons.appLogo,
+        titleContent = { titleModifier, foreground ->
+            MasroofGuidanceLabel(title, guidance, titleModifier, style = MasroofReference.pair, contentColor = foreground)
+        }, footer = footer)
 }
 
 @Composable

@@ -68,6 +68,21 @@ internal fun BetaDashboardAnalysisPanel(snapshot: DashboardSnapshot, enabled: Bo
         else {
             Text(stringResource(R.string.beta_dash_average)); Text(dashboardAmount(selectedTrend.averageDailySpending), modifier = Modifier.testTag("chart-average"))
             Text(stringResource(R.string.beta_chart_signed_help), style = MaterialTheme.typography.bodySmall)
+            if (!bars) {
+                val visual = BetaDashboardVisualMapper.trend(selectedTrend)
+                if (visual == null) Text(stringResource(R.string.beta_dash_unavailable_help), modifier = Modifier.testTag("chart-line-unavailable"))
+                else com.baraa.masroof.ui.components.MasroofInteractiveLineChart(
+                    values = visual.values, referenceValue = visual.average ?: java.math.BigDecimal.ZERO,
+                    labels = com.baraa.masroof.ui.components.LineChartLabels(stringResource(R.string.beta_chart_day_axis),
+                        stringResource(R.string.beta_chart_previous_point), stringResource(R.string.beta_chart_next_point),
+                        stringResource(R.string.beta_chart_average_announcement, dashboardAmount(selectedTrend.averageDailySpending))),
+                    modifier = Modifier.testTag("beta-shared-line-chart"),
+                    selectedPointIndex = visual.dates.indexOf(selectedDay).takeIf { it >= 0 } ?: 0,
+                    onPointSelected = { index -> if (enabled) selectedDay = visual.dates[index] },
+                    pointLabel = { index -> visual.dates[index] + " " + visual.values[index].toPlainString() + " " + visual.currency },
+                    axisLabel = { index -> visual.dates[index].substringAfterLast('-') },
+                    currencyLabel = visual.currency, showAverage = visual.average != null)
+            }
             BetaDashboardExplorer.bars(selectedTrend).forEach { point ->
                 Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(BetaSpacing.section)) {
                     Text(point.day.date.toString()); Text(dashboardAmount(point.day.net))
