@@ -1,8 +1,6 @@
 package com.baraa.masroof.lab.beta.data
 
 import androidx.room.*
-import com.baraa.masroof.lab.beta.application.interpretation.LegacyInterpretationAdapter
-import com.baraa.masroof.lab.bank.InterpretationVersion
 import com.baraa.masroof.lab.finance.asset.*
 import com.baraa.masroof.lab.finance.classification.*
 import com.baraa.masroof.lab.finance.posting.*
@@ -46,18 +44,15 @@ internal fun dashboardRegistryBinding(assets: Collection<OwnedAsset>): String {
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
-/** Write side only: candidate archives and review acknowledgement never supply authority. */
+/** Write side only: the same explicit archive reading as financial adoption. Acknowledgement is not authority. */
 internal class RoomBetaDashboardAuxFacts(private val database: BetaDatabase) {
     suspend fun refresh(id: String): Boolean {
         check(database.inTransaction())
         val outcome = database.evidenceDao().outcome(id) ?: return false
         if (database.evidenceDao().retry(id) != null) return false
-        val json = try { JSONObject(outcome.baselineJson) } catch (_: org.json.JSONException) { return false }
+        val json = try { BetaFinancialArchive.json(outcome) } catch (_: Exception) { return false }
         val route = try { JSONObject(outcome.route) } catch (_: org.json.JSONException) { return false }
-        if (json.optInt("archiveVersion") != 1 || json.optInt("contractVersion") != InterpretationVersion.CURRENT_CONTRACT ||
-            json.optString("engineVersion") != LegacyInterpretationAdapter.VERSION.engine ||
-            json.optString("rulesVersion") != LegacyInterpretationAdapter.VERSION.rules ||
-            json.optString("evidenceId") != id || json.optString("bank") != "BANK_ALJAZIRA" ||
+        if (json.optString("evidenceId") != id || json.optString("bank") != "BANK_ALJAZIRA" ||
             route.optString("kind") != "MATCHED") return false
         val candidates = route.optJSONArray("candidates") ?: return false
         if (candidates.length() != 1 || candidates.optString(0) != json.getString("bank")) return false
@@ -66,7 +61,7 @@ internal class RoomBetaDashboardAuxFacts(private val database: BetaDatabase) {
         val diagnostics = json.optJSONArray("diagnostics") ?: return false
         if ((0 until diagnostics.length()).any { diagnostics.getJSONObject(it).let { d ->
             d.getString("severity") == "ERROR" || d.getString("code").contains("CONFLICT") } }) return false
-        val f = json.optJSONObject("facts") ?: return false
+        val f = try { BetaFinancialArchive.facts(database, outcome) } catch (_: Exception) { return false }
         fun text(name: String): String? = if (f.isNull(name)) null else f.getString(name)
         fun money(name: String): Money? = if (f.isNull(name)) null else f.getJSONObject(name).let {
             Money.of(it.getString("amount"), Currency.valueOf(it.getString("currency"))) }
@@ -80,7 +75,7 @@ internal class RoomBetaDashboardAuxFacts(private val database: BetaDatabase) {
         if (!informational) {
             if (json.optString("status") != "SUCCESS" || family != "FINANCING_INSTALLMENT") return false
             val adopted = database.financialAdoptionDao().evidence(id) ?: return false
-            if (adopted.status != "ACTIVE" || adopted.archiveFingerprint != RoomBetaFinancialAdoption.fingerprint(outcome)) return false
+            if (adopted.status != "ACTIVE" || adopted.archiveFingerprint != BetaFinancialArchive.fingerprint(database, outcome)) return false
             val key = RoomBetaFinancialAdoption.key(id)
             val correction = readBetaCorrectionState(database, key)
             if (correction != null && correction.activity != com.baraa.masroof.lab.beta.application.corrections.BetaLedgerActivity.ACTIVE) return false
@@ -132,7 +127,7 @@ internal class RoomBetaDashboardAuxFacts(private val database: BetaDatabase) {
         val dueDate = text("paymentDueDate")?.let { raw ->
             try { LocalDate.parse(raw).toString() } catch (_: java.time.format.DateTimeParseException) { return false }
         }
-        database.dashboardAuxFactsDao().put(BetaDashboardAuxFactsEntity(id, bank, RoomBetaFinancialAdoption.fingerprint(outcome),
+        database.dashboardAuxFactsDao().put(BetaDashboardAuxFactsEntity(id, bank, BetaFinancialArchive.fingerprint(database, outcome),
             outcome.attempts, outcome.updatedAt, informational, dashboardRegistryBinding(registry.values), boundInput, timestamp?.toString(),
             balanceAsset?.id?.localId, balance?.amount?.toPlainString(), balance?.currency?.name,
             facility?.id?.localId, due?.amount?.toPlainString(), due?.currency?.name, dueDate,

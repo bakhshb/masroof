@@ -34,7 +34,7 @@ class RoomBetaDashboardFacts(private val database: BetaDatabase) {
         val adopted = database.financialAdoptionDao().evidence(id) ?: return auxiliary
         if (adopted.status != "ACTIVE" || database.evidenceDao().retry(id) != null) return false
         val outcome = database.evidenceDao().outcome(id) ?: return false
-        if (adopted.archiveFingerprint != RoomBetaFinancialAdoption.fingerprint(outcome)) return false
+        if (adopted.archiveFingerprint != BetaFinancialArchive.fingerprint(database, outcome)) return false
         val key = RoomBetaFinancialAdoption.key(id)
         val correction = readBetaCorrectionState(database, key)
         if (correction != null && correction.activity != BetaLedgerActivity.ACTIVE) return false
@@ -44,7 +44,7 @@ class RoomBetaDashboardFacts(private val database: BetaDatabase) {
         val baseline = RoomBetaFinancialAdoption(database).observation(key)?.input ?: return false
         val registry = BetaAssetRegistry(database).all().associateBy { it.id }
         if (financialRegistryDependencies(input).any { input.assets[it] != registry[it] }) return false
-        val facts = JSONObject(outcome.baselineJson).getJSONObject("facts")
+        val facts = BetaFinancialArchive.facts(database, outcome)
         fun text(name: String): String? = if (facts.isNull(name)) null else facts.getString(name)
         fun money(name: String): Money? = if (facts.isNull(name)) null else facts.getJSONObject(name).let {
             Money.of(it.getString("amount"), Currency.valueOf(it.getString("currency"))) }

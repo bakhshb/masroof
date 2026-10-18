@@ -6,7 +6,8 @@ import com.baraa.masroof.lab.finance.posting.*
 import com.baraa.masroof.lab.finance.value.Environment
 
 /** Explicit financial approval, separate from comparison acknowledgement. No parser success is
- * asserted by this request. Amount and time always come from the exact durable baseline archive. */
+ * asserted by this request. Amount and time come from the current bank-engine archive, or from a
+ * preserved historical baseline when that is the only completed archive. */
 data class BetaFinancialApproval(
     val evidenceId: String,
     val archiveRevision: String,
