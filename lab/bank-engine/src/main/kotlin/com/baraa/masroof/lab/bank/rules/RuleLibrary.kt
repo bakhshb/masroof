@@ -14,7 +14,7 @@ object RuleLibrary {
     ))
 
     /** One interpreter, versioned literal profiles. Bank aliases remain caller-owned identity data. */
-    fun current(): BankRuleSchema = initial().let { previous -> previous.copy(revision = 6,
+    fun current(): BankRuleSchema = initial().let { previous -> previous.copy(revision = 7,
         network = NetworkRules(sourceBankLabels = listOf("source bank", "from bank", "بنك المرسل", "البنك المرسل"),
             destinationBankLabels = listOf("destination bank", "to bank", "بنك المستفيد"),
             networkLabels = listOf("bank network", "network", "شبكة الحوالة")),
@@ -31,7 +31,7 @@ object RuleLibrary {
             MessageFamily.FEE -> listOf("رسوم خدمة")
             else -> emptyList()
         }, detailLabels = mapOf(
-            "dueAmount" to listOf("المبلغ المستحق", "اجمالي المبلغ المستحق", "المبلغ المتبقي", "outstanding balance", "due amount"),
+            "dueAmount" to listOf("المبلغ المستحق", "اجمالي المبلغ المستحق", "اجمالي المستحق", "المبلغ المتبقي", "outstanding balance", "due amount"),
             "foreignAmount" to listOf("المبلغ الاجنبي", "foreign amount"),
             "counterparty" to listOf("جهة التمويل", "counterparty") + when(rule.family) {
                 MessageFamily.FINANCING_INSTALLMENT -> listOf("لـ")
@@ -55,6 +55,7 @@ object RuleLibrary {
             ExtractionField.DESTINATION_ACCOUNT to listOf("الى حساب", "to account", "اودعت الى حساب", "deposited to account") + if(rule.family in setOf(MessageFamily.TRANSFER_IN, MessageFamily.TRANSFER_OUT)) listOf("الى", "المعرف البديل \\الايبان") else emptyList(),
         ),
             observations = buildMap {
+                if(rule.family in setOf(MessageFamily.PURCHASE,MessageFamily.REFUND)) put("fee.sar_unlabeled",listOf("رسوم العمليات الدولية"))
                 if (rule.family in setOf(MessageFamily.PURCHASE, MessageFamily.REFUND, MessageFamily.CARD_PAYMENT, MessageFamily.BALANCE_NOTICE, MessageFamily.NON_FINANCIAL)) {
                     put("card.credit", listOf("credit", "credit card", "ائتمانية"))
                     put("card.debit", listOf("debit", "debit card", "مدى"))

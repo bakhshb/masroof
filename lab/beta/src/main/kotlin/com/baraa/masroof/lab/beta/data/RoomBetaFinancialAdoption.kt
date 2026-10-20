@@ -260,11 +260,18 @@ class RoomBetaFinancialAdoption(private val database: BetaDatabase) {
         }
     }
 
-    suspend fun approve(request: BetaFinancialApproval): BetaFinancialAdoptionResult {
+    suspend fun approve(request: BetaFinancialApproval, restoreIgnored: Boolean = false): BetaFinancialAdoptionResult {
         // Commit explicit intent before financial derivation. Process death/SQL failure can retry
         // the same bound request, never infer approval from comparison or a background parser.
         database.withTransaction {
             requireNotNull(database.evidenceDao().raw(request.evidenceId))
+            if(restoreIgnored) {
+                check(database.correctionDao().evidenceOwner("BETA",request.evidenceId)==null)
+                val previous=requireNotNull(database.evidenceDao().decision(request.evidenceId))
+                check(previous.decision in setOf(EvidenceReviewDecision.USER_NON_FINANCIAL.name,EvidenceReviewDecision.RESTORE_AUTOMATIC.name))
+                database.evidenceDao().decision(previous.copy(revision=previous.revision+1,
+                    decision=EvidenceReviewDecision.RESTORE_AUTOMATIC.name,updatedAt=Instant.now().toString()))
+            }
             database.ownershipDao().clearExclusion(request.evidenceId)
             dao.retry(BetaFinancialApprovalRetryEntity(request.evidenceId, encodeRequest(request)))
         }

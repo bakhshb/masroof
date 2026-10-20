@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+  <string name="beta_review_parity_external_in">Incoming external transfer (not income)</string>
+  <string name="beta_review_parity_external_out">Outgoing external transfer</string>
+  <string name="beta_review_parity_counterparty">Counterparty: %1$s</string>
+  <string name="beta_review_parity_merchant">Merchant: %1$s</string>
+  <string name="beta_review_parity_ignore">Ignore (not a financial transaction)</string>
+  <string name="beta_review_parity_reason_fee">The international fee has no valid currency for this template.</string>
+  <string name="beta_review_parity_reason_bank">The counterparty bank could not be established from its name in the message.</string>
+  <string name="beta_review_parity_reason_network">The message contains conflicting transfer bank or direction information.</string>
+  <string name="beta_review_parity_reason_ownership">Confirm ownership of the account or card referenced by this message once.</string>
+  <string name="beta_review_parity_reason_card">Complete the card type and account link once to process its messages automatically.</string>
+  <string name="beta_review_parity_type_expense">Expense</string>
+  <string name="beta_review_parity_type_income">Income</string>
+  <string name="beta_review_parity_type_credit_card_payment">Card payment</string>
+  <string name="beta_review_parity_type_refund">Refund</string>
+  <string name="beta_review_parity_type_cash_withdrawal">Cash withdrawal</string>
+  <string name="beta_review_parity_type_bill_payment">Bill payment</string>
+  <string name="beta_review_parity_type_fee">Fee</string>
+  <string name="beta_review_parity_type_loan_repayment">Loan repayment</string>
+  <string name="beta_review_parity_restore_title">Restore and classify</string>
+  <string name="beta_review_parity_restore_hint">You can restore this message as a financial transaction, or choose a different classification.</string>
+  <string name="beta_review_parity_restore">Restore as-is</string>
+  <string name="beta_review_parity_ignored_at">Ignored on: %1$s</string>
+  <string name="beta_review_parity_kind">Needs classification</string>
+  <string name="beta_review_parity_ignored">Ignored</string>
+  <string name="beta_review_parity_actions">Choose transaction type</string>
+  <string name="beta_review_parity_owner_title">Unregistered card</string>
+  <string name="beta_review_parity_owner_body">This transaction is linked to new card ...%1$s. Confirm it is yours or choose Do not track.</string>
+  <string name="beta_review_parity_owner_warning">Unregistered card</string>
+  <string name="beta_review_parity_my_card">My card</string>
+  <string name="beta_review_parity_not_mine">Do not track</string>
+  <string name="beta_review_parity_restore_as">Restore as %1$s</string>
+</resources>

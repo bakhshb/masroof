@@ -17,7 +17,7 @@
     <string name="beta_home_move_down">نقل %1$s للأسفل</string>
     <string name="beta_detail_data">البيانات المالية</string>
     <string name="beta_detail_account">الحساب المرتبط</string>
-    <string name="beta_detail_shared_due">المستحق مشترك على التسهيل الائتماني</string>
+    <string name="beta_detail_shared_due">المبلغ المستحق مشترك بين البطاقة الأساسية والإضافية</string>
     <string name="beta_asset_last4">آخر أربعة أرقام</string>
     <string name="beta_dash_as_of_label">تاريخ الرصد</string>
     <string name="beta_dash_due_date">تاريخ الاستحقاق</string>

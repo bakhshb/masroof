@@ -12,15 +12,15 @@ data class BetaInboxRow(val id: String, val sender: String, val receivedAt: Inst
 data class BetaInboxPage(val rows: List<BetaInboxRow>, val next: String?, val processing: Int)
 
 class BetaReviewInboxWorkflow(private val database: BetaDatabase) {
-    suspend fun resolveNonFinancial(id: String, restore: Boolean) = database.withTransaction {
+    suspend fun resolveNonFinancial(id: String, restore: Boolean, type: com.baraa.masroof.lab.finance.posting.FinancialType? = null) = database.withTransaction {
         val dao=database.evidenceDao()
         requireNotNull(dao.raw(id))
         val owner=database.correctionDao().evidenceOwner("BETA",id)
         if(restore && owner!=null && database.correctionDao().current("BETA",owner)?.activity=="SUPPRESSED") {
             val workflow=com.baraa.masroof.lab.beta.application.corrections.BetaReviewWorkflow(database)
             val detail=requireNotNull(workflow.detail(com.baraa.masroof.lab.finance.posting.PostingKey(com.baraa.masroof.lab.finance.value.Environment.BETA,owner)))
-            val type=detail.current?.overlay?.let {com.baraa.masroof.lab.finance.corrections.CorrectionSnapshots.export(it).financial}?.storedType ?: detail.observation.input.storedType
-            val result=workflow.save(detail.token,java.util.UUID.randomUUID().toString(),com.baraa.masroof.lab.finance.corrections.FinancialDecision.ResolveFinancialType(type))
+            val restoredType=type ?: detail.current?.overlay?.let {com.baraa.masroof.lab.finance.corrections.CorrectionSnapshots.export(it).financial}?.storedType ?: detail.observation.input.storedType
+            val result=workflow.save(detail.token,java.util.UUID.randomUUID().toString(),com.baraa.masroof.lab.finance.corrections.FinancialDecision.ResolveFinancialType(restoredType))
             check(result is com.baraa.masroof.lab.beta.application.corrections.BetaCorrectionResult.Applied && result.current.activity==com.baraa.masroof.lab.beta.application.corrections.BetaLedgerActivity.ACTIVE)
             return@withTransaction
         }
@@ -30,6 +30,10 @@ class BetaReviewInboxWorkflow(private val database: BetaDatabase) {
             (if(restore) EvidenceReviewDecision.RESTORE_AUTOMATIC else EvidenceReviewDecision.USER_NON_FINANCIAL).name,
             Instant.now().toString()))
     }
+
+    /** Persist restoration and explicit approval together before the independently retryable post. */
+    suspend fun restoreFinancial(request: BetaFinancialApproval): BetaFinancialAdoptionResult =
+        RoomBetaFinancialAdoption(database).approve(request,restoreIgnored=true)
 
     suspend fun page(after: String = "", ignored: Boolean = false): BetaInboxPage = database.withTransaction {
         val dao=database.evidenceDao()

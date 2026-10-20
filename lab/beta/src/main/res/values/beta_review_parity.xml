@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+  <string name="beta_review_parity_external_in">تحويل وارد خارجي (ليس دخلًا)</string>
+  <string name="beta_review_parity_external_out">تحويل صادر خارجي</string>
+  <string name="beta_review_parity_counterparty">الطرف الآخر: %1$s</string>
+  <string name="beta_review_parity_merchant">التاجر: %1$s</string>
+  <string name="beta_review_parity_ignore">تجاهل (ليس حركة مالية)</string>
+  <string name="beta_review_parity_reason_fee">رسوم العمليات الدولية لا تتضمن عملة صالحة. تعذر اعتماد الرسوم من هذا القالب.</string>
+  <string name="beta_review_parity_reason_bank">تعذر تحديد بنك الطرف الآخر من الاسم المكتوب في الرسالة.</string>
+  <string name="beta_review_parity_reason_network">توجد إشارات متعارضة إلى بنك أو اتجاه الحوالة.</string>
+  <string name="beta_review_parity_reason_ownership">أكد ملكية الحساب أو البطاقة المرتبطة بهذه الرسالة مرة واحدة.</string>
+  <string name="beta_review_parity_reason_card">أكمل نوع البطاقة وربطها مرة واحدة، ثم تعالج رسائلها تلقائيًا.</string>
+  <string name="beta_review_parity_type_expense">مصروف</string>
+  <string name="beta_review_parity_type_income">دخل</string>
+  <string name="beta_review_parity_type_credit_card_payment">سداد البطاقة الائتمانية</string>
+  <string name="beta_review_parity_type_refund">استرداد</string>
+  <string name="beta_review_parity_type_cash_withdrawal">سحب نقدي</string>
+  <string name="beta_review_parity_type_bill_payment">سداد الفاتورة</string>
+  <string name="beta_review_parity_type_fee">رسوم</string>
+  <string name="beta_review_parity_type_loan_repayment">قسط تمويل</string>
+  <string name="beta_review_parity_restore_title">استعادة وتصنيف</string>
+  <string name="beta_review_parity_restore_hint">يمكنك استعادة هذه الرسالة وإنشاء معاملة مالية منها، أو اختيار نوع مختلف للتصنيف.</string>
+  <string name="beta_review_parity_restore">استعادة كما هي</string>
+  <string name="beta_review_parity_ignored_at">تاريخ التجاهل: %1$s</string>
+  <string name="beta_review_parity_kind">يحتاج تصنيف</string>
+  <string name="beta_review_parity_ignored">تم التجاهل</string>
+  <string name="beta_review_parity_actions">اختر نوع الحركة</string>
+  <string name="beta_review_parity_owner_title">بطاقة غير مسجلة</string>
+  <string name="beta_review_parity_owner_body">هذه الحركة مرتبطة ببطاقة جديدة ···%1$s. أكّد أنها بطاقتك أو اختر «لا أتابعها».</string>
+  <string name="beta_review_parity_owner_warning">بطاقة غير مسجلة</string>
+  <string name="beta_review_parity_my_card">بطاقتي</string>
+  <string name="beta_review_parity_not_mine">لا أتابعها</string>
+  <string name="beta_review_parity_restore_as">استعادة كـ %1$s</string>
+</resources>

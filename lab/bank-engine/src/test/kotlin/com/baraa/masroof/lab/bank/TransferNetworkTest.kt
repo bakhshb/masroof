@@ -18,6 +18,22 @@ class TransferNetworkTest {
     private fun input(body: String) = MessageInput("transfer-fixture", "SyntheticSender", body, Instant.parse("2026-10-18T10:00:00Z"))
     private fun parse(body: String, config: BankRuleSchema = schema) = RuleInterpreter(config).interpret(input(body), catalog)
 
+    @Test fun explicitUnknownExternalBankDoesNotInventBankIdentityOrOwnership() {
+        val config=schema.copy(network=schema.network.copy(standaloneDestinationBrackets=true,unidentifiedExternalBankMarkers=listOf("bank","بنك")))
+        val body=outgoing.replace("Outgoing transfer","Outgoing transfer\n[Future Bank]")
+        val r=parse(body,config)
+        assertEquals(ParseStatus.SUCCESS,r.status)
+        assertEquals(BankNetwork.INTER_BANK,r.facts.bankNetwork)
+        assertEquals(local,r.facts.sourceAccount!!.bank)
+        assertNull(r.facts.destinationAccount!!.bank)
+        for(bad in listOf(body.replace("Future Bank","Bank"),body.replace("Future Bank","Unknown"),body.replace("Future Bank","Local Bank / Future Bank"),"$body\nDestination bank: Other Bank",body.replace("Outgoing transfer","Outgoing inter-bank transfer\nBank network: intra_bank"),"$outgoing\n[Future Bank]")) {
+            assertEquals(ParseStatus.REVIEW_REQUIRED,parse(bad,config).status)
+        }
+        val collision=config.copy(network=config.network.copy(bankAliases=config.network.bankAliases+mapOf("SECOND" to listOf("Future Bank"),"THIRD" to listOf("Future Bank"))))
+        assertEquals(ParseStatus.REVIEW_REQUIRED,parse(body,collision).status)
+        assertEquals(ParseStatus.REVIEW_REQUIRED,parse("$outgoing\nSource bank: Future Bank\nDestination bank: Remote Bank",config).status)
+    }
+
     @Test fun outgoingAndIncomingBindBankIdentityToTheCorrectAccountRole() {
         val out = parse("$outgoing\nDestination bank: Remote Bank")
         assertEquals(ParseStatus.SUCCESS, out.status); assertEquals(BankNetwork.INTER_BANK, out.facts.bankNetwork)

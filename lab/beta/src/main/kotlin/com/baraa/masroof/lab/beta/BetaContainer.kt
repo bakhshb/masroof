@@ -394,10 +394,16 @@ class BetaContainer(
         }
     }
 
-    fun resolveReviewAsNonFinancial(id: String, restore: Boolean = false) = lock.withLock {
+    fun resolveReviewAsNonFinancial(id: String, restore: Boolean = false, type: com.baraa.masroof.lab.finance.posting.FinancialType? = null) = lock.withLock {
         check(!closed)
-        runBlocking {com.baraa.masroof.lab.beta.application.evidence.BetaReviewInboxWorkflow(database).resolveNonFinancial(id,restore)}
+        runBlocking {com.baraa.masroof.lab.beta.application.evidence.BetaReviewInboxWorkflow(database).resolveNonFinancial(id,restore,type)}
         invalidateAutomaticProcessing()
+    }
+
+    fun restoreReviewAsFinancial(request: com.baraa.masroof.lab.beta.application.evidence.BetaFinancialApproval) = lock.withLock {
+        check(!closed)
+        invalidateAutomaticProcessing()
+        runBlocking {com.baraa.masroof.lab.beta.application.evidence.BetaReviewInboxWorkflow(database).restoreFinancial(request)}
     }
 
     fun reviewInboxPage(after: String = "", ignored: Boolean = false) = lock.withLock {

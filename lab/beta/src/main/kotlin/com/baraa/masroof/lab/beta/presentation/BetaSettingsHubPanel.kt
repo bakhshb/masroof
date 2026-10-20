@@ -97,7 +97,7 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
             val kinds = when (category) {
                 "ACCOUNTS" -> setOf(AssetKind.ACCOUNT)
                 "LOANS" -> setOf(AssetKind.LOAN)
-                else -> setOf(AssetKind.CREDIT_CARD, AssetKind.DEBIT_CARD, AssetKind.CREDIT_FACILITY)
+                else -> setOf(AssetKind.CREDIT_CARD, AssetKind.DEBIT_CARD)
             }
             banks.forEach { bank ->
                 MasroofCard {

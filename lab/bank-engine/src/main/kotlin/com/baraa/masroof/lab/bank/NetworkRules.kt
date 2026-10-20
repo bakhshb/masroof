@@ -8,12 +8,13 @@ data class NetworkRules(
     val standaloneDestinationBrackets: Boolean = false,
     val networkLabels: List<String> = emptyList(),
     val standaloneSourceBrackets: Boolean = false,
+    val unidentifiedExternalBankMarkers: List<String> = emptyList(),
 ) {
     fun validate() {
         require(bankAliases.size <= 100)
         require(bankAliases.keys.all { it.matches(Regex("[A-Za-z0-9_-]{1,64}")) })
         require(bankAliases.values.all { it.isNotEmpty() })
-        (bankAliases.values + listOf(sourceBankLabels, destinationBankLabels, networkLabels)).forEach { terms ->
+        (bankAliases.values + listOf(sourceBankLabels, destinationBankLabels, networkLabels, unidentifiedExternalBankMarkers)).forEach { terms ->
             require(terms.size <= 20 && terms.all { it.any(Char::isLetterOrDigit) && it.length <= 100 && '\n' !in it && '\r' !in it })
         }
     }

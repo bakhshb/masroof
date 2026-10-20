@@ -10,7 +10,7 @@
     <string name="beta_dash_incomplete">بعض البيانات لم تكتمل بعد. القيمة غير المتاحة تختلف عن الصفر.</string>
     <string name="beta_dash_balance">رصيد الحسابات</string>
     <string name="beta_dash_salary_spending">إنفاق فترة الراتب</string>
-    <string name="beta_dash_due">المستحق على التسهيل</string>
+    <string name="beta_dash_due">المبلغ المستحق</string>
     <string name="beta_dash_statement_spending">إنفاق فترة الكشف</string>
     <string name="beta_dash_available">المتاح في البطاقة</string>
     <string name="beta_dash_calendar_spending">إنفاق الشهر التقويمي</string>
@@ -56,7 +56,7 @@
     <string name="beta_detail_account_movements">حركات الحساب</string>
     <string name="beta_detail_card_movements">حركات البطاقة</string>
     <string name="beta_detail_loan_movements">حركات التمويل</string>
-    <string name="beta_detail_facility_members">بطاقات التسهيل</string>
+    <string name="beta_detail_facility_members">البطاقات المرتبطة</string>
     <string name="beta_detail_observed_balance">الرصيد المرصود</string>
     <string name="beta_detail_balance_date">تاريخ الرصيد</string>
     <string name="beta_detail_inflow_group">الوارد من خارج حساباتي</string>
@@ -65,7 +65,7 @@
     <string name="beta_detail_internal_help">هذه التحويلات تدخل في صافي حركة الحساب، وتبقى منفصلة عن الوارد والصادر الخارجي.</string>
     <string name="beta_detail_daily">الإنفاق اليومي</string>
     <string name="beta_detail_card_data">بيانات البطاقة</string>
-    <string name="beta_detail_due_once">المستحق يظهر مرة واحدة على التسهيل، ولا يُنسخ كمبلغ خاص بهذه البطاقة.</string>
+    <string name="beta_detail_due_once">المبلغ المستحق مشترك بين البطاقة الأساسية والإضافية ويُحتسب مرة واحدة.</string>
     <string name="beta_detail_primary">بطاقة ائتمانية أساسية</string>
     <string name="beta_detail_supplementary">بطاقة ائتمانية إضافية</string>
     <string name="beta_detail_credit_type">بطاقة ائتمانية</string>

@@ -9,7 +9,7 @@
     <string name="beta_controls_salary">يوم بداية فترة الراتب</string>
     <string name="beta_controls_statement">يوم إغلاق فترة الكشف</string>
     <string name="beta_controls_unset">غير محدد</string>
-    <string name="beta_controls_facility_number">تسهيل ائتماني %1$d</string>
+    <string name="beta_controls_facility_number">مجموعة بطاقات %1$d</string>
     <string name="beta_controls_recurring">الالتزامات المتكررة</string>
     <string name="beta_controls_due_day">اليوم (1–31)</string>
     <string name="beta_controls_no_end">مستمر</string>

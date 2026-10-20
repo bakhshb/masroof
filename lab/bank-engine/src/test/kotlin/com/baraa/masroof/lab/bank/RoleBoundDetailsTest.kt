@@ -20,6 +20,20 @@ class RoleBoundDetailsTest {
     private fun input(body: String) = MessageInput("role-fixture", "SyntheticBank", body, Instant.parse("2026-10-17T10:00:00Z"))
     private fun parse(body: String, schema: BankRuleSchema = RuleLibrary.current()) = RuleInterpreter(schema).interpret(input(body), catalog)
 
+    @Test fun configuredBareSarFeesAreRoleBoundAndNeverBorrowPrincipalCurrency() {
+        val bare="$purchase\nرسوم العمليات الدولية: 1.40"
+        val r=parse(bare)
+        assertEquals(ParseStatus.SUCCESS,r.status)
+        assertEquals("SAR",r.facts.internationalFee!!.currency.name)
+        assertEquals("USD",r.facts.amount!!.currency.name)
+        assertEquals("1.40",r.facts.internationalFee!!.amount.toPlainString())
+        val noDefault=RuleLibrary.current().let {it.copy(rules=it.rules.map {rule ->rule.copy(observations=rule.observations-"fee.sar_unlabeled")})}
+        assertEquals(ParseStatus.REVIEW_REQUIRED,parse(bare,noDefault).status)
+        for(value in listOf("-1.40","1.4001","1.40 USD SAR","1.40 junk")) assertEquals(ParseStatus.REVIEW_REQUIRED,parse("$purchase\nرسوم العمليات الدولية: $value").status)
+        assertEquals(ParseStatus.REVIEW_REQUIRED,parse("$purchase\nInternational fee: 1.40").status)
+        assertEquals(ParseStatus.REVIEW_REQUIRED,parse("$bare\nرسوم العمليات الدولية: 2.00").status)
+    }
+
     @Test fun secondaryCurrenciesAndExplicitRateNeverConvertOrReplacePrincipal() {
         val body = "$purchase\nDue amount: SAR 900\nForeign amount: USD 23\nInternational fee: SAR 1.99\nExchange rate: 3.756957"
         val r = parse(body)

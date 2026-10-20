@@ -15,7 +15,7 @@ class BetaInterpretationService(private val candidate: BankInterpreter) {
 
         /** Bank identities are configuration, not a second parser or inferred ownership. */
         fun currentSchema() = com.baraa.masroof.lab.bank.rules.RuleLibrary.current().let { schema ->
-            schema.copy(network = schema.network.copy(standaloneDestinationBrackets = true, standaloneSourceBrackets = true, bankAliases = mapOf(
+            schema.copy(network = schema.network.copy(standaloneDestinationBrackets = true, standaloneSourceBrackets = true, unidentifiedExternalBankMarkers=listOf("بنك","bank"), bankAliases = mapOf(
                 "BANK_ALJAZIRA" to listOf("AlJazira", "Bank AlJazira", "AlJazira Bank", "بنك الجزيرة", "بنك الجزيره"),
                 "BANK_D360" to listOf("بنك دال ثلاثمائة وستون", "D360 Bank", "D360 بنك"),
                 "BANK_RIYAD" to listOf("بنك الرياض", "Riyad Bank"),

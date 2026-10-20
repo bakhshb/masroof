@@ -10,7 +10,7 @@
     <string name="beta_dash_incomplete">Some information is incomplete. Unavailable values are different from zero.</string>
     <string name="beta_dash_balance">Account balance</string>
     <string name="beta_dash_salary_spending">Salary-period spending</string>
-    <string name="beta_dash_due">Facility due</string>
+    <string name="beta_dash_due">Amount due</string>
     <string name="beta_dash_statement_spending">Statement-period spending</string>
     <string name="beta_dash_available">Card available balance</string>
     <string name="beta_dash_calendar_spending">Calendar-month spending</string>
@@ -56,7 +56,7 @@
     <string name="beta_detail_account_movements">Account movements</string>
     <string name="beta_detail_card_movements">Card movements</string>
     <string name="beta_detail_loan_movements">Loan movements</string>
-    <string name="beta_detail_facility_members">Facility cards</string>
+    <string name="beta_detail_facility_members">Linked cards</string>
     <string name="beta_detail_observed_balance">Observed balance</string>
     <string name="beta_detail_balance_date">Balance date</string>
     <string name="beta_detail_inflow_group">Inflow from outside my accounts</string>
@@ -65,7 +65,7 @@
     <string name="beta_detail_internal_help">These transfers are included in net account movement and stay separate from external inflow and outflow.</string>
     <string name="beta_detail_daily">Daily spending</string>
     <string name="beta_detail_card_data">Card details</string>
-    <string name="beta_detail_due_once">Statement due is shown once on the facility and is not copied as this card’s own amount.</string>
+    <string name="beta_detail_due_once">The amount due is shared by the primary and supplementary cards and counted once.</string>
     <string name="beta_detail_primary">Primary credit card</string>
     <string name="beta_detail_supplementary">Supplementary credit card</string>
     <string name="beta_detail_credit_type">Credit card</string>

@@ -19,7 +19,7 @@ import com.baraa.masroof.ui.theme.*
 
 @Composable
 internal fun BetaReviewResolutionActions(detail: BetaReviewDetail,busy: Boolean,
-    onApprove: (BetaFinancialApproval)->Unit,onRetryPending: ()->Unit,onCancelPending: ()->Unit) {
+    onApprove: (BetaFinancialApproval)->Unit,onRetryPending: ()->Unit,onCancelPending: ()->Unit,restore: Boolean = false) {
     val preview=detail.preview ?: return
     if(preview.pending!=null) {
         MasroofCard {Text(stringResource(R.string.beta_fix_saved_decision));Text(stringResource(financialTypeLabel(preview.pending.type)))}
@@ -37,12 +37,18 @@ internal fun BetaReviewResolutionActions(detail: BetaReviewDetail,busy: Boolean,
     var selector by remember {mutableStateOf<String?>(null)}
     var draftChoice by remember {mutableStateOf<String?>(null)}
     fun request(type: String)=betaApprovalDraft(preview,type,source,destination,detail.income?.name)
-    if(detail.actions.isNotEmpty()) DashboardSectionHeading(stringResource(R.string.beta_complete_review_actions),MasroofOutlineIcons.ShieldCheck)
+    if(detail.actions.isNotEmpty() && !restore) DashboardSectionHeading(stringResource(R.string.beta_review_parity_actions),MasroofOutlineIcons.ShieldCheck)
     detail.actions.forEach {type ->
-        OutlinedButton(enabled=!busy,onClick={val ready=request(type.name);if(ready!=null) onApprove(ready) else selectedType=type.name},
+        Button(enabled=!busy,onClick={val ready=request(type.name)
+            if(ready!=null && type==detail.suggestedType) onApprove(ready) else {
+                selectedType=type.name
+                val incomingChoice=type in setOf(FinancialType.INCOME,FinancialType.REFUND,FinancialType.EXTERNAL_TRANSFER_IN)
+                source=if(incomingChoice) "external" else choice(detail.source)
+                destination=if(incomingChoice || type in setOf(FinancialType.LOAN_REPAYMENT,FinancialType.CREDIT_CARD_PAYMENT)) null else "external"
+            }},shape=MaterialTheme.shapes.medium,
             modifier=Modifier.fillMaxWidth().testTag("review-resolve-${type.name}")) {
-            Icon(reviewTypeIcon(type),null,Modifier.size(MasroofIconSizes.sm));Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
-            Text(stringResource(R.string.beta_complete_review_as,stringResource(financialTypeLabel(type))))
+            Icon(reviewTypeIcon(type),null,Modifier.size(MasroofIconSizes.moneyRowLeading));Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
+            Text(if(restore) stringResource(R.string.beta_review_parity_restore_as,stringResource(financialTypeLabel(type))) else stringResource(when(type) {FinancialType.EXTERNAL_TRANSFER_IN->R.string.beta_review_parity_external_in;FinancialType.EXTERNAL_TRANSFER_OUT->R.string.beta_review_parity_external_out;else->reviewFinancialTypeActionLabel(type)}))
         }
     }
     if(selectedType!=null) MasroofCard {
@@ -70,7 +76,7 @@ internal fun BetaReviewResolutionActions(detail: BetaReviewDetail,busy: Boolean,
             !sourceField && type==FinancialType.LOAN_REPAYMENT -> setOf(com.baraa.masroof.lab.finance.asset.AssetKind.LOAN)
             !sourceField && type==FinancialType.CREDIT_CARD_PAYMENT -> setOf(com.baraa.masroof.lab.finance.asset.AssetKind.CREDIT_CARD)
             (!sourceField && !incomingType) -> emptySet()
-            type in setOf(FinancialType.LOAN_REPAYMENT,FinancialType.CREDIT_CARD_PAYMENT,FinancialType.INCOME,FinancialType.EXTERNAL_TRANSFER_IN,FinancialType.EXTERNAL_TRANSFER_OUT) -> setOf(com.baraa.masroof.lab.finance.asset.AssetKind.ACCOUNT)
+            type in setOf(FinancialType.LOAN_REPAYMENT,FinancialType.CREDIT_CARD_PAYMENT,FinancialType.INCOME,FinancialType.EXTERNAL_TRANSFER_IN,FinancialType.EXTERNAL_TRANSFER_OUT,FinancialType.CASH_WITHDRAWAL) -> setOf(com.baraa.masroof.lab.finance.asset.AssetKind.ACCOUNT)
             else -> setOf(com.baraa.masroof.lab.finance.asset.AssetKind.ACCOUNT,com.baraa.masroof.lab.finance.asset.AssetKind.CREDIT_CARD)
         }
         val choices=(if(externalAllowed) listOf("external") else emptyList())+preview.assets.filter {it.kind in kinds}.map {betaAssetChoiceKey(it.id)}
@@ -88,7 +94,7 @@ private fun reviewAssetLabel(asset: OwnedAsset,detail: BetaReviewDetail): String
 @Composable
 internal fun BetaReviewMeta(icon: ImageVector,label: String) {
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
-        Icon(icon,null,Modifier.size(MasroofIconSizes.sm),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(icon,null,Modifier.size(MasroofIconSizes.moneyRowLeading),tint=MaterialTheme.colorScheme.onSurfaceVariant)
         Text(label,style=MaterialTheme.typography.bodyMedium)
     }
 }
@@ -100,13 +106,26 @@ internal fun reviewFamilyLabel(family: String?): Int = when(family) {
     "FEE" -> financialTypeLabel(FinancialType.FEE); else -> R.string.beta_review_required
 }
 internal fun reviewFamilyIcon(family: String?): ImageVector = when(family) {
-    "FINANCING_INSTALLMENT" -> MasroofOutlineIcons.HandCoins; "CARD_PAYMENT","PURCHASE","REFUND" -> MasroofOutlineIcons.CreditCard
-    "TRANSFER_IN" -> MasroofOutlineIcons.ArrowDownLeft; "TRANSFER_OUT" -> MasroofOutlineIcons.ArrowUpRight
-    "BILL_PAYMENT" -> MasroofOutlineIcons.Receipt; else -> MasroofOutlineIcons.MessageSquare
+    "PURCHASE" -> MasroofOutlineIcons.ShoppingCart
+    "TRANSFER_IN" -> MasroofOutlineIcons.ArrowDownLeft
+    "TRANSFER_OUT" -> MasroofOutlineIcons.ArrowUpRight
+    "BILL_PAYMENT","CARD_PAYMENT" -> MasroofOutlineIcons.CreditCard
+    "REFUND" -> MasroofOutlineIcons.Undo2
+    "WITHDRAWAL" -> MasroofOutlineIcons.Banknote
+    "FEE" -> MasroofOutlineIcons.List
+    else -> MasroofOutlineIcons.Info
 }
 internal fun reviewTypeIcon(type: FinancialType): ImageVector = when(type) {
-    FinancialType.LOAN_REPAYMENT -> MasroofOutlineIcons.HandCoins; FinancialType.INCOME,FinancialType.EXTERNAL_TRANSFER_IN -> MasroofOutlineIcons.ArrowDownLeft
-    FinancialType.EXTERNAL_TRANSFER_OUT -> MasroofOutlineIcons.ArrowUpRight; else -> MasroofOutlineIcons.Receipt
+    FinancialType.EXPENSE -> MasroofOutlineIcons.ShoppingBag
+    FinancialType.INCOME -> MasroofOutlineIcons.TrendingUp
+    FinancialType.EXTERNAL_TRANSFER_IN -> MasroofOutlineIcons.ArrowDownLeft
+    FinancialType.EXTERNAL_TRANSFER_OUT -> MasroofOutlineIcons.ArrowUpRight
+    FinancialType.CREDIT_CARD_PAYMENT -> MasroofOutlineIcons.CreditCard
+    FinancialType.REFUND -> MasroofOutlineIcons.RotateCcw
+    FinancialType.CASH_WITHDRAWAL -> MasroofOutlineIcons.Banknote
+    FinancialType.BILL_PAYMENT -> MasroofOutlineIcons.ReceiptText
+    FinancialType.LOAN_REPAYMENT -> MasroofOutlineIcons.Landmark
+    else -> MasroofOutlineIcons.Receipt
 }
 internal fun reviewReasonLabel(detail: BetaReviewDetail): Int = when {
     detail.row.reason=="CONFIRM_LOAN" -> R.string.beta_complete_review_loan_reason
@@ -116,3 +135,80 @@ internal fun reviewReasonLabel(detail: BetaReviewDetail): Int = when {
     detail.row.reason==null || detail.row.family=="UNKNOWN" -> R.string.beta_complete_review_unknown_reason
     else -> approvalReason(detail.row.reason)
 }
+
+/** Same primary icon-action geometry as production IconTextButton. */
+@Composable
+internal fun BetaReviewActionButton(label: String,icon: ImageVector,enabled: Boolean,tag: String,onClick: ()->Unit) {
+    Button(onClick=onClick,enabled=enabled,modifier=Modifier.fillMaxWidth().testTag(tag),shape=MaterialTheme.shapes.medium) {
+        Icon(icon,null,Modifier.size(MasroofIconSizes.moneyRowLeading))
+        Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
+        Text(label)
+    }
+}
+internal fun reviewReasonLabels(detail: BetaReviewDetail): List<Int> {
+    val codes=detail.reasons.map {it.uppercase()}.toSet()
+    val labels=buildList {
+        if(codes.any {it.contains("INTERNATIONALFEE")}) add(R.string.beta_review_parity_reason_fee)
+        if("NETWORK_ALIAS_NOT_UNIQUE" in codes) add(R.string.beta_review_parity_reason_bank)
+        else if(codes.any {it.startsWith("NETWORK_") || it=="UNBOUND_BANK_BRACKET"}) add(R.string.beta_review_parity_reason_network)
+        if(detail.row.reason=="CONFIRM_OWNERSHIP") add(R.string.beta_review_parity_reason_ownership)
+        if(detail.row.reason in setOf("CONFIRM_CARD","CONFIGURE_CARD","LINK_DEBIT_ACCOUNT")) add(R.string.beta_review_parity_reason_card)
+    }
+    return labels.ifEmpty {listOf(reviewReasonLabel(detail))}.distinct()
+}
+
+internal fun reviewFinancialTypeActionLabel(type: FinancialType): Int = when(type) {
+    FinancialType.EXPENSE->R.string.beta_review_parity_type_expense
+    FinancialType.INCOME->R.string.beta_review_parity_type_income
+    FinancialType.CREDIT_CARD_PAYMENT->R.string.beta_review_parity_type_credit_card_payment
+    FinancialType.REFUND->R.string.beta_review_parity_type_refund
+    FinancialType.CASH_WITHDRAWAL->R.string.beta_review_parity_type_cash_withdrawal
+    FinancialType.BILL_PAYMENT->R.string.beta_review_parity_type_bill_payment
+    FinancialType.FEE->R.string.beta_review_parity_type_fee
+    FinancialType.LOAN_REPAYMENT->R.string.beta_review_parity_type_loan_repayment
+    else->financialTypeLabel(type)
+}
+
+/** Review uses the production inline prompt; setup retains its discovery cards. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun BetaReviewOwnershipPrompt(candidate: com.baraa.masroof.lab.beta.application.BetaOwnershipCandidate,
+    busy: Boolean, onDecide: (Boolean?, com.baraa.masroof.lab.finance.asset.AssetId?)->Unit, onConfigure: ()->Unit) {
+    val ref=candidate.reference
+    val card=ref.kind==com.baraa.masroof.lab.beta.application.BetaOwnershipKind.CARD
+    val tag="ownership-${ref.bank.value}-${ref.kind}-${ref.suffix}"
+    var selected by remember(candidate.token) {mutableStateOf(candidate.asset?.id)}
+    DashboardSectionHeading(stringResource(if(card) R.string.beta_review_parity_owner_title else R.string.beta_complete_review_owner),MasroofOutlineIcons.ShieldCheck)
+    Text(stringResource(if(card) R.string.beta_review_parity_owner_body else R.string.beta_ownership_account_suffix,ref.suffix))
+    Column(Modifier.fillMaxWidth().testTag(tag),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
+        Row(verticalAlignment=Alignment.CenterVertically) {
+            Icon(MasroofOutlineIcons.TriangleAlert,null,Modifier.size(MasroofIconSizes.sm),tint=MaterialTheme.colorScheme.error)
+            Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
+            Text(stringResource(if(card) R.string.beta_review_parity_owner_warning else R.string.beta_review_parity_reason_ownership),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.error)
+        }
+        if(candidate.conflictingKinds) Text(stringResource(R.string.beta_ownership_kind_conflict),color=MaterialTheme.colorScheme.error)
+        if(candidate.choices.size>1) {
+            Text(stringResource(R.string.beta_ownership_collision))
+            candidate.choices.forEachIndexed {index,asset ->
+                BetaChoice(selected==asset.id,{selected=asset.id},Modifier.testTag("$tag-choice-$index"),enabled=!busy) {
+                    Text(stringResource(R.string.beta_asset_summary,stringResource(assetKindLabel(asset.kind)),asset.last4.orEmpty(),index+1))
+                }
+            }
+        }
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
+            Button(onClick={onDecide(true,selected)},enabled=!busy && !candidate.conflictingKinds && (candidate.choices.size<=1 || selected!=null),shape=MaterialTheme.shapes.medium,modifier=Modifier.testTag("$tag-owned")) {
+                Icon(MasroofOutlineIcons.CircleCheck,null,Modifier.size(MasroofIconSizes.moneyRowLeading));Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
+                Text(stringResource(if(card) R.string.beta_review_parity_my_card else R.string.beta_ownership_my_account))
+            }
+            Button(onClick={onDecide(false,null)},enabled=!busy,shape=MaterialTheme.shapes.medium,modifier=Modifier.testTag("$tag-external")) {
+                Icon(MasroofOutlineIcons.TriangleAlert,null,Modifier.size(MasroofIconSizes.moneyRowLeading));Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
+                Text(stringResource(R.string.beta_review_parity_not_mine))
+            }
+        }
+        if(candidate.status==com.baraa.masroof.lab.beta.application.BetaOwnershipStatus.OWNED && card &&
+            (candidate.asset?.parentId==null || (candidate.asset.kind==com.baraa.masroof.lab.finance.asset.AssetKind.CREDIT_CARD && candidate.asset.creditCardRole==null)))
+            BetaReviewActionButton(stringResource(R.string.beta_ownership_configure_card),MasroofOutlineIcons.CreditCard,!busy,"$tag-configure",onConfigure)
+    }
+}
+
+internal val betaReviewFinancialTypes=listOf(FinancialType.EXPENSE,FinancialType.INCOME,FinancialType.CREDIT_CARD_PAYMENT,FinancialType.REFUND,FinancialType.CASH_WITHDRAWAL,FinancialType.BILL_PAYMENT,FinancialType.FEE,FinancialType.LOAN_REPAYMENT)

@@ -19,6 +19,6 @@
   <string name="beta_ownership_configure_card">تحديد نوع البطاقة وربطها</string>
 <string name="beta_ownership_status_review">الملكية: تحتاج مراجعة</string>
 <string name="beta_ownership_defer">حسم التعارض لاحقًا</string>
-<string name="beta_ownership_new_facility">إنشاء مجموعة ائتمانية مستقلة لهذه البطاقة الأساسية</string>
+<string name="beta_ownership_new_facility">هذه بطاقة أساسية مستقلة</string>
 <string name="beta_ownership_configuration_required">حدد نوع البطاقة واربطها لاحقًا من بطاقاتي. يمكنك إنهاء الإعداد الآن؛ تبقى العمليات المتأثرة في المراجعة.</string>
 </resources>

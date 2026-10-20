@@ -9,7 +9,7 @@
     <string name="beta_controls_salary">Salary period start day</string>
     <string name="beta_controls_statement">Statement closing day</string>
     <string name="beta_controls_unset">Not configured</string>
-    <string name="beta_controls_facility_number">Credit facility %1$d</string>
+    <string name="beta_controls_facility_number">Card group %1$d</string>
     <string name="beta_controls_recurring">Recurring commitments</string>
     <string name="beta_controls_due_day">Day (1–31)</string>
     <string name="beta_controls_no_end">Ongoing</string>

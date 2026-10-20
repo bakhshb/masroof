@@ -20,6 +20,7 @@ internal class DetailExtractor(
     private val evidence: MutableList<Evidence>,
     private val problem: (String, Blocker) -> Unit,
     knownLabels: List<String> = emptyList(),
+    private val implicitSarFeeLabels: List<String> = emptyList(),
 ) {
     private val reserved = mutableListOf<IntRange>()
     private val reader = RoleLineReader(source, configured + mapOf("internationalFee" to FEE_LABELS, "exchangeRate" to RATE_LABELS), evidence, knownLabels)
@@ -34,8 +35,12 @@ internal class DetailExtractor(
         return if (values.any { it == null }) null else known.singleOrNull()
     }
 
-    private fun money(field: String): Money? =
-        one(field, entries(field, reserve = true).map { MoneyGrammar.parse(it.normalized) })
+    private fun money(field: String): Money? {
+        val sarRanges=if(field=="internationalFee") RoleLineReader(source,mapOf(field to implicitSarFeeLabels),mutableListOf()).read(field).map {it.range}.toSet() else emptySet()
+        return one(field, entries(field, reserve = true).map { row ->
+            MoneyGrammar.parse(row.normalized) ?: if(row.range in sarRanges) MoneyGrammar.parse("sar "+row.normalized) else null
+        })
+    }
 
     private fun text(field: String, identifier: Boolean = false): String? =
         one(field, entries(field).filter { entry ->

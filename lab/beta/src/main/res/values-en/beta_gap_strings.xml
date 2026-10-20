@@ -17,7 +17,7 @@
     <string name="beta_home_move_down">Move %1$s down</string>
     <string name="beta_detail_data">Financial details</string>
     <string name="beta_detail_account">Linked account</string>
-    <string name="beta_detail_shared_due">Statement due is shared by the credit facility</string>
+    <string name="beta_detail_shared_due">The amount due is shared by the primary and supplementary cards</string>
     <string name="beta_asset_last4">Last four digits</string>
     <string name="beta_dash_as_of_label">Observed on</string>
     <string name="beta_dash_due_date">Due date</string>

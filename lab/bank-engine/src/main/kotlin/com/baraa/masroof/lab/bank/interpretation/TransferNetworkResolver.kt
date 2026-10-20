@@ -27,12 +27,20 @@ internal class TransferNetworkResolver(
         val transfer = family in setOf(MessageFamily.TRANSFER_IN, MessageFamily.TRANSFER_OUT)
         val reader = RoleLineReader(source, mapOf("sourceBank" to rules.sourceBankLabels,
             "destinationBank" to rules.destinationBankLabels, "bankNetwork" to rules.networkLabels), evidence)
-        fun bank(rows: List<RoleLine>): BankId? {
+        var unidentifiedExternal=false
+        fun bank(rows: List<RoleLine>,externalRole: Boolean): BankId? {
+            val unknownNames=mutableSetOf<String>()
             val ids = rows.map { row ->
                 val candidates = owners[key(row.normalized)].orEmpty()
-                if (candidates.size != 1) { fail("NETWORK_ALIAS_NOT_UNIQUE"); null } else candidates.single()
+                if(candidates.size==1) candidates.single()
+                else if(candidates.isEmpty() && externalRole && rules.unidentifiedExternalBankMarkers.any {source.phrase(it).containsMatchIn(row.normalized) && source.phrase(it).replace(row.normalized, "").any(Char::isLetter)} &&
+                    owners.keys.none {SourceText(row.normalized).phrase(it).containsMatchIn(row.normalized)}) {
+                    unidentifiedExternal=true
+                    unknownNames+=key(row.normalized)
+                    null // External bank identity remains unknown. Never bind its suffix to a local owned asset.
+                } else {fail("NETWORK_ALIAS_NOT_UNIQUE");null}
             }.filterNotNull().distinct()
-            if (ids.size > 1) fail("NETWORK_ROLE_CONFLICT")
+            if (ids.size > 1 || unknownNames.size>1 || (unknownNames.isNotEmpty() && ids.isNotEmpty())) fail("NETWORK_ROLE_CONFLICT")
             return ids.singleOrNull()
         }
         val sourceRows = reader.read("sourceBank").toMutableList()
@@ -58,9 +66,10 @@ internal class TransferNetworkResolver(
                 offset += line.length + 1
             }
         }
-        val sourceBank = bank(sourceRows)
-        val destinationBank = bank(destinationRows)
+        val sourceBank = bank(sourceRows,family==MessageFamily.TRANSFER_IN)
+        val destinationBank = bank(destinationRows,family==MessageFamily.TRANSFER_OUT)
         val networks = linkedSetOf<BankNetwork>()
+        if(unidentifiedExternal) networks+=BankNetwork.INTER_BANK
         if (transfer) {
             val title = source.text.lineSequence().firstOrNull { it.any(Char::isLetterOrDigit) }.orEmpty()
             listOf("network.intra" to BankNetwork.INTRA_BANK, "network.inter" to BankNetwork.INTER_BANK).forEach { (key, kind) ->

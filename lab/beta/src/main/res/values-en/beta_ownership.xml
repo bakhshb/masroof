@@ -19,6 +19,6 @@
   <string name="beta_ownership_configure_card">Configure card type and link</string>
 <string name="beta_ownership_status_review">Ownership: needs review</string>
 <string name="beta_ownership_defer">Review conflict later</string>
-<string name="beta_ownership_new_facility">Create a separate credit facility for this primary card</string>
+<string name="beta_ownership_new_facility">This is a separate primary card</string>
 <string name="beta_ownership_configuration_required">You can finish setup now. Configure missing card details later in My cards; affected transactions remain in review.</string>
 </resources>
