@@ -75,11 +75,17 @@ class RoomBetaDashboardSource(
             fun moneyTime(column: String)="($column >= $from AND $column < $until)"
             val rawMoney="SELECT r.id FROM beta_raw_evidence r LEFT JOIN beta_parsed_event p ON p.rawId=r.id WHERE "+moneyTime("COALESCE(p.occurredAtEpochMillis,r.receivedAtEpochMillis)")
             fun latest(prefix: String,asset: String): String = "SELECT p.rawId FROM beta_parsed_event p JOIN (SELECT ${prefix}_bankId AS bank,${prefix}_${asset} AS asset,MAX(${prefix}_epochMillis) AS at FROM beta_parsed_event WHERE ${prefix}_present=1 AND ${prefix}_${asset} IS NOT NULL AND ${prefix}_epochMillis <= $cutoff GROUP BY ${prefix}_bankId,${prefix}_${asset}) last ON p.${prefix}_bankId=last.bank AND p.${prefix}_${asset}=last.asset AND p.${prefix}_epochMillis=last.at WHERE p.${prefix}_present=1"
-            val factScope="SELECT rawId FROM beta_parsed_event WHERE f_present=1 AND "+moneyTime("f_epochMillis")+" UNION "+latest("f","balanceAsset")
+            // Explicit bounded foreign-definition sources may predate the display windows.
+            // They supply valuation facts only and are removed from the financial rows below.
+            val commitmentSources="SELECT sourceTransactionId FROM beta_commitment WHERE amountCurrency!='SAR' AND sourceTransactionId IS NOT NULL"
+            val commitmentEvidence="SELECT evidenceId FROM beta_financial_transaction_raw_sms_link WHERE environment='BETA' AND transactionId IN ($commitmentSources)"
+            val monetaryFactScope="SELECT rawId FROM beta_parsed_event WHERE f_present=1 AND "+moneyTime("f_epochMillis")+" UNION "+latest("f","balanceAsset")
+            val factScope="$monetaryFactScope UNION SELECT rawId FROM beta_parsed_event WHERE f_present=1 AND f_transactionId IN ($commitmentSources)"
             val auxScope="SELECT rawId FROM beta_parsed_event WHERE a_present=1 AND (rawId IN ($rawMoney) OR "+moneyTime("a_epochMillis")+") UNION "+latest("a","balanceAsset")+" UNION "+latest("a","facilityAsset")+" UNION "+latest("a","loanAsset")
-            val relevantEvidence="$rawMoney UNION $factScope UNION $auxScope"
+            val relevantEvidence="$rawMoney UNION $factScope UNION $auxScope UNION $commitmentEvidence"
             val moneyLedger="SELECT transactionId FROM beta_financial_transaction WHERE environment='BETA' AND ("+moneyTime("occurredAtEpochMillis")+" OR (financialType='CREDIT_CARD_PAYMENT' AND occurredAtEpochMillis < ${paymentCutoff.toEpochMilli()}))"
-            val relevantLedger="$moneyLedger UNION SELECT f_transactionId FROM beta_parsed_event WHERE rawId IN ($factScope) AND f_transactionId IS NOT NULL"
+            val monetaryLedger="$moneyLedger UNION SELECT f_transactionId FROM beta_parsed_event WHERE rawId IN ($monetaryFactScope) AND f_transactionId IS NOT NULL"
+            val relevantLedger="$monetaryLedger UNION $commitmentSources"
             val heldInMoney=linkedSetOf<String>()
 
             val capabilities = database.query(SimpleSQLiteQuery(
@@ -253,6 +259,8 @@ class RoomBetaDashboardSource(
                 }
             }
             val rows = mutableListOf<DashboardLedgerRow>()
+            val valuationSources=mutableListOf<DashboardLedgerRow>()
+            val foreignSourceIds=configuration?.draft?.commitments.orEmpty().filter {it.amount.currency!=Currency.SAR}.mapNotNull {it.sourceTransactionId}.toSet()
             val postingFacts = mutableListOf<DashboardPostingFacts>()
             val fees = mutableListOf<LinkedInternationalFee>()
             val knownFees = mutableSetOf<PostingKey>()
@@ -262,7 +270,8 @@ class RoomBetaDashboardSource(
             var completeMerchantFacts = hasFacts
             database.query(SimpleSQLiteQuery(
                 "SELECT l.transactionId,l.correction,l.interpretation,l.payload," +
-                    "c.correction,c.interpretation,c.transition,c.activity,c.payload,l.occurredAtEpochMillis " +
+                    "c.correction,c.interpretation,c.transition,c.activity,c.payload,l.occurredAtEpochMillis," +
+                    "CASE WHEN l.transactionId IN ($monetaryLedger) THEN 1 ELSE 0 END AS moneyRelevant " +
                     "FROM beta_financial_transaction l LEFT JOIN beta_correction_current c " +
                     "ON c.environment=l.environment AND c.transactionId=l.transactionId " +
                     "WHERE l.environment=? AND l.transactionId IN ($relevantLedger) ORDER BY l.transactionId LIMIT ?",
@@ -273,6 +282,7 @@ class RoomBetaDashboardSource(
                     if (++count > limits.currentRows) throw BetaDashboardReadLimitExceeded("current ledger rows", limits.currentRows)
                     repeat(9) { fingerprint(cursor.optional(it)) }
                     val id = cursor.getString(0)
+                    val moneyRelevant=cursor.getInt(10)==1
                     val key = PostingKey(Environment.BETA, id)
                     val revision = PostingRevision(cursor.getLong(1), cursor.getLong(2))
                     val correction = cursor.optional(8)?.let(BetaCorrectionCodec::decode)
@@ -303,7 +313,7 @@ class RoomBetaDashboardSource(
                     // ownership snapshot is unavailable, not a crash or a silent zero balance.
                     if ((listOf(posting.classification.input) + posting.observations.map { it.input }).any { input ->
                             !matchesCurrentRegistry(input, registry)
-                        }) { completeLedger = false; reviewKeys += id; if (persisted != null) observations += Observation(persisted, false); continue }
+                        }) { if(moneyRelevant) {completeLedger = false; reviewKeys += id}; if (persisted != null) observations += Observation(persisted, false); continue }
                     unhandledEvidence.removeAll(posting.command.evidenceIds)
                     posting.command.evidenceIds.forEach { activeInputs[it] = BetaLedgerCodec.encodeInput(posting.classification.input) }
                     val fact = persisted?.takeIf { row ->
@@ -316,24 +326,26 @@ class RoomBetaDashboardSource(
                         BankId(fact.bankId), local)] }?.takeIf { card ->
                         card.kind == AssetKind.DEBIT_CARD && card.last4 == fact.debitCardLast4 && card.parentId?.localId == fact.debitCardParent
                     }?.id
-                    val scoped = windows.any { posting.command.time.instant >= it.from && posting.command.time.instant < it.until }
-                    val possibleSettlement = posting.classification.effectiveType == FinancialType.CREDIT_CARD_PAYMENT && posting.command.time.instant < paymentCutoff
-                    if (!scoped && !possibleSettlement) continue
-                    rows += DashboardLedgerRow(posting, true)
-                    val metadata = correction?.overlay?.metadata.orEmpty()
-                    if (posting.classification.effectiveType in setOf(FinancialType.EXPENSE, FinancialType.REFUND) &&
-                        fact == null && "merchant" !in metadata) completeMerchantFacts = false
-                    if (fact != null || metadata.keys.any { it == "merchant" || it == "counterparty" }) postingFacts += DashboardPostingFacts(
-                        key, revision, posting.command.evidenceIds.sorted().first(), metadata["merchant"] ?: fact?.merchant,
-                        metadata["counterparty"] ?: fact?.counterparty, debitCard = provedDebit,
-                        messageFamily = fact?.messageFamily?.let(DashboardEvidenceFamily::valueOf),
-                    )
+                    if(id in foreignSourceIds) valuationSources+=DashboardLedgerRow(posting,true)
                     if (fact?.feeKnown == true && ((fact.feeAmount == null && fact.feeCurrency == null) ||
                         (fact.feeAmount != null && fact.feeCurrency == Currency.SAR.name))) {
                         knownFees += key
                         if (fact.feeAmount != null && fact.feeCurrency != null) fees += LinkedInternationalFee(key, revision,
                             fact.evidenceId, Money.of(fact.feeAmount, Currency.valueOf(fact.feeCurrency)))
                     }
+                    val scoped = windows.any { posting.command.time.instant >= it.from && posting.command.time.instant < it.until }
+                    val possibleSettlement = posting.classification.effectiveType == FinancialType.CREDIT_CARD_PAYMENT && posting.command.time.instant < paymentCutoff
+                    if (!scoped && !possibleSettlement) continue
+                    rows += DashboardLedgerRow(posting, true)
+                    val metadata = correction?.overlay?.metadata.orEmpty()
+                    if (moneyRelevant && posting.classification.effectiveType in setOf(FinancialType.EXPENSE, FinancialType.REFUND) &&
+                        fact == null && "merchant" !in metadata) completeMerchantFacts = false
+                    if (fact != null || metadata.keys.any { it == "merchant" || it == "counterparty" }) postingFacts += DashboardPostingFacts(
+                        key, revision, posting.command.evidenceIds.sorted().first(), metadata["merchant"] ?: fact?.merchant,
+                        metadata["counterparty"] ?: fact?.counterparty, debitCard = provedDebit,
+                        messageFamily = fact?.messageFamily?.let(DashboardEvidenceFamily::valueOf),
+                    )
+
                 }
             }
             if (unhandledEvidence.isNotEmpty()) completeLedger = false
@@ -401,6 +413,8 @@ class RoomBetaDashboardSource(
             val settlementPeriods = assetFacts.mapNotNull { fact -> fact.statement?.takeIf { it.issuedAt < paymentCutoff }?.let {
                 fact.id to DisplayPeriod(it.issuedAt, paymentCutoff, query.zone, PeriodKind.SELECTED, null)
             } }.toMap()
+            val valuedCommitments=com.baraa.masroof.lab.beta.application.dashboard.BetaCommitmentValuationCalculator.resolve(
+                configuration?.draft ?: BetaDashboardConfigurationDraft(),valuationSources,fees,knownFees,frozenPeriods.salary)
             rows.removeAll { row ->
                 val at = row.posting.command.time.instant
                 windows.none { at >= it.from && at < it.until } && settlementPeriods.none { (facility, window) ->
@@ -412,13 +426,13 @@ class RoomBetaDashboardSource(
             val includedKeys = rows.mapTo(hashSetOf()) { it.posting.command.key }
             postingFacts.removeAll { it.key !in includedKeys }; fees.removeAll { it.key !in includedKeys }
             val occurrences = com.baraa.masroof.lab.beta.application.dashboard.BetaCommitmentOccurrenceCalculator.rows(
-                configuration?.draft ?: BetaDashboardConfigurationDraft(), frozenPeriods.salary,
+                valuedCommitments.draft, frozenPeriods.salary,
                 com.baraa.masroof.lab.beta.application.dashboard.BetaCommitmentPaymentCalculator.payments(rows,postingFacts,fees,knownFees))
             val token = digest.digest().joinToString("") { "%02x".format(it) }
             DashboardReadBatch(query, ReadRevision("beta-current-v2:$token", readAt),
                 Collections.unmodifiableList(rows), Collections.unmodifiableList(assets),
                 DashboardCoverage(completeLedger = completeLedger, completeRegistry = true, completeFeeFacts = hasFacts && rows.all { it.posting.command.key in knownFees },
-                    reviewRequiredCount = reviewCount, atomicRuntimeSource = true, completeMerchantFacts = completeMerchantFacts, completeUserCommitments = configuration?.revision?.let { it > 0 } == true),
+                    reviewRequiredCount = reviewCount, atomicRuntimeSource = true, completeMerchantFacts = completeMerchantFacts, completeUserCommitments = configuration?.revision?.let { it > 0 } == true && valuedCommitments.complete),
                 frozenPeriods, assetFacts = Collections.unmodifiableList(assetFacts), postingFacts = Collections.unmodifiableList(postingFacts),
                 fees = Collections.unmodifiableList(fees), commitmentOccurrences = Collections.unmodifiableList(occurrences),
                 settlementPeriods = Collections.unmodifiableMap(settlementPeriods),

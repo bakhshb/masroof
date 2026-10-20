@@ -112,7 +112,7 @@ internal class RoomBetaDashboardConfiguration(private val database: BetaDatabase
                 }
                 require(!item.active || item.pauseIntervals.none {it.resumedAt==null})
                 require(item.id.matches(Regex("[A-Za-z0-9_-]{1,80}")) && item.label.isNotBlank() && item.label.length <= 120) { "Invalid commitment identity or label" }
-                require(item.amount.currency == Currency.SAR && item.amount.amount.signum() > 0 && item.amount.amount.precision() <= 20 && item.amount.amount.scale() <= 2) { "Commitment must be a positive SAR amount with at most two decimals" }
+                require((item.amount.currency == Currency.SAR || item.sourceTransactionId!=null) && item.amount.amount.signum() > 0 && item.amount.amount.precision() <= 20 && item.amount.amount.scale() <= 2) { "Commitment must have a positive amount with at most two decimals and a source for foreign currency" }
                 require(item.dueDay in 1..31 && item.starts.year in 1900..2200 && (item.ends == null || (item.ends >= item.starts && item.ends.year in 1900..2200))) { "Invalid commitment date range" }
                 require(item.paidMonths.size <= 1200 && item.paidMonths.all { it >= item.starts && it.year in 1900..2200 && (item.ends == null || it <= item.ends) }) { "Invalid paid occurrences" }
             }

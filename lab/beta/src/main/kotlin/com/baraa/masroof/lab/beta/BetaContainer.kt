@@ -424,6 +424,15 @@ class BetaContainer(
         check(!closed)
         runBlocking {com.baraa.masroof.lab.beta.application.corrections.BetaTransactionDetailWorkflow(database).detail(com.baraa.masroof.lab.finance.posting.PostingKey(com.baraa.masroof.lab.finance.value.Environment.BETA,id))}
     }
+    fun commitmentCreationPreview(id: String) = lock.withLock {
+        check(!closed)
+        runBlocking {com.baraa.masroof.lab.beta.application.BetaCommitmentCreationWorkflow(database).preview(
+            com.baraa.masroof.lab.finance.posting.PostingKey(com.baraa.masroof.lab.finance.value.Environment.BETA,id))}
+    }
+    fun createCommitment(preview: com.baraa.masroof.lab.beta.application.BetaCommitmentCreationPreview) = lock.withLock {
+        check(!closed)
+        runBlocking {com.baraa.masroof.lab.beta.application.BetaCommitmentCreationWorkflow(database).create(preview)}
+    }
     fun reclassifyTransaction(token: com.baraa.masroof.lab.beta.application.corrections.BetaReviewToken,decisionId: String,type: com.baraa.masroof.lab.finance.posting.FinancialType) = lock.withLock {
         check(!closed)
         runBlocking {com.baraa.masroof.lab.beta.application.corrections.BetaTransactionDetailWorkflow(database).resolve(token,decisionId,type)}

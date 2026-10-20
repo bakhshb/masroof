@@ -341,7 +341,7 @@
     "beta_review_unavailable"
   ],
   "verified_tests": {
-    "lab_jvm": 336,
+    "lab_jvm": 345,
     "bank_engine": 58,
     "finance_core": 181,
     "android16_full": {
@@ -350,7 +350,7 @@
       "failed": 0,
       "scope": "Full Android 16 suite after source transaction-list port and CI rename-readiness fix. Final digit-comparison refinement is validated separately by targeted filter tests. Final digit comparison and calculator placement passed all 322 JVM tests, lint, and four targeted native tests including the actual Activity. Subsequent registry-fact preservation and navigation-generation changes passed all 323 JVM tests, lint and five targeted Android tests; they do not claim a second full 200-test run."
     },
-    "ci": "a88975df source UI: static/unit/isolated-lab and most device checks passed; remaining live device jobs are checked separately. Payment/due-date follow-up passes locally and awaits CI after push.",
+    "ci": "e76f6f1d: all GitHub checks passed. Current creation/native-currency follow-up passed 345 JVM tests, lint, 15 targeted Android checks and two final native checks locally; CI awaits push.",
     "android16_followup": {
       "passed": 20,
       "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
@@ -472,6 +472,15 @@
       "scope": "Current posted rows only. Source-id or exact trimmed/case-folded merchant/counterparty matching; source definition ordering; each payment consumed once; actual amount/date; half-open salary scope; inactive/held and invalid registry rows remain excluded upstream. Persisted rate/fee projection reused without parser, rate lookup or writes. Native tests cover SAR, immutable foreign rate, unknown FX, unknown SMS fee proof, explicit due date outside salary, actual settings and reopened lifecycle metadata.",
       "due_date_regression": "Reproduced the old guard failure with explicitUserDueDateIsDisplayMetadataRatherThanAnOccurrenceScopeGate before fixing it. Scheduled occurrences remain scoped by the application calculator; display due dates do not widen SQL/financial scope.",
       "limitations": "Foreign-currency commitment definitions still require source-bound expected-amount projection; creation from a posted transaction and source summary/navigation remain open. No full native/process-death rerun claimed for this change."
+    },
+    "commitment_creation_followup": {
+      "lab_jvm_passed": 345,
+      "native_targeted_passed": 15,
+      "native_final_followup_passed": 2,
+      "lint": "passed",
+      "scope": "Real transaction detail cancel → confirm-dialog recreation → create → already-linked state → management list/count. One definition per source under concurrent requests; stale/unnamed/non-eligible/suppressed sources rejected; financial history unchanged. Native USD definition retains its money/date/source, values through a 2020 source into a 2026 salary cycle, and never contributes the old transaction to current spending. Missing/suppressed rates remain unknown; inactive definitions do not poison current totals.",
+      "precision_improvement": "The inherited prototype resolveMoney rounds the native/source ratio to two decimals before multiplication. Lab now rounds only the final SAR hint: 0.01 USD from a 20 USD / 75 SAR source becomes 0.04 SAR, rather than an intermediate zero. This intentionally improves an edited commitment forecast; no posted transaction or stored rate is changed.",
+      "limitations": "Whole transaction-detail UI, source summary/navigation, transient visual variants, and remaining settings/backup/setup pages still require completion. No full native/process-death rerun claimed on this follow-up."
     }
   },
   "implementation_notes": [
@@ -494,7 +503,9 @@
     "أُصلح مسح حالة الالتزام وسجل توقفه ورابطه عند تغيير إعدادات أخرى، واختُبر الحفظ بعد إعادة الفتح. هذا إصلاح حفظ جزئي؛ نموذج التكرار المتقدم وإدارة الالتزام من المصدر ما زالا مفتوحين. أُضيف أيضًا جيل التنقل لمطابقة حفظ الفلاتر عند الرجوع وإعادة ضبطها عند فتح الحركات من جديد.",
     "أضيفت حقائق الالتزام الناقصة إلى الجدول الموجود: نوع التكرار وتاريخ العملية والاستحقاق، مع ترقية محددة لنسخة المختبر 14→15 دون لمس الفعلي أو مسح البيانات. أضيفت واجهة تطبيق للإيقاف والاستئناف والتعديل والحذف وسجلها. هذه بنية لازمة للنقل؛ واجهة إدارة الالتزامات القديمة ومطابقة السداد التلقائية ما زالتا تحتاجان الإكمال، ولا يعد هذا إعلان تطابق الصفحة.",
     "نُقلت إدارة الالتزامات ومحررها من SettingsCommitmentsScreen/SettingsCommitmentEditorScreen، بتبويبات النشط والمتوقف والسجل وإجراءات الفعلي. أُزيل محرر الالتزام العام وأزرار الإضافة والتعليم اليدوي للسداد ومساراتها ونصوصها الحصرية، وأصبحت اختبارات الحفظ تمر عبر واجهة التطبيق الجديدة. الصور المحملة للصفحتين متطابقة في 16 مقارنة؛ هذا لا يغلق ربط السداد والإنشاء من الحركة وملخص الالتزامات أو كل الحالات البصرية.",
-    "رُبط سداد الالتزامات بالحركات المعتمدة المخزنة، باستخدام معرّف المصدر أو الاسم كما في الفعلي، ومنع استهلاك الحركة مرتين. تعرض الدفعة مبلغها وتاريخها الفعليين، وتُستخدم أسعار الصرف والرسوم المثبتة فقط. أُصلح أيضًا تعطل الملخص عند اختيار استحقاق خارج فترة الراتب؛ الاستحقاق معلومة عرض ولا يوسّع نطاق الحركات. لم يتغير تفسير الرسائل أو ML أو سلطة اعتماد الحركة."
+    "رُبط سداد الالتزامات بالحركات المعتمدة المخزنة، باستخدام معرّف المصدر أو الاسم كما في الفعلي، ومنع استهلاك الحركة مرتين. تعرض الدفعة مبلغها وتاريخها الفعليين، وتُستخدم أسعار الصرف والرسوم المثبتة فقط. أُصلح أيضًا تعطل الملخص عند اختيار استحقاق خارج فترة الراتب؛ الاستحقاق معلومة عرض ولا يوسّع نطاق الحركات. لم يتغير تفسير الرسائل أو ML أو سلطة اعتماد الحركة.",
+    "أُضيف إنشاء الالتزام من الحركة المعتمدة عبر تأكيد الفعلي، مع ربط التأكيد بمصدره الحالي ورفض المصدر المتغيّر أو الموقوف، ومنع تكرار الإنشاء. تُحفظ العملة والمبلغ والتاريخ الأصليون والرابط، وتُقرأ مصادر العملة الأجنبية القديمة قراءة مخصصة لا تدخل في صرف الفترة الحالية. يعرض مركز الإعدادات عدد النشط والمتوقف الحقيقي بدل صفر مشتق من الأصول.",
+    "تحسين دقة موثّق عن الحساب القديم: قيمة الالتزام الأجنبي المعدّلة تُقرب مرة واحدة عند ناتج الريال، بدل تقريب النسبة الوسيطة التي قد تجعل 0.01 USD تظهر بصفر. بقيت مبالغ الحركات الفعلية وأسعارها المثبتة وقواعد المحرك وML دون تغيير."
   ],
   "source_page_inventory": [
     {
@@ -875,10 +886,10 @@
     },
     {
       "id": "DATA-002",
-      "finding_ar": "نُقلت إدارة الالتزامات ومحررها، ورُبط السداد من الحركات المعتمدة إلى التعريفات بالريال، بما فيها الدفعات الأجنبية ذات التحويل المثبّت. ما زال إنشاء الالتزام من الحركة وتعريفه بعملة أجنبية وملخصه وتنقله بحاجة إلى إكمال.",
-      "action_ar": "إكمال إنشاء التعريف من الحركة المعتمدة وحساب قيمته المرجعية بعملة أجنبية من مصدره، ثم نقل الملخص والتنقل والحالات البصرية المتبقية. يبقى تدقيق الرحلة الكاملة مفتوحًا.",
+      "finding_ar": "اكتمل ربط الإنشاء بالحركة المعتمدة وحفظ العملة الأصلية وقراءة مصدر التحويل القديم دون إدخاله في صرف الفترة الحالية. بقي ملخص الالتزامات والتنقل منه وحالات الواجهة البصرية غير الافتراضية بحاجة إلى إكمال.",
+      "action_ar": "نقل ملخص الالتزامات والتنقل إلى محرر الالتزام وصفحات القرض والبطاقة، ثم إكمال صور حالات التأكيد والخطأ والانتظار والعملات الأجنبية. تظل الرحلة الكاملة غير معتمدة.",
       "status": "open",
-      "evidence": "BetaCommitmentPaymentCalculator; BetaCommitmentOccurrenceCalculator; BetaCommitmentPaymentTest; RoomBetaConfigTest; BetaCommitmentPaymentsDeviceTest; source CommitmentsOverview."
+      "evidence": "BetaCommitmentCreationWorkflow; BetaCommitmentValuationCalculator; BetaCommitmentCreationTest; BetaCommitmentCreationActivityTest; BetaForeignCommitmentDeviceTest. Source detail/summary visual acceptance remains open."
     },
     {
       "id": "NAV-001",
@@ -893,6 +904,13 @@
       "action_ar": "أُزيل هذا الخلط؛ حساب التكرار يحدد الدورة، ويُعرض تاريخ الاستحقاق كما اختاره المستخدم، دون جلب أو احتساب حركات خارج النطاق.",
       "status": "fixed_pending_final_ci",
       "evidence": "Failing-before-fix BetaAnalysisParityTest.explicitUserDueDateIsDisplayMetadataRatherThanAnOccurrenceScopeGate; passing native explicitDueOutsideSalaryDoesNotCrashOrExtendTheFinancialRead. 181 core / 336 lab tests; 9 native targeted passed."
+    },
+    {
+      "id": "DATA-004",
+      "finding_ar": "تقريب نسبة المبلغ الأصلي قبل التحويل قد يجعل قيمة التزام أجنبي صغيرة تظهر بصفر، رغم وجود سعر مثبت.",
+      "action_ar": "يُحسب التناسب بدقة ثم تُقرّب قيمة الريال النهائية فقط؛ القيمة الأصلية وسعر الحركة ودفترها لا تتغير.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "smallForeignDefinitionRoundsOnceInsteadOfBecomingZeroAtTheRatioStep; native createAndEditRetainNativeMoneyWhileOldSourceValuesOnlyTheCurrentDefinition: 0.01 USD → 0.04 SAR from the persisted 20 USD / 75 SAR source."
     }
   ]
 }

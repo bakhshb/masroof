@@ -36,4 +36,5 @@
   <string name="beta_commitment_settings_commitments_tab_active">نشط</string>
   <string name="beta_commitment_settings_commitments_tab_disabled">متوقف</string>
   <string name="beta_commitment_settings_commitments_tab_record">السجل</string>
+<string name="beta_commitment_settings_commitments_hub_subtitle">%1$d نشط · %2$d متوقف</string>
 </resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="beta_commitment_action_settings_cancel">إلغاء</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment">تعيين كالتزام</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_already">هذه الحركة مُعيَّنة كالتزام بالفعل</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_confirm_action">تعيين</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_confirm_body">سيتم إنشاء التزام من هذه الحركة باستخدام اسم المتجر والمبلغ والتاريخ.</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_confirm_title">تعيين كالتزام؟</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_failed">تعذّر إنشاء الالتزام</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_success">تم إنشاء الالتزام</string>
+</resources>

@@ -21,7 +21,7 @@ internal object BetaCommitmentOccurrenceCalculator {
         require(payments.map {it.id}.distinct().size==payments.size) {"Duplicate commitment payment identity"}
         val consumed=hashSetOf<String>()
         return BetaCommitmentLists.ordered(draft.commitments).flatMap {row ->
-            val occurrences=if(!visible(row,first,period.zone,draft.salary?.day ?: 27)) emptyList() else dates(row,first,end)
+            val occurrences=scheduled(draft,row,period)
             if(occurrences.isEmpty()) emptyList() else {
                 val matching=payments.filter {payment ->
                     payment.at>=period.from && payment.at<period.until && payment.id !in consumed &&
@@ -45,6 +45,11 @@ internal object BetaCommitmentOccurrenceCalculator {
         }
     }
 
+    fun scheduled(draft: BetaDashboardConfigurationDraft,row: BetaRecurringCommitment,period: DisplayPeriod?): List<LocalDate> {
+        period ?: return emptyList()
+        val first=period.from.atZone(period.zone).toLocalDate();val end=period.until.atZone(period.zone).toLocalDate()
+        return if(!visible(row,first,period.zone,draft.salary?.day ?: 27)) emptyList() else dates(row,first,end)
+    }
     fun dates(row: BetaRecurringCommitment,first: LocalDate,end: LocalDate): List<LocalDate> {
         require(first<end && ChronoUnit.DAYS.between(first,end)<=95)
         val anchor=row.anchorDate

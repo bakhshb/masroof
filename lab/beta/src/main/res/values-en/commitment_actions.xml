@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="beta_commitment_action_settings_cancel">Cancel</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment">Mark as commitment</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_already">This transaction is already a commitment</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_confirm_action">Mark</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_confirm_body">Masroof will create a commitment using the merchant, amount, and date from this transaction.</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_confirm_title">Mark as commitment?</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_failed">Could not create commitment</string>
+  <string name="beta_commitment_action_transaction_detail_mark_commitment_success">Commitment created</string>
+</resources>

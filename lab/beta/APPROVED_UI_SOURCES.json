@@ -495,6 +495,24 @@
       "symbol": "MasroofNavCard",
       "source_sha256": "f7ef8b9a1a37b5aa44ac099d151b2e099f6987a0b3f3ff6a3736653bdddbff83",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedSettingsNavigationRow.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/application/commitment/CommitmentFromTransactionService.kt",
+      "symbol": "createFromTransaction / native amount, date, monthly default and source identity",
+      "source_sha256": "b8e76ffa781895cedd7476281920fd6fcf7cd425c4d031ff3cd1af866b0ec8c1",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/BetaCommitmentCreationWorkflow.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionDetailScreen.kt",
+      "symbol": "Mark-as-commitment action and confirmation",
+      "source_sha256": "2cee71053ed54b45875f693d7b6ced4b9be3372e9e76e51b02afcd1eadb22cb2",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaPostedTransactionActions.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofUiComponents.kt",
+      "symbol": "IconTextButtonOutlined",
+      "source_sha256": "d9339af5fd68cbbd96fc5822fc256c85326c8d380a42dc0c69b9300f3f95509a",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
     }
   ],
   "adaptations": [

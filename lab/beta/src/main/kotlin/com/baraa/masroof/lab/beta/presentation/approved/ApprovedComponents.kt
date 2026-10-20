@@ -177,6 +177,18 @@ internal fun ApprovedIconTextButton(
     }
 }
 
+/** Production IconTextButtonOutlined; reused by source transaction actions. */
+@Composable
+internal fun ApprovedIconTextButtonOutlined(onClick: ()->Unit,icon: ImageVector,text: String,
+    modifier: Modifier=Modifier,enabled: Boolean=true) {
+    ApprovedOutlinedButton(onClick,modifier,enabled,shape=MaterialTheme.shapes.medium,
+        border=BorderStroke(MasroofSpacing.borderWidth,MaterialTheme.colorScheme.outline)) {
+        Icon(icon,null,Modifier.size(MasroofIconSizes.moneyRowLeading))
+        Spacer(Modifier.width(MasroofSpacing.carouselGap))
+        ApprovedText(text)
+    }
+}
+
 @Composable
 internal fun ApprovedOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
     shape: Shape = MasroofShapes.small, colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),

@@ -36,6 +36,15 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
     onTracking: (BetaTrackedAsset,Boolean,()->Unit)->Unit = {_,_,_->},onOwnership: (BetaOwnershipCandidate,Boolean,AssetId?)->Unit = {_,_,_->},
     onAccountType: (OwnedAsset,String,Long,()->Unit)->Unit = {_,_,_,_->},onRegistryTitle: (String?)->Unit = {},initialRegistryTab: String="followed",
     theme: String = "SYSTEM", language: String = "SYSTEM", cardTasks: List<BetaCardSetupTask> = emptyList(), metadata: Map<AssetId,BetaAssetMetadata> = emptyMap(), onConfigureTask: (BetaCardSetupTask) -> Unit = {}, onTheme: (String) -> Unit = {}, onLanguage: (String) -> Unit = {}, onData: () -> Unit = {}, onSetup: () -> Unit = {}, onReset: () -> Unit = {}, onDeveloper: () -> Unit = {},onHistory: () -> Unit = {}) {
+    var commitmentCounts by remember {mutableStateOf<Pair<Int,Int>?>(null)}
+    BetaLaunchedEffect(controls,category) {
+        if(category=="HUB") {
+            commitmentCounts=null
+            try {val cfg=controls.read();if(cfg.available) commitmentCounts=cfg.draft.commitments.count {it.active} to cfg.draft.commitments.count {!it.active}}
+            catch(cancelled: kotlinx.coroutines.CancellationException) {throw cancelled}
+            catch(_: Exception) {commitmentCounts=null}
+        }
+    }
     var renameId by rememberSaveable {mutableStateOf<String?>(null)}
     var renameBank by rememberSaveable {mutableStateOf<String?>(null)}
     var renameRevision by rememberSaveable {mutableLongStateOf(0)}
@@ -50,7 +59,7 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
             val groups = listOf("ACCOUNTS" to R.string.beta_home_accounts, "CARDS" to R.string.beta_home_cards,
                 "LOANS" to R.string.beta_home_loans, "COMMITMENTS" to R.string.beta_home_commitments_shortcut)
             groups.forEachIndexed { index, (key, label) ->
-                BetaManagementRow(stringResource(label), stringResource(R.string.beta_complete_asset_count,assets.count {a -> when(key) {"ACCOUNTS"->a.kind==AssetKind.ACCOUNT;"LOANS"->a.kind==AssetKind.LOAN;"CARDS"->a.kind in setOf(AssetKind.CREDIT_CARD,AssetKind.DEBIT_CARD);else->false}}), when (key) {
+                BetaManagementRow(stringResource(label), if(key=="COMMITMENTS") commitmentCounts?.let {stringResource(R.string.beta_commitment_settings_commitments_hub_subtitle,it.first,it.second)}.orEmpty() else stringResource(R.string.beta_complete_asset_count,assets.count {a -> when(key) {"ACCOUNTS"->a.kind==AssetKind.ACCOUNT;"LOANS"->a.kind==AssetKind.LOAN;"CARDS"->a.kind in setOf(AssetKind.CREDIT_CARD,AssetKind.DEBIT_CARD);else->false}}), when (key) {
                     "ACCOUNTS" -> MasroofOutlineIcons.Landmark; "CARDS" -> MasroofOutlineIcons.CreditCard
                     "LOANS" -> MasroofOutlineIcons.HandCoins; else -> MasroofOutlineIcons.CalendarCheck
                 }, enabled = !busy, onClick = { onCategory(key) }, modifier = Modifier.testTag("manage-$key"), divider = index != groups.lastIndex)
