@@ -469,6 +469,16 @@ class BetaContainer(
         } }
     }
 
+    fun assetTrackingSnapshot() = lock.withLock {
+        check(!closed)
+        runBlocking {com.baraa.masroof.lab.beta.application.BetaAssetTrackingWorkflow(database).snapshot()}
+    }
+    fun setAssetTracked(expected: com.baraa.masroof.lab.beta.application.BetaTrackedAsset,owned: Boolean) = lock.withLock {
+        check(!closed)
+        invalidateAutomaticProcessing()
+        runBlocking {com.baraa.masroof.lab.beta.application.BetaAssetTrackingWorkflow(database).setOwned(expected,owned)}
+    }
+
     fun ownershipSnapshot() = lock.withLock {
         check(!closed)
         runBlocking { com.baraa.masroof.lab.beta.application.BetaOwnershipWorkflow(database).snapshot() }

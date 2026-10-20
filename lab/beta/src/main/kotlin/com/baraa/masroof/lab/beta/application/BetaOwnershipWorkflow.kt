@@ -20,6 +20,7 @@ class BetaOwnershipWorkflow(private val database: BetaDatabase) {
         val enabled = database.bankSelectionDao().all().filter { it.state == "ENABLED" }.map { it.bankId }.toSet()
         val registry = BetaAssetRegistry(database).all()
         val decisions = database.ownershipDao().all().associateBy { Triple(it.bankId, it.kind, it.suffix) }
+        val stopped=database.assetDao().tracking().filter {it.status=="EXTERNAL"}.mapTo(hashSetOf()) {Triple(it.environment,it.bankId,it.localId)}
         val store = RoomBetaEvidenceStore(database)
         val observations = mutableListOf<BetaOwnershipObservation>()
         var after = ""
@@ -40,6 +41,7 @@ class BetaOwnershipWorkflow(private val database: BetaDatabase) {
                 else choices.singleOrNull().takeIf { !conflict }
             val status = when {
                 decision?.status == "EXTERNAL" -> BetaOwnershipStatus.EXTERNAL
+                chosen?.id?.let {Triple(it.environment.name,it.bank.value,it.localId) in stopped}==true -> BetaOwnershipStatus.EXTERNAL
                 conflict && decision?.status == "REVIEW" -> BetaOwnershipStatus.REVIEW
                 conflict -> BetaOwnershipStatus.UNKNOWN
                 decision?.status == "OWNED" && (chosen != null || (choices.isEmpty() && kinds.isEmpty())) -> BetaOwnershipStatus.OWNED

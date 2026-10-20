@@ -119,6 +119,8 @@ class BetaAssetRegistry(private val database: BetaDatabase) : ManualAssetStore {
         database.ownershipDao().all().filter { it.status == "EXTERNAL" }.mapTo(hashSetOf()) {
             com.baraa.masroof.lab.beta.application.BetaOwnershipReference(BankId(it.bankId),
                 com.baraa.masroof.lab.beta.application.BetaOwnershipKind.valueOf(it.kind), it.suffix)
+        }, database.assetDao().tracking().filter {it.status!="OWNED"}.mapTo(hashSetOf()) {
+            AssetId(Environment.valueOf(it.environment),BankId(it.bankId),it.localId)
         })
 
     private fun OwnedAsset.toEntity() = BetaAssetEntity(

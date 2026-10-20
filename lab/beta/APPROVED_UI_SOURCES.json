@@ -387,6 +387,55 @@
       "source_sha256": "b760978d416d7f9bb4ec94c0471899f5dd28ab552db3bc856f62688fbf16804f",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/BetaHomeLayout.kt",
       "adaptations": "Six visible source sections. Version-1 lab TREND/MERCHANTS preferences are combined deterministically; other order/visibility choices retained. Financial developer controls are outside layout customization."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsBankAccountsScreen.kt",
+      "symbol": "SettingsBankAccountsScreen",
+      "source_sha256": "3640bcfe685205fd4d58f9218b4a5764924f5a9026fc94b52c4ecb4474daf791",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaRegistryManagementPanel.kt",
+      "adaptations": "Source registry tabs, cards, ownership prompts, stop/resume and account-type dialog. Lab workflow callbacks retain full bank-qualified identities, optimistic revisions and durable automatic replay; no production writes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsBankCardsScreen.kt",
+      "symbol": "SettingsBankCardsScreen",
+      "source_sha256": "6e49fe886ef01539a15d19c80345d1f3144c8a2cb86a1b1baa873295e9e0722b",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaRegistryManagementPanel.kt",
+      "adaptations": "Source registry tabs, cards, ownership prompts, stop/resume and account-type dialog. Lab workflow callbacks retain full bank-qualified identities, optimistic revisions and durable automatic replay; no production writes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsBankLoansScreen.kt",
+      "symbol": "SettingsBankLoansScreen",
+      "source_sha256": "c2c9dee4a94179afb3b05ee6dfe286fb9cb03beddaba6878c646a7ccecfc283c",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaRegistryManagementPanel.kt",
+      "adaptations": "Source registry tabs, cards, ownership prompts, stop/resume and account-type dialog. Lab workflow callbacks retain full bank-qualified identities, optimistic revisions and durable automatic replay; no production writes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsBankScreen.kt",
+      "symbol": "SettingsBankScreen",
+      "source_sha256": "a2b17a82fc6c160e730c19453e9c7d91458733b9a678dac3463b640151c9c95c",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaRegistryManagementPanel.kt",
+      "adaptations": "Source registry tabs, cards, ownership prompts, stop/resume and account-type dialog. Lab workflow callbacks retain full bank-qualified identities, optimistic revisions and durable automatic replay; no production writes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsMyAccountsScreen.kt",
+      "symbol": "SettingsAccountTypeDialog",
+      "source_sha256": "89c43a2b514b26fc17b6803de0afea60d41aeaaf6ad1709b087f369cffbf1e9b",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaSettingsHubPanel.kt",
+      "adaptations": "Source registry tabs, cards, ownership prompts, stop/resume and account-type dialog. Lab workflow callbacks retain full bank-qualified identities, optimistic revisions and durable automatic replay; no production writes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/AccountOwnershipInlinePrompt.kt",
+      "symbol": "AccountOwnershipInlinePrompt",
+      "source_sha256": "bdd29fb7b5bcf7cfba5c59f84e13a486835f49c429d1df4c8da43c928d20f8e1",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaRegistryManagementPanel.kt",
+      "adaptations": "Inline registry confirmation, source labels/icons/spacing; collision selection and lab ownership authority retained."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/CardOwnershipInlinePrompt.kt",
+      "symbol": "CardOwnershipInlinePrompt",
+      "source_sha256": "0f954132ef5e0794b74e93ae8529b02dddcb9c46b4591b173c9888d3331ff979",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaRegistryManagementPanel.kt",
+      "adaptations": "Inline registry confirmation, source labels/icons/spacing; collision selection and lab ownership authority retained."
     }
   ],
   "adaptations": [

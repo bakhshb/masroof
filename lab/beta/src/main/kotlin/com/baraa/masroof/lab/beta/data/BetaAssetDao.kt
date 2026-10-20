@@ -4,6 +4,14 @@ import androidx.room.*
 
 @Dao
 internal interface BetaAssetDao : BetaAuditWriter {
+    @Query("SELECT environment,bankId,localId,ownershipStatus AS status,metadataRevision AS revision FROM beta_account_registry UNION ALL SELECT environment,bankId,localId,ownershipStatus AS status,metadataRevision AS revision FROM beta_card_registry UNION ALL SELECT environment,bankId,localId,ownershipStatus AS status,metadataRevision AS revision FROM beta_credit_facility UNION ALL SELECT environment,bankId,localId,ownershipStatus AS status,metadataRevision AS revision FROM beta_loan_registry ORDER BY bankId,localId")
+    suspend fun tracking(): List<BetaAssetTrackingRow>
+    @Query("UPDATE beta_account_registry SET ownershipStatus=:status,metadataRevision=metadataRevision+1 WHERE environment=:environment AND bankId=:bank AND localId=:id AND metadataRevision=:revision")
+    suspend fun trackingAccount(environment: String,bank: String,id: String,status: String,revision: Long): Int
+    @Query("UPDATE beta_card_registry SET ownershipStatus=:status,metadataRevision=metadataRevision+1 WHERE environment=:environment AND bankId=:bank AND localId=:id AND metadataRevision=:revision")
+    suspend fun trackingCard(environment: String,bank: String,id: String,status: String,revision: Long): Int
+    @Query("UPDATE beta_loan_registry SET ownershipStatus=:status,metadataRevision=metadataRevision+1 WHERE environment=:environment AND bankId=:bank AND localId=:id AND metadataRevision=:revision")
+    suspend fun trackingLoan(environment: String,bank: String,id: String,status: String,revision: Long): Int
     @Query("UPDATE beta_account_registry SET displayName=:name,network=:network,accountType=:accountType,loanType=:loanType,metadataRevision=metadataRevision+1 WHERE environment=:environment AND bankId=:bank AND localId=:id AND metadataRevision=:revision")
     suspend fun metadataAccount(environment: String,bank: String,id: String,name: String?,network: String?,accountType: String?,loanType: String?,revision: Long): Int
     @Insert suspend fun account(row: BetaAccountRecord)
@@ -71,3 +79,5 @@ internal interface BetaAssetDao : BetaAuditWriter {
     @Query("SELECT DISTINCT a.* FROM beta_asset a JOIN beta_audit_log x ON x.eventKind='ASSET_ALIAS' AND a.environment=x.environment AND a.bankId=x.bankId AND a.localId=x.targetId WHERE x.environment=:environment AND x.bankId=:bank AND x.aliasKind=:kind AND x.aliasValue=:value AND NOT EXISTS(SELECT 1 FROM beta_audit_log r WHERE r.eventKind='ALIAS_REMOVED' AND r.relatedId=x.id) ORDER BY a.localId")
     suspend fun candidates(environment: String, bank: String, kind: String, value: String): List<BetaAssetEntity>
 }
+
+internal data class BetaAssetTrackingRow(val environment: String,val bankId: String,val localId: String,val status: String,val revision: Long)

@@ -55,13 +55,8 @@ class BetaCleanJourneyTest {
                 click("onboarding-manage"); await("beta-management-settings")
                 compose.onNodeWithTag("beta-theme-DARK").assertDoesNotExist()
                 compose.onNodeWithTag("beta-settings-reset").assertDoesNotExist()
-                click("manage-ACCOUNTS"); click("manage-add-BANK_ALJAZIRA")
-                compose.onNodeWithTag("asset-last4").performScrollTo().performTextInput("1234")
-                compose.onNodeWithTag("asset-save").assertIsDisplayed().assertIsNotEnabled()
-                compose.onNodeWithTag("asset-last4").performImeAction()
-                compose.waitForIdle()
-                click("asset-owned-confirm"); click("asset-save")
-                await("manage-add-BANK_ALJAZIRA")
+                click("manage-ACCOUNTS");await("registry-tab-followed")
+                compose.onNodeWithTag("manage-add-BANK_ALJAZIRA").assertDoesNotExist()
                 click("beta-page-back"); await("beta-management-settings")
                 click("beta-page-back"); await("onboarding-ASSETS")
                 click("ownership-continue"); await("onboarding-REVIEW")
@@ -78,7 +73,7 @@ class BetaCleanJourneyTest {
             drain()
             BetaContainer(context).use {
                 assertEquals(BetaOnboardingStep.COMPLETE, it.onboardingStep())
-                assertEquals(1, it.assets().size)
+                assertEquals(0, it.assets().size)
                 assertTrue(it.evidencePage().isEmpty()); assertEquals(true,it.historySession()?.finished)
             }
             ActivityScenario.launch(BetaActivity::class.java).use { await("dashboard-ready"); compose.onNodeWithTag("onboarding-IMPORT").assertDoesNotExist() }

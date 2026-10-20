@@ -50,15 +50,36 @@ class BetaApprovedFixtureScreensTest {
                     var title by remember {mutableStateOf<String?>(null)}
                     val preferencePage=page.value=="preferences"
                     val reviewPage=page.value=="review"
+                    val registryPage=page.value in setOf("myAccounts","myCards","myLoans")
                     BetaShell(0,false,showReturn=false,showMaintenanceActions=false,notificationCount=3,
                         secondaryTitle=if(reviewPage) stringResource(R.string.beta_nav_review) else if(preferencePage) stringResource(R.string.beta_approved_reference_preferences_title) else title,
-                        onNavigateBack={},selectedHomeTab=if(reviewPage) "REVIEW" else if(preferencePage) "SETTINGS" else if(page.value=="home") "HOME" else "NONE",onOpenHome={},dashboardOwnsScroll=true,editorOwnsScroll=reviewPage,
+                        onNavigateBack={},selectedHomeTab=if(reviewPage) "REVIEW" else if(preferencePage || registryPage) "SETTINGS" else if(page.value=="home") "HOME" else "NONE",onOpenHome={},dashboardOwnsScroll=true,editorOwnsScroll=reviewPage,
                         editor=if(reviewPage) ({Column(Modifier.fillMaxSize().testTag("review-fixture-ready")) {
                             ApprovedReviewListContent(listOf(
                                 ApprovedReviewListItem("حوالة تحتاج مطابقة",stringResource(R.string.beta_approved_review_pending_match),false,"750 ر.س","8 أكتوبر · بنك الجزيرة","multiple_candidates",stringResource(R.string.beta_complete_review_evidence)),
                                 ApprovedReviewListItem("بطاقة غير مؤكدة الملكية",stringResource(R.string.beta_review_parity_kind),false,null,"8 أكتوبر · بنك الجزيرة","unknown_ownership",stringResource(R.string.beta_complete_review_evidence))),false,true,{},{},emptyContent={})
                         }}) else if(preferencePage) ({BetaSettingsHubPanel("APP",{},emptyList(),emptyList(),UnavailableBetaDashboardControls,false,
-                            {_,_->},{_,_->},{},{},{},theme=if(dark.value) "DARK" else "LIGHT",language=language.value)}) else null,
+                            {},{},{},theme=if(dark.value) "DARK" else "LIGHT",language=language.value)}) else if(registryPage) ({
+                            val bank=BankId("BANK_ALJAZIRA")
+                            fun id(value: String)=AssetId(Environment.BETA,bank,value)
+                            val assets=listOf(OwnedAsset(id("3001"),AssetKind.ACCOUNT,"3001"),OwnedAsset(id("5002"),AssetKind.ACCOUNT,"5002"),
+                                OwnedAsset(id("facility"),AssetKind.CREDIT_FACILITY,null),
+                                OwnedAsset(id("7271"),AssetKind.CREDIT_CARD,"7271",id("facility"),CreditCardRole.PRIMARY),
+                                OwnedAsset(id("8842"),AssetKind.CREDIT_CARD,"8842",id("facility"),CreditCardRole.SUPPLEMENTARY),
+                                OwnedAsset(id("4421"),AssetKind.DEBIT_CARD,"4421",id("3001")),OwnedAsset(id("personal"),AssetKind.LOAN,null))
+                            val metadata=mapOf(
+                                id("3001") to com.baraa.masroof.lab.beta.application.BetaAssetMetadata(displayName="الجاري",accountType="CURRENT"),
+                                id("5002") to com.baraa.masroof.lab.beta.application.BetaAssetMetadata(displayName="الادخار",accountType="SAVINGS"),
+                                id("7271") to com.baraa.masroof.lab.beta.application.BetaAssetMetadata(displayName="البطاقة الأساسية",network="VISA"),
+                                id("8842") to com.baraa.masroof.lab.beta.application.BetaAssetMetadata(displayName="البطاقة الفرعية",network="VISA"),
+                                id("4421") to com.baraa.masroof.lab.beta.application.BetaAssetMetadata(displayName="مدى",network="MADA"),
+                                id("personal") to com.baraa.masroof.lab.beta.application.BetaAssetMetadata(displayName="قرض شخصي",loanType="PERSONAL"))
+                            BetaSettingsHubPanel(when(page.value) {"myAccounts"->"ACCOUNTS";"myLoans"->"LOANS";else->"CARDS"},{},
+                                listOf(com.baraa.masroof.lab.beta.application.BetaBankChoice(bank,null)),assets,UnavailableBetaDashboardControls,false,{},{},{},
+                                // Source account fixture has no bankTree, hence no linked debit rows.
+                                tracking=assets.filterNot {page.value=="myAccounts" && it.kind==AssetKind.DEBIT_CARD}.map {com.baraa.masroof.lab.beta.application.BetaTrackedAsset(it,com.baraa.masroof.lab.beta.application.BetaOwnershipStatus.OWNED,0)},
+                                metadata=metadata,onRegistryTitle={title=it})
+                        }) else null,
                         dashboard=({BetaDashboardPanel(workflow,ownsScroll=true,showInternalHeader=false,
                             requestedRoute=when(page.value) {"loans","loanDetail" -> "LOANS";"merchants" -> "MERCHANTS";"daily" -> "DAILY";"home" -> "OVERVIEW";"accounts","accountDetail" -> "ACCOUNTS";else -> "CARDS"},onPageTitle={title=it})}),
                         onReturn={},onReset={},onBackup={},onRestore={})
@@ -67,9 +88,9 @@ class BetaApprovedFixtureScreensTest {
         }
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val directory=File(instrumentation.targetContext.getExternalFilesDir(null),"lab-approved-fixture").apply {mkdirs()}
-        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home","review")) {
+        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home","review","myAccounts","myCards","myLoans")) {
             compose.runOnIdle {language.value=lang;dark.value=night;page.value=destination}
-            compose.waitUntil(15000) {compose.onAllNodesWithTag(if(destination=="review") "review-fixture-ready" else if(destination=="preferences") "beta-settings-panel" else "dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
+            compose.waitUntil(15000) {compose.onAllNodesWithTag(if(destination=="review") "review-fixture-ready" else if(destination=="preferences" || destination.startsWith("my")) "beta-settings-panel" else "dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
             if(destination in setOf("cardDetail","loanDetail","accountDetail")) {
                 val target=when(destination) {"cardDetail" -> "8842";"accountDetail" -> "3001";else -> "personal"}
                 compose.onNodeWithTag("dash-asset-BANK_ALJAZIRA-$target").performScrollTo().performClick()

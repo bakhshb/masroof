@@ -71,7 +71,7 @@
       "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
       "lab_visual_reference": "build/reports/ui-parity/lab-approved-fixture",
-      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — loaded-state top/bottom captures only; whole journey remains in progress.",
+      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — summary/detail and source registry-management captures; complete error/loading/setup journeys remain open.",
       "old_renderer_removed": false,
       "accepted": false
     },
@@ -86,7 +86,7 @@
       "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
       "lab_visual_reference": "build/reports/ui-parity/lab-approved-fixture",
-      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — loaded-state top/bottom captures only; whole journey remains in progress.",
+      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — summary/detail and source registry-management captures; complete error/loading/setup journeys remain open.",
       "old_renderer_removed": false,
       "accepted": false
     },
@@ -101,7 +101,7 @@
       "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
       "lab_visual_reference": "build/reports/ui-parity/lab-approved-fixture",
-      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — loaded-state top/bottom captures only; whole journey remains in progress.",
+      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — summary/detail and source registry-management captures; complete error/loading/setup journeys remain open.",
       "old_renderer_removed": false,
       "accepted": false
     },
@@ -159,7 +159,7 @@
       "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
       "lab_visual_reference": "build/reports/ui-parity/lab-approved-fixture",
-      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — loaded-state top/bottom captures only; whole journey remains in progress.",
+      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — summary/detail and source registry-management captures; complete error/loading/setup journeys remain open.",
       "old_renderer_removed": false,
       "accepted": false
     },
@@ -246,7 +246,8 @@
     "Old BetaSectionTrend chart renderer (now a binding to ApprovedSpendingTrend)",
     "BetaDashboardAnalysisPanel: replaced by approved daily/merchant pages; obsolete table/bar controls and 30 exclusive string keys removed.",
     "Duplicate Home transaction renderer: now uses the canonical scoped transaction rows.",
-    "Hand-built review list layout: replaced by source ReviewListScreen content with fixed choices and independent list scrolling."
+    "Hand-built review list layout: replaced by source ReviewListScreen content with fixed choices and independent list scrolling.",
+    "Generic settings asset/bank loop and ordinary management Add callbacks replaced by one source-derived BetaRegistryManagementPanel; explicit developer manual configuration remains separate."
   ],
   "removed_resource_keys": [
     "beta_asset_link_account",
@@ -343,8 +344,8 @@
       "scope": "Actual notification/read-state/review/back navigation, settings rename and shared navigation."
     },
     "paired_native_captures": {
-      "pairs": 88,
-      "body_pixel_identical": 84,
+      "pairs": 112,
+      "body_pixel_identical": 108,
       "pages": [
         "cards",
         "cardDetail",
@@ -356,7 +357,10 @@
         "accountDetail",
         "merchants",
         "daily",
-        "review"
+        "review",
+        "myAccounts",
+        "myCards",
+        "myLoans"
       ],
       "region": "1080×1755 captures; compare y=195 onward only. Top/bottom views only; long-page middle coverage and full journeys are separate gates.",
       "remaining_differences": "Four account-detail bottom captures: maximum channel difference 6–7/255, on rendered edges; retained as differences, not counted as pixel-identical."
@@ -377,6 +381,15 @@
     "review_ci_followup": {
       "passed": 4,
       "scope": "Arabic/English review/detail/ignore/restore, correction recovery and bounded 201-message pagination. Await ignored detail restore-action readiness before checking all financial choices."
+    },
+    "registry_tracking_followup": {
+      "jvm_passed": 316,
+      "android_full_passed": 196,
+      "android_targeted_passed": 16,
+      "scope": "Persisted stop/resume, same-suffix identity collision, backup/reopen, loan ownership, paired-transfer authority, actual registry cancellation/confirmation/recreation, rename, setup and notifications. Lint passed. Full Android 16 suite has zero failures.",
+      "android_final_ui_passed": 6,
+      "process_death_phases_passed": 39,
+      "previous_head_ci": "52581263: all GitHub checks passed; current follow-up checks run after push."
     }
   },
   "implementation_notes": [
@@ -392,6 +405,8 @@
     "المقارنة المصورة تغطي أعلى وأسفل 11 صفحة باللغتين والمظهرين. لا تغطي وسط جميع الصفحات الطويلة، ولا تثبت وحدها صحة استخراج الرسائل أو اعتماد الرحلة كاملة.",
     "المتبقي: تبويبات إدارة الأصول والمتابعة والإيقاف والاستئناف، بقية صفحات الإعدادات والنسخ الاحتياطي والالتزامات والعمليات، وحالات التحميل والخطأ والمقارنة الكاملة لخطوات الإعداد وتفاصيل المراجعة.",
     "النطاق هو المختبر فقط. لا تغييرات على app أو ui-kit أو قاعدة بيانات الفعلي أو منطق LessCode وBankEngine وML. لا جداول أو أعمدة جديدة في هذه الدفعة.",
-    "أظهر CI سباق تزامن في الاختبار بعد فتح رسالة متجاهلة؛ أصبح الاختبار ينتظر اكتمال التفاصيل بظهور إجراء الاستعادة، ثم يفحص جميع خيارات التصنيف دون حذف أي تحقق."
+    "أظهر CI سباق تزامن في الاختبار بعد فتح رسالة متجاهلة؛ أصبح الاختبار ينتظر اكتمال التفاصيل بظهور إجراء الاستعادة، ثم يفحص جميع خيارات التصنيف دون حذف أي تحقق.",
+    "Registry management now uses source SettingsBankAccounts/Cards/Loans presentation, fixed followed/unconfirmed/stopped tabs and confirmation dialogs. Existing ownershipStatus columns are wired to registry visibility, dashboard snapshots and durable automatic replay. No new tables, columns or production changes. Full identity + revision is required for every tracking action; unresolved linked transfer ownership preserves the engine match-identity review gate.",
+    "إدارة الحسابات والبطاقات والقروض تستخدم تبويبات الفعلي وإجراءات الإيقاف والاستئناف ونوافذ التأكيد. أُزيل زر الإضافة العام من الإدارة العادية. استُخدمت أعمدة الملكية الموجودة دون أي جداول أو أعمدة جديدة. يظل اعتماد التحويل المرتبط محميًا عند تغيير ملكية أحد طرفيه، مع مراجعة واحدة بدل تكرار الرسالتين."
   ]
 }

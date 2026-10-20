@@ -200,6 +200,17 @@ class RoomBetaDashboardSource(
                 }
                 result
             } else emptySet()
+            // Ownership columns already exist in each normalized registry. Read within this same snapshot.
+            val nonOwnedIds=hashSetOf<AssetId>()
+            if(schema>=14) database.query(SimpleSQLiteQuery("SELECT environment,bankId,localId,ownershipStatus,metadataRevision FROM beta_account_registry UNION ALL SELECT environment,bankId,localId,ownershipStatus,metadataRevision FROM beta_card_registry UNION ALL SELECT environment,bankId,localId,ownershipStatus,metadataRevision FROM beta_credit_facility UNION ALL SELECT environment,bankId,localId,ownershipStatus,metadataRevision FROM beta_loan_registry ORDER BY bankId,localId LIMIT ?",arrayOf(limits.assets+1))).use {cursor ->
+                var count=0
+                while(cursor.moveToNext()) {
+                    if(++count>limits.assets) throw BetaDashboardReadLimitExceeded("confirmed assets",limits.assets)
+                    repeat(5) {fingerprint(cursor.optional(it))}
+                    check(cursor.getString(3) in setOf("OWNED","UNKNOWN","EXTERNAL")) {"Invalid asset ownership"}
+                    if(cursor.getString(3)!="OWNED") nonOwnedIds+=AssetId(Environment.valueOf(cursor.getString(0)),BankId(cursor.getString(1)),cursor.getString(2))
+                }
+            }
             val assetMetadata=mutableMapOf<AssetId,com.baraa.masroof.lab.beta.application.BetaAssetMetadata>()
             val assets = com.baraa.masroof.lab.beta.application.ownedBetaAssets(database.query(SimpleSQLiteQuery(
                 "SELECT environment,bankId,localId,kind,last4,parentLocalId,creditCardRole,displayName,network,accountType,loanType FROM beta_asset " +
@@ -216,7 +227,7 @@ class RoomBetaDashboardSource(
                         cursor.optional(5)?.let { AssetId(id.environment, id.bank, it) }, cursor.optional(6)?.let(CreditCardRole::valueOf))
                 }
                 result
-            }, externalReferences)
+            }, externalReferences, nonOwnedIds)
             val registry = assets.associateBy { it.id }
             val registryBinding = dashboardRegistryBinding(assets)
             val unavailableObligations = linkedSetOf<AssetId>()

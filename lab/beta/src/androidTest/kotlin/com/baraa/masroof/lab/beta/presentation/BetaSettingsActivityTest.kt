@@ -132,5 +132,53 @@ class BetaSettingsActivityTest {
         } finally {BetaContainer.resetOffline(context)}
     }
 
+    @Test fun registryCardStopRequiresConfirmationAndResumeSurvivesRecreation() {
+        BetaContainer.resetOffline(context)
+        val bank=com.baraa.masroof.lab.finance.value.BankId("BANK_ALJAZIRA")
+        val id=com.baraa.masroof.lab.finance.asset.AssetId(com.baraa.masroof.lab.finance.value.Environment.BETA,bank,"tracking-card")
+        BetaContainer(context).use {beta ->
+            beta.acknowledgeStart()
+            beta.setBankEnabled(bank,true)
+            beta.saveManualAsset(com.baraa.masroof.lab.beta.application.ManualAssetDraft(id,
+                com.baraa.masroof.lab.finance.asset.AssetKind.CREDIT_CARD,"7271",id.copy(localId="facility"),
+                com.baraa.masroof.lab.finance.asset.CreditCardRole.STANDALONE,true,createCreditFacility=true))
+        }
+        fun await(tag: String) { compose.waitUntil(15000) {
+            compose.onAllNodesWithTag(tag).fetchSemanticsNodes(atLeastOneRootRequired=false).isNotEmpty()
+        }; compose.waitForIdle() }
+        try {
+            ActivityScenario.launch(BetaActivity::class.java).use {scenario ->
+                await("dashboard-ready")
+                compose.onNode(hasText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_settings)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
+                compose.onNodeWithTag("manage-CARDS").performScrollTo().performClick()
+                await("registry-tab-followed")
+                compose.onNodeWithTag("manage-add").assertDoesNotExist()
+                val stop="registry-stop-${bank.value}-${id.localId}"
+                val resume="registry-resume-${bank.value}-${id.localId}"
+                compose.onNodeWithTag(stop).performScrollTo().performClick()
+                compose.onNodeWithTag("registry-stop-cancel").performClick()
+                compose.onNodeWithTag(stop).assertExists()
+                compose.onNodeWithTag(stop).performScrollTo().performClick()
+                compose.onNodeWithTag("registry-stop-confirm").performClick()
+                compose.waitUntil(15000) {compose.onAllNodesWithTag("registry-stop-confirm").fetchSemanticsNodes().isEmpty()}
+                compose.onNodeWithTag("registry-tab-stopped").performClick()
+                await(resume)
+                scenario.recreate()
+                await(resume)
+                compose.onNodeWithTag(resume).performScrollTo().performClick()
+                compose.waitUntil(15000) {compose.onAllNodesWithTag(resume).fetchSemanticsNodes().isEmpty()}
+                compose.onNodeWithTag("registry-tab-followed").performClick()
+                await(stop)
+            }
+            waitForClose()
+            BetaContainer(context).use {beta ->
+                val restored=beta.assetTrackingSnapshot().single {it.asset.id==id}
+                assertEquals(com.baraa.masroof.lab.beta.application.BetaOwnershipStatus.OWNED,restored.status)
+                assertEquals(2L,restored.revision)
+                assertEquals(2,beta.assets().size)
+            }
+        } finally {waitForClose();BetaContainer.resetOffline(context)}
+    }
+
     private fun waitForClose() { val done = CountDownLatch(1); BetaIo.execute { done.countDown() }; assertTrue(done.await(15, TimeUnit.SECONDS)) }
 }

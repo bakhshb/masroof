@@ -1,6 +1,6 @@
 {
   "production_commit": "0d86c5d3",
-  "scope": "Eleven frozen-data native screen pairs only; no whole-app acceptance.",
+  "scope": "Fourteen frozen-data native pages only; no whole-app acceptance.",
   "entries": [
     {
       "page": "cards",
@@ -1590,6 +1590,438 @@
     },
     {
       "page": "review",
+      "language": "en",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myAccounts",
+      "language": "ar",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myAccounts",
+      "language": "ar",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myAccounts",
+      "language": "ar",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myAccounts",
+      "language": "ar",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myAccounts",
+      "language": "en",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myAccounts",
+      "language": "en",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myAccounts",
+      "language": "en",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myAccounts",
+      "language": "en",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myCards",
+      "language": "ar",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myCards",
+      "language": "ar",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myCards",
+      "language": "ar",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myCards",
+      "language": "ar",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myCards",
+      "language": "en",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myCards",
+      "language": "en",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myCards",
+      "language": "en",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myCards",
+      "language": "en",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myLoans",
+      "language": "ar",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myLoans",
+      "language": "ar",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myLoans",
+      "language": "ar",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myLoans",
+      "language": "ar",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myLoans",
+      "language": "en",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myLoans",
+      "language": "en",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myLoans",
+      "language": "en",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "myLoans",
       "language": "en",
       "theme": "dark",
       "position": "bottom",

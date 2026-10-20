@@ -29,15 +29,19 @@ import java.time.YearMonth
 @Composable
 internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit,
     banks: List<BetaBankChoice>, assets: List<OwnedAsset>, controls: BetaDashboardControls, busy: Boolean,
-    onBankEnabled: (BankId, Boolean) -> Unit, onAdd: (BankId, AssetKind) -> Unit, onEdit: (OwnedAsset) -> Unit,
+    onEdit: (OwnedAsset) -> Unit,
     onBusyChanged: (Boolean) -> Unit, onClose: () -> Unit,
     onRename: (OwnedAsset,String,Long,()->Unit) -> Unit = {_,_,_,_->}, failed: Boolean = false,
+    tracking: List<BetaTrackedAsset> = emptyList(),references: List<BetaOwnershipCandidate> = emptyList(),
+    onTracking: (BetaTrackedAsset,Boolean,()->Unit)->Unit = {_,_,_->},onOwnership: (BetaOwnershipCandidate,Boolean,AssetId?)->Unit = {_,_,_->},
+    onAccountType: (OwnedAsset,String,Long,()->Unit)->Unit = {_,_,_,_->},onRegistryTitle: (String?)->Unit = {},initialRegistryTab: String="followed",
     theme: String = "SYSTEM", language: String = "SYSTEM", cardTasks: List<BetaCardSetupTask> = emptyList(), metadata: Map<AssetId,BetaAssetMetadata> = emptyMap(), onConfigureTask: (BetaCardSetupTask) -> Unit = {}, onTheme: (String) -> Unit = {}, onLanguage: (String) -> Unit = {}, onData: () -> Unit = {}, onSetup: () -> Unit = {}, onReset: () -> Unit = {}, onDeveloper: () -> Unit = {},onHistory: () -> Unit = {}) {
     var renameId by rememberSaveable {mutableStateOf<String?>(null)}
     var renameBank by rememberSaveable {mutableStateOf<String?>(null)}
     var renameRevision by rememberSaveable {mutableLongStateOf(0)}
     var renameName by rememberSaveable {mutableStateOf("")}
-    val renameAsset=assets.singleOrNull {it.id.bank.value==renameBank && it.id.localId==renameId}
+    val renameAsset=(tracking.map {it.asset}.ifEmpty {assets}).singleOrNull {it.id.bank.value==renameBank && it.id.localId==renameId}
+    var typeTarget by remember {mutableStateOf<OwnedAsset?>(null)}
     var resetConfirmation by rememberSaveable { mutableStateOf(false) }
     BackHandler { if (!busy) { if (resetConfirmation) resetConfirmation = false else if (category == "HUB") onClose() else onCategory("HUB") } }
     Column(Modifier.testTag("beta-settings-panel"), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
@@ -69,48 +73,13 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
             BetaDashboardConfigurationPanel(controls, emptyList(), YearMonth.now(java.time.ZoneId.of("Asia/Riyadh")), !busy,
                 onBusyChanged, onSaved = {}, commitmentsOnly = true)
         } else {
-            val kinds = when (category) {
-                "ACCOUNTS" -> setOf(AssetKind.ACCOUNT)
-                "LOANS" -> setOf(AssetKind.LOAN)
-                else -> setOf(AssetKind.CREDIT_CARD, AssetKind.DEBIT_CARD)
-            }
-            banks.forEach { bank ->
-                Column(verticalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
-                MasroofCard {
-                    Text(stringResource(bankName(bank.bankId)), style = MaterialTheme.typography.titleMedium)
-                    if (category == "ACCOUNTS") {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(stringResource(if (bank.state == BankSelectionState.ENABLED) R.string.beta_bank_enabled else R.string.beta_bank_disabled), Modifier.weight(1f))
-                            Switch(bank.state == BankSelectionState.ENABLED, onCheckedChange = { onBankEnabled(bank.bankId, it) }, enabled = !busy,
-                                modifier = Modifier.testTag("manage-bank-${bank.bankId.value}"))
-                        }
-                    }
-                }
-                    if(category=="CARDS") cardTasks.filter { it.bank==bank.bankId && it.assetId==null }.forEach { task ->
-                        BetaManagementRow("•• "+task.suffix,stringResource(R.string.beta_parity_card_missing),MasroofOutlineIcons.CreditCard,!busy,{onConfigureTask(task)},modifier=Modifier.testTag("configure-card-${task.suffix}"))
-                    }
-                    assets.filter { it.id.bank == bank.bankId && it.kind in kinds }.forEach { asset ->
-                        com.baraa.masroof.lab.beta.presentation.approved.ApprovedRegistryItemCard(
-                            icon=if(category=="CARDS") MasroofOutlineIcons.CreditCard else if(category=="LOANS") MasroofOutlineIcons.HandCoins else MasroofOutlineIcons.Wallet,
-                            bankLabel=stringResource(bankName(bank.bankId)),
-                            title=approvedRegistryDisplayLabel(metadata[asset.id]?.displayName,stringResource(assetKindLabel(asset.kind)),asset.last4.orEmpty()),
-                            showBankLabel=false, modifier=Modifier.testTag("manage-asset-${asset.id.bank.value}-${asset.id.localId}"),
-                            onTitleClick=if(busy || category=="LOANS") null else ({
-                                renameId=asset.id.localId;renameBank=asset.id.bank.value
-                                renameName=metadata[asset.id]?.displayName.orEmpty();renameRevision=metadata[asset.id]?.revision ?: 0
-                            }),
-                            endAction={
-                                com.baraa.masroof.lab.beta.presentation.approved.ApprovedManagementAction(
-                                    stringResource(if(category=="CARDS") R.string.beta_approved_settings_card_setup else R.string.beta_asset_edit),
-                                    {onEdit(asset)},enabled=!busy)
-                            })
-                    }
-                    OutlinedButton(enabled = !busy && bank.state == BankSelectionState.ENABLED, onClick = {
-                        onAdd(bank.bankId, when (category) { "ACCOUNTS" -> AssetKind.ACCOUNT; "LOANS" -> AssetKind.LOAN; else -> AssetKind.CREDIT_CARD })
-                    }, modifier = Modifier.fillMaxWidth().testTag("manage-add-${bank.bankId.value}")) { Text(stringResource(R.string.beta_asset_add)) }
-                }
-            }
+            BetaRegistryManagementPanel(category,banks,tracking.ifEmpty {assets.map {BetaTrackedAsset(it,BetaOwnershipStatus.OWNED,metadata[it.id]?.revision ?: 0)}},
+                references,metadata,cardTasks,busy,initialRegistryTab,onCategory,onRegistryTitle,onRename={asset ->
+                    renameId=asset.id.localId;renameBank=asset.id.bank.value
+                    renameName=metadata[asset.id]?.displayName.orEmpty();renameRevision=metadata[asset.id]?.revision ?: 0
+                },onEdit=onEdit,onPickAccountType={typeTarget=it},onTracking,onOwnership,onConfigureTask)
         }
+
         if (category == "ABOUT") MasroofCard {
             Text(stringResource(R.string.beta_setup_lab_settings), style = MaterialTheme.typography.titleMedium)
             OutlinedButton(enabled = !busy, onClick = onSetup, modifier = Modifier.fillMaxWidth().testTag("settings-setup")) {
@@ -121,6 +90,14 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
             }
         }
 
+    }
+    typeTarget?.let {target ->
+        AlertDialog(onDismissRequest={if(!busy) typeTarget=null},title={Text(stringResource(R.string.beta_registry_settings_account_type_title))},
+            text={Column(verticalArrangement=Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
+                listOf("CURRENT","SAVINGS","WALLET").forEach {type -> TextButton(enabled=!busy && type!=metadata[target.id]?.accountType,onClick={
+                    onAccountType(target,type,metadata[target.id]?.revision ?: 0) {typeTarget=null}
+                },modifier=Modifier.testTag("registry-account-type-$type")) {Text(registryAccountType(type))}}
+            }},confirmButton={},dismissButton={TextButton(enabled=!busy,onClick={typeTarget=null}) {Text(stringResource(R.string.beta_registry_settings_cancel))}})
     }
     if(renameAsset!=null) com.baraa.masroof.lab.beta.presentation.approved.ApprovedRenameAssetDialog(
         "${renameAsset.id.bank.value}:${renameAsset.id.localId}",renameName,
