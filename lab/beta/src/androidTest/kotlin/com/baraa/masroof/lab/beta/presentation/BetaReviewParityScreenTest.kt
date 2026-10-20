@@ -62,9 +62,12 @@ class BetaReviewParityScreenTest {
                 actions.forEach {compose.onNodeWithTag("review-resolve-$it").assertExists()}
                 capture("ignored-$language-${mode.lowercase()}");click("review-restore")
                 await("review-filter-pending");click("review-filter-pending");await("review-item-0")
+                click("history-review-0");click("review-resolve-EXPENSE");await("review-empty")
+                compose.onNodeWithTag("review-select-source").assertDoesNotExist()
+                compose.onNodeWithTag("review-select-destination").assertDoesNotExist()
             }
             val done=CountDownLatch(1);BetaIo.execute {done.countDown()};assertTrue(done.await(20,TimeUnit.SECONDS))
-            BetaContainer(context).use {beta ->assertEquals(1,beta.reviewInboxPage().rows.size);assertTrue(beta.reviewInboxPage(ignored=true).rows.isEmpty())}
+            BetaContainer(context).use {beta ->assertTrue(beta.reviewInboxPage().rows.isEmpty());assertTrue(beta.reviewInboxPage(ignored=true).rows.isEmpty())}
         } finally {BetaContainer.resetOffline(context)}
     }
 }

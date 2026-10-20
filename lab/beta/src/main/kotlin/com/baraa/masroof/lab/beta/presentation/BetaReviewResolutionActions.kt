@@ -39,12 +39,11 @@ internal fun BetaReviewResolutionActions(detail: BetaReviewDetail,busy: Boolean,
     fun request(type: String)=betaApprovalDraft(preview,type,source,destination,detail.income?.name)
     if(detail.actions.isNotEmpty() && !restore) DashboardSectionHeading(stringResource(R.string.beta_review_parity_actions),MasroofOutlineIcons.ShieldCheck)
     detail.actions.forEach {type ->
-        Button(enabled=!busy,onClick={val ready=request(type.name)
-            if(ready!=null && type==detail.suggestedType) onApprove(ready) else {
-                selectedType=type.name
-                val incomingChoice=type in setOf(FinancialType.INCOME,FinancialType.REFUND,FinancialType.EXTERNAL_TRANSFER_IN)
-                source=if(incomingChoice) "external" else choice(detail.source)
-                destination=if(incomingChoice || type in setOf(FinancialType.LOAN_REPAYMENT,FinancialType.CREDIT_CARD_PAYMENT)) null else "external"
+        Button(enabled=!busy,onClick={
+            val endpoints=betaReviewDefaultEndpoints(detail,type)
+            val ready=betaApprovalDraft(preview,type.name,endpoints.first,endpoints.second,detail.income?.name)
+            if(ready!=null) onApprove(ready) else {
+                selectedType=type.name;source=endpoints.first;destination=endpoints.second
             }},shape=MaterialTheme.shapes.medium,
             modifier=Modifier.fillMaxWidth().testTag("review-resolve-${type.name}")) {
             Icon(reviewTypeIcon(type),null,Modifier.size(MasroofIconSizes.moneyRowLeading));Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))

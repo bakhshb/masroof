@@ -66,6 +66,8 @@ class BetaReportedMessagesChecks(private val context: Context) {
                 assertEquals(0,requireNotNull(snapshot.loans.single().remaining).amount.compareTo("30361.14".toBigDecimal()))
                 assertEquals(0,requireNotNull(snapshot.loans.single().latestInstallment).amount.compareTo("3036.11".toBigDecimal()))
                 assertTrue(beta.assets().none {it.last4 in setOf("9466","3673")})
+                // A credit purchase does not prove which bank account should receive manual income.
+                assertNull(betaReviewDefaultEndpoints(beta.reviewDetail(ids.first()),FinancialType.INCOME).second)
                 beta.processAutomaticEvidence()
                 assertEquals(5,beta.dashboard(query).snapshot.transactions.size)
             }
@@ -76,12 +78,18 @@ class BetaReportedMessagesChecks(private val context: Context) {
         try {BetaContainer(context).use {beta ->
             beta.acknowledgeStart();beta.setBankEnabled(bank,true)
             val account=beta.saveManualAsset(ManualAssetDraft(AssetId(Environment.BETA,bank,"restore-account"),AssetKind.ACCOUNT,"3001",ownedConfirmed=true))
+            beta.saveManualAsset(ManualAssetDraft(AssetId(Environment.BETA,bank,"unrelated-loan"),AssetKind.LOAN,"",ownedConfirmed=true,
+                metadata=com.baraa.masroof.lab.beta.application.BetaAssetMetadata(loanType="PERSONAL")))
             val id=(beta.importEvidence(EvidenceRequest("restore",EvidenceOrigin.EXPLICIT_HISTORY,setOf(bank)),listOf(EvidenceMessage("restore","AlJazira",
                 "خصم: قسط تمويل\nمن: 3001\nالقسط: SAR 20\nلـ: تمويل\nفي: 2026-10-18 01:10",Instant.parse("2026-10-17T22:11:00Z"),ReceiptTimeSource.PROVIDER_TIMESTAMP))).single() as EvidenceResult.Stored).summary.id
             beta.processAutomaticEvidence();beta.resolveReviewAsNonFinancial(id)
             assertEquals(1,beta.reviewInboxPage(ignored=true).rows.size)
             val preview=requireNotNull(beta.financialApprovalPreview(id))
-            val request=requireNotNull(betaApprovalDraft(preview,FinancialType.FEE.name,betaAssetChoiceKey(account.id),"external",null))
+            val detail=beta.reviewDetail(id)
+            assertNull(betaReviewDefaultEndpoints(detail,FinancialType.LOAN_REPAYMENT).second) // A sole unrelated loan is not a proved destination.
+            val endpoints=betaReviewDefaultEndpoints(detail,FinancialType.FEE)
+            assertEquals(betaAssetChoiceKey(account.id),endpoints.first)
+            val request=requireNotNull(betaApprovalDraft(preview,FinancialType.FEE.name,endpoints.first,endpoints.second,null))
             val faultDb=Room.databaseBuilder(context,BetaDatabase::class.java,BetaDatabase.NAME).build()
             try {
                 faultDb.openHelper.writableDatabase.execSQL("CREATE TRIGGER restore_classification_failure BEFORE INSERT ON beta_financial_transaction BEGIN SELECT RAISE(ABORT,'synthetic'); END")

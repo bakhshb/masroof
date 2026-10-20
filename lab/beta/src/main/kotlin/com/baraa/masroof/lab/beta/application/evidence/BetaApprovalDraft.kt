@@ -2,6 +2,8 @@ package com.baraa.masroof.lab.beta.application.evidence
 
 import com.baraa.masroof.lab.finance.classification.*
 import com.baraa.masroof.lab.finance.posting.*
+import com.baraa.masroof.lab.finance.asset.AssetId
+import com.baraa.masroof.lab.finance.asset.AssetKind
 
 fun betaAssetChoiceKey(id: com.baraa.masroof.lab.finance.asset.AssetId): String = "asset:${id.environment.name}:${id.bank.value}:${id.localId}"
 
@@ -20,4 +22,25 @@ fun betaApprovalDraft(preview: BetaFinancialApprovalPreview, type: String?, sour
     if (FinancialImpactClassifier.classify(input) !is FinancialClassification.Classified) return null
     return BetaFinancialApproval(preview.item.evidenceId, preview.item.archiveRevision, preview.item.postingRevision, selectedType,
         (input.source as? FinancialEndpoint.Owned)?.id, (input.destination as? FinancialEndpoint.Owned)?.id, attribution, preview.registryRevision)
+}
+
+/** Reclassification preserves the proven owned side when reversing direction. Never picks an
+ * unrelated registry entity merely because there is only one account/card/loan in the bank. */
+fun betaReviewDefaultEndpoints(detail: BetaReviewDetail,type: FinancialType): Pair<String?,String?> {
+    val assets=detail.preview?.assets.orEmpty().associateBy {it.id}
+    fun key(id: AssetId?,kinds: Set<AssetKind>): String? =
+        id?.takeIf {assets[it]?.kind in kinds}?.let(::betaAssetChoiceKey)
+    val account=setOf(AssetKind.ACCOUNT)
+    val credit=setOf(AssetKind.CREDIT_CARD)
+    val spending=account+credit
+    fun owned(kinds: Set<AssetKind>)=key(detail.source,kinds) ?: key(detail.destination,kinds)
+    return when(type) {
+        FinancialType.INCOME,FinancialType.EXTERNAL_TRANSFER_IN -> "external" to owned(account)
+        FinancialType.REFUND -> "external" to (key(detail.destination,spending) ?: key(detail.source,spending))
+        FinancialType.CREDIT_CARD_PAYMENT -> owned(account) to (key(detail.destination,credit) ?: key(detail.source,credit))
+        FinancialType.LOAN_REPAYMENT -> owned(account) to key(detail.destination,setOf(AssetKind.LOAN))
+        FinancialType.CASH_WITHDRAWAL,FinancialType.EXTERNAL_TRANSFER_OUT -> owned(account) to "external"
+        FinancialType.EXPENSE,FinancialType.BILL_PAYMENT,FinancialType.FEE -> owned(spending) to "external"
+        else -> null to null
+    }
 }
