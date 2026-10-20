@@ -24,12 +24,13 @@ import com.baraa.masroof.lab.finance.posting.PostingKey
 /** Source TransactionListScreen toolbar and independent list; no money totals are computed here. */
 @Composable
 internal fun BetaDashboardTransactions(snapshot: DashboardSnapshot, rows: List<TransactionFacts> = snapshot.transactions,
-    enabled: Boolean, onTransaction: (PostingKey) -> Unit, complete: Boolean = true, bounded: Boolean = false,onShare: (BetaListShare?)->Unit = {}) {
+    enabled: Boolean, onTransaction: (PostingKey) -> Unit, complete: Boolean = true, bounded: Boolean = false,onShare: (BetaListShare?)->Unit = {},openGeneration: Int=0) {
     var search by rememberSaveable {mutableStateOf("")}
     var types by rememberSaveable {mutableStateOf(emptyList<String>())}
     var accounts by rememberSaveable {mutableStateOf(emptyList<String>())}
     var cards by rememberSaveable {mutableStateOf(emptyList<String>())}
     var sheet by rememberSaveable {mutableStateOf(false)}
+    var appliedGeneration by rememberSaveable {mutableIntStateOf(openGeneration)}
     val labels=dashboardAssetLabels(snapshot).toMutableMap().apply {snapshot.accounts.forEach {put(it.id,betaAccountDisplayLabel(it))}}
     val availableTypes=remember(rows) {BetaTransactionListWorkflow.types(rows)}
     val availableAccounts=remember(snapshot,rows) {BetaTransactionListWorkflow.accounts(snapshot,rows)}
@@ -45,6 +46,9 @@ internal fun BetaDashboardTransactions(snapshot: DashboardSnapshot, rows: List<T
     val typeChoices=listOf("" to allTypes)+availableTypes.map {it.name to stringResource(financialTypeLabel(it))}+listOf("advanced" to advanced)
     val sourceChoices=listOf("" to allSources)+(availableAccounts+availableCards).map {betaAssetChoiceKey(it) to labels[it].orEmpty()}
     fun clear() {search="";types=emptyList();accounts=emptyList();cards=emptyList();sheet=false}
+    LaunchedEffect(openGeneration) {
+        if(appliedGeneration!=openGeneration) {clear();appliedGeneration=openGeneration}
+    }
     fun open(id: String) {rows.singleOrNull {it.key.transactionId==id}?.let {onTransaction(it.key)}}
     Column(if(bounded) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
         if(rows.isEmpty() && complete) {

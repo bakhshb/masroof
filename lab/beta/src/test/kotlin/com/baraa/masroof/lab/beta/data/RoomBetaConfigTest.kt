@@ -47,6 +47,12 @@ class RoomBetaConfigTest {
         BetaRecurringCommitment("rent", "Synthetic rent", Money.of("100", Currency.SAR), 5, YearMonth.of(2026, 1),
             paidMonths = if (paid) setOf(YearMonth.of(2026, 10)) else emptySet())))
 
+    @Test fun salaryAndCommitmentEditsPreserveRegistryPauseAndSourceFacts() = runBlocking {
+        val expected=com.baraa.masroof.lab.beta.verification.BetaCommitmentPreservationChecks.editsPreserveRegistryFacts(db)
+        db.close();db=openDb()
+        assertEquals(expected,db.dashboardConfigurationDao().commitments().single())
+    }
+
     @Test fun durableAuthorityAndReadOnly() = runBlocking {
         val unknown = source().load(query)
         assertFalse(unknown.coverage.completeUserCommitments); assertNull(unknown.periods.salary)

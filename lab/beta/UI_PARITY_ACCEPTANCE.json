@@ -325,16 +325,16 @@
     "beta_fix_no_matches"
   ],
   "verified_tests": {
-    "lab_jvm": 322,
+    "lab_jvm": 323,
     "bank_engine": 58,
     "finance_core": 180,
     "android16_full": {
       "passed": 199,
       "total": 199,
       "failed": 0,
-      "scope": "Full Android 16 suite after source transaction-list port and CI rename-readiness fix. Final digit-comparison refinement is validated separately by targeted filter tests. Final digit comparison and calculator placement passed all 322 JVM tests, lint, and four targeted native tests including the actual Activity."
+      "scope": "Full Android 16 suite after source transaction-list port and CI rename-readiness fix. Final digit-comparison refinement is validated separately by targeted filter tests. Final digit comparison and calculator placement passed all 322 JVM tests, lint, and four targeted native tests including the actual Activity. Subsequent registry-fact preservation and navigation-generation changes passed all 323 JVM tests, lint and five targeted Android tests; they do not claim a second full 200-test run."
     },
-    "ci": "46bad459: one async card-rename assertion failed; persisted-name readiness fix verified locally, next-head CI pending.",
+    "ci": "60712511: all GitHub CI and isolated-lab checks passed. The subsequent commitment-preservation/navigation follow-up is pending CI after push.",
     "android16_followup": {
       "passed": 20,
       "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
@@ -405,9 +405,17 @@
       "android_final_targeted_passed": 4,
       "android_full_passed": 199,
       "paired_list_bodies_identical": 8,
-      "lint": "passed"
+      "lint": "passed",
+      "new_navigation_requests_reset_filter": true
     },
-    "report_visual_review": "Rendered the top and actionable audit sections with headless Chrome; inspected their PNGs. Scope is report readability, not application acceptance."
+    "report_visual_review": "Rendered the top and actionable audit sections with headless Chrome; inspected their PNGs. Scope is report readability, not application acceptance.",
+    "commitment_storage_followup": {
+      "jvm_total_passed": 323,
+      "targeted_configuration_tests_passed": 10,
+      "native_preservation_test_passed": 1,
+      "native_final_targeted_passed": 5,
+      "scope": "Reproduced metadata loss with a failing test before the fix. Salary and commitment-name edits now preserve active/pauseIntervals/sourceTransactionId across SQLite reopen. The same helper runs on Robolectric and Android. No schema/table/column changes in this follow-up."
+    }
   },
   "implementation_notes": [
     "المرجع هو docs/DESIGN_SYSTEM.md وكود الفعلي عند 0d86c5d3. يوضح سجل المصادر الملفات والرموز المنقولة. لم يُعلن اكتمال نقل جميع الرحلات.",
@@ -425,7 +433,8 @@
     "أظهر CI سباق تزامن في الاختبار بعد فتح رسالة متجاهلة؛ أصبح الاختبار ينتظر اكتمال التفاصيل بظهور إجراء الاستعادة، ثم يفحص جميع خيارات التصنيف دون حذف أي تحقق.",
     "Registry management now uses source SettingsBankAccounts/Cards/Loans presentation, fixed followed/unconfirmed/stopped tabs and confirmation dialogs. Existing ownershipStatus columns are wired to registry visibility, dashboard snapshots and durable automatic replay. No new tables, columns or production changes. Full identity + revision is required for every tracking action; unresolved linked transfer ownership preserves the engine match-identity review gate.",
     "إدارة الحسابات والبطاقات والقروض تستخدم تبويبات الفعلي وإجراءات الإيقاف والاستئناف ونوافذ التأكيد. أُزيل زر الإضافة العام من الإدارة العادية. استُخدمت أعمدة الملكية الموجودة دون أي جداول أو أعمدة جديدة. يظل اعتماد التحويل المرتبط محميًا عند تغيير ملكية أحد طرفيه، مع مراجعة واحدة بدل تكرار الرسالتين.",
-    "قائمة الحركات تستخدم الآن أدوات الفعلي والتمرير المستقل والبحث والفلاتر المتعددة والإلغاء/التطبيق وزر مشاركة القائمة المفلترة. أصلحت المقارنة عنوان الصفحة والمسافة السفلية وترتيب التعادل في التوقيت. تفاصيل الحركة وحالات بقية الصفحات تبقى مفتوحة."
+    "قائمة الحركات تستخدم الآن أدوات الفعلي والتمرير المستقل والبحث والفلاتر المتعددة والإلغاء/التطبيق وزر مشاركة القائمة المفلترة. أصلحت المقارنة عنوان الصفحة والمسافة السفلية وترتيب التعادل في التوقيت. تفاصيل الحركة وحالات بقية الصفحات تبقى مفتوحة.",
+    "أُصلح مسح حالة الالتزام وسجل توقفه ورابطه عند تغيير إعدادات أخرى، واختُبر الحفظ بعد إعادة الفتح. هذا إصلاح حفظ جزئي؛ نموذج التكرار المتقدم وإدارة الالتزام من المصدر ما زالا مفتوحين. أُضيف أيضًا جيل التنقل لمطابقة حفظ الفلاتر عند الرجوع وإعادة ضبطها عند فتح الحركات من جديد."
   ],
   "source_page_inventory": [
     {
@@ -752,8 +761,8 @@
       "id": "CI-001",
       "finding_ar": "اختبار التسمية كان يعتبر إغلاق النافذة دليلًا على وصول اسم البطاقة الجديد إلى الصفحة. هذا تزامن غير مضمون.",
       "action_ar": "انتظار الاسم المحفوظ نفسه، مع إبقاء فحص الهوية والبيانات بعد إعادة الفتح.",
-      "status": "fixed_pending_final_ci",
-      "evidence": "BetaSettingsActivityTest.approvedCardTitleRenameRestoresDraftAndPreservesIdentityOnReopen; previous failing GitHub job 118606034221."
+      "status": "fixed",
+      "evidence": "BetaSettingsActivityTest.approvedCardTitleRenameRestoresDraftAndPreservesIdentityOnReopen; previous failing GitHub job 118606034221. All GitHub checks passed at 60712511, including emulator-beta (job 118637754106)."
     },
     {
       "id": "UI-001",
@@ -792,10 +801,10 @@
     },
     {
       "id": "DATA-001",
-      "finding_ar": "إعداد الالتزامات الحالي يعيد إنشاء الصفوف ولا يعرض خصائص active وpauseIntervals وsourceTransactionId الموجودة؛ واجهة الفعلي تدعم أيضًا تكرارًا أسبوعيًا وسنويًا. نقل الشكل وحده لا يكفي.",
-      "action_ar": "إكمال نموذج الالتزام وإجراءاته وحفظ خصائصه وسجله، وربط الملخص والتعديل بنفس دورة حياة الفعلي.",
-      "status": "open",
-      "evidence": "RoomBetaDashboardConfiguration.BetaDashboardConfigurationDao.put/all; BetaRecurringCommitment; BetaCommitmentRecord; SettingsCommitmentsScreen."
+      "finding_ar": "تغيير يوم الراتب أو تسمية الالتزام كان يعيد صف الالتزام إلى نشط ويمسح فترات توقفه ورابط الحركة الأصلية.",
+      "action_ar": "حفظ الحقول التي لا تملكها واجهة إعداد الدورة والمبلغ عند استبدال صفوفها؛ تحقق مماثل على JVM وSQLite في الجهاز مع إعادة الفتح.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "RoomBetaConfigTest.salaryAndCommitmentEditsPreserveRegistryPauseAndSourceFacts; BetaCommitmentPreservationTest; failing-before/passing-after reproduction."
     },
     {
       "id": "SEARCH-001",
@@ -803,6 +812,20 @@
       "action_ar": "توحيد الأرقام للمقارنة فقط مع إبقاء النص والبيانات المحفوظة كما هي، واختبار الإدخال العربي والفارسي والأسماء المستوردة.",
       "status": "fixed_pending_final_ci",
       "evidence": "BetaTransactionListWorkflow.matchesSearch; BetaTransactionListWorkflowTest; BetaTransactionListScreenTest."
+    },
+    {
+      "id": "DATA-002",
+      "finding_ar": "نموذج الالتزام الحالي وقراءته للداشبورد ما زالا محدودين بالشهر؛ لا يثبتان التكرار الأسبوعي/السنوي وسجل الإيقاف والربط وإجراءات الفعلي.",
+      "action_ar": "إكمال النموذج والحفظ والحسابات والواجهات من المصدر؛ حماية الحقول لا تعني اكتمال دورة الحياة.",
+      "status": "open",
+      "evidence": "BetaRecurringCommitment; BetaConfiguredPeriods; SettingsCommitmentsScreen; SettingsCommitmentEditorScreen; CommitmentFromTransactionService."
+    },
+    {
+      "id": "NAV-001",
+      "finding_ar": "حفظ حالة القائمة عند الرجوع من التفاصيل يجب ألا يحوّل الفلتر إلى حالة دائمة عند فتح الحركات بطلب تنقل جديد.",
+      "action_ar": "تمرير جيل طلب التنقل واستخدام قاعدة الفعلي: حفظ الحالة للرجوع وإعادة الإنشاء، وإعادة الضبط لفتح جديد.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "BetaDashboardTransactions.openGeneration; BetaTransactionListScreenTest; BetaConfirmedJourneyScreenTest."
     }
   ]
 }

@@ -215,7 +215,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
                         "DAILY" -> BetaDailyExpensesPage(snapshot,interactive,DashboardSection.RUNTIME_SOURCE !in read.unavailableSections,
                             {selectedTransaction=it})
                     }
-                    if (selectedId == null && selectedTransaction == null && route == "TRANSACTIONS") BetaDashboardTransactions(snapshot, enabled = interactive, onTransaction = { selectedTransaction = it.transactionId }, complete = DashboardSection.RUNTIME_SOURCE !in read.unavailableSections,bounded=ownsScroll,onShare=onListShare)
+                    if (selectedId == null && selectedTransaction == null && route == "TRANSACTIONS") BetaDashboardTransactions(snapshot, enabled = interactive, onTransaction = { selectedTransaction = it.transactionId }, complete = DashboardSection.RUNTIME_SOURCE !in read.unavailableSections,bounded=ownsScroll,onShare=onListShare,openGeneration=routeRequest)
                     if (selectedId == null && selectedTransaction == null && route == "CONFIGURATION") BetaDashboardConfigurationPanel(controls, snapshot.creditFacilities, month, interactive,
                         onBusyChanged = { controlsBusy = it; onBusyChanged(it) }, onSaved = { retry++ })
                     }

@@ -28,9 +28,10 @@ class BetaTransactionListScreenTest {
     }
     private fun count(value: Int)=compose.onNodeWithText(compose.activity.getString(R.string.beta_list_dashboard_summary_transactions_title,value))
     @Test fun filterDraftRestoresAndCancelDiscardsWhileApplyAndClearUpdateOnlyTheList() {
+        val generation=mutableIntStateOf(0)
         val restoration=StateRestorationTester(compose)
         restoration.setContent {BetaLocaleProvider("en") {MasroofTheme {Box(Modifier.fillMaxSize()) {
-            BetaDashboardTransactions(snapshot,enabled=true,onTransaction={},bounded=true)
+            BetaDashboardTransactions(snapshot,enabled=true,onTransaction={},bounded=true,openGeneration=generation.intValue)
         }}}}
         count(17).assertExists()
         advanced()
@@ -49,6 +50,11 @@ class BetaTransactionListScreenTest {
         compose.onNodeWithTag("transactions-search").performTextReplacement("٨٠٠")
         count(1).assertExists()
         compose.onNodeWithTag("transactions-clear").performClick()
+        count(17).assertExists()
+        compose.onNodeWithTag("transactions-search").performTextReplacement("NOON")
+        count(2).assertExists()
+        compose.runOnIdle {generation.intValue++}
+        compose.waitUntil(10000) {compose.onAllNodesWithText(compose.activity.getString(R.string.beta_list_dashboard_summary_transactions_title,17)).fetchSemanticsNodes().isNotEmpty()}
         count(17).assertExists()
         assertEquals(17,snapshot.transactions.size)
         compose.onNodeWithTag("transactions-more").assertDoesNotExist()

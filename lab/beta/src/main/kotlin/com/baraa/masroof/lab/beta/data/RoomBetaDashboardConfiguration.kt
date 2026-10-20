@@ -28,9 +28,15 @@ internal data class BetaDashboardConfigurationEntity(val id: Int,val revision: L
     }
     suspend fun put(row: BetaDashboardConfigurationEntity) {
         val j=JSONObject(row.payload); val array=j.getJSONArray("commitments")
+        // This facade owns cycle/amount/date settings, not registry tracking or provenance.
+        // Preserve those normalized facts when replacing its editable projection.
+        val existing=commitments().associateBy {it.id}
         val commitments=(0 until array.length()).map { index -> val c=array.getJSONObject(index)
             BetaCommitmentRecord(c.getString("id"),c.getString("label"),c.getString("amount"),c.optString("currency","SAR"),
-                c.getInt("day"),c.getString("starts"),if(c.isNull("ends")) null else c.getString("ends"),paidMonths=c.getJSONArray("paid").toString()) }
+                c.getInt("day"),c.getString("starts"),if(c.isNull("ends")) null else c.getString("ends"),paidMonths=c.getJSONArray("paid").toString()).let {changed ->
+                    existing[changed.id]?.let {previous -> changed.copy(active=previous.active,
+                        pauseIntervals=previous.pauseIntervals,sourceTransactionId=previous.sourceTransactionId)} ?: changed
+                } }
         clearCommitments(); saveCommitments(commitments)
         j.remove("commitments")
         appendAudit(BetaAuditRecord(auditId("FINANCIAL_CONFIGURATION",row.revision),"FINANCIAL_CONFIGURATION",targetId="periods",transition=row.revision,payload=j.toString()))
