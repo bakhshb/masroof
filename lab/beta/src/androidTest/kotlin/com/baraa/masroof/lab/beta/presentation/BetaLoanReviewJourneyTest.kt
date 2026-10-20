@@ -54,7 +54,11 @@ class BetaLoanReviewJourneyTest {
             compose.onNodeWithTag("asset-kind-CREDIT_CARD").assertDoesNotExist()
             compose.onNodeWithTag("asset-kind-DEBIT_CARD").assertDoesNotExist()
             click("asset-loan-type-PERSONAL");click("asset-owned-confirm");click("asset-save")
+            // The message remains composed beneath the sheet while the financial save runs.
+            // Wait for sheet dismissal and re-enabled controls before testing Back.
+            compose.waitUntil(20000) {compose.onAllNodesWithTag("asset-save").fetchSemanticsNodes().isEmpty()}
             await("review-configure-loan")
+            compose.waitUntil(20000) {runCatching {compose.onNodeWithTag("review-configure-loan").assertIsEnabled();true}.getOrDefault(false)}
             compose.onNodeWithTag("manage-CARDS").assertDoesNotExist()
             compose.onNodeWithTag("review-resolve-LOAN_REPAYMENT").assertExists()
             scenario.onActivity {it.onBackPressedDispatcher.onBackPressed()}
@@ -66,6 +70,9 @@ class BetaLoanReviewJourneyTest {
         }
             val done=CountDownLatch(1);BetaIo.execute {done.countDown()};assertTrue(done.await(20,TimeUnit.SECONDS))
             BetaContainer(context).use {beta ->assertEquals(1,beta.assets().count {it.kind==AssetKind.LOAN})}
-        } finally {BetaContainer.resetOffline(context)}
+        } finally {
+            val closed=CountDownLatch(1);BetaIo.execute {closed.countDown()};assertTrue(closed.await(20,TimeUnit.SECONDS))
+            BetaContainer.resetOffline(context)
+        }
     }
 }

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="beta_startup_title">Could not open the lab</string>
+    <string name="beta_startup_processing_failed">Saved message processing could not finish. Your data is retained. Retry to finish processing and open the lab.</string>
+</resources>

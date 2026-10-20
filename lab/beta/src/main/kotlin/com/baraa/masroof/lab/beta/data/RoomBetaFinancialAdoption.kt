@@ -194,7 +194,8 @@ class RoomBetaFinancialAdoption(private val database: BetaDatabase) {
 
     /** Complete current candidate pool; neither amount nor a suffix alone chooses a pair. */
     private suspend fun postAutomaticSelfTransfer(input: FinancialClassificationInput, id: String, outcome: BetaEvidenceOutcomeEntity) {
-        fun observation(value: FinancialClassificationInput, family: String)=TransferObservation(value,
+        fun scoped(value: FinancialClassificationInput)=value.copy(assets=value.assets.filterKeys {it in financialRegistryDependencies(value)})
+        fun observation(value: FinancialClassificationInput, family: String)=TransferObservation(scoped(value),
             if(family=="TRANSFER_OUT") TransferDirection.OUTBOUND else TransferDirection.INBOUND)
         val family=currentArchive(outcome).getJSONObject("facts").getString("family")
         val nearby=dao.bank(rawBank(outcome)).filter { it.approvalRequest==AUTOMATIC_AUTHORITY && it.status=="ACTIVE" && it.transactionId!=input.key.transactionId }
@@ -205,7 +206,12 @@ class RoomBetaFinancialAdoption(private val database: BetaDatabase) {
             } }
         val own=ledger.readAudit(input.key)?.takeIf {it.matchIdentity?.kind=="BANK_NOTICES"}
         val existing=own ?: nearby.singleOrNull()
-        val pool=(existing?.observations.orEmpty().filter {it.input.key!=input.key} + observation(input,family))
+        // Replace in place: observation order is part of the exact persisted payload.
+        // Removing the canonical notice and appending it reverses a valid pair on replay,
+        // causing REVISION_PAYLOAD at an otherwise unchanged revision.
+        val updated=observation(input,family)
+        val originals=existing?.observations.orEmpty().map {it.copy(input=scoped(it.input))}
+        val pool=if(originals.any {it.input.key==input.key}) originals.map {if(it.input.key==input.key) updated else it} else originals+updated
         val canonical=existing?.command?.key ?: input.key
         val result=if(nearby.size>1) TransferMatchResult.Review(setOf(ReviewReason.AMBIGUOUS_MATCH))
             else SelfTransferMatcher.match(pool,TransferMatchProof.BankNotices(canonical))
@@ -222,7 +228,12 @@ class RoomBetaFinancialAdoption(private val database: BetaDatabase) {
         val matched=SelfTransferMatcher.match(revised,TransferMatchProof.BankNotices(canonical)) as? TransferMatchResult.Matched ?: return
         val posted=ledger.post(matched.transfer)
         if(posted !is FinancialPostingResult.Applied && posted !is FinancialPostingResult.AlreadyApplied) {
-            error("Automatic self-transfer write incomplete")
+            // A conservative domain rejection needs a scoped human decision, like ordinary
+            // automatic postings. Actual database exceptions still escape and keep startup blocked.
+            dao.put(BetaFinancialAdoptionEntity(id,input.key.transactionId,rawBank(outcome),fingerprint(outcome),"REVIEW","AUTOMATIC_POSTING_REVIEW",
+                BetaLedgerCodec.encodeInput(input),input.revision.correction,input.revision.interpretation,AUTOMATIC_AUTHORITY,input.revision.interpretation))
+            (nearby+listOfNotNull(own)).forEach {p -> dao.transaction(p.command.key.transactionId)?.let {dao.hold(it.evidenceId,"AUTOMATIC_POSTING_REVIEW")} }
+            return
         }
         val canonicalId=canonical.transactionId.removePrefix("evidence:")
         val canonicalOutcome=requireNotNull(database.evidenceDao().outcome(canonicalId))

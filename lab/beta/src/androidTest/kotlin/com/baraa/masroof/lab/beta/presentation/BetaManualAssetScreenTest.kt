@@ -7,7 +7,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.lab.beta.BetaContainer
 import com.baraa.masroof.lab.beta.application.ManualAssetDraft
@@ -45,7 +44,8 @@ class BetaManualAssetScreenTest {
     private fun confirmOwnership() {
         // Real IME animations are outside Compose's idle clock. Finish text entry
         // before scrolling/clicking so a changing keyboard inset cannot move the target.
-        closeSoftKeyboard()
+        compose.onNodeWithTag("asset-last4").performImeAction()
+        compose.waitForIdle()
         compose.onNodeWithTag("asset-owned-confirm").performScrollTo()
             .assertIsDisplayed().performClick().assertIsOn()
         compose.onNodeWithTag("asset-save").assertIsDisplayed().assertIsEnabled()

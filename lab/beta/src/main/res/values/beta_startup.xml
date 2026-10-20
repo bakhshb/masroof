@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="beta_startup_title">تعذر فتح المختبر</string>
+    <string name="beta_startup_processing_failed">تعذر إكمال معالجة الرسائل المحفوظة. بياناتك محفوظة. أعد المحاولة لإكمال المعالجة ثم فتح المختبر.</string>
+</resources>

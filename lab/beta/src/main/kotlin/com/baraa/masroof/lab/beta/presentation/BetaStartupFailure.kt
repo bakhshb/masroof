@@ -13,10 +13,10 @@ import com.baraa.masroof.lab.beta.R
 import com.baraa.masroof.lab.beta.presentation.theme.BetaSpacing
 
 @Composable
-internal fun BetaStartupFailure(onRetry: () -> Unit, onReturn: () -> Unit) {
+internal fun BetaStartupFailure(onRetry: () -> Unit, onReturn: () -> Unit, processing: Boolean = false) {
     Column(Modifier.padding(BetaSpacing.screen).testTag("beta-startup-failure"), verticalArrangement = Arrangement.spacedBy(BetaSpacing.section)) {
-        Text(stringResource(R.string.beta_settings_title))
-        Text(stringResource(R.string.beta_startup_failed))
+        Text(stringResource(R.string.beta_startup_title))
+        Text(stringResource(if(processing) R.string.beta_startup_processing_failed else R.string.beta_startup_failed))
         OutlinedButton(onClick = onRetry, modifier = Modifier.testTag("beta-startup-retry")) { Text(stringResource(R.string.beta_retry)) }
         OutlinedButton(onClick = onReturn) { Text(stringResource(R.string.beta_return)) }
     }

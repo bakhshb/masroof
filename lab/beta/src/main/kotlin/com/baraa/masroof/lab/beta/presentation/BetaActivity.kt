@@ -41,9 +41,10 @@ class BetaActivity : ComponentActivity() {
             val container = try { withContext(BetaIo.dispatcher) {
                 BetaContainer(applicationContext).also { betaContainer = it }
             } } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (_: Exception) {
+            catch (error: Exception) {
+                recordStartupFailure("OPEN_STORAGE",error)
                 setContent { com.baraa.masroof.ui.theme.MasroofTheme {
-                    BetaShell(markerCount = 0, restoreMissing = false, showMaintenanceActions = false,
+                    BetaShell(markerCount = 0, restoreMissing = false, showMaintenanceActions = false, showReturn = false,
                         editor = { BetaStartupFailure(onRetry = { recreate() }, onReturn = { finish() }) },
                         onReturn = { finish() }, onReset = {}, onBackup = {}, onRestore = {})
                 } }
@@ -140,7 +141,8 @@ class BetaActivity : ComponentActivity() {
                         return true
                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
                         throw cancelled
-                    } catch (_: Exception) {
+                    } catch (error: Exception) {
+                        recordStartupFailure(if(automaticProcessing) "AUTOMATIC_PROCESSING" else "LOAD_STATE",error)
                         banks = emptyList()
                         automationFailed = automaticProcessing
                         failed = true
@@ -190,11 +192,11 @@ class BetaActivity : ComponentActivity() {
                 }
                 if (!loaded || automationFailed || startState != com.baraa.masroof.lab.beta.application.BetaStartState.READY) {
                     BetaShell(
-                        markerCount = 0, restoreMissing = false, showMaintenanceActions = false,
+                        markerCount = 0, restoreMissing = false, showMaintenanceActions = false, showReturn = !failed,
                         returnEnabled = !busy || !loaded, onReturn = { finish() }, onReset = {}, onBackup = {}, onRestore = {},
                         editor = {
                             if (!loaded || automationFailed) {
-                                if (failed) BetaStartupFailure(onRetry = { perform { null } }, onReturn = { finish() })
+                                if (failed) BetaStartupFailure(onRetry = { perform { null } }, onReturn = { finish() },processing=automationFailed)
                                 else androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_start_loading))
                             } else BetaStartPanel(checkNotNull(startState), busy, failed,
                                 onContinue = { perform { if (startState == com.baraa.masroof.lab.beta.application.BetaStartState.NEW) shellContainer.beginOnboarding() else shellContainer.acknowledgeStart(); null } },
@@ -320,6 +322,13 @@ class BetaActivity : ComponentActivity() {
             }
             }
         }
+    }
+
+    private fun recordStartupFailure(stage: String,error: Exception) {
+        // Do not log exception messages/causes: they may contain SQL values or captured SMS.
+        val frames=error.stackTrace.filter {it.className.startsWith("com.baraa.masroof.lab.")}.take(4)
+            .joinToString(";") {"${it.className}.${it.methodName}:${it.lineNumber}"}
+        android.util.Log.e("MasroofBetaStartup","stage=$stage type=${error.javaClass.simpleName} frames=$frames retry=AVAILABLE")
     }
 
     override fun onDestroy() {

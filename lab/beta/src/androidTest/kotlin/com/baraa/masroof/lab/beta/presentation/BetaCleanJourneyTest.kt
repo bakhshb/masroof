@@ -135,9 +135,11 @@ class BetaCleanJourneyTest {
                 compose.onNodeWithTag("settings-reset-cancel").assertIsEnabled().performClick(); compose.onNodeWithTag("settings-reset-confirm").assertDoesNotExist()
                 drain(); BetaContainer(context).use { assertEquals(1, it.markerCount()); assertTrue(it.settings().backupAvailable) }
                 click("settings-reset-lab")
-                val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
-                android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("input keyevent 4")).use { it.readBytes() }
-                compose.waitUntil(5000) { compose.onAllNodesWithTag("settings-reset-confirm").fetchSemanticsNodes().isEmpty() }
+                // Exercise the Activity back callback after the confirmation is committed.
+                // A raw shell key can reach the previous window during Android 16 focus transfer.
+                compose.waitForIdle()
+                scenario.onActivity {it.onBackPressedDispatcher.onBackPressed()}
+                compose.waitUntil(20000) { compose.onAllNodesWithTag("settings-reset-confirm").fetchSemanticsNodes().isEmpty() }
                 compose.onNodeWithTag("settings-reset-lab").assertExists()
                 click("settings-reset-lab"); compose.onNodeWithTag("settings-reset-confirm").assertIsEnabled().performClick(); await("beta-start-continue")
                 click("beta-start-continue"); await("onboarding-IMPORT")
