@@ -325,7 +325,7 @@
     "beta_fix_no_matches"
   ],
   "verified_tests": {
-    "lab_jvm": 323,
+    "lab_jvm": 329,
     "bank_engine": 58,
     "finance_core": 180,
     "android16_full": {
@@ -334,7 +334,7 @@
       "failed": 0,
       "scope": "Full Android 16 suite after source transaction-list port and CI rename-readiness fix. Final digit-comparison refinement is validated separately by targeted filter tests. Final digit comparison and calculator placement passed all 322 JVM tests, lint, and four targeted native tests including the actual Activity. Subsequent registry-fact preservation and navigation-generation changes passed all 323 JVM tests, lint and five targeted Android tests; they do not claim a second full 200-test run."
     },
-    "ci": "60712511: all GitHub CI and isolated-lab checks passed. The subsequent commitment-preservation/navigation follow-up is pending CI after push.",
+    "ci": "1576c368: all GitHub CI and isolated-lab checks passed. Commitment schema/lifecycle follow-up passed locally and awaits CI after push.",
     "android16_followup": {
       "passed": 20,
       "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
@@ -415,6 +415,22 @@
       "native_preservation_test_passed": 1,
       "native_final_targeted_passed": 5,
       "scope": "Reproduced metadata loss with a failing test before the fix. Salary and commitment-name edits now preserve active/pauseIntervals/sourceTransactionId across SQLite reopen. The same helper runs on Robolectric and Android. No schema/table/column changes in this follow-up."
+    },
+    "commitment_model_followup": {
+      "jvm_total_passed": 329,
+      "native_targeted_passed": 11,
+      "lint": "passed",
+      "schema_before": 14,
+      "schema_after": 15,
+      "table_count_before": 16,
+      "table_count_after": 16,
+      "added_columns": [
+        "beta_commitment.recurrence",
+        "beta_commitment.transactionDate",
+        "beta_commitment.dueDate"
+      ],
+      "scope": "Real Android 16 container cold reopen; once recurrence; lifecycle history chronological fractional timestamp ordering; revision conflict; preservation of source/pause facts; previous-schema snapshot restore upgrades staged copy while published snapshot remains byte-identical at schema 14; current encrypted financial-history archive round trip and strict rejected historical schema. No full native or process-death rerun claimed for this change.",
+      "limitations": "Commitment UI port, automatic payment matching, foreign-currency projection and creation from posted transaction remain open. Model tests do not establish page parity."
     }
   },
   "implementation_notes": [
@@ -434,7 +450,8 @@
     "Registry management now uses source SettingsBankAccounts/Cards/Loans presentation, fixed followed/unconfirmed/stopped tabs and confirmation dialogs. Existing ownershipStatus columns are wired to registry visibility, dashboard snapshots and durable automatic replay. No new tables, columns or production changes. Full identity + revision is required for every tracking action; unresolved linked transfer ownership preserves the engine match-identity review gate.",
     "إدارة الحسابات والبطاقات والقروض تستخدم تبويبات الفعلي وإجراءات الإيقاف والاستئناف ونوافذ التأكيد. أُزيل زر الإضافة العام من الإدارة العادية. استُخدمت أعمدة الملكية الموجودة دون أي جداول أو أعمدة جديدة. يظل اعتماد التحويل المرتبط محميًا عند تغيير ملكية أحد طرفيه، مع مراجعة واحدة بدل تكرار الرسالتين.",
     "قائمة الحركات تستخدم الآن أدوات الفعلي والتمرير المستقل والبحث والفلاتر المتعددة والإلغاء/التطبيق وزر مشاركة القائمة المفلترة. أصلحت المقارنة عنوان الصفحة والمسافة السفلية وترتيب التعادل في التوقيت. تفاصيل الحركة وحالات بقية الصفحات تبقى مفتوحة.",
-    "أُصلح مسح حالة الالتزام وسجل توقفه ورابطه عند تغيير إعدادات أخرى، واختُبر الحفظ بعد إعادة الفتح. هذا إصلاح حفظ جزئي؛ نموذج التكرار المتقدم وإدارة الالتزام من المصدر ما زالا مفتوحين. أُضيف أيضًا جيل التنقل لمطابقة حفظ الفلاتر عند الرجوع وإعادة ضبطها عند فتح الحركات من جديد."
+    "أُصلح مسح حالة الالتزام وسجل توقفه ورابطه عند تغيير إعدادات أخرى، واختُبر الحفظ بعد إعادة الفتح. هذا إصلاح حفظ جزئي؛ نموذج التكرار المتقدم وإدارة الالتزام من المصدر ما زالا مفتوحين. أُضيف أيضًا جيل التنقل لمطابقة حفظ الفلاتر عند الرجوع وإعادة ضبطها عند فتح الحركات من جديد.",
+    "أضيفت حقائق الالتزام الناقصة إلى الجدول الموجود: نوع التكرار وتاريخ العملية والاستحقاق، مع ترقية محددة لنسخة المختبر 14→15 دون لمس الفعلي أو مسح البيانات. أضيفت واجهة تطبيق للإيقاف والاستئناف والتعديل والحذف وسجلها. هذه بنية لازمة للنقل؛ واجهة إدارة الالتزامات القديمة ومطابقة السداد التلقائية ما زالتا تحتاجان الإكمال، ولا يعد هذا إعلان تطابق الصفحة."
   ],
   "source_page_inventory": [
     {
@@ -815,10 +832,10 @@
     },
     {
       "id": "DATA-002",
-      "finding_ar": "نموذج الالتزام الحالي وقراءته للداشبورد ما زالا محدودين بالشهر؛ لا يثبتان التكرار الأسبوعي/السنوي وسجل الإيقاف والربط وإجراءات الفعلي.",
-      "action_ar": "إكمال النموذج والحفظ والحسابات والواجهات من المصدر؛ حماية الحقول لا تعني اكتمال دورة الحياة.",
+      "finding_ar": "اكتملت إضافة حقائق التكرار الأسبوعي/الشهري/السنوي والمرة الواحدة وتواريخ العملية والاستحقاق وحفظ سجل الإيقاف. لا تزال واجهة الإدارة وربط الدفع الفعلي وإنشاء الالتزام من الحركة غير مكتملة.",
+      "action_ar": "نقل إدارة الالتزامات ومحررها من المصدر وربطهما بواجهة التطبيق الجديدة، ثم مطابقة المدفوعات من الحقائق المخزنة ومقارنة رحلة الإنشاء والتعديل والإيقاف والاستئناف بصريًا ووظيفيًا.",
       "status": "open",
-      "evidence": "BetaRecurringCommitment; BetaConfiguredPeriods; SettingsCommitmentsScreen; SettingsCommitmentEditorScreen; CommitmentFromTransactionService."
+      "evidence": "BetaCommitmentsWorkflow; BetaCommitmentCodec; BetaCommitmentOccurrenceCalculator; BetaCommitmentMigrationTest; BetaCommitmentLifecyclePersistenceTest. Whole-page acceptance remains open."
     },
     {
       "id": "NAV-001",

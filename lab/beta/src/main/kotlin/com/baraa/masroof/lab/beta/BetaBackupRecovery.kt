@@ -203,7 +203,7 @@ internal class BetaBackupRecovery(
         require(metadata.keys().asSequence().toSet() == setOf("format", "environment", "database", "schema", "databaseSha256", "preferencesSha256"))
         require(metadata.getInt("format") == 1 && metadata.getString("environment") == "BETA")
         BetaEnvironment.requireBetaDatabaseName(metadata.getString("database"))
-        require(metadata.getInt("schema") == BetaDatabase.VERSION)
+        require(com.baraa.masroof.lab.beta.data.BetaSchemaMigrations.readable(metadata.getInt("schema")))
         require(sha(File(folder, DB)) == metadata.getString("databaseSha256")) { "Beta database checksum mismatch" }
         require(sha(File(folder, PREFS)) == metadata.getString("preferencesSha256")) { "Beta preferences checksum mismatch" }
         require(inspectSqlite(File(folder, DB)) == metadata.getInt("schema"))
@@ -213,6 +213,7 @@ internal class BetaBackupRecovery(
     @android.annotation.SuppressLint("RestrictedApi")
     private fun validateRoom(file: File) {
         val staged = Room.databaseBuilder(context, BetaDatabase::class.java, file.absolutePath)
+            .addMigrations(com.baraa.masroof.lab.beta.data.BetaSchemaMigrations.COMMITMENT_FACTS)
             .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE).build()
         val reference = Room.databaseBuilder(context, BetaDatabase::class.java, File(file.parentFile, "reference.db").absolutePath)
             .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE).build()
@@ -242,7 +243,7 @@ internal class BetaBackupRecovery(
         return SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
             db.rawQuery("PRAGMA integrity_check", null).use { require(it.moveToFirst() && it.getString(0) == "ok" && !it.moveToNext()) }
             db.rawQuery("PRAGMA foreign_key_check", null).use { require(!it.moveToFirst()) { "Broken Beta foreign keys" } }
-            require(db.version == BetaDatabase.VERSION) { "Unsupported Beta schema" }
+            require(com.baraa.masroof.lab.beta.data.BetaSchemaMigrations.readable(db.version)) { "Unsupported Beta schema" }
             db.rawQuery("SELECT identity_hash FROM room_master_table WHERE id=42", null).use { require(it.moveToFirst() && it.getString(0).isNotBlank()) }
             db.version
         }

@@ -10,7 +10,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 
-/** Old lab files are rejected; this fresh namespace never migrates them. */
+/** Unrelated historical schemas stay rejected; only the explicit immediately preceding upgrade is supported. */
 class BetaArchiveUpgradeTest {
     @get:Rule val helper = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), BetaDatabase::class.java)
     @Test fun historicalSchemaIsRejectedWithoutModification() {

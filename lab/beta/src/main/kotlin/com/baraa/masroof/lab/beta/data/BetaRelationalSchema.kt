@@ -2,7 +2,7 @@ package com.baraa.masroof.lab.beta.data
 
 import androidx.room.*
 
-/** Fresh lab schema. No production database or historical lab migration is opened. */
+/** Isolated lab schema. Only the immediately preceding lab version has an explicit metadata upgrade. */
 @Entity(tableName = "beta_raw_sms_provider_alias", indices = [Index("rawSmsId")], foreignKeys = [ForeignKey(entity=BetaRawEvidenceEntity::class, parentColumns=["id"], childColumns=["rawSmsId"], onDelete=ForeignKey.RESTRICT)])
 internal data class BetaProviderAliasRecord(@PrimaryKey val providerMessageId: String, val rawSmsId: String)
 
@@ -102,7 +102,9 @@ internal data class BetaRetryRecord(val rawId: String, val kind: String, val sta
 @Entity(tableName="beta_commitment", indices=[Index("active")])
 internal data class BetaCommitmentRecord(@PrimaryKey val id: String, val label: String, val amountDecimal: String,
     val amountCurrency: String, val dueDay: Int, val starts: String, val ends: String? = null,
-    val active: Boolean = true, val paidMonths: String = "[]", val pauseIntervals: String = "[]", val sourceTransactionId: String? = null)
+    val active: Boolean = true, val paidMonths: String = "[]", val pauseIntervals: String = "[]", val sourceTransactionId: String? = null,
+    @ColumnInfo(defaultValue="'MONTHLY'") val recurrence: String? = "MONTHLY",
+    val transactionDate: String? = null, val dueDate: String? = null)
 
 /** Append-only decisions, revisions, aliases and retained financial proof claims. */
 @Entity(tableName="beta_audit_log", indices=[Index(value=["eventKind", "environment", "targetId", "transition"]),

@@ -6,6 +6,8 @@ import com.baraa.masroof.lab.finance.asset.*
 import com.baraa.masroof.lab.finance.value.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Instant
+import java.time.Clock
 import java.time.YearMonth
 import java.time.ZoneId
 import java.util.Collections
@@ -21,29 +23,37 @@ internal data class BetaDashboardConfigurationEntity(val id: Int,val revision: L
     suspend fun all(): List<BetaDashboardConfigurationEntity> = latest().map { row ->
         val j=JSONObject(row.payload)
         j.put("commitments",JSONArray().also { array -> commitments().forEach { c ->
-            array.put(JSONObject().put("id",c.id).put("label",c.label).put("amount",c.amountDecimal).put("currency",c.amountCurrency)
-                .put("day",c.dueDay).put("starts",c.starts).put("ends",c.ends ?: JSONObject.NULL).put("paid",JSONArray(c.paidMonths)))
+            array.put(BetaCommitmentCodec.json(c))
         } })
         row.copy(payload=j.toString())
     }
-    suspend fun put(row: BetaDashboardConfigurationEntity) {
+    @Query("SELECT a.targetId AS id,c.label AS name,a.operation AS event,a.createdAt AS at,a.transition AS revision FROM beta_audit_log a JOIN beta_commitment c ON c.id=a.targetId WHERE a.eventKind='COMMITMENT_LIFECYCLE' ORDER BY a.createdAt DESC,a.id DESC LIMIT 10001")
+    suspend fun history(): List<BetaCommitmentHistoryRow>
+    suspend fun put(row: BetaDashboardConfigurationEntity,at: String=Instant.now().toString()) {
         val j=JSONObject(row.payload); val array=j.getJSONArray("commitments")
-        // This facade owns cycle/amount/date settings, not registry tracking or provenance.
-        // Preserve those normalized facts when replacing its editable projection.
+        // Legacy payloads preserve registry metadata; current payloads explicitly own all user fields.
         val existing=commitments().associateBy {it.id}
         val commitments=(0 until array.length()).map { index -> val c=array.getJSONObject(index)
-            BetaCommitmentRecord(c.getString("id"),c.getString("label"),c.getString("amount"),c.optString("currency","SAR"),
-                c.getInt("day"),c.getString("starts"),if(c.isNull("ends")) null else c.getString("ends"),paidMonths=c.getJSONArray("paid").toString()).let {changed ->
-                    existing[changed.id]?.let {previous -> changed.copy(active=previous.active,
-                        pauseIntervals=previous.pauseIntervals,sourceTransactionId=previous.sourceTransactionId)} ?: changed
-                } }
+            BetaCommitmentCodec.record(c,existing[c.getString("id")]) }
         clearCommitments(); saveCommitments(commitments)
+        commitments.forEach {next ->
+            val previous=existing[next.id]
+            val event=when {previous==null->"CREATED";previous.active && !next.active->"PAUSED";!previous.active && next.active->"RESUMED";else->null}
+            if(event!=null) appendAudit(BetaAuditRecord(auditId("COMMITMENT_LIFECYCLE",row.revision)+":"+next.id,
+                "COMMITMENT_LIFECYCLE",targetId=next.id,transition=row.revision,operation=event,createdAt=at))
+        }
         j.remove("commitments")
         appendAudit(BetaAuditRecord(auditId("FINANCIAL_CONFIGURATION",row.revision),"FINANCIAL_CONFIGURATION",targetId="periods",transition=row.revision,payload=j.toString()))
     }
 }
 
-internal class RoomBetaDashboardConfiguration(private val database: BetaDatabase) : BetaDashboardControls {
+internal data class BetaCommitmentHistoryRow(val id: String,val name: String,val event: String,val at: String,val revision: Long)
+internal class RoomBetaDashboardConfiguration(private val database: BetaDatabase,private val clock: Clock=Clock.systemUTC()) : BetaDashboardControls,BetaCommitmentHistorySource {
+    override suspend fun commitmentHistory(): List<BetaCommitmentHistoryEntry> = database.withTransaction {
+        val rows=database.dashboardConfigurationDao().history()
+        require(rows.size<=10000) {"Commitment history exceeds the bounded read"}
+        rows.sortedWith(compareByDescending<BetaCommitmentHistoryRow> {Instant.parse(it.at)}.thenByDescending {it.revision}.thenBy {it.id}).map {BetaCommitmentHistoryEntry(it.id,it.name,BetaCommitmentRecordEvent.valueOf(it.event),Instant.parse(it.at))}
+    }
     override suspend fun read(): BetaDashboardConfiguration = database.withTransaction { current() }
 
     internal suspend fun current(): BetaDashboardConfiguration {
@@ -70,7 +80,7 @@ internal class RoomBetaDashboardConfiguration(private val database: BetaDatabase
         if (current.revision > 0 && current.draft == decode(payload)) return@withTransaction BetaDashboardConfigurationWrite.Saved(current)
         check(current.revision < Long.MAX_VALUE) { "Configuration revision exhausted" }
         val next = BetaDashboardConfigurationEntity(1, current.revision + 1, payload)
-        database.dashboardConfigurationDao().put(next)
+        database.dashboardConfigurationDao().put(next,clock.instant().toString())
         BetaDashboardConfigurationWrite.Saved(BetaDashboardConfiguration(next.revision, decode(payload)))
     }
 
@@ -83,7 +93,17 @@ internal class RoomBetaDashboardConfiguration(private val database: BetaDatabase
             require(draft.statements.size <= 100 && draft.statements.map { it.facilityId }.distinct().size == draft.statements.size) { "Duplicate or excessive facilities" }
             require(draft.statements.all { it.facilityId.environment == Environment.BETA && it.closingDay in 1..31 }) { "Invalid statement configuration" }
             require(draft.commitments.size <= 100 && draft.commitments.map { it.id }.distinct().size == draft.commitments.size) { "Duplicate or excessive commitments" }
+            require(draft.commitments.mapNotNull {it.sourceTransactionId}.distinct().size==draft.commitments.mapNotNull {it.sourceTransactionId}.size) {"Duplicate commitment source"}
             for (item in draft.commitments) {
+                require(item.transactionDate==null || item.transactionDate.year in 1900..2200)
+                require(item.dueDate==null || item.dueDate.year in 1900..2200)
+                require(item.sourceTransactionId==null || (item.sourceTransactionId.isNotBlank() && item.sourceTransactionId.length<=1000))
+                require(item.pauseIntervals.size<=2400)
+                item.pauseIntervals.forEachIndexed {index,pause ->
+                    require(pause.resumedAt==null || pause.resumedAt>=pause.pausedAt)
+                    if(index>0) require(item.pauseIntervals[index-1].resumedAt?.let {it<=pause.pausedAt}==true)
+                }
+                require(!item.active || item.pauseIntervals.none {it.resumedAt==null})
                 require(item.id.matches(Regex("[A-Za-z0-9_-]{1,80}")) && item.label.isNotBlank() && item.label.length <= 120) { "Invalid commitment identity or label" }
                 require(item.amount.currency == Currency.SAR && item.amount.amount.signum() > 0 && item.amount.amount.precision() <= 20 && item.amount.amount.scale() <= 2) { "Commitment must be a positive SAR amount with at most two decimals" }
                 require(item.dueDay in 1..31 && item.starts.year in 1900..2200 && (item.ends == null || (item.ends >= item.starts && item.ends.year in 1900..2200))) { "Invalid commitment date range" }
@@ -97,9 +117,7 @@ internal class RoomBetaDashboardConfiguration(private val database: BetaDatabase
                 array.put(JSONObject().put("bank", it.facilityId.bank.value).put("id", it.facilityId.localId).put("day", it.closingDay))
             } })
             put("commitments", JSONArray().also { array -> draft.commitments.sortedBy { it.id }.forEach {
-                array.put(JSONObject().put("id", it.id).put("label", it.label).put("amount", it.amount.amount.toPlainString())
-                    .put("day", it.dueDay).put("starts", it.starts.toString()).put("ends", it.ends?.toString() ?: JSONObject.NULL)
-                    .put("paid", JSONArray(it.paidMonths.sorted().map(YearMonth::toString))))
+                array.put(BetaCommitmentCodec.json(it))
             } })
         }.toString()
 
@@ -112,10 +130,7 @@ internal class RoomBetaDashboardConfiguration(private val database: BetaDatabase
                 array.getJSONObject(index).let { BetaFacilityCycle(AssetId(Environment.BETA, BankId(it.getString("bank")), it.getString("id")), it.getInt("day")) }
             } }
             val commitments = json.getJSONArray("commitments").let { array -> require(array.length() <= 100); (0 until array.length()).map { index ->
-                val item = array.getJSONObject(index)
-                val paid = item.getJSONArray("paid").let { values -> require(values.length() <= 1200); (0 until values.length()).map { YearMonth.parse(values.getString(it)) }.toSet() }
-                BetaRecurringCommitment(item.getString("id"), item.getString("label"), Money.of(item.getString("amount"), Currency.SAR), item.getInt("day"),
-                    YearMonth.parse(item.getString("starts")), if (item.isNull("ends")) null else YearMonth.parse(item.getString("ends")), Collections.unmodifiableSet(paid))
+                BetaCommitmentCodec.decode(array.getJSONObject(index))
             } }
             return BetaDashboardConfigurationDraft(salary, Collections.unmodifiableList(statements), Collections.unmodifiableList(commitments)).also(::validate)
         }

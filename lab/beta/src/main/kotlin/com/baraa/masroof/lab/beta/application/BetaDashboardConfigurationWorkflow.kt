@@ -27,8 +27,9 @@ object BetaDashboardConfigurationWorkflow {
         val paid = existing?.paidMonths.orEmpty()
         // A date-range edit may not silently erase a previous manual payment decision.
         require(paid.all { it >= from && (until == null || it <= until) })
-        val row = BetaRecurringCommitment(existing?.id ?: UUID.randomUUID().toString(), label.trim(), money,
-            validDay(day), from, until, paid)
+        val row = existing?.copy(label=label.trim(),amount=money,dueDay=validDay(day),starts=from,ends=until,paidMonths=paid,
+            transactionDate=existing.transactionDate?.let {from.atDay(minOf(validDay(day),from.lengthOfMonth()))})
+            ?: BetaRecurringCommitment(UUID.randomUUID().toString(),label.trim(),money,validDay(day),from,until,paid)
         return base.copy(commitments = base.commitments.filterNot { it.id == row.id } + row)
     }
 

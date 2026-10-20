@@ -33,18 +33,6 @@ internal object BetaConfiguredPeriods {
             draft.statements.associate { it.facilityId to period(it.closingDay, false) })
     }
 
-    fun occurrences(draft: BetaDashboardConfigurationDraft, salary: DisplayPeriod?): List<CommitmentRow> {
-        salary ?: return emptyList()
-        val first = salary.from.atZone(salary.zone).toLocalDate()
-        val end = salary.until.atZone(salary.zone).toLocalDate()
-        val months = generateSequence(YearMonth.from(first)) { it.plusMonths(1).takeIf { next -> next <= YearMonth.from(end.minusDays(1)) } }.toList()
-        require(months.size <= 3) { "Configured salary window exceeds a monthly cycle" }
-        return draft.commitments.flatMap { definition -> months.mapNotNull { month ->
-            if (month < definition.starts || (definition.ends != null && month > definition.ends)) return@mapNotNull null
-            val date = month.atDay(minOf(definition.dueDay, month.lengthOfMonth()))
-            if (date < first || date >= end) null else CommitmentRow(Environment.BETA,
-                "user:${definition.id}:$month", definition.label, definition.amount, date,
-                if (month in definition.paidMonths) PaymentStatus.PAID else PaymentStatus.UNPAID, userCommitmentId = definition.id)
-        } }
-    }
+    fun occurrences(draft: BetaDashboardConfigurationDraft, salary: DisplayPeriod?): List<CommitmentRow> =
+        com.baraa.masroof.lab.beta.application.dashboard.BetaCommitmentOccurrenceCalculator.rows(draft,salary)
 }

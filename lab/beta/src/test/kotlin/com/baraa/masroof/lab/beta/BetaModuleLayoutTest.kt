@@ -52,7 +52,7 @@ class BetaModuleLayoutTest {
     fun databaseIsIndependentBetaSchema() {
         val database = File("src/main/kotlin/com/baraa/masroof/lab/beta/data/BetaDatabase.kt").readText()
         assertTrue(database.contains("version=BetaDatabase.VERSION"))
-        assertTrue(database.contains("const val VERSION: Int=14"))
+        assertTrue(database.contains("const val VERSION: Int=15"))
         assertTrue(database.contains("BetaEnvironment.DATABASE_NAME"))
         assertFalse(database.contains("MasroofDatabase"))
         assertEquals("masroof_beta_v2.db", BetaEnvironment.DATABASE_NAME)

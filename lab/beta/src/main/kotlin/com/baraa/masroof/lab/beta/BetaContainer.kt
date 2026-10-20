@@ -270,10 +270,14 @@ class BetaContainer(
     }
 
     /** Controls retain the lifecycle lock on every operation, including callers holding this facade across restore. */
-    fun dashboardControls(): com.baraa.masroof.lab.beta.application.BetaDashboardControls = object : com.baraa.masroof.lab.beta.application.BetaDashboardControls {
+    fun dashboardControls(): com.baraa.masroof.lab.beta.application.BetaDashboardControls = object : com.baraa.masroof.lab.beta.application.BetaDashboardControls, com.baraa.masroof.lab.beta.application.BetaCommitmentHistorySource {
         override suspend fun read() = kotlinx.coroutines.withContext(BetaIo.dispatcher) { lock.withLock {
             check(!closed)
             runBlocking { com.baraa.masroof.lab.beta.data.RoomBetaDashboardConfiguration(database).read() }
+        } }
+        override suspend fun commitmentHistory() = kotlinx.coroutines.withContext(BetaIo.dispatcher) { lock.withLock {
+            check(!closed)
+            runBlocking { com.baraa.masroof.lab.beta.data.RoomBetaDashboardConfiguration(database).commitmentHistory() }
         } }
         override suspend fun save(expectedRevision: Long, draft: com.baraa.masroof.lab.beta.application.BetaDashboardConfigurationDraft) = kotlinx.coroutines.withContext(BetaIo.dispatcher) { lock.withLock {
             check(!closed)
@@ -799,7 +803,7 @@ class BetaContainer(
                 }
             }
         }
-        return Room.databaseBuilder(appContext, BetaDatabase::class.java, name).build()
+        return Room.databaseBuilder(appContext, BetaDatabase::class.java, name).addMigrations(com.baraa.masroof.lab.beta.data.BetaSchemaMigrations.COMMITMENT_FACTS).build()
     }
 
     private fun copyLiveDatabaseToBackup() {

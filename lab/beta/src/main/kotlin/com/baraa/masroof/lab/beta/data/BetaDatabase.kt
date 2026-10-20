@@ -4,7 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.baraa.masroof.lab.beta.BetaEnvironment
 
-/** Fresh lab-only schema. Historical lab data is intentionally outside this reset increment. */
+/** Lab-only schema. Version 14 gains nullable commitment facts without rewriting financial evidence. */
 @Database(entities=[BetaRawEvidenceEntity::class,BetaProviderAliasRecord::class,BetaParsedRecord::class,
     BetaBankSelectionEntity::class,BetaAccountRecord::class,BetaCardRecord::class,BetaCreditFacilityRecord::class,BetaLoanRecord::class,
     BetaLedgerCurrentEntity::class,BetaEvidenceLinkRecord::class,BetaCommitmentRecord::class,BetaReviewRecord::class,
@@ -27,5 +27,5 @@ abstract class BetaDatabase : RoomDatabase() {
     internal abstract fun dashboardAuxFactsDao(): BetaDashboardAuxFactsDao
     internal abstract fun dashboardConfigurationDao(): BetaDashboardConfigurationDao
     internal abstract fun shellMarkerDao(): BetaShellMarkerDao
-    companion object { const val NAME: String=BetaEnvironment.DATABASE_NAME; const val VERSION: Int=14 }
+    companion object { const val NAME: String=BetaEnvironment.DATABASE_NAME; const val VERSION: Int=15 }
 }

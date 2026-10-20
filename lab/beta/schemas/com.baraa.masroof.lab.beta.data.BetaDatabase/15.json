@@ -1,0 +1,2271 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 15,
+    "identityHash": "99a24b54944bfc42cf59e5cb96fbb9aa",
+    "entities": [
+      {
+        "tableName": "beta_raw_evidence",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `namespace` TEXT NOT NULL, `providerId` TEXT NOT NULL, `origin` TEXT NOT NULL, `sender` TEXT NOT NULL, `body` TEXT NOT NULL, `receivedAt` TEXT NOT NULL, `timeSource` TEXT NOT NULL, `capturedAt` TEXT NOT NULL, `captureRoute` TEXT NOT NULL, `captureSelections` TEXT NOT NULL, `historyBanks` TEXT NOT NULL, `receivedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namespace",
+            "columnName": "namespace",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerId",
+            "columnName": "providerId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sender",
+            "columnName": "sender",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "body",
+            "columnName": "body",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receivedAt",
+            "columnName": "receivedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timeSource",
+            "columnName": "timeSource",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capturedAt",
+            "columnName": "capturedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "captureRoute",
+            "columnName": "captureRoute",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "captureSelections",
+            "columnName": "captureSelections",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "historyBanks",
+            "columnName": "historyBanks",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receivedAtEpochMillis",
+            "columnName": "receivedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_raw_evidence_namespace_providerId",
+            "unique": true,
+            "columnNames": [
+              "namespace",
+              "providerId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_beta_raw_evidence_namespace_providerId` ON `${TABLE_NAME}` (`namespace`, `providerId`)"
+          },
+          {
+            "name": "index_beta_raw_evidence_receivedAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "receivedAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_raw_evidence_receivedAtEpochMillis` ON `${TABLE_NAME}` (`receivedAtEpochMillis`)"
+          },
+          {
+            "name": "index_beta_raw_evidence_sender_receivedAt",
+            "unique": false,
+            "columnNames": [
+              "sender",
+              "receivedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_raw_evidence_sender_receivedAt` ON `${TABLE_NAME}` (`sender`, `receivedAt`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_raw_sms_provider_alias",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`providerMessageId` TEXT NOT NULL, `rawSmsId` TEXT NOT NULL, PRIMARY KEY(`providerMessageId`), FOREIGN KEY(`rawSmsId`) REFERENCES `beta_raw_evidence`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "providerMessageId",
+            "columnName": "providerMessageId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rawSmsId",
+            "columnName": "rawSmsId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "providerMessageId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_raw_sms_provider_alias_rawSmsId",
+            "unique": false,
+            "columnNames": [
+              "rawSmsId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_raw_sms_provider_alias_rawSmsId` ON `${TABLE_NAME}` (`rawSmsId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_raw_evidence",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "rawSmsId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_parsed_event",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rawId` TEXT NOT NULL, `disposition` TEXT NOT NULL, `route` TEXT NOT NULL, `reasons` TEXT NOT NULL, `baselineJson` TEXT NOT NULL, `candidateJson` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `bankId` TEXT, `messageFamily` TEXT, `parseStatus` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, `direction` TEXT, `occurredAtEpochMillis` INTEGER, `occurredAtLocal` TEXT, `cardLast4` TEXT, `sourceAccountLast4` TEXT, `destinationAccountLast4` TEXT, `merchant` TEXT, `counterparty` TEXT, `engineVersion` TEXT, `rulesVersion` TEXT, `contractVersion` INTEGER, `f_epochMillis` INTEGER, `a_epochMillis` INTEGER, `ownershipExcluded` INTEGER NOT NULL, `f_present` INTEGER NOT NULL, `a_present` INTEGER NOT NULL, `f_transactionId` TEXT, `f_bankId` TEXT, `f_archiveFingerprint` TEXT, `f_observationRevision` INTEGER NOT NULL, `f_correction` INTEGER NOT NULL, `f_interpretation` INTEGER NOT NULL, `f_boundInput` TEXT, `f_observedAt` TEXT, `f_feeKnown` INTEGER NOT NULL, `f_feeAmount` TEXT, `f_feeCurrency` TEXT, `f_balanceAsset` TEXT, `f_balanceAmount` TEXT, `f_balanceCurrency` TEXT, `f_facilityAsset` TEXT, `f_dueAmount` TEXT, `f_dueCurrency` TEXT, `f_dueDate` TEXT, `f_merchant` TEXT, `f_counterparty` TEXT, `f_debitCardAsset` TEXT, `f_debitCardLast4` TEXT, `f_debitCardParent` TEXT, `f_messageFamily` TEXT, `a_bankId` TEXT, `a_archiveFingerprint` TEXT, `a_outcomeAttempt` INTEGER NOT NULL, `a_outcomeAt` TEXT, `a_nonFinancial` INTEGER NOT NULL, `a_registryBinding` TEXT, `a_boundInput` TEXT, `a_observedAt` TEXT, `a_balanceAsset` TEXT, `a_balanceAmount` TEXT, `a_balanceCurrency` TEXT, `a_facilityAsset` TEXT, `a_dueAmount` TEXT, `a_dueCurrency` TEXT, `a_dueDate` TEXT, `a_loanAsset` TEXT, `a_loanType` TEXT, `a_loanRemaining` TEXT, `a_loanRemainingCurrency` TEXT, `a_loanInstallment` TEXT, `a_loanInstallmentCurrency` TEXT, `a_statementProved` INTEGER NOT NULL, PRIMARY KEY(`rawId`), FOREIGN KEY(`rawId`) REFERENCES `beta_raw_evidence`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "rawId",
+            "columnName": "rawId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "disposition",
+            "columnName": "disposition",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "route",
+            "columnName": "route",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reasons",
+            "columnName": "reasons",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baselineJson",
+            "columnName": "baselineJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateJson",
+            "columnName": "candidateJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "messageFamily",
+            "columnName": "messageFamily",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "parseStatus",
+            "columnName": "parseStatus",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "amountDecimal",
+            "columnName": "amountDecimal",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "amountCurrency",
+            "columnName": "amountCurrency",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "direction",
+            "columnName": "direction",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "occurredAtEpochMillis",
+            "columnName": "occurredAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "occurredAtLocal",
+            "columnName": "occurredAtLocal",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "cardLast4",
+            "columnName": "cardLast4",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sourceAccountLast4",
+            "columnName": "sourceAccountLast4",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "destinationAccountLast4",
+            "columnName": "destinationAccountLast4",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "merchant",
+            "columnName": "merchant",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "counterparty",
+            "columnName": "counterparty",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "engineVersion",
+            "columnName": "engineVersion",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "rulesVersion",
+            "columnName": "rulesVersion",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "contractVersion",
+            "columnName": "contractVersion",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_epochMillis",
+            "columnName": "f_epochMillis",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_epochMillis",
+            "columnName": "a_epochMillis",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ownershipExcluded",
+            "columnName": "ownershipExcluded",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "f_present",
+            "columnName": "f_present",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "a_present",
+            "columnName": "a_present",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "f_transactionId",
+            "columnName": "f_transactionId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_bankId",
+            "columnName": "f_bankId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_archiveFingerprint",
+            "columnName": "f_archiveFingerprint",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_observationRevision",
+            "columnName": "f_observationRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "f_correction",
+            "columnName": "f_correction",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "f_interpretation",
+            "columnName": "f_interpretation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "f_boundInput",
+            "columnName": "f_boundInput",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_observedAt",
+            "columnName": "f_observedAt",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_feeKnown",
+            "columnName": "f_feeKnown",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "f_feeAmount",
+            "columnName": "f_feeAmount",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_feeCurrency",
+            "columnName": "f_feeCurrency",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_balanceAsset",
+            "columnName": "f_balanceAsset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_balanceAmount",
+            "columnName": "f_balanceAmount",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_balanceCurrency",
+            "columnName": "f_balanceCurrency",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_facilityAsset",
+            "columnName": "f_facilityAsset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_dueAmount",
+            "columnName": "f_dueAmount",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_dueCurrency",
+            "columnName": "f_dueCurrency",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_dueDate",
+            "columnName": "f_dueDate",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_merchant",
+            "columnName": "f_merchant",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_counterparty",
+            "columnName": "f_counterparty",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_debitCardAsset",
+            "columnName": "f_debitCardAsset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_debitCardLast4",
+            "columnName": "f_debitCardLast4",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_debitCardParent",
+            "columnName": "f_debitCardParent",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "f_messageFamily",
+            "columnName": "f_messageFamily",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_bankId",
+            "columnName": "a_bankId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_archiveFingerprint",
+            "columnName": "a_archiveFingerprint",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_outcomeAttempt",
+            "columnName": "a_outcomeAttempt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "a_outcomeAt",
+            "columnName": "a_outcomeAt",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_nonFinancial",
+            "columnName": "a_nonFinancial",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "a_registryBinding",
+            "columnName": "a_registryBinding",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_boundInput",
+            "columnName": "a_boundInput",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_observedAt",
+            "columnName": "a_observedAt",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_balanceAsset",
+            "columnName": "a_balanceAsset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_balanceAmount",
+            "columnName": "a_balanceAmount",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_balanceCurrency",
+            "columnName": "a_balanceCurrency",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_facilityAsset",
+            "columnName": "a_facilityAsset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_dueAmount",
+            "columnName": "a_dueAmount",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_dueCurrency",
+            "columnName": "a_dueCurrency",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_dueDate",
+            "columnName": "a_dueDate",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_loanAsset",
+            "columnName": "a_loanAsset",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_loanType",
+            "columnName": "a_loanType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_loanRemaining",
+            "columnName": "a_loanRemaining",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_loanRemainingCurrency",
+            "columnName": "a_loanRemainingCurrency",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_loanInstallment",
+            "columnName": "a_loanInstallment",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_loanInstallmentCurrency",
+            "columnName": "a_loanInstallmentCurrency",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "a_statementProved",
+            "columnName": "a_statementProved",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "rawId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_parsed_event_bankId_occurredAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "bankId",
+              "occurredAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_parsed_event_bankId_occurredAtEpochMillis` ON `${TABLE_NAME}` (`bankId`, `occurredAtEpochMillis`)"
+          },
+          {
+            "name": "index_beta_parsed_event_messageFamily",
+            "unique": false,
+            "columnNames": [
+              "messageFamily"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_parsed_event_messageFamily` ON `${TABLE_NAME}` (`messageFamily`)"
+          },
+          {
+            "name": "index_beta_parsed_event_cardLast4_bankId",
+            "unique": false,
+            "columnNames": [
+              "cardLast4",
+              "bankId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_parsed_event_cardLast4_bankId` ON `${TABLE_NAME}` (`cardLast4`, `bankId`)"
+          },
+          {
+            "name": "index_beta_parsed_event_f_epochMillis",
+            "unique": false,
+            "columnNames": [
+              "f_epochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_parsed_event_f_epochMillis` ON `${TABLE_NAME}` (`f_epochMillis`)"
+          },
+          {
+            "name": "index_beta_parsed_event_a_epochMillis",
+            "unique": false,
+            "columnNames": [
+              "a_epochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_parsed_event_a_epochMillis` ON `${TABLE_NAME}` (`a_epochMillis`)"
+          },
+          {
+            "name": "index_beta_parsed_event_f_bankId_f_balanceAsset_f_epochMillis",
+            "unique": false,
+            "columnNames": [
+              "f_bankId",
+              "f_balanceAsset",
+              "f_epochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_parsed_event_f_bankId_f_balanceAsset_f_epochMillis` ON `${TABLE_NAME}` (`f_bankId`, `f_balanceAsset`, `f_epochMillis`)"
+          },
+          {
+            "name": "index_beta_parsed_event_a_bankId_a_facilityAsset_a_epochMillis",
+            "unique": false,
+            "columnNames": [
+              "a_bankId",
+              "a_facilityAsset",
+              "a_epochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_parsed_event_a_bankId_a_facilityAsset_a_epochMillis` ON `${TABLE_NAME}` (`a_bankId`, `a_facilityAsset`, `a_epochMillis`)"
+          },
+          {
+            "name": "index_beta_parsed_event_a_bankId_a_balanceAsset_a_epochMillis",
+            "unique": false,
+            "columnNames": [
+              "a_bankId",
+              "a_balanceAsset",
+              "a_epochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_parsed_event_a_bankId_a_balanceAsset_a_epochMillis` ON `${TABLE_NAME}` (`a_bankId`, `a_balanceAsset`, `a_epochMillis`)"
+          },
+          {
+            "name": "index_beta_parsed_event_a_bankId_a_loanAsset_a_epochMillis",
+            "unique": false,
+            "columnNames": [
+              "a_bankId",
+              "a_loanAsset",
+              "a_epochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_parsed_event_a_bankId_a_loanAsset_a_epochMillis` ON `${TABLE_NAME}` (`a_bankId`, `a_loanAsset`, `a_epochMillis`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_raw_evidence",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "rawId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_bank_selection",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`bankId` TEXT NOT NULL, `state` TEXT NOT NULL, PRIMARY KEY(`bankId`))",
+        "fields": [
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "bankId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_account_registry",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `bankId` TEXT NOT NULL, `localId` TEXT NOT NULL, `last4` TEXT, `displayName` TEXT, `ownershipStatus` TEXT NOT NULL, `network` TEXT, `accountType` TEXT, `loanType` TEXT, `metadataRevision` INTEGER NOT NULL, PRIMARY KEY(`environment`, `bankId`, `localId`))",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localId",
+            "columnName": "localId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "last4",
+            "columnName": "last4",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ownershipStatus",
+            "columnName": "ownershipStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "network",
+            "columnName": "network",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "accountType",
+            "columnName": "accountType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "loanType",
+            "columnName": "loanType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "metadataRevision",
+            "columnName": "metadataRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "bankId",
+            "localId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_account_registry_bankId_last4",
+            "unique": false,
+            "columnNames": [
+              "bankId",
+              "last4"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_account_registry_bankId_last4` ON `${TABLE_NAME}` (`bankId`, `last4`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_card_registry",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `bankId` TEXT NOT NULL, `localId` TEXT NOT NULL, `last4` TEXT, `kind` TEXT NOT NULL, `parentLocalId` TEXT, `creditCardRole` TEXT, `displayName` TEXT, `ownershipStatus` TEXT NOT NULL, `linkedAccountLocalId` TEXT, `facilityLocalId` TEXT, `network` TEXT, `accountType` TEXT, `loanType` TEXT, `metadataRevision` INTEGER NOT NULL, PRIMARY KEY(`environment`, `bankId`, `localId`), FOREIGN KEY(`environment`, `bankId`, `linkedAccountLocalId`) REFERENCES `beta_account_registry`(`environment`, `bankId`, `localId`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`environment`, `bankId`, `facilityLocalId`) REFERENCES `beta_credit_facility`(`environment`, `bankId`, `localId`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localId",
+            "columnName": "localId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "last4",
+            "columnName": "last4",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentLocalId",
+            "columnName": "parentLocalId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "creditCardRole",
+            "columnName": "creditCardRole",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ownershipStatus",
+            "columnName": "ownershipStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "linkedAccountLocalId",
+            "columnName": "linkedAccountLocalId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "facilityLocalId",
+            "columnName": "facilityLocalId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "network",
+            "columnName": "network",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "accountType",
+            "columnName": "accountType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "loanType",
+            "columnName": "loanType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "metadataRevision",
+            "columnName": "metadataRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "bankId",
+            "localId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_card_registry_bankId_last4",
+            "unique": false,
+            "columnNames": [
+              "bankId",
+              "last4"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_card_registry_bankId_last4` ON `${TABLE_NAME}` (`bankId`, `last4`)"
+          },
+          {
+            "name": "index_beta_card_registry_environment_bankId_linkedAccountLocalId",
+            "unique": false,
+            "columnNames": [
+              "environment",
+              "bankId",
+              "linkedAccountLocalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_card_registry_environment_bankId_linkedAccountLocalId` ON `${TABLE_NAME}` (`environment`, `bankId`, `linkedAccountLocalId`)"
+          },
+          {
+            "name": "index_beta_card_registry_environment_bankId_facilityLocalId",
+            "unique": false,
+            "columnNames": [
+              "environment",
+              "bankId",
+              "facilityLocalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_card_registry_environment_bankId_facilityLocalId` ON `${TABLE_NAME}` (`environment`, `bankId`, `facilityLocalId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_account_registry",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "environment",
+              "bankId",
+              "linkedAccountLocalId"
+            ],
+            "referencedColumns": [
+              "environment",
+              "bankId",
+              "localId"
+            ]
+          },
+          {
+            "table": "beta_credit_facility",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "environment",
+              "bankId",
+              "facilityLocalId"
+            ],
+            "referencedColumns": [
+              "environment",
+              "bankId",
+              "localId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_credit_facility",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `bankId` TEXT NOT NULL, `localId` TEXT NOT NULL, `last4` TEXT, `displayName` TEXT, `ownershipStatus` TEXT NOT NULL, `network` TEXT, `accountType` TEXT, `loanType` TEXT, `metadataRevision` INTEGER NOT NULL, PRIMARY KEY(`environment`, `bankId`, `localId`))",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localId",
+            "columnName": "localId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "last4",
+            "columnName": "last4",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ownershipStatus",
+            "columnName": "ownershipStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "network",
+            "columnName": "network",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "accountType",
+            "columnName": "accountType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "loanType",
+            "columnName": "loanType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "metadataRevision",
+            "columnName": "metadataRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "bankId",
+            "localId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_credit_facility_bankId_last4",
+            "unique": false,
+            "columnNames": [
+              "bankId",
+              "last4"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_credit_facility_bankId_last4` ON `${TABLE_NAME}` (`bankId`, `last4`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_loan_registry",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `bankId` TEXT NOT NULL, `localId` TEXT NOT NULL, `last4` TEXT, `displayName` TEXT, `ownershipStatus` TEXT NOT NULL, `network` TEXT, `accountType` TEXT, `loanType` TEXT, `metadataRevision` INTEGER NOT NULL, PRIMARY KEY(`environment`, `bankId`, `localId`))",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localId",
+            "columnName": "localId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "last4",
+            "columnName": "last4",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "ownershipStatus",
+            "columnName": "ownershipStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "network",
+            "columnName": "network",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "accountType",
+            "columnName": "accountType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "loanType",
+            "columnName": "loanType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "metadataRevision",
+            "columnName": "metadataRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "bankId",
+            "localId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_loan_registry_bankId_last4",
+            "unique": false,
+            "columnNames": [
+              "bankId",
+              "last4"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_loan_registry_bankId_last4` ON `${TABLE_NAME}` (`bankId`, `last4`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_financial_transaction",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `transactionId` TEXT NOT NULL, `correction` INTEGER NOT NULL, `interpretation` INTEGER NOT NULL, `payload` TEXT NOT NULL, `occurredAtEpochMillis` INTEGER, `occurredAtZone` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, `financialType` TEXT, `sourceLocalId` TEXT, `destinationLocalId` TEXT, `sourceBankId` TEXT, `destinationBankId` TEXT, PRIMARY KEY(`environment`, `transactionId`))",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correction",
+            "columnName": "correction",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "interpretation",
+            "columnName": "interpretation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurredAtEpochMillis",
+            "columnName": "occurredAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "occurredAtZone",
+            "columnName": "occurredAtZone",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "amountDecimal",
+            "columnName": "amountDecimal",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "amountCurrency",
+            "columnName": "amountCurrency",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "financialType",
+            "columnName": "financialType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sourceLocalId",
+            "columnName": "sourceLocalId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "destinationLocalId",
+            "columnName": "destinationLocalId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sourceBankId",
+            "columnName": "sourceBankId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "destinationBankId",
+            "columnName": "destinationBankId",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "transactionId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_financial_transaction_occurredAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "occurredAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_financial_transaction_occurredAtEpochMillis` ON `${TABLE_NAME}` (`occurredAtEpochMillis`)"
+          },
+          {
+            "name": "index_beta_financial_transaction_financialType_occurredAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "financialType",
+              "occurredAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_financial_transaction_financialType_occurredAtEpochMillis` ON `${TABLE_NAME}` (`financialType`, `occurredAtEpochMillis`)"
+          },
+          {
+            "name": "index_beta_financial_transaction_sourceLocalId_occurredAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "sourceLocalId",
+              "occurredAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_financial_transaction_sourceLocalId_occurredAtEpochMillis` ON `${TABLE_NAME}` (`sourceLocalId`, `occurredAtEpochMillis`)"
+          },
+          {
+            "name": "index_beta_financial_transaction_destinationLocalId_occurredAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "destinationLocalId",
+              "occurredAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_financial_transaction_destinationLocalId_occurredAtEpochMillis` ON `${TABLE_NAME}` (`destinationLocalId`, `occurredAtEpochMillis`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_financial_transaction_raw_sms_link",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `evidenceId` TEXT NOT NULL, `transactionId` TEXT NOT NULL, `ledgerClaim` INTEGER NOT NULL, `correctionClaim` INTEGER NOT NULL, `ledgerTransactionId` TEXT, `correctionTransactionId` TEXT, PRIMARY KEY(`environment`, `evidenceId`), FOREIGN KEY(`environment`, `ledgerTransactionId`) REFERENCES `beta_financial_transaction`(`environment`, `transactionId`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`environment`, `correctionTransactionId`) REFERENCES `beta_correction_current`(`environment`, `transactionId`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceId",
+            "columnName": "evidenceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ledgerClaim",
+            "columnName": "ledgerClaim",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correctionClaim",
+            "columnName": "correctionClaim",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ledgerTransactionId",
+            "columnName": "ledgerTransactionId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "correctionTransactionId",
+            "columnName": "correctionTransactionId",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "evidenceId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_financial_transaction_raw_sms_link_environment_transactionId",
+            "unique": false,
+            "columnNames": [
+              "environment",
+              "transactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_financial_transaction_raw_sms_link_environment_transactionId` ON `${TABLE_NAME}` (`environment`, `transactionId`)"
+          },
+          {
+            "name": "index_beta_financial_transaction_raw_sms_link_environment_ledgerTransactionId",
+            "unique": false,
+            "columnNames": [
+              "environment",
+              "ledgerTransactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_financial_transaction_raw_sms_link_environment_ledgerTransactionId` ON `${TABLE_NAME}` (`environment`, `ledgerTransactionId`)"
+          },
+          {
+            "name": "index_beta_financial_transaction_raw_sms_link_environment_correctionTransactionId",
+            "unique": false,
+            "columnNames": [
+              "environment",
+              "correctionTransactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_financial_transaction_raw_sms_link_environment_correctionTransactionId` ON `${TABLE_NAME}` (`environment`, `correctionTransactionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_financial_transaction",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "environment",
+              "ledgerTransactionId"
+            ],
+            "referencedColumns": [
+              "environment",
+              "transactionId"
+            ]
+          },
+          {
+            "table": "beta_correction_current",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "environment",
+              "correctionTransactionId"
+            ],
+            "referencedColumns": [
+              "environment",
+              "transactionId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_commitment",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `label` TEXT NOT NULL, `amountDecimal` TEXT NOT NULL, `amountCurrency` TEXT NOT NULL, `dueDay` INTEGER NOT NULL, `starts` TEXT NOT NULL, `ends` TEXT, `active` INTEGER NOT NULL, `paidMonths` TEXT NOT NULL, `pauseIntervals` TEXT NOT NULL, `sourceTransactionId` TEXT, `recurrence` TEXT DEFAULT 'MONTHLY', `transactionDate` TEXT, `dueDate` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amountDecimal",
+            "columnName": "amountDecimal",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amountCurrency",
+            "columnName": "amountCurrency",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dueDay",
+            "columnName": "dueDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "starts",
+            "columnName": "starts",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ends",
+            "columnName": "ends",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "active",
+            "columnName": "active",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paidMonths",
+            "columnName": "paidMonths",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pauseIntervals",
+            "columnName": "pauseIntervals",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceTransactionId",
+            "columnName": "sourceTransactionId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "recurrence",
+            "columnName": "recurrence",
+            "affinity": "TEXT",
+            "notNull": false,
+            "defaultValue": "'MONTHLY'"
+          },
+          {
+            "fieldPath": "transactionDate",
+            "columnName": "transactionDate",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dueDate",
+            "columnName": "dueDate",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_commitment_active",
+            "unique": false,
+            "columnNames": [
+              "active"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_commitment_active` ON `${TABLE_NAME}` (`active`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_review_item",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `recordKind` TEXT NOT NULL, `evidenceId` TEXT, `transactionId` TEXT, `bankId` TEXT NOT NULL, `status` TEXT NOT NULL, `reason` TEXT NOT NULL, `archiveFingerprint` TEXT NOT NULL, `approvedInput` TEXT NOT NULL, `correction` INTEGER NOT NULL, `interpretation` INTEGER NOT NULL, `approvalRequest` TEXT NOT NULL, `observationRevision` INTEGER NOT NULL, `referenceKind` TEXT, `suffix` TEXT, `assetLocalId` TEXT, `revision` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`evidenceId`) REFERENCES `beta_raw_evidence`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordKind",
+            "columnName": "recordKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceId",
+            "columnName": "evidenceId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archiveFingerprint",
+            "columnName": "archiveFingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "approvedInput",
+            "columnName": "approvedInput",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correction",
+            "columnName": "correction",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "interpretation",
+            "columnName": "interpretation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "approvalRequest",
+            "columnName": "approvalRequest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observationRevision",
+            "columnName": "observationRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "referenceKind",
+            "columnName": "referenceKind",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "suffix",
+            "columnName": "suffix",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "assetLocalId",
+            "columnName": "assetLocalId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_review_item_recordKind_status",
+            "unique": false,
+            "columnNames": [
+              "recordKind",
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_review_item_recordKind_status` ON `${TABLE_NAME}` (`recordKind`, `status`)"
+          },
+          {
+            "name": "index_beta_review_item_bankId",
+            "unique": false,
+            "columnNames": [
+              "bankId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_review_item_bankId` ON `${TABLE_NAME}` (`bankId`)"
+          },
+          {
+            "name": "index_beta_review_item_evidenceId",
+            "unique": true,
+            "columnNames": [
+              "evidenceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_beta_review_item_evidenceId` ON `${TABLE_NAME}` (`evidenceId`)"
+          },
+          {
+            "name": "index_beta_review_item_transactionId",
+            "unique": true,
+            "columnNames": [
+              "transactionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_beta_review_item_transactionId` ON `${TABLE_NAME}` (`transactionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_raw_evidence",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "evidenceId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_correction_current",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`environment` TEXT NOT NULL, `transactionId` TEXT NOT NULL, `correction` INTEGER NOT NULL, `interpretation` INTEGER NOT NULL, `transition` INTEGER NOT NULL, `activity` TEXT NOT NULL, `payload` TEXT NOT NULL, `occurredAtEpochMillis` INTEGER, PRIMARY KEY(`environment`, `transactionId`))",
+        "fields": [
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transactionId",
+            "columnName": "transactionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correction",
+            "columnName": "correction",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "interpretation",
+            "columnName": "interpretation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transition",
+            "columnName": "transition",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activity",
+            "columnName": "activity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurredAtEpochMillis",
+            "columnName": "occurredAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "environment",
+            "transactionId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_processing_retry",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rawId` TEXT NOT NULL, `kind` TEXT NOT NULL, `stage` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `code` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, `request` TEXT, PRIMARY KEY(`rawId`, `kind`), FOREIGN KEY(`rawId`) REFERENCES `beta_raw_evidence`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "rawId",
+            "columnName": "rawId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stage",
+            "columnName": "stage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "code",
+            "columnName": "code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "request",
+            "columnName": "request",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "rawId",
+            "kind"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_processing_retry_kind_updatedAt",
+            "unique": false,
+            "columnNames": [
+              "kind",
+              "updatedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_processing_retry_kind_updatedAt` ON `${TABLE_NAME}` (`kind`, `updatedAt`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_raw_evidence",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "rawId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "beta_audit_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `eventKind` TEXT NOT NULL, `environment` TEXT NOT NULL, `targetId` TEXT NOT NULL, `correction` INTEGER NOT NULL, `interpretation` INTEGER NOT NULL, `transition` INTEGER NOT NULL, `decisionId` TEXT, `operation` TEXT NOT NULL, `payload` TEXT NOT NULL, `proofKind` TEXT, `issuer` TEXT, `reference` TEXT, `bankId` TEXT, `aliasKind` TEXT, `aliasValue` TEXT, `evidenceId` TEXT, `relatedId` TEXT, `createdAt` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventKind",
+            "columnName": "eventKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "environment",
+            "columnName": "environment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetId",
+            "columnName": "targetId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correction",
+            "columnName": "correction",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "interpretation",
+            "columnName": "interpretation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transition",
+            "columnName": "transition",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "decisionId",
+            "columnName": "decisionId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "operation",
+            "columnName": "operation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "proofKind",
+            "columnName": "proofKind",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "issuer",
+            "columnName": "issuer",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "reference",
+            "columnName": "reference",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "aliasKind",
+            "columnName": "aliasKind",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "aliasValue",
+            "columnName": "aliasValue",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "evidenceId",
+            "columnName": "evidenceId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "relatedId",
+            "columnName": "relatedId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_audit_log_eventKind_environment_targetId_transition",
+            "unique": false,
+            "columnNames": [
+              "eventKind",
+              "environment",
+              "targetId",
+              "transition"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_audit_log_eventKind_environment_targetId_transition` ON `${TABLE_NAME}` (`eventKind`, `environment`, `targetId`, `transition`)"
+          },
+          {
+            "name": "index_beta_audit_log_eventKind_environment_decisionId",
+            "unique": true,
+            "columnNames": [
+              "eventKind",
+              "environment",
+              "decisionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_beta_audit_log_eventKind_environment_decisionId` ON `${TABLE_NAME}` (`eventKind`, `environment`, `decisionId`)"
+          },
+          {
+            "name": "index_beta_audit_log_eventKind_environment_proofKind_issuer_reference",
+            "unique": true,
+            "columnNames": [
+              "eventKind",
+              "environment",
+              "proofKind",
+              "issuer",
+              "reference"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_beta_audit_log_eventKind_environment_proofKind_issuer_reference` ON `${TABLE_NAME}` (`eventKind`, `environment`, `proofKind`, `issuer`, `reference`)"
+          },
+          {
+            "name": "index_beta_audit_log_eventKind_bankId_aliasKind_aliasValue",
+            "unique": false,
+            "columnNames": [
+              "eventKind",
+              "bankId",
+              "aliasKind",
+              "aliasValue"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_audit_log_eventKind_bankId_aliasKind_aliasValue` ON `${TABLE_NAME}` (`eventKind`, `bankId`, `aliasKind`, `aliasValue`)"
+          },
+          {
+            "name": "index_beta_audit_log_relatedId",
+            "unique": false,
+            "columnNames": [
+              "relatedId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_beta_audit_log_relatedId` ON `${TABLE_NAME}` (`relatedId`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "beta_learning_label",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rawId` TEXT NOT NULL, `revision` INTEGER NOT NULL, `decisionId` TEXT NOT NULL, `archiveHash` TEXT NOT NULL, `interpretationAttempt` INTEGER NOT NULL, `engineVersion` TEXT NOT NULL, `rulesVersion` TEXT NOT NULL, `field` TEXT NOT NULL, `value` TEXT NOT NULL, `start` INTEGER NOT NULL, `end` INTEGER NOT NULL, `originalText` TEXT NOT NULL, `provenance` TEXT NOT NULL, `createdAt` TEXT NOT NULL, `tokenStart` INTEGER DEFAULT NULL, `tokenEnd` INTEGER DEFAULT NULL, `tokenizerVersion` TEXT DEFAULT NULL, `modelVersion` TEXT DEFAULT NULL, `humanProvenance` TEXT DEFAULT NULL, `sourceReceivedAt` TEXT DEFAULT NULL, PRIMARY KEY(`rawId`, `revision`), FOREIGN KEY(`rawId`) REFERENCES `beta_raw_evidence`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "rawId",
+            "columnName": "rawId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "decisionId",
+            "columnName": "decisionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archiveHash",
+            "columnName": "archiveHash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "interpretationAttempt",
+            "columnName": "interpretationAttempt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "engineVersion",
+            "columnName": "engineVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rulesVersion",
+            "columnName": "rulesVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "field",
+            "columnName": "field",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "start",
+            "columnName": "start",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "end",
+            "columnName": "end",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalText",
+            "columnName": "originalText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "provenance",
+            "columnName": "provenance",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tokenStart",
+            "columnName": "tokenStart",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "defaultValue": "NULL"
+          },
+          {
+            "fieldPath": "tokenEnd",
+            "columnName": "tokenEnd",
+            "affinity": "INTEGER",
+            "notNull": false,
+            "defaultValue": "NULL"
+          },
+          {
+            "fieldPath": "tokenizerVersion",
+            "columnName": "tokenizerVersion",
+            "affinity": "TEXT",
+            "notNull": false,
+            "defaultValue": "NULL"
+          },
+          {
+            "fieldPath": "modelVersion",
+            "columnName": "modelVersion",
+            "affinity": "TEXT",
+            "notNull": false,
+            "defaultValue": "NULL"
+          },
+          {
+            "fieldPath": "humanProvenance",
+            "columnName": "humanProvenance",
+            "affinity": "TEXT",
+            "notNull": false,
+            "defaultValue": "NULL"
+          },
+          {
+            "fieldPath": "sourceReceivedAt",
+            "columnName": "sourceReceivedAt",
+            "affinity": "TEXT",
+            "notNull": false,
+            "defaultValue": "NULL"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "rawId",
+            "revision"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_beta_learning_label_decisionId",
+            "unique": true,
+            "columnNames": [
+              "decisionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_beta_learning_label_decisionId` ON `${TABLE_NAME}` (`decisionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "beta_raw_evidence",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "rawId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "views": [
+      {
+        "viewName": "beta_asset",
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT environment,bankId,localId,'ACCOUNT' AS kind,last4,NULL AS parentLocalId,NULL AS creditCardRole,displayName,network,accountType,loanType,metadataRevision FROM beta_account_registry UNION ALL SELECT environment,bankId,localId,kind,last4,parentLocalId,creditCardRole,displayName,network,accountType,loanType,metadataRevision FROM beta_card_registry UNION ALL SELECT environment,bankId,localId,'CREDIT_FACILITY' AS kind,last4,NULL AS parentLocalId,NULL AS creditCardRole,displayName,network,accountType,loanType,metadataRevision FROM beta_credit_facility UNION ALL SELECT environment,bankId,localId,'LOAN' AS kind,last4,NULL AS parentLocalId,NULL AS creditCardRole,displayName,network,accountType,loanType,metadataRevision FROM beta_loan_registry"
+      },
+      {
+        "viewName": "beta_evidence_outcome",
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT rawId,disposition,route,reasons,baselineJson,candidateJson,updatedAt,attempts FROM beta_parsed_event"
+      },
+      {
+        "viewName": "beta_evidence_retry",
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT rawId,stage,attempts,code,updatedAt FROM beta_processing_retry WHERE kind='INTERPRETATION'"
+      },
+      {
+        "viewName": "beta_financial_adoption",
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT evidenceId,transactionId,bankId,archiveFingerprint,status,reason,approvedInput,correction,interpretation,approvalRequest,observationRevision FROM beta_review_item WHERE recordKind='FINANCIAL'"
+      },
+      {
+        "viewName": "beta_financial_approval_retry",
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT rawId AS evidenceId,request FROM beta_processing_retry WHERE kind='APPROVAL'"
+      },
+      {
+        "viewName": "beta_ownership_decision",
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT bankId,referenceKind AS kind,suffix,status,assetLocalId,revision FROM beta_review_item WHERE recordKind='OWNERSHIP'"
+      },
+      {
+        "viewName": "beta_ownership_exclusion",
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT rawId FROM beta_parsed_event WHERE ownershipExcluded=1"
+      },
+      {
+        "viewName": "beta_dashboard_evidence_facts",
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT rawId AS evidenceId, f_transactionId AS transactionId, f_bankId AS bankId, f_archiveFingerprint AS archiveFingerprint, f_observationRevision AS observationRevision, f_correction AS correction, f_interpretation AS interpretation, f_boundInput AS boundInput, f_observedAt AS observedAt, f_feeKnown AS feeKnown, f_feeAmount AS feeAmount, f_feeCurrency AS feeCurrency, f_balanceAsset AS balanceAsset, f_balanceAmount AS balanceAmount, f_balanceCurrency AS balanceCurrency, f_facilityAsset AS facilityAsset, f_dueAmount AS dueAmount, f_dueCurrency AS dueCurrency, f_dueDate AS dueDate, f_merchant AS merchant, f_counterparty AS counterparty, f_debitCardAsset AS debitCardAsset, f_debitCardLast4 AS debitCardLast4, f_debitCardParent AS debitCardParent, f_messageFamily AS messageFamily FROM beta_parsed_event WHERE f_present = 1"
+      },
+      {
+        "viewName": "beta_dashboard_aux_facts",
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT rawId AS evidenceId, a_bankId AS bankId, a_archiveFingerprint AS archiveFingerprint, a_outcomeAttempt AS outcomeAttempt, a_outcomeAt AS outcomeAt, a_nonFinancial AS nonFinancial, a_registryBinding AS registryBinding, a_boundInput AS boundInput, a_observedAt AS observedAt, a_balanceAsset AS balanceAsset, a_balanceAmount AS balanceAmount, a_balanceCurrency AS balanceCurrency, a_facilityAsset AS facilityAsset, a_dueAmount AS dueAmount, a_dueCurrency AS dueCurrency, a_dueDate AS dueDate, a_loanAsset AS loanAsset, a_loanType AS loanType, a_loanRemaining AS loanRemaining, a_loanRemainingCurrency AS loanRemainingCurrency, a_loanInstallment AS loanInstallment, a_loanInstallmentCurrency AS loanInstallmentCurrency, a_statementProved AS statementProved FROM beta_parsed_event WHERE a_present = 1"
+      },
+      {
+        "viewName": "beta_correction_evidence_claim",
+        "createSql": "CREATE VIEW `${VIEW_NAME}` AS SELECT environment,evidenceId,transactionId FROM beta_financial_transaction_raw_sms_link WHERE correctionClaim=1"
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '99a24b54944bfc42cf59e5cb96fbb9aa')"
+    ]
+  }
+}
