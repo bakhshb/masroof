@@ -106,6 +106,84 @@ class BetaReportedMessagesChecks(private val context: Context) {
         }} finally {BetaContainer.resetOffline(context)}
     }
 
+    fun previousEngineKeepsManualClassificationAndSuppression(failFirst: Boolean = false) {
+        BetaContainer.resetOffline(context)
+        try {
+            val ids=BetaContainer(context).use {beta ->
+                beta.acknowledgeStart();beta.setBankEnabled(bank,true)
+                val account=beta.saveManualAsset(ManualAssetDraft(AssetId(Environment.BETA,bank,"manual-upgrade-account"),AssetKind.ACCOUNT,"3001",ownedConfirmed=true))
+                val ids=(0..2).map {i -> (beta.importEvidence(EvidenceRequest("manual-upgrade",EvidenceOrigin.EXPLICIT_HISTORY,setOf(bank)),listOf(EvidenceMessage("manual-$i","AlJazira",
+                    "Cash withdrawal\nFrom account: 3001\nAmount: ${20+i} SAR\nDate: 2026-10-18 12:0$i",Instant.parse("2026-10-18T09:03:00Z").plusSeconds(i.toLong()),ReceiptTimeSource.PROVIDER_TIMESTAMP))).single() as EvidenceResult.Stored).summary.id}
+                val preview=requireNotNull(beta.financialApprovalPreview(ids[0]))
+                assertTrue(beta.approveEvidenceFinancial(requireNotNull(betaApprovalDraft(preview,FinancialType.FEE.name,betaAssetChoiceKey(account.id),"external",null))) is BetaFinancialAdoptionResult.Posted)
+                beta.processAutomaticEvidence()
+                val second=requireNotNull(beta.transactionActionDetail("evidence:${ids[1]}"))
+                assertTrue(beta.reclassifyTransaction(second.token,"manual-refund",FinancialType.REFUND))
+                val third=requireNotNull(beta.transactionActionDetail("evidence:${ids[2]}"))
+                assertTrue(beta.saveReview(third.token,"manual-ignore",com.baraa.masroof.lab.finance.corrections.FinancialDecision.SuppressAsNonFinancial) is com.baraa.masroof.lab.beta.application.corrections.BetaCorrectionResult.Applied)
+                ids
+            }
+            val db=Room.databaseBuilder(context,BetaDatabase::class.java,BetaDatabase.NAME).build()
+            try {runBlocking {ids.forEach {id ->
+                val archive=JSONObject(requireNotNull(db.evidenceDao().outcome(id)).candidateJson).put("engineVersion","bank-rules-independent-v8")
+                db.openHelper.writableDatabase.execSQL("UPDATE beta_parsed_event SET candidateJson=? WHERE rawId=?",arrayOf(archive.toString(),id))
+            }}} finally {db.close()}
+            assertTrue(context.getSharedPreferences(BetaEnvironment.PREFS_NAME,Context.MODE_PRIVATE).edit().putString("beta_auto_complete_v1","previous-engine").putString("beta_reinterpret_complete","previous-engine").commit())
+            if(failFirst) {
+                val faultDb=Room.databaseBuilder(context,BetaDatabase::class.java,BetaDatabase.NAME).build()
+                try {
+                    faultDb.openHelper.writableDatabase.execSQL("CREATE TRIGGER manual_upgrade_failure BEFORE UPDATE ON beta_financial_transaction BEGIN SELECT RAISE(ABORT,'synthetic'); END")
+                    BetaContainer(context).use {beta ->
+                        assertTrue(runCatching {beta.processAutomaticEvidence()}.isFailure)
+                        assertNull(beta.financialPosting(PostingKey(Environment.BETA,"evidence:${ids[0]}")))
+                    }
+                } finally {faultDb.openHelper.writableDatabase.execSQL("DROP TRIGGER IF EXISTS manual_upgrade_failure");faultDb.close()}
+            }
+            BetaContainer(context).use {beta ->
+                beta.processAutomaticEvidence()
+                assertEquals(FinancialType.FEE,beta.financialPosting(PostingKey(Environment.BETA,"evidence:${ids[0]}"))?.command?.type)
+                assertEquals(FinancialType.REFUND,beta.financialPosting(PostingKey(Environment.BETA,"evidence:${ids[1]}"))?.command?.type)
+                assertNull(beta.financialPosting(PostingKey(Environment.BETA,"evidence:${ids[2]}")))
+                assertTrue(beta.reviewInboxPage().rows.isEmpty())
+                assertEquals(ids[2],beta.reviewInboxPage(ignored=true).rows.single().id)
+                val sizes=ids.map {beta.financialHistory(PostingKey(Environment.BETA,"evidence:$it")).size}
+                beta.processAutomaticEvidence()
+                assertEquals(sizes,ids.map {beta.financialHistory(PostingKey(Environment.BETA,"evidence:$it")).size})
+            }
+        } finally {BetaContainer.resetOffline(context)}
+    }
+
+    fun correctionReviewCanBeIgnoredAndResolved() {
+        BetaContainer.resetOffline(context)
+        try {BetaContainer(context).use {beta ->
+            beta.acknowledgeStart();beta.setBankEnabled(bank,true)
+            beta.saveManualAsset(ManualAssetDraft(AssetId(Environment.BETA,bank,"correction-review-account"),AssetKind.ACCOUNT,"3001",ownedConfirmed=true))
+            val id=(beta.importEvidence(EvidenceRequest("correction-review",EvidenceOrigin.EXPLICIT_HISTORY,setOf(bank)),listOf(EvidenceMessage("correction-review","AlJazira",
+                "Cash withdrawal\nFrom account: 3001\nAmount: 20 SAR\nDate: 2026-10-18 12:00",Instant.parse("2026-10-18T09:00:00Z"),ReceiptTimeSource.PROVIDER_TIMESTAMP))).single() as EvidenceResult.Stored).summary.id
+            beta.processAutomaticEvidence()
+            val key=PostingKey(Environment.BETA,"evidence:$id")
+            val detail=requireNotNull(beta.transactionActionDetail(key.transactionId))
+            val correction=beta.saveReview(detail.token,"incomplete-payment",com.baraa.masroof.lab.finance.corrections.FinancialDecision.ResolveFinancialType(FinancialType.CREDIT_CARD_PAYMENT))
+            assertTrue(correction is com.baraa.masroof.lab.beta.application.corrections.BetaCorrectionResult.Applied)
+            assertNull(beta.financialPosting(key))
+            assertEquals(id,beta.reviewInboxPage().rows.single().id)
+            assertEquals(1,beta.evidenceInboxCounts().needsReview)
+            assertTrue(FinancialType.CASH_WITHDRAWAL in requireNotNull(beta.reviewDetail(id).correctionAction).allowedTypes)
+            beta.resolveReviewAsNonFinancial(id)
+            assertTrue(beta.reviewInboxPage().rows.isEmpty())
+            assertEquals(0,beta.evidenceInboxCounts().needsReview)
+            assertTrue(beta.reviewInboxPage(ignored=true).rows.single().financiallySuppressed)
+            beta.resolveReviewAsNonFinancial(id,true,FinancialType.CASH_WITHDRAWAL)
+            assertEquals(FinancialType.CASH_WITHDRAWAL,beta.financialPosting(key)?.command?.type)
+            val again=requireNotNull(beta.transactionActionDetail(key.transactionId))
+            beta.saveReview(again.token,"incomplete-payment-again",com.baraa.masroof.lab.finance.corrections.FinancialDecision.ResolveFinancialType(FinancialType.CREDIT_CARD_PAYMENT))
+            val pending=requireNotNull(beta.transactionActionDetail(key.transactionId))
+            assertTrue(beta.reclassifyTransaction(pending.token,"keep-original-type",FinancialType.CASH_WITHDRAWAL))
+            assertEquals(FinancialType.CASH_WITHDRAWAL,beta.financialPosting(key)?.command?.type)
+            assertTrue(beta.reviewInboxPage().rows.isEmpty())
+        }} finally {BetaContainer.resetOffline(context)}
+    }
+
     private fun purchase(amount: String,fee: String,merchant: String,time: String,balance: String)="شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nمبلغ: SAR $amount\nلدى: $merchant\nفي: 2026-10-06 $time\nالدولة: USA\nرسوم العمليات الدولية: $fee\nسعر الصرف: 1.0\nالرصيد المتاح: SAR $balance\nإجمالي المستحق: SAR 6705.18"
     private fun transfer(amount: String,suffix: String,bank: String,time: String,reference: String)="عملية حوالة مالية صادرة مقبولة\nخصمت من حساب: 3001\nإلى: TEST BENEFICIARY\nمبلغ العملية: $amount SAR\nالمعرف البديل \\الايبان: $suffix\n[$bank]\nفي: $time\nرقم المعاملة: TEST_REFERENCE_$reference"
 }

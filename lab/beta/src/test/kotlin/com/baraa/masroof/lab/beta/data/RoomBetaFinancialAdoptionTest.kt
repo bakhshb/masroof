@@ -352,4 +352,29 @@ class RoomBetaFinancialAdoptionTest {
         assertEquals(FinancialType.FEE, posting()!!.command.type)
         assertEquals(manuallySelected.command.amount, posting()!!.command.amount)
     }
+    @Test fun existingApprovalRebaseKeepsItsSelectionAndMakesSecuritySticky() = runBlocking {
+        capture();RoomBetaFinancialAdoption(db).approve(request())
+        val first=requireNotNull(posting())
+        capture(archive=archive("one","777"))
+        assertTrue(RoomBetaFinancialAdoption(db).reconcileApprovedEvidence("one") is BetaFinancialAdoptionResult.Posted)
+        assertEquals(first.command.amount,posting()!!.command.amount)
+        assertEquals(first.command.time,posting()!!.command.time)
+        assertEquals(first.command.appliedFx,posting()!!.command.appliedFx)
+        capture(archive=archive("one",family=MessageFamily.OTP))
+        assertEquals(BetaFinancialAdoptionResult.Review("CORRECTION_REVIEW"),RoomBetaFinancialAdoption(db).reconcileApprovedEvidence("one"))
+        assertNull(posting())
+        capture()
+        assertEquals(BetaFinancialAdoptionResult.Review("CORRECTION_REVIEW"),RoomBetaFinancialAdoption(db).reconcileApprovedEvidence("one"))
+        assertNull(posting())
+    }
+
+    @Test fun rebaseDoesNotReleaseAChangedOwnedAccount() = runBlocking {
+        capture();RoomBetaFinancialAdoption(db).approve(request())
+        BetaAssetRegistry(db).save(account.copy(last4="9999"),true,account)
+        capture(archive=archive("one","777"))
+        assertEquals(BetaFinancialAdoptionResult.Review("REGISTRY_CHANGED"),RoomBetaFinancialAdoption(db).reconcileApprovedEvidence("one"))
+        assertNull(posting())
+        assertNotNull(RoomBetaFinancialLedger(db).readAudit(RoomBetaFinancialAdoption.key("one")))
+    }
+
 }

@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.*
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -91,12 +93,8 @@ private fun reviewAssetLabel(asset: OwnedAsset,detail: BetaReviewDetail): String
         asset.last4?.let {" · •• $it"}.orEmpty()+" · "+stringResource(bankName(asset.id.bank))
 
 @Composable
-internal fun BetaReviewMeta(icon: ImageVector,label: String) {
-    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
-        Icon(icon,null,Modifier.size(MasroofIconSizes.moneyRowLeading),tint=MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(label,style=MaterialTheme.typography.bodyMedium)
-    }
-}
+internal fun BetaReviewMeta(icon: ImageVector,label: String) = ApprovedIconLabelRow(icon,label)
+
 internal fun reviewFamilyLabel(family: String?): Int = when(family) {
     "PURCHASE" -> financialTypeLabel(FinancialType.EXPENSE); "REFUND" -> financialTypeLabel(FinancialType.REFUND)
     "FINANCING_INSTALLMENT" -> financialTypeLabel(FinancialType.LOAN_REPAYMENT); "BILL_PAYMENT" -> financialTypeLabel(FinancialType.BILL_PAYMENT)
@@ -127,6 +125,7 @@ internal fun reviewTypeIcon(type: FinancialType): ImageVector = when(type) {
     else -> MasroofOutlineIcons.Receipt
 }
 internal fun reviewReasonLabel(detail: BetaReviewDetail): Int = when {
+    detail.correctionAction!=null -> R.string.beta_review_parity_reason_correction
     detail.row.reason=="CONFIRM_LOAN" -> R.string.beta_complete_review_loan_reason
     detail.reasons.any {it in setOf("MISSING_TRANSACTION_TIME","INVALID_TIME","UNBOUND_TIME_ROLE")} -> R.string.beta_complete_review_time_reason
     detail.reasons.any {it.contains("AMOUNT") || it.contains("CURRENCY") || it=="MISSING_POSITIVE_PRINCIPAL"} -> R.string.beta_complete_review_amount_reason
@@ -135,15 +134,11 @@ internal fun reviewReasonLabel(detail: BetaReviewDetail): Int = when {
     else -> approvalReason(detail.row.reason)
 }
 
-/** Same primary icon-action geometry as production IconTextButton. */
+/** Callback/tag adapter; rendering is the ported production IconTextButton. */
 @Composable
-internal fun BetaReviewActionButton(label: String,icon: ImageVector,enabled: Boolean,tag: String,onClick: ()->Unit) {
-    Button(onClick=onClick,enabled=enabled,modifier=Modifier.fillMaxWidth().testTag(tag),shape=MaterialTheme.shapes.medium) {
-        Icon(icon,null,Modifier.size(MasroofIconSizes.moneyRowLeading))
-        Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
-        Text(label)
-    }
-}
+internal fun BetaReviewActionButton(label: String,icon: ImageVector,enabled: Boolean,tag: String,onClick: ()->Unit) =
+    ApprovedIconTextButton(onClick,label,Modifier.fillMaxWidth().testTag(tag),enabled,icon)
+
 internal fun reviewReasonLabels(detail: BetaReviewDetail): List<Int> {
     val codes=detail.reasons.map {it.uppercase()}.toSet()
     val labels=buildList {

@@ -32,11 +32,12 @@ class BetaManualAssetScreenTest {
     @After fun close() { beta.close(); BetaContainer.resetOffline(context) }
     private fun showEditor(existing: OwnedAsset? = null, onCancel: () -> Unit = {}, onSaved: () -> Unit = {}) {
         val assets = beta.assets()
+        val metadata = existing?.let { beta.assetMetadata()[it.id] } ?: com.baraa.masroof.lab.beta.application.BetaAssetMetadata()
         compose.setContent {
             MaterialTheme {
                 BetaShell(0, false, editor = {
                     BetaAssetEditor(bank, existing, assets, false, false,
-                        onSave = { beta.saveManualAsset(it); onSaved() }, onCancel = onCancel)
+                        onSave = { beta.saveManualAsset(it); onSaved() }, onCancel = onCancel, metadata = metadata)
                 }, onReturn = {}, onReset = {}, onBackup = {}, onRestore = {})
             }
         }
@@ -49,6 +50,29 @@ class BetaManualAssetScreenTest {
         compose.onNodeWithTag("asset-owned-confirm").performScrollTo()
             .assertIsDisplayed().performClick().assertIsOn()
         compose.onNodeWithTag("asset-save").assertIsDisplayed().assertIsEnabled()
+    }
+    @Test fun reselectingCurrentDebitKindAndNetworkPreservesItsAccount() {
+        beta.saveManualAsset(ManualAssetDraft(id("account"), AssetKind.ACCOUNT, "1111", ownedConfirmed = true))
+        val debit = beta.saveManualAsset(ManualAssetDraft(id("debit"), AssetKind.DEBIT_CARD, "3333", id("account"), ownedConfirmed = true,
+            metadata = com.baraa.masroof.lab.beta.application.BetaAssetMetadata(network = "MADA")))
+        showEditor(debit)
+        compose.onNodeWithTag("asset-kind-DEBIT_CARD").performScrollTo().performClick()
+        compose.onNodeWithTag("asset-network-MADA").performScrollTo().performClick()
+        confirmOwnership()
+        compose.onNodeWithTag("asset-save").performClick()
+        assertEquals(debit, beta.assets().single { it.id == debit.id })
+        assertEquals(2, beta.assets().size)
+    }
+    @Test fun reselectingCurrentPrimaryKindAndRoleDoesNotCreateAnotherFacility() {
+        beta.saveManualAsset(ManualAssetDraft(id("facility"), AssetKind.CREDIT_FACILITY, "", ownedConfirmed = true))
+        val primary = beta.saveManualAsset(ManualAssetDraft(id("primary"), AssetKind.CREDIT_CARD, "2222", id("facility"), CreditCardRole.PRIMARY, true))
+        showEditor(primary)
+        compose.onNodeWithTag("asset-kind-CREDIT_CARD").performScrollTo().performClick()
+        compose.onNodeWithTag("asset-role-PRIMARY").performScrollTo().performClick()
+        confirmOwnership()
+        compose.onNodeWithTag("asset-save").performClick()
+        assertEquals(primary, beta.assets().single { it.id == primary.id })
+        assertEquals(2, beta.assets().size)
     }
     @Test fun cancelAndBackDiscardUnconfirmedDraftWithoutWrites() {
         var canceled = 0

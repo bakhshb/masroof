@@ -37,7 +37,7 @@ class BetaTransactionDetailWorkflow(private val database: BetaDatabase) {
     suspend fun resolve(token: BetaReviewToken,decisionId: String,type: FinancialType): Boolean = database.withTransaction {
         val current=review.detail(token.key) ?: return@withTransaction false
         val input=current.stored?.classification?.input ?: return@withTransaction false
-        if(input.storedType==type && current.token.interpretation==token.interpretation && current.token.evidence==token.evidence) return@withTransaction true
+        if((current.current==null || current.current.activity==BetaLedgerActivity.ACTIVE) && input.storedType==type && current.token.interpretation==token.interpretation && current.token.evidence==token.evidence) return@withTransaction true
         if(current.token!=token) return@withTransaction false
         if(type !in detail(token.key)!!.allowedTypes) return@withTransaction false
         val desired=reclassified(input,type)

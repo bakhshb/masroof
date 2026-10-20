@@ -1,0 +1,53 @@
+{
+  "production_commit": "0d86c5d3",
+  "scope": "lab only; rendering only; source files are read-only",
+  "components": [
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofCardComponents.kt",
+      "symbol": "MasroofBadge",
+      "source_sha256": "f7ef8b9a1a37b5aa44ac099d151b2e099f6987a0b3f3ff6a3736653bdddbff83",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofGuidance.kt",
+      "symbol": "MasroofGuidanceLabel",
+      "source_sha256": "28abc79f63e080895a2e27f1e4d73fd918ed5a9c3c78bb3f62abcd8dc831c736",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofUiComponents.kt",
+      "symbol": "IconLabelRow",
+      "source_sha256": "d9339af5fd68cbbd96fc5822fc256c85326c8d380a42dc0c69b9300f3f95509a",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofReferenceControls.kt",
+      "symbol": "MasroofButton",
+      "source_sha256": "62ab5125e86e7d4a03a095be6a0e0321ba519a57b511053505b9997c3cc0ccb3",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/review/ReviewScreen.kt",
+      "symbol": "ReviewListCard",
+      "source_sha256": "3de5c6ed8f325787c69e4ff17b0983f9e2dc3755d8cc7cfe3a9b6fb47c964273",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofUiComponents.kt",
+      "symbol": "IconTextButton",
+      "source_sha256": "d9339af5fd68cbbd96fc5822fc256c85326c8d380a42dc0c69b9300f3f95509a",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/application/locale/AppDigits.kt",
+      "symbol": "AppDigits",
+      "source_sha256": "afdfe038e8f167e6de6a7a5597a10d5e49b3ec4d138ea590057f20abaf2b8b63",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/BetaDisplayDigits.kt"
+    }
+  ],
+  "adaptations": [
+    "Rename local renderer symbols; use the existing ui-kit theme/components.",
+    "Resolve labels and workflow callbacks in the Beta adapter; never copy production financial repositories or parsing.",
+    "Apply the same production Latin-digit display boundary."
+  ]
+}

@@ -31,4 +31,5 @@
   <string name="beta_review_parity_my_card">My card</string>
   <string name="beta_review_parity_not_mine">Do not track</string>
   <string name="beta_review_parity_restore_as">Restore as %1$s</string>
+    <string name="beta_review_parity_reason_correction">The previous classification is incomplete. Choose the correct transaction type below, or ignore this message if it is not financial.</string>
 </resources>

@@ -13,7 +13,8 @@ import java.time.Instant
 data class BetaReviewDetail(val row: BetaInboxRow, val preview: BetaFinancialApprovalPreview?,
     val ownership: List<BetaOwnershipCandidate>, val actions: List<FinancialType>,
     val source: AssetId?, val destination: AssetId?, val income: IncomeAttribution?,
-    val loanConfiguration: Boolean, val assetMetadata: Map<AssetId,BetaAssetMetadata>, val reasons: Set<String>, val suggestedType: FinancialType? = null, val resolvedAt: Instant? = null, val merchant: String? = null, val counterparty: String? = null)
+    val loanConfiguration: Boolean, val assetMetadata: Map<AssetId,BetaAssetMetadata>, val reasons: Set<String>, val suggestedType: FinancialType? = null, val resolvedAt: Instant? = null, val merchant: String? = null, val counterparty: String? = null,
+    val correctionAction: com.baraa.masroof.lab.beta.application.corrections.BetaTransactionActionDetail? = null)
 
 class BetaReviewResolutionWorkflow(private val database: BetaDatabase) {
     suspend fun detail(id: String): BetaReviewDetail = database.withTransaction {
@@ -63,12 +64,16 @@ class BetaReviewResolutionWorkflow(private val database: BetaDatabase) {
         }
         val loan=assets.filter {it.kind==AssetKind.LOAN && it.id.bank.value==row.bank && metadata[it.id]?.loanType==text("loanType")}.singleOrNull()
         val incoming=family in setOf("REFUND","TRANSFER_IN")
+        val correctionKey=correctionOwner?.let {com.baraa.masroof.lab.finance.posting.PostingKey(com.baraa.masroof.lab.finance.value.Environment.BETA,it)}
+        val correction=correctionKey?.let {com.baraa.masroof.lab.beta.application.corrections.BetaReviewWorkflow(database).detail(it)}
+        val correctionAction=if(correction!=null && correction.current?.overlay?.safetyHold==false && !dismissed)
+            com.baraa.masroof.lab.beta.application.corrections.BetaTransactionDetailWorkflow(database).detail(correction.token.key) else null
         BetaReviewDetail(row,preview,ownership,
             if(type==FinancialType.EXTERNAL_TRANSFER_IN) listOf(type,FinancialType.INCOME) else if(type==FinancialType.EXTERNAL_TRANSFER_OUT) listOf(type) else if(type!=null) listOf(FinancialType.EXPENSE,FinancialType.INCOME,FinancialType.CREDIT_CARD_PAYMENT,FinancialType.REFUND,FinancialType.CASH_WITHDRAWAL,FinancialType.BILL_PAYMENT,FinancialType.FEE,FinancialType.LOAN_REPAYMENT) else emptyList(),
             if(incoming) null else if(type in setOf(FinancialType.LOAN_REPAYMENT,FinancialType.CREDIT_CARD_PAYMENT)) account?.id else owner,
             if(type==FinancialType.LOAN_REPAYMENT) loan?.id else if(type==FinancialType.CREDIT_CARD_PAYMENT) credit?.id else if(incoming) owner else null,
             if(text("salaryIncomeWording")=="true") IncomeAttribution.SALARY else IncomeAttribution.OTHER,
             reason=="CONFIRM_LOAN",metadata,summary.reasonCodes+listOfNotNull(reason)+
-                archive?.optJSONArray("diagnostics")?.let {ds -> (0 until ds.length()).map {ds.getJSONObject(it).optString("code")}}.orEmpty(), type, dao.decision(id)?.updatedAt?.let(Instant::parse).takeIf {dismissed},text("merchant"),text("counterparty"))
+                archive?.optJSONArray("diagnostics")?.let {ds -> (0 until ds.length()).map {ds.getJSONObject(it).optString("code")}}.orEmpty(), type, dao.decision(id)?.updatedAt?.let(Instant::parse).takeIf {dismissed},text("merchant"),text("counterparty"),correctionAction)
     }
 }

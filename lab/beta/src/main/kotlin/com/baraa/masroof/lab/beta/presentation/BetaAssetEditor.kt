@@ -72,14 +72,14 @@ internal fun BetaAssetEditor(
         val kinds = if (existing == null) (allowedKinds?.toList() ?: listOf(AssetKind.ACCOUNT, AssetKind.DEBIT_CARD, AssetKind.CREDIT_CARD, AssetKind.LOAN))
             else if (existing.kind in setOf(AssetKind.DEBIT_CARD, AssetKind.CREDIT_CARD)) listOf(AssetKind.DEBIT_CARD, AssetKind.CREDIT_CARD) else listOf(existing.kind)
         MasroofSheetChoices(kinds,setOf(kind),{stringResource(assetKindLabel(it))},
-            {kindName=it.name;parentLocalId=null;createFacility=false},{"asset-kind-${it.name}"},enabled=!busy)
+            {if(kindName!=it.name) {kindName=it.name;parentLocalId=null;createFacility=false}},{"asset-kind-${it.name}"},enabled=!busy)
         OutlinedTextField(value=displayName,onValueChange={if(it.length<=120) displayName=it},enabled=!busy,singleLine=true,
             label={Text(stringResource(R.string.beta_parity_display_name))},modifier=Modifier.fillMaxWidth().testTag("asset-display-name"))
         if(kind in setOf(AssetKind.DEBIT_CARD,AssetKind.CREDIT_CARD)) {
             Text(stringResource(R.string.beta_parity_network))
             val networks=listOf("MADA","VISA","MASTERCARD")
             MasroofSheetChoices(networks,setOfNotNull(network),{if(it=="MADA") stringResource(R.string.beta_parity_mada) else if(it=="VISA") "Visa" else "Mastercard"},
-                {network=it;if(it=="MADA") {kindName=AssetKind.DEBIT_CARD.name;parentLocalId=null}},{"asset-network-$it"},enabled=!busy)
+                {network=it;if(it=="MADA" && kindName!=AssetKind.DEBIT_CARD.name) {kindName=AssetKind.DEBIT_CARD.name;parentLocalId=null}},{"asset-network-$it"},enabled=!busy)
         }
         if(kind==AssetKind.ACCOUNT) {
             Text(stringResource(R.string.beta_parity_account_type))
@@ -107,7 +107,7 @@ internal fun BetaAssetEditor(
         if (kind == AssetKind.CREDIT_CARD) {
             MasroofSheetChoices(CreditCardRole.entries.toList(),CreditCardRole.entries.filter {it.name==roleName}.toSet(),
                 {stringResource(if(it==CreditCardRole.PRIMARY) R.string.beta_asset_primary else R.string.beta_asset_supplementary)},
-                {roleName=it.name;parentLocalId=null},{"asset-role-${it.name}"},enabled=!busy)
+                {if(roleName!=it.name) {roleName=it.name;parentLocalId=null}},{"asset-role-${it.name}"},enabled=!busy)
             Text(stringResource(R.string.beta_asset_shared_facility), style = MaterialTheme.typography.bodySmall)
         }
         if(kind==AssetKind.CREDIT_CARD && roleName==CreditCardRole.SUPPLEMENTARY.name) {

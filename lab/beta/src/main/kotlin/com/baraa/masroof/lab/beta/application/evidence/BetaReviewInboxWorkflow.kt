@@ -15,13 +15,16 @@ class BetaReviewInboxWorkflow(private val database: BetaDatabase) {
     suspend fun resolveNonFinancial(id: String, restore: Boolean, type: com.baraa.masroof.lab.finance.posting.FinancialType? = null) = database.withTransaction {
         val dao=database.evidenceDao()
         requireNotNull(dao.raw(id))
-        val owner=database.correctionDao().evidenceOwner("BETA",id)
-        if(restore && owner!=null && database.correctionDao().current("BETA",owner)?.activity=="SUPPRESSED") {
+        val owner=database.correctionDao().evidenceOwner("BETA",id) ?: database.ledgerDao().evidenceOwner("BETA",id)
+        if(owner!=null && (!restore || database.correctionDao().current("BETA",owner)?.activity=="SUPPRESSED")) {
             val workflow=com.baraa.masroof.lab.beta.application.corrections.BetaReviewWorkflow(database)
             val detail=requireNotNull(workflow.detail(com.baraa.masroof.lab.finance.posting.PostingKey(com.baraa.masroof.lab.finance.value.Environment.BETA,owner)))
             val restoredType=type ?: detail.current?.overlay?.let {com.baraa.masroof.lab.finance.corrections.CorrectionSnapshots.export(it).financial}?.storedType ?: detail.observation.input.storedType
-            val result=workflow.save(detail.token,java.util.UUID.randomUUID().toString(),com.baraa.masroof.lab.finance.corrections.FinancialDecision.ResolveFinancialType(restoredType))
-            check(result is com.baraa.masroof.lab.beta.application.corrections.BetaCorrectionResult.Applied && result.current.activity==com.baraa.masroof.lab.beta.application.corrections.BetaLedgerActivity.ACTIVE)
+            val decision=if(restore) com.baraa.masroof.lab.finance.corrections.FinancialDecision.ResolveFinancialType(restoredType)
+                else com.baraa.masroof.lab.finance.corrections.FinancialDecision.SuppressAsNonFinancial
+            val result=workflow.save(detail.token,java.util.UUID.randomUUID().toString(),decision)
+            val expected=if(restore) com.baraa.masroof.lab.beta.application.corrections.BetaLedgerActivity.ACTIVE else com.baraa.masroof.lab.beta.application.corrections.BetaLedgerActivity.SUPPRESSED
+            check(result is com.baraa.masroof.lab.beta.application.corrections.BetaCorrectionResult.Applied && result.current.activity==expected)
             return@withTransaction
         }
         check(database.ledgerDao().evidenceOwner("BETA",id)==null && database.financialAdoptionDao().retry(id)==null)
@@ -41,6 +44,7 @@ class BetaReviewInboxWorkflow(private val database: BetaDatabase) {
         val rows=mutableListOf<BetaInboxRow>()
         val seenOwnership=mutableSetOf<String>()
         val seenSuppressed=mutableSetOf<String>()
+        val seenCorrectionReview=mutableSetOf<String>()
         var cursor=after
         val processing=dao.inboxCounts().processing
         var more=true
@@ -63,6 +67,7 @@ class BetaReviewInboxWorkflow(private val database: BetaDatabase) {
                 val suppressed=correctionOwner!=null && database.correctionDao().current("BETA",correctionOwner)?.activity=="SUPPRESSED"
                 val dismissed=summary.manualDecision==EvidenceReviewDecision.USER_NON_FINANCIAL || suppressed
                 if(ignored && suppressed && !seenSuppressed.add(checkNotNull(correctionOwner))) continue
+                if(!ignored && summary.financialReviewReason=="CORRECTION_REVIEW" && correctionOwner!=null && !seenCorrectionReview.add(correctionOwner)) continue
                 val informational=family in setOf("OTP","NON_FINANCIAL","BALANCE_NOTICE","STATEMENT")
                 val pending=summary.disposition!=EvidenceDisposition.INTERPRETED || summary.financialReviewReason!=null
                 if(if(ignored) !informational && !dismissed else (!pending || informational || dismissed)) continue

@@ -81,6 +81,11 @@ class RoomBetaFinancialAdoption(private val database: BetaDatabase) {
             if ((external && !manual) || matchedNotice) database.ownershipDao().exclude(BetaOwnershipExclusionEntity(id))
             else database.ownershipDao().clearExclusion(id)
             adoptAutomatic(id, registry, enabled, ownership, external && !manual,loanTypes)
+            // Parser upgrades must carry existing explicit financial decisions, not ask the
+            // user to classify the same evidence again. Pending approvals retain their retry.
+            if(previous!=null && previous.reason !in setOf("OWNERSHIP_CHANGED","REGISTRY_CHANGED") &&
+                (previous.approvalRequest!=AUTOMATIC_AUTHORITY || database.correctionDao().current(Environment.BETA.name,key(id).transactionId)!=null))
+                reconcileApprovedEvidence(id)
             RoomBetaDashboardFacts(database).refresh(id)
         }
     }
@@ -395,23 +400,47 @@ class RoomBetaFinancialAdoption(private val database: BetaDatabase) {
         if (dao.retry(id) != null) return@withTransaction review("APPROVAL_RETRY_PENDING")
         val outcome = database.evidenceDao().outcome(id) ?: return@withTransaction review("NO_COMPLETED_ARCHIVE")
         val key = key(id)
-        val correction = readBetaCorrectionState(database, key) ?: return@withTransaction review("EXPLICIT_REAPPROVAL_REQUIRED")
+        val correction = readBetaCorrectionState(database, key)
+        val stored=ledger.readAudit(key)
+        if(correction==null) {
+            if(adopted.approvalRequest==AUTOMATIC_AUTHORITY || stored==null || stored.matchIdentity!=null ||
+                stored.classification.input.authority !in setOf(CorrectionAuthority.USER_FINANCIAL_TYPE,CorrectionAuthority.CONFIRMED_FAMILY_OR_AMOUNT))
+                return@withTransaction review("EXPLICIT_REAPPROVAL_REQUIRED")
+            if(adopted.status=="ACTIVE" && adopted.archiveFingerprint==fingerprint(outcome))
+                ledger.read(key)?.let {return@withTransaction BetaFinancialAdoptionResult.Posted(FinancialPostingResult.AlreadyApplied(it))}
+        }
         // An immediate retry after a manual type/endpoint edit has no new raw observation. Rebuilding
         // an observation from the new selected endpoint at the old interpretation would falsely conflict
         // with the immutable observation reviewed by that edit. Preserve that exact transition.
-        if (adopted.status == "ACTIVE" && adopted.archiveFingerprint == fingerprint(outcome) &&
+        if (correction!=null && adopted.status == "ACTIVE" && adopted.archiveFingerprint == fingerprint(outcome) &&
             adopted.observationRevision <= correction.overlay.interpretationRevision) {
             val current = ledger.read(key)
             return@withTransaction if (correction.activity == BetaLedgerActivity.ACTIVE && current != null)
                 BetaFinancialAdoptionResult.Posted(FinancialPostingResult.AlreadyApplied(current))
             else review(if (correction.activity == BetaLedgerActivity.SUPPRESSED) "MANUAL_SUPPRESSION_PRESERVED" else "CORRECTION_REVIEW")
         }
+        if(stored!=null) {
+            val owned=BetaAssetRegistry(database).owned().associateBy {it.id}
+            val changed=financialRegistryDependencies(stored.classification.input).filter {stored.classification.input.assets[it]!=owned[it]}
+            if(changed.isNotEmpty()) {
+                val reason=if(changed.any {owned[it]==null}) "OWNERSHIP_CHANGED" else "REGISTRY_CHANGED"
+                if(adopted.reason!=reason) dao.hold(id,reason)
+                return@withTransaction review(reason)
+            }
+        }
         val latest = observation(key) ?: run {
-            val previous = correction.overlay.latestObservation.input
+            val previous = correction?.overlay?.latestObservation?.input ?: requireNotNull(stored).classification.input
             CorrectionObservation(previous.copy(revision = PostingRevision(0, maxOf(outcome.attempts.toLong(), adopted.observationRevision)),
                 authority = CorrectionAuthority.NONE), ObservationSafety.SECURITY)
         }
-        val result = RoomBetaCorrectionLifecycle(database).rebase(latest, correction.overlay.correctionRevision)
+        val lifecycle=RoomBetaCorrectionLifecycle(database)
+        val result=if(correction!=null) lifecycle.rebase(latest,correction.overlay.correctionRevision) else {
+            val original=requireNotNull(stored)
+            // Keep carries the verified stored selection; it grants no new financial authority.
+            // The seeded overlay also makes a new security hold durable and sticky across replay.
+            lifecycle.submit(latest,CorrectionRequest("preserve-approved:$id:${original.command.revision.correction}:${latest.input.revision.interpretation}",
+                key,original.command.revision.correction+1,latest.input.revision.interpretation,original.command.evidenceIds,FinancialDecision.Keep))
+        }
         val current = when (result) {
             is BetaCorrectionResult.Applied -> result.current
             is BetaCorrectionResult.AlreadyApplied -> result.current

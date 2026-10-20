@@ -34,6 +34,34 @@ class BetaReviewParityScreenTest {
     }
     @Test fun approvedReviewListDetailActionsAndIgnoreRestoreUseOneJourney() = verify("ar","LIGHT")
     @Test fun englishDarkReviewUsesTheSameActionsAndJourney() = verify("en","DARK")
+    @Test fun incompleteFinancialCorrectionCanBeResolvedFromTheReviewPage() {
+        BetaContainer.resetOffline(context)
+        try {
+            val bank=BankId("BANK_ALJAZIRA")
+            val evidence=BetaContainer(context).use {beta ->
+                beta.acknowledgeStart();beta.setBankEnabled(bank,true);beta.setLanguage("ar")
+                beta.registerAsset(OwnedAsset(AssetId(Environment.BETA,bank,"correction-account"),AssetKind.ACCOUNT,"3001"))
+                val id=(beta.importEvidence(EvidenceRequest("correction-ui",EvidenceOrigin.EXPLICIT_HISTORY,setOf(bank)),listOf(EvidenceMessage("withdrawal","AlJazira",
+                    "Cash withdrawal\nFrom account: 3001\nAmount: 20 SAR\nDate: 2026-10-18 12:00",Instant.parse("2026-10-18T09:00:00Z"),ReceiptTimeSource.PROVIDER_TIMESTAMP))).single() as EvidenceResult.Stored).summary.id
+                beta.processAutomaticEvidence()
+                val detail=requireNotNull(beta.transactionActionDetail("evidence:$id"))
+                beta.saveReview(detail.token,"incomplete-ui-payment",com.baraa.masroof.lab.finance.corrections.FinancialDecision.ResolveFinancialType(com.baraa.masroof.lab.finance.posting.FinancialType.CREDIT_CARD_PAYMENT))
+                id
+            }
+            ActivityScenario.launch(BetaActivity::class.java).use {
+                await("dash-refresh")
+                compose.onNode(hasText(label(com.baraa.masroof.lab.beta.R.string.beta_nav_review)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
+                click("history-review-0")
+                click("review-resolve-CASH_WITHDRAWAL")
+                await("review-empty")
+            }
+            val done=CountDownLatch(1);BetaIo.execute {done.countDown()};assertTrue(done.await(20,TimeUnit.SECONDS))
+            BetaContainer(context).use {beta ->
+                assertEquals(com.baraa.masroof.lab.finance.posting.FinancialType.CASH_WITHDRAWAL,beta.financialPosting(com.baraa.masroof.lab.finance.posting.PostingKey(Environment.BETA,"evidence:$evidence"))?.command?.type)
+                assertEquals(0,beta.evidenceInboxCounts().needsReview)
+            }
+        } finally {BetaContainer.resetOffline(context)}
+    }
     private fun verify(locale: String,theme: String) {
         language=locale;mode=theme
         BetaContainer.resetOffline(context)

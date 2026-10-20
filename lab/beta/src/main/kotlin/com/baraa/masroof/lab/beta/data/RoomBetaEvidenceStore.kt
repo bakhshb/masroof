@@ -98,12 +98,17 @@ internal class RoomBetaEvidenceStore(private val database: BetaDatabase) : BetaE
             outcome?.reasons?.let(::strings)?.toSet().orEmpty() + listOfNotNull(retry?.code),
             decision?.decision?.let(EvidenceReviewDecision::valueOf),
             if (database.financialAdoptionDao().retry(id) != null) "FINANCIAL_APPROVAL_PENDING"
-            else database.financialAdoptionDao().evidence(id)?.takeIf { it.status == "REVIEW" }?.reason)
+            else database.financialAdoptionDao().evidence(id)?.takeIf { it.status == "REVIEW" }?.reason
+                ?: database.correctionDao().evidenceOwner("BETA",id)?.let {owner ->
+                    "CORRECTION_REVIEW".takeIf {database.correctionDao().current("BETA",owner)?.activity=="REVIEW"}})
     }
 
     override suspend fun begin(id: String, at: Instant) = database.withTransaction {
         requireNotNull(dao.raw(id)) { "Unknown Beta evidence" }
-        database.financialAdoptionDao().hold(id, "INTERPRETATION_PENDING")
+        // Re-parsing does not clear a user's ownership/configuration hold. The durable
+        // interpretation retry already prevents financial use until this attempt finishes.
+        if(database.financialAdoptionDao().evidence(id)?.reason !in setOf("OWNERSHIP_CHANGED","REGISTRY_CHANGED"))
+            database.financialAdoptionDao().hold(id, "INTERPRETATION_PENDING")
         val attempts = (dao.retry(id)?.attempts ?: dao.outcome(id)?.attempts ?: 0) + 1
         dao.retry(BetaEvidenceRetryEntity(id, EvidenceStage.INTERPRETATION.name, attempts, "INTERPRETATION_PENDING", at.toString()))
     }

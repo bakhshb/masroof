@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.*
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -131,7 +133,17 @@ internal fun BetaReviewInboxPanel(container: BetaContainer, onClose: () -> Unit,
             MasroofCard {Text(entry.body,textAlign=TextAlign.Start)}
             if(!entry.dismissed && !ignored) {
                 if(current.preview?.pending==null) BetaReviewActionButton(stringResource(R.string.beta_review_parity_ignore),MasroofOutlineIcons.TriangleAlert,!busy,"review-dismiss") {perform(true) {container.resolveReviewAsNonFinancial(entry.id)}}
-                BetaReviewResolutionActions(current,busy,{request ->
+                if(current.correctionAction!=null) {
+                    DashboardSectionHeading(stringResource(R.string.beta_review_parity_actions),MasroofOutlineIcons.ShieldCheck)
+                    current.actions.filter {it in current.correctionAction.allowedTypes}.forEach {type ->
+                        BetaReviewActionButton(stringResource(reviewFinancialTypeActionLabel(type)),reviewTypeIcon(type),!busy,"review-resolve-${type.name}") {
+                            perform {
+                                check(container.reclassifyTransaction(current.correctionAction.token,java.util.UUID.randomUUID().toString(),type))
+                                selected=null
+                            }
+                        }
+                    }
+                } else BetaReviewResolutionActions(current,busy,{request ->
                     perform {
                         val result=container.approveEvidenceFinancial(request)
                         check(result is BetaFinancialAdoptionResult.Posted) {"Financial decision remains retryable"}
@@ -160,23 +172,13 @@ internal fun BetaReviewInboxPanel(container: BetaContainer, onClose: () -> Unit,
                 Spacer(Modifier.height(MasroofSpacing.sectionGap))
                 Text(stringResource(if(ignored) R.string.beta_complete_review_ignored_empty else R.string.beta_complete_review_empty),textAlign=TextAlign.Center)
             } else {
-                loaded.rows.forEachIndexed {index,item -> MasroofCard(Modifier.testTag("review-item-$index")) {
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-                        Text(item.description ?: item.sender,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
-                        Surface(shape=MasroofBadgeShape,color=if(ignored) MasroofThemeExtras.extendedColors.inflowSoft else MasroofThemeExtras.extendedColors.liabilitySoft) {
-                            Text(stringResource(if(ignored) R.string.beta_review_parity_ignored else R.string.beta_review_parity_kind),Modifier.padding(horizontal=MasroofSpacing.badgeHorizontalPadding,vertical=MasroofSpacing.badgeVerticalPadding),style=MaterialTheme.typography.labelSmall,color=if(ignored) MasroofThemeExtras.extendedColors.inflow else MasroofThemeExtras.extendedColors.liability,maxLines=1)
-                        }
-                    }
-                    Spacer(Modifier.height(MasroofSpacing.sectionGap))
-                    item.amount?.let {MasroofReferenceMoney(betaMoney(it,item.currency))}
-                    Text(betaDate(item.receivedAt),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    if(!ignored) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                        Text(stringResource(R.string.beta_review_parity_kind),Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        MasroofGuidanceButton(stringResource(R.string.beta_review_parity_kind),stringResource(if(item.family==null || item.family=="UNKNOWN") R.string.beta_complete_review_unknown_reason else approvalReason(item.reason.orEmpty())))
-                    }
-                    Spacer(Modifier.height(MasroofSpacing.sectionGap))
-                    Button(enabled=!busy,onClick={selected=item.id},modifier=Modifier.fillMaxWidth().testTag("history-review-$index"),shape=MaterialTheme.shapes.medium) {Text(stringResource(R.string.beta_complete_review_evidence))}
-                }}
+                loaded.rows.forEachIndexed {index,item ->
+                    ApprovedReviewListCard(ApprovedReviewListItem(item.description ?: item.sender,
+                        stringResource(if(ignored) R.string.beta_review_parity_ignored else R.string.beta_review_parity_kind),ignored,
+                        item.amount?.let {betaMoney(it,item.currency)},betaDate(item.receivedAt),
+                        stringResource(if(item.family==null || item.family=="UNKNOWN") R.string.beta_complete_review_unknown_reason else approvalReason(item.reason.orEmpty())),
+                        stringResource(R.string.beta_complete_review_evidence)),!busy,Modifier.testTag("review-item-$index"),Modifier.testTag("history-review-$index")) {selected=item.id}
+                }
             }
             if(loaded.next!=null) OutlinedButton(enabled=!busy,onClick={after=loaded.next}) {Text(stringResource(R.string.beta_history_next))}
             if(after.isNotEmpty()) TextButton(enabled=!busy,onClick={after=""}) {Text(stringResource(R.string.beta_history_first))}
