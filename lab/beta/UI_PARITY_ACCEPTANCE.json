@@ -1,0 +1,245 @@
+{
+  "scope": "Lab only. Production sources, storage and engine remain unchanged.",
+  "production_commit": "0d86c5d3",
+  "allowed_lab_affordances": [
+    "Beta badge",
+    "Return to host Masroof",
+    "Explicit lab reset"
+  ],
+  "completion_requires": [
+    "A production source and one canonical lab renderer for every journey.",
+    "No old parallel renderer or unreachable code/resources remains.",
+    "Production and lab screenshots use the same data, dimensions, language and theme; all material differences resolved.",
+    "User-visible financial values and movements match on the same supported messages; intentional engine differences documented.",
+    "Complete setup/import/ownership/review/dashboard/reopen journey is demonstrated, including card edits and process death.",
+    "All reported defects have a reproduction and closure evidence; final-head CI is green."
+  ],
+  "pages": [
+    {
+      "id": "setup",
+      "label_ar": "الإعداد واعتماد الملكية",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/onboarding/OnboardingScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaOnboardingPanel.kt",
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaHistoryPanel.kt",
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDiscoveryPanel.kt"
+      ],
+      "status": "in_progress",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": null,
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "home",
+      "label_ar": "الرئيسية",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/DashboardScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDashboardHome.kt"
+      ],
+      "status": "pending",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "transactions",
+      "label_ar": "الحركات وتفاصيلها",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionListScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDashboardPanel.kt",
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaPostedTransactionActions.kt"
+      ],
+      "status": "pending",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "accounts",
+      "label_ar": "الحسابات والتفاصيل",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/AccountsSummaryScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaEntitySummaryPages.kt",
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaAssetDetail.kt"
+      ],
+      "status": "in_progress",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "cards",
+      "label_ar": "البطاقات والتفاصيل",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/CardsSummaryScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaEntitySummaryPages.kt",
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaAssetDetail.kt"
+      ],
+      "status": "in_progress",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "loans",
+      "label_ar": "القروض والتفاصيل",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/LoansSummaryScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaEntitySummaryPages.kt",
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaAssetDetail.kt"
+      ],
+      "status": "in_progress",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "commitments",
+      "label_ar": "الالتزامات",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/CommitmentsSummaryScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaEntitySummaryPages.kt"
+      ],
+      "status": "pending",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "analysis",
+      "label_ar": "التحليل والتجار والمصروفات اليومية",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/DailyExpensesScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDashboardAnalysisPanel.kt"
+      ],
+      "status": "pending",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "review",
+      "label_ar": "المراجعة والتجاهل والاستعادة",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/review/ReviewScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaReviewInboxPanel.kt",
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaReviewResolutionActions.kt"
+      ],
+      "status": "in_progress",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": null,
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "settings",
+      "label_ar": "الإعدادات وإدارة الأصول",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaSettingsHubPanel.kt",
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaAssetEditor.kt"
+      ],
+      "status": "in_progress",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": null,
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "cardSetup",
+      "label_ar": "إعداد البطاقة الأساسية والإضافية ومدى",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsCardSetupSheet.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaAssetEditor.kt"
+      ],
+      "status": "pending",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": null,
+      "old_renderer_removed": false,
+      "accepted": false
+    },
+    {
+      "id": "backup",
+      "label_ar": "النسخ الاحتياطي والاستعادة والتصفير",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsDataBackupScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaSettingsPanel.kt"
+      ],
+      "status": "in_progress",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
+      "lab_visual_reference": null,
+      "same_data_comparison": null,
+      "old_renderer_removed": false,
+      "accepted": false
+    }
+  ],
+  "design_guide": "docs/DESIGN_SYSTEM.md",
+  "design_version": "approved-2026-10-10",
+  "production_visual_baseline": {
+    "pages": 32,
+    "locales": [
+      "ar",
+      "en"
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "captures": 256,
+    "path": "lab/beta/build/reports/ui-parity/production",
+    "status": "captured",
+    "data": "synthetic FidelityFixtures; no user database",
+    "viewport": "1080x1920, density 420; content screenshots exclude Android status bars"
+  },
+  "removed_implementations": [
+    "The Material3 ModalBottomSheet body in BetaBottomSheet; now a labels/tags adapter to the copied production modal.",
+    "Inline duplicate review-list card and meta-row geometry.",
+    "Legacy credit-detail calendar/salary/statement display blocks and obsolete SpendingRow/period functions.",
+    "memberCardAmounts helper used only by the retired renderer; its implementation-only test was removed, keeping unknown-loan-type protection."
+  ],
+  "removed_resource_keys": [
+    "beta_parity_import_date",
+    "beta_parity_month_start",
+    "beta_parity_last_30",
+    "beta_parity_last_27",
+    "beta_parity_custom_date",
+    "beta_parity_date_value",
+    "beta_detail_last4",
+    "beta_detail_network",
+    "beta_detail_salary_period"
+  ],
+  "verified_tests": {
+    "lab_jvm": 301,
+    "bank_engine": 58,
+    "finance_core": 179,
+    "android16_full": {
+      "total": 179,
+      "passed": 178,
+      "outdated_assertions": 1
+    },
+    "android16_followup": {
+      "passed": 1,
+      "purpose": "Shared supplementary facility due matches production display; aggregate is still counted once."
+    },
+    "ci": "2278dee523d9d5a81aa90e784bf4a3c28856af41 is green; later UI port is not yet pushed."
+  }
+}

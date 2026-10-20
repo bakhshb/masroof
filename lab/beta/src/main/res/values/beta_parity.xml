@@ -3,12 +3,6 @@
     <string name="beta_parity_permission_body">يستخدم مصروف رسائل البنك لاكتشاف حساباتك وبطاقاتك وتنظيم عملياتك. بعد السماح اختر تاريخ بداية الاستيراد، ثم أكد العناصر التي تخصك.</string>
     <string name="beta_parity_permission_action">السماح بقراءة الرسائل</string>
     <string name="beta_parity_open_permissions">فتح إعدادات الصلاحيات</string>
-    <string name="beta_parity_import_date">من أي تاريخ تريد استيراد الحركات؟</string>
-    <string name="beta_parity_month_start">بداية الشهر الحالي</string>
-    <string name="beta_parity_last_30">آخر ٣٠ يومًا</string>
-    <string name="beta_parity_last_27">آخر يوم ٢٧</string>
-    <string name="beta_parity_custom_date">اختيار تاريخ</string>
-    <string name="beta_parity_date_value">بداية الاستيراد: %1$s</string>
     <string name="beta_parity_finalize">إنهاء الإعداد</string>
     <string name="beta_parity_done_title">اكتمل إعداد مصروف</string>
     <string name="beta_parity_done_counts">حساباتك وبطاقاتك: %1$d · حركات تحتاج مراجعة: %2$d</string>

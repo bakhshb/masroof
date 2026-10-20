@@ -72,7 +72,6 @@
     <string name="beta_detail_card_type">نوع البطاقة</string>
     <string name="beta_detail_linked_primary">الأساسية المرتبطة</string>
     <string name="beta_detail_linked_account">الحساب المرتبط</string>
-    <string name="beta_detail_network">الشبكة</string>
     <string name="beta_detail_loan_data">بيانات التمويل</string>
     <string name="beta_detail_loan_type">نوع التمويل</string>
     <string name="beta_detail_loan_personal">تمويل شخصي</string>
@@ -83,7 +82,5 @@
     <string name="beta_detail_pos">مشتريات</string>
     <string name="beta_detail_internal_in">تحويل وارد بين أصولي</string>
     <string name="beta_detail_internal_out">تحويل صادر بين أصولي</string>
-    <string name="beta_detail_last4">آخر أربعة أرقام</string>
-    <string name="beta_detail_salary_period">فترة الراتب</string>
     <string name="beta_detail_due_date">تاريخ الاستحقاق</string>
 </resources>

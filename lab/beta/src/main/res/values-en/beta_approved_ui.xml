@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+  <string name="beta_approved_sheet_cancel">Cancel</string>
+  <string name="beta_approved_sheet_close_without_saving">Close without saving</string>
+  <string name="beta_approved_approved_available_balance">Recorded available balance</string>
+  <string name="beta_approved_approved_balance_date">Last recorded update</string>
+  <string name="beta_approved_approved_due_amount">Amount due</string>
+  <string name="beta_approved_approved_due_date">Due date</string>
+  <string name="beta_approved_approved_installment_date">Last installment date</string>
+  <string name="beta_approved_approved_last_installment">Last recorded installment</string>
+  <string name="beta_approved_approved_linked_primary">Linked primary card</string>
+  <string name="beta_approved_approved_loan_remaining">Remaining loan amount</string>
+  <string name="beta_approved_approved_shared_due">The due belongs to the shared credit facility and is counted once.</string>
+  <string name="beta_approved_card_network_mada">Mada</string>
+  <string name="beta_approved_dashboard_debit_card_linked_account">Linked account</string>
+  <string name="beta_approved_dashboard_expenses_before_refunds">Expenses before refunds</string>
+  <string name="beta_approved_reference_card_data">Card information</string>
+  <string name="beta_approved_reference_card_type">Card type</string>
+  <string name="beta_approved_reference_linked_primary_caption">Linked to primary •• %1$s</string>
+  <string name="beta_approved_reference_loan_data">Loan information</string>
+  <string name="beta_approved_reference_loan_type">Loan type</string>
+  <string name="beta_approved_reference_refunds">Refunds</string>
+  <string name="beta_approved_reference_shared_due_amount">Shared facility amount due</string>
+  <string name="beta_approved_reference_primary_credit_type">Primary credit card</string>
+  <string name="beta_approved_reference_supplementary_credit_type">Supplementary credit card</string>
+  <string name="beta_approved_reference_credit_type">Credit card</string>
+  <string name="beta_approved_onboarding_date_current_month">Start of current month</string>
+  <string name="beta_approved_onboarding_date_custom">Custom date</string>
+  <string name="beta_approved_onboarding_date_last_27">From last day 27</string>
+  <string name="beta_approved_onboarding_date_last_30">Last 30 days</string>
+  <string name="beta_approved_onboarding_import_date_title">From which date should transactions be imported?</string>
+  <string name="beta_approved_onboarding_selected_date">Selected date: %1$s</string>
+  <string name="beta_approved_onboarding_start_import">Start import</string>
+</resources>

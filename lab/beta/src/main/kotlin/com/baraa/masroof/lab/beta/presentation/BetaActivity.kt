@@ -197,7 +197,7 @@ class BetaActivity : ComponentActivity() {
                         editor = {
                             if (!loaded || automationFailed) {
                                 if (failed) BetaStartupFailure(onRetry = { perform { null } }, onReturn = { finish() },processing=automationFailed)
-                                else androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_start_loading))
+                                else com.baraa.masroof.lab.beta.presentation.approved.ApprovedText(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_start_loading))
                             } else BetaStartPanel(checkNotNull(startState), busy, failed,
                                 onContinue = { perform { if (startState == com.baraa.masroof.lab.beta.application.BetaStartState.NEW) shellContainer.beginOnboarding() else shellContainer.acknowledgeStart(); null } },
                                 onFresh = { perform { shellContainer.startFresh(); null } })
@@ -218,11 +218,11 @@ class BetaActivity : ComponentActivity() {
                     onNavigateBack={onBackPressedDispatcher.onBackPressed()},
                     setupFooter = if(onboarding==BetaOnboardingStep.ASSETS && editBank==null && !settingsOpen && !developerToolsOpen) ({
                         androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxWidth().padding(com.baraa.masroof.ui.theme.MasroofSpacing.screenHorizontal),verticalArrangement=androidx.compose.foundation.layout.Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofSpacing.smallGap)) {
-                            if(ownershipPending in 1 until Int.MAX_VALUE) androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_parity_ownership_pending,ownershipPending),style=androidx.compose.material3.MaterialTheme.typography.bodySmall)
+                            if(ownershipPending in 1 until Int.MAX_VALUE) com.baraa.masroof.lab.beta.presentation.approved.ApprovedText(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_parity_ownership_pending,ownershipPending),style=androidx.compose.material3.MaterialTheme.typography.bodySmall)
                             androidx.compose.material3.Button(enabled=!busy && !historyBusy && ownershipPending==0,onClick={
                                 discoveryOpen=false; perform {shellContainer.advanceOnboarding(BetaOnboardingStep.ASSETS);null}
                             },modifier=androidx.compose.ui.Modifier.fillMaxWidth().testTag("ownership-continue")) {
-                                androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_parity_finalize))
+                                com.baraa.masroof.lab.beta.presentation.approved.ApprovedText(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_parity_finalize))
                             }
                         }
                     }) else null,
@@ -270,9 +270,9 @@ class BetaActivity : ComponentActivity() {
                         key(editBank, editId) {
                             val existing = editId?.let { id -> assets.singleOrNull { it.id.bank.value == editBank && it.id.localId == id } }
                             if (editId != null && existing == null) {
-                                androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_asset_missing))
+                                com.baraa.masroof.lab.beta.presentation.approved.ApprovedText(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_asset_missing))
                                 androidx.compose.material3.OutlinedButton(onClick = { editBank = null; editId = null }) {
-                                    androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_asset_cancel))
+                                    com.baraa.masroof.lab.beta.presentation.approved.ApprovedText(androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_asset_cancel))
                                 }
                             } else BetaAssetEditor(BankId(checkNotNull(editBank)), existing, assets, busy, failed,
                                 initialKind = AssetKind.valueOf(initialAssetKind), initialSuffix = ownershipEditSuffix,

@@ -6,48 +6,133 @@
       "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofCardComponents.kt",
       "symbol": "MasroofBadge",
       "source_sha256": "f7ef8b9a1a37b5aa44ac099d151b2e099f6987a0b3f3ff6a3736653bdddbff83",
-      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
     },
     {
       "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofGuidance.kt",
       "symbol": "MasroofGuidanceLabel",
       "source_sha256": "28abc79f63e080895a2e27f1e4d73fd918ed5a9c3c78bb3f62abcd8dc831c736",
-      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
     },
     {
       "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofUiComponents.kt",
       "symbol": "IconLabelRow",
       "source_sha256": "d9339af5fd68cbbd96fc5822fc256c85326c8d380a42dc0c69b9300f3f95509a",
-      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
     },
     {
       "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofReferenceControls.kt",
       "symbol": "MasroofButton",
       "source_sha256": "62ab5125e86e7d4a03a095be6a0e0321ba519a57b511053505b9997c3cc0ccb3",
-      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
     },
     {
       "source": "app/src/main/kotlin/com/baraa/masroof/presentation/review/ReviewScreen.kt",
       "symbol": "ReviewListCard",
       "source_sha256": "3de5c6ed8f325787c69e4ff17b0983f9e2dc3755d8cc7cfe3a9b6fb47c964273",
-      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
     },
     {
       "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofUiComponents.kt",
       "symbol": "IconTextButton",
       "source_sha256": "d9339af5fd68cbbd96fc5822fc256c85326c8d380a42dc0c69b9300f3f95509a",
-      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewComponents.kt"
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
     },
     {
       "source": "app/src/main/kotlin/com/baraa/masroof/application/locale/AppDigits.kt",
       "symbol": "AppDigits",
       "source_sha256": "afdfe038e8f167e6de6a7a5597a10d5e49b3ec4d138ea590057f20abaf2b8b63",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/BetaDisplayDigits.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofBottomSheet.kt",
+      "symbol": "MasroofBottomSheet",
+      "source_sha256": "7891828acad0e918ed0e6e0b010ccff367c20de1c7e6b4818e99cfa30ef9ed73",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedBottomSheet.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofSheetChoices.kt",
+      "symbol": "MasroofSheetChoices",
+      "source_sha256": "2df993459ea348e79007c63c1c4f48b230bf51c13959ab33745e0a57faf5a0e9",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/MasroofSheetChoices.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/CreditCardDetailSummary.kt",
+      "symbol": "CreditCardDetailSummaryCard",
+      "source_sha256": "51bcc4d3ae7c282d25627033bb8b8f78ffe786b34d120bf5e522738bb2f0b854",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAssetSummaryCards.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/CreditFacilitySection.kt",
+      "symbol": "DebitCardDetailSummaryCard",
+      "source_sha256": "cf8edb0521eba24d1010657c6c5d3eb38c97433bf79dfc807828853637c78446",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAssetSummaryCards.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/LoanSection.kt",
+      "symbol": "LoanDetailSummaryCard",
+      "source_sha256": "53480d557e7cbf0d6847b937714a85c09b48e299bf79c87bf5d2aacfd83b3341",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAssetSummaryCards.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofApprovedComponents.kt",
+      "symbol": "MasroofDetailRow",
+      "source_sha256": "2637f3a634ee2a39b6b321a1ef289ffb20c990027dd4426d867a4bfdf1d54038",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofApprovedComponents.kt",
+      "symbol": "MasroofHeroCard",
+      "source_sha256": "2637f3a634ee2a39b6b321a1ef289ffb20c990027dd4426d867a4bfdf1d54038",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofUiComponents.kt",
+      "symbol": "BackNavigationIcon",
+      "source_sha256": "d9339af5fd68cbbd96fc5822fc256c85326c8d380a42dc0c69b9300f3f95509a",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/onboarding/OnboardingScreen.kt",
+      "symbol": "ImportDateStep/DateOptionRow",
+      "source_sha256": "414a18754b18f7021edad75c73dea70c4e2e51f368890deddf8b41600f7a1ddf",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedOnboardingComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofText.kt",
+      "symbol": "MasroofText",
+      "source_sha256": "f9390d0e9fcc5ea49e70f6b20a8fbf1b56a21ce1c16826f9400cccd1155807a2",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedText.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/locale/AppDigitsVisualTransformation.kt",
+      "symbol": "AppDigitsVisualTransformation",
+      "source_sha256": "37a4b5afb248ec2e4a9defdf23d18969c18ea963dfd6458b3800061bc0bae19f",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedDigitsVisualTransformation.kt"
     }
   ],
   "adaptations": [
     "Rename local renderer symbols; use the existing ui-kit theme/components.",
     "Resolve labels and workflow callbacks in the Beta adapter; never copy production financial repositories or parsing.",
-    "Apply the same production Latin-digit display boundary."
-  ]
+    "Apply the same production Latin-digit display boundary.",
+    "Keep existing Beta test tags as parameters; copy modal window, drag, busy dismissal, IME and action geometry unchanged.",
+    "Retain Beta enabled guards for sheet choices while financial writes are busy; preserve production row geometry and colors.",
+    "Keep global brand header, with a separate fixed secondary header from MasroofSecondaryScaffold; retain Beta badge and back callback tags.",
+    "Use the copied production text/identity-offset input boundary across lab screens; keep password masking and original stored SMS/inputs unchanged. Request latn digits for the Arabic DatePicker locale."
+  ],
+  "design_guide": "docs/DESIGN_SYSTEM.md",
+  "visual_baseline": {
+    "pages": 32,
+    "locales": [
+      "ar",
+      "en"
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "captures": 256,
+    "path": "/tmp/masroof-ui-parity-production",
+    "command": "ApprovedFidelityMatrixTest on Android 16, 1080x1920, density 420"
+  }
 }

@@ -72,7 +72,6 @@
     <string name="beta_detail_card_type">Card type</string>
     <string name="beta_detail_linked_primary">Linked primary</string>
     <string name="beta_detail_linked_account">Linked account</string>
-    <string name="beta_detail_network">Network</string>
     <string name="beta_detail_loan_data">Loan details</string>
     <string name="beta_detail_loan_type">Loan type</string>
     <string name="beta_detail_loan_personal">Personal finance</string>
@@ -83,7 +82,5 @@
     <string name="beta_detail_pos">Purchases</string>
     <string name="beta_detail_internal_in">Incoming transfer between my assets</string>
     <string name="beta_detail_internal_out">Outgoing transfer between my assets</string>
-    <string name="beta_detail_last4">Last four digits</string>
-    <string name="beta_detail_salary_period">Salary period</string>
     <string name="beta_detail_due_date">Due date</string>
 </resources>

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.ui.components.MasroofMoneyDisplay
+import com.baraa.masroof.lab.beta.R
 import com.baraa.masroof.lab.beta.BetaContainer
 import com.baraa.masroof.lab.beta.BetaIo
 import com.baraa.masroof.lab.beta.application.BetaDashboardWorkflow
@@ -307,7 +308,7 @@ class BetaDashboardScreenTest {
         }
     }
 
-    @Test fun authoritativeFacilityDueIsDisplayedOnPrimaryAndNeverSupplementary() {
+    @Test fun authoritativeFacilityDueIsSharedOnSupplementaryAndCountedOnce() {
         val facilityId = AssetId(Environment.BETA, bank, "statement-facility")
         fun card(id: String, last4: String, role: CreditCardRole) = CreditCardSummary(
             AssetId(Environment.BETA, bank, id), role, null, last4, null, null, null, null, null)
@@ -331,8 +332,12 @@ class BetaDashboardScreenTest {
         compose.onAllNodesWithText(due).assertCountEquals(1) // The primary displays the single shared facility due.
         compose.onNodeWithTag("dash-detail-back").performScrollTo().performClick()
         compose.onNodeWithTag("dash-asset-BANK_ALJAZIRA-statement-supplementary").performScrollTo().performClick()
-        compose.onAllNodesWithText(due).assertCountEquals(0)
+        compose.onAllNodesWithText(due).assertCountEquals(1)
+        compose.onNodeWithText(context.getString(R.string.beta_approved_reference_shared_due_amount)).assertExists()
+        compose.onNodeWithText("•• 7271").assertExists()
+        compose.onNodeWithText(due).performScrollTo(); screenshot("supplementary-shared-due")
         compose.onNodeWithTag("dash-detail-back").performScrollTo().performClick()
+        compose.onAllNodesWithText(due).assertCountEquals(1) // Aggregate still counts the facility once.
         route("LOANS")
         compose.onNodeWithText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_asset_loan)).assertExists()
         route("COMMITMENTS")

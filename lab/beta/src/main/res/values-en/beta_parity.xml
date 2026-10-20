@@ -3,12 +3,6 @@
     <string name="beta_parity_permission_body">Masroof uses bank messages to discover your accounts and cards and organize your transactions. Allow access, choose an import start date, then confirm what belongs to you.</string>
     <string name="beta_parity_permission_action">Allow message access</string>
     <string name="beta_parity_open_permissions">Open permission settings</string>
-    <string name="beta_parity_import_date">When should transaction import begin?</string>
-    <string name="beta_parity_month_start">Start of this month</string>
-    <string name="beta_parity_last_30">Last 30 days</string>
-    <string name="beta_parity_last_27">Most recent 27th</string>
-    <string name="beta_parity_custom_date">Choose a date</string>
-    <string name="beta_parity_date_value">Import begins: %1$s</string>
     <string name="beta_parity_finalize">Finish setup</string>
     <string name="beta_parity_done_title">Masroof setup is complete</string>
     <string name="beta_parity_done_counts">Your accounts and cards: %1$d · Transactions to review: %2$d</string>

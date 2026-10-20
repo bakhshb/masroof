@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -63,7 +65,7 @@ internal fun BetaInterpretationReviewPanel(container: BetaContainer, evidenceId:
                     }
                 },
                 label = { Text(stringResource(R.string.beta_label_original)) },
-                modifier = Modifier.fillMaxWidth().testTag("label-original"))
+                modifier = Modifier.fillMaxWidth().testTag("label-original"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
             Text(stringResource(R.string.beta_label_select))
             if (selectedStart >= 0 && selectedEnd > selectedStart) {
                 Text(stringResource(R.string.beta_label_selected, current.body.substring(selectedStart, selectedEnd)), modifier = Modifier.testTag("label-selected"))
@@ -101,7 +103,7 @@ internal fun BetaInterpretationReviewPanel(container: BetaContainer, evidenceId:
                     }
                 }
             } else OutlinedTextField(value = value, enabled = !busy, onValueChange = { value = it; confirmed = false },
-                label = { Text(stringResource(R.string.beta_label_value)) }, modifier = Modifier.fillMaxWidth().testTag("label-value"))
+                label = { Text(stringResource(R.string.beta_label_value)) }, modifier = Modifier.fillMaxWidth().testTag("label-value"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
             Row {
                 Checkbox(checked = confirmed, enabled = !busy, onCheckedChange = { confirmed = it }, modifier = Modifier.testTag("label-confirm"))
                 Text(stringResource(R.string.beta_label_confirm))

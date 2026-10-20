@@ -44,7 +44,7 @@
     <string name="beta_asset_missing">الأصل لم يعد موجودًا. أغلق التكوين وأعد تحميل القائمة.</string>
     <string name="beta_history_title">استيراد رسائل إلى Beta</string>
     <string name="beta_history_help">استورد رسائل البنك ثم أكّد حساباتك وبطاقاتك. تُضاف العمليات الواضحة تلقائيًا، وتحتاج الرسائل غير الواضحة فقط للمراجعة. تبقى بيانات مصروف الأساسي مستقلة.</string>
-    <string name="beta_history_scope">تُقرأ رسائل الوارد خلال الفترة المحددة لتحديد البنوك المختارة. يُحفظ المتطابق فقط في Beta. الحد ١٠٬٠٠٠ رسالة لكل استيراد. البدء مجددًا يعيد فحص الفترة دون تكرار الأدلة المحفوظة.</string>
+    <string name="beta_history_scope">تُقرأ رسائل الوارد خلال الفترة المحددة لتحديد البنوك المختارة. يُحفظ المتطابق فقط في Beta. الحد 10٬000 رسالة لكل استيراد. البدء مجددًا يعيد فحص الفترة دون تكرار الأدلة المحفوظة.</string>
     <string name="beta_history_days">آخر %1$d أيام</string>
     <string name="beta_history_days_selected">✓ آخر %1$d أيام</string>
     <string name="beta_history_denied">يمكنك المتابعة بإضافة الحسابات والبطاقات يدويًا دون إذن الرسائل. لمنح الإذن لاحقًا اضغط بدء الاستيراد أو استخدم إعدادات النظام.</string>
@@ -55,7 +55,7 @@
     <string name="beta_history_paused">يمكن استئناف الفحص المحفوظ بعد التوقف أو إغلاق Beta.</string>
     <string name="beta_history_resume">استئناف الفترة والبنوك المحفوظة</string>
     <string name="beta_history_pause">إيقاف بعد الدفعة الحالية</string>
-    <string name="beta_history_retry">إعادة محاولة الأدلة المعلقة (حتى ١٠٠)</string>
+    <string name="beta_history_retry">إعادة محاولة الأدلة المعلقة (حتى 100)</string>
     <string name="beta_history_saved">الرسائل المحفوظة</string>
     <string name="beta_history_row">الرسالة %1$d: %2$s</string>
     <string name="beta_history_pending">تحتاج إعادة المحاولة</string>

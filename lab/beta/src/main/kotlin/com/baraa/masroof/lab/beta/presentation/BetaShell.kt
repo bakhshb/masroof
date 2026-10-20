@@ -1,5 +1,9 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
+
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedBackNavigationIcon
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,7 +16,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -73,15 +76,8 @@ fun BetaShell(
     Scaffold(
         topBar = {
             com.baraa.masroof.ui.components.MasroofAppBar(
-                title = secondaryTitle ?: stringResource(R.string.beta_home_brand),
-                showLogo = secondaryTitle == null,
-                navigation = if(secondaryTitle!=null && onNavigateBack!=null) ({
-                    androidx.compose.material3.IconButton(onClick=onNavigateBack,enabled=!busy && returnEnabled,modifier=Modifier.testTag("beta-page-back")) {
-                        androidx.compose.material3.Icon(if(androidx.compose.ui.platform.LocalLayoutDirection.current==androidx.compose.ui.unit.LayoutDirection.Rtl)
-                            com.baraa.masroof.ui.components.MasroofOutlineIcons.ChevronRight else com.baraa.masroof.ui.components.MasroofOutlineIcons.ChevronLeft,
-                            stringResource(R.string.beta_dash_back))
-                    }
-                }) else null,
+                title = stringResource(R.string.beta_home_brand),
+                showLogo = true,
                 actions = {
                     if (dashboard != null && editor == null && secondaryTitle==null) androidx.compose.material3.IconButton(
                         enabled = !busy, onClick = {if(onOpenDashboardSettings!=null && !workspaceOpen) onOpenDashboardSettings() else workspaceOpen = !workspaceOpen}, modifier = Modifier.testTag("beta-tools")) {
@@ -121,8 +117,16 @@ fun BetaShell(
             }
         },
     ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+        if(secondaryTitle!=null) com.baraa.masroof.ui.components.MasroofAppBar(
+            title=secondaryTitle,showLogo=false,
+            navigation=onNavigateBack?.let {back -> {
+                ApprovedBackNavigationIcon(back,stringResource(R.string.beta_dash_back),!busy && returnEnabled,Modifier.testTag("beta-page-back"))
+            }})
         Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberSaveable(secondaryTitle,selectedHomeTab,workspaceOpen,saver=androidx.compose.foundation.ScrollState.Saver) {androidx.compose.foundation.ScrollState(0)}).padding(BetaSpacing.screen),
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberSaveable(secondaryTitle,selectedHomeTab,workspaceOpen,saver=androidx.compose.foundation.ScrollState.Saver) {androidx.compose.foundation.ScrollState(0)})
+                .padding(horizontal=BetaSpacing.screen).padding(bottom=BetaSpacing.screen)
+                .then(if(secondaryTitle==null) Modifier.padding(top=BetaSpacing.screen) else Modifier),
             verticalArrangement = Arrangement.spacedBy(BetaSpacing.section),
         ) {
             if (editor != null) {
@@ -222,6 +226,7 @@ fun BetaShell(
             }
             if (showMaintenanceActions) Text(stringResource(R.string.beta_marker_count, markerCount), style = MaterialTheme.typography.bodySmall)
             if (restoreMissing) Text(stringResource(R.string.beta_restore_missing), color = MaterialTheme.colorScheme.error)
+        }
         }
     }
 }

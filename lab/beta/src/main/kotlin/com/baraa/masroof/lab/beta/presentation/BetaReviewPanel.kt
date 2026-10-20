@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -124,11 +126,11 @@ internal fun BetaReviewEditor(detail: BetaReviewDetail, busy: Boolean, failed: B
         }
         when (mode) {
             "note" -> OutlinedTextField(note, { note = it; decisionId = UUID.randomUUID().toString() }, enabled = !busy,
-                label = { Text(stringResource(R.string.beta_review_note)) }, modifier = Modifier.testTag("review-note"))
+                label = { Text(stringResource(R.string.beta_review_note)) }, modifier = Modifier.testTag("review-note"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
             "amount" -> OutlinedTextField(amount, { amount = it; confirmed = false; decisionId = UUID.randomUUID().toString() }, enabled = !busy,
-                label = { Text(stringResource(R.string.beta_review_amount)) }, supportingText = { Text(input.amount.currency.name) }, modifier = Modifier.testTag("review-amount"))
+                label = { Text(stringResource(R.string.beta_review_amount)) }, supportingText = { Text(input.amount.currency.name) }, modifier = Modifier.testTag("review-amount"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
             "time" -> OutlinedTextField(time, { time = it; confirmed = false; decisionId = UUID.randomUUID().toString() }, enabled = !busy,
-                label = { Text(stringResource(R.string.beta_review_time)) }, supportingText = { Text(stringResource(R.string.beta_review_time_help)) }, modifier = Modifier.testTag("review-time"))
+                label = { Text(stringResource(R.string.beta_review_time)) }, supportingText = { Text(stringResource(R.string.beta_review_time_help)) }, modifier = Modifier.testTag("review-time"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
             "type" -> FinancialType.entries.filter { it !in setOf(FinancialType.UNKNOWN, FinancialType.ADJUSTMENT, FinancialType.SELF_TRANSFER) }.forEach { value ->
                 BetaChoice(selected = type == value.name, onClick = { type = value.name; confirmed = false; decisionId = UUID.randomUUID().toString() }, enabled = !busy,
                     label = { Text(stringResource(financialTypeLabel(value))) }, modifier = Modifier.testTag("review-type-${value.name}"))

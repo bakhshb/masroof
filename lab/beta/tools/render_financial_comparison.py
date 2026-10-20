@@ -1,0 +1,23 @@
+"""Publish actual cross-run output from the unchanged production calculator and lab classifier."""
+from pathlib import Path
+from decimal import Decimal
+from html import escape
+import csv
+
+root = Path(__file__).resolve().parents[3]
+source = root / 'lab/finance-core/build/reports/m8-parity/ui-financial-comparison.csv'
+rows = list(csv.DictReader(source.open()))
+assert rows, 'Run the production financial parity test before rendering its evidence.'
+metrics = dict(SPENDING_GROSS='المصاريف قبل الاسترداد', REFUNDS='الاستردادات', SPENDING_NET='صافي المصاريف', INCOME='الدخل', EXTERNAL_IN='الحوالات الواردة', EXTERNAL_OUT='الحوالات الصادرة', CREDIT_SETTLEMENTS='سداد البطاقات', CASH_WITHDRAWALS='السحب النقدي', SELF_TRANSFERS='التحويلات الداخلية', COMBINED_INCOMING='إجمالي الوارد', NET_CASH_FLOW='صافي التدفق')
+scenarios = dict(zip(['account-purchase','debit-purchase','credit-purchase','supplementary-purchase','credit-settlement','account-refund','debit-refund','credit-refund','loan','financing-fee','fee','bill','explicit-bill-over-financing','withdrawal','external-out','income','stored-income-over-other-attribution','external-in','salary-transfer-in','self-transfer','empty'], ['شراء من الحساب','شراء مدى','شراء ائتماني','شراء بطاقة إضافية','سداد بطاقة','استرداد إلى الحساب','استرداد مدى','استرداد ائتماني','قسط تمويل','رسوم قسط تمويل','رسوم','سداد فاتورة','فاتورة بتصنيف يدوي صريح','سحب نقدي','حوالة صادرة','دخل راتب','دخل مصنّف صراحةً','حوالة واردة','حوالة راتب واردة','تحويل بين حساباتي','مجموعة فارغة']))
+body = ''
+differences = 0
+for row in rows:
+    difference = Decimal(row['lab']) - Decimal(row['production'])
+    differences += difference != 0
+    name = 'المجموعة كاملة' if '+' in row['scenario'] else scenarios[row['scenario']]
+    body += f'<tr data-case="{escape(row["scenario"], quote=True)}"><td>{name}</td><td>{metrics.get(row["metric"], row["metric"])}</td><td dir="ltr">{row["production"]}</td><td dir="ltr">{row["lab"]}</td><td dir="ltr">{difference}</td></tr>'
+options = ''.join(f'<option value="{escape(key, quote=True)}">{"المجموعة كاملة" if "+" in key else scenarios[key]}</option>' for key in dict.fromkeys(row['scenario'] for row in rows))
+html = '''<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>مصروف — مقارنة الحسابات المالية</title><style>*{box-sizing:border-box}body{margin:0;background:#f4f7f6;color:#193c38;font:17px/1.8 Arial,sans-serif}main{max-width:1120px;margin:auto;padding:28px 22px}header{background:#e4f2ef;padding:28px;border-radius:22px;border:1px solid #dae5e2}h1{font-size:29px}p{max-width:930px}select{font:inherit;color:inherit;background:white;border:1px solid #c8d8d3;border-radius:12px;padding:10px;max-width:100%}table{border-collapse:collapse;width:100%;background:white;margin-top:18px}td,th{border:1px solid #dae5e2;padding:12px;text-align:right}th{background:#e4f2ef}a{color:#0d756e}.scope{padding:16px;border-right:4px solid #b45309;background:white}small{color:#526d68}@media(max-width:700px){main{padding:15px}td,th{padding:7px;font-size:13px}}</style><main><header><small>النطاق: مقارنة مدخلات مالية اصطناعية معتمدة · SAR</small><h1>COUNT مقارنة بين حسابات الفعلي والمختبر</h1><p>عدد الفروق: <strong>DIFFS</strong>. يشغّل المرجع حاسبة مصروف الفعلي الأصلية المثبّتة ببصمات مصدرها، ويقارنها بمخرجات النواة الجديدة لنفس المدخلات. يشمل 20 سيناريو منفردًا، والمجموعة كاملة، والمجموعة الفارغة؛ ولكل منها 11 قيمة مالية.</p></header><p class="scope">هذه مقارنة للحسابات المالية بعد اعتماد نوع العملية وملكيتها. لا تثبت وحدها استخراج كل صيغة رسالة، أو مطابقة كل صفحة، أو نتائج قاعدة بيانات هاتفك. لهذه الأمور أدلة مستقلة في <a href="UI_PARITY_ACCEPTANCE_AR.html">قائمة التسليم</a>.</p><p><a href="../finance-core/build/reports/m8-parity/ui-financial-comparison.csv">النتائج الخام CSV</a> · <a href="../finance-core/src/test/resources/parity/oracle-sha256.properties">بصمات كود الفعلي المستخدم</a></p><label>اختر الحالة: <select id="cases"><option value="">جميع الحالات</option>OPTIONS</select></label><table><thead><tr><th>الحالة</th><th>القيمة المالية</th><th>الفعلي</th><th>المختبر</th><th>الفرق</th></tr></thead><tbody>ROWS</tbody></table></main><script>document.getElementById('cases').addEventListener('change',e=>document.querySelectorAll('tbody tr').forEach(r=>r.hidden=Boolean(e.target.value)&&r.dataset.case!==e.target.value));</script></html>'''
+(root / 'lab/beta/UI_FINANCIAL_COMPARISON_AR.html').write_text(html.replace('COUNT', str(len(rows))).replace('DIFFS', str(differences)).replace('OPTIONS', options).replace('ROWS', body))
+print(f'{len(rows)} comparisons; {differences} differences')

@@ -45,10 +45,6 @@ object BetaAssetDetailFacts {
         if (money.amount.signum() == 0) null else BetaFlowLine(bucket, money.amount, money.currency.name)
     }
 
-    /** Member cards keep their own balances and spending. Facility due is not one of those amounts. */
-    fun memberCardAmounts(card: CreditCardSummary): List<SignedAmount?> = listOf(
-        card.availableBalance, card.calendarSpending?.net, card.salarySpending?.net, card.statementSpending?.net)
-
     fun knownLoanType(type: String): String? = type.takeIf { it == "PERSONAL" || it == "AUTO" || it == "MORTGAGE" }
 }
 

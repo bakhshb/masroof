@@ -15,7 +15,8 @@ internal fun BetaLocaleProvider(language: String, content: @Composable () -> Uni
     val configuration=LocalConfiguration.current
     val localized=remember(host,configuration,language) {
         val copy=Configuration(configuration)
-        if(language!="SYSTEM") copy.setLocale(Locale.forLanguageTag(language))
+        val requested=if(language=="SYSTEM") configuration.locales[0] else Locale.forLanguageTag(language)
+        copy.setLocale(Locale.Builder().setLocale(requested).setUnicodeLocaleKeyword("nu","latn").build())
         android.view.ContextThemeWrapper(host,0).apply {applyOverrideConfiguration(copy)}
     }
     val config=localized.resources.configuration

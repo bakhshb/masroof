@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+  <string name="beta_approved_sheet_cancel">إلغاء</string>
+  <string name="beta_approved_sheet_close_without_saving">إغلاق دون حفظ</string>
+  <string name="beta_approved_approved_available_balance">الرصيد المتاح المسجل</string>
+  <string name="beta_approved_approved_balance_date">تاريخ آخر معلومة</string>
+  <string name="beta_approved_approved_due_amount">المبلغ المستحق</string>
+  <string name="beta_approved_approved_due_date">تاريخ الاستحقاق</string>
+  <string name="beta_approved_approved_installment_date">تاريخ آخر قسط</string>
+  <string name="beta_approved_approved_last_installment">آخر قسط مسجل</string>
+  <string name="beta_approved_approved_linked_primary">البطاقة الأساسية المرتبطة</string>
+  <string name="beta_approved_approved_loan_remaining">المبلغ المتبقي</string>
+  <string name="beta_approved_approved_shared_due">المبلغ المستحق يخص التسهيل المشترك ويُحتسب مرة واحدة.</string>
+  <string name="beta_approved_card_network_mada">مدى</string>
+  <string name="beta_approved_dashboard_debit_card_linked_account">الحساب المرتبط</string>
+  <string name="beta_approved_dashboard_expenses_before_refunds">المصاريف قبل الاستردادات</string>
+  <string name="beta_approved_reference_card_data">بيانات البطاقة</string>
+  <string name="beta_approved_reference_card_type">نوع البطاقة</string>
+  <string name="beta_approved_reference_linked_primary_caption">مرتبطة بالأساسية •• %1$s</string>
+  <string name="beta_approved_reference_loan_data">بيانات القرض</string>
+  <string name="beta_approved_reference_loan_type">نوع القرض</string>
+  <string name="beta_approved_reference_refunds">الاستردادات</string>
+  <string name="beta_approved_reference_shared_due_amount">المبلغ المستحق للتسهيل المشترك</string>
+  <string name="beta_approved_reference_primary_credit_type">ائتمانية أساسية</string>
+  <string name="beta_approved_reference_supplementary_credit_type">ائتمانية فرعية</string>
+  <string name="beta_approved_reference_credit_type">ائتمانية</string>
+  <string name="beta_approved_onboarding_date_current_month">بداية الشهر الحالي</string>
+  <string name="beta_approved_onboarding_date_custom">تاريخ مخصص</string>
+  <string name="beta_approved_onboarding_date_last_27">من آخر يوم 27</string>
+  <string name="beta_approved_onboarding_date_last_30">آخر 30 يوم</string>
+  <string name="beta_approved_onboarding_import_date_title">من أي تاريخ تريد استيراد الحركات؟</string>
+  <string name="beta_approved_onboarding_selected_date">التاريخ المحدد: %1$s</string>
+  <string name="beta_approved_onboarding_start_import">بدء الاستيراد</string>
+</resources>

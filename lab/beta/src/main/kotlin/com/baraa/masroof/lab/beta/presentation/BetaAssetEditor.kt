@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -74,7 +76,7 @@ internal fun BetaAssetEditor(
         MasroofSheetChoices(kinds,setOf(kind),{stringResource(assetKindLabel(it))},
             {if(kindName!=it.name) {kindName=it.name;parentLocalId=null;createFacility=false}},{"asset-kind-${it.name}"},enabled=!busy)
         OutlinedTextField(value=displayName,onValueChange={if(it.length<=120) displayName=it},enabled=!busy,singleLine=true,
-            label={Text(stringResource(R.string.beta_parity_display_name))},modifier=Modifier.fillMaxWidth().testTag("asset-display-name"))
+            label={Text(stringResource(R.string.beta_parity_display_name))},modifier=Modifier.fillMaxWidth().testTag("asset-display-name"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
         if(kind in setOf(AssetKind.DEBIT_CARD,AssetKind.CREDIT_CARD)) {
             Text(stringResource(R.string.beta_parity_network))
             val networks=listOf("MADA","VISA","MASTERCARD")
@@ -97,7 +99,7 @@ internal fun BetaAssetEditor(
             onValueChange = { value -> normalizeManualAssetSuffix(value)?.let { suffix = it } },
             label = { Text(stringResource(R.string.beta_asset_suffix)) }, singleLine = true,
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number,imeAction=androidx.compose.ui.text.input.ImeAction.Done),
-            modifier = Modifier.fillMaxWidth().testTag("asset-last4"))
+            modifier = Modifier.fillMaxWidth().testTag("asset-last4"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
         if (kind==AssetKind.DEBIT_CARD) {
             Text(stringResource(R.string.beta_asset_link_account))
             val options=listOf<String?>(null)+parents.map {it.id.localId}

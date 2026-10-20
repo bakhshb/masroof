@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -131,13 +133,13 @@ internal fun BetaDashboardConfigurationPanel(controls: BetaDashboardControls, fa
             }
             if (editor in setOf("SALARY", "STATEMENT", "COMMITMENT")) {
                 if (editor == "COMMITMENT") {
-                    OutlinedTextField(label = { Text(stringResource(R.string.beta_controls_label)) }, value = label, onValueChange = { label = it }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("controls-label"))
-                    OutlinedTextField(label = { Text(stringResource(R.string.beta_controls_amount)) }, value = amount, onValueChange = { amount = it }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("controls-amount"))
-                    OutlinedTextField(label = { Text(stringResource(R.string.beta_controls_starts)) }, value = starts, onValueChange = { starts = it }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("controls-starts"))
-                    OutlinedTextField(label = { Text(stringResource(R.string.beta_controls_ends)) }, value = ends, onValueChange = { ends = it }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("controls-ends"))
+                    OutlinedTextField(label = { Text(stringResource(R.string.beta_controls_label)) }, value = label, onValueChange = { label = it }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("controls-label"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
+                    OutlinedTextField(label = { Text(stringResource(R.string.beta_controls_amount)) }, value = amount, onValueChange = { amount = it }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("controls-amount"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
+                    OutlinedTextField(label = { Text(stringResource(R.string.beta_controls_starts)) }, value = starts, onValueChange = { starts = it }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("controls-starts"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
+                    OutlinedTextField(label = { Text(stringResource(R.string.beta_controls_ends)) }, value = ends, onValueChange = { ends = it }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("controls-ends"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
                 }
                 OutlinedTextField(label = { Text(stringResource(R.string.beta_controls_due_day)) }, value = day, onValueChange = { day = it }, enabled = !busy,
-                    modifier = Modifier.fillMaxWidth().testTag("controls-day"))
+                    modifier = Modifier.fillMaxWidth().testTag("controls-day"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
                 Text(stringResource(if (editor == "COMMITMENT") R.string.beta_controls_clamp else R.string.beta_controls_period_help))
             } else {
                 Text(label); Text(month.toString()); Text(stringResource(if (editor == "PAID") R.string.beta_controls_payment_help else R.string.beta_controls_delete_help))

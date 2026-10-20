@@ -8,6 +8,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.baraa.masroof.lab.beta.R
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -17,11 +21,6 @@ import com.baraa.masroof.ui.theme.*
 // Ported from the production functions recorded in lab/beta/APPROVED_UI_SOURCES.json.
 // Production files remain unchanged. This file contains rendering only; Beta workflows own writes.
 
-@Composable
-internal fun ApprovedText(text: String,modifier: Modifier = Modifier,style: TextStyle = LocalTextStyle.current,
-    color: Color = Color.Unspecified,maxLines: Int = Int.MAX_VALUE,overflow: TextOverflow = TextOverflow.Clip) {
-    Text(com.baraa.masroof.lab.beta.application.BetaDisplayDigits.display(text),modifier,style=style,color=color,maxLines=maxLines,overflow=overflow)
-}
 @Composable
 internal fun ApprovedBadge(
     text: String,
@@ -175,5 +174,87 @@ internal fun ApprovedIconTextButton(
         }
         Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
         ApprovedText(text)
+    }
+}
+
+@Composable
+internal fun ApprovedOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
+    shape: Shape = MasroofShapes.small, colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
+    elevation: ButtonElevation? = null,
+    border: BorderStroke? = BorderStroke(MasroofSpacing.borderWidth, MasroofThemeExtras.extendedColors.cardBorder),
+    contentPadding: PaddingValues = PaddingValues(horizontal = MasroofSpacing.compactCardContentPadding,
+        vertical = MasroofReference.rowGap), content: @Composable RowScope.() -> Unit) {
+    androidx.compose.material3.OutlinedButton(onClick, modifier, enabled, shape, colors, elevation, border,
+        contentPadding = contentPadding, content = content)
+}
+
+@Composable
+internal fun ApprovedTextButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
+    colors: ButtonColors = ButtonDefaults.textButtonColors(),
+    contentPadding: PaddingValues = PaddingValues(horizontal = MasroofSpacing.none, vertical = MasroofSpacing.inlineGap),
+    content: @Composable RowScope.() -> Unit) {
+    com.baraa.masroof.ui.components.MasroofTextButton(onClick, modifier, enabled, colors, contentPadding, content)
+}
+
+@Composable
+internal fun ApprovedDetailRow(label: String, value: String, modifier: Modifier = Modifier, guidance: String? = null,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface, dense: Boolean = false, divider: Boolean = true) {
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = if (dense) MasroofReference.rowGap else MasroofReference.rowVertical,
+                bottom = if (dense) MasroofSpacing.none else MasroofReference.rowVertical),
+            horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ApprovedGuidanceLabel(label, guidance, Modifier.weight(1f), style = if (dense) MaterialTheme.typography.bodySmall else MasroofReference.pair,
+                contentColor = MaterialTheme.colorScheme.onSurface)
+            ApprovedText(value, Modifier.weight(1f), style = (if (dense) MaterialTheme.typography.bodySmall else MasroofReference.pair).copy(fontWeight = com.baraa.masroof.ui.theme.MasroofFontWeights.semiBold),
+                textAlign = androidx.compose.ui.text.style.TextAlign.End, color = valueColor)
+        }
+        if (divider && !dense) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+@Composable
+internal fun ApprovedHeroCard(
+    title: String,
+    value: String,
+    subtitle: String? = null,
+    role: MasroofHeroRole = MasroofHeroRole.Brand,
+    modifier: Modifier = Modifier,
+    guidance: String? = null,
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
+) {
+    com.baraa.masroof.ui.components.MasroofHeroCard(
+        title = com.baraa.masroof.lab.beta.application.BetaDisplayDigits.display(title),
+        value = com.baraa.masroof.lab.beta.application.BetaDisplayDigits.display(value),
+        subtitle = subtitle?.let(com.baraa.masroof.lab.beta.application.BetaDisplayDigits::display),
+        role = role, modifier = modifier,
+        icon = if (role == MasroofHeroRole.Card) MasroofOutlineIcons.CreditCard else MasroofOutlineIcons.Wallet,
+        titleContent = { titleModifier, foreground ->
+            ApprovedGuidanceLabel(title, guidance, titleModifier, style = MasroofReference.pair, contentColor = foreground)
+        }, footer = footer)
+}
+
+
+@Composable
+internal fun ApprovedBackNavigationIcon(
+    onClick: () -> Unit,
+    contentDescription: String?,
+    enabled: Boolean = true, modifier: Modifier = Modifier,
+) {
+    val isLtr = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Ltr
+    androidx.compose.material3.Surface(onClick = onClick, enabled = enabled,
+        modifier = modifier.size(com.baraa.masroof.ui.theme.MasroofReference.iconButton),
+        shape = com.baraa.masroof.ui.theme.MasroofShapes.small,
+        border = BorderStroke(MasroofSpacing.borderWidth, com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.cardBorder)) {
+        androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+        Icon(
+            imageVector = MasroofOutlineIcons.ArrowRight,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.icon)
+                .graphicsLayer { scaleX = if (isLtr) -1f else 1f },
+        )
+        }
     }
 }

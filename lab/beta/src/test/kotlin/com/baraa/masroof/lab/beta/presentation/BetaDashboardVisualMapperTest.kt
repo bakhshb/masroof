@@ -55,13 +55,7 @@ class BetaDashboardVisualMapperTest {
         assertEquals(0, BetaAssetDetailFacts.lines(accountFlow(), BetaAssetDetailFacts.externalIn).size)
     }
 
-    @Test fun memberCardAmountsExcludeFacilityDue() {
-        val card = CreditCardSummary(AssetId(Environment.BETA, BankId("BANK_ALJAZIRA"), "card"), CreditCardRole.SUPPLEMENTARY,
-            null, "7288", null, null, PeriodSpending(DisplayPeriod(from, until, query.zone, PeriodKind.STATEMENT, null),
-                SignedAmount(BigDecimal("12.00"), Currency.SAR)), SignedAmount(BigDecimal("100.00"), Currency.SAR), null)
-        val shown = BetaAssetDetailFacts.memberCardAmounts(card).mapNotNull { it?.amount }
-        assertEquals(listOf(BigDecimal("100.00"), BigDecimal("12.00")), shown)
-        assertFalse(shown.any { it.compareTo(BigDecimal("2694.32")) == 0 })
+    @Test fun unknownLoanTypesAreNotDisplayedAsPersonalLoans() {
         assertNull(BetaAssetDetailFacts.knownLoanType("UNKNOWN"))
         assertNull(BetaAssetDetailFacts.knownLoanType("fixture"))
         assertEquals("PERSONAL", BetaAssetDetailFacts.knownLoanType("PERSONAL"))

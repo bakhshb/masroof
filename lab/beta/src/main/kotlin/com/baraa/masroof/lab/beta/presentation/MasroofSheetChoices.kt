@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as MasroofText
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Checkbox
@@ -11,9 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import com.baraa.masroof.ui.theme.*
-import androidx.compose.material3.Text
 
-/** Production choice-row geometry, scoped here because shared and production sources are frozen. */
 @Composable
 internal fun <T> MasroofSheetChoices(options: List<T>, selected: Set<T>, label: @Composable (T) -> String,
     onToggle: (T) -> Unit, optionKey: (T) -> String, enabled: Boolean = true) {
@@ -28,9 +28,9 @@ internal fun <T> MasroofSheetChoices(options: List<T>, selected: Set<T>, label: 
                             .testTag(optionKey(value)), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
                             Checkbox(value in selected, onCheckedChange = null, enabled = enabled,
-                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary,
-                                    checkmarkColor = MaterialTheme.colorScheme.onPrimary))
-                            Text(label(value), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                                colors = CheckboxDefaults.colors(checkedColor = MasroofPalette.Primary,
+                                    checkmarkColor = MasroofLightColors.OnPrimary))
+                            MasroofText(label(value), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                         }
                     }
                     if (choices.size < columns) Spacer(Modifier.weight(1f))

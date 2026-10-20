@@ -1,5 +1,9 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
+
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedImportDateStep
+
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
@@ -104,24 +108,12 @@ internal fun BetaHistoryPanel(container: BetaContainer, onClose: () -> Unit, onB
     Column(verticalArrangement = Arrangement.spacedBy(BetaSpacing.section)) {
         if (!reviewOnly) {
         if(onContinueSetup!=null) Text(stringResource(R.string.beta_onboarding_progress,if(running) 4 else 3,6),style=MaterialTheme.typography.bodySmall)
-        Text(stringResource(R.string.beta_parity_import_date),style=MaterialTheme.typography.headlineSmall,modifier=Modifier.testTag("onboarding-IMPORT"))
-        com.baraa.masroof.lab.beta.application.history.BetaImportDateOption.entries.forEach { option ->
-            val label=when(option) {
-                com.baraa.masroof.lab.beta.application.history.BetaImportDateOption.CURRENT_MONTH_START -> R.string.beta_parity_month_start
-                com.baraa.masroof.lab.beta.application.history.BetaImportDateOption.LAST_30_DAYS -> R.string.beta_parity_last_30
-                com.baraa.masroof.lab.beta.application.history.BetaImportDateOption.LAST_27TH -> R.string.beta_parity_last_27
-                else -> R.string.beta_parity_custom_date
-            }
-            BetaChoice(selected=dateOption==option,enabled=!busy,onClick={ if(option==com.baraa.masroof.lab.beta.application.history.BetaImportDateOption.CUSTOM) datePickerOpen=true else dateOption=option },
-                modifier=Modifier.testTag("history-date-${option.name}"),label={Text(stringResource(label))})
-        }
-        Text(stringResource(R.string.beta_parity_date_value,java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).format(selectedDate)))
-        if (denied) Text(stringResource(R.string.beta_history_denied), modifier = Modifier.testTag("history-denied"))
-        if (failed) Text(stringResource(R.string.beta_action_failed), color = MaterialTheme.colorScheme.error)
-        Button(enabled = !busy, onClick = {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED) scan(selectedDate)
-            else { pendingDate = selectedDate.toEpochDay(); permission.launch(Manifest.permission.READ_SMS) }
-        }, modifier = Modifier.testTag("history-start")) { Text(stringResource(R.string.beta_history_start)) }
+        ApprovedImportDateStep(dateOption,selectedDate,busy,{dateOption=it},{datePickerOpen=true},{
+            if(ContextCompat.checkSelfPermission(context,Manifest.permission.READ_SMS)==PackageManager.PERMISSION_GRANTED) scan(selectedDate)
+            else {pendingDate=selectedDate.toEpochDay();permission.launch(Manifest.permission.READ_SMS)}
+        },Modifier.testTag("onboarding-IMPORT"))
+        if(denied) Text(stringResource(R.string.beta_history_denied),modifier=Modifier.testTag("history-denied"))
+        if(failed) Text(stringResource(R.string.beta_action_failed),color=MaterialTheme.colorScheme.error)
         session?.let { current ->
             val formatter = java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
                 .withLocale(java.util.Locale.getDefault()).withZone(java.time.ZoneId.systemDefault())

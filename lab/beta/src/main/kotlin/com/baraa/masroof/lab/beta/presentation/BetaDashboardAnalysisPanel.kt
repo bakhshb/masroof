@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -147,7 +149,7 @@ internal fun BetaDashboardTransactions(snapshot: DashboardSnapshot, rows: List<T
     val filtered=remember(rows,search,type,asset) {BetaDashboardExplorer.filterTransactions(rows,search,type,asset)}
     Text(stringResource(R.string.beta_transaction_title),style=MaterialTheme.typography.headlineSmall)
     OutlinedTextField(search,{search=it;limit=20},label={Text(stringResource(R.string.beta_fix_search))},
-        singleLine=true,modifier=Modifier.fillMaxWidth().testTag("transactions-search"))
+        singleLine=true,modifier=Modifier.fillMaxWidth().testTag("transactions-search"), visualTransformation = com.baraa.masroof.lab.beta.presentation.approved.ApprovedDigitsVisualTransformation)
     TextButton(onClick={filters=true},enabled=enabled,modifier=Modifier.testTag("transactions-filters")) {Text(stringResource(R.string.beta_fix_filters))}
     if(filters) {
         var draftType by remember {mutableStateOf(type)}

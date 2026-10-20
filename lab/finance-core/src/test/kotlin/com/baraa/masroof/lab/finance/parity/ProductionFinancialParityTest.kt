@@ -139,9 +139,18 @@ class ProductionFinancialParityTest {
     }
 
     @Test fun originalMonthlyCalculatorMatchesEachResolvedCaseAndWholeBatch() {
-        fixtures().forEach { assertMonthlyParity(listOf(it)) }
-        assertMonthlyParity(fixtures())
-        assertMonthlyParity(emptyList())
+        val comparison = mutableListOf("scenario,metric,production,lab")
+        (fixtures().map { listOf(it) } + listOf(fixtures(), emptyList())).forEach { cases ->
+            assertMonthlyParity(cases)
+            val actual = cases.map(::candidate)
+            oldMetrics(monthly(cases)).forEach { (key, expected) ->
+                val value = actual.fold(BigDecimal.ZERO) { sum, row -> sum + row.metrics.getValue(key).amount }
+                comparison += "${cases.joinToString("+") { it.name }.ifEmpty { "empty" }},${key.name},${expected.toPlainString()},${value.toPlainString()}"
+            }
+        }
+        val output = Path.of(System.getProperty("m8.parity.report")).resolveSibling("ui-financial-comparison.csv")
+        Files.createDirectories(output.parent)
+        Files.writeString(output, comparison.joinToString("\n", postfix = "\n"))
     }
 
     @Test fun refundHeavyAggregateRetainsNegativeSpendingAndPositiveNetCash() {
