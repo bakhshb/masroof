@@ -126,7 +126,7 @@ internal fun BetaLoansSummary(snapshot: DashboardSnapshot,limit: Int,enabled: Bo
 internal fun loanLabel(type: String)=stringResource(when(type) {"PERSONAL"->R.string.beta_approved_settings_loan_type_personal;"AUTO"->R.string.beta_approved_settings_loan_type_auto;"MORTGAGE"->R.string.beta_approved_settings_loan_type_mortgage;else->R.string.beta_asset_loan})
 
 @Composable
-internal fun BetaCommitmentsSummary(summary: CommitmentsSummary, enabled: Boolean, onSelect: (CommitmentRow)->Unit) {
+internal fun BetaCommitmentsSummary(snapshot: DashboardSnapshot,summary: CommitmentsSummary, enabled: Boolean, onSelect: (CommitmentRow)->Unit) {
     val colors=MasroofThemeExtras.extendedColors
     val date=java.time.format.DateTimeFormatter.ofPattern("d MMM", androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
     MasroofHeroCard(stringResource(R.string.beta_commitment_summary_dashboard_commitments_remaining),betaSummaryMoney(summary.remaining),
@@ -141,7 +141,13 @@ internal fun BetaCommitmentsSummary(summary: CommitmentsSummary, enabled: Boolea
                     Box(Modifier.size(MasroofReference.iconBox),contentAlignment=Alignment.Center) {Icon(if(paid) MasroofOutlineIcons.CircleCheck else MasroofOutlineIcons.CalendarCheck,null,Modifier.size(MasroofReference.icon),tint=tint)}
                 }
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
-                    Text(row.label,style=MasroofReference.pair)
+                    val label=when {
+                        row.label.isNotBlank()->row.label
+                        row.loanId!=null->snapshot.loans.singleOrNull {it.id==row.loanId}?.let {loanLabel(it.type)} ?: stringResource(R.string.beta_asset_loan)
+                        row.facilityId!=null->stringResource(R.string.beta_asset_credit)
+                        else->stringResource(R.string.beta_dash_commitments)
+                    }
+                    Text(label,style=MasroofReference.pair)
                     row.expectedDate?.let {Text(date.format(it),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
                     ApprovedBadge(stringResource(if(paid) R.string.beta_commitment_summary_dashboard_commitments_status_paid else R.string.beta_commitment_summary_dashboard_commitments_status_unpaid),if(paid) MasroofCardAccent.Inflow else MasroofCardAccent.Liability)
                 }

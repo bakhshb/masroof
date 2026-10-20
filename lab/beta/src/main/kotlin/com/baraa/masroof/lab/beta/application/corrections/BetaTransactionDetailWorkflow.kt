@@ -11,7 +11,11 @@ import java.time.Instant
 
 /** Explicit transaction detail reads, separate from the dashboard projection load path. */
 data class BetaTransactionEvidence(val sender: String,val body: String,val receivedAt: Instant)
-data class BetaTransactionActionDetail(val token: BetaReviewToken,val allowedTypes: List<FinancialType>,val evidence: List<BetaTransactionEvidence>)
+data class BetaTransactionActionDetail(val token: BetaReviewToken,val allowedTypes: List<FinancialType>,val evidence: List<BetaTransactionEvidence>,val currentType: FinancialType) {
+    /** Stable across recreation; restored drafts never silently adopt a fresh review token. */
+    val confirmationKey: String get()=auditId("TRANSACTION_ACTION",token.key.environment,token.key.transactionId,
+        token.interpretation,token.correction,token.transition,token.ledgerRevision,*token.evidence.sorted().toTypedArray())
+}
 
 class BetaTransactionDetailWorkflow(private val database: BetaDatabase) {
     private val review=BetaReviewWorkflow(database)
@@ -23,7 +27,7 @@ class BetaTransactionDetailWorkflow(private val database: BetaDatabase) {
                 FinancialImpactClassifier.classify(reclassified(input,type)) is FinancialClassification.Classified &&
                 (d.current==null || reclassified(input,type).incomeAttribution==input.incomeAttribution)
         }
-        BetaTransactionActionDetail(d.token,types,input.evidenceIds.sorted().mapNotNull {id ->database.evidenceDao().raw(id)?.let {BetaTransactionEvidence(it.sender,it.body,Instant.parse(it.receivedAt))}})
+        BetaTransactionActionDetail(d.token,types,input.evidenceIds.sorted().mapNotNull {id ->database.evidenceDao().raw(id)?.let {BetaTransactionEvidence(it.sender,it.body,Instant.parse(it.receivedAt))}},(d.current?.posting ?: d.stored)?.classification?.effectiveType ?: input.storedType)
     }
     private fun reclassified(input: FinancialClassificationInput,type: FinancialType): FinancialClassificationInput {
         val owner=(input.source as? FinancialEndpoint.Owned) ?: (input.destination as? FinancialEndpoint.Owned)

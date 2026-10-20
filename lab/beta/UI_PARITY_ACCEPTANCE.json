@@ -51,13 +51,14 @@
       "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionListScreen.kt",
       "previous_lab_renderers": [
         "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDashboardPanel.kt",
-        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaPostedTransactionActions.kt"
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaPostedTransactionActions.kt",
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaTransactionDetailContent.kt"
       ],
       "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
       "lab_visual_reference": "build/reports/ui-parity/lab-approved-fixture",
-      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — all eight list bodies match; filter draft/cancel/apply, independent 120-row scrolling and filtered chooser payload verified. Detail/actions and complete failure/empty journeys still open.",
-      "old_renderer_removed": false,
+      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — 8 list + 8 detail body pairs exact. Financial actions/cancel/recreation/resume/stale token tested in actual Activity; non-default visuals and complete journey remain open.",
+      "old_renderer_removed": true,
       "accepted": false
     },
     {
@@ -209,7 +210,7 @@
   "design_guide": "docs/DESIGN_SYSTEM.md",
   "design_version": "approved-2026-10-10",
   "production_visual_baseline": {
-    "pages": 32,
+    "pages": 33,
     "locales": [
       "ar",
       "en"
@@ -218,11 +219,12 @@
       "light",
       "dark"
     ],
-    "captures": 256,
+    "captures": 264,
     "path": "lab/beta/build/reports/ui-parity/production",
     "status": "captured",
     "data": "synthetic FidelityFixtures; no user database",
-    "viewport": "1080x1920, density 420; content screenshots exclude Android status bars"
+    "viewport": "1080x1920, density 420; content screenshots exclude Android status bars",
+    "transaction_detail_reference": "Pinned production 0d86c5d3, unchanged main source, temporary synthetic test harness prepared with lab/beta/tools/prepare_transaction_detail_reference.py; 8 native captures passed."
   },
   "removed_implementations": [
     "The Material3 ModalBottomSheet body in BetaBottomSheet; now a labels/tags adapter to the copied production modal.",
@@ -249,7 +251,8 @@
     "Hand-built review list layout: replaced by source ReviewListScreen content with fixed choices and independent list scrolling.",
     "Generic settings asset/bank loop and ordinary management Add callbacks replaced by one source-derived BetaRegistryManagementPanel; explicit developer manual configuration remains separate.",
     "Generic transaction list renderer, twenty-row pagination and single type/asset filter replaced by source toolbar, multi-filter draft and independent lazy list. TransactionPreviewRow is now one canonical BetaMovementRow reused by list and scoped pages.",
-    "Generic commitment list/editor/add/delete/manual-paid UI and commitmentsOnly branch removed from BetaDashboardConfigurationPanel. Unused legacy commitment/paid/remove workflow methods removed; storage regression now calls BetaCommitmentsWorkflow.edit. Salary/statement controls remain separate."
+    "Generic commitment list/editor/add/delete/manual-paid UI and commitmentsOnly branch removed from BetaDashboardConfigurationPanel. Unused legacy commitment/paid/remove workflow methods removed; storage regression now calls BetaCommitmentsWorkflow.edit. Salary/statement controls remain separate.",
+    "The legacy colored transaction hero, generic detail rows, source-evidence/actions headings and direct-save classification sheet are removed. Detail content, evidence and buttons use one source-derived renderer each; the sheet has the source current badge, preview and explicit confirmation. Twelve exclusive old text keys are removed."
   ],
   "removed_resource_keys": [
     "beta_asset_link_account",
@@ -286,6 +289,9 @@
     "beta_chart_scope_purchases",
     "beta_chart_signed_help",
     "beta_chart_table",
+    "beta_complete_source_evidence",
+    "beta_complete_transaction_actions",
+    "beta_complete_transactions_data",
     "beta_controls_add",
     "beta_controls_amount",
     "beta_controls_clamp",
@@ -338,19 +344,28 @@
     "beta_review_suppressed",
     "beta_review_time",
     "beta_review_time_help",
-    "beta_review_unavailable"
+    "beta_review_unavailable",
+    "beta_transaction_counterparty",
+    "beta_transaction_destination",
+    "beta_transaction_details",
+    "beta_transaction_external_unknown",
+    "beta_transaction_fee",
+    "beta_transaction_fx",
+    "beta_transaction_merchant",
+    "beta_transaction_sar_free",
+    "beta_transaction_source"
   ],
   "verified_tests": {
     "lab_jvm": 345,
     "bank_engine": 58,
-    "finance_core": 181,
+    "finance_core": 182,
     "android16_full": {
       "passed": 199,
       "total": 199,
       "failed": 0,
       "scope": "Full Android 16 suite after source transaction-list port and CI rename-readiness fix. Final digit-comparison refinement is validated separately by targeted filter tests. Final digit comparison and calculator placement passed all 322 JVM tests, lint, and four targeted native tests including the actual Activity. Subsequent registry-fact preservation and navigation-generation changes passed all 323 JVM tests, lint and five targeted Android tests; they do not claim a second full 200-test run."
     },
-    "ci": "e76f6f1d: all GitHub checks passed. Current creation/native-currency follow-up passed 345 JVM tests, lint, 15 targeted Android checks and two final native checks locally; CI awaits push.",
+    "ci": "e76f6f1d: all GitHub checks passed. Later 1690cb54: beta instrumentation failed 1 of 220 cases (technical obligation label); all other checks passed. The producer label regression is fixed and passes 182 core / 345 lab JVM tests locally. Latest transaction/navigation/label follow-up still requires final-head CI.",
     "android16_followup": {
       "passed": 20,
       "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
@@ -480,7 +495,7 @@
       "lint": "passed",
       "scope": "Real transaction detail cancel → confirm-dialog recreation → create → already-linked state → management list/count. One definition per source under concurrent requests; stale/unnamed/non-eligible/suppressed sources rejected; financial history unchanged. Native USD definition retains its money/date/source, values through a 2020 source into a 2026 salary cycle, and never contributes the old transaction to current spending. Missing/suppressed rates remain unknown; inactive definitions do not poison current totals.",
       "precision_improvement": "The inherited prototype resolveMoney rounds the native/source ratio to two decimals before multiplication. Lab now rounds only the final SAR hint: 0.01 USD from a 20 USD / 75 SAR source becomes 0.04 SAR, rather than an intermediate zero. This intentionally improves an edited commitment forecast; no posted transaction or stored rate is changed.",
-      "limitations": "Whole transaction-detail UI, source summary/navigation, transient visual variants, and remaining settings/backup/setup pages still require completion. No full native/process-death rerun claimed on this follow-up."
+      "limitations": "This historical checkpoint did not cover the source detail/summary; both are implemented and tested in later follow-ups. Current remaining work is non-default visual states, review details and remaining settings/backup/setup flows. No full native/process-death rerun claimed for the creation-only checkpoint."
     },
     "commitment_summary_followup": {
       "lab_jvm_passed": 345,
@@ -491,6 +506,20 @@
       "summary_pixel_identical_bodies": 8,
       "native_scope": "Ten native cases passed in the first run (creation Activity, management screen/activity, clean setup journey, paired capture). Three typed-navigation tests passed after correcting only the test host scroll owner; card and loan Back return Home, user occurrence routes by definition id. Actual editor cancel/recreate/reopen/save returns to updated summary. Four preexisting account-detail bottom edge differences remain, maximum 6–7/255. No full-suite/process-death rerun or final-head CI acceptance claimed.",
       "native_targeted_cases_passed": 13
+    },
+    "transaction_detail_followup": {
+      "lab_jvm_passed": 345,
+      "finance_core_passed": 182,
+      "native_targeted_passed_before_label_followup": 8,
+      "production_reference_capture_test_passed": 1,
+      "paired_pages": 19,
+      "paired_captures": 152,
+      "pixel_identical_bodies": 148,
+      "transaction_detail_exact_bodies": 8,
+      "scope": "Final 9-case Android run passed: actual Activity share keeps details after resume; two-step category/cancel/confirmation; resume with open confirmation; recreation; classification/ignore reject a changed token without writing; existing creation and list filters/share; confirmed finance; all 19 frozen pages captured; prior CI shared-facility-due/label rendering case. All 182 core and 345 lab JVM tests and lint pass. Independent unchanged production main source supplied 8 matching detail captures via a pinned temporary reference. No full native/process-death rerun or whole-app acceptance claimed.",
+      "native_final_cases_passed": 9,
+      "lint": "passed",
+      "ci_label_regression": "New label producer regression failed before fix, passed after; the Android read-contract fixture uses the producer labels and continues asserting that technical IDs never render."
     }
   },
   "implementation_notes": [
@@ -516,7 +545,8 @@
     "رُبط سداد الالتزامات بالحركات المعتمدة المخزنة، باستخدام معرّف المصدر أو الاسم كما في الفعلي، ومنع استهلاك الحركة مرتين. تعرض الدفعة مبلغها وتاريخها الفعليين، وتُستخدم أسعار الصرف والرسوم المثبتة فقط. أُصلح أيضًا تعطل الملخص عند اختيار استحقاق خارج فترة الراتب؛ الاستحقاق معلومة عرض ولا يوسّع نطاق الحركات. لم يتغير تفسير الرسائل أو ML أو سلطة اعتماد الحركة.",
     "أُضيف إنشاء الالتزام من الحركة المعتمدة عبر تأكيد الفعلي، مع ربط التأكيد بمصدره الحالي ورفض المصدر المتغيّر أو الموقوف، ومنع تكرار الإنشاء. تُحفظ العملة والمبلغ والتاريخ الأصليون والرابط، وتُقرأ مصادر العملة الأجنبية القديمة قراءة مخصصة لا تدخل في صرف الفترة الحالية. يعرض مركز الإعدادات عدد النشط والمتوقف الحقيقي بدل صفر مشتق من الأصول.",
     "تحسين دقة موثّق عن الحساب القديم: قيمة الالتزام الأجنبي المعدّلة تُقرب مرة واحدة عند ناتج الريال، بدل تقريب النسبة الوسيطة التي قد تجعل 0.01 USD تظهر بصفر. بقيت مبالغ الحركات الفعلية وأسعارها المثبتة وقواعد المحرك وML دون تغيير.",
-    "Commitments summary now uses the production label/date/badge/money/icon layout with source row names and no legacy twenty-row pagination. Typed rows open primary card/loan; user occurrences open the existing settings editor. Unique direct-launch state is discarded on exit, retained on recreation, and removed from the holder after leaving. Production sources remain untouched."
+    "Commitments summary now uses the production label/date/badge/money/icon layout with source row names and no legacy twenty-row pagination. Typed rows open primary card/loan; user occurrences open the existing settings editor. Unique direct-launch state is discarded on exit, retained on recreation, and removed from the holder after leaving. Production sources remain untouched.",
+    "نُقلت تفاصيل الحركة ونص الرسالة والأزرار والتأكيد الثاني للتصنيف من الفعلي. المشاركة تحفظ صفحة التفاصيل، والتحديث عند استئناف التطبيق أو وصول رسالة لا يُعد طلب تنقل جديدًا. المسودات مرتبطة بالإصدار الأصلي وتُرفض إذا تغيرت العملية. أزيل العرض القديم و12 مفتاح نص غير مستخدم. المقارنة الآن 152 زوجًا على 19 صفحة، منها 148 منطقة متطابقة؛ الفروق الأربع المتبقية عند حواف صور تفاصيل الحساب مسجلة مسبقًا. النطاق المختبر فقط، مع تصحيح تسمية مقروءة في lab/finance-core دون تغيير المال أو المحرك أو قاعدة البيانات."
   ],
   "source_page_inventory": [
     {
@@ -716,7 +746,7 @@
       "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
       "loaded_state_paired": true,
       "accepted": false,
-      "remaining_gate": "Loaded active list/editor top and bottom match in both languages/themes. Record/disabled/date-picker/error/busy/long-list visual variants and creation/payment/summary integration still require evidence.",
+      "remaining_gate": "Loaded active list/editor top/bottom match in both languages/themes. Actual creation, edit, native-money valuation, payment matching, direct summary navigation and reopen are covered by targeted native tests. Record/disabled/date-picker/error/busy/long-list visual variants remain open.",
       "label_ar": "تحرير الالتزام"
     },
     {
@@ -772,8 +802,17 @@
       "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
       "loaded_state_paired": true,
       "accepted": false,
-      "remaining_gate": "Loaded active list/editor top and bottom match in both languages/themes. Record/disabled/date-picker/error/busy/long-list visual variants and creation/payment/summary integration still require evidence.",
+      "remaining_gate": "Loaded active list/editor top/bottom match in both languages/themes. Actual creation, edit, native-money valuation, payment matching, direct summary navigation and reopen are covered by targeted native tests. Record/disabled/date-picker/error/busy/long-list visual variants remain open.",
       "label_ar": "إدارة الالتزامات"
+    },
+    {
+      "id": "transactionDetail",
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionDetailScreen.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Eight loaded-state top/bottom captures are exact in both languages/themes. Actual Activity share, two-step reclassification/cancel/recreation/resume, ignore and stale-token rejection passed. FX/multiple-SMS/held-write/error/long-content visual variants remain open.",
+      "label_ar": "تفاصيل الحركة وإجراءاتها",
+      "reference_harness": "lab/beta/tools/prepare_transaction_detail_reference.py"
     }
   ],
   "additional_state_gates": [
@@ -862,10 +901,10 @@
     },
     {
       "id": "UI-003",
-      "finding_ar": "تفاصيل الحركة وإجراءات الالتزام والمراجعة التفصيلية لم تثبت مطابقتها للمصدر.",
-      "action_ar": "نقلها ومقارنة حالات العرض والتنفيذ وإعادة الفتح قبل إغلاقها.",
+      "finding_ar": "نُقلت تفاصيل الحركة وإجراءاتها وتطابقت صورها المحملة مع الفعلي. تفاصيل المراجعة وإجراءاتها وحالات الخطأ والانتظار غير الافتراضية ما زالت بحاجة إلى إكمال.",
+      "action_ar": "إكمال المراجعة التفصيلية ومقارنة حالاتها وإجراءاتها قبل اعتماد الرحلة كاملة.",
       "status": "open",
-      "evidence": "BetaDashboardTransactionDetail; BetaPostedTransactionActions; BetaReviewResolutionActions."
+      "evidence": "BetaTransactionDetailContent; BetaTransactionReclassifySheet; BetaPostedTransactionActions; 8/8 detail image pairs exact and actual Activity tests passed. BetaReviewResolutionActions remains open."
     },
     {
       "id": "UI-004",
@@ -897,8 +936,8 @@
     },
     {
       "id": "DATA-002",
-      "finding_ar": "اكتمل إنشاء الالتزام من الحركة وحفظ عملته الأصلية، ونُقل الملخص وربط صفوفه بالمحرر وتفاصيل القرض والبطاقة. بقي إثبات الحالات البصرية غير الافتراضية وتفاصيل الحركة بالكامل.",
-      "action_ar": "إكمال صور حالات التأكيد والخطأ والانتظار والعملات الأجنبية وتفاصيل الحركة؛ تبقى الرحلة الكاملة غير معتمدة.",
+      "finding_ar": "اكتمل إنشاء الالتزام من الحركة وحفظ عملته الأصلية، ونُقل الملخص وربط صفوفه بالمحرر وتفاصيل القرض والبطاقة. نُقلت تفاصيل الحركة أيضًا؛ بقي إثبات الحالات البصرية غير الافتراضية.",
+      "action_ar": "إكمال صور حالات التأكيد والخطأ والانتظار والعملات الأجنبية؛ تبقى الرحلة الكاملة غير معتمدة.",
       "status": "open",
       "evidence": "BetaCommitmentCreationWorkflow; BetaCommitmentValuationCalculator; BetaCommitmentCreationTest; BetaCommitmentCreationActivityTest; BetaForeignCommitmentDeviceTest. Source detail/summary visual acceptance remains open. Summary loaded-state 8/8 pairs exact; actual Activity cancel/recreate/reopen/save returns to updated summary."
     },
@@ -929,6 +968,27 @@
       "action_ar": "نقل عرض المصدر وشاراته وأيقوناته وإلغاء ترقيم الصفوف القديم، وربط كل نوع بتفاصيله. محرر الالتزام يعود إلى الملخص ويلغي المسودة عند الرجوع، مع حفظها عند إعادة إنشاء الشاشة.",
       "status": "fixed_pending_final_ci",
       "evidence": "BetaCommitmentsSummary; 3 typed-navigation native tests passed; real Activity direct editor/cancel/recreate/save passed. All 8 summary capture bodies pixel-identical to frozen production source."
+    },
+    {
+      "id": "SAFETY-001",
+      "finding_ar": "مسودة التصنيف أو التجاهل كانت تستعيد واجهتها بعد إعادة إنشاء الشاشة، لكنها تقرأ رمز إصدار جديدًا؛ وقد يُطبَّق القرار القديم على عملية تغيرت أثناء الانتظار.",
+      "action_ar": "ربط التأكيد برمز الإصدار الأصلي المحفوظ؛ رفض المسودة القديمة مع إبقاء الإصدار الأحدث دون كتابة.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "BetaTransactionActionDetail.confirmationKey; actual Android Activity rejects both restored classification and ignore after concurrent correction; financial history and the newer ACTIVE state remain unchanged. Passed in the final 9-case native run."
+    },
+    {
+      "id": "NAV-002",
+      "finding_ar": "الرجوع من مشاركة تفاصيل الحركة كان يغلق التفاصيل ويعيد قائمة الحركات؛ لأن استئناف التطبيق ووصول الرسائل يستخدمان عدّاد طلب التنقل نفسه.",
+      "action_ar": "فصل تحديث البيانات عن طلبات التنقل، وحفظ حالة التفاصيل أثناء التحميل فقط، ومسحها بعد الخروج الفعلي منها.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "Failed before fix in the real Activity (share returned to list). Passed after separating dashboardRefresh/refreshRequest and adding transaction SaveableStateProvider cleanup: sharing stays in detail, resume retains the open confirmation, explicit cancellation writes nothing. Final 9-case native run passed."
+    },
+    {
+      "id": "DATA-005",
+      "finding_ar": "أسماء التزامات البطاقة والقرض كانت تستخدم المعرّف التقني كقيمة احتياطية؛ فشل اختبار CI عند إظهارها بعد نقل واجهة الملخص.",
+      "action_ar": "إنتاج آخر أربعة أرقام للبطاقة الأساسية واسم القرض فقط؛ القيم الناقصة تحصل على تسمية منتج محلية في العرض. تظل المعرّفات للربط فقط.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "CI 1690cb54 failed this rendering case. The new producer regression failed before fix (TECH_FACILITY_ID instead of 7271), then all 182 core tests passed. Final native authoritativeFacilityDueIsSharedOnSupplementaryAndCountedOnce passes, asserts last4/localized loan fallback, no opaque IDs and the unchanged one-facility due across primary/supplementary cards."
     }
   ]
 }

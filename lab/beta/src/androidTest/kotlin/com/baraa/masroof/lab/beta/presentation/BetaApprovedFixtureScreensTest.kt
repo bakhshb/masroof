@@ -57,8 +57,8 @@ class BetaApprovedFixtureScreensTest {
                         transactionDate=LocalDate.parse("2026-10-05"),sourceTransactionId="ref-12")
                     BetaShell(0,false,showReturn=false,showMaintenanceActions=false,notificationCount=3,
                         secondaryTitle=if(commitmentPage) stringResource(if(page.value=="myCommitments") R.string.beta_commitment_reference_manage_commitments else R.string.beta_commitment_settings_commitment_edit_title) else if(reviewPage) stringResource(R.string.beta_nav_review) else if(preferencePage) stringResource(R.string.beta_approved_reference_preferences_title) else title,
-                        secondaryActions={if(page.value=="transactions") listShare?.let {BetaListShareAction(it)}},
-                        onNavigateBack={},selectedHomeTab=if(reviewPage) "REVIEW" else if(preferencePage || registryPage || commitmentPage) "SETTINGS" else if(page.value=="transactions") "TRANSACTIONS" else if(page.value=="home") "HOME" else "NONE",onOpenHome={},dashboardOwnsScroll=true,editorOwnsScroll=reviewPage || commitmentPage,
+                        secondaryActions={if(page.value in setOf("transactions","transactionDetail")) listShare?.let {BetaListShareAction(it)}},
+                        onNavigateBack={},selectedHomeTab=if(reviewPage) "REVIEW" else if(preferencePage || registryPage || commitmentPage) "SETTINGS" else if(page.value in setOf("transactions","transactionDetail")) "TRANSACTIONS" else if(page.value=="home") "HOME" else "NONE",onOpenHome={},dashboardOwnsScroll=true,editorOwnsScroll=reviewPage || commitmentPage,
                         editor=if(commitmentPage) ({
                             if(page.value=="myCommitments") BetaCommitmentsContent(listOf(commitment),emptyList(),"ACTIVE",false,{},{},{},{})
                             else BetaCommitmentEditorContent(commitment,false,{},{},{})
@@ -89,16 +89,26 @@ class BetaApprovedFixtureScreensTest {
                                 metadata=metadata,onRegistryTitle={title=it})
                         }) else null,
                         dashboard=({BetaDashboardPanel(workflow,ownsScroll=true,onListShare={listShare=it},showInternalHeader=false,
-                            requestedRoute=when(page.value) {"commitments"->"COMMITMENTS";"transactions"->"TRANSACTIONS";"loans","loanDetail" -> "LOANS";"merchants" -> "MERCHANTS";"daily" -> "DAILY";"home" -> "OVERVIEW";"accounts","accountDetail" -> "ACCOUNTS";else -> "CARDS"},onPageTitle={title=it})}),
+                            transactionExtras=if(page.value=="transactionDetail") ({_,_ ->
+                                BetaTransactionEvidenceContent(listOf(com.baraa.masroof.lab.beta.application.corrections.BetaTransactionEvidence("ALJAZIRA", "شراء عبر الإنترنت\nبطاقة: 8842\nمبلغ: SAR 600.00\nلدى: NOON",Instant.parse("2026-10-06T10:00:00Z"))))
+                                BetaTransactionDetailButtons(true,true,false,false,onClassify={},onMark={},onIgnore={})
+                            }) else null,
+                            requestedRoute=when(page.value) {"commitments"->"COMMITMENTS";"transactions","transactionDetail"->"TRANSACTIONS";"loans","loanDetail" -> "LOANS";"merchants" -> "MERCHANTS";"daily" -> "DAILY";"home" -> "OVERVIEW";"accounts","accountDetail" -> "ACCOUNTS";else -> "CARDS"},onPageTitle={title=it})}),
                         onReturn={},onReset={},onBackup={},onRestore={})
                 }
             }}
         }
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val directory=File(instrumentation.targetContext.getExternalFilesDir(null),"lab-approved-fixture").apply {mkdirs()}
-        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home","review","myAccounts","myCards","myLoans","transactions","myCommitments","commitmentEditor","commitments")) {
+        val capturePages=InstrumentationRegistry.getArguments().getString("capturePages")?.split(",")?.toSet()
+        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home","review","myAccounts","myCards","myLoans","transactions","myCommitments","commitmentEditor","commitments","transactionDetail").filter {capturePages==null || it in capturePages}) {
             compose.runOnIdle {language.value=lang;dark.value=night;page.value=destination}
             compose.waitUntil(15000) {compose.onAllNodesWithTag(if(destination=="myCommitments") "commitments-list" else if(destination=="commitmentEditor") "commitment-editor" else if(destination=="review") "review-fixture-ready" else if(destination=="preferences" || destination.startsWith("my")) "beta-settings-panel" else "dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
+            if(destination=="transactionDetail") {
+                compose.onNodeWithTag("transactions-list").performScrollToNode(hasTestTag("dash-transaction-ref-11"))
+                compose.onNodeWithTag("dash-transaction-ref-11").performClick()
+                compose.waitUntil(15000) {compose.onAllNodesWithTag("transaction-detail").fetchSemanticsNodes().isNotEmpty()}
+            }
             if(destination in setOf("cardDetail","loanDetail","accountDetail")) {
                 val target=when(destination) {"cardDetail" -> "8842";"accountDetail" -> "3001";else -> "personal"}
                 compose.onNodeWithTag("dash-asset-BANK_ALJAZIRA-$target").performScrollTo().performClick()

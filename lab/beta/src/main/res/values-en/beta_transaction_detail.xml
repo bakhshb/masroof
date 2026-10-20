@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="beta_detail_transaction_detail_title">Transaction details</string>
+    <string name="beta_detail_transaction_detail_info_section">Transaction info</string>
+    <string name="beta_detail_transaction_detail_type">Category</string>
+    <string name="beta_detail_transaction_detail_date">Date</string>
+    <string name="beta_detail_transaction_detail_direction">Direction</string>
+    <string name="beta_detail_transaction_detail_card">Card</string>
+    <string name="beta_detail_transaction_detail_merchant">Merchant / description</string>
+    <string name="beta_detail_transaction_detail_sar_equivalent">Amount in SAR</string>
+    <string name="beta_detail_transaction_detail_exchange_rate">Exchange rate used (%1$s→SAR)</string>
+    <string name="beta_detail_transaction_detail_exchange_rate_source">Rate source</string>
+    <string name="beta_detail_exchange_rate_source_sms">Bank message</string>
+    <string name="beta_detail_exchange_rate_source_historical_merchant">Prior purchase from same merchant</string>
+    <string name="beta_detail_exchange_rate_source_market">Market rate (from internet)</string>
+    <string name="beta_detail_transaction_detail_sms_section">Message text</string>
+    <string name="beta_detail_transaction_detail_sms_index">Message %1$d of %2$d</string>
+    <string name="beta_detail_transaction_detail_edit_category">Edit category</string>
+    <string name="beta_detail_transaction_detail_ignore_confirm_title">Ignore transaction?</string>
+    <string name="beta_detail_transaction_detail_ignore_confirm_body">This removes the transaction from your dashboard totals. You can bring it back later by rescanning SMS if needed.</string>
+    <string name="beta_detail_transaction_detail_ignore_confirm_action">Ignore</string>
+    <string name="beta_detail_transaction_detail_ignore_failed">Could not ignore transaction</string>
+    <string name="beta_detail_transaction_detail_reclassify_success">Category updated</string>
+    <string name="beta_detail_transaction_detail_reclassify_failed">Could not update category</string>
+    <string name="beta_detail_transaction_reclassify_sheet_title">Choose new category</string>
+    <string name="beta_detail_transaction_reclassify_sheet_save">Save</string>
+    <string name="beta_detail_transaction_reclassify_current_badge">Current</string>
+    <string name="beta_detail_transaction_reclassify_preview">From %1$s to %2$s</string>
+    <string name="beta_detail_transaction_reclassify_confirm_title">Confirm category change</string>
+    <string name="beta_detail_transaction_reclassify_confirm_body">Category will change from %1$s to %2$s.</string>
+    <string name="beta_detail_transaction_reclassify_confirm_action">Confirm</string>
+    <string name="beta_detail_dashboard_direction_out">Outgoing</string>
+    <string name="beta_detail_dashboard_direction_in">Incoming</string>
+    <string name="beta_detail_dashboard_direction_income">Income</string>
+    <string name="beta_detail_dashboard_direction_transfer_in">Incoming transfer</string>
+    <string name="beta_detail_dashboard_direction_neutral">Transfer</string>
+    <string name="beta_detail_transaction_share_detail_heading">%1$s — Transaction details</string>
+    <string name="beta_detail_transaction_share_amount">Amount</string>
+    <string name="beta_detail_review_sender">Sender: %1$s</string>
+    <string name="beta_detail_review_action_ignore">Ignore (not a financial transaction)</string>
+    <string name="beta_detail_settings_cancel">Cancel</string>
+    <string name="beta_detail_dashboard_credit_card_last4">Card ···%1$s</string>
+</resources>

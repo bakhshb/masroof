@@ -151,6 +151,24 @@ class BetaAnalysisParityTest {
         assertTrue(read.snapshot.transactions.isEmpty())
     }
 
+    @Test fun obligationLabelsUseDisplayFactsRatherThanOpaqueAssetIds() {
+        val facility=OwnedAsset(account.id.copy(localId="TECH_FACILITY_ID"),AssetKind.CREDIT_FACILITY)
+        val card=OwnedAsset(account.id.copy(localId="TECH_CARD_ID"),AssetKind.CREDIT_CARD,"7271",facility.id,CreditCardRole.PRIMARY)
+        val loan=OwnedAsset(account.id.copy(localId="TECH_LOAN_ID"),AssetKind.LOAN)
+        val period=DisplayPeriod(query.from,query.until,zone,PeriodKind.SALARY,null)
+        val source=batch(emptyList()).copy(assets=listOf(account,facility,card,loan),periods=DashboardPeriods(salary=period),
+            coverage=DashboardCoverage(true,true,true,0,completeUserCommitments=true),
+            assetFacts=listOf(DashboardAssetFacts(facility.id,statement=ObservedStatement(Money.of("100",Currency.SAR),query.from,first)),
+                DashboardAssetFacts(loan.id,loanType="PERSONAL",loanRemaining=ObservedMoney(Money.of("500",Currency.SAR),query.from),
+                    loanInstallment=ObservedMoney(Money.of("25",Currency.SAR),query.from))))
+        val rows=build(source).snapshot.commitments!!.rows
+        assertEquals("7271",rows.single {it.facilityId==facility.id}.label)
+        assertEquals("",rows.single {it.loanId==loan.id}.label)
+        assertTrue(rows.none {it.label.contains("TECH_")})
+        val named=build(source.copy(assetFacts=source.assetFacts.map {if(it.id==loan.id) it.copy(label="My loan") else it}))
+        assertEquals("My loan",named.snapshot.commitments!!.rows.single {it.loanId==loan.id}.label)
+    }
+
     @Test fun priorStatementPaymentWindowAndForeignObligationCannotBecomeUnpaidOrZero() {
         val facility = OwnedAsset(account.id.copy(localId = "facility"), AssetKind.CREDIT_FACILITY)
         val card = OwnedAsset(account.id.copy(localId = "card"), AssetKind.CREDIT_CARD, "7271", facility.id, CreditCardRole.PRIMARY)

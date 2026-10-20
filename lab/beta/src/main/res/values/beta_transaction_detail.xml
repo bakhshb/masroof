@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="beta_detail_transaction_detail_title">تفاصيل الحركة</string>
+    <string name="beta_detail_transaction_detail_info_section">معلومات الحركة</string>
+    <string name="beta_detail_transaction_detail_type">التصنيف</string>
+    <string name="beta_detail_transaction_detail_date">التاريخ</string>
+    <string name="beta_detail_transaction_detail_direction">الاتجاه</string>
+    <string name="beta_detail_transaction_detail_card">البطاقة</string>
+    <string name="beta_detail_transaction_detail_merchant">التاجر / الوصف</string>
+    <string name="beta_detail_transaction_detail_sar_equivalent">المبلغ بالريال</string>
+    <string name="beta_detail_transaction_detail_exchange_rate">سعر الصرف المستخدم (%1$s→SAR)</string>
+    <string name="beta_detail_transaction_detail_exchange_rate_source">مصدر سعر الصرف</string>
+    <string name="beta_detail_exchange_rate_source_sms">رسالة البنك</string>
+    <string name="beta_detail_exchange_rate_source_historical_merchant">مشترى سابق لنفس التاجر</string>
+    <string name="beta_detail_exchange_rate_source_market">سعر السوق (من الإنترنت)</string>
+    <string name="beta_detail_transaction_detail_sms_section">نص الرسالة</string>
+    <string name="beta_detail_transaction_detail_sms_index">رسالة %1$d من %2$d</string>
+    <string name="beta_detail_transaction_detail_edit_category">تعديل التصنيف</string>
+    <string name="beta_detail_transaction_detail_ignore_confirm_title">تجاهل الحركة؟</string>
+    <string name="beta_detail_transaction_detail_ignore_confirm_body">سيتم حذف الحركة من الرئيسية ولن تُحسب ضمن إجمالياتك. يمكنك إعادة استيرادها لاحقاً بإعادة مسح الرسائل إذا لزم.</string>
+    <string name="beta_detail_transaction_detail_ignore_confirm_action">تجاهل</string>
+    <string name="beta_detail_transaction_detail_ignore_failed">تعذر تجاهل الحركة</string>
+    <string name="beta_detail_transaction_detail_reclassify_success">تم تحديث التصنيف</string>
+    <string name="beta_detail_transaction_detail_reclassify_failed">تعذر تحديث التصنيف</string>
+    <string name="beta_detail_transaction_reclassify_sheet_title">اختر التصنيف الجديد</string>
+    <string name="beta_detail_transaction_reclassify_sheet_save">حفظ</string>
+    <string name="beta_detail_transaction_reclassify_current_badge">الحالي</string>
+    <string name="beta_detail_transaction_reclassify_preview">من %1$s إلى %2$s</string>
+    <string name="beta_detail_transaction_reclassify_confirm_title">تأكيد تغيير التصنيف</string>
+    <string name="beta_detail_transaction_reclassify_confirm_body">سيتم تغيير التصنيف من «%1$s» إلى «%2$s».</string>
+    <string name="beta_detail_transaction_reclassify_confirm_action">تأكيد</string>
+    <string name="beta_detail_dashboard_direction_out">صادر</string>
+    <string name="beta_detail_dashboard_direction_in">وارد</string>
+    <string name="beta_detail_dashboard_direction_income">دخل</string>
+    <string name="beta_detail_dashboard_direction_transfer_in">تحويل وارد</string>
+    <string name="beta_detail_dashboard_direction_neutral">تحويل</string>
+    <string name="beta_detail_transaction_share_detail_heading">%1$s — تفاصيل حركة</string>
+    <string name="beta_detail_transaction_share_amount">المبلغ</string>
+    <string name="beta_detail_review_sender">المرسل: %1$s</string>
+    <string name="beta_detail_review_action_ignore">تجاهل (ليس حركة مالية)</string>
+    <string name="beta_detail_settings_cancel">إلغاء</string>
+    <string name="beta_detail_dashboard_credit_card_last4">بطاقة ···%1$s</string>
+</resources>

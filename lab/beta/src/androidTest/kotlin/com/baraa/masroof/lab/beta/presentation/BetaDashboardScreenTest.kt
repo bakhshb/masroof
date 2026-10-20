@@ -340,7 +340,7 @@ class BetaDashboardScreenTest {
     }
 
     @Test fun authoritativeFacilityDueIsSharedOnSupplementaryAndCountedOnce() {
-        val facilityId = AssetId(Environment.BETA, bank, "statement-facility")
+        val facilityId = AssetId(Environment.BETA, bank, "TECH_FACILITY_ID")
         fun card(id: String, last4: String, role: CreditCardRole) = CreditCardSummary(
             AssetId(Environment.BETA, bank, id), role, null, last4, null, null, null, null, null)
         val facility = FacilitySummary(facilityId, Money.of("2694.32", Currency.SAR), LocalDate.of(2026, 10, 25), at,
@@ -348,10 +348,11 @@ class BetaDashboardScreenTest {
         val loanId = AssetId(Environment.BETA, bank, "TECH_LOAN_ID")
         val loan = LoanSummary(loanId, "fixture", "", Money.of("1000", Currency.SAR), at, Money.of("125", Currency.SAR), at, null, null)
         val commitments = CommitmentsSummary(Currency.SAR, listOf(
-            CommitmentRow(Environment.BETA, "fixture-facility", "TECH_FACILITY_ID", Money.of("2694.32", Currency.SAR), null, PaymentStatus.UNPAID, facilityId = facilityId),
-            CommitmentRow(Environment.BETA, "fixture-loan", "TECH_LOAN_ID", Money.of("125", Currency.SAR), null, PaymentStatus.UNPAID, loanId = loanId),
+            CommitmentRow(Environment.BETA, "fixture-facility", "7271", Money.of("2694.32", Currency.SAR), null, PaymentStatus.UNPAID, facilityId = facilityId),
+            CommitmentRow(Environment.BETA, "fixture-loan", "", Money.of("125", Currency.SAR), null, PaymentStatus.UNPAID, loanId = loanId),
             CommitmentRow(Environment.BETA, "fixture-user", "التزامي الشخصي", Money.of("50", Currency.SAR), null, PaymentStatus.UNPAID, userCommitmentId = "user-fixture")), null, null, null)
-        // An authoritative read-contract fixture tests rendering; actual statement authority is the producer's responsibility.
+        // Display facts mirror the producer contract covered by obligationLabelsUseDisplayFactsRatherThanOpaqueAssetIds.
+        // Opaque IDs remain identities; blank loan names use a localized product fallback.
         val workflow = BetaDashboardWorkflow({ query, _ -> DashboardProduction(
             DashboardSnapshot(query, emptyList(), emptyList(), listOf(facility), loans = listOf(loan), commitments = commitments,
                 totals=PortfolioTotals(Currency.SAR,null,null,null,null,facility.statementDue,null,null,null,null)), emptySet(), null)
@@ -377,6 +378,8 @@ class BetaDashboardScreenTest {
         route("COMMITMENTS")
         compose.onNodeWithText("TECH_FACILITY_ID").assertDoesNotExist()
         compose.onNodeWithText("TECH_LOAN_ID").assertDoesNotExist()
+        compose.onNodeWithText("7271").assertExists()
+        compose.onNodeWithText(context.getString(R.string.beta_asset_loan)).assertExists()
         compose.onNodeWithText("التزامي الشخصي").assertExists()
     }
 

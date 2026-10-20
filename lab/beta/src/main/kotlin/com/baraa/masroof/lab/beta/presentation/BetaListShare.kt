@@ -21,7 +21,7 @@ import com.baraa.masroof.ui.components.MasroofOutlineIcons
 import java.time.format.DateTimeFormatter
 
 /** Value payload avoids stale callbacks and recomposition loops in the shared header. */
-data class BetaListShare(val subject: String,val text: String,val enabled: Boolean)
+data class BetaListShare(val subject: String,val text: String,val enabled: Boolean,val detail: Boolean=false)
 
 /** Source ShareActionIcon and Android text chooser; only a user click opens the chooser. */
 @Composable internal fun BetaListShareAction(payload: BetaListShare) {

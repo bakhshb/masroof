@@ -11,7 +11,7 @@ import json
 
 folder = Path(__file__).resolve().parents[1]
 images = folder / 'build/reports/ui-parity'
-pages = {'cards': 'ملخص البطاقات', 'cardDetail': 'تفاصيل البطاقة الفرعية', 'loans': 'ملخص القروض', 'loanDetail': 'تفاصيل القرض', 'preferences': 'المظهر واللغة', 'home': 'الرئيسية', 'accounts': 'ملخص الحسابات', 'accountDetail': 'تفاصيل الحساب', 'merchants': 'التجار', 'daily': 'المصاريف اليومية', 'review': 'قائمة المراجعة', 'myAccounts': 'إدارة الحسابات', 'myCards': 'إدارة البطاقات', 'myLoans': 'إدارة القروض', 'transactions': 'قائمة الحركات', 'myCommitments': 'إدارة الالتزامات', 'commitmentEditor': 'محرر الالتزام', 'commitments': 'ملخص الالتزامات'}
+pages = {'cards': 'ملخص البطاقات', 'cardDetail': 'تفاصيل البطاقة الفرعية', 'loans': 'ملخص القروض', 'loanDetail': 'تفاصيل القرض', 'preferences': 'المظهر واللغة', 'home': 'الرئيسية', 'accounts': 'ملخص الحسابات', 'accountDetail': 'تفاصيل الحساب', 'merchants': 'التجار', 'daily': 'المصاريف اليومية', 'review': 'قائمة المراجعة', 'myAccounts': 'إدارة الحسابات', 'myCards': 'إدارة البطاقات', 'myLoans': 'إدارة القروض', 'transactions': 'قائمة الحركات', 'myCommitments': 'إدارة الالتزامات', 'commitmentEditor': 'محرر الالتزام', 'commitments': 'ملخص الالتزامات', 'transactionDetail': 'تفاصيل الحركة'}
 entries = []
 image_cache = {}
 for page in pages:

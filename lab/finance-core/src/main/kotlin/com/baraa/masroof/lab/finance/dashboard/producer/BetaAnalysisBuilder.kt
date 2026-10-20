@@ -206,7 +206,8 @@ internal object BetaAnalysisBuilder {
                 row.native.input.time.instant >= issued && row.native.input.time.instant <= batch.revision.asOf && (row.native.input.destination as? com.baraa.masroof.lab.finance.classification.FinancialEndpoint.Owned)?.id.let { id ->
                     id == facility.facilityId || facility.cards.any { it.cardId == id } } }
             val paid = payments.fold(BigDecimal.ZERO) { sum, row -> sum + row.sarAmount.amount } >= due.amount
-            rows += CommitmentRow(batch.query.environment, "facility:${facility.facilityId}:$issued", facility.facilityId.localId,
+            rows += CommitmentRow(batch.query.environment, "facility:${facility.facilityId}:$issued",
+                facility.cards.singleOrNull {it.role==com.baraa.masroof.lab.finance.asset.CreditCardRole.PRIMARY}?.last4.orEmpty(),
                 due, date, if (paid) PaymentStatus.PAID else PaymentStatus.UNPAID, facilityId = facility.facilityId)
         }
         for (loan in loans) {
@@ -216,7 +217,7 @@ internal object BetaAnalysisBuilder {
             if (!paid && loan.remaining?.amount?.signum() == 0) continue
             val amount = if (paid) Money.of(requireNotNull(payment).amount, Currency.SAR) else loan.latestInstallment ?: continue
             if (amount.currency != Currency.SAR) continue
-            rows += CommitmentRow(batch.query.environment, "loan:${loan.id}:${period.from}", loan.label.ifBlank { loan.id.localId },
+            rows += CommitmentRow(batch.query.environment, "loan:${loan.id}:${period.from}", loan.label.trim(),
                 amount, null, if (paid) PaymentStatus.PAID else PaymentStatus.UNPAID, loanId = loan.id)
         }
         val known = batch.coverage.completeUserCommitments && facilities.all { facility ->

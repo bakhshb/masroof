@@ -20,16 +20,7 @@
     <string name="beta_chart_save_error">View preferences could not be saved. Review the choices and try again.</string>
     <string name="beta_transaction_title">Transactions</string>
     <string name="beta_transaction_scope_help">Approved transactions in the displayed calendar month only. A drilldown does not change full summary totals.</string>
-    <string name="beta_transaction_details">Transaction details</string>
     <string name="beta_transaction_original_type">Stored type</string>
-    <string name="beta_transaction_merchant">Merchant</string>
-    <string name="beta_transaction_counterparty">Counterparty</string>
-    <string name="beta_transaction_sar_free">SAR equivalent excluding international fees</string>
-    <string name="beta_transaction_fee">Observed international fee</string>
-    <string name="beta_transaction_fx">Applied exchange rate, full precision</string>
-    <string name="beta_transaction_source">Source</string>
-    <string name="beta_transaction_destination">Destination</string>
-    <string name="beta_transaction_external_unknown">External or unavailable</string>
     <string name="beta_transaction_readonly">Read only. Opening details never approves or reposts a transaction.</string>
     <string name="beta_type_expense">Expense</string>
     <string name="beta_type_income">Income</string>

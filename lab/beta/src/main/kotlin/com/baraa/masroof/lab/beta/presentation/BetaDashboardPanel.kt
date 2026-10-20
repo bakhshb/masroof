@@ -33,7 +33,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     controls: BetaDashboardControls = UnavailableBetaDashboardControls,
     ownsScroll: Boolean = false,
     onDestinationChanged: (String)->Unit = {},
-    preferences: BetaDashboardViewPreferencesWorkflow? = null, requestedRoute: String? = null, routeRequest: Int = 0, onPrimaryTabChanged: (String) -> Unit = {}, onBusyChanged: (Boolean) -> Unit = {}, onImport: () -> Unit = {}, onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onPageTitle: (String?) -> Unit = {},onListShare: (BetaListShare?)->Unit = {}, showInternalHeader: Boolean = true, onManageAssets: (com.baraa.masroof.lab.finance.asset.AssetKind)->Unit = {},onNotificationFacts: (String,Int)->Unit = {_,_->}, onOpenCommitment: (String)->Unit = {}, transactionExtras: (@Composable (String,(Boolean)->Unit)->Unit)? = null) {
+    preferences: BetaDashboardViewPreferencesWorkflow? = null, requestedRoute: String? = null, routeRequest: Int = 0, refreshRequest: Int = 0, onPrimaryTabChanged: (String) -> Unit = {}, onBusyChanged: (Boolean) -> Unit = {}, onImport: () -> Unit = {}, onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onPageTitle: (String?) -> Unit = {},onListShare: (BetaListShare?)->Unit = {}, showInternalHeader: Boolean = true, onManageAssets: (com.baraa.masroof.lab.finance.asset.AssetKind)->Unit = {},onNotificationFacts: (String,Int)->Unit = {_,_->}, onOpenCommitment: (String)->Unit = {}, transactionExtras: (@Composable (TransactionFacts,(Boolean)->Unit)->Unit)? = null) {
     var controlsBusy by remember { mutableStateOf(false) }
     var homeLayoutOpen by rememberSaveable { mutableStateOf(false) }
     val pageStates=androidx.compose.runtime.saveable.rememberSaveableStateHolder()
@@ -46,6 +46,12 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     var selectedBank by rememberSaveable { mutableStateOf<String?>(null) }
     var commitmentDetailExitsToHome by rememberSaveable {mutableStateOf(false)}
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var previousTransaction by remember {mutableStateOf(selectedTransaction)}
+    LaunchedEffect(selectedTransaction) {
+        val previous=previousTransaction
+        if(previous!=null && previous!=selectedTransaction) pageStates.removeState("transaction:$previous")
+        previousTransaction=selectedTransaction
+    }
     var retry by remember { mutableIntStateOf(0) }
     var result by remember { mutableStateOf<DashboardProduction?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -63,7 +69,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     val month = YearMonth.parse(monthText)
     var cardTab by rememberSaveable {mutableStateOf("CREDIT")}
     var visibleRows by rememberSaveable(route, monthText) { mutableIntStateOf(20) }
-    BetaLaunchedEffect(workflow, monthText, retry, routeRequest) {
+    BetaLaunchedEffect(workflow, monthText, retry, routeRequest,refreshRequest) {
         // Clear old money before a different period is exposed, including failed reads.
         loading = true; failed = false
         if(result?.snapshot?.query != activeWorkflow.query(month)) result = null
@@ -95,7 +101,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     }
     BackHandler(enabled=selectedTransaction!=null || selectedId!=null || route!="OVERVIEW" || controlsBusy) {goBack()}
     val pageTitle=when {
-        selectedTransaction!=null -> stringResource(R.string.beta_transaction_details)
+        selectedTransaction!=null -> stringResource(R.string.beta_detail_transaction_detail_title)
         route=="MERCHANTS" && selectedMerchantKey!=null -> result?.snapshot?.analysis?.merchants?.singleOrNull {it.merchantKey==selectedMerchantKey}?.merchant ?: stringResource(R.string.beta_approved_dashboard_merchants_summary_title)
         selectedId!=null -> stringResource(when {
             result?.snapshot?.accounts?.any {it.id.bank.value==selectedBank && it.id.localId==selectedId}==true -> R.string.beta_approved_reference_account_detail_title
@@ -114,7 +120,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     fun matches(id: AssetId) = id.bank.value == selectedBank && id.localId == selectedId
     val originalContent: @Composable () -> Unit = {
         Box((if(ownsScroll && route=="TRANSACTIONS" && selectedTransaction==null) Modifier.fillMaxSize() else Modifier).testTag("beta-dashboard")) {
-        Column(verticalArrangement = Arrangement.spacedBy(BetaSpacing.section), modifier = (if(ownsScroll && route=="TRANSACTIONS" && selectedTransaction==null) Modifier.fillMaxSize() else Modifier).testTag("dash-route-$route").semantics {selected=true}) {
+        Column(verticalArrangement = Arrangement.spacedBy(if(selectedTransaction!=null) com.baraa.masroof.ui.theme.MasroofSpacing.screenVertical else BetaSpacing.section), modifier = (if(ownsScroll && route=="TRANSACTIONS" && selectedTransaction==null) Modifier.fillMaxSize() else Modifier).testTag("dash-route-$route").semantics {selected=true}) {
             val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
             val displayedPeriod=activeWorkflow.query(month)
             val periodLabel = com.baraa.masroof.lab.beta.presentation.approved.approvedPeriodRange(
@@ -157,9 +163,11 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
                     if (read.unavailableSections.any {it in setOf(DashboardSection.CURRENT_LEDGER,DashboardSection.VALUATION,DashboardSection.RUNTIME_SOURCE)}) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
                         Text(stringResource(if(DashboardSection.CURRENT_LEDGER in read.unavailableSections || DashboardSection.VALUATION in read.unavailableSections) R.string.beta_fix_confirmed_only else R.string.beta_fix_commitments_unknown), Modifier.padding(BetaSpacing.screen).testTag("dash-incomplete"))
                     }
-                    if (selectedTransaction != null) {
-                        BetaDashboardTransactionDetail(snapshot, checkNotNull(selectedTransaction))
-                        transactionExtras?.invoke(checkNotNull(selectedTransaction)) {closed -> if(closed) selectedTransaction=null;retry++}
+                    if (selectedTransaction != null) pageStates.SaveableStateProvider("transaction:$selectedTransaction") {
+                        BetaDashboardTransactionDetail(snapshot, checkNotNull(selectedTransaction),onListShare)
+                        snapshot.transactions.singleOrNull {it.key.transactionId==selectedTransaction}?.let {tx ->
+                            transactionExtras?.invoke(tx) {closed -> if(closed) selectedTransaction=null;retry++}
+                        }
                     } else pageStates.SaveableStateProvider(BetaDailyExpensesWorkflow.pageStateKey(route,selectedBank,selectedId)) {
                     if (selectedId != null) {
                         val account = snapshot.accounts.singleOrNull { matches(it.id) }
@@ -205,7 +213,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
                         "COMMITMENTS" -> {
                             val commitments = snapshot.commitments
                             if (commitments == null || (commitments.rows.isEmpty() && DashboardSection.COMMITMENTS in read.unavailableSections)) DashUnavailable() else {
-                                BetaCommitmentsSummary(commitments,interactive) {row ->
+                                BetaCommitmentsSummary(snapshot,commitments,interactive) {row ->
                                     row.userCommitmentId?.let(onOpenCommitment)
                                     val target=row.loanId ?: row.facilityId?.let {facility ->
                                         snapshot.creditFacilities.singleOrNull {it.facilityId==facility}?.cards

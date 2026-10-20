@@ -20,16 +20,7 @@
     <string name="beta_chart_save_error">تعذر حفظ تفضيلات العرض. راجع الاختيارات وأعد المحاولة.</string>
     <string name="beta_transaction_title">المعاملات</string>
     <string name="beta_transaction_scope_help">المعاملات المعتمدة ضمن الشهر التقويمي المعروض فقط. لا تتغير إجماليات الملخص عند فتح قائمة فرعية.</string>
-    <string name="beta_transaction_details">تفاصيل المعاملة</string>
     <string name="beta_transaction_original_type">النوع المسجل</string>
-    <string name="beta_transaction_merchant">التاجر</string>
-    <string name="beta_transaction_counterparty">الطرف الآخر</string>
-    <string name="beta_transaction_sar_free">المقابل بالريال بدون الرسوم الدولية</string>
-    <string name="beta_transaction_fee">الرسوم الدولية المرصودة</string>
-    <string name="beta_transaction_fx">سعر الصرف المعتمد كامل الدقة</string>
-    <string name="beta_transaction_source">المصدر</string>
-    <string name="beta_transaction_destination">الوجهة</string>
-    <string name="beta_transaction_external_unknown">خارجي أو غير متاح</string>
     <string name="beta_transaction_readonly">عرض فقط. لا يؤدي فتح التفاصيل إلى اعتماد أو إعادة ترحيل المعاملة.</string>
     <string name="beta_type_expense">مصروف</string>
     <string name="beta_type_income">دخل</string>

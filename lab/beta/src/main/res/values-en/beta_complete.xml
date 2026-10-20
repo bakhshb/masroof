@@ -28,10 +28,7 @@
     <string name="beta_complete_last_installment">Last installment</string>
     <string name="beta_complete_installment_date">Installment date</string>
     <string name="beta_complete_loans_remaining">Total loan balance</string>
-    <string name="beta_complete_transactions_data">Transaction data</string>
-    <string name="beta_complete_transaction_actions">Transaction actions</string>
     <string name="beta_complete_correct_transaction">Change classification or ignore</string>
-    <string name="beta_complete_source_evidence">Linked SMS evidence</string>
     <string name="beta_complete_theme">Appearance</string>
     <string name="beta_complete_language">Language</string>
     <string name="beta_complete_about">About the lab</string>

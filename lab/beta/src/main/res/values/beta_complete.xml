@@ -28,10 +28,7 @@
     <string name="beta_complete_last_installment">آخر قسط</string>
     <string name="beta_complete_installment_date">تاريخ القسط</string>
     <string name="beta_complete_loans_remaining">إجمالي المتبقي من القروض</string>
-    <string name="beta_complete_transactions_data">بيانات العملية</string>
-    <string name="beta_complete_transaction_actions">إجراءات العملية</string>
     <string name="beta_complete_correct_transaction">تعديل التصنيف أو تجاهل العملية</string>
-    <string name="beta_complete_source_evidence">الرسائل المرتبطة</string>
     <string name="beta_complete_theme">المظهر</string>
     <string name="beta_complete_language">اللغة</string>
     <string name="beta_complete_about">حول المختبر</string>

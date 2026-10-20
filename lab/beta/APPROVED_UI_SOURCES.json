@@ -519,6 +519,24 @@
       "symbol": "CommitmentsSummaryScreen",
       "source_sha256": "5655b333174bac68c0513fa30c84e94c39bcaf88c59872d4f72978ff43933121",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaEntitySummaryPages.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionDetailScreen.kt",
+      "symbol": "TransactionDetailScreen",
+      "source_sha256": "2cee71053ed54b45875f693d7b6ced4b9be3372e9e76e51b02afcd1eadb22cb2",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaTransactionDetailContent.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionReclassifyBottomSheet.kt",
+      "symbol": "TransactionReclassifyBottomSheet",
+      "source_sha256": "b1454f27c0faee3a2c5bd3e23912a3b9b5a5b099a9273680aa73de0778db1387",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaTransactionReclassifySheet.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofTextStyles.kt",
+      "symbol": "MasroofAmountText",
+      "source_sha256": "2161849af8e9d3c9f363964d909f640c6f08acb3322625cc2384a1c054678688",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAmountText.kt"
     }
   ],
   "adaptations": [

@@ -1,7 +1,6 @@
 package com.baraa.masroof.lab.beta.presentation
 
 import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeLabel as financialTypeLabel
-import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeIcon as reviewTypeIcon
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedFormField as OutlinedTextField
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 
@@ -127,35 +126,6 @@ internal fun BetaDashboardTransactions(snapshot: DashboardSnapshot, rows: List<T
     Text(stringResource(R.string.beta_list_transaction_list_no_filter_results),Modifier.fillMaxWidth().padding(vertical=MasroofSpacing.contentPaddingLarge).testTag("transactions-empty"),
         style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
 }
-
-@Composable
-internal fun BetaDashboardTransactionDetail(snapshot: DashboardSnapshot, transactionId: String) {
-    val tx = snapshot.transactions.singleOrNull { it.key.transactionId == transactionId }
-    if (tx == null) { Text(stringResource(R.string.beta_dash_missing), modifier = Modifier.testTag("transaction-missing")); return }
-    val assets = dashboardAssetLabels(snapshot)
-    Column(Modifier.testTag("transaction-detail"),verticalArrangement=Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofSpacing.sectionGap)) {
-        com.baraa.masroof.ui.components.MasroofHeroCard(
-            tx.merchant ?: tx.counterparty ?: stringResource(financialTypeLabel(tx.effectiveType)),
-            betaMoney(tx.amount.amount.toPlainString(),tx.amount.currency.name),
-            subtitle=stringResource(financialTypeLabel(tx.effectiveType)),role=com.baraa.masroof.ui.theme.MasroofHeroRole.Account,
-            icon=reviewTypeIcon(tx.effectiveType))
-        com.baraa.masroof.ui.components.MasroofCard {
-            Text(stringResource(R.string.beta_complete_transactions_data),style=MaterialTheme.typography.titleMedium)
-            BetaFinancialDetailRow(stringResource(R.string.beta_review_type),stringResource(financialTypeLabel(tx.effectiveType)))
-            BetaFinancialDetailRow(stringResource(R.string.beta_complete_review_date,betaDate(tx.time.instant,tx.time.zone)),"")
-            tx.merchant?.let {BetaFinancialDetailRow(stringResource(R.string.beta_transaction_merchant),it)}
-            tx.counterparty?.let {BetaFinancialDetailRow(stringResource(R.string.beta_transaction_counterparty),it)}
-            BetaFinancialDetailRow(stringResource(R.string.beta_transaction_source),tx.source?.let(assets::get) ?: stringResource(R.string.beta_transaction_external_unknown))
-            BetaFinancialDetailRow(stringResource(R.string.beta_transaction_destination),tx.destination?.let(assets::get) ?: stringResource(R.string.beta_transaction_external_unknown))
-            if(tx.amount.currency!=com.baraa.masroof.lab.finance.value.Currency.SAR) {
-                BetaFinancialDetailRow(stringResource(R.string.beta_transaction_sar_free),betaSummaryMoney(tx.sarEquivalent))
-                BetaFinancialDetailRow(stringResource(R.string.beta_transaction_fx),tx.appliedFx?.rateToSar?.toPlainString() ?: stringResource(R.string.beta_approved_dashboard_value_unavailable))
-            }
-            tx.internationalFee?.let {BetaFinancialDetailRow(stringResource(R.string.beta_transaction_fee),betaSummaryMoney(it))}
-        }
-    }
-}
-
 
 @Composable internal fun dashboardAssetLabels(snapshot: DashboardSnapshot): Map<AssetId, String> = buildMap {
     snapshot.accounts.forEachIndexed { index, row -> put(row.id, (row.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_dash_account_number, index + 1)) + row.last4?.let {" · •• $it"}.orEmpty() + " · " + stringResource(if (row.id.bank.value == "BANK_ALJAZIRA") R.string.beta_bank_aljazira else R.string.beta_bank_title)) }
