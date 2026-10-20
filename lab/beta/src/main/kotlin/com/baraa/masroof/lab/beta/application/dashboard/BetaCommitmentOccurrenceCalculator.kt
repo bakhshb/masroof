@@ -3,23 +3,48 @@ package com.baraa.masroof.lab.beta.application.dashboard
 import com.baraa.masroof.lab.beta.application.*
 import com.baraa.masroof.lab.finance.dashboard.*
 import com.baraa.masroof.lab.finance.value.Environment
+import com.baraa.masroof.lab.finance.value.Money
+import com.baraa.masroof.lab.finance.posting.FinancialType
+import java.util.Locale
 import java.time.*
 import java.time.temporal.ChronoUnit
 
-/** Source recurrence and salary-cycle pause rules over persisted user settings only. */
+/** Persisted current payment facts; never a financial posting command. */
+internal data class BetaCommitmentPayment(val id: String,val type: FinancialType,val amount: Money,val at: Instant,
+    val merchant: String?=null,val counterparty: String?=null)
+/** Source recurrence, payment consumption and salary-cycle pause rules over persisted facts. */
 internal object BetaCommitmentOccurrenceCalculator {
-    fun rows(draft: BetaDashboardConfigurationDraft,period: DisplayPeriod?): List<CommitmentRow> {
+    fun rows(draft: BetaDashboardConfigurationDraft,period: DisplayPeriod?,payments: List<BetaCommitmentPayment> = emptyList()): List<CommitmentRow> {
         if(period==null || draft.commitments.isEmpty()) return emptyList()
         val first=period.from.atZone(period.zone).toLocalDate();val end=period.until.atZone(period.zone).toLocalDate()
         require(ChronoUnit.DAYS.between(first,end) in 1..95)
-        return draft.commitments.flatMap {row ->
-            if(!visible(row,first,period.zone,draft.salary?.day ?: 27)) emptyList() else dates(row,first,end).map {date ->
-                val month=YearMonth.from(date)
-                CommitmentRow(Environment.BETA,"user:${row.id}:${if(row.transactionDate==null && row.recurrence==BetaCommitmentRecurrence.MONTHLY) month else date}",row.label,row.amount,row.dueDate ?: date,
-                    if(month in row.paidMonths) PaymentStatus.PAID else PaymentStatus.UNPAID,userCommitmentId=row.id)
+        require(payments.map {it.id}.distinct().size==payments.size) {"Duplicate commitment payment identity"}
+        val consumed=hashSetOf<String>()
+        return BetaCommitmentLists.ordered(draft.commitments).flatMap {row ->
+            val occurrences=if(!visible(row,first,period.zone,draft.salary?.day ?: 27)) emptyList() else dates(row,first,end)
+            if(occurrences.isEmpty()) emptyList() else {
+                val matching=payments.filter {payment ->
+                    payment.at>=period.from && payment.at<period.until && payment.id !in consumed &&
+                        payment.type in setOf(FinancialType.EXPENSE,FinancialType.FEE,FinancialType.BILL_PAYMENT) &&
+                        payment.amount.amount.signum()>0 && payment.amount.currency==row.amount.currency &&
+                        (payment.id==row.sourceTransactionId || (payment.merchant?.trim() ?: payment.counterparty?.trim())
+                            ?.lowercase(Locale.ROOT)==row.label.trim().lowercase(Locale.ROOT))
+                }.sortedBy {it.at}
+                // Source consumes every matching payment once, even when there are fewer occurrences.
+                consumed.addAll(matching.map {it.id})
+                occurrences.mapIndexed {index,date ->
+                    val month=YearMonth.from(date)
+                    val payment=matching.getOrNull(index)
+                    val paid=payment!=null || (row.recurrence==BetaCommitmentRecurrence.MONTHLY && month in row.paidMonths) ||
+                        (row.recurrence==null && row.sourceTransactionId!=null && row.anchorDate>=first && row.anchorDate<end)
+                    CommitmentRow(Environment.BETA,"user:${row.id}:${if(row.transactionDate==null && row.recurrence==BetaCommitmentRecurrence.MONTHLY) month else date}",row.label,
+                        payment?.amount ?: row.amount,payment?.at?.atZone(period.zone)?.toLocalDate() ?: row.dueDate ?: date,
+                        if(paid) PaymentStatus.PAID else PaymentStatus.UNPAID,userCommitmentId=row.id)
+                }
             }
         }
     }
+
     fun dates(row: BetaRecurringCommitment,first: LocalDate,end: LocalDate): List<LocalDate> {
         require(first<end && ChronoUnit.DAYS.between(first,end)<=95)
         val anchor=row.anchorDate

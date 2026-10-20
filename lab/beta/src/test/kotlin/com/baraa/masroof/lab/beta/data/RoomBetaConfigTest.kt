@@ -77,6 +77,25 @@ class RoomBetaConfigTest {
         assertEquals(Money.of("0", Currency.SAR), BetaDashboardBuilder.build(empty).snapshot.commitments!!.total)
     }
 
+    @Test fun postedSourcePaymentOutsideCalendarButInsideSalaryPaysTheUserCommitmentReadOnly()=runBlocking {
+        db.bankSelectionDao().upsert(BetaBankSelectionEntity(bank.value,"ENABLED"))
+        BetaAssetRegistry(db).register(account)
+        val key=PostingKey(Environment.BETA,"purchase-source")
+        val input=FinancialClassificationInput(key,PostingRevision(0,1),FinancialType.EXPENSE,
+            Money.of("125",Currency.SAR),TransactionTime(Instant.parse("2026-09-30T12:00:00Z"),zone),
+            FinancialEndpoint.Owned(account.id),FinancialEndpoint.External,mapOf(account.id to account),setOf("source-evidence"),true)
+        assertTrue(RoomBetaFinancialLedger(db).post(input) is FinancialPostingResult.Applied)
+        val definition=draft().commitments.single().copy(sourceTransactionId=key.transactionId)
+        assertTrue(controls().save(0,draft().copy(commitments=listOf(definition))) is BetaDashboardConfigurationWrite.Saved)
+        sql.clear()
+        val batch=source().load(query)
+        val user=BetaDashboardBuilder.build(batch).snapshot.commitments!!.rows.single()
+        assertEquals(PaymentStatus.PAID,user.status);assertEquals(Money.of("125",Currency.SAR),user.amount)
+        assertEquals(LocalDate.of(2026,9,30),user.expectedDate)
+        assertFalse(sql.any {it.trimStart().matches(Regex("(?is)(INSERT|UPDATE|DELETE|ALTER|CREATE|REPLACE).*"))})
+        assertEquals(1,batch.rows.size)
+    }
+
     @Test fun atomicRevisionAndValidation() = runBlocking {
         assertTrue(controls().save(0, draft().copy(salary = BetaSalaryCycle(0))) is BetaDashboardConfigurationWrite.Invalid)
         assertTrue(controls().save(0, draft().copy(salary = BetaSalaryCycle(27, ZoneId.of("UTC")))) is BetaDashboardConfigurationWrite.Invalid)

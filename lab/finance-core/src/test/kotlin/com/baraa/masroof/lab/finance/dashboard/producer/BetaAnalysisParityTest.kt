@@ -139,6 +139,18 @@ class BetaAnalysisParityTest {
         assertEquals(Money.of("0", Currency.SAR), complete.snapshot.commitments.remaining)
     }
 
+    @Test fun explicitUserDueDateIsDisplayMetadataRatherThanAnOccurrenceScopeGate() {
+        val period=DisplayPeriod(query.from,query.until,zone,PeriodKind.SALARY,null)
+        val due=first.plusDays(20)
+        val row=CommitmentRow(Environment.BETA,"user:rent:$first","Synthetic rent",Money.of("100",Currency.SAR),due,
+            PaymentStatus.UNPAID,userCommitmentId="rent")
+        val partial=batch(emptyList()).copy(periods=DashboardPeriods(salary=period),commitmentOccurrences=listOf(row))
+        val read=build(partial.copy(coverage=partial.coverage.copy(completeUserCommitments=true)))
+        assertEquals(due,read.snapshot.commitments!!.rows.single().expectedDate)
+        assertEquals(Money.of("100",Currency.SAR),read.snapshot.commitments.remaining)
+        assertTrue(read.snapshot.transactions.isEmpty())
+    }
+
     @Test fun priorStatementPaymentWindowAndForeignObligationCannotBecomeUnpaidOrZero() {
         val facility = OwnedAsset(account.id.copy(localId = "facility"), AssetKind.CREDIT_FACILITY)
         val card = OwnedAsset(account.id.copy(localId = "card"), AssetKind.CREDIT_CARD, "7271", facility.id, CreditCardRole.PRIMARY)

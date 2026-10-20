@@ -341,16 +341,16 @@
     "beta_review_unavailable"
   ],
   "verified_tests": {
-    "lab_jvm": 330,
+    "lab_jvm": 336,
     "bank_engine": 58,
-    "finance_core": 180,
+    "finance_core": 181,
     "android16_full": {
       "passed": 199,
       "total": 199,
       "failed": 0,
       "scope": "Full Android 16 suite after source transaction-list port and CI rename-readiness fix. Final digit-comparison refinement is validated separately by targeted filter tests. Final digit comparison and calculator placement passed all 322 JVM tests, lint, and four targeted native tests including the actual Activity. Subsequent registry-fact preservation and navigation-generation changes passed all 323 JVM tests, lint and five targeted Android tests; they do not claim a second full 200-test run."
     },
-    "ci": "e63cbb06: all GitHub CI and isolated-lab checks passed. Source commitment UI follow-up passes 330 JVM tests, lint and 17 final targeted Android tests locally; CI for the follow-up awaits push.",
+    "ci": "a88975df source UI: static/unit/isolated-lab and most device checks passed; remaining live device jobs are checked separately. Payment/due-date follow-up passes locally and awaits CI after push.",
     "android16_followup": {
       "passed": 20,
       "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
@@ -463,6 +463,15 @@
       "financial_invariance": "Real Activity seed has 39 active posted transactions plus existing history. Fingerprints of every unchanged storage table (excluding preferences, commitment definitions and their audit log) stay identical through draft cancellation, save/recreation, pause/resume/history navigation, delete cancellation, cold reopen and final delete.",
       "cleanup": "Removed the old generic renderer and its add/edit/delete/manual-paid paths, 15 exclusive text keys and unused legacy workflow methods. Storage regression now exercises the live BetaCommitmentsWorkflow.edit facade.",
       "limitations": "No full native/process-death rerun claimed for this UI change. Creation from a posted transaction, automatic payment matching, foreign-currency projection, summary navigation and non-default visual variants remain open."
+    },
+    "commitment_payment_followup": {
+      "lab_jvm_passed": 336,
+      "finance_core_passed": 181,
+      "android_targeted_passed": 9,
+      "lint": "passed",
+      "scope": "Current posted rows only. Source-id or exact trimmed/case-folded merchant/counterparty matching; source definition ordering; each payment consumed once; actual amount/date; half-open salary scope; inactive/held and invalid registry rows remain excluded upstream. Persisted rate/fee projection reused without parser, rate lookup or writes. Native tests cover SAR, immutable foreign rate, unknown FX, unknown SMS fee proof, explicit due date outside salary, actual settings and reopened lifecycle metadata.",
+      "due_date_regression": "Reproduced the old guard failure with explicitUserDueDateIsDisplayMetadataRatherThanAnOccurrenceScopeGate before fixing it. Scheduled occurrences remain scoped by the application calculator; display due dates do not widen SQL/financial scope.",
+      "limitations": "Foreign-currency commitment definitions still require source-bound expected-amount projection; creation from a posted transaction and source summary/navigation remain open. No full native/process-death rerun claimed for this change."
     }
   },
   "implementation_notes": [
@@ -484,7 +493,8 @@
     "قائمة الحركات تستخدم الآن أدوات الفعلي والتمرير المستقل والبحث والفلاتر المتعددة والإلغاء/التطبيق وزر مشاركة القائمة المفلترة. أصلحت المقارنة عنوان الصفحة والمسافة السفلية وترتيب التعادل في التوقيت. تفاصيل الحركة وحالات بقية الصفحات تبقى مفتوحة.",
     "أُصلح مسح حالة الالتزام وسجل توقفه ورابطه عند تغيير إعدادات أخرى، واختُبر الحفظ بعد إعادة الفتح. هذا إصلاح حفظ جزئي؛ نموذج التكرار المتقدم وإدارة الالتزام من المصدر ما زالا مفتوحين. أُضيف أيضًا جيل التنقل لمطابقة حفظ الفلاتر عند الرجوع وإعادة ضبطها عند فتح الحركات من جديد.",
     "أضيفت حقائق الالتزام الناقصة إلى الجدول الموجود: نوع التكرار وتاريخ العملية والاستحقاق، مع ترقية محددة لنسخة المختبر 14→15 دون لمس الفعلي أو مسح البيانات. أضيفت واجهة تطبيق للإيقاف والاستئناف والتعديل والحذف وسجلها. هذه بنية لازمة للنقل؛ واجهة إدارة الالتزامات القديمة ومطابقة السداد التلقائية ما زالتا تحتاجان الإكمال، ولا يعد هذا إعلان تطابق الصفحة.",
-    "نُقلت إدارة الالتزامات ومحررها من SettingsCommitmentsScreen/SettingsCommitmentEditorScreen، بتبويبات النشط والمتوقف والسجل وإجراءات الفعلي. أُزيل محرر الالتزام العام وأزرار الإضافة والتعليم اليدوي للسداد ومساراتها ونصوصها الحصرية، وأصبحت اختبارات الحفظ تمر عبر واجهة التطبيق الجديدة. الصور المحملة للصفحتين متطابقة في 16 مقارنة؛ هذا لا يغلق ربط السداد والإنشاء من الحركة وملخص الالتزامات أو كل الحالات البصرية."
+    "نُقلت إدارة الالتزامات ومحررها من SettingsCommitmentsScreen/SettingsCommitmentEditorScreen، بتبويبات النشط والمتوقف والسجل وإجراءات الفعلي. أُزيل محرر الالتزام العام وأزرار الإضافة والتعليم اليدوي للسداد ومساراتها ونصوصها الحصرية، وأصبحت اختبارات الحفظ تمر عبر واجهة التطبيق الجديدة. الصور المحملة للصفحتين متطابقة في 16 مقارنة؛ هذا لا يغلق ربط السداد والإنشاء من الحركة وملخص الالتزامات أو كل الحالات البصرية.",
+    "رُبط سداد الالتزامات بالحركات المعتمدة المخزنة، باستخدام معرّف المصدر أو الاسم كما في الفعلي، ومنع استهلاك الحركة مرتين. تعرض الدفعة مبلغها وتاريخها الفعليين، وتُستخدم أسعار الصرف والرسوم المثبتة فقط. أُصلح أيضًا تعطل الملخص عند اختيار استحقاق خارج فترة الراتب؛ الاستحقاق معلومة عرض ولا يوسّع نطاق الحركات. لم يتغير تفسير الرسائل أو ML أو سلطة اعتماد الحركة."
   ],
   "source_page_inventory": [
     {
@@ -865,10 +875,10 @@
     },
     {
       "id": "DATA-002",
-      "finding_ar": "أضيف نموذج التكرار والتواريخ وسجل الإيقاف، ونُقلت إدارة الالتزامات ومحررها من الفعلي. ما زال إنشاء الالتزام من الحركة وربط السداد التلقائي والعملات الأجنبية وملخص الالتزامات بحاجة إلى إكمال.",
-      "action_ar": "ربط الإنشاء بمعرّف الحركة المعتمدة ومطابقة السداد من الحقائق المخزنة، ثم إكمال ملخص الالتزامات وحالات الصفحة البصرية المتبقية. لا يُستبدل السداد التلقائي بزر تعليم يدوي.",
+      "finding_ar": "نُقلت إدارة الالتزامات ومحررها، ورُبط السداد من الحركات المعتمدة إلى التعريفات بالريال، بما فيها الدفعات الأجنبية ذات التحويل المثبّت. ما زال إنشاء الالتزام من الحركة وتعريفه بعملة أجنبية وملخصه وتنقله بحاجة إلى إكمال.",
+      "action_ar": "إكمال إنشاء التعريف من الحركة المعتمدة وحساب قيمته المرجعية بعملة أجنبية من مصدره، ثم نقل الملخص والتنقل والحالات البصرية المتبقية. يبقى تدقيق الرحلة الكاملة مفتوحًا.",
       "status": "open",
-      "evidence": "BetaCommitmentsPanel; BetaCommitmentEditorContent; BetaCommitmentsWorkflow; BetaCommitmentLists; BetaCommitmentsActivityTest; BetaCommitmentsScreenTest; 16 paired loaded-state captures. Source summary/payment/creation integration remains open."
+      "evidence": "BetaCommitmentPaymentCalculator; BetaCommitmentOccurrenceCalculator; BetaCommitmentPaymentTest; RoomBetaConfigTest; BetaCommitmentPaymentsDeviceTest; source CommitmentsOverview."
     },
     {
       "id": "NAV-001",
@@ -876,6 +886,13 @@
       "action_ar": "تمرير جيل طلب التنقل واستخدام قاعدة الفعلي: حفظ الحالة للرجوع وإعادة الإنشاء، وإعادة الضبط لفتح جديد.",
       "status": "fixed_pending_final_ci",
       "evidence": "BetaDashboardTransactions.openGeneration; BetaTransactionListScreenTest; BetaConfirmedJourneyScreenTest."
+    },
+    {
+      "id": "DATA-003",
+      "finding_ar": "كان اختيار تاريخ استحقاق خارج دورة الراتب يعطّل الملخص، بسبب اعتبار تاريخ العرض بوابة لتحديد نطاق التكرار.",
+      "action_ar": "أُزيل هذا الخلط؛ حساب التكرار يحدد الدورة، ويُعرض تاريخ الاستحقاق كما اختاره المستخدم، دون جلب أو احتساب حركات خارج النطاق.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "Failing-before-fix BetaAnalysisParityTest.explicitUserDueDateIsDisplayMetadataRatherThanAnOccurrenceScopeGate; passing native explicitDueOutsideSalaryDoesNotCrashOrExtendTheFinancialRead. 181 core / 336 lab tests; 9 native targeted passed."
     }
   ]
 }

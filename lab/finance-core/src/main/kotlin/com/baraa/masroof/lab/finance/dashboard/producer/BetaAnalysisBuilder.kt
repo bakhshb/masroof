@@ -183,8 +183,9 @@ internal object BetaAnalysisBuilder {
         if (salary == null) return null // PaymentStatus has no UNKNOWN; never invent UNPAID on incomplete rows.
         val from = period.from.atZone(period.zone).toLocalDate()
         val until = period.until.minusNanos(1).atZone(period.zone).toLocalDate()
-        require(batch.commitmentOccurrences.all { it.environment == batch.query.environment && it.userCommitmentId != null &&
-            it.expectedDate?.let { date -> date in from..until } != false })
+        // Occurrences are scoped by the application calculator. An explicit due date is
+        // display metadata and may be outside the occurrence's salary cycle, as in production.
+        require(batch.commitmentOccurrences.all { it.environment == batch.query.environment && it.userCommitmentId != null })
         val rows = batch.commitmentOccurrences.toMutableList()
         val coveredFacilities = hashSetOf<AssetId>()
         for (facility in facilities) {

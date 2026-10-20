@@ -411,7 +411,9 @@ class RoomBetaDashboardSource(
             }
             val includedKeys = rows.mapTo(hashSetOf()) { it.posting.command.key }
             postingFacts.removeAll { it.key !in includedKeys }; fees.removeAll { it.key !in includedKeys }
-            val occurrences = BetaConfiguredPeriods.occurrences(configuration?.draft ?: BetaDashboardConfigurationDraft(), frozenPeriods.salary)
+            val occurrences = com.baraa.masroof.lab.beta.application.dashboard.BetaCommitmentOccurrenceCalculator.rows(
+                configuration?.draft ?: BetaDashboardConfigurationDraft(), frozenPeriods.salary,
+                com.baraa.masroof.lab.beta.application.dashboard.BetaCommitmentPaymentCalculator.payments(rows,postingFacts,fees,knownFees))
             val token = digest.digest().joinToString("") { "%02x".format(it) }
             DashboardReadBatch(query, ReadRevision("beta-current-v2:$token", readAt),
                 Collections.unmodifiableList(rows), Collections.unmodifiableList(assets),
