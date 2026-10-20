@@ -67,6 +67,9 @@ class BetaDailyExpensesWorkflowTest {
         val selected=BetaDailyExpensesWorkflow.select(read,preferences,null,day)!!
         assertEquals(amount("-3.00"),selected.point!!.net);assertEquals(listOf(key("refund")),selected.transactions.map {it.key})
         assertEquals(merchant.transactionIds,BetaDailyExpensesWorkflow.merchantTransactions(read,"same").map {it.key}.toSet())
+        assertTrue(BetaDailyExpensesWorkflow.merchantComplete(read,"same"))
+        assertFalse(BetaDailyExpensesWorkflow.merchantComplete(read.copy(transactions=rows.dropLast(1)),"same"))
+        assertFalse(BetaDailyExpensesWorkflow.merchantComplete(read.copy(analysis=read.analysis!!.copy(merchants=listOf(merchant.copy(transactionIds=emptySet())))),"same"))
         assertEquals(amount("14"),all.totalSpending)
         val unavailable=all.copy(categoryTrends=emptyMap(),points=all.points.map {it.copy(transactions=setOf(key("missing")))})
         assertFalse(BetaDailyExpensesWorkflow.select(read.copy(analysis=read.analysis!!.copy(trends=listOf(unavailable))),workflow(),null,day)!!.complete)

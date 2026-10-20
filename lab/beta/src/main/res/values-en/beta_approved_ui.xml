@@ -223,4 +223,8 @@
 <string name="beta_approved_dashboard_mada_trend_basis">Includes Mada purchases and cash withdrawals confirmed to belong to this card, less refunds. A withdrawal is not assigned to a specific card without confirmed attribution.</string>
 <string name="beta_approved_dashboard_summary_transactions_title">Period transactions (%1$d)</string>
 <string name="beta_approved_transactions_empty">No transactions in this period</string>
+<string name="beta_approved_review_count">%1$d transaction(s) need review</string>
+<string name="beta_approved_review_ignored_count">%1$d ignored</string>
+<string name="beta_approved_review_pending_match">Pending match</string>
+<string name="beta_approved_review_page_empty">No matching items on this page. Continue to the next page.</string>
 </resources>

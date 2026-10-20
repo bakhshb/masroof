@@ -22,7 +22,7 @@ class BetaReviewParityScreenTest {
     private var mode="LIGHT"
     private val context get()=ApplicationProvider.getApplicationContext<Context>()
     private fun await(tag: String) {compose.waitUntil(20000) {compose.onAllNodesWithTag(tag).fetchSemanticsNodes(atLeastOneRootRequired=false).isNotEmpty()};compose.waitForIdle()}
-    private fun click(tag: String) {await(tag);compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled().performClick()}
+    private fun click(tag: String) {await(tag);compose.onNodeWithTag(tag).let {if(tag.startsWith("review-filter")) it else it.performScrollTo()}.assertIsEnabled().performClick()}
     private fun label(id: Int)=context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply {setLocale(java.util.Locale(language))}).getString(id)
     private fun capture(name: String) {
         compose.waitForIdle();InstrumentationRegistry.getInstrumentation().waitForIdleSync();android.os.SystemClock.sleep(300)
@@ -62,6 +62,35 @@ class BetaReviewParityScreenTest {
             }
         } finally {BetaContainer.resetOffline(context)}
     }
+    @Test fun ignoredMessageAfterAnEmptyBoundedPageRemainsReachable() {
+        language="en"
+        BetaContainer.resetOffline(context)
+        try {
+            val bank=BankId("BANK_ALJAZIRA")
+            BetaContainer(context).use {beta ->
+                beta.acknowledgeStart();beta.setBankEnabled(bank,true);beta.setLanguage(language)
+                val rows=beta.importEvidence(EvidenceRequest("review-paging",EvidenceOrigin.EXPLICIT_HISTORY,setOf(bank)),
+                    (1..201).map {index -> EvidenceMessage("page-$index","AlJazira","Unknown synthetic bank format $index",
+                        Instant.parse("2026-10-18T09:00:00Z").plusSeconds(index.toLong()),ReceiptTimeSource.PROVIDER_TIMESTAMP)})
+                beta.processAutomaticEvidence()
+                val last=rows.map {(it as EvidenceResult.Stored).summary.id}.maxOrNull()!!
+                beta.resolveReviewAsNonFinancial(last)
+                val page=beta.reviewInboxPage(ignored=true)
+                assertTrue(page.rows.isEmpty());assertNotNull(page.next)
+            }
+            ActivityScenario.launch(BetaActivity::class.java).use {
+                await("dashboard-ready")
+                compose.onNode(hasText(label(com.baraa.masroof.lab.beta.R.string.beta_nav_review)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
+                click("review-filter-ignored")
+                await("review-next-page")
+                compose.onNodeWithTag("review-next-page").assertIsDisplayed().performClick()
+                await("review-item-0")
+                compose.onNodeWithTag("review-count").assertExists()
+                click("history-review-0")
+                await("review-restore")
+            }
+        } finally {BetaContainer.resetOffline(context)}
+    }
     private fun verify(locale: String,theme: String) {
         language=locale;mode=theme
         BetaContainer.resetOffline(context)
@@ -77,7 +106,7 @@ class BetaReviewParityScreenTest {
             ActivityScenario.launch(BetaActivity::class.java).use {scenario ->
                 await("dashboard-ready")
                 compose.onNode(hasText(label(com.baraa.masroof.lab.beta.R.string.beta_nav_review)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
-                await("review-item-0");capture("list-$language-${mode.lowercase()}")
+                await("review-item-0");compose.onNodeWithTag("review-count").assertExists();capture("list-$language-${mode.lowercase()}")
                 click("history-review-0");await("review-configure-loan");capture("detail-$language-${mode.lowercase()}")
                 compose.onNodeWithTag("review-advanced-learning").assertDoesNotExist()
                 compose.onNodeWithTag("manage-CARDS").assertDoesNotExist()

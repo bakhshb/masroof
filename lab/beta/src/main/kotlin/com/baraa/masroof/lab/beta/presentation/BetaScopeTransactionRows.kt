@@ -60,4 +60,3 @@ internal fun BetaScopeTransactionRows(snapshot: DashboardSnapshot, rows: List<Tr
         }
     }
 }
-

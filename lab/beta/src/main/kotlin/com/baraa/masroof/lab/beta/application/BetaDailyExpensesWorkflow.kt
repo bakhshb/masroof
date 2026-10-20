@@ -30,6 +30,11 @@ internal object BetaDailyExpensesWorkflow {
         return BetaDailyExpenseSelection(source,selected,point,rows,key,point?.net!=null && (!hasMoney || ids.isNotEmpty()) &&
             ids.all {id -> rows.any {it.key==id}})
     }
+    fun merchantComplete(snapshot: DashboardSnapshot,key: String): Boolean {
+        val merchant=snapshot.analysis?.merchants?.singleOrNull {it.merchantKey==key} ?: return false
+        val available=snapshot.transactions.mapTo(hashSetOf()) {it.key}
+        return merchant.transactionIds.isNotEmpty() && merchant.transactionIds.all {it in available}
+    }
     fun merchantTransactions(snapshot: DashboardSnapshot,key: String): List<TransactionFacts> {
         val ids=snapshot.analysis?.merchants?.singleOrNull {it.merchantKey==key}?.transactionIds ?: return emptyList()
         return snapshot.transactions.filter {it.key in ids}.sortedWith(

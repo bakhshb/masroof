@@ -42,6 +42,7 @@ fun BetaShell(
     editorKey: String? = null,
     dashboard: (@Composable () -> Unit)? = null,
     dashboardOwnsScroll: Boolean = false,
+    editorOwnsScroll: Boolean = false,
     onOpenDiscovery: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onOpenReview: () -> Unit = {},
@@ -127,6 +128,7 @@ fun BetaShell(
         val shellScroll=rememberSaveable(secondaryTitle,selectedHomeTab,workspaceOpen,saver=androidx.compose.foundation.ScrollState.Saver) {androidx.compose.foundation.ScrollState(0)}
         val bodyModifier=Modifier.weight(1f).fillMaxWidth().let {base ->
             if(dashboardOwnsScroll && dashboard!=null && editor==null && !workspaceOpen) base
+            else if(editor!=null && editorOwnsScroll) base.padding(horizontal=BetaSpacing.screen).padding(bottom=BetaSpacing.screen)
             else base.padding(horizontal=BetaSpacing.screen).padding(bottom=BetaSpacing.screen)
                 .then(if(secondaryTitle==null) Modifier.padding(top=BetaSpacing.screen) else Modifier).verticalScroll(shellScroll)
         }

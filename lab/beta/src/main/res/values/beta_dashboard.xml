@@ -38,7 +38,6 @@
     <string name="beta_dash_refunds">المبالغ المستردة</string>
     <string name="beta_dash_merchants">التجار</string>
     <string name="beta_dash_trends">اتجاه الإنفاق اليومي (بدون سداد الديون والتحويلات والسحب النقدي)</string>
-    <string name="beta_dash_average">متوسط الإنفاق اليومي</string>
     <string name="beta_dash_as_of">آخر تحديث: %1$s</string>
     <string name="beta_dash_refresh">تحديث البيانات</string>
     <string name="beta_dash_empty">لا توجد عناصر مؤكدة في هذا القسم.</string>

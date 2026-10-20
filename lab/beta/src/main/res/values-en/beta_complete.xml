@@ -2,7 +2,7 @@
 <resources>
     <string name="beta_complete_review_count">Messages to review (%1$d)</string>
     <string name="beta_complete_review_details">Message details</string>
-    <string name="beta_complete_review_evidence">Review evidence</string>
+    <string name="beta_complete_review_evidence">View evidence and options</string>
     <string name="beta_complete_review_reasons">Review reasons</string>
     <string name="beta_complete_review_actions">Choose an action</string>
     <string name="beta_complete_review_message">SMS message</string>

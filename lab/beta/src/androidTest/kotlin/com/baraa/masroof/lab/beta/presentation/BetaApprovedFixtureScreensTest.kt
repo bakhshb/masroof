@@ -1,6 +1,11 @@
 package com.baraa.masroof.lab.beta.presentation
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import com.baraa.masroof.lab.beta.presentation.approved.*
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -44,10 +49,15 @@ class BetaApprovedFixtureScreensTest {
                 key(page.value,language.value,dark.value) {
                     var title by remember {mutableStateOf<String?>(null)}
                     val preferencePage=page.value=="preferences"
+                    val reviewPage=page.value=="review"
                     BetaShell(0,false,showReturn=false,showMaintenanceActions=false,notificationCount=3,
-                        secondaryTitle=if(preferencePage) stringResource(R.string.beta_approved_reference_preferences_title) else title,
-                        onNavigateBack={},selectedHomeTab=if(preferencePage) "SETTINGS" else if(page.value=="home") "HOME" else "NONE",onOpenHome={},dashboardOwnsScroll=true,
-                        editor=if(preferencePage) ({BetaSettingsHubPanel("APP",{},emptyList(),emptyList(),UnavailableBetaDashboardControls,false,
+                        secondaryTitle=if(reviewPage) stringResource(R.string.beta_nav_review) else if(preferencePage) stringResource(R.string.beta_approved_reference_preferences_title) else title,
+                        onNavigateBack={},selectedHomeTab=if(reviewPage) "REVIEW" else if(preferencePage) "SETTINGS" else if(page.value=="home") "HOME" else "NONE",onOpenHome={},dashboardOwnsScroll=true,editorOwnsScroll=reviewPage,
+                        editor=if(reviewPage) ({Column(Modifier.fillMaxSize().testTag("review-fixture-ready")) {
+                            ApprovedReviewListContent(listOf(
+                                ApprovedReviewListItem("حوالة تحتاج مطابقة",stringResource(R.string.beta_approved_review_pending_match),false,"750 ر.س","8 أكتوبر · بنك الجزيرة","multiple_candidates",stringResource(R.string.beta_complete_review_evidence)),
+                                ApprovedReviewListItem("بطاقة غير مؤكدة الملكية",stringResource(R.string.beta_review_parity_kind),false,null,"8 أكتوبر · بنك الجزيرة","unknown_ownership",stringResource(R.string.beta_complete_review_evidence))),false,true,{},{},emptyContent={})
+                        }}) else if(preferencePage) ({BetaSettingsHubPanel("APP",{},emptyList(),emptyList(),UnavailableBetaDashboardControls,false,
                             {_,_->},{_,_->},{},{},{},theme=if(dark.value) "DARK" else "LIGHT",language=language.value)}) else null,
                         dashboard=({BetaDashboardPanel(workflow,ownsScroll=true,showInternalHeader=false,
                             requestedRoute=when(page.value) {"loans","loanDetail" -> "LOANS";"merchants" -> "MERCHANTS";"daily" -> "DAILY";"home" -> "OVERVIEW";"accounts","accountDetail" -> "ACCOUNTS";else -> "CARDS"},onPageTitle={title=it})}),
@@ -57,9 +67,9 @@ class BetaApprovedFixtureScreensTest {
         }
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val directory=File(instrumentation.targetContext.getExternalFilesDir(null),"lab-approved-fixture").apply {mkdirs()}
-        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home")) {
+        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home","review")) {
             compose.runOnIdle {language.value=lang;dark.value=night;page.value=destination}
-            compose.waitUntil(15000) {compose.onAllNodesWithTag(if(destination=="preferences") "beta-settings-panel" else "dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
+            compose.waitUntil(15000) {compose.onAllNodesWithTag(if(destination=="review") "review-fixture-ready" else if(destination=="preferences") "beta-settings-panel" else "dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
             if(destination in setOf("cardDetail","loanDetail","accountDetail")) {
                 val target=when(destination) {"cardDetail" -> "8842";"accountDetail" -> "3001";else -> "personal"}
                 compose.onNodeWithTag("dash-asset-BANK_ALJAZIRA-$target").performScrollTo().performClick()

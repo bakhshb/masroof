@@ -366,6 +366,13 @@
       "source_sha256": "62ab5125e86e7d4a03a095be6a0e0321ba519a57b511053505b9997c3cc0ccb3",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedSelect.kt",
       "adaptations": "Lab read-model provenance and navigation; shared theme, content geometry and draft controls follow production."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/review/ReviewScreen.kt",
+      "symbol": "ReviewListScreen",
+      "source_sha256": "3de5c6ed8f325787c69e4ff17b0983f9e2dc3755d8cc7cfe3a9b6fb47c964273",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewListContent.kt",
+      "adaptations": "Lab facade supplies rows; preserve bounded paging and durable retry controls. Fixed mode choices and independent list scrolling match production."
     }
   ],
   "adaptations": [

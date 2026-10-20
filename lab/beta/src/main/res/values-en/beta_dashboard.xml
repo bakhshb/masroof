@@ -38,7 +38,6 @@
     <string name="beta_dash_refunds">Refunds</string>
     <string name="beta_dash_merchants">Merchants</string>
     <string name="beta_dash_trends">Daily spending (excludes debt payments, transfers and cash withdrawals)</string>
-    <string name="beta_dash_average">Average daily spending</string>
     <string name="beta_dash_as_of">As of %1$s</string>
     <string name="beta_dash_refresh">Refresh</string>
     <string name="beta_dash_empty">No confirmed items in this section.</string>

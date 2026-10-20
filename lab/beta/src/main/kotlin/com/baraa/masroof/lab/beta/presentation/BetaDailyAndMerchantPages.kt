@@ -31,7 +31,7 @@ internal fun BetaMerchantsPage(snapshot: DashboardSnapshot,selectedKey: String?,
         ApprovedMerchantRow(selected,false) {}
         val transactions=BetaDailyExpensesWorkflow.merchantTransactions(snapshot,selected.merchantKey)
         BetaScopeTransactionRows(snapshot,transactions,
-            stringResource(R.string.beta_approved_dashboard_summary_transactions_title,transactions.size),enabled,onTransaction,complete)
+            stringResource(R.string.beta_approved_dashboard_summary_transactions_title,transactions.size),enabled,onTransaction,complete && BetaDailyExpensesWorkflow.merchantComplete(snapshot,selected.merchantKey))
     } else {
         Row(horizontalArrangement=Arrangement.spacedBy(MasroofReference.shortcutGap)) {
             ApprovedChoice(stringResource(R.string.beta_approved_reference_period_view),true,{},enabled=enabled)

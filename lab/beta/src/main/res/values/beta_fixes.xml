@@ -3,7 +3,7 @@
     <string name="beta_fix_unknown_message">صيغة الرسالة غير واضحة أو تحتوي معلومات متعارضة. لن تُحسب حتى يتحدد القرار الصحيح. الرسائل المعروفة الواضحة تُحسب تلقائيًا.</string>
     <string name="beta_fix_advanced_learning">متقدم: تعليم الاستخراج</string>
     <string name="beta_fix_review_pending">بانتظار المراجعة</string>
-    <string name="beta_fix_review_informational">المتجاهلة</string>
+    <string name="beta_fix_review_informational">متجاهلة</string>
     <string name="beta_fix_processing">توجد رسائل قيد المعالجة أو إعادة المحاولة. لا تحتاج إلى إعادة تعريفها.</string>
     <string name="beta_fix_ownership_reason">تحتاج العملية إلى تأكيد الحساب أو إعداد البطاقة وربطها.</string>
     <string name="beta_fix_transfer_reason">تحتاج أطراف الحوالة أو مطابقتها إلى مراجعة.</string>

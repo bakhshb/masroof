@@ -2,7 +2,7 @@
 <resources>
     <string name="beta_complete_review_count">رسائل تحتاج مراجعة (%1$d)</string>
     <string name="beta_complete_review_details">تفاصيل الرسالة</string>
-    <string name="beta_complete_review_evidence">مراجعة الدليل</string>
+    <string name="beta_complete_review_evidence">عرض الأدلة والخيارات</string>
     <string name="beta_complete_review_reasons">أسباب المراجعة</string>
     <string name="beta_complete_review_actions">الإجراء المطلوب</string>
     <string name="beta_complete_review_message">نص الرسالة</string>

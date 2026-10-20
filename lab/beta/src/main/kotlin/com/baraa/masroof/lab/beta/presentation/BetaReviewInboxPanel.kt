@@ -7,6 +7,8 @@ import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 import com.baraa.masroof.lab.beta.presentation.approved.*
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -88,7 +90,7 @@ internal fun BetaReviewInboxPanel(container: BetaContainer, onClose: () -> Unit,
                 candidate?.reference?.let {ref -> container.ownershipSnapshot().candidates.singleOrNull {it.reference==ref}?.let {container.decideOwnership(it,true,saved.id)}}
             }})
     }
-    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
+    Column(Modifier.fillMaxSize().then(if(current!=null) Modifier.verticalScroll(rememberScrollState()) else Modifier),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         if(failed) {
             Text(stringResource(failureReason?.let(::approvalReason) ?: R.string.beta_review_failed),color=MaterialTheme.colorScheme.error)
             OutlinedButton(enabled=!busy,onClick={generation++}) {Text(stringResource(R.string.beta_retry))}
@@ -162,30 +164,29 @@ internal fun BetaReviewInboxPanel(container: BetaContainer, onClose: () -> Unit,
             }
             return@Column
         }
-        Row(horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
-            BetaChoice(!ignored,{ignored=false;after=""},Modifier.testTag("review-filter-pending"),enabled=!busy) {Text(stringResource(R.string.beta_fix_review_pending))}
-            BetaChoice(ignored,{ignored=true;after=""},Modifier.testTag("review-filter-ignored"),enabled=!busy) {Text(stringResource(R.string.beta_fix_review_informational))}
-        }
         page?.let {loaded ->
             if(loaded.processing>0) MasroofCard {
                 Text(stringResource(R.string.beta_fix_processing))
                 OutlinedButton(enabled=!busy,onClick={perform {container.retryEvidence(100)}},modifier=Modifier.testTag("review-retry-processing")) {Text(stringResource(R.string.beta_retry))}
             }
-            if(loaded.rows.isEmpty()) Column(Modifier.fillMaxWidth().testTag("review-empty").padding(MasroofSpacing.screenPaddingLarge),horizontalAlignment=Alignment.CenterHorizontally) {
-                Icon(MasroofOutlineIcons.CircleCheck,null,Modifier.size(MasroofIconSizes.hero),tint=MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(MasroofSpacing.sectionGap))
-                Text(stringResource(if(ignored) R.string.beta_complete_review_ignored_empty else R.string.beta_complete_review_empty),textAlign=TextAlign.Center)
-            } else {
-                loaded.rows.forEachIndexed {index,item ->
-                    ApprovedReviewListCard(ApprovedReviewListItem(item.description ?: item.sender,
-                        stringResource(if(ignored) R.string.beta_review_parity_ignored else R.string.beta_review_parity_kind),ignored,
-                        item.amount?.let {betaMoney(it,item.currency)},betaDate(item.receivedAt),
-                        stringResource(if(item.family==null || item.family=="UNKNOWN") R.string.beta_complete_review_unknown_reason else approvalReason(item.reason.orEmpty())),
-                        stringResource(R.string.beta_complete_review_evidence)),!busy,Modifier.testTag("review-item-$index"),Modifier.testTag("history-review-$index")) {selected=item.id}
+            val items=loaded.rows.map {item -> ApprovedReviewListItem(item.description ?: item.sender,
+                stringResource(if(ignored) R.string.beta_review_parity_ignored else R.string.beta_review_parity_kind),ignored,
+                item.amount?.let {betaMoney(it,item.currency)},betaDate(item.receivedAt),
+                stringResource(if(item.family==null || item.family=="UNKNOWN") R.string.beta_complete_review_unknown_reason else approvalReason(item.reason.orEmpty())),
+                stringResource(R.string.beta_complete_review_evidence))}
+            ApprovedReviewListContent(items,ignored,!busy,{ignored=it;after=""},{selected=loaded.rows[it].id},afterContent=if(loaded.next!=null || after.isNotEmpty()) ({
+                if(loaded.next!=null) OutlinedButton(enabled=!busy,onClick={after=loaded.next},modifier=Modifier.testTag("review-next-page")) {Text(stringResource(R.string.beta_history_next))}
+                if(after.isNotEmpty()) TextButton(enabled=!busy,onClick={after=""},modifier=Modifier.testTag("review-first-page")) {Text(stringResource(R.string.beta_history_first))}
+            }) else null) {
+                Column(Modifier.fillMaxSize().testTag("review-empty").padding(MasroofSpacing.screenPaddingLarge),
+                    horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+                    Icon(MasroofOutlineIcons.CircleCheck,null,Modifier.size(MasroofIconSizes.hero),tint=MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(MasroofSpacing.sectionGap))
+                    Text(stringResource(if(loaded.next!=null) R.string.beta_approved_review_page_empty else if(ignored) R.string.beta_complete_review_ignored_empty else R.string.beta_complete_review_empty),Modifier.fillMaxWidth(),textAlign=TextAlign.Center)
+                    Spacer(Modifier.height(MasroofSpacing.sectionGap))
+                    ApprovedIconTextButton(onClose,stringResource(R.string.beta_dash_back),icon=MasroofOutlineIcons.CalendarDays,enabled=!busy)
                 }
             }
-            if(loaded.next!=null) OutlinedButton(enabled=!busy,onClick={after=loaded.next}) {Text(stringResource(R.string.beta_history_next))}
-            if(after.isNotEmpty()) TextButton(enabled=!busy,onClick={after=""}) {Text(stringResource(R.string.beta_history_first))}
         }
     }
 }
