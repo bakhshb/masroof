@@ -1,6 +1,6 @@
 {
   "production_commit": "0d86c5d3",
-  "scope": "Five frozen-data native screen pairs only; no whole-app acceptance.",
+  "scope": "Ten frozen-data native screen pairs only; no whole-app acceptance.",
   "entries": [
     {
       "page": "cards",
@@ -17,7 +17,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cards",
@@ -34,7 +35,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cards",
@@ -51,7 +53,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cards",
@@ -68,7 +71,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cards",
@@ -85,7 +89,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cards",
@@ -102,7 +107,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cards",
@@ -119,7 +125,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cards",
@@ -136,7 +143,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cardDetail",
@@ -153,7 +161,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cardDetail",
@@ -170,7 +179,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cardDetail",
@@ -187,7 +197,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cardDetail",
@@ -204,7 +215,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cardDetail",
@@ -221,7 +233,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cardDetail",
@@ -238,7 +251,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cardDetail",
@@ -255,7 +269,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "cardDetail",
@@ -272,7 +287,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loans",
@@ -289,7 +305,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loans",
@@ -306,7 +323,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loans",
@@ -323,7 +341,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loans",
@@ -340,7 +359,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loans",
@@ -357,7 +377,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loans",
@@ -374,7 +395,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loans",
@@ -391,7 +413,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loans",
@@ -408,7 +431,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loanDetail",
@@ -425,7 +449,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loanDetail",
@@ -442,7 +467,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loanDetail",
@@ -459,7 +485,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loanDetail",
@@ -476,7 +503,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loanDetail",
@@ -493,7 +521,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loanDetail",
@@ -510,7 +539,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loanDetail",
@@ -527,7 +557,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "loanDetail",
@@ -544,7 +575,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "preferences",
@@ -561,7 +593,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "preferences",
@@ -578,7 +611,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "preferences",
@@ -595,7 +629,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "preferences",
@@ -612,7 +647,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "preferences",
@@ -629,7 +665,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "preferences",
@@ -646,7 +683,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "preferences",
@@ -663,7 +701,8 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
     },
     {
       "page": "preferences",
@@ -680,7 +719,748 @@
       ],
       "changed_pixels": 0,
       "total_pixels": 1684800,
-      "difference_bounds": null
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "home",
+      "language": "ar",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "home",
+      "language": "ar",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "home",
+      "language": "ar",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "home",
+      "language": "ar",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "home",
+      "language": "en",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "home",
+      "language": "en",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "home",
+      "language": "en",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "home",
+      "language": "en",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accounts",
+      "language": "ar",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accounts",
+      "language": "ar",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accounts",
+      "language": "ar",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accounts",
+      "language": "ar",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accounts",
+      "language": "en",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accounts",
+      "language": "en",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accounts",
+      "language": "en",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accounts",
+      "language": "en",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accountDetail",
+      "language": "ar",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accountDetail",
+      "language": "ar",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 24338,
+      "total_pixels": 1684800,
+      "difference_bounds": [
+        64,
+        49,
+        1023,
+        1495
+      ],
+      "max_channel_difference": 7
+    },
+    {
+      "page": "accountDetail",
+      "language": "ar",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accountDetail",
+      "language": "ar",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 22112,
+      "total_pixels": 1684800,
+      "difference_bounds": [
+        0,
+        41,
+        1080,
+        1495
+      ],
+      "max_channel_difference": 6
+    },
+    {
+      "page": "accountDetail",
+      "language": "en",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accountDetail",
+      "language": "en",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 27092,
+      "total_pixels": 1684800,
+      "difference_bounds": [
+        64,
+        48,
+        1016,
+        1494
+      ],
+      "max_channel_difference": 7
+    },
+    {
+      "page": "accountDetail",
+      "language": "en",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "accountDetail",
+      "language": "en",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 24976,
+      "total_pixels": 1684800,
+      "difference_bounds": [
+        0,
+        41,
+        1080,
+        1494
+      ],
+      "max_channel_difference": 6
+    },
+    {
+      "page": "merchants",
+      "language": "ar",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "merchants",
+      "language": "ar",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "merchants",
+      "language": "ar",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "merchants",
+      "language": "ar",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "merchants",
+      "language": "en",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "merchants",
+      "language": "en",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "merchants",
+      "language": "en",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "merchants",
+      "language": "en",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "daily",
+      "language": "ar",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "daily",
+      "language": "ar",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "daily",
+      "language": "ar",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "daily",
+      "language": "ar",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "daily",
+      "language": "en",
+      "theme": "light",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "daily",
+      "language": "en",
+      "theme": "light",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "daily",
+      "language": "en",
+      "theme": "dark",
+      "position": "top",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
+    },
+    {
+      "page": "daily",
+      "language": "en",
+      "theme": "dark",
+      "position": "bottom",
+      "width": 1080,
+      "height": 1755,
+      "compared_region": [
+        0,
+        195,
+        1080,
+        1755
+      ],
+      "changed_pixels": 0,
+      "total_pixels": 1684800,
+      "difference_bounds": null,
+      "max_channel_difference": 0
     }
   ]
 }

@@ -148,7 +148,8 @@ internal object BetaAnalysisBuilder {
                     AssetKind.CREDIT_CARD -> credit
                     else -> debit
                 }
-                TrendScope.FINANCIAL_OUTFLOWS -> ChartCategory.entries.toSet()
+                TrendScope.FINANCIAL_OUTFLOWS -> purchases + setOf(ChartCategory.OTHER_EXPENSES, ChartCategory.BILLS,
+                    ChartCategory.FEES, ChartCategory.LOAN_REPAYMENTS)
             }
             return trend(scope, asset).copy(categoryTrends = java.util.Collections.unmodifiableMap(
                 allowed.associateWith { trend(scope, asset, it, chartCategory = true) }))
@@ -170,7 +171,7 @@ internal object BetaAnalysisBuilder {
                 MerchantSpending(label, signed(group.fold(BigDecimal.ZERO) { sum, tx ->
                     val amount = requireNotNull(byKey!![tx.key]).sarAmount.amount
                     sum + if (tx.effectiveType == FinancialType.REFUND) amount.negate() else amount }),
-                    group.count { it.effectiveType == FinancialType.EXPENSE })
+                    group.count { it.effectiveType == FinancialType.EXPENSE },merchantKey(label),freezeSet(group.map {it.key}.toSet()))
             }.sortedWith(compareByDescending<MerchantSpending> { it.net.amount }.thenBy { it.merchant.lowercase(Locale.ROOT) }.thenBy { merchantKey(it.merchant) })
         return AnalysisSummary(Currency.SAR, summary.metrics, summary.transactionCount, summary.reviewRequiredCount,
             summary.excludedOtherCurrencyCount, freezeList(trends), freezeList(merchants))

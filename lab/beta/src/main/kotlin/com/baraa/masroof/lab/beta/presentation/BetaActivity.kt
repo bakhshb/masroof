@@ -126,6 +126,7 @@ class BetaActivity : ComponentActivity() {
                     try {
                         val snapshot = withContext(BetaIo.dispatcher) {
                             val restored = action()
+                            dashboardPreferences.refresh()
                             automaticProcessing = true
                             shellContainer.processAutomaticEvidence()
                             automaticProcessing = false
@@ -270,7 +271,7 @@ class BetaActivity : ComponentActivity() {
                             }
                         }
                     }) else null,
-                    selectedHomeTab = when { notificationsOpen -> "NONE"; settingsOpen -> "SETTINGS"; reviewOpen -> "REVIEW"; dashboardDestination in setOf("ACCOUNTS","CARDS","LOANS","COMMITMENTS","ANALYSIS") -> "NONE"; else -> dashboardTab },
+                    selectedHomeTab = when { notificationsOpen -> "NONE"; settingsOpen -> "SETTINGS"; reviewOpen -> "REVIEW"; dashboardDestination in setOf("ACCOUNTS","CARDS","LOANS","COMMITMENTS","MERCHANTS","DAILY","ANALYSIS") -> "NONE"; else -> dashboardTab },
                     onOpenHome = { openRoute("HOME") },
                     onOpenTransactions = { openRoute("TRANSACTIONS") },
                     dashboardOwnsScroll=true,

@@ -107,8 +107,9 @@ data class DailySpending(
     val transactions: Set<PostingKey>,
 )
 
-data class MerchantSpending(val merchant: String, val net: SignedAmount, val purchaseTransactionCount: Int? = null) {
-    init { require(purchaseTransactionCount == null || purchaseTransactionCount >= 0) }
+data class MerchantSpending(val merchant: String, val net: SignedAmount, val purchaseTransactionCount: Int? = null,
+    val merchantKey: String = merchant, val transactionIds: Set<PostingKey> = emptySet()) {
+    init { require(purchaseTransactionCount == null || purchaseTransactionCount >= 0); require(merchantKey.isNotBlank()) }
 }
 
 /** Missing metric is rejected. Null value marks unavailable; valid empty history has explicit zero.

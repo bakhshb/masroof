@@ -345,6 +345,27 @@
       "source_sha256": "56b7130dd22e593a7e506faadbf6161dc5838bcb18f025ff05a3a9bdde77ed0d",
       "destination": "lab/finance-core/src/main/kotlin/com/baraa/masroof/lab/finance/dashboard/producer/BetaAnalysisBuilder.kt",
       "adaptations": "Existing persisted lab contribution calculators publish sparse read-only category facts; full-scope money and posting rules are unchanged. Account scopes retain their own flow categorization."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/MerchantSpendingSummaryScreen.kt",
+      "symbol": "MerchantSpendingSummaryScreen",
+      "source_sha256": "864e4b5dae2abb4e0f7a881c28ab8563bdd06f36f1ba08b5ae287f9f3191d317",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDailyAndMerchantPages.kt",
+      "adaptations": "Lab read-model provenance and navigation; shared theme, content geometry and draft controls follow production."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/DailyExpensesScreen.kt",
+      "symbol": "DailyExpensesScreen",
+      "source_sha256": "e8a5da13b65d2cae3c45ea8a5dce39de76c2a64e8d14d0c79aec78efa6af90f9",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDailyAndMerchantPages.kt",
+      "adaptations": "Lab read-model provenance and navigation; shared theme, content geometry and draft controls follow production."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofReferenceControls.kt",
+      "symbol": "MasroofSelect",
+      "source_sha256": "62ab5125e86e7d4a03a095be6a0e0321ba519a57b511053505b9997c3cc0ccb3",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedSelect.kt",
+      "adaptations": "Lab read-model provenance and navigation; shared theme, content geometry and draft controls follow production."
     }
   ],
   "adaptations": [

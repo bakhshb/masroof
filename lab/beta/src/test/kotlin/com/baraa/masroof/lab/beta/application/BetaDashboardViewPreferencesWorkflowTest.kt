@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.lab.beta.*
 import com.baraa.masroof.lab.finance.asset.AssetId
 import com.baraa.masroof.lab.finance.dashboard.TrendScope
+import com.baraa.masroof.lab.finance.dashboard.ChartCategory
 import com.baraa.masroof.lab.finance.value.*
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -19,22 +20,27 @@ class BetaDashboardViewPreferencesWorkflowTest {
     @Test fun preferencesRestore() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         BetaContainer.resetOffline(context)
-        val chosen = BetaDashboardViewPreferences(BetaChartChoice(TrendScope.ASSET, asset = AssetId(Environment.BETA, BankId("BANK_ALJAZIRA"), "account-a")), false)
+        val key=BetaChartDataWorkflow.key(TrendScope.ASSET,AssetId(Environment.BETA,BankId("BANK_ALJAZIRA"),"account-a"))
+        val allowed=setOf(ChartCategory.CREDIT_PURCHASES,ChartCategory.FEES)
         val workflow = BetaDashboardViewPreferencesWorkflow(context)
         assertEquals(TrendScope.PURCHASES, workflow.readHomeScope())
         workflow.saveHomeScope(TrendScope.OVERALL)
-        workflow.save(chosen)
-        assertEquals(chosen, BetaDashboardViewPreferencesWorkflow(context).read())
+        workflow.chartData.save(key,setOf(ChartCategory.FEES),allowed)
+        assertEquals(listOf(ChartCategory.FEES),BetaDashboardViewPreferencesWorkflow(context).chartData.preferences.value.selections[key])
         val prefs = context.getSharedPreferences(BetaEnvironment.PREFS_NAME, Context.MODE_PRIVATE)
         assertTrue(prefs.all.values.all { it is String })
         BetaContainer(context).use { beta ->
             beta.putMarker("synthetic-view-preferences", "isolated backup fixture")
-            beta.backup(); workflow.save(BetaDashboardViewPreferences()); workflow.saveHomeScope(TrendScope.PURCHASES); assertTrue(beta.restore())
+            beta.backup(); workflow.chartData.save(key,allowed,allowed); workflow.saveHomeScope(TrendScope.PURCHASES)
+            assertTrue(workflow.chartData.preferences.value.selections.isEmpty());assertTrue(beta.restore())
         }
-        assertEquals(chosen, BetaDashboardViewPreferencesWorkflow(context).read())
+        assertEquals(listOf(ChartCategory.FEES),BetaDashboardViewPreferencesWorkflow(context).chartData.preferences.value.selections[key])
+        assertTrue(workflow.chartData.preferences.value.selections.isEmpty()) // Same live object was not recreated by restore.
+        workflow.refresh()
+        assertEquals(listOf(ChartCategory.FEES),workflow.chartData.preferences.value.selections[key])
         assertEquals(TrendScope.OVERALL, workflow.readHomeScope())
-        prefs.edit().putString("dashboard_view_scope", "REMOVED_ENUM").commit()
-        assertEquals(BetaDashboardViewPreferences(), workflow.read())
+        prefs.edit().putString("dashboard_chart_categories", "broken JSON").commit()
+        workflow.refresh();assertTrue(workflow.chartData.preferences.value.selections.isEmpty())
         BetaContainer.resetOffline(context)
     }
     @Test fun homeLayoutIsAtomicAndBackedUp(): Unit = runBlocking {

@@ -327,6 +327,8 @@ class BetaDashboardProducerTest {
         equal("10", trendTotal(TrendScope.ASSET, account.id))
         equal("0", trendTotal(TrendScope.ASSET, other.id))
         equal("0", metric(result, SummaryMetric.NET_CASH_FLOW))
+        equal("0", result.snapshot.totals!!.accountInflow!!.amount)
+        equal("0", result.snapshot.totals.accountOutflow!!.amount)
         equal("0", result.snapshot.fleetFlow!!.externalIn.amount)
         equal("10", result.snapshot.fleetFlow.buckets.getValue(FlowBucket.INTERNAL_IN).amount)
         equal("10", result.snapshot.fleetFlow.buckets.getValue(FlowBucket.INTERNAL_OUT).amount)

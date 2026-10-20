@@ -1,6 +1,5 @@
 package com.baraa.masroof.lab.beta.presentation
 
-import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeLabel as financialTypeLabel
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 
 import androidx.compose.foundation.layout.*
@@ -15,12 +14,11 @@ import com.baraa.masroof.lab.beta.R
 import com.baraa.masroof.lab.beta.application.*
 import com.baraa.masroof.lab.finance.dashboard.*
 import com.baraa.masroof.lab.finance.dashboard.producer.*
-import com.baraa.masroof.lab.finance.posting.FinancialType
 import com.baraa.masroof.ui.components.*
 import com.baraa.masroof.ui.dashboard.*
 import com.baraa.masroof.ui.theme.*
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -121,7 +119,7 @@ internal fun BetaDashboardHome(read: DashboardProduction, enabled: Boolean,
 
             }
             BetaHomeSection.TREND -> {
-    BetaHomeTrend(snapshot, enabled, preferences, onRoute)
+    BetaHomeTrend(snapshot, enabled, preferences)
 
 
             }
@@ -129,7 +127,7 @@ internal fun BetaDashboardHome(read: DashboardProduction, enabled: Boolean,
     Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         DashboardSectionHeading(stringResource(R.string.beta_dash_analysis), icons.ChartLine)
         DashboardSectionHeading(stringResource(R.string.beta_home_top_merchants), icons.Store,
-            actionLabel = stringResource(R.string.beta_home_view_all), onAction = if (enabled && DashboardSection.MERCHANT_TOTALS !in read.unavailableSections && analysis?.merchants?.isNotEmpty() == true) ({ onRoute("ANALYSIS") }) else null)
+            actionLabel = stringResource(R.string.beta_home_view_all), onAction = if (enabled && DashboardSection.MERCHANT_TOTALS !in read.unavailableSections && analysis?.merchants?.isNotEmpty() == true) ({ onRoute("MERCHANTS") }) else null)
         when {
             DashboardSection.MERCHANT_TOTALS in read.unavailableSections || analysis == null ->
                 Text(stringResource(R.string.beta_dash_unavailable_help), Modifier.testTag("home-merchants-unavailable"))
@@ -150,41 +148,23 @@ internal fun BetaDashboardHome(read: DashboardProduction, enabled: Boolean,
 
             }
             BetaHomeSection.TRANSACTIONS -> {
-    DashboardSectionHeading(stringResource(R.string.beta_home_recent), icons.List,
-        modifier = Modifier.testTag("home-recent-heading"), actionLabel = stringResource(R.string.beta_home_view_all),
-        onAction = if (enabled) ({ onRoute("TRANSACTIONS") }) else null)
-    val rows = BetaDashboardExplorer.transactions(snapshot)
-    when {
-        DashboardSection.RUNTIME_SOURCE in read.unavailableSections ->
-            Text(stringResource(R.string.beta_dash_unavailable_help), Modifier.testTag("home-transactions-unavailable"))
-        rows.isEmpty() -> {
-            Text(stringResource(R.string.beta_home_empty), style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedButton(enabled = enabled, onClick = onImport, modifier = Modifier.fillMaxWidth().testTag("home-import")) {
-                Icon(icons.RefreshCw, null); Text(stringResource(R.string.beta_history_title))
-            }
-        }
-        else -> MasroofCard {
-            rows.take(5).forEach { row ->
-                val type = row.effectiveType
-                val inward = type in setOf(FinancialType.INCOME, FinancialType.EXTERNAL_TRANSFER_IN, FinancialType.REFUND)
-                val neutral = type in setOf(FinancialType.SELF_TRANSFER, FinancialType.ADJUSTMENT, FinancialType.UNKNOWN)
-                val colors = MasroofThemeExtras.extendedColors
-                val (color, background) = when (type) {
-                    FinancialType.LOAN_REPAYMENT -> colors.liability to colors.liabilitySoft
-                    FinancialType.CREDIT_CARD_PAYMENT -> colors.card to colors.cardSoft
-                    else -> if (inward) colors.inflow to colors.inflowSoft else if (neutral) colors.account to colors.accountSoft else colors.outflow to colors.outflowSoft
+    Column {
+        DashboardSectionHeading(stringResource(R.string.beta_home_recent), icons.List,
+            modifier = Modifier.testTag("home-recent-heading"), actionLabel = stringResource(R.string.beta_home_view_all),
+            onAction = if (enabled) ({ onRoute("TRANSACTIONS") }) else null)
+        val rows = BetaDashboardExplorer.transactions(snapshot)
+        when {
+            DashboardSection.RUNTIME_SOURCE in read.unavailableSections ->
+                Text(stringResource(R.string.beta_dash_unavailable_help), Modifier.testTag("home-transactions-unavailable"))
+            rows.isEmpty() -> {
+                Text(stringResource(R.string.beta_home_empty), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(enabled = enabled, onClick = onImport, modifier = Modifier.fillMaxWidth().testTag("home-import")) {
+                    Icon(icons.RefreshCw, null); Text(stringResource(R.string.beta_history_title))
                 }
-                val label = stringResource(financialTypeLabel(type))
-                val value = MasroofMoneyDisplay.format(row.amount.amount, row.amount.currency.name, language)
-                val locale = LocalConfiguration.current.locales[0]
-                DashboardTransactionRow(row.merchant ?: row.counterparty ?: label,
-                    label + (row.primaryCardLast4?.let { " · $it" } ?: ""),
-                    (if (inward) "+" else if (neutral) "" else "−") + value.substringBeforeLast(' '),
-                    DateTimeFormatter.ofPattern("d MMM", locale).format(row.time.instant.atZone(row.time.zone).toLocalDate()) + " · " + value.substringAfterLast(' '),
-                    transactionIcon(type), color, background, Modifier.testTag("home-transaction-${row.key.transactionId}"),
-                    onClick = if (enabled) ({ onTransaction(row.key.transactionId) }) else null)
             }
+            else -> BetaScopeTransactionRows(snapshot,rows.take(3),"",enabled,onTransaction,true,
+                showTitle=false,tagPrefix="home-transaction")
         }
     }
             }
@@ -194,71 +174,37 @@ internal fun BetaDashboardHome(read: DashboardProduction, enabled: Boolean,
 }
 
 @Composable
-private fun BetaHomeTrend(snapshot: DashboardSnapshot, enabled: Boolean,
-    preferences: BetaDashboardViewPreferencesWorkflow?, onRoute: (String) -> Unit) {
-    var scope by rememberSaveable { mutableStateOf(TrendScope.PURCHASES) }
-    var loaded by remember { mutableStateOf(preferences == null) }
-    var saving by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf(false) }
-    val coroutine = rememberBetaUiScope()
+private fun BetaHomeTrend(snapshot: DashboardSnapshot,enabled: Boolean,preferences: BetaDashboardViewPreferencesWorkflow?) {
+    var scope by rememberSaveable {mutableStateOf(TrendScope.PURCHASES)}
+    var loaded by remember {mutableStateOf(preferences==null)}
+    var saving by remember {mutableStateOf(false)}
+    var error by remember {mutableStateOf(false)}
+    val coroutine=rememberBetaUiScope()
     BetaLaunchedEffect(preferences) {
-        try { scope = preferences?.readHomeScope() ?: TrendScope.PURCHASES; loaded = true }
-        catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { error = true; loaded = true }
+        try {scope=preferences?.readHomeScope() ?: TrendScope.PURCHASES;loaded=true}
+        catch(c: CancellationException) {throw c}
+        catch(_: Exception) {error=true;loaded=true}
     }
-    val trend = BetaDashboardExplorer.trend(snapshot, BetaChartChoice(scope))
-    val visual = trend?.let(BetaDashboardVisualMapper::trend)
-    var selectedDate by rememberSaveable(snapshot.query.from.toString(), scope) { mutableStateOf<String?>(null) }
-    val index = visual?.dates?.indexOf(selectedDate)?.takeIf { it >= 0 } ?: visual?.dates?.lastIndex ?: 0
-    val locale = LocalConfiguration.current.locales[0]
-    val labels = listOf(stringResource(R.string.beta_home_purchases), stringResource(R.string.beta_home_all_expenses))
-    MasroofCard(Modifier.testTag("home-trend-card")) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
-            HomeGuidanceLabel(labels[if (scope == TrendScope.PURCHASES) 0 else 1],
-                stringResource(R.string.beta_home_chart_basis), Modifier.weight(1f), title = true)
-            IconButton(enabled = enabled, onClick = { onRoute("ANALYSIS") }, modifier = Modifier.testTag("home-chart-customize")) {
-                Icon(DashboardChartMenuIcon, stringResource(R.string.beta_chart_customize), Modifier.size(MasroofReference.icon))
-            }
-        }
-        Column(Modifier.fillMaxWidth().padding(top = MasroofSpacing.sectionGap)) {
-            MasroofChartScopeTabs(labels, if (scope == TrendScope.PURCHASES) 0 else 1, enabled = enabled && loaded && !saving, onSelected = { selected ->
-                if (enabled && loaded && !saving) {
-                    val next = if (selected == 0) TrendScope.PURCHASES else TrendScope.OVERALL
-                    saving = true
-                    coroutine.launch {
-                        try { preferences?.saveHomeScope(next); scope = next; selectedDate = null; error = false }
-                        catch (cancelled: CancellationException) { throw cancelled }
-                        catch (_: Exception) { error = true }
-                        finally { saving = false }
-                    }
-                }
+    val choice=BetaDailyExpensesWorkflow.homeChoice(scope)
+    val trend=BetaDashboardExplorer.trend(snapshot,choice)
+    val labels=listOf(stringResource(R.string.beta_approved_dashboard_daily_purchases),stringResource(R.string.beta_approved_approved_all_expenses))
+    com.baraa.masroof.lab.beta.presentation.approved.ApprovedSpendingTrend(trend,labels[if(scope==TrendScope.PURCHASES) 0 else 1],
+        stringResource(if(scope==TrendScope.PURCHASES) R.string.beta_approved_dashboard_purchases_trend_basis else R.string.beta_approved_dashboard_all_trend_basis),
+        MasroofHeroRole.Brand,enabled && loaded && !saving,BetaChartDataWorkflow.key(choice.scope,null),true,
+        cardTag="home-trend-card",chartTag="home-spending-chart",averageTag="home-chart-average",
+        unavailableTag="home-chart-unavailable",customizeTag="home-chart-customize",controls={
+            MasroofChartScopeTabs(labels,if(scope==TrendScope.PURCHASES) 0 else 1,enabled=enabled && loaded && !saving,onSelected={selected ->
+                val next=if(selected==0) TrendScope.PURCHASES else TrendScope.OVERALL
+                if(enabled && loaded && !saving) {saving=true;coroutine.launch {
+                    try {preferences?.saveHomeScope(next);scope=next;error=false}
+                    catch(c: CancellationException) {throw c}
+                    catch(_: Exception) {error=true}
+                    finally {saving=false}
+                }}
             })
-        }
-        if (error) Text(stringResource(R.string.beta_chart_save_error), color = MaterialTheme.colorScheme.error)
-        when {
-            !loaded -> LinearProgressIndicator(Modifier.fillMaxWidth().testTag("home-scope-loading"))
-            trend?.points?.isEmpty() == true -> Text(stringResource(R.string.beta_home_no_elapsed_days), style = MaterialTheme.typography.bodySmall)
-            visual == null -> Text(stringResource(R.string.beta_dash_unavailable_help), Modifier.testTag("home-chart-unavailable"))
-            else -> {
-                fun money(value: java.math.BigDecimal) = MasroofMoneyDisplay.format(value, visual.currency, locale.toLanguageTag())
-                DashboardTrendHead(DateTimeFormatter.ofPattern("d MMM", locale).format(LocalDate.parse(visual.dates[index])), money(visual.values[index]),
-                    average = visual.average?.let { average -> ({
-                        MasroofChartAverageLegend(stringResource(R.string.beta_home_chart_average, money(average)),
-                            Modifier.weight(1f).testTag("home-chart-average"))
-                    }) })
-                MasroofInteractiveLineChart(visual.values, visual.average ?: java.math.BigDecimal.ZERO,
-                    modifier = Modifier.testTag("home-spending-chart"), selectedPointIndex = index,
-                    labels = LineChartLabels(stringResource(R.string.beta_chart_day_axis), stringResource(R.string.beta_chart_previous_point),
-                        stringResource(R.string.beta_chart_next_point), stringResource(R.string.beta_chart_average_announcement,
-                            visual.average?.let(::money) ?: stringResource(R.string.beta_approved_dashboard_value_unavailable))),
-                    onPointSelected = { if (enabled) selectedDate = visual.dates[it] },
-                    pointLabel = { DateTimeFormatter.ofPattern("d MMM", locale).format(LocalDate.parse(visual.dates[it])) + " · " + money(visual.values[it]) },
-                    axisLabel = { DateTimeFormatter.ofPattern("d/M", locale).format(LocalDate.parse(visual.dates[it])) },
-                    currencyLabel = MasroofMoneyDisplay.currencyLabel(visual.currency, locale.toLanguageTag()), showAverage = visual.average != null)
-            }
-        }
-    }
+            if(error) Text(stringResource(R.string.beta_chart_save_error),color=MaterialTheme.colorScheme.error)
+            if(!loaded) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("home-scope-loading"))
+        })
 }
 
 @Composable
@@ -275,20 +221,4 @@ private fun HomeGuidanceLabel(label: String, message: String? = null, modifier: 
 private fun HomeUnavailable(title: String, tag: String) {
     DashboardSectionHeading(title, MasroofOutlineIcons.Clock3)
     Text(stringResource(R.string.beta_fix_commitments_unknown), Modifier.testTag(tag), style = MaterialTheme.typography.bodySmall)
-}
-
-private fun transactionIcon(type: FinancialType) = when (type) {
-    FinancialType.INCOME -> MasroofOutlineIcons.TrendingUp
-    FinancialType.REFUND -> MasroofOutlineIcons.RotateCcw
-    FinancialType.EXTERNAL_TRANSFER_IN -> MasroofOutlineIcons.ArrowDownLeft
-    FinancialType.EXTERNAL_TRANSFER_OUT -> MasroofOutlineIcons.ArrowUpRight
-    FinancialType.CREDIT_CARD_PAYMENT -> MasroofOutlineIcons.CreditCard
-    FinancialType.CASH_WITHDRAWAL -> MasroofOutlineIcons.Banknote
-    FinancialType.LOAN_REPAYMENT -> MasroofOutlineIcons.Landmark
-    FinancialType.SELF_TRANSFER -> MasroofOutlineIcons.ArrowLeftRight
-    FinancialType.EXPENSE -> MasroofOutlineIcons.ShoppingBag
-    FinancialType.BILL_PAYMENT -> MasroofOutlineIcons.ReceiptText
-    FinancialType.FEE -> MasroofOutlineIcons.Receipt
-    FinancialType.ADJUSTMENT -> MasroofOutlineIcons.ArrowRightLeft
-    FinancialType.UNKNOWN -> MasroofOutlineIcons.Info
 }

@@ -23,6 +23,7 @@ internal class InMemoryBetaChartDataPreferencesRepository : BetaChartDataPrefere
 internal class BetaChartDataWorkflow(private val repository: BetaChartDataPreferencesRepository) {
     private val mutable=MutableStateFlow(repository.load())
     val preferences: StateFlow<BetaChartDataPreferences> = mutable.asStateFlow()
+    fun reload() {mutable.value=repository.load()}
     fun categories(trend: SpendingTrend,key: String): Set<ChartCategory> {
         val allowed=trend.categoryTrends.keys
         return mutable.value.selections[key]?.toSet()?.intersect(allowed)?.ifEmpty {allowed} ?: allowed

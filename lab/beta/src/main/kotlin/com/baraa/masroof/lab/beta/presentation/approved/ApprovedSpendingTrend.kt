@@ -26,10 +26,14 @@ internal val LocalBetaChartDataWorkflow=staticCompositionLocalOf {BetaChartDataW
 /** Production SpendingTrendSection/ChartHeader over lab projections. All arithmetic stays in workflows. */
 @Composable
 internal fun ApprovedSpendingTrend(trend: SpendingTrend?, title: String, explanation: String,
-    role: MasroofHeroRole, enabled: Boolean, chartKey: String, showAverage: Boolean) {
+    role: MasroofHeroRole, enabled: Boolean, chartKey: String, showAverage: Boolean,
+    modifier: Modifier=Modifier,cardTag: String="asset-trend",chartTag: String="asset-spending-chart",averageTag: String="chart-average",
+    unavailableTag: String="asset-chart-unavailable",customizeTag: String="chart-customize",
+    controls: (@Composable ()->Unit)?=null,selectedDate: LocalDate?=null,
+    onDaySelected: ((LocalDate)->Unit)?=null,scopeLabel: String=title) {
     if(trend==null) {
-        MasroofCard(Modifier.testTag("asset-trend")) {
-            ApprovedText(stringResource(R.string.beta_dash_unavailable_help),Modifier.testTag("asset-chart-unavailable"))
+        MasroofCard(modifier.testTag(cardTag)) {
+            ApprovedText(stringResource(R.string.beta_dash_unavailable_help),Modifier.testTag(unavailableTag))
         }
         return
     }
@@ -42,39 +46,40 @@ internal fun ApprovedSpendingTrend(trend: SpendingTrend?, title: String, explana
     val guidance=if(custom) stringResource(R.string.beta_approved_chart_selected_data,categoryNames)+"\n"+
         stringResource(R.string.beta_approved_chart_refunds_selection_hint) else explanation
     var sheetOpen by rememberSaveable(chartKey) {mutableStateOf(false)}
-    if(sheetOpen) ApprovedChartDataSheet(trend,chartKey,title,enabled) {sheetOpen=false}
+    if(sheetOpen) ApprovedChartDataSheet(trend,chartKey,scopeLabel,enabled) {sheetOpen=false}
     val visual=BetaDashboardVisualMapper.trend(selected)
     val locale=LocalConfiguration.current.locales[0]
     val date=DateTimeFormatter.ofPattern("d MMM",locale)
-    var selectedDate by rememberSaveable(chartKey,trend.period.from.toString()) {mutableStateOf<String?>(null)}
-    MasroofCard(Modifier.testTag("asset-trend")) {
+    var rememberedDate by rememberSaveable(chartKey,trend.period.from.toString()) {mutableStateOf<String?>(null)}
+    MasroofCard(modifier.testTag(cardTag)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,
             horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
             ApprovedGuidanceLabel(title,guidance,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,
                 contentColor=MaterialTheme.colorScheme.onSurface)
             if(trend.categoryTrends.isNotEmpty()) IconButton(onClick={sheetOpen=true},enabled=enabled,
-                modifier=Modifier.testTag("chart-customize")) {
+                modifier=Modifier.testTag(customizeTag)) {
                 Icon(DashboardChartMenuIcon,stringResource(R.string.beta_approved_chart_customize_title),Modifier.size(MasroofReference.icon))
             } else Icon(MasroofOutlineIcons.ChartLine,null,Modifier.size(MasroofReference.icon))
         }
         if(custom) ApprovedText(stringResource(R.string.beta_approved_chart_custom_selection,categories.size),
             Modifier.testTag("chart-custom-summary"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        controls?.let {content -> Column(Modifier.fillMaxWidth().padding(top=MasroofSpacing.sectionGap)) {content()}}
         when {
             selected.points.isEmpty() -> ApprovedText(stringResource(R.string.beta_home_no_elapsed_days),style=MaterialTheme.typography.bodySmall)
-            visual==null -> ApprovedText(stringResource(R.string.beta_dash_unavailable_help),Modifier.testTag("asset-chart-unavailable"))
+            visual==null -> ApprovedText(stringResource(R.string.beta_dash_unavailable_help),Modifier.testTag(unavailableTag))
             else -> {
-                val index=visual.dates.indexOf(selectedDate).takeIf {it>=0} ?: visual.dates.lastIndex
+                val index=visual.dates.indexOf(selectedDate?.toString() ?: rememberedDate).takeIf {it>=0} ?: visual.dates.lastIndex
                 fun money(value: BigDecimal)=MasroofMoneyDisplay.format(value,visual.currency,locale.toLanguageTag())
                 DashboardTrendHead(date.format(LocalDate.parse(visual.dates[index])),money(visual.values[index]),
                     average=if(showAverage) visual.average?.let {value -> ({
-                        MasroofChartAverageLegend(stringResource(R.string.beta_approved_dashboard_chart_average_value,money(value)),Modifier.weight(1f))
+                        MasroofChartAverageLegend(stringResource(R.string.beta_approved_dashboard_chart_average_value,money(value)),Modifier.weight(1f).testTag(averageTag))
                     })} else null)
                 MasroofInteractiveLineChart(visual.values,visual.average ?: BigDecimal.ZERO,
                     LineChartLabels(stringResource(R.string.beta_chart_day_axis),stringResource(R.string.beta_chart_previous_point),
                         stringResource(R.string.beta_chart_next_point),stringResource(R.string.beta_chart_average_announcement,
                             visual.average?.let(::money) ?: stringResource(R.string.beta_approved_dashboard_value_unavailable))),
-                    modifier=Modifier.testTag("asset-spending-chart"),selectedPointIndex=index,role=role,
-                    onPointSelected={if(enabled) selectedDate=visual.dates[it]},
+                    modifier=Modifier.testTag(chartTag),selectedPointIndex=index,role=role,
+                    onPointSelected={if(enabled) {rememberedDate=visual.dates[it];onDaySelected?.invoke(LocalDate.parse(visual.dates[it]))}},
                     pointLabel={date.format(LocalDate.parse(visual.dates[it]))+" · "+money(visual.values[it])},
                     axisLabel={DateTimeFormatter.ofPattern("d/M",locale).format(LocalDate.parse(visual.dates[it]))},
                     currencyLabel=MasroofMoneyDisplay.currencyLabel(visual.currency,locale.toLanguageTag()),

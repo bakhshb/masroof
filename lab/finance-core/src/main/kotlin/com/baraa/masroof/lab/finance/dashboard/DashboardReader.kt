@@ -73,6 +73,7 @@ data class DashboardSnapshot(
             require(row.facilityId == null || row.facilityId in facilityIds)
             require(row.loanId == null || row.loanId in loanIds)
         }
+        require(analysis?.merchants?.all {row -> row.transactionIds.all {it.environment==query.environment}} != false)
         analysis?.trends?.forEach { trend ->
             require(trend.period.zone == query.zone)
             require(trend.assetId == null || trend.assetId in ids)

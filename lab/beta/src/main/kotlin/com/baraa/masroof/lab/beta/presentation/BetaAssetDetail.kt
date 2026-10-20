@@ -103,7 +103,7 @@ private fun AccountDetail(snapshot: DashboardSnapshot, account: AccountSummary, 
         @Composable fun formatted(buckets: List<FlowBucket>): List<Pair<String,String>> = flow?.let { value ->
             BetaAssetDetailFacts.lines(value,buckets).map {line -> stringResource(bucketLabel(line.bucket)) to MasroofMoneyDisplay.format(line.amount,line.currency,language)}
         }.orEmpty()
-        ApprovedAccountPeriodSummaryCard(label+" · "+stringResource(R.string.beta_home_remaining),bankLabel(account.id.bank),
+        ApprovedAccountPeriodSummaryCard(label+" · "+stringResource(R.string.beta_approved_dashboard_remaining_title),bankLabel(account.id.bank),
             formatMoney(flow?.cashPosition,unavailable),formatMoney(flow?.totalIn,unavailable),formatMoney(flow?.totalOut,unavailable),
             formatted(BetaAssetDetailFacts.externalIn),formatted(BetaAssetDetailFacts.externalOut),formatted(BetaAssetDetailFacts.internal),
             trend={BetaSectionTrend(snapshot,account.id,MasroofHeroRole.Account,enabled)})
@@ -181,43 +181,10 @@ internal fun BetaSectionTrend(snapshot: DashboardSnapshot, asset: AssetId?, role
 }
 
 @Composable
-private fun AssetTransactions(snapshot: DashboardSnapshot, asset: AssetId, title: String, enabled: Boolean,
-    onTransaction: (String) -> Unit, complete: Boolean) {
-    val rows = BetaDashboardExplorer.transactions(snapshot, asset = asset)
-    val language = LocalConfiguration.current.locales[0].toLanguageTag()
-    val locale = LocalConfiguration.current.locales[0]
-    val labels=dashboardAssetLabels(snapshot)
-    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
-        ApprovedSectionTitle(title)
-        when {
-            !complete -> Text(stringResource(R.string.beta_dash_unavailable_help), Modifier.testTag("transactions-unavailable"))
-            rows.isEmpty() -> Text(stringResource(R.string.beta_dash_empty), Modifier.testTag("transactions-empty"))
-            else -> MasroofCard {
-                rows.forEach { row ->
-                    val type = row.effectiveType
-                    val direction = transactionDirection(row, asset.takeIf { id -> snapshot.accounts.any { it.id == id } })
-                    val inward = direction == BetaTransactionDirection.INWARD
-                    val neutral = direction == BetaTransactionDirection.NEUTRAL
-                    val colors = MasroofThemeExtras.extendedColors
-                    val (color, background) = when (type) {
-                        FinancialType.LOAN_REPAYMENT -> colors.liability to colors.liabilitySoft
-                        FinancialType.CREDIT_CARD_PAYMENT -> colors.card to colors.cardSoft
-                        else -> if (inward) colors.inflow to colors.inflowSoft else if (neutral) colors.account to colors.accountSoft else colors.outflow to colors.outflowSoft
-                    }
-                    val label = stringResource(financialTypeLabel(type))
-                    val cardLabel=row.cards.singleOrNull()?.let(labels::get) ?: row.primaryCardLast4?.let {"•• $it"}
-                    val value = MasroofMoneyDisplay.format(row.amount.amount, row.amount.currency.name, language)
-                    DashboardTransactionRow(row.merchant ?: row.counterparty ?: label,
-                        label + (cardLabel?.let { " · $it" } ?: ""),
-                        (if (inward) "+" else if (neutral) "" else "−") + value.substringBeforeLast(' '),
-                        DateTimeFormatter.ofPattern("d MMM", locale).format(row.time.instant.atZone(row.time.zone).toLocalDate()) + " · " + value.substringAfterLast(' '),
-                        reviewTypeIcon(type), color, background, Modifier.testTag("dash-transaction-${row.key.transactionId}"),
-                        onClick = if (enabled) ({ onTransaction(row.key.transactionId) }) else null)
-                }
-            }
-        }
-    }
-}
+private fun AssetTransactions(snapshot: DashboardSnapshot,asset: AssetId,title: String,enabled: Boolean,
+    onTransaction: (String)->Unit,complete: Boolean) = BetaScopeTransactionRows(snapshot,
+    BetaDashboardExplorer.transactions(snapshot,asset=asset),title,enabled,onTransaction,complete,
+    asset.takeIf {id -> snapshot.accounts.any {it.id==id}})
 
 @Composable
 private fun formatMoney(amount: SignedAmount?, unavailable: String): String =

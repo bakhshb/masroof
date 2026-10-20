@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalContext
@@ -94,7 +95,6 @@ class BetaDashboardScreenTest {
                 val index=listOf("ACCOUNTS","CARDS","LOANS","COMMITMENTS").indexOf(value)
                 compose.onNodeWithTag("dashboard-shortcut-$index").performClick()
             }
-            "ANALYSIS" -> compose.onNodeWithTag("home-chart-customize").performScrollTo().performClick()
             else -> error("Unsupported test destination")
         }
         compose.onNodeWithTag("dash-route-$value").assertIsSelected()
@@ -385,20 +385,27 @@ class BetaDashboardScreenTest {
             val period = DisplayPeriod(query.from, query.until, query.zone, PeriodKind.CALENDAR_MONTH, null)
             val amount = SignedAmount(BigDecimal("42.35"), Currency.SAR)
             val trend = SpendingTrend(null, null, period, Currency.SAR,
-                listOf(DailySpending(at.atZone(query.zone).toLocalDate(), amount, amount, SignedAmount(BigDecimal.ZERO, Currency.SAR), emptySet())), amount)
+                listOf(DailySpending(at.atZone(query.zone).toLocalDate(), amount, amount, SignedAmount(BigDecimal.ZERO, Currency.SAR), emptySet())), amount,scope=TrendScope.FINANCIAL_OUTFLOWS)
             DashboardProduction(
                 DashboardSnapshot(query, emptyList(), emptyList(), emptyList(), commitments = CommitmentsSummary(Currency.SAR, emptyList(), null, null, null),
                     analysis = AnalysisSummary(Currency.SAR, SummaryMetric.entries.associateWith { null }, 0, 0, 0, listOf(trend), emptyList())),
                 setOf(DashboardSection.CONFIRMED_REGISTRY, DashboardSection.COMMITMENTS, DashboardSection.TRENDS, DashboardSection.MERCHANT_TOTALS), null)
         }, clock,periodStartDay=1)
-        compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) { BetaDashboardPanel(workflow) } } }
+        var destination by mutableStateOf("OVERVIEW")
+        var request by mutableIntStateOf(0)
+        compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
+            BetaDashboardPanel(workflow,requestedRoute=destination,routeRequest=request)
+        } } }
         waitLoaded()
         listOf("ACCOUNTS", "CARDS", "LOANS", "COMMITMENTS").forEach { section ->
             route(section); compose.onNodeWithTag("dash-empty").assertDoesNotExist()
             compose.onNodeWithTag("dash-unavailable").assertExists()
         }
-        route("ANALYSIS")
-        compose.onAllNodesWithTag("dash-unavailable").assertCountEquals(1) // Merchant coverage only; this ordinary series is complete.
-        compose.onAllNodesWithText("42.35 SAR").assertCountEquals(2) // Precomputed average and point; no UI-derived money.
+        // A restored destination must keep missing merchant coverage explicit, even though the day series is proved.
+        compose.runOnIdle {destination="MERCHANTS";request++};waitLoaded()
+        compose.onAllNodesWithTag("dash-unavailable").assertCountEquals(1)
+        compose.runOnIdle {destination="DAILY";request++};waitLoaded()
+        compose.onNode(hasText("42.35 SAR") and hasAnyAncestor(hasTestTag("daily-net"))).assertExists()
+        compose.onNode(hasText("42.35 SAR") and hasAnyAncestor(hasTestTag("daily-before-refunds"))).assertExists()
     }
 }

@@ -33,67 +33,11 @@ import java.math.BigDecimal
 class BetaApprovedFixtureScreensTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
     private val zone=ZoneId.of("Asia/Riyadh")
-    private val bank=BankId("BANK_ALJAZIRA")
-    private fun id(value: String)=AssetId(Environment.BETA,bank,value)
-    private fun money(value: String)=Money.of(value,Currency.SAR)
-    private fun signed(value: String)=SignedAmount(BigDecimal(value),Currency.SAR)
-    private val account=id("3001")
-    private val primary=id("7271")
-    private val child=id("8842")
-    private val loanId=id("personal")
-    private fun transaction(key: String,type: FinancialType,amount: String,day: String,title: String,card: AssetId?=null,loan: AssetId?=null)=TransactionFacts(
-        key=PostingKey(Environment.BETA,key),revision=PostingRevision(0,1),
-        time=TransactionTime(LocalDate.parse(day).atStartOfDay(zone).toInstant(),zone),storedType=type,effectiveType=type,
-        amount=money(amount),merchant=title,counterparty=null,primaryCardLast4=card?.localId,
-        accounts=if(loan!=null) setOf(account) else emptySet(),cards=setOfNotNull(card),debitSpendingCards=emptySet(),loans=setOfNotNull(loan),
-        categories=setOf(if(loan!=null) ChartCategory.LOAN_REPAYMENTS else ChartCategory.CREDIT_PURCHASES),
-        appliedFx=null,sarEquivalent=null,internationalFee=null,evidenceIds=emptySet(),source=if(loan!=null) account else card,destination=loan)
-    private fun snapshot(query: DashboardQuery): DashboardSnapshot {
-        val period=DisplayPeriod(query.from,query.until,zone,PeriodKind.SALARY,null)
-        val statement=period.copy(kind=PeriodKind.STATEMENT)
-        val primaryCard=CreditCardSummary(primary,CreditCardRole.PRIMARY,"البطاقة الأساسية •• 7271","7271",null,
-            PeriodSpending(period,signed("800")),PeriodSpending(statement,signed("800")),signed("5000"),Instant.parse("2026-10-02T07:00:00Z"))
-        val childCard=CreditCardSummary(child,CreditCardRole.SUPPLEMENTARY,"البطاقة الفرعية •• 8842","8842",null,
-            PeriodSpending(period,signed("600")),PeriodSpending(statement,signed("600")),null,null)
-        val facility=FacilitySummary(id("facility"),money("2200"),LocalDate.parse("2026-10-15"),Instant.parse("2026-10-02T07:00:00Z"),
-            signed("1400"),signed("1400"),listOf(primaryCard,childCard))
-        val loan=LoanSummary(loanId,"PERSONAL","القرض الشخصي",money("84200"),Instant.parse("2026-09-27T07:00:00Z"),
-            money("1800"),Instant.parse("2026-09-27T07:00:00Z"),signed("1800"),period)
-        val transactions=listOf(transaction("ref-10",FinancialType.EXPENSE,"800","2026-10-02","NOON",primary),
-            transaction("ref-11",FinancialType.EXPENSE,"600","2026-10-06","NOON",child),
-            transaction("ref-4",FinancialType.LOAN_REPAYMENT,"1800","2026-09-27","القرض الشخصي",loan=loanId))
-        fun trend(asset: AssetId?,average: String,total: String): SpendingTrend {
-            val points=(0L..13L).map {offset ->
-                val day=LocalDate.parse("2026-09-27").plusDays(offset)
-                val value=when {
-                    day==LocalDate.parse("2026-10-02") && asset!=child -> "800"
-                    day==LocalDate.parse("2026-10-06") && asset!=primary -> "600"
-                    else -> "0"
-                }
-                DailySpending(day,signed(value),signed(value),signed("0"),transactions.filter {
-                    it.cards.isNotEmpty() && it.time.instant.atZone(zone).toLocalDate()==day && (asset==null || asset in it.cards)
-                }.mapTo(linkedSetOf()) {it.key})
-            }
-            val base=SpendingTrend(asset,null,period,Currency.SAR,points,signed(average),if(asset==null) TrendScope.CREDIT_CARDS else TrendScope.ASSET,
-                signed(total),signed(total),signed("0"))
-            val allowed=setOf(ChartCategory.CREDIT_PURCHASES,ChartCategory.BILLS,ChartCategory.FEES,
-                ChartCategory.CASH_WITHDRAWALS,ChartCategory.UNATTRIBUTED_REFUNDS)
-            return base.copy(categoryTrends=allowed.associateWith {category ->
-                if(category==ChartCategory.CREDIT_PURCHASES) base.copy(category=category)
-                else base.copy(category=category,points=emptyList(),averageDailySpending=signed("0"),
-                    totalSpending=signed("0"),totalBeforeRefunds=signed("0"),totalRefunds=signed("0"))
-            })
-        }
-        return DashboardSnapshot(query,listOf(AccountSummary(account,null,"الجاري •• 3001",last4="3001")),emptyList(),listOf(facility),loans=listOf(loan),
-            analysis=AnalysisSummary(Currency.SAR,SummaryMetric.entries.associateWith {null},3,0,0,
-                listOf(trend(null,"100","1400"),trend(primary,"57.14","800"),trend(child,"42.86","600")),emptyList()),
-            transactions=transactions,totals=PortfolioTotals(Currency.SAR,null,null,null,null,money("2200"),signed("1400"),null,money("84200"),signed("1800"),signed("1400")))
-    }
     @Test fun sameFrozenProductionFactsRenderInBothLanguagesAndThemes() {
         val page=mutableStateOf("cards")
         val language=mutableStateOf("ar")
         val dark=mutableStateOf(false)
-        val workflow=BetaDashboardWorkflow({query,_ -> DashboardProduction(snapshot(query),emptySet(),null)},
+        val workflow=BetaDashboardWorkflow({query,_ -> DashboardProduction(BetaFrozenProductionRead.snapshot(query),emptySet(),null)},
             Clock.fixed(Instant.parse("2026-10-10T12:00:00Z"),zone),zone)
         compose.setContent {
             BetaLocaleProvider(language.value) {MasroofTheme(darkTheme=dark.value) {
@@ -102,24 +46,24 @@ class BetaApprovedFixtureScreensTest {
                     val preferencePage=page.value=="preferences"
                     BetaShell(0,false,showReturn=false,showMaintenanceActions=false,notificationCount=3,
                         secondaryTitle=if(preferencePage) stringResource(R.string.beta_approved_reference_preferences_title) else title,
-                        onNavigateBack={},selectedHomeTab=if(preferencePage) "SETTINGS" else "NONE",onOpenHome={},dashboardOwnsScroll=true,
+                        onNavigateBack={},selectedHomeTab=if(preferencePage) "SETTINGS" else if(page.value=="home") "HOME" else "NONE",onOpenHome={},dashboardOwnsScroll=true,
                         editor=if(preferencePage) ({BetaSettingsHubPanel("APP",{},emptyList(),emptyList(),UnavailableBetaDashboardControls,false,
                             {_,_->},{_,_->},{},{},{},theme=if(dark.value) "DARK" else "LIGHT",language=language.value)}) else null,
                         dashboard=({BetaDashboardPanel(workflow,ownsScroll=true,showInternalHeader=false,
-                            requestedRoute=if(page.value in setOf("loans","loanDetail")) "LOANS" else "CARDS",onPageTitle={title=it})}),
+                            requestedRoute=when(page.value) {"loans","loanDetail" -> "LOANS";"merchants" -> "MERCHANTS";"daily" -> "DAILY";"home" -> "OVERVIEW";"accounts","accountDetail" -> "ACCOUNTS";else -> "CARDS"},onPageTitle={title=it})}),
                         onReturn={},onReset={},onBackup={},onRestore={})
                 }
             }}
         }
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val directory=File(instrumentation.targetContext.getExternalFilesDir(null),"lab-approved-fixture").apply {mkdirs()}
-        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences")) {
+        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home")) {
             compose.runOnIdle {language.value=lang;dark.value=night;page.value=destination}
             compose.waitUntil(15000) {compose.onAllNodesWithTag(if(destination=="preferences") "beta-settings-panel" else "dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
-            if(destination in setOf("cardDetail","loanDetail")) {
-                val target=if(destination=="cardDetail") "8842" else "personal"
+            if(destination in setOf("cardDetail","loanDetail","accountDetail")) {
+                val target=when(destination) {"cardDetail" -> "8842";"accountDetail" -> "3001";else -> "personal"}
                 compose.onNodeWithTag("dash-asset-BANK_ALJAZIRA-$target").performScrollTo().performClick()
-                val detail=if(destination=="cardDetail") "beta-credit-detail" else "beta-loan-detail"
+                val detail=when(destination) {"cardDetail" -> "beta-credit-detail";"accountDetail" -> "beta-account-detail";else -> "beta-loan-detail"}
                 compose.waitUntil(15000) {compose.onAllNodesWithTag(detail).fetchSemanticsNodes().isNotEmpty()}
             }
             compose.waitForIdle();instrumentation.waitForIdleSync();Thread.sleep(250)

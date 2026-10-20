@@ -20,6 +20,7 @@ import com.baraa.masroof.lab.beta.data.*
 import com.baraa.masroof.lab.finance.asset.*
 import com.baraa.masroof.lab.finance.classification.*
 import com.baraa.masroof.lab.finance.dashboard.TrendScope
+import com.baraa.masroof.lab.finance.dashboard.ChartCategory
 import com.baraa.masroof.lab.finance.posting.*
 import com.baraa.masroof.lab.finance.value.*
 import kotlinx.coroutines.runBlocking
@@ -46,7 +47,6 @@ class BetaDashboardExplorationActivityTest {
         when(name) {
             "OVERVIEW" -> Unit
             "TRANSACTIONS" -> compose.onNode(hasText(context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply {setLocale(java.util.Locale("ar"))}).getString(com.baraa.masroof.lab.beta.R.string.beta_nav_transactions)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
-            "ANALYSIS" -> compose.onNodeWithTag("home-chart-customize").performScrollTo().performClick()
             "CONFIGURATION" -> {
                 compose.onNodeWithTag("home-configure").performScrollTo().performClick()
                 compose.onNodeWithTag("home-period-settings").performScrollTo().performClick()
@@ -112,39 +112,42 @@ class BetaDashboardExplorationActivityTest {
                 screenshot("activity-rtl-transaction-detail")
                 scenario.recreate(); waitLoaded(); waitDetail(); compose.onNodeWithTag("transaction-detail").assertExists()
                 compose.onNodeWithTag("beta-page-back").performClick()
-                route("ANALYSIS", scenario)
-                val day = postedAt.atZone(ZoneId.of("Asia/Riyadh")).toLocalDate()
-                compose.onNodeWithTag("chart-day-$day").performScrollTo()
-                screenshot("activity-rtl-chart")
-                compose.onNodeWithTag("chart-day-$day").performClick()
+                route("OVERVIEW", scenario)
+                compose.waitUntil(15000) {compose.onAllNodesWithTag("home-scope-loading").fetchSemanticsNodes().isEmpty()}
+                compose.onNodeWithTag("home-chart-scope-1").performScrollTo().performClick()
+                compose.waitUntil(15000) {context.getSharedPreferences(BetaEnvironment.PREFS_NAME,0).getString("dashboard_home_scope",null)=="overall"}
+                compose.onNodeWithTag("home-shortcuts").performScrollTo()
+                compose.onNodeWithTag("dashboard-shortcut-0").performClick()
+                compose.onNodeWithTag("dash-asset-BANK_ALJAZIRA-synthetic-full-account").performScrollTo().performClick()
                 compose.onNodeWithTag("dash-transaction-${key.transactionId}").performScrollTo().performClick()
-                waitDetail(); compose.onNodeWithTag("transaction-detail").assertExists()
+                waitDetail();compose.onNodeWithTag("transaction-detail").assertExists()
                 compose.onNodeWithTag("beta-page-back").performClick()
-                compose.onNodeWithTag("dash-customize").performScrollTo().performClick()
-                compose.onNodeWithTag("chart-scope-FINANCIAL_OUTFLOWS").performScrollTo().performClick()
-                compose.onNodeWithTag("chart-category-FEES").performScrollTo().performClick()
-                compose.onNodeWithTag("chart-table").performScrollTo().performClick()
-                compose.onNodeWithTag("dash-sheet-cancel").performClick()
-                compose.waitUntil { compose.onAllNodesWithTag("dash-sheet").fetchSemanticsNodes().isEmpty() }
-                assertEquals(BetaDashboardViewPreferences(), BetaDashboardViewPreferencesWorkflow(context).read())
-                compose.onNodeWithTag("dash-customize").performScrollTo().performClick()
-                compose.onNodeWithTag("chart-scope-FINANCIAL_OUTFLOWS").performScrollTo().performClick()
-                compose.onNodeWithTag("chart-category-FEES").performScrollTo().performClick()
-                compose.onNodeWithTag("chart-table").performScrollTo().performClick()
-                compose.onNodeWithTag("dash-sheet-apply").performClick()
-                compose.waitUntil { compose.onAllNodesWithTag("dash-sheet").fetchSemanticsNodes().isEmpty() }
-                val chosen = BetaDashboardViewPreferencesWorkflow(context).read()
-                assertEquals(TrendScope.FINANCIAL_OUTFLOWS, chosen.choice.scope); assertFalse(chosen.bars)
+                compose.onNodeWithTag("beta-account-detail").assertExists()
+                route("OVERVIEW",scenario)
+                fun feesOnly() {setOf(ChartCategory.CREDIT_PURCHASES,ChartCategory.MADA_PURCHASES,ChartCategory.CASH_WITHDRAWALS,
+                    ChartCategory.EXTERNAL_TRANSFERS,ChartCategory.UNATTRIBUTED_REFUNDS,ChartCategory.OTHER_EXPENSES,
+                    ChartCategory.BILLS,ChartCategory.LOAN_REPAYMENTS).forEach {
+                    compose.onNodeWithTag("chart-category-${it.name}").performScrollTo().performClick()
+                }}
+                compose.onNodeWithTag("home-chart-customize").performScrollTo().performClick()
+                feesOnly();compose.onNodeWithTag("chart-data-cancel").performClick()
+                assertTrue(BetaDashboardViewPreferencesWorkflow(context).chartData.preferences.value.selections.isEmpty())
+                compose.onNodeWithTag("home-chart-customize").performScrollTo().performClick()
+                feesOnly();compose.onNodeWithTag("chart-data-apply").performClick()
+                val chartKey=BetaChartDataWorkflow.key(TrendScope.FINANCIAL_OUTFLOWS,null)
+                assertEquals(listOf(ChartCategory.FEES),BetaDashboardViewPreferencesWorkflow(context).chartData.preferences.value.selections[chartKey])
+                compose.onNodeWithTag("chart-custom-summary").assertExists()
+                screenshot("activity-rtl-chart")
                 route("OVERVIEW", scenario); compose.onNode(hasText("42.35 ر.س") and hasAnyAncestor(hasTestTag("dash-summary-spending"))).assertExists()
             }
             closed()
             ActivityScenario.launch(BetaActivity::class.java).use { scenario ->
-                waitLoaded(); route("ANALYSIS", scenario); compose.onNodeWithTag("dash-customize").performScrollTo().performClick()
-                compose.onNodeWithTag("chart-scope-FINANCIAL_OUTFLOWS").assertIsOn()
+                waitLoaded()
+                compose.waitUntil(15000) {compose.onAllNodesWithTag("home-scope-loading").fetchSemanticsNodes().isEmpty()}
+                compose.onNodeWithTag("home-chart-customize").performScrollTo().performClick()
                 compose.onNodeWithTag("chart-category-FEES").performScrollTo().assertIsOn()
-                compose.onNodeWithTag("chart-table").performScrollTo().assertIsOn()
-                compose.onNodeWithTag("dash-sheet-cancel").performClick()
-                compose.waitUntil { compose.onAllNodesWithTag("dash-sheet").fetchSemanticsNodes().isEmpty() }
+                compose.onNodeWithTag("chart-category-OTHER_EXPENSES").performScrollTo().assertIsOff()
+                compose.onNodeWithTag("chart-data-cancel").performClick()
                 InstrumentationRegistry.getInstrumentation().waitForIdleSync()
                 route("CONFIGURATION", scenario); compose.onNodeWithTag("dash-configuration").assertExists()
                 screenshot("activity-rtl-configuration")

@@ -205,4 +205,22 @@
 <string name="beta_approved_settings_theme_light">فاتح</string>
 <string name="beta_approved_settings_theme_system">حسب الجهاز</string>
 <string name="beta_approved_settings_theme_title">المظهر</string>
+<string name="beta_approved_reference_daily_title">المصاريف اليومية</string>
+<string name="beta_approved_reference_before_refunds">مصاريف اليوم قبل الاسترداد</string>
+<string name="beta_approved_reference_day_refunds">استردادات اليوم</string>
+<string name="beta_approved_reference_day_transactions">الحركات الداخلة في مصاريف اليوم</string>
+<string name="beta_approved_reference_daily_net">صافي المصاريف %1$s</string>
+<string name="beta_approved_reference_day_view">عرض يوم محدد</string>
+<string name="beta_approved_reference_period_view">عرض الفترة</string>
+<string name="beta_approved_dashboard_merchants_summary_title">المصاريف حسب التاجر</string>
+<string name="beta_approved_dashboard_merchants_empty">لا يوجد تاجر لديه حركتا شراء أو أكثر في هذه الفترة</string>
+<string name="beta_approved_dashboard_merchants_qualifying_count">%1$d تاجر لديه حركتا شراء أو أكثر</string>
+<string name="beta_approved_dashboard_merchants_transaction_count">%1$d حركات شراء / دفع</string>
+<string name="beta_approved_dashboard_purchases_trend_basis">تشمل مشتريات بطاقات الائتمان ومدى والسحب النقدي والتحويلات الخارجية الصادرة، بعد خصم الاستردادات المرتبطة بالبطاقات. تستبعد الفواتير وأقساط القروض والرسوم المستقلة وسداد البطاقات والتحويلات بين حساباتك. المتوسط يحسب على أيام الفترة المنقضية، بما فيها الأيام بلا مصاريف.</string>
+<string name="beta_approved_dashboard_all_trend_basis">تشمل المشتريات والفواتير والرسوم وأقساط القروض والسحب النقدي والتحويلات الخارجية الصادرة، بعد خصم الاستردادات. تستبعد سداد البطاقات والتحويلات بين حساباتك لتجنب التكرار. المتوسط يحسب على أيام الفترة المنقضية، بما فيها الأيام بلا مصاريف.</string>
+<string name="beta_approved_dashboard_daily_purchases">المشتريات اليومية</string>
+<string name="beta_approved_approved_all_expenses">جميع المصاريف اليومية</string>
+<string name="beta_approved_dashboard_mada_trend_basis">تشمل مشتريات مدى والسحب النقدي المؤكد ارتباطه بهذه البطاقة، بعد خصم الاستردادات. لا ينسب السحب إلى بطاقة محددة دون بيانات تؤكد ارتباطه بها.</string>
+<string name="beta_approved_dashboard_summary_transactions_title">الحركات المالية (%1$d)</string>
+<string name="beta_approved_transactions_empty">لا توجد حركات في هذه الفترة</string>
 </resources>

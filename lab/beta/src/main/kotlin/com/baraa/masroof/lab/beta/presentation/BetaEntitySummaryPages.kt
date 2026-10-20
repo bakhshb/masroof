@@ -45,8 +45,8 @@ internal fun BetaAccountsSummary(snapshot: DashboardSnapshot,limit: Int,enabled:
             stringResource(R.string.beta_approved_dashboard_remaining_formula,betaSummaryMoney(snapshot.totals?.accountInflow),betaSummaryMoney(snapshot.totals?.accountOutflow)) else null,
             stringResource(R.string.beta_approved_dashboard_accounts_fleet_total_hint)).joinToString("\n\n"))
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(MasroofReference.metricGap)) {
-        BetaSummaryMetric(R.string.beta_fix_inflow,betaSummaryMoney(snapshot.totals?.accountInflow),colors.inflow,Modifier.weight(1f))
-        BetaSummaryMetric(R.string.beta_fix_outflow,betaSummaryMoney(snapshot.totals?.accountOutflow),colors.outflow,Modifier.weight(1f))
+        BetaSummaryMetric(R.string.beta_approved_dashboard_total_inflow,betaSummaryMoney(snapshot.totals?.accountInflow),colors.inflow,Modifier.weight(1f))
+        BetaSummaryMetric(R.string.beta_approved_dashboard_total_spent,betaSummaryMoney(snapshot.totals?.accountOutflow),colors.outflow,Modifier.weight(1f))
     }
     BetaSectionTrend(snapshot,null,MasroofHeroRole.Account,enabled,TrendScope.ACCOUNTS)
     ApprovedSectionTitle(stringResource(R.string.beta_approved_reference_followed_accounts))

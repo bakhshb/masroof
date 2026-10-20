@@ -284,39 +284,49 @@
     "beta_review_unavailable"
   ],
   "verified_tests": {
-    "lab_jvm": 310,
+    "lab_jvm": 312,
     "bank_engine": 58,
     "finance_core": 180,
     "android16_full": {
-      "total": 189,
-      "passed": 189,
-      "duration": "6m29s",
-      "scope": "Summary/detail source tiles, same-fixture capture harness, dashboard scroll/pull, notifications, actual review/approval, approved appearance/language persistence and category draft/save/reset/recreation. Four obsolete tests of an unreachable review renderer were removed."
+      "total": 190,
+      "passed": 190,
+      "duration": "6m45s including lint/JVM verification",
+      "scope": "Full lab Android suite after source Home, merchant/daily pages, scoped provenance, back-state restoration and preference cache refresh."
     },
-    "ci": "Both CI and Lab passed at 4db0507b. Current source/notification/chart follow-up has not yet been pushed.",
+    "ci": "CI 39389564037 and Lab 39389564051 passed at 396e5d29. Current daily/merchant follow-up awaits push and final-head CI.",
     "android16_followup": {
       "passed": 20,
       "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
     },
     "process_death": {
       "passed": 39,
-      "scope": "Repeated after summary/chart/preferences source ports: permission, historical import, ledger, corrections, learning and restore."
+      "scope": "Repeated after source Home/merchant/daily and preference-refresh ports: permission, historical import, ledger, correction, learning, backup/restore and startup recovery."
     },
     "notification_followup": {
       "passed": 7,
       "scope": "Actual notification/read-state/review/back navigation, settings rename and shared navigation."
     },
     "paired_native_captures": {
-      "pairs": 40,
-      "body_pixel_identical": 40,
+      "pairs": 80,
+      "body_pixel_identical": 76,
       "pages": [
         "cards",
         "cardDetail",
         "loans",
         "loanDetail",
-        "preferences"
+        "preferences",
+        "home",
+        "accounts",
+        "accountDetail",
+        "merchants",
+        "daily"
       ],
-      "region": "1080×1755 captures; compare y=195 onward only. Top/bottom views only; long-page middle coverage and full journeys are separate gates."
+      "region": "1080×1755 captures; compare y=195 onward only. Top/bottom views only; long-page middle coverage and full journeys are separate gates.",
+      "remaining_differences": "Four account-detail bottom captures: maximum channel difference 6–7/255, on rendered edges; retained as differences, not counted as pixel-identical."
+    },
+    "daily_merchant_followup": {
+      "passed": 15,
+      "scope": "Actual daily/merchant drilldown, day/card restoration, Home category save/cancel/relaunch, and all frozen fixture captures."
     }
   },
   "implementation_notes": [
@@ -330,6 +340,9 @@
     "Frozen production card/loan facts now pass through actual lab dashboard routes and navigation; 40 capture pairs (five pages × languages/themes/top/bottom) are available in UI_PAIRED_COMPARISON_AR.html. These do not prove SMS extraction or whole-app parity.",
     "Source summary/detail tiles, average bands, terminology, period ranges, dashboard-owned scrolling and long-hold pull refresh replace the previous generic renderers. Account self-transfers now display incoming/outgoing signs from full bank-qualified endpoints.",
     "Deleted unused BetaReviewPanel / BetaReviewEditor, four tests that only exercised that unreachable renderer, and twelve exclusive resource keys. Current review/approval journey tests cover actual activity paths; endpoint display helper remains with the active approval editor.",
-    "نُقلت صفحة المظهر واللغة من الفعلي، وحُذف تخطيطها السابق. نُقل تخصيص فئات رسم الحسابات والبطاقات إلى نافذة الفعلي، مع حفظ مستقل لكل هوية كاملة. بُنيت مساهمات مختصرة للسجل الطويل، وتبقى الحقائق غير المثبتة غير متوفرة. ربط الرئيسية وصفحات التحليل اليومية ما زال قيد العمل."
+    "نُقلت صفحة المظهر واللغة من الفعلي، وحُذف تخطيطها السابق. نُقل تخصيص فئات رسم الحسابات والبطاقات إلى نافذة الفعلي، مع حفظ مستقل لكل هوية كاملة. بُنيت مساهمات مختصرة للسجل الطويل، وتبقى الحقائق غير المثبتة غير متوفرة. ربط الرئيسية وصفحات التحليل اليومية ما زال قيد العمل.",
+    "نُقلت صفحات التجار والتفاصيل اليومية وربط الرئيسية بفئات الرسم المعتمد. تعني «كل المصاريف اليومية» نطاق التدفقات الخارجة، بما يشمل السحب والقسط، وتبقى ملخصات الأموال مستقلة عن ترشيح الرسم.",
+    "حُذف محلل الرسم العام القديم وخيارات الجدول والأعمدة غير المستخدمة. يستخدم عرض الحركات مكوّنًا واحدًا للرئيسية والتفاصيل؛ يعرض آخر ثلاث حركات مع الاسم الكامل للبطاقة، ويحفظ اليوم والبطاقة عند الرجوع من التفاصيل.",
+    "استعادة النسخة الاحتياطية تعيد تحميل تفضيلات الرسم في نفس الجلسة؛ لا تبقى نسخة مؤقتة قديمة. تمت حماية تفاصيل التجار بمعرفات الحركات المثبتة بدلاً من تطابق الاسم فقط."
   ]
 }

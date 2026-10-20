@@ -205,4 +205,22 @@
 <string name="beta_approved_settings_theme_light">Light</string>
 <string name="beta_approved_settings_theme_system">System</string>
 <string name="beta_approved_settings_theme_title">Appearance</string>
+<string name="beta_approved_reference_daily_title">Daily expenses</string>
+<string name="beta_approved_reference_before_refunds">Expenses before refunds</string>
+<string name="beta_approved_reference_day_refunds">Day refunds</string>
+<string name="beta_approved_reference_day_transactions">Transactions included in daily expenses</string>
+<string name="beta_approved_reference_daily_net">Net expenses %1$s</string>
+<string name="beta_approved_reference_day_view">Choose a day</string>
+<string name="beta_approved_reference_period_view">Period view</string>
+<string name="beta_approved_dashboard_merchants_summary_title">Expenses by merchant</string>
+<string name="beta_approved_dashboard_merchants_empty">No merchant has two or more purchases in this period</string>
+<string name="beta_approved_dashboard_merchants_qualifying_count">%1$d merchants with two or more purchases</string>
+<string name="beta_approved_dashboard_merchants_transaction_count">%1$d purchase / payment transactions</string>
+<string name="beta_approved_dashboard_purchases_trend_basis">Includes credit and Mada purchases, cash withdrawals and outgoing external transfers, less card-attributed refunds. Excludes bills, loan repayments, standalone fees, card settlements and transfers between your own accounts. The average uses elapsed period days, including zero-spend days.</string>
+<string name="beta_approved_dashboard_all_trend_basis">Includes purchases, bills, fees, loan repayments, cash withdrawals and outgoing external transfers, less refunds. Card settlements and transfers between your own accounts are excluded to avoid duplicates. The average uses elapsed period days, including zero-spend days.</string>
+<string name="beta_approved_dashboard_daily_purchases">Daily purchases</string>
+<string name="beta_approved_approved_all_expenses">All daily expenses</string>
+<string name="beta_approved_dashboard_mada_trend_basis">Includes Mada purchases and cash withdrawals confirmed to belong to this card, less refunds. A withdrawal is not assigned to a specific card without confirmed attribution.</string>
+<string name="beta_approved_dashboard_summary_transactions_title">Period transactions (%1$d)</string>
+<string name="beta_approved_transactions_empty">No transactions in this period</string>
 </resources>
