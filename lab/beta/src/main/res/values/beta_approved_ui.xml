@@ -227,4 +227,11 @@
 <string name="beta_approved_review_ignored_count">%1$d حركة متجاهلة</string>
 <string name="beta_approved_review_pending_match">بانتظار مطابقة</string>
 <string name="beta_approved_review_page_empty">لا توجد عناصر مطابقة في هذه الصفحة. انتقل إلى الصفحة التالية.</string>
+<string name="beta_approved_home_customize_title">تخصيص الشاشة الرئيسية</string>
+<string name="beta_approved_home_customize_save">حفظ التخصيص</string>
+<string name="beta_approved_home_section_hero">البطاقة الرئيسية</string>
+<string name="beta_approved_home_section_shortcuts">الاختصارات</string>
+<string name="beta_approved_home_section_commitments">الالتزامات</string>
+<string name="beta_approved_home_section_quick">البطاقات السريعة</string>
+<string name="beta_approved_home_section_analysis">التحليل</string>
 </resources>

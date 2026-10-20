@@ -373,6 +373,20 @@
       "source_sha256": "3de5c6ed8f325787c69e4ff17b0983f9e2dc3755d8cc7cfe3a9b6fb47c964273",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedReviewListContent.kt",
       "adaptations": "Lab facade supplies rows; preserve bounded paging and durable retry controls. Fixed mode choices and independent list scrolling match production."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/DashboardCustomizeBottomSheet.kt",
+      "symbol": "DashboardCustomizeBottomSheet",
+      "source_sha256": "d109f57f843c7c8d5a0289d46ea4cdbabbb93441a7475b27cb6313aa7e5c4748",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaHomeLayoutSheet.kt",
+      "adaptations": "Source rows/icons/labels and nested quick toggles; atomic lab preference saves and busy dismissal gate retained. Existing source-derived DashboardLayoutChoiceRow is reused."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/application/dashboard/DashboardLayoutPreferences.kt",
+      "symbol": "DashboardLayoutSnapshot",
+      "source_sha256": "b760978d416d7f9bb4ec94c0471899f5dd28ab552db3bc856f62688fbf16804f",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/BetaHomeLayout.kt",
+      "adaptations": "Six visible source sections. Version-1 lab TREND/MERCHANTS preferences are combined deterministically; other order/visibility choices retained. Financial developer controls are outside layout customization."
     }
   ],
   "adaptations": [

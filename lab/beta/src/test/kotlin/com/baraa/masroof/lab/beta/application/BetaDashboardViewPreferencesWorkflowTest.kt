@@ -64,6 +64,13 @@ class BetaDashboardViewPreferencesWorkflowTest {
             assertTrue(workflow.saveHomeLayout(BetaHomeLayout(), draft)) // Explicit Apply repairs only display preferences.
             assertEquals(BetaHomeSection.entries.size, draft.sections.map { it.section }.distinct().size)
             assertEquals(original, BetaHomeLayout.decode(original.encode()))
+            val legacy="v1|false|true|HERO:false|SHORTCUTS:true|COMMITMENTS:true|METRICS:true|TREND:true|MERCHANTS:false|TRANSACTIONS:true"
+            val upgraded=BetaHomeLayout.decode(legacy)
+            assertEquals(BetaHomeSection.entries.toList(),upgraded.sections.map {it.section})
+            assertFalse(upgraded.sections.first().visible);assertFalse(upgraded.expensesVisible)
+            assertTrue(upgraded.sections.single {it.section==BetaHomeSection.MERCHANTS}.visible)
+            assertEquals(upgraded,BetaHomeLayout.decode(upgraded.encode()))
+            assertThrows(IllegalArgumentException::class.java) {BetaHomeLayout.decode(legacy.replace("SHORTCUTS:true","HERO:true"))}
             assertThrows(IllegalArgumentException::class.java) { BetaHomeLayout.decode("v1|true|true|HERO:true") }
         } finally { BetaContainer.resetOffline(context) }
     }

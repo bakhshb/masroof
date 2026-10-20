@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 internal fun BetaDashboardHome(read: DashboardProduction, enabled: Boolean,
     preferences: BetaDashboardViewPreferencesWorkflow?, onRoute: (String) -> Unit,
     onTransaction: (String) -> Unit, onImport: () -> Unit, layoutOpen: Boolean = false,
-    onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onLayoutClose: () -> Unit = {}, onConfiguration: () -> Unit = {}) {
+    onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onLayoutClose: () -> Unit = {}) {
     val snapshot = read.snapshot
     val unavailable = stringResource(R.string.beta_approved_dashboard_value_unavailable)
     val language = LocalConfiguration.current.locales[0].toLanguageTag()
@@ -45,7 +45,7 @@ internal fun BetaDashboardHome(read: DashboardProduction, enabled: Boolean,
     }
     if (layoutError) Text(stringResource(R.string.beta_chart_save_error), color = MaterialTheme.colorScheme.error)
     if (layoutOpen && layoutLoaded) BetaHomeLayoutSheet(layout, preferences, onClose = onLayoutClose,
-        onSaved = { layout = it; onLayoutClose() }, onConfiguration = onConfiguration)
+        onSaved = { layout = it; onLayoutClose() })
     // Keep recovery outside customizable sections, even when Recent transactions is hidden.
     if(pendingCardCount>0) MasroofCard(Modifier.testTag("home-card-setup")) {
         Text(stringResource(R.string.beta_home_cards),style=MaterialTheme.typography.titleMedium)
@@ -118,14 +118,12 @@ internal fun BetaDashboardHome(read: DashboardProduction, enabled: Boolean,
     }
 
             }
-            BetaHomeSection.TREND -> {
-    BetaHomeTrend(snapshot, enabled, preferences)
-
-
-            }
             BetaHomeSection.MERCHANTS -> {
+    Column {
+    BetaHomeTrend(snapshot, enabled, preferences)
     Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         DashboardSectionHeading(stringResource(R.string.beta_dash_analysis), icons.ChartLine)
+        Column(verticalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
         DashboardSectionHeading(stringResource(R.string.beta_home_top_merchants), icons.Store,
             actionLabel = stringResource(R.string.beta_home_view_all), onAction = if (enabled && DashboardSection.MERCHANT_TOTALS !in read.unavailableSections && analysis?.merchants?.isNotEmpty() == true) ({ onRoute("MERCHANTS") }) else null)
         when {
@@ -145,7 +143,8 @@ internal fun BetaDashboardHome(read: DashboardProduction, enabled: Boolean,
             }
         }
     }
-
+    }
+    }
             }
             BetaHomeSection.TRANSACTIONS -> {
     Column {

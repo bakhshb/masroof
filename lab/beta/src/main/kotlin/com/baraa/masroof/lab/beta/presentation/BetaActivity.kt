@@ -174,7 +174,7 @@ class BetaActivity : ComponentActivity() {
                     historyOpen = route == "HISTORY"; reviewOpen = route == "REVIEW"; approvalOpen = route == "APPROVAL"
                     discoveryOpen = route == "DISCOVERY"; settingsOpen = route == "SETTINGS"; developerToolsOpen = route in setOf("DEVELOPER","DATA"); maintenanceTools=route=="DEVELOPER"
                     editBank = null; editId = null; proposalId = null; approvalEvidenceId = null
-                    if (route == "HOME" || route == "TRANSACTIONS") { dashboardTab = route; dashboardRequest++ }
+                    if (route == "HOME" || route == "TRANSACTIONS" || route == "CONFIGURATION") { dashboardTab = route; dashboardRequest++ }
                 }
                 fun resumeSetup() {
                     if (busy || historyBusy) return
@@ -271,18 +271,19 @@ class BetaActivity : ComponentActivity() {
                             }
                         }
                     }) else null,
-                    selectedHomeTab = when { notificationsOpen -> "NONE"; settingsOpen -> "SETTINGS"; reviewOpen -> "REVIEW"; dashboardDestination in setOf("ACCOUNTS","CARDS","LOANS","COMMITMENTS","MERCHANTS","DAILY","ANALYSIS") -> "NONE"; else -> dashboardTab },
+                    selectedHomeTab = when { notificationsOpen -> "NONE"; settingsOpen -> "SETTINGS"; reviewOpen -> "REVIEW"; dashboardDestination in setOf("ACCOUNTS","CARDS","LOANS","COMMITMENTS","MERCHANTS","DAILY","ANALYSIS","CONFIGURATION") -> "NONE"; else -> dashboardTab },
                     onOpenHome = { openRoute("HOME") },
                     onOpenTransactions = { openRoute("TRANSACTIONS") },
                     dashboardOwnsScroll=true,editorOwnsScroll=reviewOpen && loaded,
                     dashboard = if (onboarding != BetaOnboardingStep.COMPLETE) null else ({ BetaDashboardPanel(dashboardWorkflow,ownsScroll=true,onDestinationChanged={dashboardDestination=it},transactionExtras={id,changed -> BetaPostedTransactionActions(shellContainer,id,{historyBusy=it},changed)}, showInternalHeader=false,onNotificationFacts={period,count -> notificationPeriod=period;notificationExcluded=count}, onPageTitle={dashboardPageTitle=it}, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, pendingCardCount=cardTasks.size,onCards={openRoute("SETTINGS");settingsCategory="CARDS"},
-                        requestedRoute = if (dashboardTab == "TRANSACTIONS") "TRANSACTIONS" else "OVERVIEW", routeRequest = dashboardRequest, onPrimaryTabChanged = { dashboardTab = it }, onBusyChanged = { historyBusy = it }, onImport = { openRoute("HISTORY") }, onSetup = ::resumeSetup,onManageAssets={kind -> openRoute("SETTINGS");settingsCategory=when(kind) {AssetKind.ACCOUNT->"ACCOUNTS";AssetKind.LOAN->"LOANS";else->"CARDS"}}) }),
+                        requestedRoute = when(dashboardTab) {"TRANSACTIONS" -> "TRANSACTIONS";"CONFIGURATION" -> "CONFIGURATION";else -> "OVERVIEW"}, routeRequest = dashboardRequest, onPrimaryTabChanged = { dashboardTab = it }, onBusyChanged = { historyBusy = it }, onImport = { openRoute("HISTORY") }, onSetup = ::resumeSetup,onManageAssets={kind -> openRoute("SETTINGS");settingsCategory=when(kind) {AssetKind.ACCOUNT->"ACCOUNTS";AssetKind.LOAN->"LOANS";else->"CARDS"}}) }),
                     onOpenDiscovery = { openRoute("DISCOVERY") },
                     onOpenHistory = { openRoute("HISTORY") },
                     onOpenApproval = { openRoute("APPROVAL") },
                     onOpenReview = { approvalEvidenceId=null;openRoute("REVIEW") },
                     onOpenSettings = { settingsCategory="HUB";openRoute("SETTINGS") },
                     onOpenDeveloperTools = { openRoute("DEVELOPER") },
+                    onOpenFinancialSettings = { openRoute("CONFIGURATION") },
                     markerCount = markerCount,
                     assets = assets,
                     returnEnabled = !historyBusy && (editBank == null || !busy),

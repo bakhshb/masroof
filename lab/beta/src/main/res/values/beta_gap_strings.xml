@@ -11,8 +11,6 @@
     <string name="beta_label_pending">قيد التنفيذ</string>
     <string name="beta_label_rejected">مرفوضة</string>
     <string name="beta_label_cancelled">ملغاة</string>
-    <string name="beta_home_layout_title">ترتيب الصفحة الرئيسية</string>
-    <string name="beta_home_layout_shortcuts">اختصارات الحسابات والبطاقات</string>
     <string name="beta_home_move_up">نقل %1$s للأعلى</string>
     <string name="beta_home_move_down">نقل %1$s للأسفل</string>
     <string name="beta_detail_data">البيانات المالية</string>

@@ -294,6 +294,8 @@
     "beta_detail_network",
     "beta_detail_outflow_group",
     "beta_detail_salary_period",
+    "beta_home_layout_shortcuts",
+    "beta_home_layout_title",
     "beta_parity_custom_date",
     "beta_parity_date_value",
     "beta_parity_import_date",
@@ -321,13 +323,12 @@
     "bank_engine": 58,
     "finance_core": 180,
     "android16_full": {
-      "total": 190,
-      "passed": 190,
-      "duration": "6m45s including lint/JVM verification",
-      "scope": "Full lab Android suite after source Home, merchant/daily pages, scoped provenance, back-state restoration and preference cache refresh.",
-      "commit": "9a1f20bf"
+      "total": 191,
+      "passed": 191,
+      "duration": "6m37s including lint/JVM verification",
+      "scope": "Full Android 16 suite after source Home customization, six-section legacy preference compatibility and developer financial-settings routing. CI test-readiness follow-up is checked separately."
     },
-    "ci": "CI 39395926174 and Lab 39395926046 passed at 9a1f20bf. Review-list follow-up awaits final-head CI.",
+    "ci": "CI/Lab passed at 9a1f20bf. Lab passed at 095900cd; CI 39398150976 failed on an async detail-readiness assertion. The assertion now waits for the restore action before checking all classification choices; final-head rerun is pending.",
     "android16_followup": {
       "passed": 20,
       "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
@@ -368,6 +369,14 @@
       "passed": 11,
       "scope": "Actual review list/detail, ignore/restore/correction, shared navigation, notifications, confirmed dashboard, daily/merchant journey and 88 captures. Includes 201-message bounded empty-page regression.",
       "lint": "passed"
+    },
+    "home_layout_followup": {
+      "passed": 16,
+      "scope": "Source layout apply/cancel, six-section v1→v2 preference/backup compatibility, actual RTL developer financial-settings navigation, category persistence, screen variants and paired captures."
+    },
+    "review_ci_followup": {
+      "passed": 4,
+      "scope": "Arabic/English review/detail/ignore/restore, correction recovery and bounded 201-message pagination. Await ignored detail restore-action readiness before checking all financial choices."
     }
   },
   "implementation_notes": [
@@ -376,11 +385,13 @@
     "رسم الرئيسية وصفحات التجار والتفاصيل اليومية تستخدم الواجهة المعتمدة. يشمل نطاق «كل المصاريف اليومية» السحب والتحويل الخارجي والقسط. ترشيح الرسم لا يغيّر إجماليات الأموال أو المستحقات.",
     "عرض الحركات موحد في الرئيسية والتفاصيل. تعرض الرئيسية آخر ثلاث حركات واسم البطاقة الكامل، وتُحفظ البطاقة واليوم عند الرجوع من تفاصيل الحركة. الإشارة في التحويل الذاتي تعتمد على الهوية الكاملة للحساب والبنك.",
     "قائمة المراجعة تستخدم ترتيب الفعلي، وعدد العناصر، والتبويبات الثابتة مع تمرير القائمة وحدها. تبقى الموافقة والتجاهل والاستعادة عبر واجهات عمل المختبر، وتمنع الكتابة المالية الرجوع أثناء التنفيذ.",
+    "تخصيص الرئيسية يستخدم الأقسام الستة وترتيب خيارات الفعلي وأيقوناته، والرسم ضمن التحليل. تُجمع تفضيلات TREND/MERCHANTS القديمة دون تصفير بقية الخيارات. إعدادات المختبر المالية متاحة من أدوات المطورين بدل نافذة التخصيص.",
     "اختبار فعلي بـ201 رسالة يثبت الوصول إلى رسالة متجاهلة بعد صفحة أولى خالية من المطابقات. لا يعني فراغ صفحة محدودة عدم وجود رسائل في الصفحات اللاحقة.",
     "نُقلت صفحة المظهر واللغة والتنبيهات وحالة المقروء. استعادة النسخة الاحتياطية تعيد تحميل تفضيلات الرسم في الجلسة نفسها.",
     "حُذفت الشاشات القديمة غير المستخدمة ومحلل الرسم العام وتكرار عرض الحركات و30 مفتاح نص حصريًا للواجهة المستبدلة. تفاصيل التاجر لا تدّعي الاكتمال إذا غابت مراجع الحركات المثبتة.",
     "المقارنة المصورة تغطي أعلى وأسفل 11 صفحة باللغتين والمظهرين. لا تغطي وسط جميع الصفحات الطويلة، ولا تثبت وحدها صحة استخراج الرسائل أو اعتماد الرحلة كاملة.",
-    "المتبقي: تبويبات إدارة الأصول والمتابعة والإيقاف والاستئناف، بقية صفحات الإعدادات والنسخ الاحتياطي والالتزامات والعمليات، تخصيص ترتيب الرئيسية، وحالات التحميل والخطأ والمقارنة الكاملة لخطوات الإعداد وتفاصيل المراجعة.",
-    "النطاق هو المختبر فقط. لا تغييرات على app أو ui-kit أو قاعدة بيانات الفعلي أو منطق LessCode وBankEngine وML. لا جداول أو أعمدة جديدة في هذه الدفعة."
+    "المتبقي: تبويبات إدارة الأصول والمتابعة والإيقاف والاستئناف، بقية صفحات الإعدادات والنسخ الاحتياطي والالتزامات والعمليات، وحالات التحميل والخطأ والمقارنة الكاملة لخطوات الإعداد وتفاصيل المراجعة.",
+    "النطاق هو المختبر فقط. لا تغييرات على app أو ui-kit أو قاعدة بيانات الفعلي أو منطق LessCode وBankEngine وML. لا جداول أو أعمدة جديدة في هذه الدفعة.",
+    "أظهر CI سباق تزامن في الاختبار بعد فتح رسالة متجاهلة؛ أصبح الاختبار ينتظر اكتمال التفاصيل بظهور إجراء الاستعادة، ثم يفحص جميع خيارات التصنيف دون حذف أي تحقق."
   ]
 }

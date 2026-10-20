@@ -227,4 +227,11 @@
 <string name="beta_approved_review_ignored_count">%1$d ignored</string>
 <string name="beta_approved_review_pending_match">Pending match</string>
 <string name="beta_approved_review_page_empty">No matching items on this page. Continue to the next page.</string>
+<string name="beta_approved_home_customize_title">Customize home screen</string>
+<string name="beta_approved_home_customize_save">Save layout</string>
+<string name="beta_approved_home_section_hero">Hero card</string>
+<string name="beta_approved_home_section_shortcuts">Shortcuts</string>
+<string name="beta_approved_home_section_commitments">Commitments</string>
+<string name="beta_approved_home_section_quick">Quick cards</string>
+<string name="beta_approved_home_section_analysis">Analysis</string>
 </resources>

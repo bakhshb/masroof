@@ -48,8 +48,11 @@ class BetaDashboardExplorationActivityTest {
             "OVERVIEW" -> Unit
             "TRANSACTIONS" -> compose.onNode(hasText(context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply {setLocale(java.util.Locale("ar"))}).getString(com.baraa.masroof.lab.beta.R.string.beta_nav_transactions)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
             "CONFIGURATION" -> {
-                compose.onNodeWithTag("home-configure").performScrollTo().performClick()
-                compose.onNodeWithTag("home-period-settings").performScrollTo().performClick()
+                val ar=context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply {setLocale(java.util.Locale("ar"))})
+                compose.onNode(hasText(ar.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_settings)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
+                compose.onNodeWithTag("manage-ABOUT").performScrollTo().performClick()
+                compose.onNodeWithTag("settings-developer-tools").performScrollTo().performClick()
+                compose.onNodeWithTag("beta-financial-settings").performScrollTo().performClick()
             }
             else -> error("Unsupported test destination")
         }

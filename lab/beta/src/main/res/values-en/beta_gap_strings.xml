@@ -11,8 +11,6 @@
     <string name="beta_label_pending">Pending</string>
     <string name="beta_label_rejected">Rejected</string>
     <string name="beta_label_cancelled">Cancelled</string>
-    <string name="beta_home_layout_title">Arrange Home</string>
-    <string name="beta_home_layout_shortcuts">Account and card shortcuts</string>
     <string name="beta_home_move_up">Move %1$s up</string>
     <string name="beta_home_move_down">Move %1$s down</string>
     <string name="beta_detail_data">Financial details</string>

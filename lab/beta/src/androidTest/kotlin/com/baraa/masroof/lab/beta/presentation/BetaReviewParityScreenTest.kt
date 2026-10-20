@@ -115,7 +115,7 @@ class BetaReviewParityScreenTest {
                 compose.onNodeWithTag("review-resolve-LOAN_REPAYMENT").performScrollTo();capture("actions-$language-${mode.lowercase()}")
                 scenario.recreate();await("review-configure-loan")
                 click("review-dismiss");await("review-empty")
-                click("review-filter-ignored");click("history-review-0")
+                click("review-filter-ignored");click("history-review-0");await("review-restore")
                 actions.forEach {compose.onNodeWithTag("review-resolve-$it").assertExists()}
                 capture("ignored-$language-${mode.lowercase()}");click("review-restore")
                 await("review-filter-pending");click("review-filter-pending");await("review-item-0")

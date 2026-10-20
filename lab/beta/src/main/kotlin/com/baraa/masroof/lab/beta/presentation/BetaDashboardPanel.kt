@@ -175,7 +175,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
                     } else when (route) {
                         "OVERVIEW" -> BetaDashboardHome(read, interactive, preferences, onRoute = { route = it },
                             onTransaction = { selectedTransaction = it }, onImport = onImport, layoutOpen = homeLayoutOpen,
-                            onSetup = onSetup, pendingCardCount=pendingCardCount,onCards=onCards, onLayoutClose = { homeLayoutOpen = false }, onConfiguration = { homeLayoutOpen = false; route = "CONFIGURATION" })
+                            onSetup = onSetup, pendingCardCount=pendingCardCount,onCards=onCards, onLayoutClose = { homeLayoutOpen = false })
                         "FLOW_IN", "FLOW_OUT" -> {
                             val incoming = route == "FLOW_IN"
                             val flow = snapshot.fleetFlow
