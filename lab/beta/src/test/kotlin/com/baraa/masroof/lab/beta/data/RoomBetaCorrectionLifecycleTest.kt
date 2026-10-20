@@ -53,6 +53,28 @@ class RoomBetaCorrectionLifecycleTest {
     @After fun close() { db.close(); BetaContainer.resetOffline(context) }
     private fun reopen() { db.close(); db = Room.databaseBuilder(context, BetaDatabase::class.java, BetaDatabase.NAME).build() }
 
+    @Test fun suppressedReviewUsesThePersistedDecisionTimeAcrossRebaseAndReopen() = runBlocking {
+        val observation=base()
+        val received=Instant.parse("2020-01-01T12:00:00Z")
+        RoomBetaEvidenceStore(db).capture(CapturedEvidence("evidence-transaction",EvidenceRequest("review-time",EvidenceOrigin.EXPLICIT_SAMPLE),
+            EvidenceMessage("evidence-transaction","fixture","synthetic only",received,ReceiptTimeSource.USER_SUPPLIED),received,
+            EvidenceRoute(RouteKind.MATCHED,setOf(bank),"review-time"),emptyList()))
+        db.evidenceDao().clearRetry("evidence-transaction")
+        store().submit(observation,command(observation))
+        val suppression=command(observation,2,decision=FinancialDecision.SuppressAsNonFinancial)
+        store().submit(observation,suppression)
+        val ignoredAt=Instant.parse("2026-10-19T23:30:00Z")
+        db.openHelper.writableDatabase.execSQL("UPDATE beta_audit_log SET createdAt=? WHERE eventKind='CORRECTION_REVISION' AND decisionId=?",
+            arrayOf(ignoredAt.toString(),suppression.decisionId))
+        assertEquals(ignoredAt,BetaReviewResolutionWorkflow(db).detail("evidence-transaction").resolvedAt)
+        val next=observation.copy(input=observation.input.copy(revision=PostingRevision(0,1)))
+        assertTrue(store().rebase(next,2) is BetaCorrectionResult.Applied)
+        reopen()
+        assertEquals(ignoredAt,BetaReviewResolutionWorkflow(db).detail("evidence-transaction").resolvedAt)
+        val ignored=BetaReviewInboxWorkflow(db).page(ignored=true).rows.single()
+        assertEquals(received,ignored.receivedAt);assertEquals(ignoredAt,ignored.resolvedAt)
+    }
+
     @Test fun financialSuppressionAndRestorationCommitDecisionAndOnlyActiveImpact() = runBlocking {
         val observation = base()
         val first = applied(store().submit(observation, command(observation)))

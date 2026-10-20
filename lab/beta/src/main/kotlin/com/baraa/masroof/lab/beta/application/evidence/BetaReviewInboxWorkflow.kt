@@ -8,7 +8,7 @@ import org.json.JSONObject
 /** User-facing review facts; operational retries are separate from human decisions. */
 data class BetaInboxRow(val id: String, val sender: String, val receivedAt: Instant,
     val bank: String?, val family: String?, val amount: String?, val currency: String?,
-    val description: String?, val reason: String?, val canApprove: Boolean, val body: String, val dismissed: Boolean = false, val financiallySuppressed: Boolean = false)
+    val description: String?, val reason: String?, val canApprove: Boolean, val body: String, val dismissed: Boolean = false, val financiallySuppressed: Boolean = false,val resolvedAt: Instant? = null)
 data class BetaInboxPage(val rows: List<BetaInboxRow>, val next: String?, val processing: Int)
 
 class BetaReviewInboxWorkflow(private val database: BetaDatabase) {
@@ -80,7 +80,7 @@ class BetaReviewInboxWorkflow(private val database: BetaDatabase) {
                 rows+=BetaInboxRow(id,raw.sender,Instant.parse(raw.receivedAt),archive?.optString("bank"),family,
                     money?.optString("amount")?.takeIf {it.toBigDecimalOrNull()!=null},money?.optString("currency")?.takeIf {code -> com.baraa.masroof.lab.finance.value.Currency.entries.any {it.name==code}},
                     facts?.optString("merchant")?.takeUnless {it in setOf("","null")} ?: facts?.optString("counterparty")?.takeUnless {it in setOf("","null")},
-                    reason, !dismissed && !informational && (summary.financialReviewReason=="FINANCIAL_APPROVAL_PENDING" || (archive?.optString("status")=="SUCCESS" && summary.financialReviewReason!=null)),raw.body,dismissed,suppressed)
+                    reason, !dismissed && !informational && (summary.financialReviewReason=="FINANCIAL_APPROVAL_PENDING" || (archive?.optString("status")=="SUCCESS" && summary.financialReviewReason!=null)),raw.body,dismissed,suppressed,resolvedAt=if(dismissed) com.baraa.masroof.lab.beta.data.RoomBetaReviewTimes(database).ignoredAt(id,correctionOwner,suppressed) else null)
             }
             if(ids.size<25) more=false
         }

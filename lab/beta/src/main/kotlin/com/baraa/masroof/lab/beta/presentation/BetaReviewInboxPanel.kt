@@ -1,7 +1,5 @@
 package com.baraa.masroof.lab.beta.presentation
 
-import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeLabel as financialTypeLabel
-import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeIcon as reviewTypeIcon
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 
 import com.baraa.masroof.lab.beta.presentation.approved.*
@@ -34,9 +32,11 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun BetaReviewInboxPanel(container: BetaContainer, onClose: () -> Unit,
     onBusyChanged: (Boolean) -> Unit,
-    initialEvidenceId: String? = null, onChanged: () -> Unit = {}, onDetailChanged: (Boolean) -> Unit = {}) {
+    initialEvidenceId: String? = null, onChanged: () -> Unit = {}, onDetailChanged: (Boolean) -> Unit = {},refreshRequest: Int=0) {
     val scope=rememberBetaUiScope()
     var busy by remember {mutableStateOf(false)}
+    var loading by remember {mutableStateOf(true)}
+    val uiBusy=busy || loading
     var ignored by rememberSaveable {mutableStateOf(false)}
     var after by rememberSaveable {mutableStateOf("")}
     var selected by rememberSaveable {mutableStateOf(initialEvidenceId)}
@@ -45,19 +45,24 @@ internal fun BetaReviewInboxPanel(container: BetaContainer, onClose: () -> Unit,
     var detail by remember {mutableStateOf<BetaReviewDetail?>(null)}
     var failed by remember {mutableStateOf(false)}
     var failureReason by remember {mutableStateOf<String?>(null)}
-    var configureReference by remember {mutableStateOf<BetaOwnershipCandidate?>(null)}
-    var configureLoan by remember {mutableStateOf(false)}
+    var configureReferenceKey by rememberSaveable {mutableStateOf<String?>(null)}
+    var configureReferenceToken by rememberSaveable {mutableStateOf<String?>(null)}
+    fun referenceKey(candidate: BetaOwnershipCandidate)=listOf(candidate.reference.bank.value,candidate.reference.kind.name,candidate.reference.suffix).joinToString("|")
+    val configureReference=detail?.ownership?.singleOrNull {referenceKey(it)==configureReferenceKey}
+    var configureLoan by rememberSaveable {mutableStateOf(false)}
     SideEffect {onBusyChanged(busy);onDetailChanged(selected!=null)}
     DisposableEffect(Unit) {onDispose {onBusyChanged(false);onDetailChanged(false)}}
-    BackHandler {if(!busy) {if(selected!=null) selected=null else onClose()}}
-    BetaLaunchedEffect(after,ignored,selected,generation) {
-        failed=false;failureReason=null;page=null;detail=null
+    BackHandler {if(!busy) {if(selected!=null) {selected=null;configureReferenceKey=null;configureReferenceToken=null;configureLoan=false} else onClose()}}
+    BetaLaunchedEffect(after,ignored,selected,generation,refreshRequest) {
+        loading=true;failed=false;failureReason=null;page=null
+        if(detail?.row?.id!=selected) detail=null
         try {withContext(BetaIo.dispatcher) {
             if(selected!=null) null to container.reviewDetail(checkNotNull(selected))
             else container.reviewInboxPage(after,ignored) to null
         }.let {page=it.first;detail=it.second}}
         catch(c: CancellationException) {throw c}
         catch(_: Exception) {failed=true}
+        finally {loading=false}
     }
     fun perform(closeOnSuccess: Boolean = false, action: ()->Unit) {
         if(busy) return
@@ -69,7 +74,7 @@ internal fun BetaReviewInboxPanel(container: BetaContainer, onClose: () -> Unit,
                     selectedId!=null && container.financialPosting(com.baraa.masroof.lab.finance.posting.PostingKey(com.baraa.masroof.lab.finance.value.Environment.BETA,"evidence:$selectedId"))!=null
                 }
                 if(closeOnSuccess || posted) selected=null
-                configureReference=null;configureLoan=false;generation++;onChanged()
+                configureReferenceKey=null;configureReferenceToken=null;configureLoan=false;generation++;onChanged()
             } catch(c: CancellationException) {throw c}
             catch(error: Exception) {failed=true;failureReason=error.message?.takeIf {it.matches(Regex("[A-Z_]{1,80}"))}}
             finally {busy=false}
@@ -81,102 +86,70 @@ internal fun BetaReviewInboxPanel(container: BetaContainer, onClose: () -> Unit,
         val existing=candidate?.asset ?: current.preview?.assets?.filter {it.kind==AssetKind.LOAN && it.id.bank.value==current.row.bank}?.singleOrNull().takeIf {configureLoan}
         val kind=existing?.kind ?: if(configureLoan) AssetKind.LOAN else if(candidate?.reference?.kind==BetaOwnershipKind.ACCOUNT) AssetKind.ACCOUNT else AssetKind.DEBIT_CARD
         val bank=existing?.id?.bank ?: candidate?.reference?.bank ?: current.row.bank?.let {com.baraa.masroof.lab.finance.value.BankId(it)}
-        if(bank!=null) BetaAssetEditor(bank,existing,current.preview?.assets.orEmpty(),busy,failed,
+        if(bank!=null) BetaAssetEditor(bank,existing,current.preview?.assets.orEmpty(),uiBusy,failed,
             initialKind=kind,initialSuffix=candidate?.reference?.suffix.orEmpty(),
             allowedKinds=if(kind in setOf(AssetKind.CREDIT_CARD,AssetKind.DEBIT_CARD)) setOf(AssetKind.CREDIT_CARD,AssetKind.DEBIT_CARD) else setOf(kind),
             ownershipConfirmed=candidate?.status==BetaOwnershipStatus.OWNED, registryMetadata=current.assetMetadata, metadata=existing?.let {current.assetMetadata[it.id]} ?: BetaAssetMetadata(),
-            onCancel={configureReference=null;configureLoan=false},onSave={draft -> perform {
-                val saved=container.saveManualAsset(draft)
-                candidate?.reference?.let {ref -> container.ownershipSnapshot().candidates.singleOrNull {it.reference==ref}?.let {container.decideOwnership(it,true,saved.id)}}
+            onCancel={configureReferenceKey=null;configureReferenceToken=null;configureLoan=false},onSave={draft -> perform {
+                if(candidate!=null) container.saveReviewAsset(draft,candidate.reference,checkNotNull(configureReferenceToken))
+                else container.saveManualAsset(draft)
             }})
     }
     Column(Modifier.fillMaxSize().then(if(current!=null) Modifier.verticalScroll(rememberScrollState()) else Modifier),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
-        if(failed) {
+        if(failed && current==null) {
             Text(stringResource(failureReason?.let(::approvalReason) ?: R.string.beta_review_failed),color=MaterialTheme.colorScheme.error)
-            OutlinedButton(enabled=!busy,onClick={generation++}) {Text(stringResource(R.string.beta_retry))}
+            OutlinedButton(enabled=!uiBusy,onClick={generation++}) {Text(stringResource(R.string.beta_retry))}
         }
         if(page==null && detail==null && !failed) CircularProgressIndicator()
         if(current!=null) {
             val entry=current.row
-            MasroofCard {
-                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.carouselGap)) {
-                    Icon(reviewFamilyIcon(entry.family),null,Modifier.size(MasroofIconSizes.logo),tint=MaterialTheme.colorScheme.primary)
-                    Text(stringResource(if(entry.dismissed) R.string.beta_review_parity_ignored else R.string.beta_review_parity_kind),style=MaterialTheme.typography.titleMedium)
-                }
-                entry.amount?.let {Text(betaMoney(it,entry.currency),Modifier.padding(top=MasroofSpacing.sectionHeaderGap),style=MaterialTheme.typography.displayMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)}
-            }
-            BetaReviewMeta(MasroofOutlineIcons.MessageSquare,stringResource(R.string.beta_complete_review_sender,entry.sender))
-            BetaReviewMeta(MasroofOutlineIcons.CalendarDays,stringResource(R.string.beta_complete_review_date,betaDate(entry.receivedAt)))
-            current.resolvedAt?.let {BetaReviewMeta(MasroofOutlineIcons.CircleCheck,stringResource(R.string.beta_review_parity_ignored_at,betaDate(it)))}
-            if(entry.dismissed) {
-                MasroofCard {Text(stringResource(R.string.beta_review_parity_restore_hint))}
-                DashboardSectionHeading(stringResource(R.string.beta_review_parity_restore_title),MasroofOutlineIcons.ShieldCheck)
-                BetaReviewActionButton(stringResource(R.string.beta_review_parity_restore),MasroofOutlineIcons.CircleCheck,!busy,"review-restore") {perform(true) {container.resolveReviewAsNonFinancial(entry.id,true)}}
-                if(entry.financiallySuppressed) betaReviewFinancialTypes.forEach {type ->
-                    BetaReviewActionButton(stringResource(R.string.beta_review_parity_restore_as,stringResource(financialTypeLabel(type))),reviewTypeIcon(type),!busy,"review-restore-${type.name}") {
-                        perform(true) {container.resolveReviewAsNonFinancial(entry.id,true,type)}
+            BetaReviewDetailContent(betaReviewDetailView(current,ignored),restoration={
+                BetaReviewActionButton(stringResource(R.string.beta_review_parity_restore),MasroofOutlineIcons.CircleCheck,!uiBusy,"review-restore") {perform(true) {container.resolveReviewAsNonFinancial(entry.id,true)}}
+                if(entry.financiallySuppressed) BetaReviewFinancialActions(betaReviewFinancialTypes,uiBusy,restore=true,tagPrefix="review-restore") {type ->
+                    perform(true) {container.resolveReviewAsNonFinancial(entry.id,true,type)}
+                } else BetaReviewResolutionActions(current.copy(actions=betaReviewFinancialTypes),uiBusy,{request -> perform {
+                    check(container.restoreReviewAsFinancial(request) is BetaFinancialAdoptionResult.Posted);selected=null
+                }},onRetryPending={perform {check(container.retryFinancialApproval(entry.id,current.preview?.pending) is BetaFinancialAdoptionResult.Posted);selected=null}},
+                    onCancelPending={perform {current.preview?.pending?.let {container.cancelFinancialApproval(it)}}},restore=true)
+            },ownership={
+                if(!entry.dismissed && !ignored) {
+                    current.ownership.filter {it.status!=BetaOwnershipStatus.OWNED || it.asset==null || (it.asset.kind==AssetKind.DEBIT_CARD && it.asset.parentId==null)}.forEach {candidate ->
+                        BetaReviewOwnershipPrompt(candidate,uiBusy,{owned,asset -> perform {
+                            if(owned==null) container.deferOwnership(candidate) else container.decideOwnership(candidate,owned,asset)
+                        }},{configureReferenceKey=referenceKey(candidate);configureReferenceToken=candidate.token})
                     }
-                } else BetaReviewResolutionActions(current.copy(actions=betaReviewFinancialTypes),busy,{request -> perform {
-                    check(container.restoreReviewAsFinancial(request) is BetaFinancialAdoptionResult.Posted)
-                    selected=null
-                }},onRetryPending={perform {check(container.retryFinancialApproval(entry.id,current.preview?.pending) is BetaFinancialAdoptionResult.Posted);selected=null}},onCancelPending={perform {current.preview?.pending?.let {container.cancelFinancialApproval(it)}}},restore=true)
-            }
-            current.merchant?.let {BetaReviewMeta(MasroofOutlineIcons.Store,stringResource(R.string.beta_review_parity_merchant,it))}
-            current.counterparty?.let {BetaReviewMeta(MasroofOutlineIcons.User,stringResource(R.string.beta_review_parity_counterparty,it))}
-            DashboardSectionHeading(stringResource(R.string.beta_complete_review_reasons),MasroofOutlineIcons.TriangleAlert)
-            reviewReasonLabels(current).forEach {Text("• "+stringResource(it))}
-            if(!entry.dismissed && !ignored) {
-                current.ownership.filter {it.status!=BetaOwnershipStatus.OWNED || it.asset==null || (it.asset.kind==AssetKind.DEBIT_CARD && it.asset.parentId==null)}.forEach {candidate ->
-                    BetaReviewOwnershipPrompt(candidate,busy,{owned,asset -> perform {
-                        if(owned==null) container.deferOwnership(candidate) else container.decideOwnership(candidate,owned,asset)
-                    }},{configureReference=candidate})
+                    if(current.loanConfiguration) BetaReviewActionButton(stringResource(R.string.beta_complete_review_loan),MasroofOutlineIcons.Landmark,!uiBusy,"review-configure-loan") {configureLoan=true}
                 }
-                if(current.loanConfiguration) Button(enabled=!busy,onClick={configureLoan=true},modifier=Modifier.fillMaxWidth().testTag("review-configure-loan")) {
-                    Text(stringResource(R.string.beta_complete_review_loan))
-                }
-            }
-            DashboardSectionHeading(stringResource(R.string.beta_complete_review_message),MasroofOutlineIcons.MessageSquare)
-            MasroofCard {Text(entry.body,textAlign=TextAlign.Start)}
-            if(!entry.dismissed && !ignored) {
-                if(current.preview?.pending==null) BetaReviewActionButton(stringResource(R.string.beta_review_parity_ignore),MasroofOutlineIcons.TriangleAlert,!busy,"review-dismiss") {perform(true) {container.resolveReviewAsNonFinancial(entry.id)}}
-                if(current.correctionAction!=null) {
-                    DashboardSectionHeading(stringResource(R.string.beta_review_parity_actions),MasroofOutlineIcons.ShieldCheck)
-                    current.actions.filter {it in current.correctionAction.allowedTypes}.forEach {type ->
-                        BetaReviewActionButton(stringResource(reviewFinancialTypeActionLabel(type)),reviewTypeIcon(type),!busy,"review-resolve-${type.name}") {
-                            perform {
-                                check(container.reclassifyTransaction(current.correctionAction.token,java.util.UUID.randomUUID().toString(),type))
-                                selected=null
-                            }
+            },actions={
+                if(!entry.dismissed && !ignored) {
+                    if(current.preview?.pending==null && betaReviewKindLabel(false,entry.reason)!=R.string.beta_approved_review_pending_match) BetaReviewActionButton(stringResource(R.string.beta_review_parity_ignore),MasroofOutlineIcons.TriangleAlert,!uiBusy,"review-dismiss") {perform(true) {container.resolveReviewAsNonFinancial(entry.id)}}
+                    if(current.correctionAction!=null) {
+                        BetaReviewFinancialActions(current.actions.filter {it in current.correctionAction.allowedTypes},uiBusy,family=entry.family) {type ->
+                            perform {check(container.reclassifyTransaction(current.correctionAction.token,java.util.UUID.randomUUID().toString(),type));selected=null}
                         }
-                    }
-                } else BetaReviewResolutionActions(current,busy,{request ->
-                    perform {
-                        val result=container.approveEvidenceFinancial(request)
-                        check(result is BetaFinancialAdoptionResult.Posted) {"Financial decision remains retryable"}
-                        selected=null
-                    }
-                },onRetryPending={perform {
-                    val request=checkNotNull(current.preview?.pending)
-                    check(container.retryFinancialApproval(entry.id,request) is BetaFinancialAdoptionResult.Posted)
-                    selected=null
-                }},onCancelPending={perform {checkNotNull(current.preview?.pending).let {check(container.cancelFinancialApproval(it))}}})
-                if(current.preview?.blockedReason!=null || current.actions.isEmpty()) BetaReviewActionButton(stringResource(R.string.beta_complete_review_retry),MasroofOutlineIcons.RotateCcw,!busy,"review-reinterpret") {perform {container.reprocessEvidence(entry.id)}}
-            }
+                    } else BetaReviewResolutionActions(current,uiBusy,{request -> perform {
+                        check(container.approveEvidenceFinancial(request) is BetaFinancialAdoptionResult.Posted) {"Financial decision remains retryable"};selected=null
+                    }},onRetryPending={perform {
+                        check(container.retryFinancialApproval(entry.id,checkNotNull(current.preview?.pending)) is BetaFinancialAdoptionResult.Posted);selected=null
+                    }},onCancelPending={perform {check(container.cancelFinancialApproval(checkNotNull(current.preview?.pending)))}})
+                    if(current.preview?.blockedReason!=null || current.actions.isEmpty()) BetaReviewActionButton(stringResource(R.string.beta_complete_review_retry),MasroofOutlineIcons.RotateCcw,!uiBusy,"review-reinterpret") {perform {container.reprocessEvidence(entry.id)}}
+                }
+            },feedback={BetaReviewFeedback(uiBusy,failed,failureReason?.let {stringResource(approvalReason(it))},onReload={generation++})})
             return@Column
         }
         page?.let {loaded ->
             if(loaded.processing>0) MasroofCard {
                 Text(stringResource(R.string.beta_fix_processing))
-                OutlinedButton(enabled=!busy,onClick={perform {container.retryEvidence(100)}},modifier=Modifier.testTag("review-retry-processing")) {Text(stringResource(R.string.beta_retry))}
+                OutlinedButton(enabled=!uiBusy,onClick={perform {container.retryEvidence(100)}},modifier=Modifier.testTag("review-retry-processing")) {Text(stringResource(R.string.beta_retry))}
             }
             val items=loaded.rows.map {item -> ApprovedReviewListItem(item.description ?: item.sender,
-                stringResource(if(ignored) R.string.beta_review_parity_ignored else R.string.beta_review_parity_kind),ignored,
-                item.amount?.let {betaMoney(it,item.currency)},betaDate(item.receivedAt),
+                stringResource(betaReviewKindLabel(ignored,item.reason)),ignored,
+                item.amount?.let {betaMoney(it,item.currency)},betaReviewDate(if(ignored) item.resolvedAt else item.receivedAt),
                 stringResource(if(item.family==null || item.family=="UNKNOWN") R.string.beta_complete_review_unknown_reason else approvalReason(item.reason.orEmpty())),
                 stringResource(R.string.beta_complete_review_evidence))}
-            ApprovedReviewListContent(items,ignored,!busy,{ignored=it;after=""},{selected=loaded.rows[it].id},afterContent=if(loaded.next!=null || after.isNotEmpty()) ({
-                if(loaded.next!=null) OutlinedButton(enabled=!busy,onClick={after=loaded.next},modifier=Modifier.testTag("review-next-page")) {Text(stringResource(R.string.beta_history_next))}
-                if(after.isNotEmpty()) TextButton(enabled=!busy,onClick={after=""},modifier=Modifier.testTag("review-first-page")) {Text(stringResource(R.string.beta_history_first))}
+            ApprovedReviewListContent(items,ignored,!uiBusy,{ignored=it;after=""},{selected=loaded.rows[it].id;configureReferenceKey=null;configureReferenceToken=null;configureLoan=false},afterContent=if(loaded.next!=null || after.isNotEmpty()) ({
+                if(loaded.next!=null) OutlinedButton(enabled=!uiBusy,onClick={after=loaded.next},modifier=Modifier.testTag("review-next-page")) {Text(stringResource(R.string.beta_history_next))}
+                if(after.isNotEmpty()) TextButton(enabled=!uiBusy,onClick={after=""},modifier=Modifier.testTag("review-first-page")) {Text(stringResource(R.string.beta_history_first))}
             }) else null) {
                 Column(Modifier.fillMaxSize().testTag("review-empty").padding(MasroofSpacing.screenPaddingLarge),
                     horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
@@ -184,7 +157,7 @@ internal fun BetaReviewInboxPanel(container: BetaContainer, onClose: () -> Unit,
                     Spacer(Modifier.height(MasroofSpacing.sectionGap))
                     Text(stringResource(if(loaded.next!=null) R.string.beta_approved_review_page_empty else if(ignored) R.string.beta_complete_review_ignored_empty else R.string.beta_complete_review_empty),Modifier.fillMaxWidth(),textAlign=TextAlign.Center)
                     Spacer(Modifier.height(MasroofSpacing.sectionGap))
-                    ApprovedIconTextButton(onClose,stringResource(R.string.beta_dash_back),icon=MasroofOutlineIcons.CalendarDays,enabled=!busy)
+                    ApprovedIconTextButton(onClose,stringResource(R.string.beta_dash_back),icon=MasroofOutlineIcons.CalendarDays,enabled=!uiBusy)
                 }
             }
         }

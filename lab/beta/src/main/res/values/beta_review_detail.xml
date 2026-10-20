@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="beta_review_detail_review_detail_title">تفاصيل المراجعة</string>
+    <string name="beta_review_detail_review_sms_body">نص الرسالة</string>
+    <string name="beta_review_detail_review_action_incoming_income">دخل (راتب أو مكافأة)</string>
+    <string name="beta_review_detail_review_action_failed">تعذر تنفيذ الإجراء</string>
+    <string name="beta_review_detail_review_reason_needs_review">يحتاج مراجعة يدوية</string>
+    <string name="beta_review_detail_review_reason_transfer_pending_match">حوالة بانتظار مطابقة الطرف الآخر</string>
+    <string name="beta_review_detail_review_reason_user_ignored_transaction">تم التجاهل من تفاصيل الحركة</string>
+    <string name="beta_review_detail_review_reason_purchase_ownership_unknown">شراء — ملكية البطاقة غير محددة</string>
+</resources>

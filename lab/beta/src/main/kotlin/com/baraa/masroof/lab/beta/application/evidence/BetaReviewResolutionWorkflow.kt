@@ -31,7 +31,7 @@ class BetaReviewResolutionWorkflow(private val database: BetaDatabase) {
         val reason=summary.financialReviewReason ?: summary.reasonCodes.sorted().firstOrNull()
         val row=BetaInboxRow(id,raw.sender,Instant.parse(raw.receivedAt),archive?.optString("bank"),text("family"),
             money?.optString("amount")?.takeIf {it.toBigDecimalOrNull()!=null},money?.optString("currency"),
-            text("merchant") ?: text("counterparty"),reason,false,raw.body,dismissed,suppressed)
+            text("merchant") ?: text("counterparty"),reason,false,raw.body,dismissed,suppressed,resolvedAt=if(dismissed) RoomBetaReviewTimes(database).ignoredAt(id,correctionOwner,suppressed) else null)
         val preview=RoomBetaFinancialAdoption(database).preview(id)
         val store=RoomBetaEvidenceStore(database)
         val refs=store.ownershipObservations(id).map {it.reference}.toSet()
@@ -74,6 +74,6 @@ class BetaReviewResolutionWorkflow(private val database: BetaDatabase) {
             if(type==FinancialType.LOAN_REPAYMENT) loan?.id else if(type==FinancialType.CREDIT_CARD_PAYMENT) credit?.id else if(incoming) owner else null,
             if(text("salaryIncomeWording")=="true") IncomeAttribution.SALARY else IncomeAttribution.OTHER,
             reason=="CONFIRM_LOAN",metadata,summary.reasonCodes+listOfNotNull(reason)+
-                archive?.optJSONArray("diagnostics")?.let {ds -> (0 until ds.length()).map {ds.getJSONObject(it).optString("code")}}.orEmpty(), type, dao.decision(id)?.updatedAt?.let(Instant::parse).takeIf {dismissed},text("merchant"),text("counterparty"),correctionAction)
+                archive?.optJSONArray("diagnostics")?.let {ds -> (0 until ds.length()).map {ds.getJSONObject(it).optString("code")}}.orEmpty(), type, row.resolvedAt,text("merchant"),text("counterparty"),correctionAction)
     }
 }

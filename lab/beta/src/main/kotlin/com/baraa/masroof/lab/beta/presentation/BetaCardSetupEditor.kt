@@ -23,6 +23,7 @@ internal fun BetaCardSetupEditor(
     initialKind: AssetKind, initialSuffix: String, metadata: BetaAssetMetadata,
     registryMetadata: Map<AssetId, BetaAssetMetadata>, ownershipConfirmed: Boolean,
 ) {
+    val originalMetadataRevision by rememberSaveable { androidx.compose.runtime.mutableLongStateOf(metadata.revision) }
     val localId = rememberSaveable { existing?.id?.localId ?: proposal?.id?.localId ?: UUID.randomUUID().toString() }
     val facilityId = rememberSaveable { UUID.randomUUID().toString() }
     val originalKind by rememberSaveable { mutableStateOf(existing?.kind?.name) }
@@ -67,6 +68,6 @@ internal fun BetaCardSetupEditor(
             onSave(ManualAssetDraft(stableId, configuration.type, suffix, parent, configuration.role,
                 ownedConfirmed = existing != null || confirmed, editing = existing != null, expectedOriginal = original,
                 createCreditFacility = configuration.type == AssetKind.CREDIT_CARD && configuration.role != CreditCardRole.SUPPLEMENTARY && assets.none { it.id == parent },
-                metadata = metadata.copy(network = configuration.network?.name, accountType = null, loanType = null)))
+                metadata = metadata.copy(network = configuration.network?.name, accountType = null, loanType = null, revision=originalMetadataRevision)))
         })
 }

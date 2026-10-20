@@ -41,6 +41,7 @@ internal fun BetaAssetEditor(
             proposal, initialKind, initialSuffix, metadata, registryMetadata, ownershipConfirmed)
         return
     }
+    val originalMetadataRevision by rememberSaveable { androidx.compose.runtime.mutableLongStateOf(metadata.revision) }
     val localId = rememberSaveable { existing?.id?.localId ?: proposal?.id?.localId ?: UUID.randomUUID().toString() }
     val originalKind by rememberSaveable { mutableStateOf(existing?.kind?.name) }
     val originalSuffix by rememberSaveable { mutableStateOf(existing?.last4) }
@@ -63,7 +64,7 @@ internal fun BetaAssetEditor(
     fun save() { onSave(ManualAssetDraft(stableId,kind,suffix,
         ownedConfirmed=confirmed,editing=existing!=null,expectedOriginal=original,
         metadata=com.baraa.masroof.lab.beta.application.BetaAssetMetadata(displayName.trim().takeIf { it.isNotEmpty() },
-            null,accountType.takeIf {kind==AssetKind.ACCOUNT},loanType.takeIf {kind==AssetKind.LOAN},metadata.revision))) }
+            null,accountType.takeIf {kind==AssetKind.ACCOUNT},loanType.takeIf {kind==AssetKind.LOAN},originalMetadataRevision))) }
     BetaBottomSheet(stringResource(if(existing==null) R.string.beta_asset_add else R.string.beta_asset_edit),busy,onCancel,::save,
         canApply=valid,applyTag="asset-save",cancelTag="asset-cancel",applyLabel=stringResource(R.string.beta_asset_save)) {
         Text(stringResource(bankName(bank)), style = MaterialTheme.typography.titleMedium)

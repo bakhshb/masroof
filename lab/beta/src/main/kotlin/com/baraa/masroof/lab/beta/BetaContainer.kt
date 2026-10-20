@@ -534,6 +534,22 @@ class BetaContainer(
         runBlocking { database.withTransaction { saveAssetDraft(draft) } }
     }
 
+    /** Bind the opened ownership prompt and commit configuration + ownership together. */
+    fun saveReviewAsset(draft: ManualAssetDraft,reference: com.baraa.masroof.lab.beta.application.BetaOwnershipReference,
+        expectedToken: String): OwnedAsset = lock.withLock {
+        check(!closed)
+        invalidateAutomaticProcessing()
+        runBlocking {database.withTransaction {
+            val ownership=com.baraa.masroof.lab.beta.application.BetaOwnershipWorkflow(database)
+            val shown=ownership.snapshot().candidates.singleOrNull {it.reference==reference}
+            check(shown?.token==expectedToken) {"STALE_OWNERSHIP"}
+            val saved=saveAssetDraft(draft)
+            val updated=ownership.snapshot().candidates.single {it.reference==reference}
+            ownership.decide(updated,true,saved.id)
+            saved
+        }}
+    }
+
     private suspend fun saveAssetDraft(draft: ManualAssetDraft): OwnedAsset {
         val workflow = BetaManualAssetWorkflow(BetaAssetRegistry(database))
         val metadata=draft.metadata

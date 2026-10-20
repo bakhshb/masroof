@@ -145,7 +145,7 @@
       "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
       "lab_visual_reference": "build/reports/ui-parity/lab-approved-fixture",
-      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — loaded-state top/bottom captures only; whole journey remains in progress.",
+      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — list plus five detail states / 40 exact native body captures; bank-choice/pairing/ordering/error and complete journey remain open.",
       "old_renderer_removed": false,
       "accepted": false
     },
@@ -210,7 +210,7 @@
   "design_guide": "docs/DESIGN_SYSTEM.md",
   "design_version": "approved-2026-10-10",
   "production_visual_baseline": {
-    "pages": 33,
+    "pages": 38,
     "locales": [
       "ar",
       "en"
@@ -219,12 +219,14 @@
       "light",
       "dark"
     ],
-    "captures": 264,
+    "captures": 304,
     "path": "lab/beta/build/reports/ui-parity/production",
     "status": "captured",
     "data": "synthetic FidelityFixtures; no user database",
     "viewport": "1080x1920, density 420; content screenshots exclude Android status bars",
-    "transaction_detail_reference": "Pinned production 0d86c5d3, unchanged main source, temporary synthetic test harness prepared with lab/beta/tools/prepare_transaction_detail_reference.py; 8 native captures passed."
+    "transaction_detail_reference": "Pinned production 0d86c5d3, unchanged main source, temporary synthetic test harness prepared with lab/beta/tools/prepare_ui_reference.py; 8 native captures passed.",
+    "count_definition": "38 source capture cases, including five states of review detail; not 38 distinct app pages.",
+    "review_detail_reference": "Original ReviewScreen bytes preserved as prefix in a temporary pinned checkout; appended test-only bridge to private renderer. Five cases / 40 PNGs; tools/prepare_ui_reference.py."
   },
   "removed_implementations": [
     "The Material3 ModalBottomSheet body in BetaBottomSheet; now a labels/tags adapter to the copied production modal.",
@@ -252,7 +254,8 @@
     "Generic settings asset/bank loop and ordinary management Add callbacks replaced by one source-derived BetaRegistryManagementPanel; explicit developer manual configuration remains separate.",
     "Generic transaction list renderer, twenty-row pagination and single type/asset filter replaced by source toolbar, multi-filter draft and independent lazy list. TransactionPreviewRow is now one canonical BetaMovementRow reused by list and scoped pages.",
     "Generic commitment list/editor/add/delete/manual-paid UI and commitmentsOnly branch removed from BetaDashboardConfigurationPanel. Unused legacy commitment/paid/remove workflow methods removed; storage regression now calls BetaCommitmentsWorkflow.edit. Salary/statement controls remain separate.",
-    "The legacy colored transaction hero, generic detail rows, source-evidence/actions headings and direct-save classification sheet are removed. Detail content, evidence and buttons use one source-derived renderer each; the sheet has the source current badge, preview and explicit confirmation. Twelve exclusive old text keys are removed."
+    "The legacy colored transaction hero, generic detail rows, source-evidence/actions headings and direct-save classification sheet are removed. Detail content, evidence and buttons use one source-derived renderer each; the sheet has the source current badge, preview and explicit confirmation. Twelve exclusive old text keys are removed.",
+    "The legacy review-detail header and raw-message-first layout were removed from BetaReviewInboxPanel; source-ordered content and financial action rows now have one canonical renderer used by live review and frozen captures."
   ],
   "removed_resource_keys": [
     "beta_asset_link_account",
@@ -520,6 +523,18 @@
       "native_final_cases_passed": 9,
       "lint": "passed",
       "ci_label_regression": "New label producer regression failed before fix, passed after; the Android read-contract fixture uses the producer labels and continues asserting that technical IDs never render."
+    },
+    "review_detail_followup": {
+      "lab_jvm_passed": 347,
+      "native_targeted_passed": 24,
+      "scope": "Review and registry real-device tests on API 36: stale metadata drafts reject changed revisions; card configuration and ownership bind atomically; failed ownership rolls back; a configured owned card posts once automatically; endpoint selection survives recreation and cancels without writing; changed archive/registry invalidates confirmation; unknown currency never invents SAR; ignored decision time survives replay and reopen. Lint passed. All 24 frozen capture cases rerun after the shared button correction: 192 pairs, 188 exact bodies; all 40 new review captures exact. Four existing account-detail bottom edge differences remain at max 6–7/255. No whole-app acceptance or full native/process-death rerun claimed.",
+      "limitations": "Review bank selection, manual pair choice, durable global review ordering, error variants, busy-write recreation and remaining setup/settings/backup flows are not accepted. Busy screenshot matches while lab navigation remains disabled during writes; visual equality alone does not prove action behavior.",
+      "lint": "passed",
+      "paired_capture_cases": 24,
+      "paired_captures": 192,
+      "pixel_identical_bodies": 188,
+      "review_detail_exact_bodies": 40,
+      "production_reference_capture_test_passed": 1
     }
   },
   "implementation_notes": [
@@ -546,7 +561,9 @@
     "أُضيف إنشاء الالتزام من الحركة المعتمدة عبر تأكيد الفعلي، مع ربط التأكيد بمصدره الحالي ورفض المصدر المتغيّر أو الموقوف، ومنع تكرار الإنشاء. تُحفظ العملة والمبلغ والتاريخ الأصليون والرابط، وتُقرأ مصادر العملة الأجنبية القديمة قراءة مخصصة لا تدخل في صرف الفترة الحالية. يعرض مركز الإعدادات عدد النشط والمتوقف الحقيقي بدل صفر مشتق من الأصول.",
     "تحسين دقة موثّق عن الحساب القديم: قيمة الالتزام الأجنبي المعدّلة تُقرب مرة واحدة عند ناتج الريال، بدل تقريب النسبة الوسيطة التي قد تجعل 0.01 USD تظهر بصفر. بقيت مبالغ الحركات الفعلية وأسعارها المثبتة وقواعد المحرك وML دون تغيير.",
     "Commitments summary now uses the production label/date/badge/money/icon layout with source row names and no legacy twenty-row pagination. Typed rows open primary card/loan; user occurrences open the existing settings editor. Unique direct-launch state is discarded on exit, retained on recreation, and removed from the holder after leaving. Production sources remain untouched.",
-    "نُقلت تفاصيل الحركة ونص الرسالة والأزرار والتأكيد الثاني للتصنيف من الفعلي. المشاركة تحفظ صفحة التفاصيل، والتحديث عند استئناف التطبيق أو وصول رسالة لا يُعد طلب تنقل جديدًا. المسودات مرتبطة بالإصدار الأصلي وتُرفض إذا تغيرت العملية. أزيل العرض القديم و12 مفتاح نص غير مستخدم. المقارنة الآن 152 زوجًا على 19 صفحة، منها 148 منطقة متطابقة؛ الفروق الأربع المتبقية عند حواف صور تفاصيل الحساب مسجلة مسبقًا. النطاق المختبر فقط، مع تصحيح تسمية مقروءة في lab/finance-core دون تغيير المال أو المحرك أو قاعدة البيانات."
+    "نُقلت تفاصيل الحركة ونص الرسالة والأزرار والتأكيد الثاني للتصنيف من الفعلي. المشاركة تحفظ صفحة التفاصيل، والتحديث عند استئناف التطبيق أو وصول رسالة لا يُعد طلب تنقل جديدًا. المسودات مرتبطة بالإصدار الأصلي وتُرفض إذا تغيرت العملية. أزيل العرض القديم و12 مفتاح نص غير مستخدم. المقارنة الآن 152 زوجًا على 19 صفحة، منها 148 منطقة متطابقة؛ الفروق الأربع المتبقية عند حواف صور تفاصيل الحساب مسجلة مسبقًا. النطاق المختبر فقط، مع تصحيح تسمية مقروءة في lab/finance-core دون تغيير المال أو المحرك أو قاعدة البيانات.",
+    "نُقل ترتيب تفاصيل المراجعة من الفعلي: نوع المراجعة والمبلغ والمرسل والتواريخ والاستعادة والتاجر والأسباب والملكية ثم الرسالة والإجراءات. أُصلحت مسودات الإعداد واختيار الأطراف المتقادمة، وجُمعت إعدادات البطاقة وقرار الملكية في معاملة واحدة، وأصبح وقت التجاهل مأخوذًا من قرار محفوظ. لا تغيير في الجداول أو المحرك أو ML أو الفعلي. اختيار البنك والربط اليدوي للتحويلات وترتيب صفحات المراجعة الكامل وحالات الخطأ وبعض الرحلات تبقى مفتوحة؛ لا إعلان اكتمال للتطبيق.",
+    "كشفت المقارنة أن زر الإجراءات المنقول يستدعي Material Button بدل غلاف الفعلي. صُحح المكوّن المشترك وأعيد استخدامه لزري الملكية بدل نسختين مكررتين. أعيد تصوير جميع الحالات الـ24: 188 منطقة متطابقة من 192، ومنها حالات تفاصيل المراجعة الخمس كلها (40/40). الفروق الأربع القديمة عند حواف تفاصيل الحساب تبقى محسوبة. نجاح الصور لا يغلق الاختيار البنكي والربط اليدوي وترتيب المراجعة وبقية الرحلات."
   ],
   "source_page_inventory": [
     {
@@ -812,7 +829,52 @@
       "accepted": false,
       "remaining_gate": "Eight loaded-state top/bottom captures are exact in both languages/themes. Actual Activity share, two-step reclassification/cancel/recreation/resume, ignore and stale-token rejection passed. FX/multiple-SMS/held-write/error/long-content visual variants remain open.",
       "label_ar": "تفاصيل الحركة وإجراءاتها",
-      "reference_harness": "lab/beta/tools/prepare_transaction_detail_reference.py"
+      "reference_harness": "lab/beta/tools/prepare_ui_reference.py"
+    },
+    {
+      "id": "reviewDetail",
+      "parent_journey": "review",
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/review/ReviewScreen.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Frozen visual body comparison passed in all eight variants per case. Action/cancel/recovery and whole journey gates remain; bank selection, pair choice and durable ordering still open.",
+      "label_ar": "تفاصيل المراجعة"
+    },
+    {
+      "id": "reviewIgnored",
+      "parent_journey": "review",
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/review/ReviewScreen.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Frozen visual body comparison passed in all eight variants per case. Action/cancel/recovery and whole journey gates remain; bank selection, pair choice and durable ordering still open.",
+      "label_ar": "استعادة رسالة متجاهلة"
+    },
+    {
+      "id": "reviewOwnership",
+      "parent_journey": "review",
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/review/ReviewScreen.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Frozen visual body comparison passed in all eight variants per case. Action/cancel/recovery and whole journey gates remain; bank selection, pair choice and durable ordering still open.",
+      "label_ar": "مراجعة ملكية البطاقة"
+    },
+    {
+      "id": "reviewTransfer",
+      "parent_journey": "review",
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/review/ReviewScreen.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Frozen visual body comparison passed in all eight variants per case. Action/cancel/recovery and whole journey gates remain; bank selection, pair choice and durable ordering still open.",
+      "label_ar": "مراجعة التحويل المعلّق"
+    },
+    {
+      "id": "reviewBusy",
+      "parent_journey": "review",
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/review/ReviewScreen.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Frozen visual body comparison passed in all eight variants per case. Action/cancel/recovery and whole journey gates remain; bank selection, pair choice and durable ordering still open.",
+      "label_ar": "المراجعة أثناء الحفظ"
     }
   ],
   "additional_state_gates": [
@@ -989,6 +1051,48 @@
       "action_ar": "إنتاج آخر أربعة أرقام للبطاقة الأساسية واسم القرض فقط؛ القيم الناقصة تحصل على تسمية منتج محلية في العرض. تظل المعرّفات للربط فقط.",
       "status": "fixed_pending_final_ci",
       "evidence": "CI 1690cb54 failed this rendering case. The new producer regression failed before fix (TECH_FACILITY_ID instead of 7271), then all 182 core tests passed. Final native authoritativeFacilityDueIsSharedOnSupplementaryAndCountedOnce passes, asserts last4/localized loan fallback, no opaque IDs and the unchanged one-facility due across primary/supplementary cards."
+    },
+    {
+      "id": "REVIEW-004",
+      "finding_ar": "مسودة تعديل الحساب أو البطاقة كانت تتبنى إصدار البيانات الجديد بعد إعادة إنشاء الشاشة، مما يسمح بحفظ مسودة متقادمة.",
+      "action_ar": "ربط المسودة بإصدارها الأصلي ورفض الحفظ عند تغيّر البيانات.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "Two native failing-before/passing-after metadata revision tests."
+    },
+    {
+      "id": "REVIEW-005",
+      "finding_ar": "حفظ إعداد البطاقة ثم اعتماد الملكية كخطوتين منفصلتين يسمح ببقاء إعداد دون ربط عند فشل الخطوة الثانية.",
+      "action_ar": "تنفيذ الإعداد وربط الملكية في معاملة واحدة مع فحص رمز المرشح قبل أي كتابة.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "Native rollback/stale-decision case and positive automatic one-posting case passed."
+    },
+    {
+      "id": "REVIEW-006",
+      "finding_ar": "وقت تجاهل العملية المالية كان مفقودًا أو يُعرض بتاريخ الرسالة بدل القرار.",
+      "action_ar": "قراءة وقت قرار التجاهل الأصلي من سجل التدقيق دون إضافة جدول أو عمود.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "Ignored-time JVM reproduction failed before fix and passed after, including replay and reopen."
+    },
+    {
+      "id": "REVIEW-007",
+      "finding_ar": "مسودة اختيار طرف العملية كانت قابلة لاستخدام معاينة أحدث بعد التحديث أو الاستعادة.",
+      "action_ar": "ربط الاختيار بالمعاينة الأصلية وطلب اختيار صريح جديد عند تغيّرها.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "Native recreation/cancel and changed archive/registry tests passed."
+    },
+    {
+      "id": "REVIEW-008",
+      "finding_ar": "عرض المبلغ كان يفترض الريال عند غياب العملة.",
+      "action_ar": "إظهار عدم توفر القيمة عند نقص العملة دون تغيير المبلغ المخزّن.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "Native missing-currency display case passed."
+    },
+    {
+      "id": "UI-REVIEW-009",
+      "finding_ar": "زر الإجراءات المنقول كان يستدعي Material Button مباشرة، فتختلف حشوته وارتفاعه عن غلاف الفعلي؛ كما اختلف نمط نص شرح الملكية.",
+      "action_ar": "استخدام غلاف الأزرار المعتمد داخل المكوّن المشترك وحذف جسمي زري الملكية المكررين، واعتماد نمط نص الفعلي. إعادة تصوير جميع الحالات المتأثرة قبل إغلاق الفرق.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "All 192 native capture pairs regenerated after correction: 188 exact body regions, including all 40 review-detail/restore/ownership/transfer/busy comparisons. Only the four previously recorded account-detail edge-color differences remain. 24 native tests and lint passed."
     }
   ]
 }

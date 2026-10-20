@@ -37,27 +37,27 @@ internal fun BetaReviewResolutionActions(detail: BetaReviewDetail,busy: Boolean,
     fun choice(asset: com.baraa.masroof.lab.finance.asset.AssetId?)=asset?.let {betaAssetChoiceKey(it)}
     val incoming=detail.row.family in setOf("TRANSFER_IN","REFUND")
     val destinationNeeded=detail.row.family in setOf("FINANCING_INSTALLMENT","CARD_PAYMENT")
-    var source by rememberSaveable(detail.row.id,preview.registryRevision) {mutableStateOf(choice(detail.source) ?: "external".takeIf {incoming})}
-    var destination by rememberSaveable(detail.row.id,preview.registryRevision) {mutableStateOf(choice(detail.destination) ?: "external".takeIf {!incoming && !destinationNeeded})}
+    var source by rememberSaveable(detail.row.id) {mutableStateOf(choice(detail.source) ?: "external".takeIf {incoming})}
+    var destination by rememberSaveable(detail.row.id) {mutableStateOf(choice(detail.destination) ?: "external".takeIf {!incoming && !destinationNeeded})}
     var selectedType by rememberSaveable(detail.row.id) {mutableStateOf<String?>(null)}
-    var selector by remember {mutableStateOf<String?>(null)}
-    var draftChoice by remember {mutableStateOf<String?>(null)}
-    fun request(type: String)=betaApprovalDraft(preview,type,source,destination,detail.income?.name)
-    if(detail.actions.isNotEmpty() && !restore) DashboardSectionHeading(stringResource(R.string.beta_review_parity_actions),MasroofOutlineIcons.ShieldCheck)
-    detail.actions.forEach {type ->
-        Button(enabled=!busy,onClick={
-            val endpoints=betaReviewDefaultEndpoints(detail,type)
-            val ready=betaApprovalDraft(preview,type.name,endpoints.first,endpoints.second,detail.income?.name)
-            if(ready!=null) onApprove(ready) else {
-                selectedType=type.name;source=endpoints.first;destination=endpoints.second
-            }},shape=MaterialTheme.shapes.medium,
-            modifier=Modifier.fillMaxWidth().testTag("review-resolve-${type.name}")) {
-            Icon(reviewTypeIcon(type),null,Modifier.size(MasroofIconSizes.moneyRowLeading));Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
-            Text(if(restore) stringResource(R.string.beta_review_parity_restore_as,stringResource(financialTypeLabel(type))) else stringResource(when(type) {FinancialType.EXTERNAL_TRANSFER_IN->R.string.beta_review_parity_external_in;FinancialType.EXTERNAL_TRANSFER_OUT->R.string.beta_review_parity_external_out;else->reviewFinancialTypeActionLabel(type)}))
+    var selector by rememberSaveable(detail.row.id) {mutableStateOf<String?>(null)}
+    var draftChoice by rememberSaveable(detail.row.id) {mutableStateOf<String?>(null)}
+    var draftBinding by rememberSaveable(detail.row.id) {mutableStateOf<String?>(null)}
+    val currentDraft=draftBinding==preview.confirmationKey
+    fun request(type: String)=betaApprovalDraft(preview,type,source,destination,detail.income?.name).takeIf {currentDraft}
+    BetaReviewFinancialActions(detail.actions,busy,restore,detail.row.family) {type ->
+        val endpoints=betaReviewDefaultEndpoints(detail,type)
+        val ready=betaApprovalDraft(preview,type.name,endpoints.first,endpoints.second,detail.income?.name)
+        if(ready!=null) onApprove(ready) else {
+            draftBinding=preview.confirmationKey;selectedType=type.name;source=endpoints.first;destination=endpoints.second
         }
     }
     if(selectedType!=null) MasroofCard {
         Text(stringResource(R.string.beta_complete_review_choose_asset),style=MaterialTheme.typography.titleMedium)
+        if(!currentDraft) {
+            Text(stringResource(R.string.beta_controls_conflict),color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("review-draft-stale"))
+            ApprovedOutlinedButton(enabled=!busy,onClick={selectedType=null;selector=null;draftChoice=null;draftBinding=null},modifier=Modifier.testTag("review-reset-draft")) {Text(stringResource(R.string.beta_controls_reload))}
+        }
         fun label(value: String?)=if(value=="external") null else preview.assets.singleOrNull {betaAssetChoiceKey(it.id)==value}
         @Composable fun endpoint(value: String?,field: String,title: Int) {
             OutlinedButton(enabled=!busy,onClick={selector=field;draftChoice=value},modifier=Modifier.fillMaxWidth().testTag("review-select-$field")) {
@@ -71,7 +71,7 @@ internal fun BetaReviewResolutionActions(detail: BetaReviewDetail,busy: Boolean,
     }
     if(selector!=null) BetaBottomSheet(stringResource(R.string.beta_complete_review_choose_asset),busy,
         onCancel={selector=null},onApply={if(selector=="source") source=draftChoice else destination=draftChoice;selector=null},
-        canApply=draftChoice!=null,applyTag="review-asset-apply",cancelTag="review-asset-cancel") {
+        canApply=draftChoice!=null && currentDraft,applyTag="review-asset-apply",cancelTag="review-asset-cancel") {
         val type=selectedType?.let(FinancialType::valueOf)
         val sourceField=selector=="source"
         val incomingType=type in setOf(FinancialType.INCOME,FinancialType.REFUND,FinancialType.EXTERNAL_TRANSFER_IN)
@@ -164,9 +164,10 @@ internal fun BetaReviewOwnershipPrompt(candidate: com.baraa.masroof.lab.beta.app
     val ref=candidate.reference
     val card=ref.kind==com.baraa.masroof.lab.beta.application.BetaOwnershipKind.CARD
     val tag="ownership-${ref.bank.value}-${ref.kind}-${ref.suffix}"
-    var selected by remember(candidate.token) {mutableStateOf(candidate.asset?.id)}
+    var selectedKey by rememberSaveable(candidate.token) {mutableStateOf(candidate.asset?.id?.let(::betaAssetChoiceKey))}
+    val selected=candidate.choices.singleOrNull {betaAssetChoiceKey(it.id)==selectedKey}?.id
     DashboardSectionHeading(stringResource(if(card) R.string.beta_review_parity_owner_title else R.string.beta_complete_review_owner),MasroofOutlineIcons.ShieldCheck)
-    Text(stringResource(if(card) R.string.beta_review_parity_owner_body else R.string.beta_ownership_account_suffix,ref.suffix))
+    Text(stringResource(if(card) R.string.beta_review_parity_owner_body else R.string.beta_ownership_account_suffix,ref.suffix),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurface)
     Column(Modifier.fillMaxWidth().testTag(tag),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
         Row(verticalAlignment=Alignment.CenterVertically) {
             Icon(MasroofOutlineIcons.TriangleAlert,null,Modifier.size(MasroofIconSizes.sm),tint=MaterialTheme.colorScheme.error)
@@ -177,20 +178,18 @@ internal fun BetaReviewOwnershipPrompt(candidate: com.baraa.masroof.lab.beta.app
         if(candidate.choices.size>1) {
             Text(stringResource(R.string.beta_ownership_collision))
             candidate.choices.forEachIndexed {index,asset ->
-                BetaChoice(selected==asset.id,{selected=asset.id},Modifier.testTag("$tag-choice-$index"),enabled=!busy) {
+                BetaChoice(selected==asset.id,{selectedKey=betaAssetChoiceKey(asset.id)},Modifier.testTag("$tag-choice-$index"),enabled=!busy) {
                     Text(stringResource(R.string.beta_asset_summary,stringResource(assetKindLabel(asset.kind)),asset.last4.orEmpty(),index+1))
                 }
             }
         }
         FlowRow(horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
-            Button(onClick={onDecide(true,selected)},enabled=!busy && !candidate.conflictingKinds && (candidate.choices.size<=1 || selected!=null),shape=MaterialTheme.shapes.medium,modifier=Modifier.testTag("$tag-owned")) {
-                Icon(MasroofOutlineIcons.CircleCheck,null,Modifier.size(MasroofIconSizes.moneyRowLeading));Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
-                Text(stringResource(if(card) R.string.beta_review_parity_my_card else R.string.beta_ownership_my_account))
-            }
-            Button(onClick={onDecide(false,null)},enabled=!busy,shape=MaterialTheme.shapes.medium,modifier=Modifier.testTag("$tag-external")) {
-                Icon(MasroofOutlineIcons.TriangleAlert,null,Modifier.size(MasroofIconSizes.moneyRowLeading));Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
-                Text(stringResource(R.string.beta_review_parity_not_mine))
-            }
+            ApprovedIconTextButton(onClick={onDecide(true,selected)},
+                text=stringResource(if(card) R.string.beta_review_parity_my_card else R.string.beta_ownership_my_account),
+                enabled=!busy && !candidate.conflictingKinds && (candidate.choices.size<=1 || selected!=null),
+                icon=MasroofOutlineIcons.CircleCheck,modifier=Modifier.testTag("$tag-owned"))
+            ApprovedIconTextButton(onClick={onDecide(false,null)},text=stringResource(R.string.beta_review_parity_not_mine),
+                enabled=!busy,icon=MasroofOutlineIcons.TriangleAlert,modifier=Modifier.testTag("$tag-external"))
         }
         if(candidate.status==com.baraa.masroof.lab.beta.application.BetaOwnershipStatus.OWNED && card &&
             (candidate.asset?.parentId==null || (candidate.asset.kind==com.baraa.masroof.lab.finance.asset.AssetKind.CREDIT_CARD && candidate.asset.creditCardRole==null)))
@@ -199,3 +198,20 @@ internal fun BetaReviewOwnershipPrompt(candidate: com.baraa.masroof.lab.beta.app
 }
 
 internal val betaReviewFinancialTypes=listOf(FinancialType.EXPENSE,FinancialType.INCOME,FinancialType.CREDIT_CARD_PAYMENT,FinancialType.REFUND,FinancialType.CASH_WITHDRAWAL,FinancialType.BILL_PAYMENT,FinancialType.FEE,FinancialType.LOAN_REPAYMENT)
+
+/** Canonical source action rows, shared by live review and frozen visual cases. */
+@Composable
+internal fun BetaReviewFinancialActions(types: List<FinancialType>,busy: Boolean,restore: Boolean=false,
+    family: String?=null,tagPrefix: String="review-resolve",onSelect: (FinancialType)->Unit) {
+    if(types.isNotEmpty() && !restore && family !in setOf("TRANSFER_IN","TRANSFER_OUT"))
+        DashboardSectionHeading(stringResource(R.string.beta_review_parity_actions),MasroofOutlineIcons.ShieldCheck)
+    types.forEach {type ->
+        val label=if(restore) stringResource(R.string.beta_review_parity_restore_as,stringResource(financialTypeLabel(type))) else stringResource(when {
+            type==FinancialType.EXTERNAL_TRANSFER_IN->R.string.beta_review_parity_external_in
+            type==FinancialType.EXTERNAL_TRANSFER_OUT->R.string.beta_review_parity_external_out
+            type==FinancialType.INCOME && family=="TRANSFER_IN"->R.string.beta_review_detail_review_action_incoming_income
+            else->reviewFinancialTypeActionLabel(type)
+        })
+        BetaReviewActionButton(label,reviewTypeIcon(type),!busy,"$tagPrefix-${type.name}") {onSelect(type)}
+    }
+}

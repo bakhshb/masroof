@@ -50,19 +50,20 @@ class BetaApprovedFixtureScreensTest {
                     var listShare by remember {mutableStateOf<BetaListShare?>(null)}
                     var title by remember {mutableStateOf<String?>(null)}
                     val preferencePage=page.value=="preferences"
-                    val reviewPage=page.value=="review"
+                    val reviewDetailPage=page.value in betaReviewCaptureCases
+                    val reviewPage=page.value=="review" || reviewDetailPage
                     val registryPage=page.value in setOf("myAccounts","myCards","myLoans")
                     val commitmentPage=page.value in setOf("myCommitments","commitmentEditor")
                     val commitment=com.baraa.masroof.lab.beta.application.BetaRecurringCommitment("internet","الإنترنت",Money.of("200",Currency.SAR),5,YearMonth.of(2026,10),
                         transactionDate=LocalDate.parse("2026-10-05"),sourceTransactionId="ref-12")
-                    BetaShell(0,false,showReturn=false,showMaintenanceActions=false,notificationCount=3,
-                        secondaryTitle=if(commitmentPage) stringResource(if(page.value=="myCommitments") R.string.beta_commitment_reference_manage_commitments else R.string.beta_commitment_settings_commitment_edit_title) else if(reviewPage) stringResource(R.string.beta_nav_review) else if(preferencePage) stringResource(R.string.beta_approved_reference_preferences_title) else title,
+                    BetaShell(0,page.value=="reviewBusy",showReturn=false,showMaintenanceActions=false,notificationCount=3,
+                        secondaryTitle=if(commitmentPage) stringResource(if(page.value=="myCommitments") R.string.beta_commitment_reference_manage_commitments else R.string.beta_commitment_settings_commitment_edit_title) else if(reviewPage) stringResource(if(reviewDetailPage) R.string.beta_review_detail_review_detail_title else R.string.beta_nav_review) else if(preferencePage) stringResource(R.string.beta_approved_reference_preferences_title) else title,
                         secondaryActions={if(page.value in setOf("transactions","transactionDetail")) listShare?.let {BetaListShareAction(it)}},
                         onNavigateBack={},selectedHomeTab=if(reviewPage) "REVIEW" else if(preferencePage || registryPage || commitmentPage) "SETTINGS" else if(page.value in setOf("transactions","transactionDetail")) "TRANSACTIONS" else if(page.value=="home") "HOME" else "NONE",onOpenHome={},dashboardOwnsScroll=true,editorOwnsScroll=reviewPage || commitmentPage,
                         editor=if(commitmentPage) ({
                             if(page.value=="myCommitments") BetaCommitmentsContent(listOf(commitment),emptyList(),"ACTIVE",false,{},{},{},{})
                             else BetaCommitmentEditorContent(commitment,false,{},{},{})
-                        }) else if(reviewPage) ({Column(Modifier.fillMaxSize().testTag("review-fixture-ready")) {
+                        }) else if(reviewDetailPage) ({BetaReviewFrozenCase(page.value)}) else if(reviewPage) ({Column(Modifier.fillMaxSize().testTag("review-fixture-ready")) {
                             ApprovedReviewListContent(listOf(
                                 ApprovedReviewListItem("حوالة تحتاج مطابقة",stringResource(R.string.beta_approved_review_pending_match),false,"750 ر.س","8 أكتوبر · بنك الجزيرة","multiple_candidates",stringResource(R.string.beta_complete_review_evidence)),
                                 ApprovedReviewListItem("بطاقة غير مؤكدة الملكية",stringResource(R.string.beta_review_parity_kind),false,null,"8 أكتوبر · بنك الجزيرة","unknown_ownership",stringResource(R.string.beta_complete_review_evidence))),false,true,{},{},emptyContent={})
@@ -101,9 +102,9 @@ class BetaApprovedFixtureScreensTest {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val directory=File(instrumentation.targetContext.getExternalFilesDir(null),"lab-approved-fixture").apply {mkdirs()}
         val capturePages=InstrumentationRegistry.getArguments().getString("capturePages")?.split(",")?.toSet()
-        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home","review","myAccounts","myCards","myLoans","transactions","myCommitments","commitmentEditor","commitments","transactionDetail").filter {capturePages==null || it in capturePages}) {
+        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home","review","myAccounts","myCards","myLoans","transactions","myCommitments","commitmentEditor","commitments","transactionDetail","reviewDetail","reviewIgnored","reviewOwnership","reviewTransfer","reviewBusy").filter {capturePages==null || it in capturePages}) {
             compose.runOnIdle {language.value=lang;dark.value=night;page.value=destination}
-            compose.waitUntil(15000) {compose.onAllNodesWithTag(if(destination=="myCommitments") "commitments-list" else if(destination=="commitmentEditor") "commitment-editor" else if(destination=="review") "review-fixture-ready" else if(destination=="preferences" || destination.startsWith("my")) "beta-settings-panel" else "dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
+            compose.waitUntil(15000) {compose.onAllNodesWithTag(if(destination in betaReviewCaptureCases) "review-detail-fixture-ready" else if(destination=="myCommitments") "commitments-list" else if(destination=="commitmentEditor") "commitment-editor" else if(destination=="review") "review-fixture-ready" else if(destination=="preferences" || destination.startsWith("my")) "beta-settings-panel" else "dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
             if(destination=="transactionDetail") {
                 compose.onNodeWithTag("transactions-list").performScrollToNode(hasTestTag("dash-transaction-ref-11"))
                 compose.onNodeWithTag("dash-transaction-ref-11").performClick()

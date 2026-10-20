@@ -17,6 +17,9 @@ internal data class BetaCorrectionEvidenceClaimEntity(val environment: String,va
 internal data class BetaCorrectionProofClaimEntity(val environment: String,val kind: String,val issuer: String,val reference: String,val transactionId: String)
 
 @Dao internal interface BetaCorrectionDao : BetaAuditWriter {
+    @Query("SELECT createdAt FROM beta_audit_log WHERE eventKind='CORRECTION_REVISION' AND environment=:environment AND targetId=:id AND decisionId=:decisionId ORDER BY transition DESC LIMIT 1")
+    suspend fun decisionRecordedAt(environment: String,id: String,decisionId: String): String?
+
     @Query("SELECT * FROM beta_correction_current WHERE environment=:environment AND transactionId=:id")
     suspend fun current(environment: String, id: String): BetaCorrectionCurrentEntity?
     @Query("SELECT environment,targetId AS transactionId,transition,decisionId,operation,payload FROM beta_audit_log WHERE eventKind='CORRECTION_REVISION' AND environment=:environment AND decisionId=:id")

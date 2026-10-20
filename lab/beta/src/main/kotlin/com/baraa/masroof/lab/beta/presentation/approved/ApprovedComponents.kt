@@ -153,7 +153,7 @@ internal fun ApprovedIconTextButton(
     require(icon != null || brandedLogo) {
         "IconTextButton requires either icon or brandedLogo"
     }
-    Button(
+    ApprovedButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,

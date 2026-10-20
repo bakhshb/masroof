@@ -537,6 +537,12 @@
       "symbol": "MasroofAmountText",
       "source_sha256": "2161849af8e9d3c9f363964d909f640c6f08acb3322625cc2384a1c054678688",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAmountText.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/review/ReviewScreen.kt",
+      "symbol": "ReviewDetailScreen / source action order",
+      "source_sha256": "3de5c6ed8f325787c69e4ff17b0983f9e2dc3755d8cc7cfe3a9b6fb47c964273",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaReviewDetailContent.kt"
     }
   ],
   "adaptations": [
@@ -547,7 +553,8 @@
     "Retain Beta enabled guards for sheet choices while financial writes are busy; preserve production row geometry and colors.",
     "Keep global brand header, with a separate fixed secondary header from MasroofSecondaryScaffold; retain Beta badge and back callback tags.",
     "Use the copied production text/identity-offset input boundary across lab screens; keep password masking and original stored SMS/inputs unchanged. Request latn digits for the Arabic DatePicker locale.",
-    "Card setup selections use bank-qualified asset identities instead of last4. Retain busy guards; standalone/Amex/wallet use existing lab text fields, without schema tables or parser/ML changes."
+    "Card setup selections use bank-qualified asset identities instead of last4. Retain busy guards; standalone/Amex/wallet use existing lab text fields, without schema tables or parser/ML changes.",
+    "Review detail uses canonical source layout and action components. Lab financial-write navigation guards remain; private production renderer is captured using an appended test bridge in a temporary pinned checkout, preserving its original bytes. Reproduce with tools/prepare_ui_reference.py."
   ],
   "design_guide": "docs/DESIGN_SYSTEM.md",
   "visual_baseline": {

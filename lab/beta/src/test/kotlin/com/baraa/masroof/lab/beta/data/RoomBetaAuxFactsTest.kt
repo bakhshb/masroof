@@ -43,17 +43,34 @@ class RoomBetaAuxFactsTest {
     @After fun close() { db.close(); BetaContainer.resetOffline(context) }
     private fun source() = RoomBetaDashboardSource(db, DashboardPeriods(salary = DisplayPeriod(query.from, query.until, zone, PeriodKind.SALARY, null)),
         clock = Clock.fixed(at.plusSeconds(10800), ZoneOffset.UTC))
+    @Test fun reviewDefaultsRespectPersistedTransferSidesWithTwoOwnedAccounts()=runBlocking {
+        val other=OwnedAsset(account.id.copy(localId="destination"),AssetKind.ACCOUNT,"5002")
+        BetaAssetRegistry(db).register(other)
+        val facts=Facts(MessageFamily.TRANSFER_IN,amount=Money.of("50",Currency.SAR),direction=MoneyDirection.INCOMING,
+            sourceAccount=AccountReference(bank,"3001"),destinationAccount=AccountReference(bank,"5002"),occurredAt=at)
+        val identityEvidence=listOf(Evidence("fixture.source","SOURCE_ACCOUNT",0,4),Evidence("fixture.destination","DESTINATION_ACCOUNT",5,9))
+        val body="3001 5002 50 2026-08-06 20:22"
+        capture("in-role",facts,ParseStatus.SUCCESS,body,identityEvidence)
+        val incoming=BetaReviewResolutionWorkflow(db).detail("in-role")
+        assertEquals(other.id,incoming.destination);assertNull(incoming.source)
+        capture("out-role",facts.copy(family=MessageFamily.TRANSFER_OUT,direction=MoneyDirection.OUTGOING),ParseStatus.SUCCESS,body,identityEvidence)
+        val outgoing=BetaReviewResolutionWorkflow(db).detail("out-role")
+        assertEquals(account.id,outgoing.source);assertNull(outgoing.destination)
+        capture("missing-role",facts.copy(destinationAccount=null),ParseStatus.SUCCESS,body,identityEvidence)
+        assertNull(BetaReviewResolutionWorkflow(db).detail("missing-role").destination)
+    }
+
     private fun notice() = Facts(MessageFamily.NON_FINANCIAL, card = CardReference(bank, "7271"), cardChannel = CardChannel.STATEMENT,
         outstandingBalance = Money.of("1250", Currency.SAR), paymentDueDate = LocalDate.of(2026, 8, 6), occurredAt = at)
     private suspend fun capture(id: String, facts: Facts = notice(), status: ParseStatus = ParseStatus.NON_FINANCIAL,
-        change: (org.json.JSONObject) -> Unit = {}) {
+        body: String="synthetic",identityEvidence: List<Evidence> = emptyList(),change: (org.json.JSONObject) -> Unit = {}) {
         val store = RoomBetaEvidenceStore(db)
         val route = EvidenceRoute(RouteKind.MATCHED, setOf(bank), "fixture")
         store.capture(CapturedEvidence(id, EvidenceRequest("fixture", EvidenceOrigin.EXPLICIT_SAMPLE),
-            EvidenceMessage(id, "AlJazira", "synthetic", at, ReceiptTimeSource.USER_SUPPLIED), at, route, emptyList()))
+            EvidenceMessage(id, "AlJazira", body, at, ReceiptTimeSource.USER_SUPPLIED), at, route, emptyList()))
         store.begin(id, at)
         val archive = org.json.JSONObject(FinancialArchiveFixture.encode(Interpretation(id, FinancialArchiveFixture.VERSION, bank, facts,
-            status, null, emptyList(), emptySet()))).apply(change).toString()
+            status, null,if(identityEvidence.isEmpty()) emptyList() else listOf(Evidence("fixture.family","family",0,1),Evidence("fixture.amount","AMOUNT",10,12),Evidence("fixture.time","occurredAtLocal",13,body.length))+identityEvidence,emptySet()))).apply(change).toString()
         store.complete(id, route, EvidenceComparison(EvidenceDisposition.COMPARISON_ONLY, emptySet(), "{}", archive), at)
     }
     private suspend fun actual(body: String, id: String): String {

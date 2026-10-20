@@ -53,6 +53,69 @@ class BetaManualAssetScreenTest {
         }
         compose.onNodeWithTag("asset-save").assertIsDisplayed().assertIsEnabled()
     }
+    private fun reviewCardCandidate(): Pair<String,com.baraa.masroof.lab.beta.application.BetaOwnershipCandidate> {
+        beta.acknowledgeStart()
+        beta.saveManualAsset(ManualAssetDraft(id("review-account"),AssetKind.ACCOUNT,"1234",ownedConfirmed=true))
+        val at=java.time.Instant.parse("2026-10-08T09:00:00Z")
+        val evidence=(beta.importEvidence(com.baraa.masroof.lab.beta.application.evidence.EvidenceRequest("review-asset",com.baraa.masroof.lab.beta.application.evidence.EvidenceOrigin.EXPLICIT_HISTORY,setOf(bank)),
+            listOf(com.baraa.masroof.lab.beta.application.evidence.EvidenceMessage("card","AlJazira","شراء عبر نقاط البيع\nبطاقة مدى: 5678\nلدى: TEST SHOP\nبمبلغ: SAR 25\nخصمت من حساب: 1234\nفي: 2026-10-08 12:00",at,com.baraa.masroof.lab.beta.application.evidence.ReceiptTimeSource.PROVIDER_TIMESTAMP))).single()
+            as com.baraa.masroof.lab.beta.application.evidence.EvidenceResult.Stored).summary.id
+        beta.processAutomaticEvidence()
+        return evidence to beta.ownershipSnapshot().candidates.single {it.reference.kind==com.baraa.masroof.lab.beta.application.BetaOwnershipKind.CARD && it.reference.suffix=="5678"}
+    }
+    @Test fun reviewConfigurationRollsBackIfOwnershipCannotBindAndRejectsAChangedDecision() {
+        val (_,candidate)=reviewCardCandidate()
+        val before=beta.assets();val metadata=beta.assetMetadata()
+        val invalid=ManualAssetDraft(id("review-card"),AssetKind.DEBIT_CARD,"9999",id("review-account"),ownedConfirmed=true,
+            metadata=com.baraa.masroof.lab.beta.application.BetaAssetMetadata(network="MADA"))
+        assertTrue(runCatching {beta.saveReviewAsset(invalid,candidate.reference,candidate.token)}.isFailure)
+        assertEquals(before,beta.assets());assertEquals(metadata,beta.assetMetadata())
+        beta.decideOwnership(candidate,false)
+        assertTrue(runCatching {beta.saveReviewAsset(invalid.copy(last4="5678"),candidate.reference,candidate.token)}.isFailure)
+        assertEquals(before,beta.assets())
+        assertEquals(com.baraa.masroof.lab.beta.application.BetaOwnershipStatus.EXTERNAL,beta.ownershipSnapshot().candidates.single {it.reference==candidate.reference}.status)
+    }
+    @Test fun reviewConfigurationAndOwnershipCommitBeforeOneAutomaticPosting() {
+        val (evidence,candidate)=reviewCardCandidate()
+        val saved=beta.saveReviewAsset(ManualAssetDraft(id("review-card"),AssetKind.DEBIT_CARD,"5678",id("review-account"),ownedConfirmed=true,
+            metadata=com.baraa.masroof.lab.beta.application.BetaAssetMetadata(network="MADA")),candidate.reference,candidate.token)
+        assertEquals(id("review-account"),saved.parentId)
+        assertEquals(com.baraa.masroof.lab.beta.application.BetaOwnershipStatus.OWNED,beta.ownershipSnapshot().candidates.single {it.reference==candidate.reference}.status)
+        beta.processAutomaticEvidence();beta.processAutomaticEvidence()
+        val key=com.baraa.masroof.lab.finance.posting.PostingKey(Environment.BETA,"evidence:$evidence")
+        assertEquals("review=${beta.reviewDetail(evidence).reasons}; blocked=${beta.financialApprovalPreview(evidence)?.blockedReason}",com.baraa.masroof.lab.finance.posting.FinancialType.EXPENSE,beta.financialPosting(key)?.command?.type)
+        assertEquals(1,beta.financialHistory(key).size)
+    }
+
+    @Test fun restoredAccountDraftKeepsItsOriginalMetadataRevision() = metadataRevisionSurvivesRestore(false)
+    @Test fun restoredCardDraftKeepsItsOriginalMetadataRevision() = metadataRevisionSurvivesRestore(true)
+    private fun metadataRevisionSurvivesRestore(card: Boolean) {
+        val asset=if(card) {
+            beta.saveManualAsset(ManualAssetDraft(id("facility"),AssetKind.CREDIT_FACILITY,"",ownedConfirmed=true))
+            beta.saveManualAsset(ManualAssetDraft(id("edited"),AssetKind.CREDIT_CARD,"7271",id("facility"),CreditCardRole.PRIMARY,true,
+                metadata=com.baraa.masroof.lab.beta.application.BetaAssetMetadata(displayName="Original",network="VISA")))
+        } else beta.saveManualAsset(ManualAssetDraft(id("edited"),AssetKind.ACCOUNT,"3001",ownedConfirmed=true,
+            metadata=com.baraa.masroof.lab.beta.application.BetaAssetMetadata(displayName="Original",accountType="CURRENT")))
+        val original=beta.assetMetadata().getValue(asset.id)
+        val shown=mutableStateOf(original)
+        var submitted: ManualAssetDraft?=null
+        val restoration=StateRestorationTester(compose)
+        restoration.setContent {MaterialTheme {
+            BetaAssetEditor(bank,asset,beta.assets(),false,false,onSave={submitted=it},onCancel={},
+                metadata=shown.value,registryMetadata=beta.assetMetadata())
+        }}
+        val latest=original.copy(displayName="Concurrent name",network=if(card) "MASTERCARD" else null,accountType=if(card) null else "SAVINGS")
+        beta.saveManualAsset(ManualAssetDraft(asset.id,asset.kind,asset.last4.orEmpty(),asset.parentId,asset.creditCardRole,true,true,asset,metadata=latest))
+        compose.runOnIdle {shown.value=beta.assetMetadata().getValue(asset.id)}
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("asset-save").assertIsEnabled().performClick()
+        assertEquals(original.revision,checkNotNull(checkNotNull(submitted).metadata).revision)
+        assertTrue(runCatching {beta.saveManualAsset(checkNotNull(submitted))}.isFailure)
+        assertEquals("Concurrent name",beta.assetMetadata().getValue(asset.id).displayName)
+        assertEquals(if(card) "MASTERCARD" else null,beta.assetMetadata().getValue(asset.id).network)
+        assertEquals(if(card) null else "SAVINGS",beta.assetMetadata().getValue(asset.id).accountType)
+    }
+
     @Test fun reselectingCurrentDebitKindAndNetworkPreservesItsAccount() {
         beta.saveManualAsset(ManualAssetDraft(id("account"), AssetKind.ACCOUNT, "1111", ownedConfirmed = true))
         val debit = beta.saveManualAsset(ManualAssetDraft(id("debit"), AssetKind.DEBIT_CARD, "3333", id("account"), ownedConfirmed = true,

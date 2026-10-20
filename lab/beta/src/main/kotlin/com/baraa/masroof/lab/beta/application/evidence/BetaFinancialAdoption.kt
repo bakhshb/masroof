@@ -4,6 +4,7 @@ import com.baraa.masroof.lab.finance.asset.AssetId
 import com.baraa.masroof.lab.finance.classification.IncomeAttribution
 import com.baraa.masroof.lab.finance.posting.*
 import com.baraa.masroof.lab.finance.value.Environment
+import com.baraa.masroof.lab.beta.data.auditId
 
 /** Explicit financial approval, separate from comparison acknowledgement. No parser success is
  * asserted by this request. Amount and time always come from the exact current BankEngine archive. */
@@ -36,7 +37,10 @@ data class BetaFinancialApprovalPreview(
     val merchant: String? = null,
     val exchangeRate: String? = null,
     val internationalFee: com.baraa.masroof.lab.finance.value.Money? = null,
-)
+) {
+    val confirmationKey: String get()=auditId("REVIEW_APPROVAL",item.evidenceId,item.archiveRevision,item.postingRevision,
+        registryRevision,amount?.amount?.toPlainString(),amount?.currency,time?.instant,time?.zone)
+}
 
 data class BetaFinancialReviewItem(val evidenceId: String, val key: PostingKey,
     val archiveRevision: String, val status: String, val reason: String,
