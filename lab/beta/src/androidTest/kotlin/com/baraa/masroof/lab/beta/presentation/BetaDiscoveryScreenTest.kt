@@ -114,7 +114,7 @@ class BetaDiscoveryScreenTest {
             assertEquals(2, beta.assets().size)
         } } finally { com.baraa.masroof.lab.beta.BetaContainer.resetOffline(context) }
     }
-    @Test fun suggestedCreditCardRequiresExplicitFacilityRatherThanInventingDebt() {
+    @Test fun suggestedCreditCardCreatesPrivateStructureOnlyAfterExplicitSave() {
         val bank = BankId("BANK_ALJAZIRA")
         val proposal = BetaAssetProposal(AssetId(Environment.BETA, bank, "opaque-card"), AssetKind.CREDIT_CARD, "1234", "evidence", "revision")
         var saved: ManualAssetDraft? = null
@@ -125,7 +125,7 @@ class BetaDiscoveryScreenTest {
         assertNull(saved) // Opening or checking ownership alone never creates the structural facility.
         compose.onNodeWithTag("asset-save").assertIsDisplayed().assertIsEnabled().performClick()
         assertTrue(requireNotNull(saved).createCreditFacility)
-        assertEquals(CreditCardRole.PRIMARY, requireNotNull(saved).role)
+        assertEquals(CreditCardRole.STANDALONE, requireNotNull(saved).role)
         assertNotNull(requireNotNull(saved).parentId)
     }
 }

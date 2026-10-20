@@ -100,15 +100,27 @@ internal fun OwnershipCandidateCard(candidate: BetaOwnershipCandidate, busy: Boo
         BetaOwnershipStatus.EXTERNAL, BetaOwnershipStatus.REVIEW -> MaterialTheme.colorScheme.onSurfaceVariant
         BetaOwnershipStatus.UNKNOWN -> MaterialTheme.colorScheme.error
     }
-    MasroofCard(Modifier.testTag(tag)) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (ref.kind == BetaOwnershipKind.ACCOUNT) MasroofOutlineIcons.ArrowDownLeft else MasroofOutlineIcons.CreditCard,
-                    null, Modifier.size(MasroofSizes.size22), tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
-                Text(stringResource(bankName(ref.bank)))
-            }
-            Text(stringResource(if (ref.kind == BetaOwnershipKind.ACCOUNT) R.string.beta_ownership_account_suffix else R.string.beta_ownership_card_suffix, ref.suffix))
+    com.baraa.masroof.lab.beta.presentation.approved.ApprovedOwnershipCandidateCard(
+        stringResource(bankName(ref.bank)),
+        stringResource(if(ref.kind==BetaOwnershipKind.ACCOUNT) R.string.beta_ownership_account_suffix else R.string.beta_ownership_card_suffix,ref.suffix),
+        ref.kind==BetaOwnershipKind.ACCOUNT,
+        stringResource(if(ref.kind==BetaOwnershipKind.ACCOUNT) R.string.beta_ownership_my_account else R.string.beta_ownership_my_card),
+        stringResource(R.string.beta_ownership_not_mine),
+        stringResource(when(candidate.status) {
+            BetaOwnershipStatus.OWNED -> R.string.beta_ownership_status_owned
+            BetaOwnershipStatus.EXTERNAL -> R.string.beta_ownership_status_external
+            BetaOwnershipStatus.UNKNOWN -> R.string.beta_ownership_status_unknown
+            BetaOwnershipStatus.REVIEW -> R.string.beta_ownership_status_review
+        }),
+        when(candidate.status) {
+            BetaOwnershipStatus.OWNED -> MasroofOutlineIcons.CircleCheck
+            BetaOwnershipStatus.UNKNOWN -> MasroofOutlineIcons.CircleAlert
+            else -> MasroofOutlineIcons.TriangleAlert
+        },statusColor,
+        onOwned={onDecide(true,selected)},onExternal={onDecide(false,null)},enabled=!busy,
+        canConfirm=!candidate.conflictingKinds && (candidate.choices.size<=1 || selected!=null),
+        modifier=Modifier.testTag(tag), ownedTag="$tag-owned", externalTag="$tag-external",
+        collisionContent={
             if (candidate.conflictingKinds) Text(stringResource(R.string.beta_ownership_kind_conflict), color = MaterialTheme.colorScheme.error)
             if (candidate.conflictingKinds) OutlinedButton(onClick = { onDecide(null, null) }, enabled = !busy,
                 modifier = Modifier.testTag("$tag-defer")) { Text(stringResource(R.string.beta_ownership_defer)) }
@@ -121,41 +133,15 @@ internal fun OwnershipCandidateCard(candidate: BetaOwnershipCandidate, busy: Boo
                         })
                 }
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
-                OwnershipButton({ onDecide(true, selected) }, stringResource(if (ref.kind == BetaOwnershipKind.ACCOUNT)
-                    R.string.beta_ownership_my_account else R.string.beta_ownership_my_card), MasroofOutlineIcons.CircleCheck,
-                    !busy && !candidate.conflictingKinds && (candidate.choices.size <= 1 || selected != null), Modifier.testTag("$tag-owned"))
-                OwnershipButton({ onDecide(false, null) }, stringResource(R.string.beta_ownership_not_mine), MasroofOutlineIcons.TriangleAlert,
-                    !busy, Modifier.testTag("$tag-external"))
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(when (candidate.status) {
-                    BetaOwnershipStatus.OWNED -> MasroofOutlineIcons.CircleCheck
-                    BetaOwnershipStatus.EXTERNAL, BetaOwnershipStatus.REVIEW -> MasroofOutlineIcons.TriangleAlert
-                    BetaOwnershipStatus.UNKNOWN -> MasroofOutlineIcons.CircleAlert
-                }, null, Modifier.size(MasroofIconSizes.sm), tint = statusColor)
-                Spacer(Modifier.width(MasroofSpacing.smallGap))
-                Text(stringResource(when (candidate.status) {
-                    BetaOwnershipStatus.OWNED -> R.string.beta_ownership_status_owned
-                    BetaOwnershipStatus.EXTERNAL -> R.string.beta_ownership_status_external
-                    BetaOwnershipStatus.UNKNOWN -> R.string.beta_ownership_status_unknown
-                    BetaOwnershipStatus.REVIEW -> R.string.beta_ownership_status_review
-                }), color = statusColor)
-            }
+        }, footer={
             if (candidate.status == BetaOwnershipStatus.OWNED && ref.kind == BetaOwnershipKind.CARD && (candidate.asset?.parentId == null || (candidate.asset.kind == AssetKind.CREDIT_CARD && candidate.asset.creditCardRole == null)))
                 OutlinedButton(onClick = onConfigure, enabled = !busy, modifier = Modifier.testTag("$tag-configure")) {
                     Text(stringResource(R.string.beta_ownership_configure_card))
                 }
-        }
-    }
+        })
 }
 
 @Composable
 private fun OwnershipButton(onClick: () -> Unit, text: String, icon: ImageVector, enabled: Boolean, modifier: Modifier = Modifier) {
-    Button(onClick, modifier, enabled, shape = MaterialTheme.shapes.medium,
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
-        Icon(icon, null, Modifier.size(MasroofIconSizes.moneyRowLeading))
-        Spacer(Modifier.width(MasroofSpacing.sectionHeaderGap))
-        Text(text)
-    }
+    com.baraa.masroof.lab.beta.presentation.approved.ApprovedIconTextButton(onClick,text,modifier,enabled,icon)
 }

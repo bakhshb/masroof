@@ -109,6 +109,75 @@
       "symbol": "AppDigitsVisualTransformation",
       "source_sha256": "37a4b5afb248ec2e4a9defdf23d18969c18ea963dfd6458b3800061bc0bae19f",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedDigitsVisualTransformation.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsCardSetupSheet.kt",
+      "symbol": "SettingsCardSetupSheet",
+      "source_sha256": "cf01e910acfa83646ed814add2f0666a5be52a54b2ea5bd45aa7f7036864812d",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedCardSetupSheet.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofPeriodComponents.kt",
+      "symbol": "PeriodDisplay",
+      "source_sha256": "1faa4086f68df69930aa5627fae79a72f519bc112775516ecc75cbf144b580c6",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedPeriodDisplay.kt",
+      "adaptations": "Lab resources, display text and stable-ID/callback bindings only"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/EntitySummaryCard.kt",
+      "symbol": "EntitySummaryCard",
+      "source_sha256": "9b0cd0dbdf3e01286598ee2cc5fcbd3a4ccda7c20dffab075d241844826f0328",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedEntitySummaryCard.kt",
+      "adaptations": "Lab resources, display text and stable-ID/callback bindings only"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/onboarding/OnboardingScreen.kt",
+      "symbol": "CandidateCard",
+      "source_sha256": "414a18754b18f7021edad75c73dea70c4e2e51f368890deddf8b41600f7a1ddf",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedOwnershipCandidateCard.kt",
+      "adaptations": "UI labels/status supplied; stable-ID collision picker and configuration footer slots; busy/authority guards and test tags retained."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofReferenceControls.kt",
+      "symbol": "MasroofFormField",
+      "source_sha256": "62ab5125e86e7d4a03a095be6a0e0321ba519a57b511053505b9997c3cc0ccb3",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedFormField.kt",
+      "adaptations": "Lab digit transformation; caller input modifier applied to editable child for accessibility and existing field actions."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/AccountPeriodSummaryCard.kt",
+      "symbol": "AccountPeriodSummaryCard / AccountReferenceGroup",
+      "source_sha256": "e4882f155c279684a2953238be74bcc093fd76858fbb7885333a535c74bb09a6",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAccountPeriodSummaryCard.kt",
+      "adaptations": "Core precomputed totals and formatted nonzero rows; existing lab chart supplied as slot. No financial calculation in renderer."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsRegistryComponents.kt",
+      "symbol": "SettingsRegistryItemCard",
+      "source_sha256": "0019c5d3eb0a3b138c0b8789e8d824b3b67f0e82e4a5fd150e015c83f9df763c",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedRegistryComponents.kt",
+      "adaptations": "Lab labels and stable IDs/callbacks; rename busy/dismiss and optimistic metadata revision guards."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofManagementAction.kt",
+      "symbol": "MasroofManagementAction",
+      "source_sha256": "e576493f135131f07591ab8fd81e07809d7fd3f6e823c784d6f642dec091bbe6",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedRegistryComponents.kt",
+      "adaptations": "Lab labels and stable IDs/callbacks; rename busy/dismiss and optimistic metadata revision guards."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsRegistryEditors.kt",
+      "symbol": "SettingsRenameCardDialog",
+      "source_sha256": "cd5158ef63e8e595307f0efd51187f175b66445e219b3e41901484fb0c4b602e",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedRegistryComponents.kt",
+      "adaptations": "Lab labels and stable IDs/callbacks; rename busy/dismiss and optimistic metadata revision guards."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsRegistryLabels.kt",
+      "symbol": "maskedName",
+      "source_sha256": "89f076797604d233b0f369fd54152064686a85142e73ecbd1ef8558130b1eced",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/BetaCardSetupModels.kt",
+      "adaptations": "Lab digit formatter; bank-qualified asset IDs stay distinct from display suffixes."
     }
   ],
   "adaptations": [
@@ -118,7 +187,8 @@
     "Keep existing Beta test tags as parameters; copy modal window, drag, busy dismissal, IME and action geometry unchanged.",
     "Retain Beta enabled guards for sheet choices while financial writes are busy; preserve production row geometry and colors.",
     "Keep global brand header, with a separate fixed secondary header from MasroofSecondaryScaffold; retain Beta badge and back callback tags.",
-    "Use the copied production text/identity-offset input boundary across lab screens; keep password masking and original stored SMS/inputs unchanged. Request latn digits for the Arabic DatePicker locale."
+    "Use the copied production text/identity-offset input boundary across lab screens; keep password masking and original stored SMS/inputs unchanged. Request latn digits for the Arabic DatePicker locale.",
+    "Card setup selections use bank-qualified asset identities instead of last4. Retain busy guards; standalone/Amex/wallet use existing lab text fields, without schema tables or parser/ML changes."
   ],
   "design_guide": "docs/DESIGN_SYSTEM.md",
   "visual_baseline": {

@@ -25,7 +25,6 @@
     <string name="beta_dash_loan_remaining">المتبقي من التمويل</string>
     <string name="beta_dash_review">بحاجة للمراجعة</string>
     <string name="beta_dash_unavailable">غير متاح</string>
-    <string name="beta_dash_details">عرض التفاصيل</string>
     <string name="beta_dash_flow">حركة الحسابات</string>
     <string name="beta_dash_accounts">الحسابات</string>
     <string name="beta_dash_cards">البطاقات</string>
@@ -56,15 +55,9 @@
     <string name="beta_detail_account_movements">حركات الحساب</string>
     <string name="beta_detail_card_movements">حركات البطاقة</string>
     <string name="beta_detail_loan_movements">حركات التمويل</string>
-    <string name="beta_detail_facility_members">البطاقات المرتبطة</string>
     <string name="beta_detail_observed_balance">الرصيد المرصود</string>
     <string name="beta_detail_balance_date">تاريخ الرصيد</string>
-    <string name="beta_detail_inflow_group">الوارد من خارج حساباتي</string>
-    <string name="beta_detail_outflow_group">الصادر إلى خارج حساباتي</string>
-    <string name="beta_detail_internal_group">التحويل بين أصولي</string>
-    <string name="beta_detail_internal_help">هذه التحويلات تدخل في صافي حركة الحساب، وتبقى منفصلة عن الوارد والصادر الخارجي.</string>
     <string name="beta_detail_daily">الإنفاق اليومي</string>
-    <string name="beta_detail_card_data">بيانات البطاقة</string>
     <string name="beta_detail_due_once">المبلغ المستحق مشترك بين البطاقة الأساسية والإضافية ويُحتسب مرة واحدة.</string>
     <string name="beta_detail_primary">بطاقة ائتمانية أساسية</string>
     <string name="beta_detail_supplementary">بطاقة ائتمانية إضافية</string>

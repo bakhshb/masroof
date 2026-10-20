@@ -380,7 +380,7 @@ class RoomBetaDashboardSource(
                 val meta=assetMetadata[asset.id]
                 if (balanceFact != null || statementFact != null || loan != null || meta?.displayName!=null || meta?.network!=null || meta?.accountType!=null || meta?.loanType!=null) assetFacts += DashboardAssetFacts(asset.id,
                     label=meta?.displayName,network=meta?.network,
-                    accountCategory=if(asset.kind==AssetKind.ACCOUNT) AccountCategory.entries.firstOrNull {it.name==meta?.accountType} ?: AccountCategory.CURRENT else null,
+                    accountCategory=if(asset.kind==AssetKind.ACCOUNT) AccountCategory.entries.firstOrNull {it.name==meta?.accountType} ?: if(meta?.accountType==null) AccountCategory.CURRENT else AccountCategory.OTHER else null,
                     balance = balanceFact, statement = statementFact, loanType = loan?.loanType ?: meta?.loanType.takeIf {asset.kind==AssetKind.LOAN},
                     loanRemaining = loan?.takeIf { it.loanRemaining != null && it.loanRemainingCurrency == Currency.SAR.name }?.let {
                         ObservedMoney(Money.of(it.loanRemaining!!, Currency.SAR), Instant.parse(it.observedAt)) },

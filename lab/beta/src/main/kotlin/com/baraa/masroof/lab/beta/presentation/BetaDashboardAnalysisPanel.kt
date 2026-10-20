@@ -1,5 +1,6 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.ApprovedFormField as OutlinedTextField
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 
 import androidx.compose.foundation.layout.*
@@ -214,8 +215,8 @@ internal fun BetaDashboardTransactionDetail(snapshot: DashboardSnapshot, transac
 @Composable internal fun dashboardAssetLabels(snapshot: DashboardSnapshot): Map<AssetId, String> = buildMap {
     snapshot.accounts.forEachIndexed { index, row -> put(row.id, (row.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_dash_account_number, index + 1)) + row.last4?.let {" · •• $it"}.orEmpty() + " · " + stringResource(if (row.id.bank.value == "BANK_ALJAZIRA") R.string.beta_bank_aljazira else R.string.beta_bank_title)) }
     snapshot.debitCards.forEach { put(it.cardId, (it.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_asset_debit)) + " · " + it.last4.orEmpty()) }
-    snapshot.creditFacilities.forEachIndexed { index, row ->
-        put(row.facilityId, stringResource(R.string.beta_controls_facility_number, index + 1))
+    snapshot.creditFacilities.forEach { row ->
+        put(row.facilityId, stringResource(R.string.beta_asset_credit))
         row.cards.forEachIndexed { cardIndex, card -> put(card.cardId, (card.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_dash_card_number, cardIndex + 1)) + " · " + card.last4.orEmpty()) }
     }
     snapshot.standaloneCreditCards.forEach { card -> put(card.cardId,(card.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_asset_credit))+" · "+card.last4.orEmpty()) }

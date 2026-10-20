@@ -20,7 +20,7 @@
     <string name="beta_bank_resume">استئناف البنك</string>
     <string name="beta_action_failed">تعذر حفظ التغيير. حاول مجددًا.</string>
     <string name="beta_retry">إعادة المحاولة</string>
-    <string name="beta_asset_add">إضافة حساب أو بطاقة</string>
+    <string name="beta_asset_add">إضافة</string>
     <string name="beta_asset_edit">تكوين الأصل</string>
     <string name="beta_asset_manual_help">إضافة يدوية في Beta فقط. لا تُنشئ الإضافة أو تعديل الربط أي حركة مالية.</string>
     <string name="beta_asset_list">حساباتي وبطاقاتي</string>
@@ -30,12 +30,7 @@
     <string name="beta_asset_facility">مجموعة البطاقات الائتمانية</string>
     <string name="beta_asset_loan">قرض</string>
     <string name="beta_asset_suffix">آخر أربعة أرقام فقط</string>
-    <string name="beta_asset_link_account">الحساب المرتبط</string>
     <string name="beta_asset_link_facility">البطاقة الأساسية التابعة لها</string>
-    <string name="beta_asset_no_parent">أضف البطاقة الأساسية أولًا، ثم اربط البطاقة الإضافية بها.</string>
-    <string name="beta_asset_primary">أساسية</string>
-    <string name="beta_asset_supplementary">إضافية</string>
-    <string name="beta_asset_shared_facility">اختر أساسية لبطاقتك الرئيسية، أو إضافية إذا كانت تشترك مع بطاقة أخرى في الحد الائتماني والمستحقات.</string>
     <string name="beta_asset_owned_confirm">أؤكد أن هذا الحساب أو البطاقة مملوك لي</string>
     <string name="beta_asset_save_failed">تعذر الحفظ. تحقق من البنك ونوع البطاقة وربطها بالبطاقة الأساسية. إذا تغيرت البيانات، أغلق النافذة وافتحها مجددًا.</string>
     <string name="beta_asset_save">حفظ</string>

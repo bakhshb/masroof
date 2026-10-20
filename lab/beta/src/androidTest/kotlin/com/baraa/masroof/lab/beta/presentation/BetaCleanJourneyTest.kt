@@ -33,7 +33,7 @@ class BetaCleanJourneyTest {
     private fun click(tag: String) {
         await(tag)
         compose.waitUntil(20000) { runCatching { compose.onNodeWithTag(tag).assertIsEnabled(); true }.getOrDefault(false) }
-        val node=compose.onNodeWithTag(tag); if(tag in setOf("asset-save","asset-cancel","ownership-continue")) node.assertIsDisplayed().performClick() else node.performScrollTo().performClick()
+        val node=compose.onNodeWithTag(tag); if(tag in setOf("asset-save","asset-cancel","ownership-continue","beta-page-back")) node.assertIsDisplayed().performClick() else node.performScrollTo().performClick()
     }
     private fun drain() { val done = CountDownLatch(1); BetaIo.execute { done.countDown() }; assertTrue(done.await(20, TimeUnit.SECONDS)) }
 
@@ -62,8 +62,8 @@ class BetaCleanJourneyTest {
                 compose.waitForIdle()
                 click("asset-owned-confirm"); click("asset-save")
                 await("manage-add-BANK_ALJAZIRA")
-                click("beta-settings-close"); await("beta-management-settings")
-                click("beta-settings-close"); await("onboarding-ASSETS")
+                click("beta-page-back"); await("beta-management-settings")
+                click("beta-page-back"); await("onboarding-ASSETS")
                 click("ownership-continue"); await("onboarding-REVIEW")
                 scenario.recreate(); await("onboarding-REVIEW")
                 click("onboarding-next"); await("dash-refresh")
@@ -73,7 +73,7 @@ class BetaCleanJourneyTest {
                 compose.onNodeWithTag("beta-settings-backup").assertDoesNotExist()
                 click("manage-COMMITMENTS"); await("controls-add")
                 compose.onNodeWithTag("controls-salary").assertDoesNotExist()
-                click("beta-settings-close"); click("beta-settings-close"); await("dash-refresh")
+                click("beta-page-back"); click("beta-page-back"); await("dash-refresh")
             }
             drain()
             BetaContainer(context).use {

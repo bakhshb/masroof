@@ -31,7 +31,13 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
     banks: List<BetaBankChoice>, assets: List<OwnedAsset>, controls: BetaDashboardControls, busy: Boolean,
     onBankEnabled: (BankId, Boolean) -> Unit, onAdd: (BankId, AssetKind) -> Unit, onEdit: (OwnedAsset) -> Unit,
     onBusyChanged: (Boolean) -> Unit, onClose: () -> Unit,
+    onRename: (OwnedAsset,String,Long,()->Unit) -> Unit = {_,_,_,_->}, failed: Boolean = false,
     theme: String = "SYSTEM", language: String = "SYSTEM", cardTasks: List<BetaCardSetupTask> = emptyList(), metadata: Map<AssetId,BetaAssetMetadata> = emptyMap(), onConfigureTask: (BetaCardSetupTask) -> Unit = {}, onTheme: (String) -> Unit = {}, onLanguage: (String) -> Unit = {}, onData: () -> Unit = {}, onSetup: () -> Unit = {}, onReset: () -> Unit = {}, onDeveloper: () -> Unit = {},onHistory: () -> Unit = {}) {
+    var renameId by rememberSaveable {mutableStateOf<String?>(null)}
+    var renameBank by rememberSaveable {mutableStateOf<String?>(null)}
+    var renameRevision by rememberSaveable {mutableLongStateOf(0)}
+    var renameName by rememberSaveable {mutableStateOf("")}
+    val renameAsset=assets.singleOrNull {it.id.bank.value==renameBank && it.id.localId==renameId}
     var resetConfirmation by rememberSaveable { mutableStateOf(false) }
     BackHandler { if (!busy) { if (resetConfirmation) resetConfirmation = false else if (category == "HUB") onClose() else onCategory("HUB") } }
     Column(Modifier.testTag("beta-settings-panel"), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
@@ -102,6 +108,7 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
                 else -> setOf(AssetKind.CREDIT_CARD, AssetKind.DEBIT_CARD)
             }
             banks.forEach { bank ->
+                Column(verticalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
                 MasroofCard {
                     Text(stringResource(bankName(bank.bankId)), style = MaterialTheme.typography.titleMedium)
                     if (category == "ACCOUNTS") {
@@ -111,12 +118,25 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
                                 modifier = Modifier.testTag("manage-bank-${bank.bankId.value}"))
                         }
                     }
+                }
                     if(category=="CARDS") cardTasks.filter { it.bank==bank.bankId && it.assetId==null }.forEach { task ->
                         BetaManagementRow("•• "+task.suffix,stringResource(R.string.beta_parity_card_missing),MasroofOutlineIcons.CreditCard,!busy,{onConfigureTask(task)},modifier=Modifier.testTag("configure-card-${task.suffix}"))
                     }
                     assets.filter { it.id.bank == bank.bankId && it.kind in kinds }.forEach { asset ->
-                        BetaManagementRow(metadata[asset.id]?.displayName ?: stringResource(assetKindLabel(asset.kind)), asset.last4?.let { "•• $it" }.orEmpty(), MasroofOutlineIcons.Wallet,
-                            enabled = !busy, onClick = { onEdit(asset) }, modifier = Modifier.testTag("manage-asset-${asset.id.bank.value}-${asset.id.localId}"))
+                        com.baraa.masroof.lab.beta.presentation.approved.ApprovedRegistryItemCard(
+                            icon=if(category=="CARDS") MasroofOutlineIcons.CreditCard else if(category=="LOANS") MasroofOutlineIcons.HandCoins else MasroofOutlineIcons.Wallet,
+                            bankLabel=stringResource(bankName(bank.bankId)),
+                            title=approvedRegistryDisplayLabel(metadata[asset.id]?.displayName,stringResource(assetKindLabel(asset.kind)),asset.last4.orEmpty()),
+                            showBankLabel=false, modifier=Modifier.testTag("manage-asset-${asset.id.bank.value}-${asset.id.localId}"),
+                            onTitleClick=if(busy || category=="LOANS") null else ({
+                                renameId=asset.id.localId;renameBank=asset.id.bank.value
+                                renameName=metadata[asset.id]?.displayName.orEmpty();renameRevision=metadata[asset.id]?.revision ?: 0
+                            }),
+                            endAction={
+                                com.baraa.masroof.lab.beta.presentation.approved.ApprovedManagementAction(
+                                    stringResource(if(category=="CARDS") R.string.beta_approved_settings_card_setup else R.string.beta_asset_edit),
+                                    {onEdit(asset)},enabled=!busy)
+                            })
                     }
                     OutlinedButton(enabled = !busy && bank.state == BankSelectionState.ENABLED, onClick = {
                         onAdd(bank.bankId, when (category) { "ACCOUNTS" -> AssetKind.ACCOUNT; "LOANS" -> AssetKind.LOAN; else -> AssetKind.CREDIT_CARD })
@@ -133,9 +153,14 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
                 Text(stringResource(R.string.beta_setup_reset), color = MaterialTheme.colorScheme.error)
             }
         }
-        OutlinedButton(enabled = !busy, onClick = { if (category == "HUB") onClose() else onCategory("HUB") },
-            modifier = Modifier.testTag("beta-settings-close")) { Text(stringResource(if (category == "HUB") R.string.beta_asset_cancel else R.string.beta_dash_back)) }
+
     }
+    if(renameAsset!=null) com.baraa.masroof.lab.beta.presentation.approved.ApprovedRenameAssetDialog(
+        "${renameAsset.id.bank.value}:${renameAsset.id.localId}",renameName,
+        stringResource(if(renameAsset.kind==AssetKind.ACCOUNT) R.string.beta_approved_settings_rename_account_title else R.string.beta_approved_settings_rename_card_title),
+        busy,onDismiss={renameId=null;renameBank=null},onSave={name ->
+            onRename(renameAsset,name,renameRevision) {renameId=null;renameBank=null}
+        },failed=failed)
     if (resetConfirmation) AlertDialog(
         onDismissRequest = { if (!busy) resetConfirmation = false },
         title = { Text(stringResource(R.string.beta_setup_reset_title)) },

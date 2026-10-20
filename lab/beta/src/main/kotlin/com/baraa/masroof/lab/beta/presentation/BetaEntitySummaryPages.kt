@@ -22,25 +22,13 @@ import com.baraa.masroof.ui.components.*
 import com.baraa.masroof.ui.dashboard.*
 import com.baraa.masroof.ui.theme.*
 
-/** Mirrors production EntitySummaryCard; only its read-model bindings differ. */
+/** Stable-ID bindings around the copied production renderer. */
 @Composable
 internal fun BetaEntitySummaryCard(title: String,subtitle: String,bank: String,icon: ImageVector,accent: Color,
     id: AssetId,enabled: Boolean,onClick: (AssetId)->Unit,content: @Composable ColumnScope.()->Unit) {
-    val colors=MasroofThemeExtras.extendedColors
-    MasroofCard(Modifier.clickable(enabled=enabled) {onClick(id)}) {
-        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
-            Surface(shape=MasroofShapes.small,color=when(accent) {colors.card->colors.cardSoft;colors.liability->colors.liabilitySoft;else->colors.accountSoft}) {
-                Box(Modifier.size(MasroofReference.iconBox),contentAlignment=Alignment.Center) {Icon(icon,null,Modifier.size(MasroofReference.icon),tint=accent)}
-            }
-            Text(title,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium.copy(fontWeight=MasroofFontWeights.semiBold))
-            Text(bank,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Spacer(Modifier.height(MasroofReference.chartHeadGap))
-        if(subtitle.isNotBlank()) Text(subtitle,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        content()
-        Spacer(Modifier.height(MasroofSpacing.cardInnerGap))
-        Button(enabled=enabled,onClick={onClick(id)},modifier=Modifier.fillMaxWidth().testTag("dash-asset-${id.bank.value}-${id.localId}"),shape=MasroofShapes.small) {Text(stringResource(R.string.beta_complete_details))}
-    }
+    com.baraa.masroof.lab.beta.presentation.approved.ApprovedEntitySummaryCard(
+        title, subtitle, icon, accent, onClick = if(enabled) ({onClick(id)}) else null,
+        modifier=Modifier.testTag("dash-asset-${id.bank.value}-${id.localId}"), bankLabel=bank, content=content)
 }
 @Composable
 internal fun BetaFinancialDetailRow(label: String,value: String,color: Color=MaterialTheme.colorScheme.onSurface) {
@@ -156,7 +144,7 @@ internal fun BetaCommitmentsSummary(snapshot: DashboardSnapshot, summary: Commit
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
                     Text(when {
                         row.loanId!=null -> snapshot.loans.singleOrNull {it.id==row.loanId}?.let {it.label.takeIf(String::isNotBlank) ?: loanLabel(it.type)} ?: stringResource(R.string.beta_asset_loan)
-                        row.facilityId!=null -> stringResource(R.string.beta_asset_facility)
+                        row.facilityId!=null -> stringResource(R.string.beta_asset_credit)
                         else -> if(row.label.isBlank()) stringResource(R.string.beta_dash_commitments) else row.label
                     },style=MaterialTheme.typography.bodyMedium)
                     row.expectedDate?.let {Text(date.format(it),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}

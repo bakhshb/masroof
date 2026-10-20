@@ -80,7 +80,7 @@ internal fun BetaReviewInboxPanel(container: BetaContainer, onClose: () -> Unit,
         if(bank!=null) BetaAssetEditor(bank,existing,current.preview?.assets.orEmpty(),busy,failed,
             initialKind=kind,initialSuffix=candidate?.reference?.suffix.orEmpty(),
             allowedKinds=if(kind in setOf(AssetKind.CREDIT_CARD,AssetKind.DEBIT_CARD)) setOf(AssetKind.CREDIT_CARD,AssetKind.DEBIT_CARD) else setOf(kind),
-            metadata=existing?.let {current.assetMetadata[it.id]} ?: BetaAssetMetadata(),
+            ownershipConfirmed=candidate?.status==BetaOwnershipStatus.OWNED, registryMetadata=current.assetMetadata, metadata=existing?.let {current.assetMetadata[it.id]} ?: BetaAssetMetadata(),
             onCancel={configureReference=null;configureLoan=false},onSave={draft -> perform {
                 val saved=container.saveManualAsset(draft)
                 candidate?.reference?.let {ref -> container.ownershipSnapshot().candidates.singleOrNull {it.reference==ref}?.let {container.decideOwnership(it,true,saved.id)}}

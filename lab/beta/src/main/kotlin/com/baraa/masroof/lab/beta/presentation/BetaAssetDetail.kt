@@ -72,18 +72,15 @@ internal fun BetaAssetDetail(
     snapshot: DashboardSnapshot,
     account: AccountSummary?,
     debit: DebitSpending?,
-    facility: FacilitySummary?,
     card: CreditCardSummary?,
     loan: LoanSummary?,
     enabled: Boolean,
-    onSelect: (AssetId) -> Unit,
     onTransaction: (String) -> Unit,
     ledgerComplete: Boolean,
 ) {
     when {
         account != null -> AccountDetail(snapshot, account, enabled, onTransaction, ledgerComplete)
         debit != null -> DebitDetail(snapshot, debit, enabled, onTransaction, ledgerComplete)
-        facility != null -> FacilityDetail(snapshot, facility, enabled, onSelect, onTransaction, ledgerComplete)
         card != null -> CreditDetail(snapshot, card, enabled, onTransaction, ledgerComplete)
         loan != null -> LoanDetail(snapshot, loan, enabled, onTransaction, ledgerComplete)
     }
@@ -93,29 +90,18 @@ internal fun BetaAssetDetail(
 private fun AccountDetail(snapshot: DashboardSnapshot, account: AccountSummary, enabled: Boolean,
     onTransaction: (String) -> Unit, ledgerComplete: Boolean) {
     val flow = account.flow
-    val colors = MasroofThemeExtras.extendedColors
     val unavailable = stringResource(R.string.beta_dash_unavailable)
     val label = account.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_asset_account)
     Column(Modifier.testTag("beta-account-detail"), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
-        MasroofHeroCard(label + " · " + stringResource(R.string.beta_home_remaining),
-            formatMoney(flow?.cashPosition, unavailable), bankLabel(account.id.bank), MasroofHeroRole.Account,
-            icon = MasroofOutlineIcons.Landmark)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MasroofReference.metricGap)) {
-            DashboardMetric(formatMoney(flow?.totalIn, unavailable), colors.inflow, Modifier.weight(1f)) {
-                Text(stringResource(R.string.beta_dash_inflow), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            DashboardMetric(formatMoney(flow?.totalOut, unavailable), colors.outflow, Modifier.weight(1f)) {
-                Text(stringResource(R.string.beta_dash_outflow), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        BetaSectionTrend(snapshot, account.id, MasroofHeroRole.Account, enabled)
-        if (flow == null) Text(stringResource(R.string.beta_dash_unavailable_help), Modifier.testTag("account-flow-unavailable"))
-        else {
-            FlowGroup(R.string.beta_detail_inflow_group, BetaAssetDetailFacts.lines(flow, BetaAssetDetailFacts.externalIn), colors.inflow)
-            FlowGroup(R.string.beta_detail_outflow_group, BetaAssetDetailFacts.lines(flow, BetaAssetDetailFacts.externalOut), colors.outflow)
-            FlowGroup(R.string.beta_detail_internal_group, BetaAssetDetailFacts.lines(flow, BetaAssetDetailFacts.internal), colors.account,
-                stringResource(R.string.beta_detail_internal_help))
-        }
+        val language=LocalConfiguration.current.locales[0].toLanguageTag()
+        @Composable fun formatted(buckets: List<FlowBucket>): List<Pair<String,String>> = flow?.let { value ->
+            BetaAssetDetailFacts.lines(value,buckets).map {line -> stringResource(bucketLabel(line.bucket)) to MasroofMoneyDisplay.format(line.amount,line.currency,language)}
+        }.orEmpty()
+        ApprovedAccountPeriodSummaryCard(label+" · "+stringResource(R.string.beta_home_remaining),bankLabel(account.id.bank),
+            formatMoney(flow?.cashPosition,unavailable),formatMoney(flow?.totalIn,unavailable),formatMoney(flow?.totalOut,unavailable),
+            formatted(BetaAssetDetailFacts.externalIn),formatted(BetaAssetDetailFacts.externalOut),formatted(BetaAssetDetailFacts.internal),
+            trend={BetaSectionTrend(snapshot,account.id,MasroofHeroRole.Account,enabled)})
+        if(flow==null) Text(stringResource(R.string.beta_dash_unavailable_help),Modifier.testTag("account-flow-unavailable"))
         AssetTransactions(snapshot, account.id, stringResource(R.string.beta_detail_account_movements), enabled, onTransaction, ledgerComplete)
     }
 }
@@ -137,32 +123,6 @@ private fun DebitDetail(snapshot: DashboardSnapshot, debit: DebitSpending, enabl
 }
 
 @Composable
-private fun FacilityDetail(snapshot: DashboardSnapshot, facility: FacilitySummary, enabled: Boolean,
-    onSelect: (AssetId) -> Unit, onTransaction: (String) -> Unit, ledgerComplete: Boolean) {
-    val unavailable = stringResource(R.string.beta_dash_unavailable)
-    Column(Modifier.testTag("beta-facility-detail"), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
-        MasroofHeroCard(stringResource(R.string.beta_asset_facility) + " · " + stringResource(R.string.beta_dash_due),
-            formatMoney(facility.statementDue, unavailable), bankLabel(facility.facilityId.bank), MasroofHeroRole.Liability,
-            icon = MasroofOutlineIcons.CreditCard)
-        FactCard(stringResource(R.string.beta_detail_card_data)) {
-            DetailRow(stringResource(R.string.beta_detail_due_date), if (facility.dueDate == null) unavailable else day(checkNotNull(facility.dueDate)))
-            DetailRow(stringResource(R.string.beta_dash_salary_spending), formatMoney(facility.salarySpending, unavailable))
-            DetailRow(stringResource(R.string.beta_dash_statement_spending), formatMoney(facility.statementSpending, unavailable), divider = false)
-        }
-        if (facility.cards.isNotEmpty()) {
-            DashboardSectionHeading(stringResource(R.string.beta_detail_facility_members), MasroofOutlineIcons.CreditCard)
-            facility.cards.forEachIndexed { index, member ->
-                OutlinedButton(enabled = enabled, onClick = { onSelect(member.cardId) },
-                    modifier = Modifier.fillMaxWidth().testTag("dash-asset-${member.cardId.bank.value}-${member.cardId.localId}")) {
-                    Text(member.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_dash_card_number, index + 1))
-                }
-            }
-        }
-        AssetTransactions(snapshot, facility.facilityId, stringResource(R.string.beta_detail_card_movements), enabled, onTransaction, ledgerComplete)
-    }
-}
-
-@Composable
 private fun CreditDetail(snapshot: DashboardSnapshot, card: CreditCardSummary, enabled: Boolean,
     onTransaction: (String) -> Unit, ledgerComplete: Boolean) {
     val unavailable = stringResource(R.string.beta_dash_unavailable)
@@ -172,7 +132,7 @@ private fun CreditDetail(snapshot: DashboardSnapshot, card: CreditCardSummary, e
     Column(Modifier.testTag("beta-credit-detail"), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         ApprovedCreditDetailSummaryCard(ApprovedCreditDetailUi(label,bankLabel(card.cardId.bank),formatMoney(card.availableBalance,unavailable),
             formatMoney(facility?.statementDue,unavailable),facility?.dueDate?.let {day(it)} ?: unavailable,
-            stringResource(when(card.role) {CreditCardRole.PRIMARY -> R.string.beta_approved_reference_primary_credit_type;CreditCardRole.SUPPLEMENTARY -> R.string.beta_approved_reference_supplementary_credit_type;null -> R.string.beta_approved_reference_credit_type}),
+            stringResource(when(card.role) {CreditCardRole.PRIMARY -> R.string.beta_approved_reference_primary_credit_type;CreditCardRole.SUPPLEMENTARY -> R.string.beta_approved_reference_supplementary_credit_type;CreditCardRole.STANDALONE,null -> R.string.beta_approved_reference_credit_type}),
             day(card.balanceAsOf,snapshot.query.zone),primary,card.role==CreditCardRole.SUPPLEMENTARY))
         BetaSectionTrend(snapshot, card.cardId, MasroofHeroRole.Card, enabled)
         AssetTransactions(snapshot, card.cardId, stringResource(R.string.beta_detail_card_movements), enabled, onTransaction, ledgerComplete)
@@ -192,33 +152,6 @@ private fun LoanDetail(snapshot: DashboardSnapshot, loan: LoanSummary, enabled: 
         AssetTransactions(snapshot, loan.id, stringResource(R.string.beta_detail_loan_movements), enabled, onTransaction, ledgerComplete)
     }
 }
-
-@Composable
-private fun FlowGroup(title: Int, lines: List<BetaFlowLine>, color: Color, guidance: String? = null) {
-    if (lines.isEmpty()) return
-    val language = LocalConfiguration.current.locales[0].toLanguageTag()
-    FactCard(stringResource(title), guidance) {
-        lines.forEachIndexed { index, line ->
-            DetailRow(stringResource(bucketLabel(line.bucket)), MasroofMoneyDisplay.format(line.amount, line.currency, language),
-                color, divider = index < lines.lastIndex)
-        }
-    }
-}
-
-@Composable
-private fun FactCard(title: String, guidance: String? = null, content: @Composable () -> Unit) {
-    MasroofCard {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-            if (guidance != null) MasroofGuidanceButton(title, guidance, description = stringResource(R.string.beta_home_about, title))
-        }
-        content()
-    }
-}
-
-@Composable
-private fun DetailRow(label: String,value: String,valueColor: Color = MaterialTheme.colorScheme.onSurface,divider: Boolean = true) =
-    ApprovedDetailRow(label,value,valueColor=valueColor,divider=divider)
 
 @Composable
 internal fun BetaSectionTrend(snapshot: DashboardSnapshot, asset: AssetId?, role: MasroofHeroRole, enabled: Boolean, scope: TrendScope = TrendScope.ASSET) {

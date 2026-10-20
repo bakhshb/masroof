@@ -88,6 +88,7 @@ class BetaDashboardScreenTest {
         if(compose.onAllNodesWithTag("dash-detail-back").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithTag("dash-detail-back").performScrollTo().performClick()
         if(compose.onAllNodesWithTag("dash-overview").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithTag("dash-overview").performScrollTo().performClick()
         when(value) {
+            "OVERVIEW" -> Unit
             "ACCOUNTS","CARDS","LOANS","COMMITMENTS" -> {
                 compose.onNodeWithTag("home-shortcuts").performScrollTo()
                 val index=listOf("ACCOUNTS","CARDS","LOANS","COMMITMENTS").indexOf(value)
@@ -202,10 +203,32 @@ class BetaDashboardScreenTest {
         compose.onNodeWithTag("dash-month").assertContentDescriptionEquals("2026-10")
         compose.onNodeWithTag("dash-detail-back").performScrollTo().performClick()
         compose.onNodeWithTag("dash-route-ACCOUNTS").assertIsSelected()
+        compose.onNodeWithTag("dash-month-previous").assertDoesNotExist()
+        route("OVERVIEW")
         compose.onNodeWithTag("dash-month-previous").performScrollTo().performClick(); waitLoaded("2026-09")
+        route("ACCOUNTS")
         state.emulateSavedInstanceStateRestore(); waitLoaded("2026-09")
         compose.onNodeWithTag("dash-month").assertContentDescriptionEquals("2026-09")
         compose.onNodeWithTag("dash-route-ACCOUNTS").assertIsSelected()
+    }
+
+    @Test fun failedSamePeriodRefreshKeepsLastKnownValuesWithErrorAndRecovers() {
+        val fail = AtomicBoolean(false)
+        val dashboard = workflow(fail)
+        compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) { BetaDashboardPanel(dashboard) } } }
+        waitLoaded()
+        val amount = hasText("42.35 SAR") and hasAnyAncestor(hasTestTag("dash-summary-spending"))
+        compose.onNode(amount).assertExists()
+        fail.set(true)
+        compose.onNodeWithTag("dash-refresh").performScrollTo().performClick()
+        compose.waitUntil(15000) {compose.onAllNodesWithTag("dash-error").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNode(amount).assertExists()
+        compose.onNodeWithTag("dash-empty").assertDoesNotExist()
+        fail.set(false)
+        compose.onNodeWithTag("dash-retry").performScrollTo().performClick()
+        compose.waitUntil(15000) {compose.onAllNodesWithTag("dash-error").fetchSemanticsNodes().isEmpty()}
+        waitLoaded()
+        compose.onNode(amount).assertExists()
     }
 
     @Test fun failedNewPeriodClearsOldMoneyAndExplicitRetryRecovers() {
@@ -301,6 +324,8 @@ class BetaDashboardScreenTest {
             compose.onNodeWithTag("dash-detail-back").performScrollTo(); screenshot("rtl-approved-card")
             compose.onNodeWithTag("dash-month").assertDoesNotExist()
             compose.onNodeWithTag("dash-detail-back").performClick()
+            compose.onNodeWithTag("dash-month-previous").assertDoesNotExist()
+            route("OVERVIEW")
             compose.onNodeWithTag("dash-month-previous").performScrollTo().performClick(); waitLoaded()
             compose.onNodeWithTag("dash-month-next").performScrollTo().performClick(); waitLoaded()
             assertEquals(original, beta.financialPosting(key)); assertEquals(history, beta.financialHistory(key))

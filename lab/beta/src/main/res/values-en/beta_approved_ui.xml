@@ -31,4 +31,49 @@
   <string name="beta_approved_onboarding_import_date_title">From which date should transactions be imported?</string>
   <string name="beta_approved_onboarding_selected_date">Selected date: %1$s</string>
   <string name="beta_approved_onboarding_start_import">Start import</string>
+  <string name="beta_approved_card_network_amex">Amex</string>
+  <string name="beta_approved_card_network_mastercard">Mastercard</string>
+  <string name="beta_approved_card_network_unknown">Unknown</string>
+  <string name="beta_approved_card_network_visa">Visa</string>
+  <string name="beta_approved_dashboard_credit_card_last4">Card ···%1$s</string>
+  <string name="beta_approved_onboarding_account_suffix">Account ending in %1$s</string>
+  <string name="beta_approved_settings_card_credit_evidence">Messages suggest a credit card. Review the type before saving.</string>
+  <string name="beta_approved_settings_card_debit_evidence">Messages suggest a debit card. Review the type before saving.</string>
+  <string name="beta_approved_settings_card_dependents_block">This card has supplementary cards. Reassign them explicitly before changing the primary card type or role.</string>
+  <string name="beta_approved_settings_card_network_title">Card network</string>
+  <string name="beta_approved_settings_card_no_account">No linked account yet</string>
+  <string name="beta_approved_settings_card_no_primary">No confirmed primary card in this bank.</string>
+  <string name="beta_approved_settings_card_primary_title">Parent primary card</string>
+  <string name="beta_approved_settings_card_role_additional">Supplementary</string>
+  <string name="beta_approved_settings_card_role_primary">Primary</string>
+  <string name="beta_approved_settings_card_role_standalone">Standalone</string>
+  <string name="beta_approved_settings_card_role_title">Card role</string>
+  <string name="beta_approved_settings_card_setup">Card setup</string>
+  <string name="beta_approved_settings_card_type_credit">Credit</string>
+  <string name="beta_approved_settings_card_type_debit">Debit</string>
+  <string name="beta_approved_settings_card_type_title">Card type</string>
+  <string name="beta_approved_settings_link_debit_title">Link Mada to account</string>
+  <string name="beta_approved_settings_save">Save</string>
+  <string name="beta_approved_settings_update_failed">Could not update card settings</string>
+    <string name="beta_approved_settings_account_type_wallet">Wallet</string>
+    <string name="beta_approved_reference_account_detail_title">Account details</string>
+    <string name="beta_approved_reference_card_detail_title">Card details</string>
+    <string name="beta_approved_reference_loan_detail_title">Loan details</string>
+<string name="beta_approved_dashboard_account_remaining_calculated_hint">In − out (external transfers, card payments, cash, bills, loan repayments, POS, fees)</string>
+
+<string name="beta_approved_dashboard_total_inflow">Total inflows</string>
+
+<string name="beta_approved_dashboard_total_spent">Total outflows</string>
+
+<string name="beta_approved_reference_inflow_external">External inflows</string>
+
+<string name="beta_approved_reference_outflow_external">External outflows</string>
+
+<string name="beta_approved_dashboard_self_transfers">Transfers between my accounts</string>
+
+<string name="beta_approved_settings_display_name_label">Display name</string>
+<string name="beta_approved_settings_cancel">Cancel</string>
+<string name="beta_approved_settings_rename_card_title">Rename card</string>
+<string name="beta_approved_settings_rename_account_title">Rename account</string>
+<string name="beta_approved_settings_action_rename">Rename</string>
 </resources>

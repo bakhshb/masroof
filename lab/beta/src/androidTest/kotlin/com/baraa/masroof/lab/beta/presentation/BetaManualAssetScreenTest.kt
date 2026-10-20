@@ -37,7 +37,7 @@ class BetaManualAssetScreenTest {
             MaterialTheme {
                 BetaShell(0, false, editor = {
                     BetaAssetEditor(bank, existing, assets, false, false,
-                        onSave = { beta.saveManualAsset(it); onSaved() }, onCancel = onCancel, metadata = metadata)
+                        onSave = { beta.saveManualAsset(it); onSaved() }, onCancel = onCancel, metadata = metadata, registryMetadata = beta.assetMetadata())
                 }, onReturn = {}, onReset = {}, onBackup = {}, onRestore = {})
             }
         }
@@ -45,10 +45,12 @@ class BetaManualAssetScreenTest {
     private fun confirmOwnership() {
         // Real IME animations are outside Compose's idle clock. Finish text entry
         // before scrolling/clicking so a changing keyboard inset cannot move the target.
-        compose.onNodeWithTag("asset-last4").performImeAction()
-        compose.waitForIdle()
-        compose.onNodeWithTag("asset-owned-confirm").performScrollTo()
-            .assertIsDisplayed().performClick().assertIsOn()
+        if (compose.onAllNodesWithTag("asset-owned-confirm").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithTag("asset-last4").performImeAction()
+            compose.waitForIdle()
+            compose.onNodeWithTag("asset-owned-confirm").performScrollTo()
+                .assertIsDisplayed().performClick().assertIsOn()
+        }
         compose.onNodeWithTag("asset-save").assertIsDisplayed().assertIsEnabled()
     }
     @Test fun reselectingCurrentDebitKindAndNetworkPreservesItsAccount() {
@@ -168,6 +170,75 @@ class BetaManualAssetScreenTest {
                 assertTrue(it.moveToFirst()); assertEquals(0, it.getInt(0))
             }
         } finally { db.close() }
+    }
+
+    @Test fun standaloneAmexKeepsPrivateFacilityAcrossBackupAndReopen() {
+        beta.saveManualAsset(ManualAssetDraft(id("facility"), AssetKind.CREDIT_FACILITY, "", ownedConfirmed = true))
+        val card = beta.saveManualAsset(ManualAssetDraft(id("card"), AssetKind.CREDIT_CARD, "4444", id("facility"), CreditCardRole.PRIMARY, true))
+        showEditor(card)
+        compose.onNodeWithTag("asset-network-AMEX").performScrollTo().performClick()
+        compose.onNodeWithTag("asset-role-STANDALONE").performScrollTo().performClick()
+        compose.onNodeWithTag("asset-save").performClick()
+        val saved = beta.assets().single { it.id == card.id }
+        assertEquals(CreditCardRole.STANDALONE, saved.creditCardRole)
+        assertEquals(card.parentId, saved.parentId)
+        assertEquals("AMEX", beta.assetMetadata()[saved.id]?.network)
+        // A second card cannot attach to a private facility, even outside the UI.
+        assertThrows(IllegalArgumentException::class.java) {
+            beta.saveManualAsset(ManualAssetDraft(id("other"), AssetKind.CREDIT_CARD, "5555", saved.parentId, CreditCardRole.PRIMARY, true))
+        }
+        assertEquals(2, beta.assets().size)
+        beta.backup()
+        assertTrue(beta.restore())
+        beta.close(); beta = BetaContainer(context)
+        assertEquals(saved, beta.assets().single { it.id == card.id })
+        assertEquals("AMEX", beta.assetMetadata()[saved.id]?.network)
+    }
+    @Test fun primaryWithSupplementaryCannotBecomeStandaloneOrDebit() {
+        beta.saveManualAsset(ManualAssetDraft(id("facility"), AssetKind.CREDIT_FACILITY, "", ownedConfirmed = true))
+        val primary = beta.saveManualAsset(ManualAssetDraft(id("primary"), AssetKind.CREDIT_CARD, "2222", id("facility"), CreditCardRole.PRIMARY, true))
+        beta.saveManualAsset(ManualAssetDraft(id("child"), AssetKind.CREDIT_CARD, "3333", id("facility"), CreditCardRole.SUPPLEMENTARY, true))
+        showEditor(primary)
+        compose.onNodeWithTag("asset-role-STANDALONE").performScrollTo().performClick()
+        compose.onNodeWithTag("asset-save").assertIsNotEnabled()
+        compose.onNodeWithTag("asset-kind-DEBIT_CARD").performScrollTo().performClick()
+        compose.onNodeWithTag("asset-save").assertIsNotEnabled()
+        assertEquals(primary, beta.assets().single { it.id == primary.id })
+    }
+    @Test fun alreadyOwnedAccountCanChangeTypeWithoutRepeatingOwnership() {
+        val account=beta.saveManualAsset(ManualAssetDraft(id("account"),AssetKind.ACCOUNT,"1234",ownedConfirmed=true))
+        showEditor(account)
+        compose.onNodeWithTag("asset-owned-confirm").assertDoesNotExist()
+        compose.onNodeWithTag("asset-account-type-WALLET").performScrollTo().performClick()
+        compose.onNodeWithTag("asset-save").assertIsEnabled().performClick()
+        assertEquals(account,beta.assets().single())
+        assertEquals("WALLET",beta.assetMetadata()[account.id]?.accountType)
+    }
+    @Test fun confirmedReferenceDoesNotRepeatMineAndNeedsAnExplicitUnknownCardType() {
+        var saved: ManualAssetDraft? = null
+        compose.setContent {com.baraa.masroof.ui.theme.MasroofTheme {
+            BetaAssetEditor(bank,null,emptyList(),false,false,{saved=it},{},initialKind=AssetKind.DEBIT_CARD,
+                initialSuffix="4444",ownershipConfirmed=true)
+        }}
+        compose.onNodeWithTag("asset-owned-confirm").assertDoesNotExist()
+        compose.onNodeWithTag("asset-last4").assertDoesNotExist()
+        compose.onNodeWithTag("asset-save").assertIsNotEnabled()
+        compose.onNodeWithTag("asset-kind-CREDIT_CARD").performScrollTo().performClick()
+        compose.onNodeWithTag("asset-save").assertIsEnabled().performClick()
+        assertEquals("4444",requireNotNull(saved).last4)
+        assertEquals(AssetKind.CREDIT_CARD,requireNotNull(saved).kind)
+        assertTrue(requireNotNull(saved).ownedConfirmed)
+        assertTrue(requireNotNull(saved).createCreditFacility)
+    }
+    @Test fun walletAccountTypePersistsAcrossReopen() {
+        showEditor()
+        compose.onNodeWithTag("asset-account-type-WALLET").performScrollTo().performClick()
+        compose.onNodeWithTag("asset-last4").performScrollTo().performTextInput("1234")
+        confirmOwnership()
+        compose.onNodeWithTag("asset-save").performClick()
+        val account = beta.assets().single()
+        beta.close(); beta = BetaContainer(context)
+        assertEquals("WALLET", beta.assetMetadata()[account.id]?.accountType)
     }
 
 }

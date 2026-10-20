@@ -46,7 +46,7 @@ class BetaAssetDetailTest {
             expected = MasroofMoneyDisplay.format(BigDecimal("-25"), "SAR", language)
             externalOnly = MasroofMoneyDisplay.format(BigDecimal("-30"), "SAR", language)
             MasroofTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
-                BetaAssetDetail(snapshot, account, null, null, null, null, true, {}, {}, true)
+                BetaAssetDetail(snapshot, account, null, null, null, true, {}, true)
             } }
         }
         compose.onNodeWithText(expected).assertExists()
@@ -69,7 +69,7 @@ class BetaAssetDetailTest {
             refund = MasroofMoneyDisplay.format(BigDecimal("20"), "SAR", language)
             dueLabel = androidx.compose.ui.res.stringResource(R.string.beta_dash_due)
             MasroofTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
-                BetaAssetDetail(snapshot, null, debit, null, null, null, true, {}, {}, true)
+                BetaAssetDetail(snapshot, null, debit, null, null, true, {}, true)
             } }
         }
         compose.onNodeWithText(gross).performScrollTo().assertIsDisplayed()

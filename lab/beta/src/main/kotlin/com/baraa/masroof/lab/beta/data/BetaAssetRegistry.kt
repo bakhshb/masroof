@@ -80,6 +80,7 @@ class BetaAssetRegistry(private val database: BetaDatabase) : ManualAssetStore {
             existing?.takeIf { it.kind == AssetKind.CREDIT_CARD }?.parentId,
             asset.takeIf { it.kind == AssetKind.CREDIT_CARD }?.parentId).toSet()
         after.filter { it.kind == AssetKind.CREDIT_CARD && it.parentId in affectedFacilities }.groupBy { it.parentId }.values.forEach { cards ->
+            require(cards.none {it.creditCardRole==CreditCardRole.STANDALONE} || cards.size==1) { "A standalone card cannot share its credit facility" }
             require(cards.count { it.creditCardRole == CreditCardRole.PRIMARY } <= 1) { "A facility already has a primary card" }
             require(cards.none { it.creditCardRole == CreditCardRole.SUPPLEMENTARY } || cards.any { it.creditCardRole == CreditCardRole.PRIMARY }) {
                 "A supplementary card needs a primary card in the same facility"

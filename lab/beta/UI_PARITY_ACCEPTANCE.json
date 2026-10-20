@@ -158,7 +158,7 @@
       ],
       "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
-      "lab_visual_reference": null,
+      "lab_visual_reference": "build/reports/ui-parity/lab/approved-card-registry.png — actual rename/reopen journey; production fixture comparison remains pending.",
       "same_data_comparison": null,
       "old_renderer_removed": false,
       "accepted": false
@@ -170,7 +170,7 @@
       "previous_lab_renderers": [
         "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaAssetEditor.kt"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
       "lab_visual_reference": null,
       "same_data_comparison": null,
@@ -214,7 +214,14 @@
     "The Material3 ModalBottomSheet body in BetaBottomSheet; now a labels/tags adapter to the copied production modal.",
     "Inline duplicate review-list card and meta-row geometry.",
     "Legacy credit-detail calendar/salary/statement display blocks and obsolete SpendingRow/period functions.",
-    "memberCardAmounts helper used only by the retired renderer; its implementation-only test was removed, keeping unknown-loan-type protection."
+    "memberCardAmounts helper used only by the retired renderer; its implementation-only test was removed, keeping unknown-loan-type protection.",
+    "The old card network/type/role/parent UI in BetaAssetEditor; existing and new cards now use the copied SettingsCardSetupSheet through BetaCardSetupEditor.",
+    "Duplicate ownership candidate card and ownership-button geometry; only collision/configuration bindings remain around the production renderer.",
+    "Duplicate EntitySummaryCard and AccountPeriodSummaryCard geometry; the previous FacilityDetail, FlowGroup and FactCard implementations were removed.",
+    "Interactive period navigation on secondary summaries/account detail; they use copied MasroofPeriodDisplay. Interactive period selection remains on Home.",
+    "Material OutlinedTextField renderers replaced by the copied production MasroofFormField throughout lab forms.",
+    "Generic asset detail title replaced with the approved account/card/loan titles.",
+    "Legacy outer registry card and duplicate bottom Back button; registry entries use the canonical copied card shell."
   ],
   "removed_resource_keys": [
     "beta_parity_import_date",
@@ -225,21 +232,49 @@
     "beta_parity_date_value",
     "beta_detail_last4",
     "beta_detail_network",
-    "beta_detail_salary_period"
+    "beta_detail_salary_period",
+    "beta_asset_primary",
+    "beta_asset_supplementary",
+    "beta_asset_shared_facility",
+    "beta_asset_no_parent",
+    "beta_asset_link_account",
+    "beta_parity_network",
+    "beta_parity_investment",
+    "beta_parity_optional_link",
+    "beta_dash_details",
+    "beta_detail_facility_members",
+    "beta_detail_card_data",
+    "beta_detail_inflow_group",
+    "beta_detail_outflow_group",
+    "beta_detail_internal_group",
+    "beta_detail_internal_help"
   ],
   "verified_tests": {
     "lab_jvm": 301,
     "bank_engine": 58,
     "finance_core": 179,
     "android16_full": {
-      "total": 179,
-      "passed": 178,
-      "outdated_assertions": 1
+      "total": 183,
+      "passed": 183,
+      "duration": "5m51s",
+      "scope": "Card setup/period/form/ownership port and same-period refresh. Subsequent account/registry source port has separate follow-up verification."
     },
+    "ci": "2278dee523d9d5a81aa90e784bf4a3c28856af41 is green; later UI port is not yet pushed.",
     "android16_followup": {
-      "passed": 1,
-      "purpose": "Shared supplementary facility due matches production display; aggregate is still counted once."
+      "passed": 20,
+      "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
     },
-    "ci": "2278dee523d9d5a81aa90e784bf4a3c28856af41 is green; later UI port is not yet pushed."
-  }
+    "process_death": {
+      "passed": 39,
+      "scope": "Permission, history import, evidence, ledger, correction and restore journeys after the UI source port."
+    }
+  },
+  "implementation_notes": [
+    "المرجع هو docs/DESIGN_SYSTEM.md وكود الفعلي. لم تُقبل مطابقة جميع الصفحات حتى الآن.",
+    "أُضيفت خيارات البطاقة المستقلة وAmex وحساب المحفظة من الفعلي. لم تُضف جداول أو أعمدة. نوع الحساب القديم غير المدعوم يظهر «أخرى» ولا يتحول تلقائيًا إلى جارٍ.",
+    "فشل تحديث الفترة نفسها يحتفظ بآخر بيانات محملة مع خطأ واضح. تغيير الفترة لا يعرض أرقام الفترة السابقة.",
+    "تسمية البطاقة عبر الضغط على عنوانها تستخدم نافذة مستقلة من الفعلي؛ وتحافظ على الهوية وآخر أربعة أرقام ومراجعة إصدار البيانات. تبويبات إيقاف المتابعة واستئنافها لم تُنقل بالكامل بعد.",
+    "مرجع البطاقة الذي سبق اعتماد ملكيته لا يكرر سؤال الملكية؛ وإذا كان نوعه مجهولًا فلا يفترض أنه مدى، بل يتطلب اختيار النوع. الإضافة اليدوية الجديدة ما زالت تتطلب اعتماد الملكية.",
+    "حُذف كرت المجموعة القديم المحيط بصف البطاقة، وزر الرجوع السفلي المكرر. الصورة المرفقة تجربة حقيقية من المحاكي وليست بعدُ مقارنة على نفس بيانات الفعلي."
+  ]
 }

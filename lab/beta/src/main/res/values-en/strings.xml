@@ -20,7 +20,7 @@
     <string name="beta_bank_resume">Resume bank</string>
     <string name="beta_action_failed">Could not save the change. Try again.</string>
     <string name="beta_retry">Retry</string>
-    <string name="beta_asset_add">Add account or card</string>
+    <string name="beta_asset_add">Add</string>
     <string name="beta_asset_edit">Configure asset</string>
     <string name="beta_asset_manual_help">Manual setup in Beta only. Adding or changing a link does not create a financial transaction.</string>
     <string name="beta_asset_list">My accounts and cards</string>
@@ -30,12 +30,7 @@
     <string name="beta_asset_facility">Credit card group</string>
     <string name="beta_asset_loan">Loan</string>
     <string name="beta_asset_suffix">Last four digits only</string>
-    <string name="beta_asset_link_account">Linked account</string>
     <string name="beta_asset_link_facility">Linked primary card</string>
-    <string name="beta_asset_no_parent">Add the primary card first, then link the supplementary card to it.</string>
-    <string name="beta_asset_primary">Primary</string>
-    <string name="beta_asset_supplementary">Supplementary</string>
-    <string name="beta_asset_shared_facility">Choose Primary for your main card, or Supplementary if it shares another card’s credit limit and amount due.</string>
     <string name="beta_asset_owned_confirm">I confirm that I own this account or card</string>
     <string name="beta_asset_save_failed">Could not save. Check the bank, card type and linked primary card. If the details changed, close this window and reopen it.</string>
     <string name="beta_asset_save">Save</string>

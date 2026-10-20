@@ -518,15 +518,15 @@ class BetaContainer(
         val oldMetadata=metadataRow?.let { com.baraa.masroof.lab.beta.application.BetaAssetMetadata(it.displayName,it.network,it.accountType,it.loanType,it.metadataRevision) } ?: com.baraa.masroof.lab.beta.application.BetaAssetMetadata()
         if(metadata!=null) {
             require(metadata.displayName==null || (metadata.displayName.isNotBlank() && metadata.displayName.length<=120))
-            require(metadata.network==null || metadata.network in setOf("MADA","VISA","MASTERCARD","UNKNOWN"))
+            require(metadata.network==null || metadata.network in setOf("MADA","VISA","MASTERCARD","AMEX","UNKNOWN"))
             require(metadata.network!="MADA" || draft.kind==com.baraa.masroof.lab.finance.asset.AssetKind.DEBIT_CARD)
-            require(metadata.accountType==null || metadata.accountType in setOf("CURRENT","SAVINGS","INVESTMENT","OTHER"))
+            require(metadata.accountType==null || metadata.accountType in setOf("CURRENT","SAVINGS","WALLET","INVESTMENT","OTHER"))
             require(metadata.loanType==null || metadata.loanType in setOf("PERSONAL","AUTO","MORTGAGE"))
             check(metadata.revision==oldMetadata.revision || metadata.copy(revision=0)==oldMetadata.copy(revision=0)) { "Registry details changed; reopen" }
         }
         if (draft.createCreditFacility) {
             require(draft.kind == com.baraa.masroof.lab.finance.asset.AssetKind.CREDIT_CARD &&
-                draft.role == com.baraa.masroof.lab.finance.asset.CreditCardRole.PRIMARY && draft.parentId != null && draft.ownedConfirmed)
+                draft.role in setOf(com.baraa.masroof.lab.finance.asset.CreditCardRole.PRIMARY,com.baraa.masroof.lab.finance.asset.CreditCardRole.STANDALONE) && draft.parentId != null && draft.ownedConfirmed)
             val all = BetaAssetRegistry(database).all()
             val parent = all.singleOrNull { it.id == draft.parentId }
             if (parent == null) workflow.save(ManualAssetDraft(requireNotNull(draft.parentId), com.baraa.masroof.lab.finance.asset.AssetKind.CREDIT_FACILITY,

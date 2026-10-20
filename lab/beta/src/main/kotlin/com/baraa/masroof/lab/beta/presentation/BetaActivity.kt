@@ -103,6 +103,7 @@ class BetaActivity : ComponentActivity() {
                 var dashboardCustomizationRequest by rememberSaveable {mutableIntStateOf(0)}
                 var developerWorkspaceRequest by rememberSaveable {mutableIntStateOf(0)}
                 var historyOpen by rememberSaveable { mutableStateOf(false) }
+                var editOwnershipConfirmed by rememberSaveable {mutableStateOf(false)}
                 var editBank by rememberSaveable { mutableStateOf<String?>(null) }
                 var editId by rememberSaveable { mutableStateOf<String?>(null) }
                 var busy by remember { mutableStateOf(true) }
@@ -174,7 +175,7 @@ class BetaActivity : ComponentActivity() {
                 }
                 fun openAsset(bank: BankId, kind: AssetKind) {
                     if (busy || historyBusy) return
-                    editBank = bank.value; editId = null; proposalId = null; initialAssetKind = kind.name; ownershipEditSuffix = ""; failed = false
+                    editOwnershipConfirmed=false; editBank = bank.value; editId = null; proposalId = null; initialAssetKind = kind.name; ownershipEditSuffix = ""; failed = false
                 }
                 BetaLaunchedEffect(Unit) { execute { null } }
                 BetaLaunchedEffect(shellContainer) {
@@ -243,8 +244,15 @@ class BetaActivity : ComponentActivity() {
                     onAddAsset = { bank -> openAsset(bank, AssetKind.ACCOUNT) },
                     onEditAsset = { asset -> if (!busy) { editBank = asset.id.bank.value; editId = asset.id.localId; proposalId = null; failed = false } },
                     editor = if (settingsOpen && editBank == null && loaded) ({ BetaSettingsHubPanel(settingsCategory, { settingsCategory = it }, banks, assets, dashboardControls, busy || historyBusy,
+                        failed=failed, onRename={asset,name,revision,completed -> perform {
+                            shellContainer.saveManualAsset(com.baraa.masroof.lab.beta.application.ManualAssetDraft(
+                                asset.id,asset.kind,asset.last4.orEmpty(),asset.parentId,asset.creditCardRole,true,true,asset,
+                                metadata=(assetMetadata[asset.id] ?: com.baraa.masroof.lab.beta.application.BetaAssetMetadata()).copy(
+                                    displayName=name.trim().takeIf {it.isNotEmpty()},revision=revision)))
+                            completed();null
+                        }},
                         theme=betaTheme,language=betaLanguage,cardTasks=cardTasks,metadata=assetMetadata,
-                        onConfigureTask={task -> editBank=task.bank.value;editId=task.assetId?.localId;ownershipEditSuffix=task.suffix;initialAssetKind=AssetKind.DEBIT_CARD.name;proposalId=null;failed=false},
+                        onConfigureTask={task -> editOwnershipConfirmed=true;editBank=task.bank.value;editId=task.assetId?.localId;ownershipEditSuffix=task.suffix;initialAssetKind=AssetKind.DEBIT_CARD.name;proposalId=null;failed=false},
                         onTheme={value -> perform {shellContainer.setTheme(value);null}},
                         onLanguage={value -> perform {shellContainer.setLanguage(value);null}},
                         onData={openRoute("DATA")},
@@ -260,6 +268,7 @@ class BetaActivity : ComponentActivity() {
                         }) else null,
                         onManage = { openRoute("SETTINGS") },
                         onConfigure = { candidate ->
+                            editOwnershipConfirmed=candidate.status==com.baraa.masroof.lab.beta.application.BetaOwnershipStatus.OWNED
                             editBank = candidate.reference.bank.value; editId = candidate.asset?.id?.localId; proposalId = null
                             initialAssetKind = (candidate.asset?.kind ?: AssetKind.DEBIT_CARD).name
                             ownershipEditSuffix = candidate.reference.suffix; failed = false
@@ -277,7 +286,7 @@ class BetaActivity : ComponentActivity() {
                             } else BetaAssetEditor(BankId(checkNotNull(editBank)), existing, assets, busy, failed,
                                 initialKind = AssetKind.valueOf(initialAssetKind), initialSuffix = ownershipEditSuffix,
                                 allowedKinds=AssetKind.valueOf(initialAssetKind).let {if(it in setOf(AssetKind.DEBIT_CARD,AssetKind.CREDIT_CARD)) setOf(AssetKind.DEBIT_CARD,AssetKind.CREDIT_CARD) else setOf(it)},
-                                metadata=existing?.let {assetMetadata[it.id]} ?: com.baraa.masroof.lab.beta.application.BetaAssetMetadata(),
+                                ownershipConfirmed=editOwnershipConfirmed, registryMetadata=assetMetadata, metadata=existing?.let {assetMetadata[it.id]} ?: com.baraa.masroof.lab.beta.application.BetaAssetMetadata(),
                                 onCancel = { editBank = null; editId = null; proposalId = null; failed = false },
                                 proposal = proposalId?.let { com.baraa.masroof.lab.beta.application.BetaAssetProposal(
                                     com.baraa.masroof.lab.finance.asset.AssetId(com.baraa.masroof.lab.finance.value.Environment.BETA, BankId(checkNotNull(editBank)), it),

@@ -25,7 +25,6 @@
     <string name="beta_dash_loan_remaining">Loan remaining</string>
     <string name="beta_dash_review">Needs review</string>
     <string name="beta_dash_unavailable">Unavailable</string>
-    <string name="beta_dash_details">View details</string>
     <string name="beta_dash_flow">Account flow</string>
     <string name="beta_dash_accounts">Accounts</string>
     <string name="beta_dash_cards">Cards</string>
@@ -56,15 +55,9 @@
     <string name="beta_detail_account_movements">Account movements</string>
     <string name="beta_detail_card_movements">Card movements</string>
     <string name="beta_detail_loan_movements">Loan movements</string>
-    <string name="beta_detail_facility_members">Linked cards</string>
     <string name="beta_detail_observed_balance">Observed balance</string>
     <string name="beta_detail_balance_date">Balance date</string>
-    <string name="beta_detail_inflow_group">Inflow from outside my accounts</string>
-    <string name="beta_detail_outflow_group">Outflow to outside my accounts</string>
-    <string name="beta_detail_internal_group">Transfers between my assets</string>
-    <string name="beta_detail_internal_help">These transfers are included in net account movement and stay separate from external inflow and outflow.</string>
     <string name="beta_detail_daily">Daily spending</string>
-    <string name="beta_detail_card_data">Card details</string>
     <string name="beta_detail_due_once">The amount due is shared by the primary and supplementary cards and counted once.</string>
     <string name="beta_detail_primary">Primary credit card</string>
     <string name="beta_detail_supplementary">Supplementary credit card</string>

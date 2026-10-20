@@ -66,5 +66,43 @@ class BetaSettingsActivityTest {
         waitForClose()
         BetaContainer(context).use { assertEquals(1, it.markerCount()) }
     }
+    @Test fun approvedCardTitleRenameRestoresDraftAndPreservesIdentityOnReopen() {
+        BetaContainer.resetOffline(context)
+        val bank=com.baraa.masroof.lab.finance.value.BankId("BANK_ALJAZIRA")
+        val id=com.baraa.masroof.lab.finance.asset.AssetId(com.baraa.masroof.lab.finance.value.Environment.BETA,bank,"rename-card")
+        val original=BetaContainer(context).use {beta ->
+            beta.setBankEnabled(bank,true)
+            beta.saveManualAsset(com.baraa.masroof.lab.beta.application.ManualAssetDraft(id,
+                com.baraa.masroof.lab.finance.asset.AssetKind.CREDIT_CARD,"7271",id.copy(localId="facility"),
+                com.baraa.masroof.lab.finance.asset.CreditCardRole.STANDALONE,true,createCreditFacility=true,
+                metadata=com.baraa.masroof.lab.beta.application.BetaAssetMetadata(displayName="Original card",network="VISA")))
+        }
+        try {ActivityScenario.launch(BetaActivity::class.java).use {scenario ->
+            compose.waitUntil(15000) {compose.onAllNodesWithTag("beta-start-continue").fetchSemanticsNodes().isNotEmpty()}
+            compose.onNodeWithTag("beta-start-continue").performClick()
+            compose.waitUntil(15000) {compose.onAllNodesWithTag("dash-refresh").fetchSemanticsNodes().isNotEmpty()}
+            compose.onNode(hasText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_settings)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
+            compose.onNodeWithTag("manage-CARDS").performScrollTo().performClick()
+            compose.onNodeWithText("Original card •• 7271").performScrollTo().performClick()
+            compose.onNodeWithTag("asset-rename-name").performTextReplacement("Travel card")
+            scenario.recreate()
+            compose.waitUntil(15000) {compose.onAllNodesWithTag("asset-rename-name").fetchSemanticsNodes().isNotEmpty()}
+            compose.onNodeWithTag("asset-rename-name").assertTextContains("Travel card")
+            compose.onNodeWithTag("asset-rename-save").performClick()
+            compose.waitUntil(15000) {compose.onAllNodesWithTag("asset-rename-save").fetchSemanticsNodes().isEmpty()}
+            compose.onNodeWithText("Travel card •• 7271").assertExists()
+            compose.waitForIdle()
+            val automation=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(
+                "screencap -p /sdcard/beta-dashboard-screenshots/approved-card-registry.png")).use {it.readBytes()}
+        }
+        waitForClose()
+        BetaContainer(context).use {beta ->
+            assertEquals(original,beta.assets().single {it.id==id})
+            assertEquals("Travel card",beta.assetMetadata()[id]?.displayName)
+            assertEquals("VISA",beta.assetMetadata()[id]?.network)
+            assertEquals(2,beta.assets().size)
+        }} finally {BetaContainer.resetOffline(context)}
+    }
     private fun waitForClose() { val done = CountDownLatch(1); BetaIo.execute { done.countDown() }; assertTrue(done.await(15, TimeUnit.SECONDS)) }
 }

@@ -38,7 +38,7 @@ class BetaSharedNavigationTest {
                 compose.onNodeWithTag("review-existing-transactions").assertDoesNotExist()
                 compose.onNodeWithTag("beta-page-back").performClick(); await("dash-refresh")
                 tab(R.string.beta_nav_settings).performClick(); await("beta-settings-panel")
-                compose.onNodeWithTag("beta-settings-close").performScrollTo().performClick(); await("beta-bottom-navigation")
+                compose.onNodeWithTag("beta-page-back").performClick(); await("beta-bottom-navigation")
                 compose.onNodeWithTag("beta-badge").assertIsDisplayed()
                 scenario.onActivity {it.onBackPressedDispatcher.onBackPressed()}
             }

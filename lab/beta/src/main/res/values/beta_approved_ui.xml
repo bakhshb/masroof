@@ -31,4 +31,49 @@
   <string name="beta_approved_onboarding_import_date_title">من أي تاريخ تريد استيراد الحركات؟</string>
   <string name="beta_approved_onboarding_selected_date">التاريخ المحدد: %1$s</string>
   <string name="beta_approved_onboarding_start_import">بدء الاستيراد</string>
+  <string name="beta_approved_card_network_amex">أمريكان إكسبريس</string>
+  <string name="beta_approved_card_network_mastercard">ماستركارد</string>
+  <string name="beta_approved_card_network_unknown">غير معروف</string>
+  <string name="beta_approved_card_network_visa">فيزا</string>
+  <string name="beta_approved_dashboard_credit_card_last4">بطاقة ···%1$s</string>
+  <string name="beta_approved_onboarding_account_suffix">حساب ينتهي بـ %1$s</string>
+  <string name="beta_approved_settings_card_credit_evidence">تشير الرسائل إلى بطاقة ائتمانية. راجع النوع قبل الحفظ.</string>
+  <string name="beta_approved_settings_card_debit_evidence">تشير الرسائل إلى بطاقة خصم مباشر. راجع النوع قبل الحفظ.</string>
+  <string name="beta_approved_settings_card_dependents_block">لهذه البطاقة بطاقات إضافية مرتبطة. أعد ربطها بنفسك أولًا قبل تغيير نوع أو دور الأساسية.</string>
+  <string name="beta_approved_settings_card_network_title">شبكة البطاقة</string>
+  <string name="beta_approved_settings_card_no_account">بدون ربط بحساب حاليًا</string>
+  <string name="beta_approved_settings_card_no_primary">لا توجد بطاقة أساسية مؤكدة في هذا البنك.</string>
+  <string name="beta_approved_settings_card_primary_title">البطاقة الأساسية التابعة لها</string>
+  <string name="beta_approved_settings_card_role_additional">فرعية</string>
+  <string name="beta_approved_settings_card_role_primary">أساسية</string>
+  <string name="beta_approved_settings_card_role_standalone">مستقلة</string>
+  <string name="beta_approved_settings_card_role_title">دور البطاقة</string>
+  <string name="beta_approved_settings_card_setup">إعداد البطاقة</string>
+  <string name="beta_approved_settings_card_type_credit">ائتمانية</string>
+  <string name="beta_approved_settings_card_type_debit">خصم مباشر</string>
+  <string name="beta_approved_settings_card_type_title">نوع البطاقة</string>
+  <string name="beta_approved_settings_link_debit_title">ربط مدى بحساب</string>
+  <string name="beta_approved_settings_save">حفظ</string>
+  <string name="beta_approved_settings_update_failed">تعذّر تحديث إعدادات البطاقة</string>
+    <string name="beta_approved_settings_account_type_wallet">محفظة</string>
+    <string name="beta_approved_reference_account_detail_title">تفاصيل الحساب</string>
+    <string name="beta_approved_reference_card_detail_title">تفاصيل البطاقة</string>
+    <string name="beta_approved_reference_loan_detail_title">تفاصيل القرض</string>
+<string name="beta_approved_dashboard_account_remaining_calculated_hint">وارد − منصرف (تحويلات خارجية، سداد البطاقة الائتمانية، سحب نقدي، فواتير، أقساط تمويل، مدى، رسوم)</string>
+
+<string name="beta_approved_dashboard_total_inflow">إجمالي الوارد</string>
+
+<string name="beta_approved_dashboard_total_spent">إجمالي الصادر</string>
+
+<string name="beta_approved_reference_inflow_external">الوارد الخارجي</string>
+
+<string name="beta_approved_reference_outflow_external">الصادر الخارجي</string>
+
+<string name="beta_approved_dashboard_self_transfers">تحويلات بين حساباتي</string>
+
+<string name="beta_approved_settings_display_name_label">الاسم المعروض</string>
+<string name="beta_approved_settings_cancel">إلغاء</string>
+<string name="beta_approved_settings_rename_card_title">تسمية البطاقة</string>
+<string name="beta_approved_settings_rename_account_title">تسمية الحساب</string>
+<string name="beta_approved_settings_action_rename">تسمية</string>
 </resources>

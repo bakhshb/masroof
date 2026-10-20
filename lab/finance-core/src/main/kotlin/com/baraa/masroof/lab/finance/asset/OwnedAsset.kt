@@ -4,7 +4,7 @@ import com.baraa.masroof.lab.finance.value.BankId
 import com.baraa.masroof.lab.finance.value.Environment
 
 enum class AssetKind { ACCOUNT, DEBIT_CARD, CREDIT_CARD, CREDIT_FACILITY, LOAN }
-enum class CreditCardRole { PRIMARY, SUPPLEMENTARY }
+enum class CreditCardRole { PRIMARY, SUPPLEMENTARY, STANDALONE }
 
 /** localId is a registry ID, not last4. Two cards at one bank may share a suffix. */
 data class AssetId(val environment: Environment, val bank: BankId, val localId: String) {
