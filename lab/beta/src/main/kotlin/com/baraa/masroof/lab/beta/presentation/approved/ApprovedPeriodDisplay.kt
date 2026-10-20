@@ -48,3 +48,10 @@ private fun ReferencePeriodContent(label: String, guidance: String?) {
         }
     }
 }
+
+/** Same display range as production FinancialPeriodUiFormatter; the workflow owns period boundaries. */
+internal fun approvedPeriodRange(from: java.time.LocalDate,endInclusive: java.time.LocalDate,
+    locale: java.util.Locale,compact: Boolean=false): String {
+    val dayMonth=java.time.format.DateTimeFormatter.ofPattern(if(compact) "d MMM" else "d MMMM",locale)
+    return "${dayMonth.format(from)} — ${dayMonth.format(endInclusive)} ${endInclusive.year}"
+}

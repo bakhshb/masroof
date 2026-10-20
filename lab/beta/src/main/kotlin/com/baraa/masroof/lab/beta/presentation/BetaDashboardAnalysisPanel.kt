@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeLabel as financialTypeLabel
+import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeIcon as reviewTypeIcon
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedFormField as OutlinedTextField
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 
@@ -203,23 +205,23 @@ internal fun BetaDashboardTransactionDetail(snapshot: DashboardSnapshot, transac
             BetaFinancialDetailRow(stringResource(R.string.beta_transaction_destination),tx.destination?.let(assets::get) ?: stringResource(R.string.beta_transaction_external_unknown))
             if(tx.amount.currency!=com.baraa.masroof.lab.finance.value.Currency.SAR) {
                 BetaFinancialDetailRow(stringResource(R.string.beta_transaction_sar_free),betaSummaryMoney(tx.sarEquivalent))
-                BetaFinancialDetailRow(stringResource(R.string.beta_transaction_fx),tx.appliedFx?.rateToSar?.toPlainString() ?: stringResource(R.string.beta_dash_unavailable))
+                BetaFinancialDetailRow(stringResource(R.string.beta_transaction_fx),tx.appliedFx?.rateToSar?.toPlainString() ?: stringResource(R.string.beta_approved_dashboard_value_unavailable))
             }
             tx.internationalFee?.let {BetaFinancialDetailRow(stringResource(R.string.beta_transaction_fee),betaSummaryMoney(it))}
         }
     }
 }
 
-@Composable private fun dashboardAmount(value: SignedAmount?) = value?.let { betaMoney(it.amount.toPlainString(),it.currency.name) } ?: stringResource(R.string.beta_dash_unavailable)
+@Composable private fun dashboardAmount(value: SignedAmount?) = value?.let { betaMoney(it.amount.toPlainString(),it.currency.name) } ?: stringResource(R.string.beta_approved_dashboard_value_unavailable)
 
 @Composable internal fun dashboardAssetLabels(snapshot: DashboardSnapshot): Map<AssetId, String> = buildMap {
     snapshot.accounts.forEachIndexed { index, row -> put(row.id, (row.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_dash_account_number, index + 1)) + row.last4?.let {" · •• $it"}.orEmpty() + " · " + stringResource(if (row.id.bank.value == "BANK_ALJAZIRA") R.string.beta_bank_aljazira else R.string.beta_bank_title)) }
-    snapshot.debitCards.forEach { put(it.cardId, (it.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_asset_debit)) + " · " + it.last4.orEmpty()) }
+    snapshot.debitCards.forEach { put(it.cardId, com.baraa.masroof.lab.beta.application.approvedRegistryDisplayLabel(it.label,stringResource(R.string.beta_asset_debit),it.last4.orEmpty())) }
     snapshot.creditFacilities.forEach { row ->
         put(row.facilityId, stringResource(R.string.beta_asset_credit))
-        row.cards.forEachIndexed { cardIndex, card -> put(card.cardId, (card.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_dash_card_number, cardIndex + 1)) + " · " + card.last4.orEmpty()) }
+        row.cards.forEachIndexed { cardIndex, card -> put(card.cardId,betaCreditDisplayLabel(card)) }
     }
-    snapshot.standaloneCreditCards.forEach { card -> put(card.cardId,(card.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_asset_credit))+" · "+card.last4.orEmpty()) }
+    snapshot.standaloneCreditCards.forEach { card -> put(card.cardId,betaCreditDisplayLabel(card)) }
     snapshot.loans.forEach { put(it.id, it.label.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_asset_loan)) }
 }
 

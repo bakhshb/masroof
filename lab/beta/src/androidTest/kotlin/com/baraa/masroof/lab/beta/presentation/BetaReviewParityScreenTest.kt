@@ -49,7 +49,7 @@ class BetaReviewParityScreenTest {
                 id
             }
             ActivityScenario.launch(BetaActivity::class.java).use {
-                await("dash-refresh")
+                await("dashboard-ready")
                 compose.onNode(hasText(label(com.baraa.masroof.lab.beta.R.string.beta_nav_review)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
                 click("history-review-0")
                 click("review-resolve-CASH_WITHDRAWAL")
@@ -75,7 +75,7 @@ class BetaReviewParityScreenTest {
                 beta.processAutomaticEvidence()
             }
             ActivityScenario.launch(BetaActivity::class.java).use {scenario ->
-                await("dash-refresh")
+                await("dashboard-ready")
                 compose.onNode(hasText(label(com.baraa.masroof.lab.beta.R.string.beta_nav_review)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
                 await("review-item-0");capture("list-$language-${mode.lowercase()}")
                 click("history-review-0");await("review-configure-loan");capture("detail-$language-${mode.lowercase()}")

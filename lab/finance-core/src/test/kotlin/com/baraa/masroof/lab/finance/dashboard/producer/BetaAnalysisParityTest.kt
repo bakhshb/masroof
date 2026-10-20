@@ -158,4 +158,40 @@ class BetaAnalysisParityTest {
             statement = ObservedStatement(Money.of("100", Currency.USD), query.from, first)))))
         assertTrue(foreign.snapshot.commitments!!.rows.isEmpty()); assertNull(foreign.snapshot.commitments.total)
     }
+    @Test fun scopedChartCategoriesPartitionExistingMoneyAndEvidenceIncludingRefundsAndFees() {
+        val rows=listOf(row("purchase",FinancialType.EXPENSE,"10",foreign=true),
+            row("refund",FinancialType.REFUND,"3",1,true),row("fee",FinancialType.FEE,"2"),
+            row("withdrawal-fee",FinancialType.FEE,"3"),
+            row("transfer",FinancialType.EXTERNAL_TRANSFER_OUT,"5"),row("bill",FinancialType.BILL_PAYMENT,"7"))
+            .map {(row,facts) -> row to facts.copy(messageFamily=when(row.posting.command.type) {
+                FinancialType.REFUND -> DashboardEvidenceFamily.REFUND
+                FinancialType.FEE -> if(row.posting.command.key.transactionId=="withdrawal-fee") DashboardEvidenceFamily.WITHDRAWAL else DashboardEvidenceFamily.FEE
+                FinancialType.BILL_PAYMENT -> DashboardEvidenceFamily.BILL_PAYMENT
+                FinancialType.EXTERNAL_TRANSFER_OUT -> DashboardEvidenceFamily.TRANSFER_OUT
+                else -> DashboardEvidenceFamily.PURCHASE
+            })}
+        val fee=LinkedInternationalFee(rows.first().first.posting.command.key,rows.first().first.posting.command.revision,
+            rows.first().second.evidenceId,Money.of("1.25",Currency.SAR))
+        val result=build(batch(rows,listOf(fee)))
+        for(trend in result.snapshot.analysis!!.trends.filter {it.category==null}) {
+            assertTrue(trend.categoryTrends.isNotEmpty())
+            trend.points.forEachIndexed {index,point ->
+                val pieces=trend.categoryTrends.values.map {part -> part.points.singleOrNull {it.date==point.date} ?:
+                    DailySpending(point.date,SignedAmount(BigDecimal.ZERO,Currency.SAR),SignedAmount(BigDecimal.ZERO,Currency.SAR),
+                        SignedAmount(BigDecimal.ZERO,Currency.SAR),emptySet())}
+                same(point.net!!.amount,pieces.fold(BigDecimal.ZERO) {sum,p -> sum+p.net!!.amount})
+                same(point.beforeRefunds!!.amount,pieces.fold(BigDecimal.ZERO) {sum,p -> sum+p.beforeRefunds!!.amount})
+                same(point.refunds!!.amount,pieces.fold(BigDecimal.ZERO) {sum,p -> sum+p.refunds!!.amount})
+                assertEquals(point.transactions,pieces.flatMap {it.transactions}.toSet())
+                assertEquals(point.transactions.size,pieces.sumOf {it.transactions.size})
+            }
+        }
+        val accountTrend=result.snapshot.analysis!!.trends.single {it.scope==TrendScope.ASSET && it.assetId==account.id}
+        same(BigDecimal("38.82"),accountTrend.categoryTrends.getValue(ChartCategory.ACCOUNT_PURCHASES).totalSpending!!.amount)
+        same(BigDecimal("11.27"),accountTrend.categoryTrends.getValue(ChartCategory.UNATTRIBUTED_REFUNDS).totalRefunds!!.amount)
+        same(BigDecimal("5"),accountTrend.categoryTrends.getValue(ChartCategory.FEES).totalSpending!!.amount)
+        val overall=result.snapshot.analysis!!.trends.single {it.scope==TrendScope.OVERALL && it.category==null}
+        same(BigDecimal("3"),overall.categoryTrends.getValue(ChartCategory.CASH_WITHDRAWALS).totalSpending!!.amount)
+    }
+
 }

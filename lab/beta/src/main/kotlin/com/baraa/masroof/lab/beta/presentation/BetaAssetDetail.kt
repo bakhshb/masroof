@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeLabel as financialTypeLabel
+import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeIcon as reviewTypeIcon
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 
 import com.baraa.masroof.lab.beta.presentation.approved.*
@@ -9,8 +11,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -60,6 +64,8 @@ import com.baraa.masroof.ui.theme.MasroofHeroRole
 import com.baraa.masroof.ui.theme.MasroofReference
 import com.baraa.masroof.ui.theme.MasroofSpacing
 import com.baraa.masroof.ui.theme.MasroofThemeExtras
+import com.baraa.masroof.lab.beta.application.transactionDirection
+import com.baraa.masroof.lab.beta.application.BetaTransactionDirection
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -90,8 +96,8 @@ internal fun BetaAssetDetail(
 private fun AccountDetail(snapshot: DashboardSnapshot, account: AccountSummary, enabled: Boolean,
     onTransaction: (String) -> Unit, ledgerComplete: Boolean) {
     val flow = account.flow
-    val unavailable = stringResource(R.string.beta_dash_unavailable)
-    val label = account.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_asset_account)
+    val unavailable = stringResource(R.string.beta_approved_dashboard_value_unavailable)
+    val label = betaAccountDisplayLabel(account)
     Column(Modifier.testTag("beta-account-detail"), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         val language=LocalConfiguration.current.locales[0].toLanguageTag()
         @Composable fun formatted(buckets: List<FlowBucket>): List<Pair<String,String>> = flow?.let { value ->
@@ -102,14 +108,14 @@ private fun AccountDetail(snapshot: DashboardSnapshot, account: AccountSummary, 
             formatted(BetaAssetDetailFacts.externalIn),formatted(BetaAssetDetailFacts.externalOut),formatted(BetaAssetDetailFacts.internal),
             trend={BetaSectionTrend(snapshot,account.id,MasroofHeroRole.Account,enabled)})
         if(flow==null) Text(stringResource(R.string.beta_dash_unavailable_help),Modifier.testTag("account-flow-unavailable"))
-        AssetTransactions(snapshot, account.id, stringResource(R.string.beta_detail_account_movements), enabled, onTransaction, ledgerComplete)
+        AssetTransactions(snapshot, account.id, stringResource(R.string.beta_approved_reference_account_movements), enabled, onTransaction, ledgerComplete)
     }
 }
 
 @Composable
 private fun DebitDetail(snapshot: DashboardSnapshot, debit: DebitSpending, enabled: Boolean,
     onTransaction: (String) -> Unit, ledgerComplete: Boolean) {
-    val unavailable = stringResource(R.string.beta_dash_unavailable)
+    val unavailable = stringResource(R.string.beta_approved_dashboard_value_unavailable)
     val label = debit.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_asset_debit)
     val trend = BetaDashboardExplorer.trend(snapshot, BetaChartChoice(TrendScope.ASSET, asset = debit.cardId))
     val linked = debit.accountId?.let { id -> snapshot.accounts.singleOrNull { it.id == id }?.label?.takeIf(String::isNotBlank) }
@@ -117,110 +123,99 @@ private fun DebitDetail(snapshot: DashboardSnapshot, debit: DebitSpending, enabl
         ApprovedDebitDetailSummaryCard(ApprovedDebitDetailUi(label,bankLabel(debit.cardId.bank),formatMoney(debit.spending,unavailable),
             linked ?: debit.accountId?.let {id -> snapshot.accounts.singleOrNull {it.id==id}?.last4} ?: unavailable,
             formatMoney(trend?.totalBeforeRefunds,unavailable),formatMoney(trend?.totalRefunds,unavailable)))
+        betaCardAverage(snapshot,debit.cardId)?.let {ApprovedCardAverage(it)}
         BetaSectionTrend(snapshot, debit.cardId, MasroofHeroRole.Account, enabled)
-        AssetTransactions(snapshot, debit.cardId, stringResource(R.string.beta_detail_card_movements), enabled, onTransaction, ledgerComplete)
+        AssetTransactions(snapshot, debit.cardId, stringResource(R.string.beta_approved_reference_card_movements), enabled, onTransaction, ledgerComplete)
     }
 }
 
 @Composable
 private fun CreditDetail(snapshot: DashboardSnapshot, card: CreditCardSummary, enabled: Boolean,
     onTransaction: (String) -> Unit, ledgerComplete: Boolean) {
-    val unavailable = stringResource(R.string.beta_dash_unavailable)
+    val unavailable = stringResource(R.string.beta_approved_dashboard_value_unavailable)
     val facility = snapshot.creditFacilities.singleOrNull { member -> card.cardId in member.cards.map { it.cardId } }
     val primary = facility?.cards?.singleOrNull { it.role == CreditCardRole.PRIMARY }?.last4
-    val label = card.label?.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_asset_credit)
+    val label = betaCreditDisplayLabel(card)
     Column(Modifier.testTag("beta-credit-detail"), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         ApprovedCreditDetailSummaryCard(ApprovedCreditDetailUi(label,bankLabel(card.cardId.bank),formatMoney(card.availableBalance,unavailable),
             formatMoney(facility?.statementDue,unavailable),facility?.dueDate?.let {day(it)} ?: unavailable,
             stringResource(when(card.role) {CreditCardRole.PRIMARY -> R.string.beta_approved_reference_primary_credit_type;CreditCardRole.SUPPLEMENTARY -> R.string.beta_approved_reference_supplementary_credit_type;CreditCardRole.STANDALONE,null -> R.string.beta_approved_reference_credit_type}),
             day(card.balanceAsOf,snapshot.query.zone),primary,card.role==CreditCardRole.SUPPLEMENTARY))
+        betaCardAverage(snapshot,card.cardId)?.let {ApprovedCardAverage(it)}
         BetaSectionTrend(snapshot, card.cardId, MasroofHeroRole.Card, enabled)
-        AssetTransactions(snapshot, card.cardId, stringResource(R.string.beta_detail_card_movements), enabled, onTransaction, ledgerComplete)
+        AssetTransactions(snapshot, card.cardId, stringResource(R.string.beta_approved_reference_card_movements), enabled, onTransaction, ledgerComplete)
     }
 }
 
 @Composable
 private fun LoanDetail(snapshot: DashboardSnapshot, loan: LoanSummary, enabled: Boolean,
     onTransaction: (String) -> Unit, ledgerComplete: Boolean) {
-    val unavailable = stringResource(R.string.beta_dash_unavailable)
+    val unavailable = stringResource(R.string.beta_approved_dashboard_value_unavailable)
     val label = loan.label.takeIf(String::isNotBlank) ?: loanLabel(loan.type)
     val installmentDate = day(loan.installmentAsOf, snapshot.query.zone)
     Column(Modifier.testTag("beta-loan-detail"), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         ApprovedLoanDetailSummaryCard(ApprovedLoanDetailUi(label,bankLabel(loan.id.bank),formatMoney(loan.remaining,unavailable),
-            BetaAssetDetailFacts.knownLoanType(loan.type)?.let {type -> stringResource(when(type) {"PERSONAL" -> R.string.beta_detail_loan_personal;"AUTO" -> R.string.beta_detail_loan_auto;else -> R.string.beta_detail_loan_mortgage})} ?: unavailable,
+            BetaAssetDetailFacts.knownLoanType(loan.type)?.let {type -> stringResource(when(type) {"PERSONAL" -> R.string.beta_approved_settings_loan_type_personal;"AUTO" -> R.string.beta_approved_settings_loan_type_auto;else -> R.string.beta_approved_settings_loan_type_mortgage})} ?: unavailable,
             formatMoney(loan.latestInstallment,unavailable),installmentDate ?: unavailable,day(loan.remainingAsOf,snapshot.query.zone) ?: unavailable))
-        AssetTransactions(snapshot, loan.id, stringResource(R.string.beta_detail_loan_movements), enabled, onTransaction, ledgerComplete)
+        AssetTransactions(snapshot, loan.id, stringResource(R.string.beta_approved_reference_loan_movements), enabled, onTransaction, ledgerComplete)
     }
 }
 
 @Composable
 internal fun BetaSectionTrend(snapshot: DashboardSnapshot, asset: AssetId?, role: MasroofHeroRole, enabled: Boolean, scope: TrendScope = TrendScope.ASSET) {
     val trend = BetaDashboardExplorer.trend(snapshot, BetaChartChoice(scope, asset = asset))
-    val visual = trend?.let(BetaDashboardVisualMapper::trend)
-    var selectedDate by rememberSaveable(asset?.bank?.value, asset?.localId, scope.name, snapshot.query.from.toString()) { mutableStateOf<String?>(null) }
-    val locale = LocalConfiguration.current.locales[0]
-    DashboardSectionHeading(stringResource(R.string.beta_detail_daily), MasroofOutlineIcons.ChartLine)
-    MasroofCard(Modifier.testTag("asset-trend")) {
-        when {
-            trend == null -> Text(stringResource(R.string.beta_dash_unavailable_help), Modifier.testTag("asset-chart-unavailable"))
-            trend.points.isEmpty() -> Text(stringResource(R.string.beta_home_no_elapsed_days), style = MaterialTheme.typography.bodySmall)
-            visual == null -> Text(stringResource(R.string.beta_dash_unavailable_help), Modifier.testTag("asset-chart-unavailable"))
-            else -> {
-                val index = visual.dates.indexOf(selectedDate).takeIf { it >= 0 } ?: visual.dates.lastIndex
-                fun money(value: BigDecimal) = MasroofMoneyDisplay.format(value, visual.currency, locale.toLanguageTag())
-                DashboardTrendHead(DateTimeFormatter.ofPattern("d MMM", locale).format(LocalDate.parse(visual.dates[index])), money(visual.values[index]),
-                    average = visual.average?.let { average -> ({
-                        MasroofChartAverageLegend(stringResource(R.string.beta_home_chart_average, money(average)), Modifier.weight(1f))
-                    }) })
-                MasroofInteractiveLineChart(visual.values, visual.average ?: BigDecimal.ZERO,
-                    LineChartLabels(stringResource(R.string.beta_chart_day_axis), stringResource(R.string.beta_chart_previous_point),
-                        stringResource(R.string.beta_chart_next_point), stringResource(R.string.beta_chart_average_announcement,
-                            visual.average?.let(::money) ?: stringResource(R.string.beta_dash_unavailable))),
-                    modifier = Modifier.testTag("asset-spending-chart"), selectedPointIndex = index, role = role,
-                    onPointSelected = { if (enabled) selectedDate = visual.dates[it] },
-                    pointLabel = { DateTimeFormatter.ofPattern("d MMM", locale).format(LocalDate.parse(visual.dates[it])) + " · " + money(visual.values[it]) },
-                    axisLabel = { DateTimeFormatter.ofPattern("d/M", locale).format(LocalDate.parse(visual.dates[it])) },
-                    currencyLabel = MasroofMoneyDisplay.currencyLabel(visual.currency, locale.toLanguageTag()), showAverage = visual.average != null)
-            }
-        }
-    }
+    val title=stringResource(when {
+        scope==TrendScope.ACCOUNTS -> R.string.beta_approved_approved_accounts_daily
+        scope==TrendScope.CREDIT_CARDS -> R.string.beta_approved_approved_credit_daily
+        snapshot.accounts.any {it.id==asset} -> R.string.beta_approved_approved_account_daily
+        else -> R.string.beta_approved_approved_card_daily
+    })
+    val explanation=stringResource(when {
+        scope==TrendScope.ACCOUNTS -> R.string.beta_approved_reference_accounts_scope
+        snapshot.accounts.any {it.id==asset} -> R.string.beta_approved_reference_account_detail_scope
+        else -> R.string.beta_approved_approved_card_expense_basis
+    })
+    ApprovedSpendingTrend(trend,title,explanation,role,enabled,
+        com.baraa.masroof.lab.beta.application.BetaChartDataWorkflow.key(scope,asset),
+        showAverage=role==MasroofHeroRole.Card || snapshot.debitCards.any {it.cardId==asset})
 }
 
 @Composable
 private fun AssetTransactions(snapshot: DashboardSnapshot, asset: AssetId, title: String, enabled: Boolean,
     onTransaction: (String) -> Unit, complete: Boolean) {
-    var limit by rememberSaveable(snapshot.query.toString(), asset.bank.value, asset.localId) { mutableIntStateOf(20) }
     val rows = BetaDashboardExplorer.transactions(snapshot, asset = asset)
     val language = LocalConfiguration.current.locales[0].toLanguageTag()
     val locale = LocalConfiguration.current.locales[0]
-    DashboardSectionHeading(title, MasroofOutlineIcons.List)
-    when {
-        !complete -> Text(stringResource(R.string.beta_dash_unavailable_help), Modifier.testTag("transactions-unavailable"))
-        rows.isEmpty() -> Text(stringResource(R.string.beta_dash_empty), Modifier.testTag("transactions-empty"))
-        else -> MasroofCard {
-            rows.take(limit).forEach { row ->
-                val type = row.effectiveType
-                val inward = type in setOf(FinancialType.INCOME, FinancialType.EXTERNAL_TRANSFER_IN, FinancialType.REFUND)
-                val neutral = type in setOf(FinancialType.SELF_TRANSFER, FinancialType.ADJUSTMENT, FinancialType.UNKNOWN)
-                val colors = MasroofThemeExtras.extendedColors
-                val (color, background) = when (type) {
-                    FinancialType.LOAN_REPAYMENT -> colors.liability to colors.liabilitySoft
-                    FinancialType.CREDIT_CARD_PAYMENT -> colors.card to colors.cardSoft
-                    else -> if (inward) colors.inflow to colors.inflowSoft else if (neutral) colors.account to colors.accountSoft else colors.outflow to colors.outflowSoft
+    val labels=dashboardAssetLabels(snapshot)
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
+        ApprovedSectionTitle(title)
+        when {
+            !complete -> Text(stringResource(R.string.beta_dash_unavailable_help), Modifier.testTag("transactions-unavailable"))
+            rows.isEmpty() -> Text(stringResource(R.string.beta_dash_empty), Modifier.testTag("transactions-empty"))
+            else -> MasroofCard {
+                rows.forEach { row ->
+                    val type = row.effectiveType
+                    val direction = transactionDirection(row, asset.takeIf { id -> snapshot.accounts.any { it.id == id } })
+                    val inward = direction == BetaTransactionDirection.INWARD
+                    val neutral = direction == BetaTransactionDirection.NEUTRAL
+                    val colors = MasroofThemeExtras.extendedColors
+                    val (color, background) = when (type) {
+                        FinancialType.LOAN_REPAYMENT -> colors.liability to colors.liabilitySoft
+                        FinancialType.CREDIT_CARD_PAYMENT -> colors.card to colors.cardSoft
+                        else -> if (inward) colors.inflow to colors.inflowSoft else if (neutral) colors.account to colors.accountSoft else colors.outflow to colors.outflowSoft
+                    }
+                    val label = stringResource(financialTypeLabel(type))
+                    val cardLabel=row.cards.singleOrNull()?.let(labels::get) ?: row.primaryCardLast4?.let {"•• $it"}
+                    val value = MasroofMoneyDisplay.format(row.amount.amount, row.amount.currency.name, language)
+                    DashboardTransactionRow(row.merchant ?: row.counterparty ?: label,
+                        label + (cardLabel?.let { " · $it" } ?: ""),
+                        (if (inward) "+" else if (neutral) "" else "−") + value.substringBeforeLast(' '),
+                        DateTimeFormatter.ofPattern("d MMM", locale).format(row.time.instant.atZone(row.time.zone).toLocalDate()) + " · " + value.substringAfterLast(' '),
+                        reviewTypeIcon(type), color, background, Modifier.testTag("dash-transaction-${row.key.transactionId}"),
+                        onClick = if (enabled) ({ onTransaction(row.key.transactionId) }) else null)
                 }
-                val label = stringResource(financialTypeLabel(type))
-                val value = MasroofMoneyDisplay.format(row.amount.amount, row.amount.currency.name, language)
-                DashboardTransactionRow(row.merchant ?: row.counterparty ?: label,
-                    label + (row.primaryCardLast4?.let { " · $it" } ?: ""),
-                    (if (inward) "+" else if (neutral) "" else "−") + value.substringBeforeLast(' '),
-                    DateTimeFormatter.ofPattern("d MMM", locale).format(row.time.instant.atZone(row.time.zone).toLocalDate()) + " · " + value.substringAfterLast(' '),
-                    detailIcon(type), color, background, Modifier.testTag("dash-transaction-${row.key.transactionId}"),
-                    onClick = if (enabled) ({ onTransaction(row.key.transactionId) }) else null)
             }
         }
-    }
-    if (complete && rows.size > limit) OutlinedButton(enabled = enabled, onClick = { limit += 20 }, modifier = Modifier.testTag("transactions-more")) {
-        Text(stringResource(R.string.beta_dash_more))
     }
 }
 
@@ -244,33 +239,17 @@ private fun day(instant: Instant?, zone: ZoneId): String? = instant?.let {
 private fun day(date: LocalDate): String = DateTimeFormatter.ofPattern("d MMM", LocalConfiguration.current.locales[0]).format(date)
 
 private fun bucketLabel(bucket: FlowBucket): Int = when (bucket) {
-    FlowBucket.SALARY -> R.string.beta_detail_salary
-    FlowBucket.OTHER_INCOME -> R.string.beta_detail_other_income
-    FlowBucket.EXTERNAL_IN -> R.string.beta_review_transfer_in
-    FlowBucket.ACCOUNT_REFUNDS -> R.string.beta_review_refund
-    FlowBucket.EXTERNAL_OUT -> R.string.beta_review_transfer_out
-    FlowBucket.CREDIT_SETTLEMENT -> R.string.beta_review_card_payment
-    FlowBucket.CASH_WITHDRAWAL -> R.string.beta_review_cash
-    FlowBucket.BILLS -> R.string.beta_review_bill
-    FlowBucket.POS_PURCHASES -> R.string.beta_detail_pos
-    FlowBucket.FEES -> R.string.beta_review_fee
-    FlowBucket.LOAN -> R.string.beta_review_loan
-    FlowBucket.INTERNAL_IN -> R.string.beta_detail_internal_in
-    FlowBucket.INTERNAL_OUT -> R.string.beta_detail_internal_out
-}
-
-private fun detailIcon(type: FinancialType): ImageVector = when (type) {
-    FinancialType.INCOME -> MasroofOutlineIcons.TrendingUp
-    FinancialType.REFUND -> MasroofOutlineIcons.RotateCcw
-    FinancialType.EXTERNAL_TRANSFER_IN -> MasroofOutlineIcons.ArrowDownLeft
-    FinancialType.EXTERNAL_TRANSFER_OUT -> MasroofOutlineIcons.ArrowUpRight
-    FinancialType.CREDIT_CARD_PAYMENT -> MasroofOutlineIcons.CreditCard
-    FinancialType.CASH_WITHDRAWAL -> MasroofOutlineIcons.Banknote
-    FinancialType.LOAN_REPAYMENT -> MasroofOutlineIcons.Landmark
-    FinancialType.SELF_TRANSFER -> MasroofOutlineIcons.ArrowLeftRight
-    FinancialType.EXPENSE -> MasroofOutlineIcons.ShoppingBag
-    FinancialType.BILL_PAYMENT -> MasroofOutlineIcons.ReceiptText
-    FinancialType.FEE -> MasroofOutlineIcons.Receipt
-    FinancialType.ADJUSTMENT -> MasroofOutlineIcons.ArrowRightLeft
-    FinancialType.UNKNOWN -> MasroofOutlineIcons.Info
+    FlowBucket.SALARY -> R.string.beta_approved_dashboard_salary
+    FlowBucket.OTHER_INCOME -> R.string.beta_approved_dashboard_other_income
+    FlowBucket.EXTERNAL_IN -> R.string.beta_approved_dashboard_external_in_short
+    FlowBucket.ACCOUNT_REFUNDS -> R.string.beta_approved_dashboard_account_refunds
+    FlowBucket.EXTERNAL_OUT -> R.string.beta_approved_dashboard_external_out_short
+    FlowBucket.CREDIT_SETTLEMENT -> R.string.beta_approved_dashboard_credit_card_payment
+    FlowBucket.CASH_WITHDRAWAL -> R.string.beta_approved_dashboard_cash_withdrawals
+    FlowBucket.BILLS -> R.string.beta_approved_dashboard_bill_payments
+    FlowBucket.POS_PURCHASES -> R.string.beta_approved_dashboard_pos_purchases_short
+    FlowBucket.FEES -> R.string.beta_approved_dashboard_fees_short
+    FlowBucket.LOAN -> R.string.beta_approved_dashboard_loan_repayments
+    FlowBucket.INTERNAL_IN -> R.string.beta_approved_dashboard_self_transfer_in
+    FlowBucket.INTERNAL_OUT -> R.string.beta_approved_dashboard_self_transfer_out
 }

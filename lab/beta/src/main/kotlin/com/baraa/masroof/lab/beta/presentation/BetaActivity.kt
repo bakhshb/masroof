@@ -99,6 +99,7 @@ class BetaActivity : ComponentActivity() {
                 var initialAssetKind by rememberSaveable { mutableStateOf(AssetKind.ACCOUNT.name) }
                 var dashboardPageTitle by remember {mutableStateOf<String?>(null)}
                 var reviewDetailOpen by remember {mutableStateOf(false)}
+                var dashboardDestination by rememberSaveable {mutableStateOf("OVERVIEW")}
                 var dashboardTab by rememberSaveable { mutableStateOf("HOME") }
                 var dashboardRequest by rememberSaveable { mutableIntStateOf(0) }
                 var developerWorkspaceRequest by rememberSaveable {mutableIntStateOf(0)}
@@ -251,7 +252,7 @@ class BetaActivity : ComponentActivity() {
                     notificationCount=notificationState?.unreadCount ?: 0,onOpenNotifications={if(!busy && !historyBusy && !notificationBusy) notificationsOpen=true},developerWorkspaceRequest=developerWorkspaceRequest,
                     secondaryTitle=when {
                         notificationsOpen -> androidx.compose.ui.res.stringResource(R.string.beta_approved_notification_center_title)
-                        settingsOpen -> androidx.compose.ui.res.stringResource(when(settingsCategory) {"APP"->R.string.beta_complete_preferences;"ACCOUNTS"->R.string.beta_home_accounts;"CARDS"->R.string.beta_home_cards;"LOANS"->R.string.beta_home_loans;"COMMITMENTS"->R.string.beta_dash_commitments;"ABOUT"->R.string.beta_complete_about;else->R.string.beta_nav_settings})
+                        settingsOpen -> androidx.compose.ui.res.stringResource(when(settingsCategory) {"APP"->R.string.beta_approved_reference_preferences_title;"ACCOUNTS"->R.string.beta_home_accounts;"CARDS"->R.string.beta_home_cards;"LOANS"->R.string.beta_home_loans;"COMMITMENTS"->R.string.beta_dash_commitments;"ABOUT"->R.string.beta_complete_about;else->R.string.beta_nav_settings})
                         reviewOpen -> androidx.compose.ui.res.stringResource(if(reviewDetailOpen) R.string.beta_complete_review_details else R.string.beta_nav_review)
                         historyOpen -> androidx.compose.ui.res.stringResource(R.string.beta_history_title)
                         developerToolsOpen -> androidx.compose.ui.res.stringResource(R.string.beta_parity_data_settings)
@@ -269,10 +270,11 @@ class BetaActivity : ComponentActivity() {
                             }
                         }
                     }) else null,
-                    selectedHomeTab = when { notificationsOpen -> "NONE"; settingsOpen -> "SETTINGS"; reviewOpen -> "REVIEW"; else -> dashboardTab },
+                    selectedHomeTab = when { notificationsOpen -> "NONE"; settingsOpen -> "SETTINGS"; reviewOpen -> "REVIEW"; dashboardDestination in setOf("ACCOUNTS","CARDS","LOANS","COMMITMENTS","ANALYSIS") -> "NONE"; else -> dashboardTab },
                     onOpenHome = { openRoute("HOME") },
                     onOpenTransactions = { openRoute("TRANSACTIONS") },
-                    dashboard = if (onboarding != BetaOnboardingStep.COMPLETE) null else ({ BetaDashboardPanel(dashboardWorkflow,transactionExtras={id,changed -> BetaPostedTransactionActions(shellContainer,id,{historyBusy=it},changed)}, showInternalHeader=false,onNotificationFacts={period,count -> notificationPeriod=period;notificationExcluded=count}, onPageTitle={dashboardPageTitle=it}, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, pendingCardCount=cardTasks.size,onCards={openRoute("SETTINGS");settingsCategory="CARDS"},
+                    dashboardOwnsScroll=true,
+                    dashboard = if (onboarding != BetaOnboardingStep.COMPLETE) null else ({ BetaDashboardPanel(dashboardWorkflow,ownsScroll=true,onDestinationChanged={dashboardDestination=it},transactionExtras={id,changed -> BetaPostedTransactionActions(shellContainer,id,{historyBusy=it},changed)}, showInternalHeader=false,onNotificationFacts={period,count -> notificationPeriod=period;notificationExcluded=count}, onPageTitle={dashboardPageTitle=it}, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, pendingCardCount=cardTasks.size,onCards={openRoute("SETTINGS");settingsCategory="CARDS"},
                         requestedRoute = if (dashboardTab == "TRANSACTIONS") "TRANSACTIONS" else "OVERVIEW", routeRequest = dashboardRequest, onPrimaryTabChanged = { dashboardTab = it }, onBusyChanged = { historyBusy = it }, onImport = { openRoute("HISTORY") }, onSetup = ::resumeSetup,onManageAssets={kind -> openRoute("SETTINGS");settingsCategory=when(kind) {AssetKind.ACCOUNT->"ACCOUNTS";AssetKind.LOAN->"LOANS";else->"CARDS"}}) }),
                     onOpenDiscovery = { openRoute("DISCOVERY") },
                     onOpenHistory = { openRoute("HISTORY") },

@@ -54,7 +54,9 @@ internal object BetaAnalysisBuilder {
             return included.fold(BigDecimal.ZERO) { sum, movement -> sum +
                 if (movement.bucket == FlowBucket.ACCOUNT_REFUNDS) movement.amount.amount.negate() else movement.amount.amount }
         }
-        fun trend(scope: TrendScope, asset: AssetId? = null, category: ChartCategory? = null): SpendingTrend {
+        var chartPointBudget = 0L
+        fun trend(scope: TrendScope, asset: AssetId? = null, category: ChartCategory? = null,
+            chartCategory: Boolean = false): SpendingTrend {
             fun contribution(tx: TransactionFacts): BigDecimal? {
                 val amount = byKey?.get(tx.key)?.sarAmount?.amount ?: return null
                 val ordinary = if (tx.effectiveType == FinancialType.REFUND) amount.negate() else amount
@@ -74,7 +76,15 @@ internal object BetaAnalysisBuilder {
                 }
             }
             val relevant = transactions.filter { tx ->
-                (category == null || category in tx.categories) && contribution(tx) != null
+                (category == null || if (!chartCategory) category in tx.categories else category == when {
+                    tx.effectiveType == FinancialType.REFUND -> ChartCategory.UNATTRIBUTED_REFUNDS
+                    (scope == TrendScope.ACCOUNTS || (scope == TrendScope.ASSET && registry[asset]?.kind == AssetKind.ACCOUNT)) &&
+                        tx.effectiveType == FinancialType.EXPENSE -> ChartCategory.ACCOUNT_PURCHASES
+                    scope == TrendScope.ACCOUNTS || (scope == TrendScope.ASSET && registry[asset]?.kind == AssetKind.ACCOUNT) -> tx.categories.singleOrNull()
+                    details[tx.key]?.messageFamily == DashboardEvidenceFamily.WITHDRAWAL -> ChartCategory.CASH_WITHDRAWALS
+                    ChartCategory.ACCOUNT_PURCHASES in tx.categories -> ChartCategory.OTHER_EXPENSES
+                    else -> tx.categories.singleOrNull()
+                }) && contribution(tx) != null
             }
             val last = minOf(period.until.minusNanos(1).atZone(period.zone).toLocalDate(), batch.revision.asOf.atZone(period.zone).toLocalDate())
             val first = period.from.atZone(period.zone).toLocalDate()
@@ -92,7 +102,14 @@ internal object BetaAnalysisBuilder {
             val known = byKey != null && !unknownDebit &&
                 (scope != TrendScope.PURCHASES || transactions.all { details[it.key]?.messageFamily != null })
             val days = if (first > last) emptyList() else generateSequence(first) { it.plusDays(1).takeIf { day -> day <= last } }.toList()
-            val points = days.map { date ->
+            // Category facts remain sparse, so an all-history recovery read does not multiply
+            // every empty calendar day by every available category.
+            val projectedDays = if (chartCategory) grouped.keys.sorted() else days
+            if (chartCategory) {
+                chartPointBudget += projectedDays.size
+                require(chartPointBudget <= 250_000) { "Dashboard category projection exceeds its bounded point budget" }
+            }
+            val points = projectedDays.map { date ->
                 val rows = grouped[date].orEmpty()
                 fun amount(refunds: Boolean): SignedAmount? = if (!known) null else signed(rows.mapNotNull(::contribution)
                     .filter { (it.signum() < 0) == refunds }.fold(BigDecimal.ZERO) { sum, value -> sum + value.abs() })
@@ -101,16 +118,44 @@ internal object BetaAnalysisBuilder {
                     freezeSet(rows.mapTo(linkedSetOf()) { it.key }))
             }
             val total = if (!known) null else signed(points.fold(BigDecimal.ZERO) { sum, point -> sum + requireNotNull(point.net).amount })
-            val average = total?.let { signed(if (points.isEmpty()) BigDecimal.ZERO else
-                it.amount.divide(points.size.toBigDecimal(), 2, RoundingMode.HALF_EVEN)) }
+            val average = total?.let { signed(if (days.isEmpty()) BigDecimal.ZERO else
+                it.amount.divide(days.size.toBigDecimal(), 2, RoundingMode.HALF_EVEN)) }
             val beforeRefunds = if (!known) null else signed(points.fold(BigDecimal.ZERO) { sum, point -> sum + requireNotNull(point.beforeRefunds).amount })
             val refunds = if (!known) null else signed(points.fold(BigDecimal.ZERO) { sum, point -> sum + requireNotNull(point.refunds).amount })
             return SpendingTrend(asset, category, period, Currency.SAR, freezeList(points), average, scope, total, beforeRefunds, refunds)
 
         }
-        val trends = TrendScope.entries.filter { it != TrendScope.ASSET }.map { trend(it) } +
+        // Approved production chart scopes. All-selected always retains the original full-scope trend.
+        val purchases = setOf(ChartCategory.CREDIT_PURCHASES, ChartCategory.MADA_PURCHASES,
+            ChartCategory.CASH_WITHDRAWALS, ChartCategory.EXTERNAL_TRANSFERS, ChartCategory.UNATTRIBUTED_REFUNDS)
+        val credit = setOf(ChartCategory.CREDIT_PURCHASES, ChartCategory.BILLS, ChartCategory.FEES,
+            ChartCategory.CASH_WITHDRAWALS, ChartCategory.UNATTRIBUTED_REFUNDS)
+        val debit = setOf(ChartCategory.MADA_PURCHASES, ChartCategory.CASH_WITHDRAWALS,
+            ChartCategory.BILLS, ChartCategory.FEES, ChartCategory.UNATTRIBUTED_REFUNDS)
+        val accounts = setOf(ChartCategory.EXTERNAL_TRANSFERS, ChartCategory.CREDIT_SETTLEMENTS,
+            ChartCategory.CASH_WITHDRAWALS, ChartCategory.BILLS, ChartCategory.ACCOUNT_PURCHASES,
+            ChartCategory.FEES, ChartCategory.LOAN_REPAYMENTS, ChartCategory.UNATTRIBUTED_REFUNDS)
+        fun configurable(scope: TrendScope, asset: AssetId? = null): SpendingTrend {
+            val allowed = when (scope) {
+                TrendScope.CREDIT_CARDS -> credit
+                TrendScope.DEBIT_CARDS -> debit
+                TrendScope.ACCOUNTS -> accounts
+                TrendScope.PURCHASES -> purchases
+                TrendScope.OVERALL -> purchases + setOf(ChartCategory.OTHER_EXPENSES, ChartCategory.BILLS,
+                    ChartCategory.FEES, ChartCategory.LOAN_REPAYMENTS)
+                TrendScope.ASSET -> when (registry[asset]?.kind) {
+                    AssetKind.ACCOUNT -> accounts + ChartCategory.INTERNAL_TRANSFERS
+                    AssetKind.CREDIT_CARD -> credit
+                    else -> debit
+                }
+                TrendScope.FINANCIAL_OUTFLOWS -> ChartCategory.entries.toSet()
+            }
+            return trend(scope, asset).copy(categoryTrends = java.util.Collections.unmodifiableMap(
+                allowed.associateWith { trend(scope, asset, it, chartCategory = true) }))
+        }
+        val trends = TrendScope.entries.filter { it != TrendScope.ASSET }.map { configurable(it) } +
             batch.assets.filter { it.kind in setOf(AssetKind.ACCOUNT, AssetKind.CREDIT_CARD, AssetKind.DEBIT_CARD) }
-                .map { trend(TrendScope.ASSET, it.id) } + ChartCategory.entries.map { trend(TrendScope.FINANCIAL_OUTFLOWS, category = it) }
+                .map { configurable(TrendScope.ASSET, it.id) } + ChartCategory.entries.map { trend(TrendScope.FINANCIAL_OUTFLOWS, category = it) }
         // Preserve the existing merchant policy: NFC/case/spacing only, two purchases minimum,
         // refunds subtract, deterministic label. Original context uses fee-inclusive SMS SAR amounts;
         // the separate TransactionFacts.sarEquivalent intentionally remains fee-free for row display.

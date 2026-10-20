@@ -258,3 +258,8 @@ internal fun ApprovedBackNavigationIcon(
         }
     }
 }
+
+@Composable
+internal fun ApprovedSectionTitle(title: String,modifier: Modifier=Modifier) {
+    ApprovedText(title,modifier=modifier,style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.onSurface)
+}

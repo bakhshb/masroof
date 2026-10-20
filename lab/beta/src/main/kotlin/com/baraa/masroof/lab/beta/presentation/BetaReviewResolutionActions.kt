@@ -1,5 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeLabel as financialTypeLabel
+import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeIcon as reviewTypeIcon
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 
 import com.baraa.masroof.lab.beta.presentation.approved.*
@@ -114,18 +116,7 @@ internal fun reviewFamilyIcon(family: String?): ImageVector = when(family) {
     "FEE" -> MasroofOutlineIcons.List
     else -> MasroofOutlineIcons.Info
 }
-internal fun reviewTypeIcon(type: FinancialType): ImageVector = when(type) {
-    FinancialType.EXPENSE -> MasroofOutlineIcons.ShoppingBag
-    FinancialType.INCOME -> MasroofOutlineIcons.TrendingUp
-    FinancialType.EXTERNAL_TRANSFER_IN -> MasroofOutlineIcons.ArrowDownLeft
-    FinancialType.EXTERNAL_TRANSFER_OUT -> MasroofOutlineIcons.ArrowUpRight
-    FinancialType.CREDIT_CARD_PAYMENT -> MasroofOutlineIcons.CreditCard
-    FinancialType.REFUND -> MasroofOutlineIcons.RotateCcw
-    FinancialType.CASH_WITHDRAWAL -> MasroofOutlineIcons.Banknote
-    FinancialType.BILL_PAYMENT -> MasroofOutlineIcons.ReceiptText
-    FinancialType.LOAN_REPAYMENT -> MasroofOutlineIcons.Landmark
-    else -> MasroofOutlineIcons.Receipt
-}
+
 internal fun reviewReasonLabel(detail: BetaReviewDetail): Int = when {
     detail.correctionAction!=null -> R.string.beta_review_parity_reason_correction
     detail.row.reason=="CONFIRM_LOAN" -> R.string.beta_complete_review_loan_reason

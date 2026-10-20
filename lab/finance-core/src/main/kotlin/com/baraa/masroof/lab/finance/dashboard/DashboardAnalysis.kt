@@ -78,9 +78,15 @@ data class SpendingTrend(
     val totalSpending: SignedAmount? = null,
     val totalBeforeRefunds: SignedAmount? = null,
     val totalRefunds: SignedAmount? = null,
+    /** Sparse same-scope contributions. Missing dates are zero only when the part total is known. */
+    val categoryTrends: Map<ChartCategory, SpendingTrend> = emptyMap(),
 ) {
     init {
         require((scope == TrendScope.ASSET) == (assetId != null))
+        val dates=points.mapTo(hashSetOf()) {it.date}
+        require(categoryTrends.all { (key, part) -> part.category == key && part.categoryTrends.isEmpty() &&
+            part.scope == scope && part.assetId == assetId && part.period == period && part.currency == currency &&
+            part.points.all {it.date in dates} })
         require(points.map { it.date }.distinct().size == points.size)
         require(points.all {
             val day = it.date.atStartOfDay(period.zone).toInstant()

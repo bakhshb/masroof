@@ -41,6 +41,7 @@ fun BetaShell(
     editor: (@Composable () -> Unit)? = null,
     editorKey: String? = null,
     dashboard: (@Composable () -> Unit)? = null,
+    dashboardOwnsScroll: Boolean = false,
     onOpenDiscovery: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onOpenReview: () -> Unit = {},
@@ -83,7 +84,7 @@ fun BetaShell(
                 showLogo = true,
                 actions = {
                     if(dashboard!=null) com.baraa.masroof.lab.beta.presentation.approved.ApprovedNotificationIconButton(
-                        notificationCount,onOpenNotifications,Modifier.testTag("beta-notifications"),enabled=!busy && returnEnabled)
+                        notificationCount,onOpenNotifications,Modifier.padding(end=com.baraa.masroof.ui.theme.MasroofSpacing.inlineGap).testTag("beta-notifications"),enabled=!busy && returnEnabled)
 
                     Surface(Modifier.padding(end = BetaSpacing.section).testTag("beta-badge"),
                         color = MaterialTheme.colorScheme.errorContainer) {
@@ -123,11 +124,13 @@ fun BetaShell(
             navigation=onNavigateBack?.let {back -> {
                 ApprovedBackNavigationIcon(back,stringResource(R.string.beta_dash_back),!busy && returnEnabled,Modifier.testTag("beta-page-back"))
             }})
-        Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberSaveable(secondaryTitle,selectedHomeTab,workspaceOpen,saver=androidx.compose.foundation.ScrollState.Saver) {androidx.compose.foundation.ScrollState(0)})
-                .padding(horizontal=BetaSpacing.screen).padding(bottom=BetaSpacing.screen)
-                .then(if(secondaryTitle==null) Modifier.padding(top=BetaSpacing.screen) else Modifier),
-            verticalArrangement = Arrangement.spacedBy(BetaSpacing.section),
+        val shellScroll=rememberSaveable(secondaryTitle,selectedHomeTab,workspaceOpen,saver=androidx.compose.foundation.ScrollState.Saver) {androidx.compose.foundation.ScrollState(0)}
+        val bodyModifier=Modifier.weight(1f).fillMaxWidth().let {base ->
+            if(dashboardOwnsScroll && dashboard!=null && editor==null && !workspaceOpen) base
+            else base.padding(horizontal=BetaSpacing.screen).padding(bottom=BetaSpacing.screen)
+                .then(if(secondaryTitle==null) Modifier.padding(top=BetaSpacing.screen) else Modifier).verticalScroll(shellScroll)
+        }
+        Column(bodyModifier,verticalArrangement=Arrangement.spacedBy(BetaSpacing.section)
         ) {
             if (editor != null) {
                 if(editorKey==null) editor() else editorState.SaveableStateProvider(editorKey) {editor()}

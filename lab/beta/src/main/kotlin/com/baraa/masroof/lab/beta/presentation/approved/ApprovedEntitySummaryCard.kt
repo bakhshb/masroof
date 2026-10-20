@@ -20,8 +20,9 @@ internal fun ApprovedEntitySummaryCard(title: String, subtitle: String, icon: Im
     guidance: String? = null,
     bankLabel: String? = null,
     actionLabel: String = androidx.compose.ui.res.stringResource(com.baraa.masroof.lab.beta.R.string.beta_complete_details),
+    actionModifier: Modifier = Modifier, enabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit) {
-    MasroofCard(modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)) {
+    MasroofCard(modifier.then(if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
             androidx.compose.material3.Surface(shape = com.baraa.masroof.ui.theme.MasroofShapes.small,
@@ -45,7 +46,7 @@ internal fun ApprovedEntitySummaryCard(title: String, subtitle: String, icon: Im
         content()
         if (onClick != null) {
             Spacer(Modifier.height(MasroofSpacing.cardInnerGap))
-            androidx.compose.material3.Button(onClick = onClick, modifier = Modifier.fillMaxWidth(),
+            androidx.compose.material3.Button(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().then(actionModifier),
                 shape = com.baraa.masroof.ui.theme.MasroofShapes.small) {
                 Text(actionLabel)
             }

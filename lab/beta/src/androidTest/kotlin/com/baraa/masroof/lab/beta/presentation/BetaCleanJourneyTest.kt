@@ -66,14 +66,14 @@ class BetaCleanJourneyTest {
                 click("beta-page-back"); await("onboarding-ASSETS")
                 click("ownership-continue"); await("onboarding-REVIEW")
                 scenario.recreate(); await("onboarding-REVIEW")
-                click("onboarding-next"); await("dash-refresh")
+                click("onboarding-next"); await("dashboard-ready")
                 val settings = compose.onNode(hasText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_settings)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation")))
                 settings.performClick(); await("beta-management-settings"); capture("m10-management-settings")
                 compose.onNodeWithTag("beta-developer-tools").assertDoesNotExist()
                 compose.onNodeWithTag("beta-settings-backup").assertDoesNotExist()
                 click("manage-COMMITMENTS"); await("controls-add")
                 compose.onNodeWithTag("controls-salary").assertDoesNotExist()
-                click("beta-page-back"); click("beta-page-back"); await("dash-refresh")
+                click("beta-page-back"); click("beta-page-back"); await("dashboard-ready")
             }
             drain()
             BetaContainer(context).use {
@@ -81,7 +81,7 @@ class BetaCleanJourneyTest {
                 assertEquals(1, it.assets().size)
                 assertTrue(it.evidencePage().isEmpty()); assertEquals(true,it.historySession()?.finished)
             }
-            ActivityScenario.launch(BetaActivity::class.java).use { await("dash-refresh"); compose.onNodeWithTag("onboarding-IMPORT").assertDoesNotExist() }
+            ActivityScenario.launch(BetaActivity::class.java).use { await("dashboard-ready"); compose.onNodeWithTag("onboarding-IMPORT").assertDoesNotExist() }
         } finally { drain(); BetaContainer.resetOffline(context) }
     }
 
@@ -127,7 +127,7 @@ class BetaCleanJourneyTest {
                 beta.setBankEnabled(bank, true); beta.backup()
             }
             ActivityScenario.launch(BetaActivity::class.java).use { scenario ->
-                await("dash-refresh")
+                await("dashboard-ready")
                 compose.onNode(hasText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_settings)) and
                     hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
                 click("manage-ABOUT")
@@ -181,7 +181,7 @@ class BetaCleanJourneyTest {
                 compose.onNodeWithTag("ownership-continue").assertIsDisplayed().assertIsNotEnabled()
                 click("ownership-BANK_ALJAZIRA-ACCOUNT-1234-owned")
                 click("ownership-continue")
-                await("onboarding-REVIEW"); click("onboarding-next"); await("dash-refresh")
+                await("onboarding-REVIEW"); click("onboarding-next"); await("dashboard-ready")
             }
             drain()
             val key = PostingKey(Environment.BETA, "evidence:$evidenceId")
@@ -190,7 +190,7 @@ class BetaCleanJourneyTest {
                 assertEquals(1, beta.financialHistory(key).size)
                 assertEquals(BetaOnboardingStep.COMPLETE, beta.onboardingStep())
             }
-            ActivityScenario.launch(BetaActivity::class.java).use { await("dash-refresh") }
+            ActivityScenario.launch(BetaActivity::class.java).use { await("dashboard-ready") }
             drain()
             BetaContainer(context).use { assertEquals(1, it.financialHistory(key).size) }
         } finally { drain(); BetaContainer.resetOffline(context) }

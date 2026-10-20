@@ -15,7 +15,7 @@ class BetaStartupReplayTest {
         try {ActivityScenario.launch(BetaActivity::class.java).use {scenario ->
             repeat(2) {pass ->
                 if(pass>0) scenario.recreate()
-                compose.waitUntil(20000) {compose.onAllNodesWithTag("dash-refresh").fetchSemanticsNodes(atLeastOneRootRequired=false).isNotEmpty()}
+                compose.waitUntil(20000) {compose.onAllNodesWithTag("dashboard-ready").fetchSemanticsNodes(atLeastOneRootRequired=false).isNotEmpty()}
                 compose.onNodeWithTag("beta-startup-failure").assertDoesNotExist()
             }
         }} finally {val done=CountDownLatch(1);BetaIo.execute {done.countDown()};Assert.assertTrue(done.await(20,TimeUnit.SECONDS))}

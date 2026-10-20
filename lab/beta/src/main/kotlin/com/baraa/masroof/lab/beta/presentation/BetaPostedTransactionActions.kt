@@ -1,5 +1,6 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeLabel as financialTypeLabel
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 
 import androidx.compose.foundation.layout.*

@@ -24,10 +24,10 @@ class BetaSharedNavigationTest {
         try {
             BetaContainer(context).use { it.putMarker("m2-new-data", "keep"); it.acknowledgeStart() }
             ActivityScenario.launch(BetaActivity::class.java).use { scenario ->
-                await("dash-refresh"); await("beta-bottom-navigation")
+                await("dashboard-ready"); await("beta-bottom-navigation")
                 tab(R.string.beta_nav_transactions).performClick()
                 compose.onNodeWithTag("dash-route-TRANSACTIONS").assertIsSelected()
-                scenario.recreate(); await("dash-refresh")
+                scenario.recreate(); await("dashboard-ready")
                 compose.onNodeWithTag("dash-route-TRANSACTIONS").assertIsSelected()
                 scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
                 compose.onNodeWithTag("beta-home-hero").assertExists()
@@ -36,7 +36,7 @@ class BetaSharedNavigationTest {
                 compose.onNodeWithTag("history-start").assertDoesNotExist() // Review is not the import screen.
                 compose.onNodeWithTag("review-close").assertDoesNotExist()
                 compose.onNodeWithTag("review-existing-transactions").assertDoesNotExist()
-                compose.onNodeWithTag("beta-page-back").performClick(); await("dash-refresh")
+                compose.onNodeWithTag("beta-page-back").performClick(); await("dashboard-ready")
                 tab(R.string.beta_nav_settings).performClick(); await("beta-settings-panel")
                 compose.onNodeWithTag("beta-page-back").performClick(); await("beta-bottom-navigation")
                 compose.onNodeWithTag("beta-badge").assertIsDisplayed()
@@ -44,7 +44,7 @@ class BetaSharedNavigationTest {
             }
             drain()
             BetaContainer(context).use { assertEquals(1, it.markerCount()); assertEquals(com.baraa.masroof.lab.beta.application.BetaStartState.READY, it.startState()) }
-            ActivityScenario.launch(BetaActivity::class.java).use { await("dash-refresh"); compose.onNodeWithTag("beta-start-continue").assertDoesNotExist() }
+            ActivityScenario.launch(BetaActivity::class.java).use { await("dashboard-ready"); compose.onNodeWithTag("beta-start-continue").assertDoesNotExist() }
         } finally { drain(); BetaContainer.resetOffline(context) }
     }
     private fun tab(label: Int) = compose.onNode(hasText(context.getString(label)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation")))

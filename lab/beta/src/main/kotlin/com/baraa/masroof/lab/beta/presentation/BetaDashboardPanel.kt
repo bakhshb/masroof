@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -30,6 +31,8 @@ import java.time.YearMonth
 @Composable
 fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     controls: BetaDashboardControls = UnavailableBetaDashboardControls,
+    ownsScroll: Boolean = false,
+    onDestinationChanged: (String)->Unit = {},
     preferences: BetaDashboardViewPreferencesWorkflow? = null, requestedRoute: String? = null, routeRequest: Int = 0, onPrimaryTabChanged: (String) -> Unit = {}, onBusyChanged: (Boolean) -> Unit = {}, onImport: () -> Unit = {}, onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onPageTitle: (String?) -> Unit = {}, showInternalHeader: Boolean = true, onManageAssets: (com.baraa.masroof.lab.finance.asset.AssetKind)->Unit = {},onNotificationFacts: (String,Int)->Unit = {_,_->}, transactionExtras: (@Composable (String,(Boolean)->Unit)->Unit)? = null) {
     var controlsBusy by remember { mutableStateOf(false) }
     var homeLayoutOpen by rememberSaveable { mutableStateOf(false) }
@@ -46,7 +49,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     var activeWorkflow by remember(workflow) { mutableStateOf(workflow) }
     var appliedPeriodDay by rememberSaveable { mutableIntStateOf(workflow.periodStartDay) }
     val interactive = enabled && !controlsBusy && !loading && !failed
-    BetaLaunchedEffect(route) { onPrimaryTabChanged(if (route == "TRANSACTIONS") "TRANSACTIONS" else "HOME") }
+    BetaLaunchedEffect(route) { onPrimaryTabChanged(if (route == "TRANSACTIONS") "TRANSACTIONS" else "HOME");onDestinationChanged(route) }
     BetaLaunchedEffect(routeRequest) {
         if (lastRouteRequest != routeRequest && requestedRoute != null) {
             route = requestedRoute; selectedId = null; selectedBank = null; selectedTransaction = null
@@ -98,127 +101,147 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
         } else {selectedBank=id.bank.value;selectedId=id.localId}
     }
     fun matches(id: AssetId) = id.bank.value == selectedBank && id.localId == selectedId
-    Box(Modifier.testTag("beta-dashboard")) {
-    Column(verticalArrangement = Arrangement.spacedBy(BetaSpacing.section), modifier = Modifier.testTag("dash-route-$route").semantics {selected=true}) {
-        val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
-        val dateFormat = java.time.format.DateTimeFormatter.ofPattern("d MMM", locale)
-        val displayedPeriod=activeWorkflow.query(month)
-        val periodLabel = dateFormat.format(displayedPeriod.from.atZone(activeWorkflow.zone)) + " – " + dateFormat.format(displayedPeriod.until.minusNanos(1).atZone(activeWorkflow.zone))
-        if(route!="LOANS" && route!="CONFIGURATION" && selectedTransaction==null && (selectedId==null || result?.snapshot?.accounts?.any {matches(it.id)}==true)) {
-            if(route=="OVERVIEW" && selectedId==null) com.baraa.masroof.ui.dashboard.DashboardPeriodHeader(periodLabel, scope = {
-            Text(stringResource(R.string.beta_parity_salary_period), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }, previousDescription = stringResource(R.string.beta_dash_previous), nextDescription = stringResource(R.string.beta_dash_next),
-            onPrevious = { monthText = month.minusMonths(1).toString() }, onNext = { monthText = month.plusMonths(1).toString() },
-            enabled = interactive && !loading, rangeTag = "dash-month", rangeModifier = Modifier.semantics { contentDescription = monthText }, previousTag = "dash-month-previous", nextTag = "dash-month-next",
-            customize = {
-                com.baraa.masroof.ui.components.MasroofTextButton(enabled = interactive, onClick = { homeLayoutOpen = true; route = "OVERVIEW"; selectedId = null; selectedBank = null; selectedTransaction = null },
-                    modifier = Modifier.heightIn(min = com.baraa.masroof.ui.theme.MasroofSpacing.minimumTouchTarget).testTag("home-configure")) {
-                    Icon(com.baraa.masroof.ui.components.MasroofOutlineIcons.SlidersHorizontal, null,
-                        Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.icon))
-                    Text(stringResource(R.string.beta_home_customize), Modifier.padding(start = com.baraa.masroof.ui.theme.MasroofSpacing.smallGap), style = MaterialTheme.typography.titleSmall)
-                }
-            })
-            else com.baraa.masroof.lab.beta.presentation.approved.ApprovedPeriodDisplay(periodLabel,
-                Modifier.testTag("dash-month").semantics {contentDescription=monthText})
-        }
-        if(selectedId==null && selectedTransaction==null && route!="OVERVIEW" && showInternalHeader) {
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-                Text(pageTitle.orEmpty(),style=MaterialTheme.typography.headlineSmall)
-                TextButton(enabled=interactive,onClick={route="OVERVIEW"},modifier=Modifier.testTag("dash-overview")) {Text(stringResource(R.string.beta_dash_back))}
+    val originalContent: @Composable () -> Unit = {
+        Box(Modifier.testTag("beta-dashboard")) {
+        Column(verticalArrangement = Arrangement.spacedBy(BetaSpacing.section), modifier = Modifier.testTag("dash-route-$route").semantics {selected=true}) {
+            val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+            val displayedPeriod=activeWorkflow.query(month)
+            val periodLabel = com.baraa.masroof.lab.beta.presentation.approved.approvedPeriodRange(
+                displayedPeriod.from.atZone(activeWorkflow.zone).toLocalDate(),displayedPeriod.until.minusNanos(1).atZone(activeWorkflow.zone).toLocalDate(),
+                locale,compact=route=="OVERVIEW" && selectedId==null)
+            if(route!="LOANS" && route!="CONFIGURATION" && selectedTransaction==null && (selectedId==null || result?.snapshot?.accounts?.any {matches(it.id)}==true)) {
+                if(route=="OVERVIEW" && selectedId==null) com.baraa.masroof.ui.dashboard.DashboardPeriodHeader(periodLabel, scope = {
+                Text(stringResource(R.string.beta_parity_salary_period), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }, previousDescription = stringResource(R.string.beta_dash_previous), nextDescription = stringResource(R.string.beta_dash_next),
+                onPrevious = { monthText = month.minusMonths(1).toString() }, onNext = { monthText = month.plusMonths(1).toString() },
+                enabled = interactive && !loading, rangeTag = "dash-month", rangeModifier = Modifier.semantics { contentDescription = monthText }, previousTag = "dash-month-previous", nextTag = "dash-month-next",
+                customize = {
+                    com.baraa.masroof.ui.components.MasroofTextButton(enabled = interactive, onClick = { homeLayoutOpen = true; route = "OVERVIEW"; selectedId = null; selectedBank = null; selectedTransaction = null },
+                        modifier = Modifier.heightIn(min = com.baraa.masroof.ui.theme.MasroofSpacing.minimumTouchTarget).testTag("home-configure")) {
+                        Icon(com.baraa.masroof.ui.components.MasroofOutlineIcons.SlidersHorizontal, null,
+                            Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.icon))
+                        Text(stringResource(R.string.beta_home_customize), Modifier.padding(start = com.baraa.masroof.ui.theme.MasroofSpacing.smallGap), style = MaterialTheme.typography.titleSmall)
+                    }
+                })
+                else com.baraa.masroof.lab.beta.presentation.approved.ApprovedPeriodDisplay(periodLabel,
+                    Modifier.testTag("dash-month").semantics {contentDescription=monthText})
             }
-        } else if(showInternalHeader && (selectedId!=null || selectedTransaction!=null)) TextButton(enabled=interactive,onClick={if(selectedTransaction!=null) selectedTransaction=null else {selectedId=null;selectedBank=null}},modifier=Modifier.testTag("dash-detail-back")) {Text(stringResource(R.string.beta_dash_back))}
+            if(selectedId==null && selectedTransaction==null && route!="OVERVIEW" && showInternalHeader) {
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                    Text(pageTitle.orEmpty(),style=MaterialTheme.typography.headlineSmall)
+                    TextButton(enabled=interactive,onClick={route="OVERVIEW"},modifier=Modifier.testTag("dash-overview")) {Text(stringResource(R.string.beta_dash_back))}
+                }
+            } else if(showInternalHeader && (selectedId!=null || selectedTransaction!=null)) TextButton(enabled=interactive,onClick={if(selectedTransaction!=null) selectedTransaction=null else {selectedId=null;selectedBank=null}},modifier=Modifier.testTag("dash-detail-back")) {Text(stringResource(R.string.beta_dash_back))}
 
-        if(failed) {
-            Text(stringResource(R.string.beta_dash_error), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("dash-error"))
-            OutlinedButton(onClick = { retry++ }, enabled = enabled && !loading && !controlsBusy, modifier = Modifier.testTag("dash-retry")) { Text(stringResource(R.string.beta_retry)) }
-        }
-        when {
-            (loading && result==null) || (result != null && result?.snapshot?.query != activeWorkflow.query(month)) -> { LinearProgressIndicator(Modifier.fillMaxWidth().testTag("dash-loading")); Text(stringResource(R.string.beta_dash_loading)) }
-            else -> result?.let { read ->
-                val snapshot = read.snapshot
-                SideEffect {onNotificationFacts(periodLabel,snapshot.analysis?.excludedOtherCurrencyCount ?: 0)}
-                if (read.unavailableSections.any {it in setOf(DashboardSection.CURRENT_LEDGER,DashboardSection.VALUATION,DashboardSection.RUNTIME_SOURCE)}) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-                    Text(stringResource(if(DashboardSection.CURRENT_LEDGER in read.unavailableSections || DashboardSection.VALUATION in read.unavailableSections) R.string.beta_fix_confirmed_only else R.string.beta_fix_commitments_unknown), Modifier.padding(BetaSpacing.screen).testTag("dash-incomplete"))
-                }
-                if (selectedTransaction != null) {
-                    BetaDashboardTransactionDetail(snapshot, checkNotNull(selectedTransaction))
-                    transactionExtras?.invoke(checkNotNull(selectedTransaction)) {closed -> if(closed) selectedTransaction=null;retry++}
-                } else if (selectedId != null) {
-                    val account = snapshot.accounts.singleOrNull { matches(it.id) }
-                    val debit = snapshot.debitCards.singleOrNull { matches(it.cardId) }
-                    val loan = snapshot.loans.singleOrNull { matches(it.id) }
-                    val card = (snapshot.creditFacilities.flatMap { it.cards }+snapshot.standaloneCreditCards).singleOrNull { matches(it.cardId) }
-                    when {
-                        account != null || debit != null || card != null || loan != null -> BetaAssetDetail(
-                            snapshot, account, debit, card, loan, interactive,
-                            { selectedTransaction = it },
-                            DashboardSection.RUNTIME_SOURCE !in read.unavailableSections)
-                        else -> Text(stringResource(R.string.beta_dash_missing), modifier = Modifier.testTag("dash-missing"))
+            if(failed) {
+                Text(stringResource(R.string.beta_dash_error), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("dash-error"))
+                OutlinedButton(onClick = { retry++ }, enabled = enabled && !loading && !controlsBusy, modifier = Modifier.testTag("dash-retry")) { Text(stringResource(R.string.beta_retry)) }
+            }
+            when {
+                (loading && result==null) || (result != null && result?.snapshot?.query != activeWorkflow.query(month)) -> { LinearProgressIndicator(Modifier.fillMaxWidth().testTag("dash-loading")); Text(stringResource(R.string.beta_dash_loading)) }
+                else -> result?.let { read ->
+                    val snapshot = read.snapshot
+                    SideEffect {onNotificationFacts(periodLabel,snapshot.analysis?.excludedOtherCurrencyCount ?: 0)}
+                    if (read.unavailableSections.any {it in setOf(DashboardSection.CURRENT_LEDGER,DashboardSection.VALUATION,DashboardSection.RUNTIME_SOURCE)}) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
+                        Text(stringResource(if(DashboardSection.CURRENT_LEDGER in read.unavailableSections || DashboardSection.VALUATION in read.unavailableSections) R.string.beta_fix_confirmed_only else R.string.beta_fix_commitments_unknown), Modifier.padding(BetaSpacing.screen).testTag("dash-incomplete"))
                     }
-                } else when (route) {
-                    "OVERVIEW" -> BetaDashboardHome(read, interactive, preferences, onRoute = { route = it },
-                        onTransaction = { selectedTransaction = it }, onImport = onImport, layoutOpen = homeLayoutOpen,
-                        onSetup = onSetup, pendingCardCount=pendingCardCount,onCards=onCards, onLayoutClose = { homeLayoutOpen = false }, onConfiguration = { homeLayoutOpen = false; route = "CONFIGURATION" })
-                    "FLOW_IN", "FLOW_OUT" -> {
-                        val incoming = route == "FLOW_IN"
-                        val flow = snapshot.fleetFlow
-                        if (flow == null) DashUnavailable() else DashCard(stringResource(if (incoming) R.string.beta_home_inflow else R.string.beta_home_outflow)) {
-                            DashValue(R.string.beta_dash_total, amount(if (incoming) flow.totalIn else flow.totalOut))
-                            val inbound = setOf(FlowBucket.SALARY, FlowBucket.OTHER_INCOME, FlowBucket.EXTERNAL_IN, FlowBucket.ACCOUNT_REFUNDS, FlowBucket.INTERNAL_IN)
-                            flow.buckets.filterKeys { (it in inbound) == incoming }.forEach { (bucket, value) ->
-                                DashValue(flowLabel(bucket), amount(value))
+                    if (selectedTransaction != null) {
+                        BetaDashboardTransactionDetail(snapshot, checkNotNull(selectedTransaction))
+                        transactionExtras?.invoke(checkNotNull(selectedTransaction)) {closed -> if(closed) selectedTransaction=null;retry++}
+                    } else if (selectedId != null) {
+                        val account = snapshot.accounts.singleOrNull { matches(it.id) }
+                        val debit = snapshot.debitCards.singleOrNull { matches(it.cardId) }
+                        val loan = snapshot.loans.singleOrNull { matches(it.id) }
+                        val card = (snapshot.creditFacilities.flatMap { it.cards }+snapshot.standaloneCreditCards).singleOrNull { matches(it.cardId) }
+                        when {
+                            account != null || debit != null || card != null || loan != null -> BetaAssetDetail(
+                                snapshot, account, debit, card, loan, interactive,
+                                { selectedTransaction = it },
+                                DashboardSection.RUNTIME_SOURCE !in read.unavailableSections)
+                            else -> Text(stringResource(R.string.beta_dash_missing), modifier = Modifier.testTag("dash-missing"))
+                        }
+                    } else when (route) {
+                        "OVERVIEW" -> BetaDashboardHome(read, interactive, preferences, onRoute = { route = it },
+                            onTransaction = { selectedTransaction = it }, onImport = onImport, layoutOpen = homeLayoutOpen,
+                            onSetup = onSetup, pendingCardCount=pendingCardCount,onCards=onCards, onLayoutClose = { homeLayoutOpen = false }, onConfiguration = { homeLayoutOpen = false; route = "CONFIGURATION" })
+                        "FLOW_IN", "FLOW_OUT" -> {
+                            val incoming = route == "FLOW_IN"
+                            val flow = snapshot.fleetFlow
+                            if (flow == null) DashUnavailable() else DashCard(stringResource(if (incoming) R.string.beta_home_inflow else R.string.beta_home_outflow)) {
+                                DashValue(R.string.beta_dash_total, amount(if (incoming) flow.totalIn else flow.totalOut))
+                                val inbound = setOf(FlowBucket.SALARY, FlowBucket.OTHER_INCOME, FlowBucket.EXTERNAL_IN, FlowBucket.ACCOUNT_REFUNDS, FlowBucket.INTERNAL_IN)
+                                flow.buckets.filterKeys { (it in inbound) == incoming }.forEach { (bucket, value) ->
+                                    DashValue(flowLabel(bucket), amount(value))
+                                }
+                            }
+                        }
+                        "ACCOUNTS" -> {
+                            if(snapshot.accounts.isEmpty() && DashboardSection.CONFIRMED_REGISTRY in read.unavailableSections) DashUnavailable() else BetaAccountsSummary(snapshot,visibleRows,interactive,{onManageAssets(com.baraa.masroof.lab.finance.asset.AssetKind.ACCOUNT)},::select)
+                            DashMore(snapshot.accounts.size>visibleRows) {visibleRows+=20}
+                        }
+                        "CARDS" -> {
+                            val hasCredit=snapshot.creditFacilities.isNotEmpty() || snapshot.standaloneCreditCards.isNotEmpty()
+                            val credit=cardTab=="CREDIT" && hasCredit
+                            if(!hasCredit && snapshot.debitCards.isEmpty() && DashboardSection.CONFIRMED_REGISTRY in read.unavailableSections) DashUnavailable() else BetaCardsSummary(snapshot,visibleRows,interactive,credit,{cardTab=if(it) "CREDIT" else "DEBIT"},{onManageAssets(com.baraa.masroof.lab.finance.asset.AssetKind.CREDIT_CARD)},::select)
+                            DashMore(snapshot.debitCards.size>visibleRows || snapshot.standaloneCreditCards.size>visibleRows || snapshot.creditFacilities.any {it.cards.size>visibleRows}) {visibleRows+=20}
+                        }
+                        "LOANS" -> {
+                            if(snapshot.loans.isEmpty() && DashboardSection.CONFIRMED_REGISTRY in read.unavailableSections) DashUnavailable() else BetaLoansSummary(snapshot,visibleRows,interactive,{onManageAssets(com.baraa.masroof.lab.finance.asset.AssetKind.LOAN)},::select)
+                            DashMore(snapshot.loans.size>visibleRows) {visibleRows+=20}
+                        }
+                        "COMMITMENTS" -> {
+                            val commitments = snapshot.commitments
+                            if (commitments == null || (commitments.rows.isEmpty() && DashboardSection.COMMITMENTS in read.unavailableSections)) DashUnavailable() else {
+                                BetaCommitmentsSummary(snapshot,commitments,visibleRows,interactive,::select)
+                                if (DashboardSection.COMMITMENTS in read.unavailableSections) DashUnavailable()
+                                DashMore(commitments.rows.size > visibleRows) { visibleRows += 20 }
+                            }
+                        }
+                        "ANALYSIS" -> {
+                            val analysis = snapshot.analysis
+                            if (analysis == null) DashUnavailable() else {
+                                DashCard(stringResource(R.string.beta_dash_analysis)) {
+                                    DashValue(R.string.beta_dash_spending, amount(analysis.metrics[SummaryMetric.SPENDING_NET]))
+                                    DashValue(R.string.beta_dash_refunds, amount(analysis.metrics[SummaryMetric.REFUNDS]))
+                                    DashValue(R.string.beta_dash_income, amount(analysis.metrics[SummaryMetric.INCOME]))
+                                }
+                                Text(stringResource(R.string.beta_dash_merchants), style = MaterialTheme.typography.titleLarge)
+                                if (DashboardSection.MERCHANT_TOTALS in read.unavailableSections) DashUnavailable()
+                                else if (analysis.merchants.isEmpty()) DashEmpty()
+                                analysis.merchants.take(visibleRows).forEach { merchant -> DashCard(merchant.merchant) { Text(amount(merchant.net)) } }
+                                DashMore(analysis.merchants.size > visibleRows) { visibleRows += 20 }
+                                BetaDashboardAnalysisPanel(snapshot, interactive, preferences) { key -> selectedTransaction = key.transactionId }
                             }
                         }
                     }
-                    "ACCOUNTS" -> {
-                        if(snapshot.accounts.isEmpty() && DashboardSection.CONFIRMED_REGISTRY in read.unavailableSections) DashUnavailable() else BetaAccountsSummary(snapshot,visibleRows,interactive,{onManageAssets(com.baraa.masroof.lab.finance.asset.AssetKind.ACCOUNT)},::select)
-                        DashMore(snapshot.accounts.size>visibleRows) {visibleRows+=20}
-                    }
-                    "CARDS" -> {
-                        val hasCredit=snapshot.creditFacilities.isNotEmpty() || snapshot.standaloneCreditCards.isNotEmpty()
-                        val credit=cardTab=="CREDIT" && hasCredit
-                        if(!hasCredit && snapshot.debitCards.isEmpty() && DashboardSection.CONFIRMED_REGISTRY in read.unavailableSections) DashUnavailable() else BetaCardsSummary(snapshot,visibleRows,interactive,credit,{cardTab=if(it) "CREDIT" else "DEBIT"},{onManageAssets(com.baraa.masroof.lab.finance.asset.AssetKind.CREDIT_CARD)},::select)
-                        DashMore(snapshot.debitCards.size>visibleRows || snapshot.standaloneCreditCards.size>visibleRows || snapshot.creditFacilities.any {it.cards.size>visibleRows}) {visibleRows+=20}
-                    }
-                    "LOANS" -> {
-                        if(snapshot.loans.isEmpty() && DashboardSection.CONFIRMED_REGISTRY in read.unavailableSections) DashUnavailable() else BetaLoansSummary(snapshot,visibleRows,interactive,{onManageAssets(com.baraa.masroof.lab.finance.asset.AssetKind.LOAN)},::select)
-                        DashMore(snapshot.loans.size>visibleRows) {visibleRows+=20}
-                    }
-                    "COMMITMENTS" -> {
-                        val commitments = snapshot.commitments
-                        if (commitments == null || (commitments.rows.isEmpty() && DashboardSection.COMMITMENTS in read.unavailableSections)) DashUnavailable() else {
-                            BetaCommitmentsSummary(snapshot,commitments,visibleRows,interactive,::select)
-                            if (DashboardSection.COMMITMENTS in read.unavailableSections) DashUnavailable()
-                            DashMore(commitments.rows.size > visibleRows) { visibleRows += 20 }
-                        }
-                    }
-                    "ANALYSIS" -> {
-                        val analysis = snapshot.analysis
-                        if (analysis == null) DashUnavailable() else {
-                            DashCard(stringResource(R.string.beta_dash_analysis)) {
-                                DashValue(R.string.beta_dash_spending, amount(analysis.metrics[SummaryMetric.SPENDING_NET]))
-                                DashValue(R.string.beta_dash_refunds, amount(analysis.metrics[SummaryMetric.REFUNDS]))
-                                DashValue(R.string.beta_dash_income, amount(analysis.metrics[SummaryMetric.INCOME]))
-                            }
-                            Text(stringResource(R.string.beta_dash_merchants), style = MaterialTheme.typography.titleLarge)
-                            if (DashboardSection.MERCHANT_TOTALS in read.unavailableSections) DashUnavailable()
-                            else if (analysis.merchants.isEmpty()) DashEmpty()
-                            analysis.merchants.take(visibleRows).forEach { merchant -> DashCard(merchant.merchant) { Text(amount(merchant.net)) } }
-                            DashMore(analysis.merchants.size > visibleRows) { visibleRows += 20 }
-                            BetaDashboardAnalysisPanel(snapshot, interactive, preferences) { key -> selectedTransaction = key.transactionId }
-                        }
-                    }
+                    if (selectedId == null && selectedTransaction == null && route == "TRANSACTIONS") BetaDashboardTransactions(snapshot, enabled = interactive, onTransaction = { selectedTransaction = it.transactionId }, complete = DashboardSection.RUNTIME_SOURCE !in read.unavailableSections)
+                    if (selectedId == null && selectedTransaction == null && route == "CONFIGURATION") BetaDashboardConfigurationPanel(controls, snapshot.creditFacilities, month, interactive,
+                        onBusyChanged = { controlsBusy = it; onBusyChanged(it) }, onSaved = { retry++ })
                 }
-                if (selectedId == null && selectedTransaction == null && route == "TRANSACTIONS") BetaDashboardTransactions(snapshot, enabled = interactive, onTransaction = { selectedTransaction = it.transactionId }, complete = DashboardSection.RUNTIME_SOURCE !in read.unavailableSections)
-                if (selectedId == null && selectedTransaction == null && route == "CONFIGURATION") BetaDashboardConfigurationPanel(controls, snapshot.creditFacilities, month, interactive,
-                    onBusyChanged = { controlsBusy = it; onBusyChanged(it) }, onSaved = { retry++ })
-                snapshot.revision?.let { Text(stringResource(R.string.beta_dash_as_of, betaDate(it.asOf,snapshot.query.zone)), style = MaterialTheme.typography.bodySmall) }
-                OutlinedButton(onClick = { retry++ }, enabled = interactive, modifier = Modifier.testTag("dash-refresh")) { Text(stringResource(R.string.beta_dash_refresh)) }
             }
         }
+        }
     }
+    val chartData=remember(preferences) {preferences?.chartData ?: BetaChartDataWorkflow(InMemoryBetaChartDataPreferencesRepository())}
+    val content: @Composable ()->Unit = {
+        CompositionLocalProvider(com.baraa.masroof.lab.beta.presentation.approved.LocalBetaChartDataWorkflow provides chartData) {originalContent()}
     }
+    val readyTag=if(result!=null && !loading && !failed) "dashboard-ready" else "dashboard-loading-state"
+    if(ownsScroll) {
+        if(route=="OVERVIEW" && selectedId==null && selectedTransaction==null) {
+            com.baraa.masroof.lab.beta.presentation.approved.ApprovedLongPullToRefreshBox(
+                isRefreshing=loading && result!=null,onRefresh={if(enabled && !controlsBusy) retry++},
+                modifier=Modifier.fillMaxSize().testTag(readyTag)) {
+                Box(Modifier.fillMaxWidth().padding(horizontal=com.baraa.masroof.ui.theme.MasroofSpacing.screenHorizontal)
+                    .padding(top=com.baraa.masroof.ui.theme.MasroofSpacing.screenVertical,bottom=com.baraa.masroof.ui.theme.MasroofSpacing.screenVertical)) {content()}
+            }
+        } else {
+            val scroll=rememberSaveable(route,selectedBank,selectedId,selectedTransaction,saver=androidx.compose.foundation.ScrollState.Saver) {androidx.compose.foundation.ScrollState(0)}
+            Box(Modifier.fillMaxSize().testTag(readyTag).padding(horizontal=com.baraa.masroof.ui.theme.MasroofSpacing.screenHorizontal)
+                .padding(bottom=com.baraa.masroof.ui.theme.MasroofSpacing.screenVertical).verticalScroll(scroll)) {content()}
+        }
+    } else Box(Modifier.testTag(readyTag)) {content()}
 }
 
 private val dashboardRoutes = listOf("OVERVIEW" to R.string.beta_dash_summary, "ACCOUNTS" to R.string.beta_dash_accounts,
@@ -237,32 +260,12 @@ private val dashboardRoutes = listOf("OVERVIEW" to R.string.beta_dash_summary, "
     // Stacked text also fits split-screen and large font without clipped currency values.
     Column(modifier) { Text(stringResource(label), style = MaterialTheme.typography.labelLarge); Text(value, style = MaterialTheme.typography.titleLarge) }
 }
-@Composable private fun amount(value: SignedAmount?): String = value?.let { betaMoney(it.amount.toPlainString(),it.currency.name) } ?: stringResource(R.string.beta_dash_unavailable)
-@Composable private fun amount(value: Money?): String = value?.let { betaMoney(it.amount.toPlainString(),it.currency.name) } ?: stringResource(R.string.beta_dash_unavailable)
+@Composable private fun amount(value: SignedAmount?): String = value?.let { betaMoney(it.amount.toPlainString(),it.currency.name) } ?: stringResource(R.string.beta_approved_dashboard_value_unavailable)
+@Composable private fun amount(value: Money?): String = value?.let { betaMoney(it.amount.toPlainString(),it.currency.name) } ?: stringResource(R.string.beta_approved_dashboard_value_unavailable)
 @Composable private fun DashEmpty() { Text(stringResource(R.string.beta_dash_empty), modifier = Modifier.testTag("dash-empty")) }
 @Composable private fun DashUnavailable() { Text(stringResource(R.string.beta_dash_unavailable_help), modifier = Modifier.testTag("dash-unavailable")) }
 @Composable private fun DashMore(visible: Boolean, onClick: () -> Unit) {
     if (visible) OutlinedButton(onClick = onClick, modifier = Modifier.testTag("dash-more")) { Text(stringResource(R.string.beta_dash_more)) }
-}
-@Composable private fun DashPeriod(period: DisplayPeriod?) {
-    if (period == null) Text(stringResource(R.string.beta_dash_period_unavailable), style = MaterialTheme.typography.bodySmall)
-    else Text(stringResource(R.string.beta_dash_period, period.from.atZone(period.zone).toLocalDateTime().toString(),
-        period.until.atZone(period.zone).toLocalDateTime().toString()), style = MaterialTheme.typography.bodySmall)
-}
-@Composable private fun DashLink(id: AssetId, label: String, enabled: Boolean, onClick: (AssetId) -> Unit) {
-    OutlinedButton(enabled = enabled, onClick = { onClick(id) }, modifier = Modifier.testTag("dash-asset-${id.bank.value}-${id.localId}")) { Text(label) }
-}
-@Composable private fun DashFlow(flow: AccountFlow?) {
-    DashValue(R.string.beta_dash_inflow, amount(flow?.totalIn)); DashValue(R.string.beta_dash_outflow, amount(flow?.totalOut)); DashValue(R.string.beta_dash_remaining, amount(flow?.remaining))
-}
-@Composable private fun DashLoan(loan: LoanSummary, zone: java.time.ZoneId, content: @Composable () -> Unit = {}) {
-    DashCard(loan.label.takeIf(String::isNotBlank) ?: stringResource(R.string.beta_asset_loan)) {
-        DashValue(R.string.beta_dash_loan_remaining, amount(loan.remaining))
-        loan.remainingAsOf?.let { Text(stringResource(R.string.beta_dash_as_of, it.atZone(zone).toLocalDate().toString()), style = MaterialTheme.typography.bodySmall) }
-        DashValue(R.string.beta_dash_installment, amount(loan.latestInstallment))
-        loan.installmentAsOf?.let { Text(stringResource(R.string.beta_dash_as_of, it.atZone(zone).toLocalDate().toString()), style = MaterialTheme.typography.bodySmall) }
-        DashValue(R.string.beta_dash_salary_payment, amount(loan.salaryPayment)); DashPeriod(loan.salaryPeriod); content()
-    }
 }
 
 private fun flowLabel(bucket: FlowBucket): Int = when (bucket) {

@@ -1,6 +1,6 @@
 {
   "production_commit": "0d86c5d3",
-  "scope": "lab only; rendering only; source files are read-only",
+  "scope": "Lab only; approved UI and read-only chart customization; production sources remain read-only.",
   "components": [
     {
       "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofCardComponents.kt",
@@ -220,6 +220,131 @@
       "source_sha256": "0799643a1d539cdecfe7345d5c5dadba0877a59a9a9b685c9061b7ea432f494c",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/notification/BetaNotificationPreferencesRepository.kt",
       "adaptations": "Isolated lab namespace, resources and snapshot/preferences adapters. The existing lab shell supplies the header and scrolling; busy and retry states retained."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/AccountsSummaryScreen.kt",
+      "symbol": "AccountsSummaryAccountCard",
+      "source_sha256": "f81c84c122c06543e8746a6384b7dba4ada602a9901513fe72004945d83e9e97",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAssetSummaryTiles.kt",
+      "adaptations": "Immutable formatted core inputs and bank-qualified action IDs; average and shared due use precomputed scoped facts without changing totals."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/CreditFacilitySection.kt",
+      "symbol": "CreditFacilityCard / DebitCardSummaryTile",
+      "source_sha256": "cf8edb0521eba24d1010657c6c5d3eb38c97433bf79dfc807828853637c78446",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAssetSummaryTiles.kt",
+      "adaptations": "Immutable formatted core inputs and bank-qualified action IDs; average and shared due use precomputed scoped facts without changing totals."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/LoanSection.kt",
+      "symbol": "LoanSummaryTile",
+      "source_sha256": "53480d557e7cbf0d6847b937714a85c09b48e299bf79c87bf5d2aacfd83b3341",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAssetSummaryTiles.kt",
+      "adaptations": "Immutable formatted core inputs and bank-qualified action IDs; average and shared due use precomputed scoped facts without changing totals."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/CardReferenceAverage.kt",
+      "symbol": "CardReferenceAverage",
+      "source_sha256": "4169604871833082a013dea732c18f37fc21dece27ebc5b74c347d32ef1a4d6c",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAssetSummaryTiles.kt",
+      "adaptations": "Immutable formatted core inputs and bank-qualified action IDs; average and shared due use precomputed scoped facts without changing totals."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofReferenceComponents.kt",
+      "symbol": "MasroofAverageBand",
+      "source_sha256": "68a4e61638fd0c7e486173add50930e797a7d7591df435ca36f3a596a5373801",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedAssetSummaryTiles.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/FinancialPeriodUiFormatter.kt",
+      "symbol": "formatRange",
+      "source_sha256": "8081e30b619fc4eb27fe298ace9653ef5f3e70c2ca4c260548e06df63734550c",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedPeriodDisplay.kt",
+      "adaptations": "Lab period boundaries and precomputed totals; no new financial arithmetic."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofLayoutComponents.kt",
+      "symbol": "MasroofSectionTitle",
+      "source_sha256": "8503f40dda176b03980c0b843711b7eac8cae9bcc58061f7200a961985b03e23",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt",
+      "adaptations": "Lab period boundaries and precomputed totals; no new financial arithmetic."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/DashboardSummaryHeroSpecs.kt",
+      "symbol": "Summary hero labels / guidance / due-date caption",
+      "source_sha256": "6337960f722c1a9d179c8ddacadf4806202a8f452f1c958e71c7d01c84531304",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaEntitySummaryPages.kt",
+      "adaptations": "Lab period boundaries and precomputed totals; no new financial arithmetic."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/LongPullToRefreshBox.kt",
+      "symbol": "LongPullToRefreshBox",
+      "source_sha256": "50d2648ef5880c5c67b72f730eef729b5bae57b9d4f5d7ba84765ea960dfc93b",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedLongPullToRefreshBox.kt",
+      "adaptations": "Lab namespace only. The dashboard owns scrolling; the host shell supplies fixed headers and navigation."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionTypeLabels.kt",
+      "symbol": "transactionTypeLabel",
+      "source_sha256": "e77c6af9ac0b1800f5e7c1d77bd0d44a92812d82ecdca8d9b7c99de120b79bd4",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedFinancialPresentation.kt",
+      "adaptations": "Resource ID mapping to the identical lab FinancialType names. Display labels only."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofIcons.kt",
+      "symbol": "transactionType",
+      "source_sha256": "e44e7287f74b6a796d4f7dce23612018a664fa1193998450341a9aee7b8096cb",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedFinancialPresentation.kt",
+      "adaptations": "Identical FinancialType names, one canonical map for all lab transaction surfaces."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/DashboardSummaryTransactions.kt",
+      "symbol": "DashboardSummaryTransactionsSection",
+      "source_sha256": "c16d21b5e6398f4be863f2b6fbff856ca5c8e354b280a989943838cc9b637afc",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaAssetDetail.kt",
+      "adaptations": "Precomputed bank-qualified fact membership; copied grouped spacing and full scoped list; stable lab correction navigation callbacks."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofReferenceControls.kt",
+      "symbol": "MasroofChoice",
+      "source_sha256": "62ab5125e86e7d4a03a095be6a0e0321ba519a57b511053505b9997c3cc0ccb3",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedChoice.kt",
+      "adaptations": "One canonical surface; string labels preserve explicit source typography, old BetaChoice delegates."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/SpendingTrendSection.kt",
+      "symbol": "SpendingTrendCard / ChartHeader",
+      "source_sha256": "a1d30814b25f532a7de70fb5cc5a2958d64eecc732e18709785def36726d60a4",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedSpendingTrend.kt",
+      "adaptations": "Source asset/aggregate chart header, help, category sheet, line, average and selection summary. Read-only category projections and string preferences; Home/analysis ports remain pending."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/AccountTransactionPresentation.kt",
+      "symbol": "directionForAccount",
+      "source_sha256": "5ee06487a3028a30d289f12db7cd2f95df5cb5d3b5059577b3100ca4e21d46e6",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/BetaTransactionDirection.kt",
+      "adaptations": "Read-only direction with full bank-qualified AssetId endpoints. No suffix fallback, no financial aggregation or mutation."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsAppScreen.kt",
+      "symbol": "SettingsAppScreen content",
+      "source_sha256": "ab43d2c71c531abf69426d349271b25d31337bfd1ee9c5a919a59c84c818ab12",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedPreferencesContent.kt",
+      "adaptations": "Source theme choices, language badge, colour legends and spacing; existing lab theme/language callbacks, lab busy guard and shell-owned navigation."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/application/dashboard/ChartDataWorkflow.kt",
+      "symbol": "ChartDataWorkflow",
+      "source_sha256": "0c555c80a8a343773e4c54c1888df24095cd987d178a4e93570cddc1ed656017",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/BetaChartDataWorkflow.kt",
+      "adaptations": "Source category/save/reset semantics and shared line/mean/gross/refunds/provenance. Nullable unknown facts remain unknown; sparse proven-empty dates become zero only when the contribution total is known."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/application/dashboard/ChartCategoryTrendsBuilder.kt",
+      "symbol": "Chart category contributions",
+      "source_sha256": "56b7130dd22e593a7e506faadbf6161dc5838bcb18f025ff05a3a9bdde77ed0d",
+      "destination": "lab/finance-core/src/main/kotlin/com/baraa/masroof/lab/finance/dashboard/producer/BetaAnalysisBuilder.kt",
+      "adaptations": "Existing persisted lab contribution calculators publish sparse read-only category facts; full-scope money and posting rules are unchanged. Account scopes retain their own flow categorization."
     }
   ],
   "adaptations": [

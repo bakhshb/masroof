@@ -49,7 +49,7 @@ class BetaNotificationsActivityTest {
     @Test fun notificationOpensReviewAndReadStatePersistsAfterRecreationAndReopen() {
         seed(true)
         try {ActivityScenario.launch(BetaActivity::class.java).use {scenario ->
-            await("dash-refresh")
+            await("dashboard-ready")
             compose.onNodeWithTag("beta-tools").assertDoesNotExist()
             compose.onNodeWithTag("beta-notifications").performClick()
             val title=context.getString(R.string.beta_approved_settings_hub_review_title)
@@ -68,7 +68,7 @@ class BetaNotificationsActivityTest {
     @Test fun backFromNotificationsRestoresTheSelectedReviewDetail() {
         seed(true)
         try {ActivityScenario.launch(BetaActivity::class.java).use {
-            await("dash-refresh")
+            await("dashboard-ready")
             compose.onNode(hasText(context.getString(R.string.beta_nav_review)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
             await("history-review-0")
             compose.onNodeWithTag("history-review-0").performScrollTo().performClick()
@@ -82,12 +82,12 @@ class BetaNotificationsActivityTest {
     @Test fun emptyNotificationCenterUsesApprovedEmptyStateAndHeaderBack() {
         seed(false)
         try {ActivityScenario.launch(BetaActivity::class.java).use {
-            await("dash-refresh")
+            await("dashboard-ready")
             compose.onNodeWithTag("beta-notifications").performClick()
             val empty=context.getString(R.string.beta_approved_notification_center_empty)
             compose.waitUntil(15000) {compose.onAllNodesWithText(empty).fetchSemanticsNodes().isNotEmpty()}
             compose.onNodeWithTag("beta-page-back").performClick()
-            await("dash-refresh")
+            await("dashboard-ready")
         }} finally {drain();BetaContainer.resetOffline(context)}
     }
 }

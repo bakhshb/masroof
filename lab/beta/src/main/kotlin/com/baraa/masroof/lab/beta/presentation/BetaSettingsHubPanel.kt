@@ -55,45 +55,12 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
         }
         if(category=="HUB") MasroofCard {
             Text(stringResource(R.string.beta_complete_app_section),style=MaterialTheme.typography.titleMedium)
-            BetaManagementRow(stringResource(R.string.beta_complete_preferences),"",MasroofOutlineIcons.Settings,!busy,{onCategory("APP")},modifier=Modifier.testTag("manage-APP"))
+            BetaManagementRow(stringResource(R.string.beta_approved_reference_preferences_title),"",MasroofOutlineIcons.Settings,!busy,{onCategory("APP")},modifier=Modifier.testTag("manage-APP"))
             BetaManagementRow(stringResource(R.string.beta_parity_data_settings),"",MasroofOutlineIcons.DatabaseBackup,!busy,onData,modifier=Modifier.testTag("manage-DATA"))
             BetaManagementRow(stringResource(R.string.beta_complete_about),"",MasroofOutlineIcons.CircleAlert,!busy,{onCategory("ABOUT")},modifier=Modifier.testTag("manage-ABOUT"),divider=false)
         } else if(category=="APP") {
-            MasroofCard {
-                Text(stringResource(R.string.beta_parity_theme),style=MaterialTheme.typography.titleMedium)
-                androidx.compose.foundation.layout.FlowRow(horizontalArrangement=Arrangement.spacedBy(MasroofReference.shortcutGap),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
-                    listOf(Triple("LIGHT",R.string.beta_parity_light,MasroofOutlineIcons.Sun),Triple("DARK",R.string.beta_parity_dark,MasroofOutlineIcons.Moon),Triple("SYSTEM",R.string.beta_parity_system,MasroofOutlineIcons.Monitor)).forEach {(value,label,icon) ->
-                        BetaChoice(theme==value,{onTheme(value)},Modifier.testTag("settings-theme-$value"),!busy) {
-                            Row(horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap),verticalAlignment=Alignment.CenterVertically) {
-                                Icon(icon,null,Modifier.size(MasroofIconSizes.sm));Text(stringResource(label))
-                            }
-                        }
-                    }
-                }
-            }
-            MasroofCard {
-                Text(stringResource(R.string.beta_parity_language),style=MaterialTheme.typography.titleMedium)
-                val resolved=if(language=="SYSTEM") androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language else language
-                listOf("ar" to "العربية","en" to "English").forEach {(tag,label) ->
-                    Row(Modifier.fillMaxWidth().clickable(enabled=!busy) {onLanguage(tag)}.padding(vertical=MasroofReference.rowVertical).testTag("settings-language-$tag"),
-                        horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-                        Text(label,style=MasroofReference.pair)
-                        Surface(color=if(resolved==tag) MasroofThemeExtras.extendedColors.inflowSoft else MaterialTheme.colorScheme.surface,shape=MasroofShapes.small) {
-                            Text(stringResource(if(resolved==tag) R.string.beta_complete_current_language else R.string.beta_complete_available_language),Modifier.padding(MasroofSpacing.sectionHeaderGap),style=MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    HorizontalDivider(color=MasroofThemeExtras.extendedColors.cardBorder)
-                }
-            }
-            MasroofCard {
-                Text(stringResource(R.string.beta_complete_color_meanings),style=MaterialTheme.typography.titleMedium)
-                val colors=MasroofThemeExtras.extendedColors
-                listOf(Triple(R.string.beta_fix_inflow,MasroofOutlineIcons.ArrowDownLeft,colors.inflow),Triple(R.string.beta_home_expenses,MasroofOutlineIcons.ArrowUpRight,colors.outflow),Triple(R.string.beta_asset_credit,MasroofOutlineIcons.CreditCard,colors.card),Triple(R.string.beta_dash_commitments,MasroofOutlineIcons.CalendarCheck,colors.liability)).forEach {(label,icon,color) ->
-                    Row(Modifier.padding(top=MasroofSpacing.sectionGap),horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap),verticalAlignment=Alignment.CenterVertically) {
-                        Icon(icon,null,Modifier.size(MasroofIconSizes.md),tint=color);Text(stringResource(label),style=MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
+            val resolved=if(language=="SYSTEM") androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language else language
+            com.baraa.masroof.lab.beta.presentation.approved.ApprovedPreferencesContent(resolved,theme,!busy,onLanguage,onTheme)
         } else if(category=="ABOUT") {
             MasroofCard {Text(stringResource(R.string.beta_home_brand),style=MaterialTheme.typography.titleLarge);Text(stringResource(R.string.beta_complete_about_body))}
             BetaManagementRow(stringResource(R.string.beta_complete_import_messages),"",MasroofOutlineIcons.MessageSquare,!busy,onHistory,modifier=Modifier.testTag("settings-import-sms"))

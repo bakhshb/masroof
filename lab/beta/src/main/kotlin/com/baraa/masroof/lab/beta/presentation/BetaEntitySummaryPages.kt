@@ -1,6 +1,8 @@
 package com.baraa.masroof.lab.beta.presentation
 
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
+import com.baraa.masroof.lab.beta.presentation.approved.*
+import com.baraa.masroof.lab.beta.application.approvedRegistryDisplayLabel
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,14 +24,6 @@ import com.baraa.masroof.ui.components.*
 import com.baraa.masroof.ui.dashboard.*
 import com.baraa.masroof.ui.theme.*
 
-/** Stable-ID bindings around the copied production renderer. */
-@Composable
-internal fun BetaEntitySummaryCard(title: String,subtitle: String,bank: String,icon: ImageVector,accent: Color,
-    id: AssetId,enabled: Boolean,onClick: (AssetId)->Unit,content: @Composable ColumnScope.()->Unit) {
-    com.baraa.masroof.lab.beta.presentation.approved.ApprovedEntitySummaryCard(
-        title, subtitle, icon, accent, onClick = if(enabled) ({onClick(id)}) else null,
-        modifier=Modifier.testTag("dash-asset-${id.bank.value}-${id.localId}"), bankLabel=bank, content=content)
-}
 @Composable
 internal fun BetaFinancialDetailRow(label: String,value: String,color: Color=MaterialTheme.colorScheme.onSurface) {
     Row(Modifier.fillMaxWidth().padding(vertical=MasroofSpacing.sectionHeaderGap),horizontalArrangement=Arrangement.spacedBy(MasroofSpacing.cardInnerGap),verticalAlignment=Alignment.CenterVertically) {
@@ -37,15 +31,8 @@ internal fun BetaFinancialDetailRow(label: String,value: String,color: Color=Mat
         Text(value,style=MaterialTheme.typography.bodyMedium.copy(fontWeight=MasroofFontWeights.semiBold),color=color)
     }
 }
-@Composable
-private fun BetaSummaryHeader(title: String,enabled: Boolean,onManage: ()->Unit) {
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-        Text(title,style=MaterialTheme.typography.titleLarge)
-        MasroofTextButton(enabled=enabled,onClick=onManage) {Text(stringResource(R.string.beta_complete_manage))}
-    }
-}
-@Composable internal fun betaSummaryMoney(value: SignedAmount?)=value?.let {betaMoney(it.amount.toPlainString(),it.currency.name)} ?: stringResource(R.string.beta_dash_unavailable)
-@Composable internal fun betaSummaryMoney(value: Money?)=value?.let {betaMoney(it.amount.toPlainString(),it.currency.name)} ?: stringResource(R.string.beta_dash_unavailable)
+@Composable internal fun betaSummaryMoney(value: SignedAmount?)=value?.let {betaMoney(it.amount.toPlainString(),it.currency.name)} ?: stringResource(R.string.beta_approved_dashboard_value_unavailable)
+@Composable internal fun betaSummaryMoney(value: Money?)=value?.let {betaMoney(it.amount.toPlainString(),it.currency.name)} ?: stringResource(R.string.beta_approved_dashboard_value_unavailable)
 @Composable private fun entityBank(id: AssetId)=stringResource(if(id.bank.value=="BANK_ALJAZIRA") R.string.beta_bank_aljazira else R.string.beta_bank_title)
 @Composable private fun BetaSummaryMetric(label: Int,value: String,color: Color,modifier: Modifier) {
     DashboardMetric(value,color,modifier) {Text(stringResource(label),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
@@ -53,77 +40,90 @@ private fun BetaSummaryHeader(title: String,enabled: Boolean,onManage: ()->Unit)
 @Composable
 internal fun BetaAccountsSummary(snapshot: DashboardSnapshot,limit: Int,enabled: Boolean,onManage: ()->Unit,onSelect: (AssetId)->Unit) {
     val colors=MasroofThemeExtras.extendedColors
-    MasroofHeroCard(stringResource(R.string.beta_fix_account_remaining),betaSummaryMoney(snapshot.totals?.accountRemaining),role=MasroofHeroRole.Account,icon=MasroofOutlineIcons.Landmark)
+    ApprovedHeroCard(stringResource(R.string.beta_approved_dashboard_accounts_remaining_total_title),betaSummaryMoney(snapshot.totals?.accountRemaining),role=MasroofHeroRole.Account,
+        guidance=listOfNotNull(if(snapshot.totals?.accountInflow!=null && snapshot.totals?.accountOutflow!=null)
+            stringResource(R.string.beta_approved_dashboard_remaining_formula,betaSummaryMoney(snapshot.totals?.accountInflow),betaSummaryMoney(snapshot.totals?.accountOutflow)) else null,
+            stringResource(R.string.beta_approved_dashboard_accounts_fleet_total_hint)).joinToString("\n\n"))
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(MasroofReference.metricGap)) {
         BetaSummaryMetric(R.string.beta_fix_inflow,betaSummaryMoney(snapshot.totals?.accountInflow),colors.inflow,Modifier.weight(1f))
         BetaSummaryMetric(R.string.beta_fix_outflow,betaSummaryMoney(snapshot.totals?.accountOutflow),colors.outflow,Modifier.weight(1f))
     }
     BetaSectionTrend(snapshot,null,MasroofHeroRole.Account,enabled,TrendScope.ACCOUNTS)
-    BetaSummaryHeader(stringResource(R.string.beta_complete_accounts_count,snapshot.accounts.size),enabled,onManage)
-    if(snapshot.accounts.isEmpty()) Text(stringResource(R.string.beta_dash_empty),Modifier.testTag("dash-empty"))
-    snapshot.accounts.take(limit).forEachIndexed {index,a ->
-        BetaEntitySummaryCard(a.label ?: stringResource(R.string.beta_dash_account_number,index+1),"•• "+a.last4.orEmpty(),entityBank(a.id),MasroofOutlineIcons.Landmark,colors.account,a.id,enabled,onSelect) {
-            BetaFinancialDetailRow(stringResource(R.string.beta_fix_account_remaining),betaSummaryMoney(a.flow?.cashPosition),colors.account)
-            BetaFinancialDetailRow(stringResource(R.string.beta_fix_inflow),betaSummaryMoney(a.flow?.totalIn),colors.inflow)
-            BetaFinancialDetailRow(stringResource(R.string.beta_fix_outflow),betaSummaryMoney(a.flow?.totalOut),colors.outflow)
-        }
+    ApprovedSectionTitle(stringResource(R.string.beta_approved_reference_followed_accounts))
+    if(snapshot.accounts.isEmpty()) Text(stringResource(R.string.beta_approved_dashboard_accounts_summary_empty),Modifier.testTag("dash-empty"))
+    snapshot.accounts.take(limit).forEach {a ->
+        ApprovedAccountSummaryTile(ApprovedAccountTileUi(betaAccountDisplayLabel(a),entityBank(a.id),
+            betaSummaryMoney(a.flow?.cashPosition),betaSummaryMoney(a.flow?.totalIn),betaSummaryMoney(a.flow?.totalOut)),
+            Modifier.testTag("dash-asset-${a.id.bank.value}-${a.id.localId}"),({onSelect(a.id)}),enabled=enabled)
     }
 }
 @Composable
 internal fun BetaCardsSummary(snapshot: DashboardSnapshot,limit: Int,enabled: Boolean,credit: Boolean,onCredit: (Boolean)->Unit,onManage: ()->Unit,onSelect: (AssetId)->Unit) {
     val colors=MasroofThemeExtras.extendedColors
+    if(snapshot.creditFacilities.isEmpty() && snapshot.standaloneCreditCards.isEmpty() && snapshot.debitCards.isEmpty()) {
+        Text(stringResource(R.string.beta_approved_dashboard_cards_summary_empty),Modifier.testTag("dash-empty"));return
+    }
     Row(horizontalArrangement=Arrangement.spacedBy(MasroofReference.shortcutGap)) {
-        BetaChoice(credit,{onCredit(true)},Modifier.testTag("cards-tab-credit"),enabled) {Text(stringResource(R.string.beta_asset_credit))}
-        BetaChoice(!credit,{onCredit(false)},Modifier.testTag("cards-tab-mada"),enabled) {Text(stringResource(R.string.beta_asset_debit))}
+        ApprovedChoice(stringResource(R.string.beta_approved_reference_credit_tab),credit,{onCredit(true)},Modifier.testTag("cards-tab-credit"),enabled)
+        ApprovedChoice(stringResource(R.string.beta_approved_reference_mada_tab),!credit,{onCredit(false)},Modifier.testTag("cards-tab-mada"),enabled)
     }
     if(credit) {
-        MasroofHeroCard(stringResource(R.string.beta_dash_due),betaSummaryMoney(snapshot.totals?.facilityDue),role=MasroofHeroRole.Card,icon=MasroofOutlineIcons.CreditCard)
+        ApprovedHeroCard(stringResource(R.string.beta_approved_dashboard_credit_card_aggregate_due),betaSummaryMoney(snapshot.totals?.facilityDue),
+            subtitle=snapshot.creditFacilities.singleOrNull()?.takeIf {snapshot.standaloneCreditCards.isEmpty()}?.dueDate?.let {
+                stringResource(R.string.beta_approved_reference_due_date_caption,java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy",androidx.compose.ui.platform.LocalConfiguration.current.locales[0]).format(it))},
+            role=MasroofHeroRole.Card,modifier=Modifier.testTag("cards-facility-due-total"))
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(MasroofReference.metricGap)) {
-            BetaSummaryMetric(R.string.beta_dash_salary_spending,betaSummaryMoney(snapshot.totals?.creditSalarySpending),colors.card,Modifier.weight(1f))
-            BetaSummaryMetric(R.string.beta_dash_statement_spending,betaSummaryMoney(snapshot.totals?.creditStatementSpending),MaterialTheme.colorScheme.onSurface,Modifier.weight(1f))
+            BetaSummaryMetric(R.string.beta_approved_reference_salary_spending,betaSummaryMoney(snapshot.totals?.creditSalarySpending),colors.card,Modifier.weight(1f))
+            BetaSummaryMetric(R.string.beta_approved_reference_statement_spending,betaSummaryMoney(snapshot.totals?.creditStatementSpending),MaterialTheme.colorScheme.onSurface,Modifier.weight(1f))
         }
         BetaSectionTrend(snapshot,null,MasroofHeroRole.Card,enabled,TrendScope.CREDIT_CARDS)
     } else {
-        MasroofHeroCard(stringResource(R.string.beta_home_expenses),betaSummaryMoney(snapshot.totals?.debitSalarySpending),role=MasroofHeroRole.Account,icon=MasroofOutlineIcons.CreditCard)
+        ApprovedHeroCard(stringResource(R.string.beta_home_expenses),betaSummaryMoney(snapshot.totals?.debitSalarySpending),role=MasroofHeroRole.Account)
         val trend=BetaDashboardExplorer.trend(snapshot,BetaChartChoice(TrendScope.DEBIT_CARDS))
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(MasroofReference.metricGap)) {
+        if(trend!=null) Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(MasroofReference.metricGap)) {
             BetaSummaryMetric(R.string.beta_detail_before_refunds,betaSummaryMoney(trend?.totalBeforeRefunds),colors.outflow,Modifier.weight(1f))
             BetaSummaryMetric(R.string.beta_dash_refunds,betaSummaryMoney(trend?.totalRefunds),colors.inflow,Modifier.weight(1f))
         }
     }
     val cards=snapshot.creditFacilities.flatMap {it.cards}+snapshot.standaloneCreditCards
-    BetaSummaryHeader(stringResource(R.string.beta_complete_cards_count,if(credit) cards.size else snapshot.debitCards.size),enabled,onManage)
+    ApprovedSectionTitle(stringResource(R.string.beta_approved_reference_followed_cards))
     if(if(credit) cards.isEmpty() else snapshot.debitCards.isEmpty()) Text(stringResource(R.string.beta_dash_empty),Modifier.testTag("dash-empty"))
     if(credit) cards.take(limit).forEach {c ->
         val facility=snapshot.creditFacilities.singleOrNull {f -> f.cards.any {it.cardId==c.cardId}}
-        BetaEntitySummaryCard(c.label ?: stringResource(R.string.beta_asset_credit),"•• "+c.last4.orEmpty(),entityBank(c.cardId),MasroofOutlineIcons.CreditCard,colors.card,c.cardId,enabled,onSelect) {
-            BetaFinancialDetailRow(stringResource(R.string.beta_dash_available),betaSummaryMoney(c.availableBalance))
-            BetaFinancialDetailRow(stringResource(R.string.beta_dash_salary_spending),betaSummaryMoney(c.salarySpending?.net),colors.card)
-            if(c.role!=CreditCardRole.SUPPLEMENTARY) BetaFinancialDetailRow(stringResource(R.string.beta_dash_due),betaSummaryMoney(facility?.statementDue),colors.liability)
-        }
+        val subtitle=stringResource(when(c.role) {
+            CreditCardRole.PRIMARY -> R.string.beta_approved_dashboard_credit_facility_primary
+            CreditCardRole.SUPPLEMENTARY -> R.string.beta_approved_dashboard_credit_facility_additional
+            else -> R.string.beta_approved_dashboard_credit_card_credit_badge
+        })
+        ApprovedCreditSummaryTile(ApprovedCreditTileUi(betaCreditDisplayLabel(c),entityBank(c.cardId),subtitle,
+            betaSummaryMoney(c.salarySpending?.net),betaSummaryMoney(c.statementSpending?.net),betaSummaryMoney(c.availableBalance),
+            betaSummaryMoney(facility?.statementDue),facility?.dueDate?.let {betaSummaryDay(it)} ?: stringResource(R.string.beta_approved_dashboard_value_unavailable),c.role==CreditCardRole.SUPPLEMENTARY),
+            Modifier.testTag("dash-asset-${c.cardId.bank.value}-${c.cardId.localId}"),({onSelect(c.cardId)}),
+            betaCardAverage(snapshot,c.cardId),enabled=enabled)
     } else snapshot.debitCards.take(limit).forEach {c ->
-        BetaEntitySummaryCard(c.label ?: stringResource(R.string.beta_asset_debit),"•• "+c.last4.orEmpty(),entityBank(c.cardId),MasroofOutlineIcons.CreditCard,colors.card,c.cardId,enabled,onSelect) {
-            BetaFinancialDetailRow(stringResource(R.string.beta_dash_salary_spending),betaSummaryMoney(c.spending),colors.outflow)
-        }
+        val linked=c.accountId?.let {id -> snapshot.accounts.singleOrNull {it.id==id}}?.let {betaAccountDisplayLabel(it)} ?: stringResource(R.string.beta_approved_dashboard_value_unavailable)
+        val trend=BetaDashboardExplorer.trend(snapshot,BetaChartChoice(TrendScope.ASSET,asset=c.cardId))
+        ApprovedDebitSummaryTile(ApprovedDebitTileUi(approvedRegistryDisplayLabel(c.label,stringResource(R.string.beta_asset_debit),c.last4.orEmpty()),
+            entityBank(c.cardId),linked,betaSummaryMoney(trend?.totalBeforeRefunds),betaSummaryMoney(trend?.totalRefunds)),
+            Modifier.testTag("dash-asset-${c.cardId.bank.value}-${c.cardId.localId}"),({onSelect(c.cardId)}),
+            betaCardAverage(snapshot,c.cardId),enabled=enabled)
     }
 }
 @Composable
 internal fun BetaLoansSummary(snapshot: DashboardSnapshot,limit: Int,enabled: Boolean,onManage: ()->Unit,onSelect: (AssetId)->Unit) {
     val colors=MasroofThemeExtras.extendedColors
-    MasroofHeroCard(stringResource(R.string.beta_complete_loans_remaining),betaSummaryMoney(snapshot.totals?.loanRemaining),role=MasroofHeroRole.Liability,icon=MasroofOutlineIcons.HandCoins)
-    if(snapshot.loans.isEmpty()) Text(stringResource(R.string.beta_dash_empty),Modifier.testTag("dash-empty"))
+    if(snapshot.loans.isEmpty()) {Text(stringResource(R.string.beta_approved_dashboard_loans_summary_empty),Modifier.testTag("dash-empty"));return}
+    ApprovedHeroCard(stringResource(R.string.beta_approved_dashboard_loans_remaining_total_title),betaSummaryMoney(snapshot.totals?.loanRemaining),role=MasroofHeroRole.Liability)
     snapshot.loans.take(limit).forEach {loan ->
-        BetaEntitySummaryCard(loan.label.takeIf(String::isNotBlank) ?: loanLabel(loan.type),"",entityBank(loan.id),MasroofOutlineIcons.HandCoins,colors.liability,loan.id,enabled,onSelect) {
-            BetaFinancialDetailRow(stringResource(R.string.beta_dash_loan_remaining),betaSummaryMoney(loan.remaining))
-            BetaFinancialDetailRow(stringResource(R.string.beta_complete_last_installment),betaSummaryMoney(loan.latestInstallment),colors.liability)
-            BetaFinancialDetailRow(stringResource(R.string.beta_complete_installment_date),loan.installmentAsOf?.let {betaSummaryDate(it,snapshot.query.zone)} ?: stringResource(R.string.beta_dash_unavailable))
-            BetaFinancialDetailRow(stringResource(R.string.beta_detail_balance_date),loan.remainingAsOf?.let {betaSummaryDate(it,snapshot.query.zone)} ?: stringResource(R.string.beta_dash_unavailable))
-        }
+        ApprovedLoanSummaryTile(ApprovedLoanDetailUi(loan.label.takeIf(String::isNotBlank) ?: loanLabel(loan.type),entityBank(loan.id),
+            betaSummaryMoney(loan.remaining),"",betaSummaryMoney(loan.latestInstallment),
+            loan.installmentAsOf?.let {betaSummaryDate(it,snapshot.query.zone)} ?: stringResource(R.string.beta_approved_dashboard_value_unavailable),
+            loan.remainingAsOf?.let {betaSummaryDate(it,snapshot.query.zone)} ?: stringResource(R.string.beta_approved_dashboard_value_unavailable)),
+            Modifier.testTag("dash-asset-${loan.id.bank.value}-${loan.id.localId}"),({onSelect(loan.id)}),enabled=enabled)
     }
-    MasroofTextButton(enabled=enabled,onClick=onManage,modifier=Modifier.fillMaxWidth()) {Text(stringResource(R.string.beta_complete_manage))}
 }
 @Composable
-internal fun loanLabel(type: String)=stringResource(when(type) {"PERSONAL"->R.string.beta_detail_loan_personal;"AUTO"->R.string.beta_detail_loan_auto;"MORTGAGE"->R.string.beta_detail_loan_mortgage;else->R.string.beta_asset_loan})
+internal fun loanLabel(type: String)=stringResource(when(type) {"PERSONAL"->R.string.beta_approved_settings_loan_type_personal;"AUTO"->R.string.beta_approved_settings_loan_type_auto;"MORTGAGE"->R.string.beta_approved_settings_loan_type_mortgage;else->R.string.beta_asset_loan})
 
 @Composable
 internal fun BetaCommitmentsSummary(snapshot: DashboardSnapshot, summary: CommitmentsSummary, limit: Int, enabled: Boolean, onSelect: (AssetId)->Unit) {
@@ -160,3 +160,19 @@ internal fun BetaCommitmentsSummary(snapshot: DashboardSnapshot, summary: Commit
 @Composable
 private fun betaSummaryDate(value: java.time.Instant,zone: java.time.ZoneId): String =
     java.time.format.DateTimeFormatter.ofPattern("d MMM",androidx.compose.ui.platform.LocalConfiguration.current.locales[0]).format(value.atZone(zone))
+
+@Composable internal fun betaAccountDisplayLabel(account: AccountSummary): String = approvedRegistryDisplayLabel(account.label,
+    stringResource(when(account.category) {AccountCategory.CURRENT->R.string.beta_parity_current;AccountCategory.SAVINGS->R.string.beta_parity_savings;
+        AccountCategory.WALLET->R.string.beta_approved_settings_account_type_wallet;AccountCategory.OTHER->R.string.beta_asset_account}),account.last4.orEmpty())
+@Composable internal fun betaCreditDisplayLabel(card: CreditCardSummary): String=approvedRegistryDisplayLabel(card.label,
+    stringResource(when(card.role) {CreditCardRole.PRIMARY->R.string.beta_approved_dashboard_credit_facility_primary;
+        CreditCardRole.SUPPLEMENTARY->R.string.beta_approved_dashboard_credit_facility_additional;else->R.string.beta_approved_dashboard_credit_card_credit_badge}),card.last4.orEmpty())
+@Composable private fun betaSummaryDay(value: java.time.LocalDate): String=
+    java.time.format.DateTimeFormatter.ofPattern("d MMM",androidx.compose.ui.platform.LocalConfiguration.current.locales[0]).format(value)
+@Composable internal fun betaCardAverage(snapshot: DashboardSnapshot,id: AssetId): ApprovedAverageUi? {
+    val trend=BetaDashboardExplorer.trend(snapshot,BetaChartChoice(TrendScope.ASSET,asset=id)) ?: return null
+    if(trend.points.isEmpty() || trend.averageDailySpending==null) return null
+    return ApprovedAverageUi(betaSummaryMoney(trend.averageDailySpending),
+        stringResource(R.string.beta_approved_reference_period_average,betaSummaryDay(trend.points.last().date),trend.points.size),
+        stringResource(R.string.beta_approved_approved_average_basis,trend.points.size)+"\n"+stringResource(R.string.beta_approved_chart_full_card_average_hint))
+}

@@ -14,6 +14,7 @@ data class BetaDashboardViewPreferences(val choice: BetaChartChoice = BetaChartC
 /** Nonfinancial preferences in the same isolated, backed-up Beta preference file. */
 class BetaDashboardViewPreferencesWorkflow(context: Context) {
     private val context = context.applicationContext
+    internal val chartData by lazy {BetaChartDataWorkflow(com.baraa.masroof.lab.beta.data.SharedBetaChartDataPreferencesRepository(this.context))}
     private fun preferences() = context.getSharedPreferences(BetaEnvironment.PREFS_NAME.also(BetaEnvironment::requireBetaPreferenceName), Context.MODE_PRIVATE)
     suspend fun read(): BetaDashboardViewPreferences = withContext(BetaIo.dispatcher) {
         runCatching {

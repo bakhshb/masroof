@@ -85,8 +85,8 @@
       ],
       "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
-      "lab_visual_reference": null,
-      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "lab_visual_reference": "UI_PAIRED_COMPARISON_AR.html",
+      "same_data_comparison": "Frozen native fixture pairs; summary/detail rendering only; full management journey not accepted.",
       "old_renderer_removed": false,
       "accepted": false
     },
@@ -100,8 +100,8 @@
       ],
       "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
-      "lab_visual_reference": null,
-      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "lab_visual_reference": "UI_PAIRED_COMPARISON_AR.html",
+      "same_data_comparison": "Frozen native fixture pairs; summary/detail rendering only; full management journey not accepted.",
       "old_renderer_removed": false,
       "accepted": false
     },
@@ -237,7 +237,13 @@
     "Generic asset detail title replaced with the approved account/card/loan titles.",
     "Legacy outer registry card and duplicate bottom Back button; registry entries use the canonical copied card shell.",
     "The old dashboard-customization toolbar button; customization remains beside the Home period, and the production notification button occupies the global header.",
-    "Duplicate BetaManagementRow geometry; it is a thin adapter to the copied production MasroofReferenceNavigationRow."
+    "Duplicate BetaManagementRow geometry; it is a thin adapter to the copied production MasroofReferenceNavigationRow.",
+    "BetaReviewPanel",
+    "BetaReviewEditor",
+    "Old DashPeriod/DashLink/DashFlow/DashLoan helpers",
+    "Generic BetaEntitySummaryCard wrapper",
+    "Old preferences/theme/language/legend renderer in BetaSettingsHubPanel",
+    "Old BetaSectionTrend chart renderer (now a binding to ApprovedSpendingTrend)"
   ],
   "removed_resource_keys": [
     "beta_parity_import_date",
@@ -263,30 +269,54 @@
     "beta_detail_inflow_group",
     "beta_detail_outflow_group",
     "beta_detail_internal_group",
-    "beta_detail_internal_help"
+    "beta_detail_internal_help",
+    "beta_review_amount",
+    "beta_review_blockers",
+    "beta_review_confirm",
+    "beta_review_help",
+    "beta_review_item",
+    "beta_review_note",
+    "beta_review_pair",
+    "beta_review_suppress",
+    "beta_review_suppressed",
+    "beta_review_time",
+    "beta_review_time_help",
+    "beta_review_unavailable"
   ],
   "verified_tests": {
-    "lab_jvm": 305,
+    "lab_jvm": 310,
     "bank_engine": 58,
-    "finance_core": 179,
+    "finance_core": 180,
     "android16_full": {
       "total": 189,
       "passed": 189,
-      "duration": "5m16s",
-      "scope": "Latest notification/header/read-state/source-port, assets, onboarding, review, dashboard and correction suite."
+      "duration": "6m29s",
+      "scope": "Summary/detail source tiles, same-fixture capture harness, dashboard scroll/pull, notifications, actual review/approval, approved appearance/language persistence and category draft/save/reset/recreation. Four obsolete tests of an unreachable review renderer were removed."
     },
-    "ci": "2278dee523d9d5a81aa90e784bf4a3c28856af41 is green; later UI port is not yet pushed.",
+    "ci": "Both CI and Lab passed at 4db0507b. Current source/notification/chart follow-up has not yet been pushed.",
     "android16_followup": {
       "passed": 20,
       "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
     },
     "process_death": {
       "passed": 39,
-      "scope": "Repeated successfully after the notification/header/editor-state changes; permissions/import/ledger/correction/restore."
+      "scope": "Repeated after summary/chart/preferences source ports: permission, historical import, ledger, corrections, learning and restore."
     },
     "notification_followup": {
       "passed": 7,
       "scope": "Actual notification/read-state/review/back navigation, settings rename and shared navigation."
+    },
+    "paired_native_captures": {
+      "pairs": 40,
+      "body_pixel_identical": 40,
+      "pages": [
+        "cards",
+        "cardDetail",
+        "loans",
+        "loanDetail",
+        "preferences"
+      ],
+      "region": "1080×1755 captures; compare y=195 onward only. Top/bottom views only; long-page middle coverage and full journeys are separate gates."
     }
   },
   "implementation_notes": [
@@ -296,6 +326,10 @@
     "تسمية البطاقة عبر الضغط على عنوانها تستخدم نافذة مستقلة من الفعلي؛ وتحافظ على الهوية وآخر أربعة أرقام ومراجعة إصدار البيانات. تبويبات إيقاف المتابعة واستئنافها لم تُنقل بالكامل بعد.",
     "مرجع البطاقة الذي سبق اعتماد ملكيته لا يكرر سؤال الملكية؛ وإذا كان نوعه مجهولًا فلا يفترض أنه مدى، بل يتطلب اختيار النوع. الإضافة اليدوية الجديدة ما زالت تتطلب اعتماد الملكية.",
     "حُذف كرت المجموعة القديم المحيط بصف البطاقة، وزر الرجوع السفلي المكرر. الصورة المرفقة تجربة حقيقية من المحاكي وليست بعدُ مقارنة على نفس بيانات الفعلي.",
-    "نُقل جرس التنبيهات وصفحة التنبيهات وخدمة المقروء/غير المقروء من الفعلي. تحفظ الحالة كسلسلة في تفضيلات المختبر كي تبقى متوافقة مع النسخ الاحتياطي. الربط النهائي لتبويبات إدارة الأصول والمقارنة المصورة ما زالا قيد العمل."
+    "نُقل جرس التنبيهات وصفحة التنبيهات وخدمة المقروء/غير المقروء من الفعلي. تحفظ الحالة كسلسلة في تفضيلات المختبر كي تبقى متوافقة مع النسخ الاحتياطي. الربط النهائي لتبويبات إدارة الأصول والمقارنة المصورة ما زالا قيد العمل.",
+    "Frozen production card/loan facts now pass through actual lab dashboard routes and navigation; 40 capture pairs (five pages × languages/themes/top/bottom) are available in UI_PAIRED_COMPARISON_AR.html. These do not prove SMS extraction or whole-app parity.",
+    "Source summary/detail tiles, average bands, terminology, period ranges, dashboard-owned scrolling and long-hold pull refresh replace the previous generic renderers. Account self-transfers now display incoming/outgoing signs from full bank-qualified endpoints.",
+    "Deleted unused BetaReviewPanel / BetaReviewEditor, four tests that only exercised that unreachable renderer, and twelve exclusive resource keys. Current review/approval journey tests cover actual activity paths; endpoint display helper remains with the active approval editor.",
+    "نُقلت صفحة المظهر واللغة من الفعلي، وحُذف تخطيطها السابق. نُقل تخصيص فئات رسم الحسابات والبطاقات إلى نافذة الفعلي، مع حفظ مستقل لكل هوية كاملة. بُنيت مساهمات مختصرة للسجل الطويل، وتبقى الحقائق غير المثبتة غير متوفرة. ربط الرئيسية وصفحات التحليل اليومية ما زال قيد العمل."
   ]
 }

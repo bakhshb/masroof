@@ -35,7 +35,7 @@ class BetaDashboardExplorationActivityTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val context get() = ApplicationProvider.getApplicationContext<Context>()
     private val key = PostingKey(Environment.BETA, "synthetic-full-activity")
-    private fun waitLoaded() { compose.waitUntil(20000) { compose.onAllNodesWithTag("dash-refresh").fetchSemanticsNodes().isNotEmpty() } }
+    private fun waitLoaded() { compose.waitUntil(20000) { compose.onAllNodesWithTag("dashboard-ready").fetchSemanticsNodes().isNotEmpty() } }
     private fun route(name: String, scenario: ActivityScenario<BetaActivity>) {
         repeat(3) {
             if(compose.onAllNodesWithTag("beta-home-hero").fetchSemanticsNodes().isEmpty()) {
@@ -55,7 +55,7 @@ class BetaDashboardExplorationActivityTest {
         }
         compose.waitUntil(15000) {compose.onAllNodesWithTag("dash-route-$name").fetchSemanticsNodes().isNotEmpty()}
         compose.waitUntil(15000) {
-            compose.onAllNodesWithTag("dash-refresh").fetchSemanticsNodes().isNotEmpty() &&
+            compose.onAllNodesWithTag("dashboard-ready").fetchSemanticsNodes().isNotEmpty() &&
                 compose.onAllNodesWithTag("dash-loading").fetchSemanticsNodes().isEmpty()
         }
         compose.waitForIdle()

@@ -52,7 +52,7 @@ class BetaConfirmedJourneyScreenTest {
         }
         try {
             ActivityScenario.launch(BetaActivity::class.java).use {scenario ->
-                await("dash-refresh");await("beta-home-hero")
+                await("dashboard-ready");await("beta-home-hero")
                 compose.onNodeWithTag("dash-summary-spending").performScrollTo().assertIsDisplayed();screenshot("home")
                 compose.onNodeWithTag("home-shortcuts").performScrollTo()
                 compose.onNodeWithTag("dashboard-shortcut-0").performClick()

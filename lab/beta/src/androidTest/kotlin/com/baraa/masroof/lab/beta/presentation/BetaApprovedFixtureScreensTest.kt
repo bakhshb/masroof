@@ -1,0 +1,144 @@
+package com.baraa.masroof.lab.beta.presentation
+
+import android.graphics.Bitmap
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.test.platform.app.InstrumentationRegistry
+import com.baraa.masroof.lab.beta.R
+import androidx.compose.ui.res.stringResource
+import com.baraa.masroof.lab.beta.application.UnavailableBetaDashboardControls
+import com.baraa.masroof.lab.beta.application.BetaDashboardWorkflow
+import com.baraa.masroof.lab.finance.asset.*
+import com.baraa.masroof.lab.finance.dashboard.*
+import com.baraa.masroof.lab.finance.dashboard.producer.DashboardProduction
+import com.baraa.masroof.lab.finance.posting.*
+import com.baraa.masroof.lab.finance.value.*
+import com.baraa.masroof.ui.theme.MasroofTheme
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import java.io.File
+import java.time.*
+import java.math.BigDecimal
+
+/**
+ * The frozen card/loan facts from production FidelityFixtures at 0d86c5d3.
+ * This compares rendering and navigation. It is not an extraction/ledger oracle.
+ */
+class BetaApprovedFixtureScreensTest {
+    @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
+    private val zone=ZoneId.of("Asia/Riyadh")
+    private val bank=BankId("BANK_ALJAZIRA")
+    private fun id(value: String)=AssetId(Environment.BETA,bank,value)
+    private fun money(value: String)=Money.of(value,Currency.SAR)
+    private fun signed(value: String)=SignedAmount(BigDecimal(value),Currency.SAR)
+    private val account=id("3001")
+    private val primary=id("7271")
+    private val child=id("8842")
+    private val loanId=id("personal")
+    private fun transaction(key: String,type: FinancialType,amount: String,day: String,title: String,card: AssetId?=null,loan: AssetId?=null)=TransactionFacts(
+        key=PostingKey(Environment.BETA,key),revision=PostingRevision(0,1),
+        time=TransactionTime(LocalDate.parse(day).atStartOfDay(zone).toInstant(),zone),storedType=type,effectiveType=type,
+        amount=money(amount),merchant=title,counterparty=null,primaryCardLast4=card?.localId,
+        accounts=if(loan!=null) setOf(account) else emptySet(),cards=setOfNotNull(card),debitSpendingCards=emptySet(),loans=setOfNotNull(loan),
+        categories=setOf(if(loan!=null) ChartCategory.LOAN_REPAYMENTS else ChartCategory.CREDIT_PURCHASES),
+        appliedFx=null,sarEquivalent=null,internationalFee=null,evidenceIds=emptySet(),source=if(loan!=null) account else card,destination=loan)
+    private fun snapshot(query: DashboardQuery): DashboardSnapshot {
+        val period=DisplayPeriod(query.from,query.until,zone,PeriodKind.SALARY,null)
+        val statement=period.copy(kind=PeriodKind.STATEMENT)
+        val primaryCard=CreditCardSummary(primary,CreditCardRole.PRIMARY,"البطاقة الأساسية •• 7271","7271",null,
+            PeriodSpending(period,signed("800")),PeriodSpending(statement,signed("800")),signed("5000"),Instant.parse("2026-10-02T07:00:00Z"))
+        val childCard=CreditCardSummary(child,CreditCardRole.SUPPLEMENTARY,"البطاقة الفرعية •• 8842","8842",null,
+            PeriodSpending(period,signed("600")),PeriodSpending(statement,signed("600")),null,null)
+        val facility=FacilitySummary(id("facility"),money("2200"),LocalDate.parse("2026-10-15"),Instant.parse("2026-10-02T07:00:00Z"),
+            signed("1400"),signed("1400"),listOf(primaryCard,childCard))
+        val loan=LoanSummary(loanId,"PERSONAL","القرض الشخصي",money("84200"),Instant.parse("2026-09-27T07:00:00Z"),
+            money("1800"),Instant.parse("2026-09-27T07:00:00Z"),signed("1800"),period)
+        val transactions=listOf(transaction("ref-10",FinancialType.EXPENSE,"800","2026-10-02","NOON",primary),
+            transaction("ref-11",FinancialType.EXPENSE,"600","2026-10-06","NOON",child),
+            transaction("ref-4",FinancialType.LOAN_REPAYMENT,"1800","2026-09-27","القرض الشخصي",loan=loanId))
+        fun trend(asset: AssetId?,average: String,total: String): SpendingTrend {
+            val points=(0L..13L).map {offset ->
+                val day=LocalDate.parse("2026-09-27").plusDays(offset)
+                val value=when {
+                    day==LocalDate.parse("2026-10-02") && asset!=child -> "800"
+                    day==LocalDate.parse("2026-10-06") && asset!=primary -> "600"
+                    else -> "0"
+                }
+                DailySpending(day,signed(value),signed(value),signed("0"),transactions.filter {
+                    it.cards.isNotEmpty() && it.time.instant.atZone(zone).toLocalDate()==day && (asset==null || asset in it.cards)
+                }.mapTo(linkedSetOf()) {it.key})
+            }
+            val base=SpendingTrend(asset,null,period,Currency.SAR,points,signed(average),if(asset==null) TrendScope.CREDIT_CARDS else TrendScope.ASSET,
+                signed(total),signed(total),signed("0"))
+            val allowed=setOf(ChartCategory.CREDIT_PURCHASES,ChartCategory.BILLS,ChartCategory.FEES,
+                ChartCategory.CASH_WITHDRAWALS,ChartCategory.UNATTRIBUTED_REFUNDS)
+            return base.copy(categoryTrends=allowed.associateWith {category ->
+                if(category==ChartCategory.CREDIT_PURCHASES) base.copy(category=category)
+                else base.copy(category=category,points=emptyList(),averageDailySpending=signed("0"),
+                    totalSpending=signed("0"),totalBeforeRefunds=signed("0"),totalRefunds=signed("0"))
+            })
+        }
+        return DashboardSnapshot(query,listOf(AccountSummary(account,null,"الجاري •• 3001",last4="3001")),emptyList(),listOf(facility),loans=listOf(loan),
+            analysis=AnalysisSummary(Currency.SAR,SummaryMetric.entries.associateWith {null},3,0,0,
+                listOf(trend(null,"100","1400"),trend(primary,"57.14","800"),trend(child,"42.86","600")),emptyList()),
+            transactions=transactions,totals=PortfolioTotals(Currency.SAR,null,null,null,null,money("2200"),signed("1400"),null,money("84200"),signed("1800"),signed("1400")))
+    }
+    @Test fun sameFrozenProductionFactsRenderInBothLanguagesAndThemes() {
+        val page=mutableStateOf("cards")
+        val language=mutableStateOf("ar")
+        val dark=mutableStateOf(false)
+        val workflow=BetaDashboardWorkflow({query,_ -> DashboardProduction(snapshot(query),emptySet(),null)},
+            Clock.fixed(Instant.parse("2026-10-10T12:00:00Z"),zone),zone)
+        compose.setContent {
+            BetaLocaleProvider(language.value) {MasroofTheme(darkTheme=dark.value) {
+                key(page.value,language.value,dark.value) {
+                    var title by remember {mutableStateOf<String?>(null)}
+                    val preferencePage=page.value=="preferences"
+                    BetaShell(0,false,showReturn=false,showMaintenanceActions=false,notificationCount=3,
+                        secondaryTitle=if(preferencePage) stringResource(R.string.beta_approved_reference_preferences_title) else title,
+                        onNavigateBack={},selectedHomeTab=if(preferencePage) "SETTINGS" else "NONE",onOpenHome={},dashboardOwnsScroll=true,
+                        editor=if(preferencePage) ({BetaSettingsHubPanel("APP",{},emptyList(),emptyList(),UnavailableBetaDashboardControls,false,
+                            {_,_->},{_,_->},{},{},{},theme=if(dark.value) "DARK" else "LIGHT",language=language.value)}) else null,
+                        dashboard=({BetaDashboardPanel(workflow,ownsScroll=true,showInternalHeader=false,
+                            requestedRoute=if(page.value in setOf("loans","loanDetail")) "LOANS" else "CARDS",onPageTitle={title=it})}),
+                        onReturn={},onReset={},onBackup={},onRestore={})
+                }
+            }}
+        }
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val directory=File(instrumentation.targetContext.getExternalFilesDir(null),"lab-approved-fixture").apply {mkdirs()}
+        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences")) {
+            compose.runOnIdle {language.value=lang;dark.value=night;page.value=destination}
+            compose.waitUntil(15000) {compose.onAllNodesWithTag(if(destination=="preferences") "beta-settings-panel" else "dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
+            if(destination in setOf("cardDetail","loanDetail")) {
+                val target=if(destination=="cardDetail") "8842" else "personal"
+                compose.onNodeWithTag("dash-asset-BANK_ALJAZIRA-$target").performScrollTo().performClick()
+                val detail=if(destination=="cardDetail") "beta-credit-detail" else "beta-loan-detail"
+                compose.waitUntil(15000) {compose.onAllNodesWithTag(detail).fetchSemanticsNodes().isNotEmpty()}
+            }
+            compose.waitForIdle();instrumentation.waitForIdleSync();Thread.sleep(250)
+            val texts=compose.onAllNodes(hasText("",substring=true),useUnmergedTree=true).fetchSemanticsNodes()
+                .flatMap {it.config.getOrElse(SemanticsProperties.Text) {emptyList()}}.map {it.text}
+            assertTrue(texts.size>4)
+            assertTrue(texts.none {Regex("[\\u0660-\\u0669\\u06F0-\\u06F9]").containsMatchIn(it)})
+            fun capture(suffix: String) {
+                val bitmap=compose.onRoot().captureToImage().asAndroidBitmap()
+                File(directory,"$destination-$lang-${if(night) "dark" else "light"}$suffix.png").outputStream().use {bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}
+                bitmap.recycle()
+            }
+            capture("")
+            val vertical=SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)
+            if(compose.onAllNodes(vertical).fetchSemanticsNodes().isNotEmpty()) {
+                compose.onAllNodes(vertical)[0].performSemanticsAction(SemanticsActions.ScrollBy) {it(0f,100000f)}
+                compose.waitForIdle();instrumentation.waitForIdleSync();Thread.sleep(250)
+            }
+            capture("-bottom")
+        }
+    }
+}

@@ -19,7 +19,7 @@
     <string name="beta_parity_card_supplementary">Supplementary</string>
     <string name="beta_parity_refresh">Refresh messages</string>
     <string name="beta_parity_card_missing">Complete card details in My cards. Confirmed spending is shown now; figures that require a card type or account relationship remain unavailable until configured.</string>
-    <string name="beta_parity_salary_period">Financial period</string>
+    <string name="beta_parity_salary_period">Salary period</string>
     <string name="beta_parity_display_name">Display name</string>
     <string name="beta_parity_mada">Mada</string>
     <string name="beta_parity_account_type">Account type</string>

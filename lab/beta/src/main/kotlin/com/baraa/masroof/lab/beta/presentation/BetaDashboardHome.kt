@@ -1,5 +1,6 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeLabel as financialTypeLabel
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 
 import androidx.compose.foundation.layout.*
@@ -30,7 +31,7 @@ internal fun BetaDashboardHome(read: DashboardProduction, enabled: Boolean,
     onTransaction: (String) -> Unit, onImport: () -> Unit, layoutOpen: Boolean = false,
     onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onLayoutClose: () -> Unit = {}, onConfiguration: () -> Unit = {}) {
     val snapshot = read.snapshot
-    val unavailable = stringResource(R.string.beta_dash_unavailable)
+    val unavailable = stringResource(R.string.beta_approved_dashboard_value_unavailable)
     val language = LocalConfiguration.current.locales[0].toLanguageTag()
     fun money(value: SignedAmount?) = value?.let { MasroofMoneyDisplay.format(it.amount, it.currency.name, language) } ?: unavailable
     val analysis = snapshot.analysis
@@ -250,7 +251,7 @@ private fun BetaHomeTrend(snapshot: DashboardSnapshot, enabled: Boolean,
                     modifier = Modifier.testTag("home-spending-chart"), selectedPointIndex = index,
                     labels = LineChartLabels(stringResource(R.string.beta_chart_day_axis), stringResource(R.string.beta_chart_previous_point),
                         stringResource(R.string.beta_chart_next_point), stringResource(R.string.beta_chart_average_announcement,
-                            visual.average?.let(::money) ?: stringResource(R.string.beta_dash_unavailable))),
+                            visual.average?.let(::money) ?: stringResource(R.string.beta_approved_dashboard_value_unavailable))),
                     onPointSelected = { if (enabled) selectedDate = visual.dates[it] },
                     pointLabel = { DateTimeFormatter.ofPattern("d MMM", locale).format(LocalDate.parse(visual.dates[it])) + " · " + money(visual.values[it]) },
                     axisLabel = { DateTimeFormatter.ofPattern("d/M", locale).format(LocalDate.parse(visual.dates[it])) },

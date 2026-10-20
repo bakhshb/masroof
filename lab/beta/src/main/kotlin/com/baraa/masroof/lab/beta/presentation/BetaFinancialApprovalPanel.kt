@@ -1,5 +1,6 @@
 package com.baraa.masroof.lab.beta.presentation
 
+import com.baraa.masroof.lab.beta.presentation.approved.approvedFinancialTypeLabel as financialTypeLabel
 import com.baraa.masroof.lab.beta.presentation.approved.ApprovedText as Text
 
 import androidx.activity.compose.BackHandler
@@ -15,6 +16,7 @@ import com.baraa.masroof.lab.beta.R
 import com.baraa.masroof.lab.beta.application.evidence.*
 import com.baraa.masroof.lab.beta.presentation.theme.BetaSpacing
 import com.baraa.masroof.lab.finance.classification.IncomeAttribution
+import com.baraa.masroof.lab.finance.classification.FinancialEndpoint
 import com.baraa.masroof.lab.finance.posting.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -179,4 +181,13 @@ internal fun approvalReason(reason: String) = when (reason) {
     "CANCELLED" -> R.string.beta_approval_cancelled
     "FX_UNAVAILABLE" -> R.string.beta_approval_fx_unknown
     else -> R.string.beta_approval_unsafe
+}
+
+@Composable
+internal fun endpointSummary(endpoint: FinancialEndpoint, assets: Map<com.baraa.masroof.lab.finance.asset.AssetId, com.baraa.masroof.lab.finance.asset.OwnedAsset>): String = when (endpoint) {
+    FinancialEndpoint.External -> stringResource(R.string.beta_review_external)
+    FinancialEndpoint.Unresolved -> stringResource(R.string.beta_review_unknown_endpoint)
+    is FinancialEndpoint.Owned -> assets[endpoint.id]?.let {
+        stringResource(bankName(it.id.bank)) + " · " + stringResource(assetKindLabel(it.kind)) + " · " + it.last4.orEmpty()
+    } ?: stringResource(R.string.beta_review_unknown_endpoint)
 }

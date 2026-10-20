@@ -80,7 +80,7 @@ class BetaSettingsActivityTest {
         try {ActivityScenario.launch(BetaActivity::class.java).use {scenario ->
             compose.waitUntil(15000) {compose.onAllNodesWithTag("beta-start-continue").fetchSemanticsNodes().isNotEmpty()}
             compose.onNodeWithTag("beta-start-continue").performClick()
-            compose.waitUntil(15000) {compose.onAllNodesWithTag("dash-refresh").fetchSemanticsNodes().isNotEmpty()}
+            compose.waitUntil(15000) {compose.onAllNodesWithTag("dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
             compose.onNode(hasText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_settings)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
             compose.onNodeWithTag("manage-CARDS").performScrollTo().performClick()
             compose.onNodeWithText("Original card •• 7271").performScrollTo().performClick()
@@ -104,5 +104,33 @@ class BetaSettingsActivityTest {
             assertEquals(2,beta.assets().size)
         }} finally {BetaContainer.resetOffline(context)}
     }
+    @Test fun approvedAppearanceControlsPersistThemeAndLanguageAcrossActivityRecreation() {
+        BetaContainer.resetOffline(context)
+        BetaContainer(context).use {it.putMarker("synthetic","appearance-route-test")}
+        try {
+            ActivityScenario.launch(BetaActivity::class.java).use {scenario ->
+                compose.waitUntil(15000) {compose.onAllNodesWithTag("beta-start-continue").fetchSemanticsNodes(atLeastOneRootRequired=false).isNotEmpty()}
+                compose.onNodeWithTag("beta-start-continue").performClick()
+                compose.waitUntil(15000) {compose.onAllNodesWithTag("beta-notifications").fetchSemanticsNodes(atLeastOneRootRequired=false).isNotEmpty()}
+                compose.onNode(hasContentDescription(context.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_settings)) and
+                    hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
+                compose.onNodeWithTag("manage-APP").performScrollTo().performClick()
+                compose.onNodeWithTag("settings-theme-DARK").performScrollTo().performClick()
+                val preferences=context.getSharedPreferences(BetaEnvironment.PREFS_NAME,Context.MODE_PRIVATE)
+                compose.waitUntil(15000) {preferences.getString("beta_ui_theme",null)=="DARK"}
+                compose.waitUntil(15000) {compose.onAllNodesWithTag("settings-theme-DARK").fetchSemanticsNodes().singleOrNull()?.config
+                    ?.getOrElse(androidx.compose.ui.semantics.SemanticsProperties.Selected) {false}==true}
+                compose.onNodeWithTag("settings-language-ar").performScrollTo().performClick()
+                compose.waitUntil(15000) {preferences.getString("beta_ui_language",null)=="ar"}
+                scenario.recreate()
+                compose.waitUntil(15000) {compose.onAllNodesWithTag("settings-theme-DARK").fetchSemanticsNodes(atLeastOneRootRequired=false).isNotEmpty()}
+                compose.onNodeWithTag("settings-theme-DARK").assertIsSelected()
+                compose.onNodeWithTag("settings-language-ar").assertExists()
+            }
+            waitForClose()
+            BetaContainer(context).use {assertEquals("DARK",it.settings().theme);assertEquals("ar",it.settings().language)}
+        } finally {BetaContainer.resetOffline(context)}
+    }
+
     private fun waitForClose() { val done = CountDownLatch(1); BetaIo.execute { done.countDown() }; assertTrue(done.await(15, TimeUnit.SECONDS)) }
 }

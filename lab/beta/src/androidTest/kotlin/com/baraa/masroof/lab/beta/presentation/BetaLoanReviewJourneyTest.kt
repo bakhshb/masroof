@@ -47,7 +47,7 @@ class BetaLoanReviewJourneyTest {
             assertEquals("CONFIRM_LOAN",beta.reviewInboxPage().rows.single().reason)
         }
         try {ActivityScenario.launch(BetaActivity::class.java).use {scenario ->
-            await("dash-refresh")
+            await("dashboard-ready")
             compose.onNode(hasText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_review)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
             click("history-review-0");click("review-configure-loan")
             compose.onNodeWithTag("asset-kind-LOAN").assertExists()

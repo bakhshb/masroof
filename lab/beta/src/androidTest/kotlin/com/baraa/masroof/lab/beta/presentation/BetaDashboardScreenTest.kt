@@ -78,7 +78,7 @@ class BetaDashboardScreenTest {
     }, clock,periodStartDay=1)
     private fun waitLoaded(expectedMonth: String? = null) {
         compose.waitUntil(15000) {
-            compose.onAllNodesWithTag("dash-refresh").fetchSemanticsNodes().isNotEmpty() &&
+            compose.onAllNodesWithTag("dashboard-ready").fetchSemanticsNodes().isNotEmpty() &&
                 compose.onAllNodesWithTag("dash-loading").fetchSemanticsNodes().isEmpty() &&
                 (expectedMonth == null || compose.onAllNodesWithTag("dash-month").fetchSemanticsNodes().singleOrNull()?.config?.getOrNull(SemanticsProperties.ContentDescription)?.any { it == expectedMonth } == true)
         }
@@ -215,12 +215,18 @@ class BetaDashboardScreenTest {
     @Test fun failedSamePeriodRefreshKeepsLastKnownValuesWithErrorAndRecovers() {
         val fail = AtomicBoolean(false)
         val dashboard = workflow(fail)
-        compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) { BetaDashboardPanel(dashboard) } } }
+        compose.setContent { MaterialTheme { BetaDashboardPanel(dashboard,ownsScroll=true) } }
         waitLoaded()
         val amount = hasText("42.35 SAR") and hasAnyAncestor(hasTestTag("dash-summary-spending"))
         compose.onNode(amount).assertExists()
         fail.set(true)
-        compose.onNodeWithTag("dash-refresh").performScrollTo().performClick()
+        compose.onNodeWithTag("dashboard-ready").performTouchInput {
+            down(androidx.compose.ui.geometry.Offset(centerX,30f))
+            (1..40).forEach {step -> moveTo(androidx.compose.ui.geometry.Offset(centerX,30f+step*24f))}
+        }
+        compose.waitForIdle()
+        Thread.sleep(650) // Production refresh requires a real deliberate hold above threshold.
+        compose.onNodeWithTag("dashboard-ready").performTouchInput {up()}
         compose.waitUntil(15000) {compose.onAllNodesWithTag("dash-error").fetchSemanticsNodes().isNotEmpty()}
         compose.onNode(amount).assertExists()
         compose.onNodeWithTag("dash-empty").assertDoesNotExist()
@@ -347,12 +353,14 @@ class BetaDashboardScreenTest {
             CommitmentRow(Environment.BETA, "fixture-user", "التزامي الشخصي", Money.of("50", Currency.SAR), null, PaymentStatus.UNPAID, userCommitmentId = "user-fixture")), null, null, null)
         // An authoritative read-contract fixture tests rendering; actual statement authority is the producer's responsibility.
         val workflow = BetaDashboardWorkflow({ query, _ -> DashboardProduction(
-            DashboardSnapshot(query, emptyList(), emptyList(), listOf(facility), loans = listOf(loan), commitments = commitments), emptySet(), null)
+            DashboardSnapshot(query, emptyList(), emptyList(), listOf(facility), loans = listOf(loan), commitments = commitments,
+                totals=PortfolioTotals(Currency.SAR,null,null,null,null,facility.statementDue,null,null,null,null)), emptySet(), null)
         }, clock,periodStartDay=1)
         compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) { BetaDashboardPanel(workflow) } } }
         waitLoaded(); route("CARDS")
         val due = MasroofMoneyDisplay.format(BigDecimal("2694.32"), "SAR", context.resources.configuration.locales[0].toLanguageTag())
-        compose.onAllNodesWithText(due).assertCountEquals(1)
+        compose.onNode(hasText(due) and hasAnyAncestor(hasTestTag("cards-facility-due-total"))).assertExists()
+        compose.onAllNodesWithText(due).assertCountEquals(3) // Aggregate plus the two cards' shared recorded due.
         compose.onNodeWithTag("dash-asset-BANK_ALJAZIRA-statement-primary").performScrollTo().performClick()
         compose.onAllNodesWithText(due).assertCountEquals(1) // The primary displays the single shared facility due.
         compose.onNodeWithTag("dash-detail-back").performScrollTo().performClick()
@@ -362,7 +370,8 @@ class BetaDashboardScreenTest {
         compose.onNodeWithText("•• 7271").assertExists()
         compose.onNodeWithText(due).performScrollTo(); screenshot("supplementary-shared-due")
         compose.onNodeWithTag("dash-detail-back").performScrollTo().performClick()
-        compose.onAllNodesWithText(due).assertCountEquals(1) // Aggregate still counts the facility once.
+        compose.onNode(hasText(due) and hasAnyAncestor(hasTestTag("cards-facility-due-total"))).assertExists()
+        compose.onAllNodesWithText(due).assertCountEquals(3) // Showing a shared fact does not recalculate the aggregate.
         route("LOANS")
         compose.onNodeWithText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_asset_loan)).assertExists()
         route("COMMITMENTS")

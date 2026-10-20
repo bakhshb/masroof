@@ -51,7 +51,7 @@ class BetaStartActivityTest {
         val before = protected.map(::hash)
         ActivityScenario.launch(BetaActivity::class.java).use { scenario ->
             await("beta-start-new")
-            compose.onNodeWithTag("dash-refresh").assertDoesNotExist()
+            compose.onNodeWithTag("dashboard-ready").assertDoesNotExist()
             compose.onNodeWithTag("beta-history").assertDoesNotExist()
             compose.onNodeWithTag("beta-settings").assertDoesNotExist()
             capture("m0-new-welcome")
@@ -88,7 +88,7 @@ class BetaStartActivityTest {
         val asset = OwnedAsset(AssetId(Environment.BETA, bank, "synthetic-m0-existing"), AssetKind.ACCOUNT, "4321")
         BetaContainer(context).use { beta -> beta.registerAsset(asset); beta.setBankEnabled(bank, true); beta.putMarker("human-note", "synthetic-keep"); beta.putPreferenceProbe("keep") }
         ActivityScenario.launch(BetaActivity::class.java).use { scenario ->
-            await("beta-start-existing"); compose.onNodeWithTag("dash-refresh").assertDoesNotExist()
+            await("beta-start-existing"); compose.onNodeWithTag("dashboard-ready").assertDoesNotExist()
             if (Build.VERSION.SDK_INT >= 33) scenario.onActivity {
                 assertEquals(android.view.View.LAYOUT_DIRECTION_RTL, it.resources.configuration.layoutDirection)
             }
@@ -98,8 +98,8 @@ class BetaStartActivityTest {
         drain()
         BetaContainer(context).use { assertEquals(BetaStartState.EXISTING, it.startState()); assertEquals(listOf(asset), it.assets()); assertEquals(1, it.markerCount()) }
         ActivityScenario.launch(BetaActivity::class.java).use { scenario ->
-            await("beta-start-existing"); compose.onNodeWithTag("beta-start-continue").performClick(); await("dash-refresh")
-            scenario.recreate(); await("dash-refresh"); compose.onNodeWithTag("beta-start-existing").assertDoesNotExist()
+            await("beta-start-existing"); compose.onNodeWithTag("beta-start-continue").performClick(); await("dashboard-ready")
+            scenario.recreate(); await("dashboard-ready"); compose.onNodeWithTag("beta-start-existing").assertDoesNotExist()
         }
         drain()
         BetaContainer(context).use { assertEquals(BetaStartState.READY, it.startState()); assertEquals(listOf(asset), it.assets()); assertEquals(1, it.markerCount()); assertEquals("keep", it.preferenceProbe()) }
@@ -112,7 +112,7 @@ class BetaStartActivityTest {
         file.parentFile?.mkdirs(); file.writeText("synthetic-corrupt-beta-must-not-be-deleted")
         val original = hash(file)
         ActivityScenario.launch(BetaActivity::class.java).use { scenario ->
-            await("beta-startup-failure"); compose.onNodeWithTag("dash-refresh").assertDoesNotExist()
+            await("beta-startup-failure"); compose.onNodeWithTag("dashboard-ready").assertDoesNotExist()
             compose.onNodeWithTag("beta-start-continue").assertDoesNotExist()
             capture("m0-corrupt-retained")
             compose.onNodeWithTag("beta-startup-retry").performClick(); await("beta-startup-failure")

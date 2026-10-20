@@ -19,7 +19,7 @@
     <string name="beta_parity_card_supplementary">إضافية</string>
     <string name="beta_parity_refresh">تحديث الرسائل</string>
     <string name="beta_parity_card_missing">يمكنك إكمال معلومات البطاقة من بطاقاتي. يظهر الإنفاق المؤكد الآن، وتبقى القيم التي تحتاج النوع أو الربط غير متاحة حتى اكتمالها.</string>
-    <string name="beta_parity_salary_period">الفترة المالية</string>
+    <string name="beta_parity_salary_period">فترة الراتب</string>
     <string name="beta_parity_display_name">اسم العرض</string>
     <string name="beta_parity_mada">مدى</string>
     <string name="beta_parity_account_type">نوع الحساب</string>
