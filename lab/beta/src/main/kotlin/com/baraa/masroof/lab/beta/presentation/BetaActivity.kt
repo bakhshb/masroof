@@ -1,6 +1,7 @@
 package com.baraa.masroof.lab.beta.presentation
 
 import android.os.Bundle
+import com.baraa.masroof.lab.beta.application.notification.*
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.platform.testTag
@@ -100,8 +101,17 @@ class BetaActivity : ComponentActivity() {
                 var reviewDetailOpen by remember {mutableStateOf(false)}
                 var dashboardTab by rememberSaveable { mutableStateOf("HOME") }
                 var dashboardRequest by rememberSaveable { mutableIntStateOf(0) }
-                var dashboardCustomizationRequest by rememberSaveable {mutableIntStateOf(0)}
                 var developerWorkspaceRequest by rememberSaveable {mutableIntStateOf(0)}
+                var notificationsOpen by rememberSaveable {mutableStateOf(false)}
+                var notificationState by remember {mutableStateOf<BetaNotificationCenterResult?>(null)}
+                var notificationLoading by remember {mutableStateOf(false)}
+                var notificationFailed by remember {mutableStateOf(false)}
+                var notificationBusy by remember {mutableStateOf(false)}
+                var notificationReload by remember {mutableIntStateOf(0)}
+                var notificationPeriod by rememberSaveable {mutableStateOf("")}
+                var notificationExcluded by rememberSaveable {mutableIntStateOf(0)}
+                val notificationPermission=androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {notificationReload++}
                 var historyOpen by rememberSaveable { mutableStateOf(false) }
                 var editOwnershipConfirmed by rememberSaveable {mutableStateOf(false)}
                 var editBank by rememberSaveable { mutableStateOf<String?>(null) }
@@ -158,6 +168,7 @@ class BetaActivity : ComponentActivity() {
                 var maintenanceTools by rememberSaveable { mutableStateOf(false) }
                 fun openRoute(route: String) {
                     if (busy || historyBusy) return
+                    notificationsOpen=route=="NOTIFICATIONS"
                     historyOpen = route == "HISTORY"; reviewOpen = route == "REVIEW"; approvalOpen = route == "APPROVAL"
                     discoveryOpen = route == "DISCOVERY"; settingsOpen = route == "SETTINGS"; developerToolsOpen = route in setOf("DEVELOPER","DATA"); maintenanceTools=route=="DEVELOPER"
                     editBank = null; editId = null; proposalId = null; approvalEvidenceId = null
@@ -170,12 +181,42 @@ class BetaActivity : ComponentActivity() {
                     perform { shellContainer.resumeOnboarding(); null }
                 }
                 fun closeTask() {
+                    notificationsOpen=false
                     historyOpen = false; discoveryOpen = false; approvalOpen = false; reviewOpen = false
                     perform { null }
                 }
                 fun openAsset(bank: BankId, kind: AssetKind) {
                     if (busy || historyBusy) return
                     editOwnershipConfirmed=false; editBank = bank.value; editId = null; proposalId = null; initialAssetKind = kind.name; ownershipEditSuffix = ""; failed = false
+                }
+                BetaLaunchedEffect(loaded,busy,startState,pendingReviewCount,assets,cardTasks,notificationReload,notificationPeriod,notificationExcluded,notificationsOpen) {
+                    if(!loaded || busy || startState!=com.baraa.masroof.lab.beta.application.BetaStartState.READY) return@BetaLaunchedEffect
+                    notificationLoading=true;notificationFailed=false
+                    try {notificationState=withContext(BetaIo.dispatcher) {shellContainer.notifications(notificationExcluded,notificationPeriod)}}
+                    catch(c: kotlinx.coroutines.CancellationException) {throw c}
+                    catch(_: Exception) {notificationFailed=true}
+                    finally {notificationLoading=false}
+                }
+                fun openNotification(item: BetaNotificationItem) {
+                    if(busy || historyBusy || notificationBusy) return
+                    notificationBusy=true;notificationFailed=false
+                    scope.launch {
+                        try {
+                            withContext(BetaIo.dispatcher) {shellContainer.readNotification(item.id)}
+                            notificationReload++
+                            when(item.action) {
+                                BetaNotificationAction.REQUEST_SMS_PERMISSION -> notificationPermission.launch(android.Manifest.permission.READ_SMS)
+                                BetaNotificationAction.OPEN_APP_SETTINGS -> startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    android.net.Uri.parse("package:$packageName")))
+                                BetaNotificationAction.OPEN_REVIEW -> openRoute("REVIEW")
+                                BetaNotificationAction.OPEN_SETTINGS_CARDS, BetaNotificationAction.OPEN_SETTINGS_ACCOUNTS -> openRoute("DISCOVERY")
+                                BetaNotificationAction.OPEN_SETTINGS_ABOUT -> {openRoute("SETTINGS");settingsCategory="ABOUT"}
+                                BetaNotificationAction.DISMISS_RESCAN, BetaNotificationAction.MARK_READ_ONLY -> Unit
+                            }
+                        } catch(c: kotlinx.coroutines.CancellationException) {throw c}
+                        catch(_: Exception) {notificationFailed=true}
+                        finally {notificationBusy=false}
+                    }
                 }
                 BetaLaunchedEffect(Unit) { execute { null } }
                 BetaLaunchedEffect(shellContainer) {
@@ -207,8 +248,9 @@ class BetaActivity : ComponentActivity() {
                 } else BetaShell(
                     showMaintenanceActions = false,
                     showReturn = false,
-                    onOpenDashboardSettings={dashboardCustomizationRequest++},developerWorkspaceRequest=developerWorkspaceRequest,
+                    notificationCount=notificationState?.unreadCount ?: 0,onOpenNotifications={if(!busy && !historyBusy && !notificationBusy) notificationsOpen=true},developerWorkspaceRequest=developerWorkspaceRequest,
                     secondaryTitle=when {
+                        notificationsOpen -> androidx.compose.ui.res.stringResource(R.string.beta_approved_notification_center_title)
                         settingsOpen -> androidx.compose.ui.res.stringResource(when(settingsCategory) {"APP"->R.string.beta_complete_preferences;"ACCOUNTS"->R.string.beta_home_accounts;"CARDS"->R.string.beta_home_cards;"LOANS"->R.string.beta_home_loans;"COMMITMENTS"->R.string.beta_dash_commitments;"ABOUT"->R.string.beta_complete_about;else->R.string.beta_nav_settings})
                         reviewOpen -> androidx.compose.ui.res.stringResource(if(reviewDetailOpen) R.string.beta_complete_review_details else R.string.beta_nav_review)
                         historyOpen -> androidx.compose.ui.res.stringResource(R.string.beta_history_title)
@@ -227,10 +269,10 @@ class BetaActivity : ComponentActivity() {
                             }
                         }
                     }) else null,
-                    selectedHomeTab = when { settingsOpen -> "SETTINGS"; reviewOpen -> "REVIEW"; else -> dashboardTab },
+                    selectedHomeTab = when { notificationsOpen -> "NONE"; settingsOpen -> "SETTINGS"; reviewOpen -> "REVIEW"; else -> dashboardTab },
                     onOpenHome = { openRoute("HOME") },
                     onOpenTransactions = { openRoute("TRANSACTIONS") },
-                    dashboard = if (onboarding != BetaOnboardingStep.COMPLETE) null else ({ BetaDashboardPanel(dashboardWorkflow,transactionExtras={id,changed -> BetaPostedTransactionActions(shellContainer,id,{historyBusy=it},changed)}, showInternalHeader=false,customizationRequest=dashboardCustomizationRequest, onPageTitle={dashboardPageTitle=it}, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, pendingCardCount=cardTasks.size,onCards={openRoute("SETTINGS");settingsCategory="CARDS"},
+                    dashboard = if (onboarding != BetaOnboardingStep.COMPLETE) null else ({ BetaDashboardPanel(dashboardWorkflow,transactionExtras={id,changed -> BetaPostedTransactionActions(shellContainer,id,{historyBusy=it},changed)}, showInternalHeader=false,onNotificationFacts={period,count -> notificationPeriod=period;notificationExcluded=count}, onPageTitle={dashboardPageTitle=it}, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, pendingCardCount=cardTasks.size,onCards={openRoute("SETTINGS");settingsCategory="CARDS"},
                         requestedRoute = if (dashboardTab == "TRANSACTIONS") "TRANSACTIONS" else "OVERVIEW", routeRequest = dashboardRequest, onPrimaryTabChanged = { dashboardTab = it }, onBusyChanged = { historyBusy = it }, onImport = { openRoute("HISTORY") }, onSetup = ::resumeSetup,onManageAssets={kind -> openRoute("SETTINGS");settingsCategory=when(kind) {AssetKind.ACCOUNT->"ACCOUNTS";AssetKind.LOAN->"LOANS";else->"CARDS"}}) }),
                     onOpenDiscovery = { openRoute("DISCOVERY") },
                     onOpenHistory = { openRoute("HISTORY") },
@@ -243,7 +285,22 @@ class BetaActivity : ComponentActivity() {
                     returnEnabled = !historyBusy && (editBank == null || !busy),
                     onAddAsset = { bank -> openAsset(bank, AssetKind.ACCOUNT) },
                     onEditAsset = { asset -> if (!busy) { editBank = asset.id.bank.value; editId = asset.id.localId; proposalId = null; failed = false } },
-                    editor = if (settingsOpen && editBank == null && loaded) ({ BetaSettingsHubPanel(settingsCategory, { settingsCategory = it }, banks, assets, dashboardControls, busy || historyBusy,
+                    editorKey=when {
+                        notificationsOpen -> "NOTIFICATIONS"
+                        editBank!=null -> null
+                        settingsOpen -> "SETTINGS"
+                        reviewOpen -> "REVIEW"
+                        developerToolsOpen -> "DATA"
+                        discoveryOpen || onboarding==BetaOnboardingStep.ASSETS -> "OWNERSHIP"
+                        historyOpen || onboarding==BetaOnboardingStep.IMPORT -> "IMPORT"
+                        else -> null
+                    },
+                    editor = if(notificationsOpen) ({
+                        androidx.activity.compose.BackHandler {if(!busy && !historyBusy && !notificationBusy) notificationsOpen=false}
+                        com.baraa.masroof.lab.beta.presentation.approved.ApprovedNotificationCenterContent(
+                            notificationState?.items.orEmpty(),notificationState?.unreadCount ?: 0,notificationLoading,notificationFailed,
+                            onRetry={notificationReload++},onOpen=::openNotification)
+                    }) else if (settingsOpen && editBank == null && loaded) ({ BetaSettingsHubPanel(settingsCategory, { settingsCategory = it }, banks, assets, dashboardControls, busy || historyBusy,
                         failed=failed, onRename={asset,name,revision,completed -> perform {
                             shellContainer.saveManualAsset(com.baraa.masroof.lab.beta.application.ManualAssetDraft(
                                 asset.id,asset.kind,asset.last4.orEmpty(),asset.parentId,asset.creditCardRole,true,true,asset,
@@ -315,7 +372,7 @@ class BetaActivity : ComponentActivity() {
                             onManage = { openRoute("SETTINGS") }, onApproval = { openRoute("REVIEW") })
                     }) else null,
                     banks = banks,
-                    busy = busy || historyBusy,
+                    busy = busy || historyBusy || notificationBusy,
                     failed = failed,
                     onRetry = { perform { null } },
                     onSetBankEnabled = { bank, enabled ->

@@ -19,6 +19,21 @@ class BetaArchiveTest {
     private val archive = BetaEncryptedArchive { SecretKeySpec(ByteArray(32) { 7 }, "HmacSHA256") }
     @Before fun clear() { BetaContainer.resetOffline(context) }
 
+    @Test fun notificationReadStateUsesBackupCompatibleStringsAndSurvivesRestoreAndReopen() {
+        val id="foreign_currency:Oct 2026"
+        BetaContainer(context).use {beta ->
+            beta.putMarker("notification-test","synthetic")
+            beta.readNotification(id)
+            beta.backup()
+            assertTrue(beta.notifications(1,"Oct 2026").items.single {it.id==id}.isRead)
+            beta.readNotification("synthetic-other")
+            assertTrue(beta.restore())
+        }
+        BetaContainer(context).use {beta ->
+            assertTrue(beta.notifications(1,"Oct 2026").items.single {it.id==id}.isRead)
+        }
+    }
+
     @Test fun roundTrip() {
         BetaContainer(context).use { it.putMarker("first", "synthetic"); it.putPreferenceProbe("a=b\nsecond"); it.setTheme("DARK"); it.backup() }
         val backup = BetaBackupRecovery(context).backupFile().readBytes()

@@ -39,6 +39,7 @@ fun BetaShell(
     banks: List<BetaBankChoice> = emptyList(),
     assets: List<OwnedAsset> = emptyList(),
     editor: (@Composable () -> Unit)? = null,
+    editorKey: String? = null,
     dashboard: (@Composable () -> Unit)? = null,
     onOpenDiscovery: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
@@ -65,13 +66,15 @@ fun BetaShell(
     setupFooter: (@Composable () -> Unit)? = null,
     secondaryTitle: String? = null,
     onNavigateBack: (() -> Unit)? = null,
-    onOpenDashboardSettings: (() -> Unit)? = null,
+    notificationCount: Int = 0,
+    onOpenNotifications: () -> Unit = onOpenReview,
     developerWorkspaceRequest: Int = 0,
 ) {
     var workspaceOpen by rememberSaveable { mutableStateOf(false) }
     var lastDeveloperRequest by rememberSaveable {mutableIntStateOf(0)}
     LaunchedEffect(developerWorkspaceRequest) {if(developerWorkspaceRequest!=lastDeveloperRequest) {lastDeveloperRequest=developerWorkspaceRequest;workspaceOpen=true}}
     val homeState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+    val editorState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     BackHandler { if (returnEnabled) { if (workspaceOpen && editor == null) workspaceOpen = false else onReturn() } }
     Scaffold(
         topBar = {
@@ -79,11 +82,8 @@ fun BetaShell(
                 title = stringResource(R.string.beta_home_brand),
                 showLogo = true,
                 actions = {
-                    if (dashboard != null && editor == null && secondaryTitle==null) androidx.compose.material3.IconButton(
-                        enabled = !busy, onClick = {if(onOpenDashboardSettings!=null && !workspaceOpen) onOpenDashboardSettings() else workspaceOpen = !workspaceOpen}, modifier = Modifier.testTag("beta-tools")) {
-                        androidx.compose.material3.Icon(com.baraa.masroof.ui.components.MasroofOutlineIcons.SlidersHorizontal,
-                            stringResource(R.string.beta_home_tools))
-                    }
+                    if(dashboard!=null) com.baraa.masroof.lab.beta.presentation.approved.ApprovedNotificationIconButton(
+                        notificationCount,onOpenNotifications,Modifier.testTag("beta-notifications"),enabled=!busy && returnEnabled)
 
                     Surface(Modifier.padding(end = BetaSpacing.section).testTag("beta-badge"),
                         color = MaterialTheme.colorScheme.errorContainer) {
@@ -130,7 +130,7 @@ fun BetaShell(
             verticalArrangement = Arrangement.spacedBy(BetaSpacing.section),
         ) {
             if (editor != null) {
-                editor()
+                if(editorKey==null) editor() else editorState.SaveableStateProvider(editorKey) {editor()}
                 return@Column
             }
             if (dashboard != null && !workspaceOpen) {

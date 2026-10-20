@@ -190,6 +190,20 @@
       "same_data_comparison": null,
       "old_renderer_removed": false,
       "accepted": false
+    },
+    {
+      "id": "notifications",
+      "label_ar": "الرأس ومركز التنبيهات",
+      "production_source": "app/src/main/kotlin/com/baraa/masroof/presentation/notification/NotificationCenterScreen.kt",
+      "previous_lab_renderers": [
+        "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaShell.kt"
+      ],
+      "status": "in_progress",
+      "production_visual_reference": "lab/beta/build/reports/ui-parity/production/notifications-ar-light.png",
+      "lab_visual_reference": null,
+      "same_data_comparison": "Copied production notification/read-state service; live permission/review/ownership snapshots. Registry-category navigation and same-fixture visual acceptance remain pending.",
+      "old_renderer_removed": false,
+      "accepted": false
     }
   ],
   "design_guide": "docs/DESIGN_SYSTEM.md",
@@ -221,7 +235,9 @@
     "Interactive period navigation on secondary summaries/account detail; they use copied MasroofPeriodDisplay. Interactive period selection remains on Home.",
     "Material OutlinedTextField renderers replaced by the copied production MasroofFormField throughout lab forms.",
     "Generic asset detail title replaced with the approved account/card/loan titles.",
-    "Legacy outer registry card and duplicate bottom Back button; registry entries use the canonical copied card shell."
+    "Legacy outer registry card and duplicate bottom Back button; registry entries use the canonical copied card shell.",
+    "The old dashboard-customization toolbar button; customization remains beside the Home period, and the production notification button occupies the global header.",
+    "Duplicate BetaManagementRow geometry; it is a thin adapter to the copied production MasroofReferenceNavigationRow."
   ],
   "removed_resource_keys": [
     "beta_parity_import_date",
@@ -250,14 +266,14 @@
     "beta_detail_internal_help"
   ],
   "verified_tests": {
-    "lab_jvm": 301,
+    "lab_jvm": 305,
     "bank_engine": 58,
     "finance_core": 179,
     "android16_full": {
-      "total": 183,
-      "passed": 183,
-      "duration": "5m51s",
-      "scope": "Card setup/period/form/ownership port and same-period refresh. Subsequent account/registry source port has separate follow-up verification."
+      "total": 189,
+      "passed": 189,
+      "duration": "5m16s",
+      "scope": "Latest notification/header/read-state/source-port, assets, onboarding, review, dashboard and correction suite."
     },
     "ci": "2278dee523d9d5a81aa90e784bf4a3c28856af41 is green; later UI port is not yet pushed.",
     "android16_followup": {
@@ -266,7 +282,11 @@
     },
     "process_death": {
       "passed": 39,
-      "scope": "Permission, history import, evidence, ledger, correction and restore journeys after the UI source port."
+      "scope": "Repeated successfully after the notification/header/editor-state changes; permissions/import/ledger/correction/restore."
+    },
+    "notification_followup": {
+      "passed": 7,
+      "scope": "Actual notification/read-state/review/back navigation, settings rename and shared navigation."
     }
   },
   "implementation_notes": [
@@ -275,6 +295,7 @@
     "فشل تحديث الفترة نفسها يحتفظ بآخر بيانات محملة مع خطأ واضح. تغيير الفترة لا يعرض أرقام الفترة السابقة.",
     "تسمية البطاقة عبر الضغط على عنوانها تستخدم نافذة مستقلة من الفعلي؛ وتحافظ على الهوية وآخر أربعة أرقام ومراجعة إصدار البيانات. تبويبات إيقاف المتابعة واستئنافها لم تُنقل بالكامل بعد.",
     "مرجع البطاقة الذي سبق اعتماد ملكيته لا يكرر سؤال الملكية؛ وإذا كان نوعه مجهولًا فلا يفترض أنه مدى، بل يتطلب اختيار النوع. الإضافة اليدوية الجديدة ما زالت تتطلب اعتماد الملكية.",
-    "حُذف كرت المجموعة القديم المحيط بصف البطاقة، وزر الرجوع السفلي المكرر. الصورة المرفقة تجربة حقيقية من المحاكي وليست بعدُ مقارنة على نفس بيانات الفعلي."
+    "حُذف كرت المجموعة القديم المحيط بصف البطاقة، وزر الرجوع السفلي المكرر. الصورة المرفقة تجربة حقيقية من المحاكي وليست بعدُ مقارنة على نفس بيانات الفعلي.",
+    "نُقل جرس التنبيهات وصفحة التنبيهات وخدمة المقروء/غير المقروء من الفعلي. تحفظ الحالة كسلسلة في تفضيلات المختبر كي تبقى متوافقة مع النسخ الاحتياطي. الربط النهائي لتبويبات إدارة الأصول والمقارنة المصورة ما زالا قيد العمل."
   ]
 }

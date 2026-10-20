@@ -178,6 +178,48 @@
       "source_sha256": "89f076797604d233b0f369fd54152064686a85142e73ecbd1ef8558130b1eced",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/BetaCardSetupModels.kt",
       "adaptations": "Lab digit formatter; bank-qualified asset IDs stay distinct from display suffixes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofReferenceComponents.kt",
+      "symbol": "MasroofReferenceNavigationRow",
+      "source_sha256": "68a4e61638fd0c7e486173add50930e797a7d7591df435ca36f3a596a5373801",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedNotificationComponents.kt",
+      "adaptations": "Isolated lab namespace, resources and snapshot/preferences adapters. The existing lab shell supplies the header and scrolling; busy and retry states retained."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/ReviewNotificationIconButton.kt",
+      "symbol": "ReviewNotificationIconButton",
+      "source_sha256": "18319009e25bc664640ee20f0870548695dce86b689149e9cfa987c1648e4e37",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedNotificationComponents.kt",
+      "adaptations": "Isolated lab namespace, resources and snapshot/preferences adapters. The existing lab shell supplies the header and scrolling; busy and retry states retained."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/notification/NotificationCenterScreen.kt",
+      "symbol": "NotificationCenterScreen / NotificationCenterRow",
+      "source_sha256": "2c56a3aa2fd982d5f2fbf6762f59f5397440e2d7af3133279664eaf6e0b418b9",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedNotificationComponents.kt",
+      "adaptations": "Isolated lab namespace, resources and snapshot/preferences adapters. The existing lab shell supplies the header and scrolling; busy and retry states retained."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/application/notification/NotificationCenterModels.kt",
+      "symbol": "NotificationCenterModels.kt",
+      "source_sha256": "63c57eeb0df45177d026a3fe42426f9f688490e8c565953f2f7605e0e65d8655",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/notification/BetaNotificationCenterModels.kt",
+      "adaptations": "Isolated lab namespace, resources and snapshot/preferences adapters. The existing lab shell supplies the header and scrolling; busy and retry states retained."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/application/notification/NotificationCenterService.kt",
+      "symbol": "NotificationCenterService.kt",
+      "source_sha256": "4860e542f8b879f02e73c8e1ded31a499c1487e5f0d2b90fa9b301d12d8c434d",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/notification/BetaNotificationCenterService.kt",
+      "adaptations": "Isolated lab namespace, resources and snapshot/preferences adapters. The existing lab shell supplies the header and scrolling; busy and retry states retained."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/application/notification/NotificationPreferencesRepository.kt",
+      "symbol": "NotificationPreferencesRepository.kt",
+      "source_sha256": "0799643a1d539cdecfe7345d5c5dadba0877a59a9a9b685c9061b7ea432f494c",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/application/notification/BetaNotificationPreferencesRepository.kt",
+      "adaptations": "Isolated lab namespace, resources and snapshot/preferences adapters. The existing lab shell supplies the header and scrolling; busy and retry states retained."
     }
   ],
   "adaptations": [

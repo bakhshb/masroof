@@ -30,11 +30,9 @@ import java.time.YearMonth
 @Composable
 fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     controls: BetaDashboardControls = UnavailableBetaDashboardControls,
-    preferences: BetaDashboardViewPreferencesWorkflow? = null, requestedRoute: String? = null, routeRequest: Int = 0, onPrimaryTabChanged: (String) -> Unit = {}, onBusyChanged: (Boolean) -> Unit = {}, onImport: () -> Unit = {}, onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onPageTitle: (String?) -> Unit = {}, showInternalHeader: Boolean = true, onManageAssets: (com.baraa.masroof.lab.finance.asset.AssetKind)->Unit = {},customizationRequest: Int = 0, transactionExtras: (@Composable (String,(Boolean)->Unit)->Unit)? = null) {
+    preferences: BetaDashboardViewPreferencesWorkflow? = null, requestedRoute: String? = null, routeRequest: Int = 0, onPrimaryTabChanged: (String) -> Unit = {}, onBusyChanged: (Boolean) -> Unit = {}, onImport: () -> Unit = {}, onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onPageTitle: (String?) -> Unit = {}, showInternalHeader: Boolean = true, onManageAssets: (com.baraa.masroof.lab.finance.asset.AssetKind)->Unit = {},onNotificationFacts: (String,Int)->Unit = {_,_->}, transactionExtras: (@Composable (String,(Boolean)->Unit)->Unit)? = null) {
     var controlsBusy by remember { mutableStateOf(false) }
     var homeLayoutOpen by rememberSaveable { mutableStateOf(false) }
-    var handledCustomization by rememberSaveable {mutableIntStateOf(0)}
-    LaunchedEffect(customizationRequest) {if(customizationRequest!=handledCustomization) {handledCustomization=customizationRequest;homeLayoutOpen=true}}
     var selectedTransaction by rememberSaveable { mutableStateOf<String?>(null) }
     var monthText by rememberSaveable { mutableStateOf(workflow.currentMonth().toString()) }
     var route by rememberSaveable { mutableStateOf(requestedRoute ?: "OVERVIEW") }
@@ -139,6 +137,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
             (loading && result==null) || (result != null && result?.snapshot?.query != activeWorkflow.query(month)) -> { LinearProgressIndicator(Modifier.fillMaxWidth().testTag("dash-loading")); Text(stringResource(R.string.beta_dash_loading)) }
             else -> result?.let { read ->
                 val snapshot = read.snapshot
+                SideEffect {onNotificationFacts(periodLabel,snapshot.analysis?.excludedOtherCurrencyCount ?: 0)}
                 if (read.unavailableSections.any {it in setOf(DashboardSection.CURRENT_LEDGER,DashboardSection.VALUATION,DashboardSection.RUNTIME_SOURCE)}) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
                     Text(stringResource(if(DashboardSection.CURRENT_LEDGER in read.unavailableSections || DashboardSection.VALUATION in read.unavailableSections) R.string.beta_fix_confirmed_only else R.string.beta_fix_commitments_unknown), Modifier.padding(BetaSpacing.screen).testTag("dash-incomplete"))
                 }

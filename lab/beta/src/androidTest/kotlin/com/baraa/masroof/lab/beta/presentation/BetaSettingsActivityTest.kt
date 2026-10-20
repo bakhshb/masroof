@@ -25,7 +25,7 @@ class BetaSettingsActivityTest {
         ActivityScenario.launch(BetaActivity::class.java).use { scenario ->
             compose.waitUntil(15000) { compose.onAllNodesWithTag("beta-start-continue").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
             compose.onNodeWithTag("beta-start-continue").performClick()
-            compose.waitUntil(15000) { compose.onAllNodesWithTag("beta-tools").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
+            compose.waitUntil(15000) { compose.onAllNodesWithTag("beta-notifications").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
             compose.onNodeWithTag("beta-reset").assertDoesNotExist()
             compose.onNode(hasText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_settings)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
             compose.onNodeWithTag("manage-ABOUT").performScrollTo().performClick()
@@ -61,7 +61,7 @@ class BetaSettingsActivityTest {
             compose.onNodeWithTag("beta-startup-retry").performClick()
             compose.waitUntil(15000) { compose.onAllNodesWithTag("beta-start-continue").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
             compose.onNodeWithTag("beta-start-continue").performClick()
-            compose.waitUntil(15000) { compose.onAllNodesWithTag("beta-tools").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
+            compose.waitUntil(15000) { compose.onAllNodesWithTag("beta-notifications").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
         }
         waitForClose()
         BetaContainer(context).use { assertEquals(1, it.markerCount()) }

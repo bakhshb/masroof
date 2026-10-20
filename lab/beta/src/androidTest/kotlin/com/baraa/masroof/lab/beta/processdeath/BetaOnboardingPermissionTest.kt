@@ -110,7 +110,7 @@ class BetaOnboardingPermissionTest {
                     throw failure
                 }
             }
-            awaitEnabled("beta-tools")
+            awaitEnabled("beta-notifications")
             compose.onNode(hasText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_settings)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
             clickWhenReady("manage-ABOUT")
             clickWhenReady("settings-developer-tools")

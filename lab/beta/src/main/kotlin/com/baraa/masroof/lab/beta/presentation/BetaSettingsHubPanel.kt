@@ -178,22 +178,6 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
 @Composable
 internal fun BetaManagementRow(title: String, subtitle: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit,
     modifier: Modifier = Modifier, divider: Boolean = true) {
-    Column(modifier.fillMaxWidth().clickable(enabled = enabled, role = Role.Button, onClick = onClick)) {
-        Row(Modifier.fillMaxWidth().padding(top = MasroofReference.rowVertical,
-            bottom = if (divider) MasroofReference.rowVertical else MasroofReference.lastRowBottom),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MasroofReference.rowGap)) {
-            Surface(shape = MasroofShapes.small, color = MasroofThemeExtras.extendedColors.accountSoft) {
-                Box(Modifier.size(MasroofReference.iconBox), contentAlignment = Alignment.Center) {
-                    Icon(icon, null, Modifier.size(MasroofReference.icon), tint = MasroofThemeExtras.extendedColors.account)
-                }
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MasroofReference.metadataGap)) {
-                Text(title, style = MasroofReference.pair.copy(fontWeight = MasroofFontWeights.semiBold))
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Icon(if (LocalLayoutDirection.current == LayoutDirection.Rtl) MasroofOutlineIcons.ChevronLeft else MasroofOutlineIcons.ChevronRight,
-                null, Modifier.size(MasroofReference.icon), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (divider) HorizontalDivider(color = MasroofThemeExtras.extendedColors.cardBorder)
-    }
+    com.baraa.masroof.lab.beta.presentation.approved.ApprovedReferenceNavigationRow(
+        title,subtitle,icon,onClick,modifier,divider,enabled=enabled)
 }

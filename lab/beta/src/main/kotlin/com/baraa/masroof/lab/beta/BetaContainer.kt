@@ -584,6 +584,25 @@ class BetaContainer(
         }
     }
 
+    /** Production notification service over lab review/ownership facts and lab-only read preferences. */
+    fun notifications(excludedForeignCurrencyCount: Int=0,periodLabel: String="") = lock.withLock {
+        check(!closed)
+        val ownership=runBlocking {com.baraa.masroof.lab.beta.application.BetaOwnershipWorkflow(database).snapshot()}
+        com.baraa.masroof.lab.beta.application.notification.BetaNotificationCenterService(
+            com.baraa.masroof.lab.beta.data.BetaNotificationPreferences(preferences)).build(
+            com.baraa.masroof.lab.beta.application.notification.BetaNotificationCenterSnapshot(
+                smsPermissionGranted=androidx.core.content.ContextCompat.checkSelfPermission(appContext,android.Manifest.permission.READ_SMS)==android.content.pm.PackageManager.PERMISSION_GRANTED,
+                reviewRequiredCount=evidenceInboxCounts().needsReview,
+                unregisteredCardCount=ownership.candidates.count {it.reference.kind==com.baraa.masroof.lab.beta.application.BetaOwnershipKind.CARD && it.status==com.baraa.masroof.lab.beta.application.BetaOwnershipStatus.UNKNOWN},
+                unregisteredAccountCount=ownership.candidates.count {it.reference.kind==com.baraa.masroof.lab.beta.application.BetaOwnershipKind.ACCOUNT && it.status==com.baraa.masroof.lab.beta.application.BetaOwnershipStatus.UNKNOWN},
+                excludedForeignCurrencyCount=excludedForeignCurrencyCount,periodLabel=periodLabel))
+    }
+    fun readNotification(id: String) = lock.withLock {
+        check(!closed)
+        val preferencesStore=com.baraa.masroof.lab.beta.data.BetaNotificationPreferences(preferences)
+        com.baraa.masroof.lab.beta.application.notification.BetaNotificationCenterService(preferencesStore).markRead(id)
+    }
+
     fun assets(): List<OwnedAsset> = lock.withLock {
         check(!closed)
         runBlocking { BetaAssetRegistry(database).owned() }
