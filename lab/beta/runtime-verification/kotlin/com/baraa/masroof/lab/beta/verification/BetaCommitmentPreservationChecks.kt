@@ -20,9 +20,11 @@ internal object BetaCommitmentPreservationChecks {
         val current=controls.read()
         val changed=controls.save(current.revision,current.draft.copy(salary=BetaSalaryCycle(26))) as BetaDashboardConfigurationWrite.Saved
         assertEquals(original,db.dashboardConfigurationDao().commitments().single())
-        val edited=BetaDashboardConfigurationWorkflow.commitment(changed.configuration.draft,"rent","Renamed","100","5","2026-01","")
-        assertTrue(controls.save(changed.configuration.revision,edited) is BetaDashboardConfigurationWrite.Saved)
-        val expected=original.copy(label="Renamed")
+        val row=changed.configuration.draft.commitments.single()
+        val edited=BetaCommitmentsWorkflow(controls).edit(row.id,changed.configuration.revision,
+            BetaCommitmentEditorDraft("Renamed",row.amount,row.anchorDate,row.recurrence,row.dueDate))
+        assertTrue(edited is BetaDashboardConfigurationWrite.Saved)
+        val expected=original.copy(label="Renamed",transactionDate=row.anchorDate.toString())
         assertEquals(expected,db.dashboardConfigurationDao().commitments().single())
         return expected
     }

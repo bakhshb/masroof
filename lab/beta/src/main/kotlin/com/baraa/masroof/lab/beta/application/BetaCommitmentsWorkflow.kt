@@ -13,7 +13,7 @@ interface BetaCommitmentHistorySource { suspend fun commitmentHistory(): List<Be
 class BetaCommitmentsWorkflow(private val controls: BetaDashboardControls,private val clock: Clock=Clock.systemUTC()) {
     suspend fun read()=controls.read()
     suspend fun history(): List<BetaCommitmentHistoryEntry> =
-        checkNotNull(controls as? BetaCommitmentHistorySource) { "Commitment history is unavailable" }.commitmentHistory()
+        BetaCommitmentLists.history(checkNotNull(controls as? BetaCommitmentHistorySource) { "Commitment history is unavailable" }.commitmentHistory())
     suspend fun edit(id: String,revision: Long,draft: BetaCommitmentEditorDraft): BetaDashboardConfigurationWrite = change(id,revision) {
         it.copy(label=draft.name.trim(),amount=draft.amount,transactionDate=draft.transactionDate,
             starts=YearMonth.from(draft.transactionDate),dueDay=draft.transactionDate.dayOfMonth,recurrence=draft.recurrence,dueDate=draft.dueDate)

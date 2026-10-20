@@ -471,6 +471,30 @@
       "source_sha256": "bc63454ad087957ecc77b29764cefd88c7b803cedae08f1a90f0c477d28fd6d4",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaListShare.kt",
       "adaptations": "Source visual layout, stable equal-time order, draft/cancel/apply/reset filters and filtered-list sharing. Lab selections retain complete bank-qualified registry identities. One canonical movement renderer; no presentation money aggregation or ledger writes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsCommitmentsScreen.kt",
+      "symbol": "SettingsCommitmentsScreen",
+      "source_sha256": "c57ff566a0f8a5432fa1c3fdfe719d5cc9c54863fcb02080736d1379dc1a830d",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaCommitmentsPanel.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsCommitmentEditorScreen.kt",
+      "symbol": "SettingsCommitmentEditorScreen",
+      "source_sha256": "51b28374daab71ff3ec6a5e2031ddce0d6155a129e6b7b8f1d64e97040e79349",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaCommitmentEditorContent.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/settings/SettingsNavigationComponents.kt",
+      "symbol": "SettingsNavRow",
+      "source_sha256": "85a6c50be2a0cb8ec9989ba91fc186170289a7d1101ad8b85f4a5222dda0b1ab",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedSettingsNavigationRow.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/common/MasroofCardComponents.kt",
+      "symbol": "MasroofNavCard",
+      "source_sha256": "f7ef8b9a1a37b5aa44ac099d151b2e099f6987a0b3f3ff6a3736653bdddbff83",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedSettingsNavigationRow.kt"
     }
   ],
   "adaptations": [

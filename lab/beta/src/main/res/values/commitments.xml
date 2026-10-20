@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="beta_commitment_reference_delete">حذف</string>
+  <string name="beta_commitment_reference_delete_commitment">حذف الالتزام</string>
+  <string name="beta_commitment_reference_edit">تعديل</string>
+  <string name="beta_commitment_reference_manage_commitments">التزاماتي · الإدارة</string>
+  <string name="beta_commitment_reference_pause">إيقاف</string>
+  <string name="beta_commitment_reference_pause_commitment">إيقاف الالتزام</string>
+  <string name="beta_commitment_settings_cancel">إلغاء</string>
+  <string name="beta_commitment_settings_commitment_amount">المبلغ</string>
+  <string name="beta_commitment_settings_commitment_delete">حذف</string>
+  <string name="beta_commitment_settings_commitment_delete_confirm_body">سيتم حذف الالتزام نهائيًا. لن تتأثر الحركة الأصلية.</string>
+  <string name="beta_commitment_settings_commitment_delete_confirm_title">حذف الالتزام؟</string>
+  <string name="beta_commitment_settings_commitment_due_date_clear">مسح تاريخ الاستحقاق</string>
+  <string name="beta_commitment_settings_commitment_due_date_none">بدون تاريخ استحقاق</string>
+  <string name="beta_commitment_settings_commitment_edit_title">تعديل الالتزام</string>
+  <string name="beta_commitment_settings_commitment_enable">تفعيل</string>
+  <string name="beta_commitment_settings_commitment_name">الاسم</string>
+  <string name="beta_commitment_settings_commitment_pause_history">سجل الإيقاف</string>
+  <string name="beta_commitment_settings_commitment_pause_interval_open">متوقف منذ %1$s</string>
+  <string name="beta_commitment_settings_commitment_pause_interval_resumed">%1$s – %2$s</string>
+  <string name="beta_commitment_settings_commitment_record_created">أُنشئ</string>
+  <string name="beta_commitment_settings_commitment_record_line">%1$s · %2$s</string>
+  <string name="beta_commitment_settings_commitment_record_paused">أُوقِف</string>
+  <string name="beta_commitment_settings_commitment_record_resumed">أُعيد تفعيله</string>
+  <string name="beta_commitment_settings_commitment_recurrence">التكرار</string>
+  <string name="beta_commitment_settings_commitment_recurrence_monthly">شهري</string>
+  <string name="beta_commitment_settings_commitment_recurrence_none">بدون تكرار</string>
+  <string name="beta_commitment_settings_commitment_recurrence_weekly">أسبوعي</string>
+  <string name="beta_commitment_settings_commitment_recurrence_yearly">سنوي</string>
+  <string name="beta_commitment_settings_commitment_save">حفظ التعديل</string>
+  <string name="beta_commitment_settings_commitment_transaction_date">تاريخ الحركة</string>
+  <string name="beta_commitment_settings_commitments_active_empty">لا توجد التزامات نشطة</string>
+  <string name="beta_commitment_settings_commitments_disabled_empty">لا توجد التزامات متوقفة</string>
+  <string name="beta_commitment_settings_commitments_record_empty">لا يوجد سجل بعد</string>
+  <string name="beta_commitment_settings_commitments_tab_active">نشط</string>
+  <string name="beta_commitment_settings_commitments_tab_disabled">متوقف</string>
+  <string name="beta_commitment_settings_commitments_tab_record">السجل</string>
+</resources>

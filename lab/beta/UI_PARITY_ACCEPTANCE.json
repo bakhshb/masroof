@@ -248,7 +248,8 @@
     "Duplicate Home transaction renderer: now uses the canonical scoped transaction rows.",
     "Hand-built review list layout: replaced by source ReviewListScreen content with fixed choices and independent list scrolling.",
     "Generic settings asset/bank loop and ordinary management Add callbacks replaced by one source-derived BetaRegistryManagementPanel; explicit developer manual configuration remains separate.",
-    "Generic transaction list renderer, twenty-row pagination and single type/asset filter replaced by source toolbar, multi-filter draft and independent lazy list. TransactionPreviewRow is now one canonical BetaMovementRow reused by list and scoped pages."
+    "Generic transaction list renderer, twenty-row pagination and single type/asset filter replaced by source toolbar, multi-filter draft and independent lazy list. TransactionPreviewRow is now one canonical BetaMovementRow reused by list and scoped pages.",
+    "Generic commitment list/editor/add/delete/manual-paid UI and commitmentsOnly branch removed from BetaDashboardConfigurationPanel. Unused legacy commitment/paid/remove workflow methods removed; storage regression now calls BetaCommitmentsWorkflow.edit. Salary/statement controls remain separate."
   ],
   "removed_resource_keys": [
     "beta_asset_link_account",
@@ -285,6 +286,21 @@
     "beta_chart_scope_purchases",
     "beta_chart_signed_help",
     "beta_chart_table",
+    "beta_controls_add",
+    "beta_controls_amount",
+    "beta_controls_clamp",
+    "beta_controls_delete",
+    "beta_controls_delete_help",
+    "beta_controls_edit",
+    "beta_controls_ends",
+    "beta_controls_label",
+    "beta_controls_mark_paid",
+    "beta_controls_mark_unpaid",
+    "beta_controls_no_end",
+    "beta_controls_payment",
+    "beta_controls_payment_help",
+    "beta_controls_recurring",
+    "beta_controls_starts",
     "beta_dash_average",
     "beta_dash_details",
     "beta_detail_card_data",
@@ -296,6 +312,10 @@
     "beta_detail_network",
     "beta_detail_outflow_group",
     "beta_detail_salary_period",
+    "beta_fix_filter_account",
+    "beta_fix_filters",
+    "beta_fix_no_matches",
+    "beta_fix_search",
     "beta_home_layout_shortcuts",
     "beta_home_layout_title",
     "beta_parity_custom_date",
@@ -318,14 +338,10 @@
     "beta_review_suppressed",
     "beta_review_time",
     "beta_review_time_help",
-    "beta_review_unavailable",
-    "beta_fix_search",
-    "beta_fix_filters",
-    "beta_fix_filter_account",
-    "beta_fix_no_matches"
+    "beta_review_unavailable"
   ],
   "verified_tests": {
-    "lab_jvm": 329,
+    "lab_jvm": 330,
     "bank_engine": 58,
     "finance_core": 180,
     "android16_full": {
@@ -334,7 +350,7 @@
       "failed": 0,
       "scope": "Full Android 16 suite after source transaction-list port and CI rename-readiness fix. Final digit-comparison refinement is validated separately by targeted filter tests. Final digit comparison and calculator placement passed all 322 JVM tests, lint, and four targeted native tests including the actual Activity. Subsequent registry-fact preservation and navigation-generation changes passed all 323 JVM tests, lint and five targeted Android tests; they do not claim a second full 200-test run."
     },
-    "ci": "1576c368: all GitHub CI and isolated-lab checks passed. Commitment schema/lifecycle follow-up passed locally and awaits CI after push.",
+    "ci": "e63cbb06: all GitHub CI and isolated-lab checks passed. Source commitment UI follow-up passes 330 JVM tests, lint and 17 final targeted Android tests locally; CI for the follow-up awaits push.",
     "android16_followup": {
       "passed": 20,
       "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
@@ -349,8 +365,8 @@
       "scope": "Actual notification/read-state/review/back navigation, settings rename and shared navigation."
     },
     "paired_native_captures": {
-      "pairs": 120,
-      "body_pixel_identical": 116,
+      "pairs": 136,
+      "body_pixel_identical": 132,
       "pages": [
         "cards",
         "cardDetail",
@@ -366,7 +382,9 @@
         "myAccounts",
         "myCards",
         "myLoans",
-        "transactions"
+        "transactions",
+        "myCommitments",
+        "commitmentEditor"
       ],
       "region": "1080×1755 captures; compare y=195 onward only. Top/bottom views only; long-page middle coverage and full journeys are separate gates.",
       "remaining_differences": "Four account-detail bottom captures: maximum channel difference 6–7/255, on rendered edges; retained as differences, not counted as pixel-identical."
@@ -431,6 +449,20 @@
       ],
       "scope": "Real Android 16 container cold reopen; once recurrence; lifecycle history chronological fractional timestamp ordering; revision conflict; preservation of source/pause facts; previous-schema snapshot restore upgrades staged copy while published snapshot remains byte-identical at schema 14; current encrypted financial-history archive round trip and strict rejected historical schema. No full native or process-death rerun claimed for this change.",
       "limitations": "Commitment UI port, automatic payment matching, foreign-currency projection and creation from posted transaction remain open. Model tests do not establish page parity."
+    },
+    "commitment_ui_followup": {
+      "jvm_total_passed": 330,
+      "source_loaded_state_pairs": 16,
+      "source_loaded_state_identical": 16,
+      "scope": "Source active list and editor in Arabic/English/light/dark/top/bottom. Real Activity journey uses the stored lab configuration and verifies financial table fingerprints remain unchanged. Pending-save, restored-revision conflict and write-failure draft retention are separate interactive gates.",
+      "old_renderer_removed": true,
+      "removed_legacy_resource_keys": 15,
+      "native_final_status": "17/17 passed in final targeted Android 16 run; source fixture capture test passed separately and produced 136 total pairs.",
+      "native_final_targeted_passed": 17,
+      "lint": "passed",
+      "financial_invariance": "Real Activity seed has 39 active posted transactions plus existing history. Fingerprints of every unchanged storage table (excluding preferences, commitment definitions and their audit log) stay identical through draft cancellation, save/recreation, pause/resume/history navigation, delete cancellation, cold reopen and final delete.",
+      "cleanup": "Removed the old generic renderer and its add/edit/delete/manual-paid paths, 15 exclusive text keys and unused legacy workflow methods. Storage regression now exercises the live BetaCommitmentsWorkflow.edit facade.",
+      "limitations": "No full native/process-death rerun claimed for this UI change. Creation from a posted transaction, automatic payment matching, foreign-currency projection, summary navigation and non-default visual variants remain open."
     }
   },
   "implementation_notes": [
@@ -451,7 +483,8 @@
     "إدارة الحسابات والبطاقات والقروض تستخدم تبويبات الفعلي وإجراءات الإيقاف والاستئناف ونوافذ التأكيد. أُزيل زر الإضافة العام من الإدارة العادية. استُخدمت أعمدة الملكية الموجودة دون أي جداول أو أعمدة جديدة. يظل اعتماد التحويل المرتبط محميًا عند تغيير ملكية أحد طرفيه، مع مراجعة واحدة بدل تكرار الرسالتين.",
     "قائمة الحركات تستخدم الآن أدوات الفعلي والتمرير المستقل والبحث والفلاتر المتعددة والإلغاء/التطبيق وزر مشاركة القائمة المفلترة. أصلحت المقارنة عنوان الصفحة والمسافة السفلية وترتيب التعادل في التوقيت. تفاصيل الحركة وحالات بقية الصفحات تبقى مفتوحة.",
     "أُصلح مسح حالة الالتزام وسجل توقفه ورابطه عند تغيير إعدادات أخرى، واختُبر الحفظ بعد إعادة الفتح. هذا إصلاح حفظ جزئي؛ نموذج التكرار المتقدم وإدارة الالتزام من المصدر ما زالا مفتوحين. أُضيف أيضًا جيل التنقل لمطابقة حفظ الفلاتر عند الرجوع وإعادة ضبطها عند فتح الحركات من جديد.",
-    "أضيفت حقائق الالتزام الناقصة إلى الجدول الموجود: نوع التكرار وتاريخ العملية والاستحقاق، مع ترقية محددة لنسخة المختبر 14→15 دون لمس الفعلي أو مسح البيانات. أضيفت واجهة تطبيق للإيقاف والاستئناف والتعديل والحذف وسجلها. هذه بنية لازمة للنقل؛ واجهة إدارة الالتزامات القديمة ومطابقة السداد التلقائية ما زالتا تحتاجان الإكمال، ولا يعد هذا إعلان تطابق الصفحة."
+    "أضيفت حقائق الالتزام الناقصة إلى الجدول الموجود: نوع التكرار وتاريخ العملية والاستحقاق، مع ترقية محددة لنسخة المختبر 14→15 دون لمس الفعلي أو مسح البيانات. أضيفت واجهة تطبيق للإيقاف والاستئناف والتعديل والحذف وسجلها. هذه بنية لازمة للنقل؛ واجهة إدارة الالتزامات القديمة ومطابقة السداد التلقائية ما زالتا تحتاجان الإكمال، ولا يعد هذا إعلان تطابق الصفحة.",
+    "نُقلت إدارة الالتزامات ومحررها من SettingsCommitmentsScreen/SettingsCommitmentEditorScreen، بتبويبات النشط والمتوقف والسجل وإجراءات الفعلي. أُزيل محرر الالتزام العام وأزرار الإضافة والتعليم اليدوي للسداد ومساراتها ونصوصها الحصرية، وأصبحت اختبارات الحفظ تمر عبر واجهة التطبيق الجديدة. الصور المحملة للصفحتين متطابقة في 16 مقارنة؛ هذا لا يغلق ربط السداد والإنشاء من الحركة وملخص الالتزامات أو كل الحالات البصرية."
   ],
   "source_page_inventory": [
     {
@@ -649,9 +682,9 @@
     {
       "id": "commitmentEditor",
       "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
-      "loaded_state_paired": false,
+      "loaded_state_paired": true,
       "accepted": false,
-      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "remaining_gate": "Loaded active list/editor top and bottom match in both languages/themes. Record/disabled/date-picker/error/busy/long-list visual variants and creation/payment/summary integration still require evidence.",
       "label_ar": "تحرير الالتزام"
     },
     {
@@ -705,9 +738,9 @@
     {
       "id": "myCommitments",
       "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
-      "loaded_state_paired": false,
+      "loaded_state_paired": true,
       "accepted": false,
-      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "remaining_gate": "Loaded active list/editor top and bottom match in both languages/themes. Record/disabled/date-picker/error/busy/long-list visual variants and creation/payment/summary integration still require evidence.",
       "label_ar": "إدارة الالتزامات"
     }
   ],
@@ -832,10 +865,10 @@
     },
     {
       "id": "DATA-002",
-      "finding_ar": "اكتملت إضافة حقائق التكرار الأسبوعي/الشهري/السنوي والمرة الواحدة وتواريخ العملية والاستحقاق وحفظ سجل الإيقاف. لا تزال واجهة الإدارة وربط الدفع الفعلي وإنشاء الالتزام من الحركة غير مكتملة.",
-      "action_ar": "نقل إدارة الالتزامات ومحررها من المصدر وربطهما بواجهة التطبيق الجديدة، ثم مطابقة المدفوعات من الحقائق المخزنة ومقارنة رحلة الإنشاء والتعديل والإيقاف والاستئناف بصريًا ووظيفيًا.",
+      "finding_ar": "أضيف نموذج التكرار والتواريخ وسجل الإيقاف، ونُقلت إدارة الالتزامات ومحررها من الفعلي. ما زال إنشاء الالتزام من الحركة وربط السداد التلقائي والعملات الأجنبية وملخص الالتزامات بحاجة إلى إكمال.",
+      "action_ar": "ربط الإنشاء بمعرّف الحركة المعتمدة ومطابقة السداد من الحقائق المخزنة، ثم إكمال ملخص الالتزامات وحالات الصفحة البصرية المتبقية. لا يُستبدل السداد التلقائي بزر تعليم يدوي.",
       "status": "open",
-      "evidence": "BetaCommitmentsWorkflow; BetaCommitmentCodec; BetaCommitmentOccurrenceCalculator; BetaCommitmentMigrationTest; BetaCommitmentLifecyclePersistenceTest. Whole-page acceptance remains open."
+      "evidence": "BetaCommitmentsPanel; BetaCommitmentEditorContent; BetaCommitmentsWorkflow; BetaCommitmentLists; BetaCommitmentsActivityTest; BetaCommitmentsScreenTest; 16 paired loaded-state captures. Source summary/payment/creation integration remains open."
     },
     {
       "id": "NAV-001",

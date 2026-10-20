@@ -216,7 +216,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
                             {selectedTransaction=it})
                     }
                     if (selectedId == null && selectedTransaction == null && route == "TRANSACTIONS") BetaDashboardTransactions(snapshot, enabled = interactive, onTransaction = { selectedTransaction = it.transactionId }, complete = DashboardSection.RUNTIME_SOURCE !in read.unavailableSections,bounded=ownsScroll,onShare=onListShare,openGeneration=routeRequest)
-                    if (selectedId == null && selectedTransaction == null && route == "CONFIGURATION") BetaDashboardConfigurationPanel(controls, snapshot.creditFacilities, month, interactive,
+                    if (selectedId == null && selectedTransaction == null && route == "CONFIGURATION") BetaDashboardConfigurationPanel(controls, snapshot.creditFacilities, interactive,
                         onBusyChanged = { controlsBusy = it; onBusyChanged(it) }, onSaved = { retry++ })
                     }
                 }

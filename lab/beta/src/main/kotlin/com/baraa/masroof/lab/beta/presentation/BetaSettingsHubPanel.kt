@@ -44,7 +44,7 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
     var typeTarget by remember {mutableStateOf<OwnedAsset?>(null)}
     var resetConfirmation by rememberSaveable { mutableStateOf(false) }
     BackHandler { if (!busy) { if (resetConfirmation) resetConfirmation = false else if (category == "HUB") onClose() else onCategory("HUB") } }
-    Column(Modifier.testTag("beta-settings-panel"), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
+    Column(Modifier.testTag("beta-settings-panel").then(if(category=="COMMITMENTS") Modifier.fillMaxSize() else Modifier), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         if (category == "HUB") MasroofCard(Modifier.testTag("beta-management-settings")) {
             Text(stringResource(R.string.beta_manage_title), style = MaterialTheme.typography.titleMedium)
             val groups = listOf("ACCOUNTS" to R.string.beta_home_accounts, "CARDS" to R.string.beta_home_cards,
@@ -70,8 +70,7 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
             BetaManagementRow(stringResource(R.string.beta_complete_import_messages),"",MasroofOutlineIcons.MessageSquare,!busy,onHistory,modifier=Modifier.testTag("settings-import-sms"))
             BetaManagementRow(stringResource(R.string.beta_complete_developer),"",MasroofOutlineIcons.SlidersHorizontal,!busy,onDeveloper,modifier=Modifier.testTag("settings-developer-tools"))
         } else if (category == "COMMITMENTS") {
-            BetaDashboardConfigurationPanel(controls, emptyList(), YearMonth.now(java.time.ZoneId.of("Asia/Riyadh")), !busy,
-                onBusyChanged, onSaved = {}, commitmentsOnly = true)
+            BetaCommitmentsPanel(controls,busy,onBusyChanged,onRegistryTitle)
         } else {
             BetaRegistryManagementPanel(category,banks,tracking.ifEmpty {assets.map {BetaTrackedAsset(it,BetaOwnershipStatus.OWNED,metadata[it.id]?.revision ?: 0)}},
                 references,metadata,cardTasks,busy,initialRegistryTab,onCategory,onRegistryTitle,onRename={asset ->

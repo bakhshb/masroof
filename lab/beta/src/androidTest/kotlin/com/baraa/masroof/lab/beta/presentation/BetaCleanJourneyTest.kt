@@ -66,7 +66,7 @@ class BetaCleanJourneyTest {
                 settings.performClick(); await("beta-management-settings"); capture("m10-management-settings")
                 compose.onNodeWithTag("beta-developer-tools").assertDoesNotExist()
                 compose.onNodeWithTag("beta-settings-backup").assertDoesNotExist()
-                click("manage-COMMITMENTS"); await("controls-add")
+                click("manage-COMMITMENTS"); await("commitments-list")
                 compose.onNodeWithTag("controls-salary").assertDoesNotExist()
                 click("beta-page-back"); click("beta-page-back"); await("dashboard-ready")
             }

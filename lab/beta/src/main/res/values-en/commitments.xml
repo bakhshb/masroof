@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="beta_commitment_reference_delete">Delete</string>
+  <string name="beta_commitment_reference_delete_commitment">Delete commitment</string>
+  <string name="beta_commitment_reference_edit">Edit</string>
+  <string name="beta_commitment_reference_manage_commitments">My commitments · Manage</string>
+  <string name="beta_commitment_reference_pause">Pause</string>
+  <string name="beta_commitment_reference_pause_commitment">Pause commitment</string>
+  <string name="beta_commitment_settings_cancel">Cancel</string>
+  <string name="beta_commitment_settings_commitment_amount">Amount</string>
+  <string name="beta_commitment_settings_commitment_delete">Delete</string>
+  <string name="beta_commitment_settings_commitment_delete_confirm_body">This permanently removes the commitment. The original transaction is not affected.</string>
+  <string name="beta_commitment_settings_commitment_delete_confirm_title">Delete commitment?</string>
+  <string name="beta_commitment_settings_commitment_due_date_clear">Clear due date</string>
+  <string name="beta_commitment_settings_commitment_due_date_none">No due date</string>
+  <string name="beta_commitment_settings_commitment_edit_title">Edit commitment</string>
+  <string name="beta_commitment_settings_commitment_enable">Enable</string>
+  <string name="beta_commitment_settings_commitment_name">Name</string>
+  <string name="beta_commitment_settings_commitment_pause_history">Pause history</string>
+  <string name="beta_commitment_settings_commitment_pause_interval_open">Paused since %1$s</string>
+  <string name="beta_commitment_settings_commitment_pause_interval_resumed">%1$s – %2$s</string>
+  <string name="beta_commitment_settings_commitment_record_created">Created</string>
+  <string name="beta_commitment_settings_commitment_record_line">%1$s · %2$s</string>
+  <string name="beta_commitment_settings_commitment_record_paused">Paused</string>
+  <string name="beta_commitment_settings_commitment_record_resumed">Resumed</string>
+  <string name="beta_commitment_settings_commitment_recurrence">Recurrence</string>
+  <string name="beta_commitment_settings_commitment_recurrence_monthly">Monthly</string>
+  <string name="beta_commitment_settings_commitment_recurrence_none">No recurrence</string>
+  <string name="beta_commitment_settings_commitment_recurrence_weekly">Weekly</string>
+  <string name="beta_commitment_settings_commitment_recurrence_yearly">Yearly</string>
+  <string name="beta_commitment_settings_commitment_save">Save changes</string>
+  <string name="beta_commitment_settings_commitment_transaction_date">Transaction date</string>
+  <string name="beta_commitment_settings_commitments_active_empty">No active commitments</string>
+  <string name="beta_commitment_settings_commitments_disabled_empty">No disabled commitments</string>
+  <string name="beta_commitment_settings_commitments_record_empty">No record yet</string>
+  <string name="beta_commitment_settings_commitments_tab_active">Active</string>
+  <string name="beta_commitment_settings_commitments_tab_disabled">Disabled</string>
+  <string name="beta_commitment_settings_commitments_tab_record">Record</string>
+</resources>

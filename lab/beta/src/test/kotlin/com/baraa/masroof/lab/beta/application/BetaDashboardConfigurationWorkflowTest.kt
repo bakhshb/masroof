@@ -20,21 +20,11 @@ class BetaDashboardConfigurationWorkflowTest {
         assertEquals(base.commitments, cleared.commitments)
         assertNull(BetaDashboardConfigurationWorkflow.salary(base, "").salary)
     }
-    @Test fun paidDecisionIsAnExplicitDueMonthAndRangeEditsCannotSilentlyDiscardIt() {
-        val paid = BetaDashboardConfigurationWorkflow.paid(base, "rent", month, true)
-        assertEquals(setOf(month), paid.commitments.single().paidMonths)
-        assertEquals(emptySet<YearMonth>(), BetaDashboardConfigurationWorkflow.paid(paid, "rent", month, false).commitments.single().paidMonths)
-        assertThrows(IllegalArgumentException::class.java) { BetaDashboardConfigurationWorkflow.commitment(paid, "rent", "Rent", "1300", "31", "2026-11", "") }
-        val changed = BetaDashboardConfigurationWorkflow.commitment(paid, "rent", "New rent", "1300", "30", "2026-10", "2027-02")
-        assertEquals(setOf(month), changed.commitments.single().paidMonths)
-        assertEquals("rent", changed.commitments.single().id)
-    }
-    @Test fun invalidAmountsDaysAndReversedDatesNeverCreateAConfigDraft() {
-        for (amount in listOf("0", "-1", "1.001", "NaN", "1e9", "")) assertThrows(IllegalArgumentException::class.java) {
-            BetaDashboardConfigurationWorkflow.commitment(base, null, "Rent", amount, "1", "2026-10", "")
+    @Test fun invalidDaysNeverCreateACycleDraft() {
+        for(day in listOf("0","32","x")) {
+            assertThrows(IllegalArgumentException::class.java) {BetaDashboardConfigurationWorkflow.salary(base,day)}
+            assertThrows(IllegalArgumentException::class.java) {BetaDashboardConfigurationWorkflow.statement(base,AssetId(Environment.BETA,BankId("A"),"facility"),day)}
         }
-        for (day in listOf("0", "32", "x")) assertThrows(IllegalArgumentException::class.java) { BetaDashboardConfigurationWorkflow.salary(base, day) }
-        assertThrows(IllegalArgumentException::class.java) { BetaDashboardConfigurationWorkflow.commitment(base, null, "Rent", "1", "1", "2026-10", "2026-09") }
-        assertEquals(1, base.commitments.size)
+        assertEquals(1,base.commitments.size)
     }
 }

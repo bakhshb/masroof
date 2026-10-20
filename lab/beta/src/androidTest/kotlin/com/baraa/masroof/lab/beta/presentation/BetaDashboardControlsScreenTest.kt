@@ -38,7 +38,7 @@ class BetaDashboardControlsScreenTest {
     }
     private fun show(controls: BetaDashboardControls, facilities: List<FacilitySummary> = emptyList()) {
         compose.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
-            BetaDashboardConfigurationPanel(controls, facilities, month, true, {}, {})
+            BetaDashboardConfigurationPanel(controls, facilities, true, {}, {})
         } } }
         compose.waitUntil(10000) { compose.onAllNodesWithTag("controls-salary").fetchSemanticsNodes().isNotEmpty() }
     }
@@ -96,7 +96,7 @@ class BetaDashboardControlsScreenTest {
         val controls = Controls()
         val restorer = StateRestorationTester(compose)
         restorer.setContent { MaterialTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
-            BetaDashboardConfigurationPanel(controls, emptyList(), month, true, {}, {})
+            BetaDashboardConfigurationPanel(controls, emptyList(), true, {}, {})
         } } }
         compose.waitUntil { compose.onAllNodesWithTag("controls-salary").fetchSemanticsNodes().isNotEmpty() }
         node("controls-salary").performScrollTo().performClick(); node("controls-day").performTextInput("27")
@@ -108,23 +108,17 @@ class BetaDashboardControlsScreenTest {
         assertEquals(0, controls.saves.get())
         node("dash-sheet-cancel").performClick()
     }
-    @Test fun recurringDraftValidationAndManualPaidDecisionNeverCreateAnImplicitPayment() {
-        val controls = Controls(); show(controls)
-        node("controls-add").performScrollTo().performClick()
-        node("controls-label").performTextInput("Synthetic rent")
-        node("controls-amount").performTextInput("-1")
-        node("controls-day").performScrollTo().performTextInput("31")
-        node("dash-sheet-apply").performClick(); node("controls-invalid").assertExists(); assertEquals(0, controls.saves.get())
-        node("controls-amount").performScrollTo().performTextReplacement("1200.00")
-        node("dash-sheet-apply").performClick(); confirm()
-        compose.waitUntil { compose.onAllNodesWithTag("dash-sheet").fetchSemanticsNodes().isEmpty() }
-        val row = controls.state.draft.commitments.single()
-        node("controls-paid-${row.id}").performScrollTo().performClick(); node("dash-sheet-cancel").performClick()
-        assertTrue(controls.state.draft.commitments.single().paidMonths.isEmpty())
-        node("controls-paid-${row.id}").performScrollTo().performClick(); node("dash-sheet-apply").performClick(); confirm()
-        compose.waitUntil { compose.onAllNodesWithTag("dash-sheet").fetchSemanticsNodes().isEmpty() }
-        assertEquals(setOf(month), controls.state.draft.commitments.single().paidMonths)
-        node("controls-delete-${row.id}").performScrollTo().performClick(); node("dash-sheet-cancel").performClick()
-        assertEquals(1, controls.state.draft.commitments.size)
+    @Test fun cycleSettingsKeepCommitmentsAndDoNotExposeTheRemovedGenericEditor() {
+        val controls=Controls()
+        val row=BetaRecurringCommitment("existing","Existing",com.baraa.masroof.lab.finance.value.Money.of("100",com.baraa.masroof.lab.finance.value.Currency.SAR),5,month,
+            recurrence=BetaCommitmentRecurrence.WEEKLY,transactionDate=month.atDay(5),sourceTransactionId="source")
+        controls.state=controls.state.copy(draft=controls.state.draft.copy(commitments=listOf(row)))
+        show(controls)
+        node("controls-add").assertDoesNotExist();node("controls-edit-existing").assertDoesNotExist()
+        node("controls-salary").performScrollTo().performClick();node("controls-day").performTextInput("27")
+        node("dash-sheet-apply").performClick();confirm()
+        compose.waitUntil {compose.onAllNodesWithTag("dash-sheet").fetchSemanticsNodes().isEmpty()}
+        assertEquals(listOf(row),controls.state.draft.commitments)
+        assertEquals(27,controls.state.draft.salary?.day)
     }
 }

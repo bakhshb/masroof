@@ -39,8 +39,15 @@ internal data class BetaDashboardConfigurationEntity(val id: Int,val revision: L
         commitments.forEach {next ->
             val previous=existing[next.id]
             val event=when {previous==null->"CREATED";previous.active && !next.active->"PAUSED";!previous.active && next.active->"RESUMED";else->null}
+            val eventAt=when(event) {
+                "PAUSED"->next.pauseIntervals.let {org.json.JSONArray(it)}.let {pauses ->
+                    if(pauses.length()>0) pauses.getJSONObject(pauses.length()-1).getString("pausedAt") else at}
+                "RESUMED"->next.pauseIntervals.let {org.json.JSONArray(it)}.let {pauses ->
+                    if(pauses.length()>0) pauses.getJSONObject(pauses.length()-1).optString("resumedAt").takeUnless {it.isBlank() || it=="null"} ?: at else at}
+                else->at
+            }
             if(event!=null) appendAudit(BetaAuditRecord(auditId("COMMITMENT_LIFECYCLE",row.revision)+":"+next.id,
-                "COMMITMENT_LIFECYCLE",targetId=next.id,transition=row.revision,operation=event,createdAt=at))
+                "COMMITMENT_LIFECYCLE",targetId=next.id,transition=row.revision,operation=event,createdAt=eventAt))
         }
         j.remove("commitments")
         appendAudit(BetaAuditRecord(auditId("FINANCIAL_CONFIGURATION",row.revision),"FINANCIAL_CONFIGURATION",targetId="periods",transition=row.revision,payload=j.toString()))
