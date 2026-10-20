@@ -35,7 +35,7 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
     tracking: List<BetaTrackedAsset> = emptyList(),references: List<BetaOwnershipCandidate> = emptyList(),
     onTracking: (BetaTrackedAsset,Boolean,()->Unit)->Unit = {_,_,_->},onOwnership: (BetaOwnershipCandidate,Boolean,AssetId?)->Unit = {_,_,_->},
     onAccountType: (OwnedAsset,String,Long,()->Unit)->Unit = {_,_,_,_->},onRegistryTitle: (String?)->Unit = {},initialRegistryTab: String="followed",
-    theme: String = "SYSTEM", language: String = "SYSTEM", cardTasks: List<BetaCardSetupTask> = emptyList(), metadata: Map<AssetId,BetaAssetMetadata> = emptyMap(), onConfigureTask: (BetaCardSetupTask) -> Unit = {}, onTheme: (String) -> Unit = {}, onLanguage: (String) -> Unit = {}, onData: () -> Unit = {}, onSetup: () -> Unit = {}, onReset: () -> Unit = {}, onDeveloper: () -> Unit = {},onHistory: () -> Unit = {}) {
+    theme: String = "SYSTEM", language: String = "SYSTEM", cardTasks: List<BetaCardSetupTask> = emptyList(), metadata: Map<AssetId,BetaAssetMetadata> = emptyMap(), onConfigureTask: (BetaCardSetupTask) -> Unit = {}, onTheme: (String) -> Unit = {}, onLanguage: (String) -> Unit = {}, onData: () -> Unit = {}, onSetup: () -> Unit = {}, onReset: () -> Unit = {}, onDeveloper: () -> Unit = {},onHistory: () -> Unit = {},initialCommitmentId: String? = null) {
     var commitmentCounts by remember {mutableStateOf<Pair<Int,Int>?>(null)}
     BetaLaunchedEffect(controls,category) {
         if(category=="HUB") {
@@ -79,7 +79,7 @@ internal fun BetaSettingsHubPanel(category: String, onCategory: (String) -> Unit
             BetaManagementRow(stringResource(R.string.beta_complete_import_messages),"",MasroofOutlineIcons.MessageSquare,!busy,onHistory,modifier=Modifier.testTag("settings-import-sms"))
             BetaManagementRow(stringResource(R.string.beta_complete_developer),"",MasroofOutlineIcons.SlidersHorizontal,!busy,onDeveloper,modifier=Modifier.testTag("settings-developer-tools"))
         } else if (category == "COMMITMENTS") {
-            BetaCommitmentsPanel(controls,busy,onBusyChanged,onRegistryTitle)
+            BetaCommitmentsPanel(controls,busy,onBusyChanged,onRegistryTitle,initialCommitmentId,onClose)
         } else {
             BetaRegistryManagementPanel(category,banks,tracking.ifEmpty {assets.map {BetaTrackedAsset(it,BetaOwnershipStatus.OWNED,metadata[it.id]?.revision ?: 0)}},
                 references,metadata,cardTasks,busy,initialRegistryTab,onCategory,onRegistryTitle,onRename={asset ->

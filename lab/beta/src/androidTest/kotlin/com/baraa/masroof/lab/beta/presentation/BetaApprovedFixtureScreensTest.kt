@@ -89,14 +89,14 @@ class BetaApprovedFixtureScreensTest {
                                 metadata=metadata,onRegistryTitle={title=it})
                         }) else null,
                         dashboard=({BetaDashboardPanel(workflow,ownsScroll=true,onListShare={listShare=it},showInternalHeader=false,
-                            requestedRoute=when(page.value) {"transactions"->"TRANSACTIONS";"loans","loanDetail" -> "LOANS";"merchants" -> "MERCHANTS";"daily" -> "DAILY";"home" -> "OVERVIEW";"accounts","accountDetail" -> "ACCOUNTS";else -> "CARDS"},onPageTitle={title=it})}),
+                            requestedRoute=when(page.value) {"commitments"->"COMMITMENTS";"transactions"->"TRANSACTIONS";"loans","loanDetail" -> "LOANS";"merchants" -> "MERCHANTS";"daily" -> "DAILY";"home" -> "OVERVIEW";"accounts","accountDetail" -> "ACCOUNTS";else -> "CARDS"},onPageTitle={title=it})}),
                         onReturn={},onReset={},onBackup={},onRestore={})
                 }
             }}
         }
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val directory=File(instrumentation.targetContext.getExternalFilesDir(null),"lab-approved-fixture").apply {mkdirs()}
-        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home","review","myAccounts","myCards","myLoans","transactions","myCommitments","commitmentEditor")) {
+        for(lang in listOf("ar","en")) for(night in listOf(false,true)) for(destination in listOf("cards","cardDetail","loans","loanDetail","preferences","merchants","daily","accounts","accountDetail","home","review","myAccounts","myCards","myLoans","transactions","myCommitments","commitmentEditor","commitments")) {
             compose.runOnIdle {language.value=lang;dark.value=night;page.value=destination}
             compose.waitUntil(15000) {compose.onAllNodesWithTag(if(destination=="myCommitments") "commitments-list" else if(destination=="commitmentEditor") "commitment-editor" else if(destination=="review") "review-fixture-ready" else if(destination=="preferences" || destination.startsWith("my")) "beta-settings-panel" else "dashboard-ready").fetchSemanticsNodes().isNotEmpty()}
             if(destination in setOf("cardDetail","loanDetail","accountDetail")) {

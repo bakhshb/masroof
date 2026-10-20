@@ -98,6 +98,8 @@ class BetaActivity : ComponentActivity() {
                 var reviewOpen by rememberSaveable { mutableStateOf(false) }
                 var settingsOpen by rememberSaveable { mutableStateOf(false) }
                 var developerToolsOpen by rememberSaveable { mutableStateOf(false) }
+                var directCommitmentId by rememberSaveable { mutableStateOf<String?>(null) }
+                var directCommitmentGeneration by rememberSaveable { mutableIntStateOf(0) }
                 var settingsCategory by rememberSaveable { mutableStateOf("HUB") }
                 var ownershipEditSuffix by rememberSaveable { mutableStateOf("") }
                 var initialAssetKind by rememberSaveable { mutableStateOf(AssetKind.ACCOUNT.name) }
@@ -176,6 +178,7 @@ class BetaActivity : ComponentActivity() {
                 var maintenanceTools by rememberSaveable { mutableStateOf(false) }
                 fun openRoute(route: String) {
                     if (busy || historyBusy) return
+                    directCommitmentId=null
                     if(route=="SETTINGS") registryInitialTab="followed"
                     notificationsOpen=route=="NOTIFICATIONS"
                     historyOpen = route == "HISTORY"; reviewOpen = route == "REVIEW"; approvalOpen = route == "APPROVAL"
@@ -282,11 +285,11 @@ class BetaActivity : ComponentActivity() {
                             }
                         }
                     }) else null,
-                    selectedHomeTab = when { notificationsOpen -> "NONE"; settingsOpen -> "SETTINGS"; reviewOpen -> "REVIEW"; dashboardDestination in setOf("ACCOUNTS","CARDS","LOANS","COMMITMENTS","MERCHANTS","DAILY","ANALYSIS","CONFIGURATION") -> "NONE"; else -> dashboardTab },
+                    selectedHomeTab = when { notificationsOpen -> "NONE"; settingsOpen -> directCommitmentId?.let {"SETTINGS:COMMITMENT:$it:$directCommitmentGeneration"} ?: "SETTINGS"; reviewOpen -> "REVIEW"; dashboardDestination in setOf("ACCOUNTS","CARDS","LOANS","COMMITMENTS","MERCHANTS","DAILY","ANALYSIS","CONFIGURATION") -> "NONE"; else -> dashboardTab },
                     onOpenHome = { openRoute("HOME") },
                     onOpenTransactions = { openRoute("TRANSACTIONS") },
                     dashboardOwnsScroll=true,editorOwnsScroll=(reviewOpen || settingsOpen && settingsCategory=="COMMITMENTS") && loaded,
-                    dashboard = if (onboarding != BetaOnboardingStep.COMPLETE) null else ({ BetaDashboardPanel(dashboardWorkflow,ownsScroll=true,onListShare={listShare=it},onDestinationChanged={dashboardDestination=it},transactionExtras={id,changed -> BetaPostedTransactionActions(shellContainer,id,{historyBusy=it},changed)}, showInternalHeader=false,onNotificationFacts={period,count -> notificationPeriod=period;notificationExcluded=count}, onPageTitle={dashboardPageTitle=it}, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, pendingCardCount=cardTasks.size,onCards={openRoute("SETTINGS");settingsCategory="CARDS";perform {null}},
+                    dashboard = if (onboarding != BetaOnboardingStep.COMPLETE) null else ({ BetaDashboardPanel(dashboardWorkflow,ownsScroll=true,onOpenCommitment={id -> openRoute("SETTINGS");settingsCategory="COMMITMENTS";directCommitmentId=id;directCommitmentGeneration++},onListShare={listShare=it},onDestinationChanged={dashboardDestination=it},transactionExtras={id,changed -> BetaPostedTransactionActions(shellContainer,id,{historyBusy=it},changed)}, showInternalHeader=false,onNotificationFacts={period,count -> notificationPeriod=period;notificationExcluded=count}, onPageTitle={dashboardPageTitle=it}, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, pendingCardCount=cardTasks.size,onCards={openRoute("SETTINGS");settingsCategory="CARDS";perform {null}},
                         requestedRoute = when(dashboardTab) {"TRANSACTIONS" -> "TRANSACTIONS";"CONFIGURATION" -> "CONFIGURATION";else -> "OVERVIEW"}, routeRequest = dashboardRequest, onPrimaryTabChanged = { dashboardTab = it }, onBusyChanged = { historyBusy = it }, onImport = { openRoute("HISTORY") }, onSetup = ::resumeSetup,onManageAssets={kind -> openRoute("SETTINGS");settingsCategory=when(kind) {AssetKind.ACCOUNT->"ACCOUNTS";AssetKind.LOAN->"LOANS";else->"CARDS"};perform {null}}) }),
                     onOpenDiscovery = { openRoute("DISCOVERY") },
                     onOpenHistory = { openRoute("HISTORY") },
@@ -303,7 +306,7 @@ class BetaActivity : ComponentActivity() {
                     editorKey=when {
                         notificationsOpen -> "NOTIFICATIONS"
                         editBank!=null -> null
-                        settingsOpen -> "SETTINGS"
+                        settingsOpen -> directCommitmentId?.let {"SETTINGS:COMMITMENT:$it:$directCommitmentGeneration"} ?: "SETTINGS"
                         reviewOpen -> "REVIEW"
                         developerToolsOpen -> "DATA"
                         discoveryOpen || onboarding==BetaOnboardingStep.ASSETS -> "OWNERSHIP"
@@ -316,7 +319,7 @@ class BetaActivity : ComponentActivity() {
                             notificationState?.items.orEmpty(),notificationState?.unreadCount ?: 0,notificationLoading,notificationFailed,
                             onRetry={notificationReload++},onOpen=::openNotification)
                     }) else if (settingsOpen && editBank == null && loaded) ({ BetaSettingsHubPanel(settingsCategory, { settingsCategory = it;registryInitialTab="followed";if(it in setOf("ACCOUNTS","CARDS","LOANS")) perform {null} }, banks, assets, dashboardControls, busy || historyBusy,
-                        failed=failed, onRename={asset,name,revision,completed -> perform {
+                        initialCommitmentId=directCommitmentId,failed=failed, onRename={asset,name,revision,completed -> perform {
                             shellContainer.saveManualAsset(com.baraa.masroof.lab.beta.application.ManualAssetDraft(
                                 asset.id,asset.kind,asset.last4.orEmpty(),asset.parentId,asset.creditCardRole,true,true,asset,
                                 metadata=(assetMetadata[asset.id] ?: com.baraa.masroof.lab.beta.application.BetaAssetMetadata()).copy(

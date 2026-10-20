@@ -68,6 +68,23 @@ class BetaCommitmentCreationActivityTest {
                 compose.waitUntil(15000) {compose.onAllNodesWithText(counts).fetchSemanticsNodes().isNotEmpty()}
                 click("manage-COMMITMENTS");await("commitments-list")
                 compose.onNodeWithText("Source subscription").assertExists()
+                compose.onNode(hasContentDescription(context.getString(com.baraa.masroof.lab.beta.R.string.beta_nav_home)) and hasAnyAncestor(hasTestTag("beta-bottom-navigation"))).performClick()
+                await("dashboard-ready")
+                compose.onNodeWithText(context.getString(com.baraa.masroof.lab.beta.R.string.beta_home_commitments_shortcut)).performScrollTo().performClick()
+                compose.onNodeWithText("Source subscription").performScrollTo().performClick()
+                await("commitment-editor")
+                compose.onNodeWithTag("commitment-name").performTextReplacement("Discarded draft")
+                scenario.recreate();await("commitment-editor")
+                compose.onNodeWithTag("commitment-name").assertTextEquals("Discarded draft")
+                click("beta-page-back");await("dashboard-ready")
+                compose.onNodeWithText("Source subscription").performScrollTo().performClick()
+                await("commitment-editor")
+                compose.onNodeWithTag("commitment-name").assertTextEquals("Source subscription")
+                compose.onNodeWithTag("commitment-name").performTextReplacement("Saved subscription")
+                click("commitment-save")
+                compose.waitUntil(15000) {runCatching {compose.onNodeWithTag("commitment-save").assertIsEnabled();true}.getOrDefault(false)}
+                click("beta-page-back");await("dashboard-ready")
+                compose.onNodeWithText("Saved subscription").assertExists()
             }
             val closed=CountDownLatch(1);BetaIo.execute {closed.countDown()};assertTrue(closed.await(15,TimeUnit.SECONDS))
             BetaContainer(context).use {beta ->

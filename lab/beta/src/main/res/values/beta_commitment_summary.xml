@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="beta_commitment_summary_dashboard_commitments_total">الإجمالي</string>
+    <string name="beta_commitment_summary_dashboard_commitments_paid">المدفوع</string>
+    <string name="beta_commitment_summary_dashboard_commitments_remaining">المتبقي</string>
+    <string name="beta_commitment_summary_dashboard_commitments_status_paid">مدفوع</string>
+    <string name="beta_commitment_summary_dashboard_commitments_status_unpaid">غير مدفوع</string>
+    <string name="beta_commitment_summary_reference_no_commitments">لا توجد التزامات لهذه الفترة</string>
+</resources>

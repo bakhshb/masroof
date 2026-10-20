@@ -25,13 +25,13 @@ import java.time.format.DateTimeFormatter
 /** Source settings journey. All writes go through the revision-checked application facade. */
 @Composable
 internal fun BetaCommitmentsPanel(controls: BetaDashboardControls, externalBusy: Boolean,
-    onBusyChanged: (Boolean)->Unit, onTitle: (String?)->Unit) {
+    onBusyChanged: (Boolean)->Unit, onTitle: (String?)->Unit, initialId: String? = null, onDirectExit: ()->Unit = {}) {
     val workflow=remember(controls) {BetaCommitmentsWorkflow(controls)}
     val scope=rememberBetaUiScope()
     var config by remember {mutableStateOf<BetaDashboardConfiguration?>(null)}
     var history by remember {mutableStateOf<List<BetaCommitmentHistoryEntry>?>(null)}
     var tab by rememberSaveable {mutableStateOf("ACTIVE")}
-    var selectedId by rememberSaveable {mutableStateOf<String?>(null)}
+    var selectedId by rememberSaveable {mutableStateOf<String?>(initialId)}
     var expectedRevision by rememberSaveable {mutableLongStateOf(-1)}
     var reload by remember {mutableIntStateOf(0)}
     var saving by remember {mutableStateOf(false)}
@@ -44,13 +44,13 @@ internal fun BetaCommitmentsPanel(controls: BetaDashboardControls, externalBusy:
     BetaLaunchedEffect(workflow,reload) {
         loading=true;failure=null;history=null
         try {
-            config=workflow.read().also {check(it.available)}
+            config=workflow.read().also {check(it.available);if(expectedRevision<0 && initialId!=null) expectedRevision=it.revision}
             history=workflow.history()
         } catch(cancelled: CancellationException) {throw cancelled}
         catch(_: Exception) {failure="ERROR"}
         finally {loading=false}
     }
-    BackHandler(selectedId!=null) {if(!busy) {selectedId=null;failure=null}}
+    BackHandler(selectedId!=null) {if(!busy) {if(initialId!=null) onDirectExit() else selectedId=null;failure=null}}
     fun write(action: suspend ()->BetaDashboardConfigurationWrite,close: Boolean=false) {
         if(busy || loading) return
         saving=true;onBusyChanged(true);failure=null
@@ -59,7 +59,7 @@ internal fun BetaCommitmentsPanel(controls: BetaDashboardControls, externalBusy:
                 when(val result=action()) {
                     is BetaDashboardConfigurationWrite.Saved -> {
                         config=result.configuration;expectedRevision=result.configuration.revision
-                        if(close) selectedId=null
+                        if(close) {if(initialId!=null) onDirectExit() else selectedId=null}
                         history=null
                         history=workflow.history()
                     }
@@ -76,7 +76,7 @@ internal fun BetaCommitmentsPanel(controls: BetaDashboardControls, externalBusy:
         if(failure!=null) {
             Text(stringResource(when(failure) {"CONFLICT"->R.string.beta_controls_conflict;"INVALID"->R.string.beta_controls_invalid;"UNAVAILABLE"->R.string.beta_controls_unavailable;else->R.string.beta_dash_error}),
                 color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("commitments-error"))
-            ApprovedOutlinedButton(enabled=!busy,onClick={selectedId=null;reload++},modifier=Modifier.testTag("commitments-retry")) {Text(stringResource(R.string.beta_controls_reload))}
+            ApprovedOutlinedButton(enabled=!busy,onClick={if(initialId==null) selectedId=null;expectedRevision=-1;reload++},modifier=Modifier.testTag("commitments-retry")) {Text(stringResource(R.string.beta_controls_reload))}
         }
         if(loading) CircularProgressIndicator(Modifier.testTag("commitments-loading"))
         else if(config?.available==true) {
@@ -84,7 +84,7 @@ internal fun BetaCommitmentsPanel(controls: BetaDashboardControls, externalBusy:
             val selected=current.draft.commitments.singleOrNull {it.id==selectedId}
             if(selectedId!=null && selected==null) {
                 Text(stringResource(R.string.beta_dash_missing))
-            } else if(selected!=null) key(selected.id) {
+            } else if(selected!=null) key(selected.id,reload) {
                 BetaCommitmentEditorContent(selected,busy,
                     onSave={draft -> write({workflow.edit(selected.id,expectedRevision,draft)})},
                     onToggleActive={write({workflow.toggle(selected.id,expectedRevision)})},

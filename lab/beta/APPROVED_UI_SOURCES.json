@@ -513,6 +513,12 @@
       "symbol": "IconTextButtonOutlined",
       "source_sha256": "d9339af5fd68cbbd96fc5822fc256c85326c8d380a42dc0c69b9300f3f95509a",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/approved/ApprovedComponents.kt"
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/CommitmentsSummaryScreen.kt",
+      "symbol": "CommitmentsSummaryScreen",
+      "source_sha256": "5655b333174bac68c0513fa30c84e94c39bcaf88c59872d4f72978ff43933121",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaEntitySummaryPages.kt"
     }
   ],
   "adaptations": [

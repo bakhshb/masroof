@@ -33,7 +33,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     controls: BetaDashboardControls = UnavailableBetaDashboardControls,
     ownsScroll: Boolean = false,
     onDestinationChanged: (String)->Unit = {},
-    preferences: BetaDashboardViewPreferencesWorkflow? = null, requestedRoute: String? = null, routeRequest: Int = 0, onPrimaryTabChanged: (String) -> Unit = {}, onBusyChanged: (Boolean) -> Unit = {}, onImport: () -> Unit = {}, onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onPageTitle: (String?) -> Unit = {},onListShare: (BetaListShare?)->Unit = {}, showInternalHeader: Boolean = true, onManageAssets: (com.baraa.masroof.lab.finance.asset.AssetKind)->Unit = {},onNotificationFacts: (String,Int)->Unit = {_,_->}, transactionExtras: (@Composable (String,(Boolean)->Unit)->Unit)? = null) {
+    preferences: BetaDashboardViewPreferencesWorkflow? = null, requestedRoute: String? = null, routeRequest: Int = 0, onPrimaryTabChanged: (String) -> Unit = {}, onBusyChanged: (Boolean) -> Unit = {}, onImport: () -> Unit = {}, onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onPageTitle: (String?) -> Unit = {},onListShare: (BetaListShare?)->Unit = {}, showInternalHeader: Boolean = true, onManageAssets: (com.baraa.masroof.lab.finance.asset.AssetKind)->Unit = {},onNotificationFacts: (String,Int)->Unit = {_,_->}, onOpenCommitment: (String)->Unit = {}, transactionExtras: (@Composable (String,(Boolean)->Unit)->Unit)? = null) {
     var controlsBusy by remember { mutableStateOf(false) }
     var homeLayoutOpen by rememberSaveable { mutableStateOf(false) }
     val pageStates=androidx.compose.runtime.saveable.rememberSaveableStateHolder()
@@ -44,6 +44,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     var route by rememberSaveable { mutableStateOf(requestedRoute ?: "OVERVIEW") }
     var lastRouteRequest by rememberSaveable { mutableIntStateOf(routeRequest) }
     var selectedBank by rememberSaveable { mutableStateOf<String?>(null) }
+    var commitmentDetailExitsToHome by rememberSaveable {mutableStateOf(false)}
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var retry by remember { mutableIntStateOf(0) }
     var result by remember { mutableStateOf<DashboardProduction?>(null) }
@@ -55,7 +56,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     BetaLaunchedEffect(route) { if(route=="ANALYSIS") {route="MERCHANTS";return@BetaLaunchedEffect}; onPrimaryTabChanged(if (route == "TRANSACTIONS") "TRANSACTIONS" else "HOME");onDestinationChanged(route) }
     BetaLaunchedEffect(routeRequest) {
         if (lastRouteRequest != routeRequest && requestedRoute != null) {
-            route = requestedRoute; selectedId = null; selectedBank = null; selectedTransaction = null;selectedMerchantKey=null
+            route = requestedRoute; commitmentDetailExitsToHome=false; selectedId = null; selectedBank = null; selectedTransaction = null;selectedMerchantKey=null
             lastRouteRequest = routeRequest
         }
     }
@@ -86,7 +87,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
         if(controlsBusy || !enabled) return
         when {
             selectedTransaction!=null -> selectedTransaction=null
-            selectedId!=null -> {selectedId=null;selectedBank=null}
+            selectedId!=null -> {selectedId=null;selectedBank=null;if(commitmentDetailExitsToHome) {route="OVERVIEW";commitmentDetailExitsToHome=false}}
             selectedMerchantKey!=null && result?.snapshot?.analysis?.merchants?.any {it.merchantKey==selectedMerchantKey}==true -> selectedMerchantKey=null
             route=="DAILY" -> route=dailyOrigin
             else -> {selectedMerchantKey=null;route="OVERVIEW"}
@@ -204,9 +205,19 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
                         "COMMITMENTS" -> {
                             val commitments = snapshot.commitments
                             if (commitments == null || (commitments.rows.isEmpty() && DashboardSection.COMMITMENTS in read.unavailableSections)) DashUnavailable() else {
-                                BetaCommitmentsSummary(snapshot,commitments,visibleRows,interactive,::select)
+                                BetaCommitmentsSummary(commitments,interactive) {row ->
+                                    row.userCommitmentId?.let(onOpenCommitment)
+                                    val target=row.loanId ?: row.facilityId?.let {facility ->
+                                        snapshot.creditFacilities.singleOrNull {it.facilityId==facility}?.cards
+                                            ?.singleOrNull {it.role==com.baraa.masroof.lab.finance.asset.CreditCardRole.PRIMARY}?.cardId
+                                    }
+                                    if(target!=null) {
+                                        route=if(row.loanId!=null) "LOANS" else "CARDS"
+                                        cardTab="CREDIT";selectedBank=target.bank.value;selectedId=target.localId
+                                        commitmentDetailExitsToHome=true
+                                    }
+                                }
                                 if (DashboardSection.COMMITMENTS in read.unavailableSections) DashUnavailable()
-                                DashMore(commitments.rows.size > visibleRows) { visibleRows += 20 }
                             }
                         }
                         "MERCHANTS" -> BetaMerchantsPage(snapshot,selectedMerchantKey,interactive,

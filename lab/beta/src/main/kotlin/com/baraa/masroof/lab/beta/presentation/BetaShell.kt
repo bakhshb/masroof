@@ -79,6 +79,12 @@ fun BetaShell(
     LaunchedEffect(developerWorkspaceRequest) {if(developerWorkspaceRequest!=lastDeveloperRequest) {lastDeveloperRequest=developerWorkspaceRequest;workspaceOpen=true}}
     val homeState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val editorState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+    var previousEditorKey by remember { mutableStateOf(editorKey) }
+    LaunchedEffect(editorKey) {
+        val previous=previousEditorKey
+        if(previous!=editorKey && previous?.startsWith("SETTINGS:COMMITMENT:")==true) editorState.removeState(previous)
+        previousEditorKey=editorKey
+    }
     BackHandler { if (returnEnabled) { if (workspaceOpen && editor == null) workspaceOpen = false else onReturn() } }
     Scaffold(
         topBar = {

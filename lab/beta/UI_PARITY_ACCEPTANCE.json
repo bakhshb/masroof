@@ -112,10 +112,10 @@
       "previous_lab_renderers": [
         "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaEntitySummaryPages.kt"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
-      "lab_visual_reference": null,
-      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "lab_visual_reference": "build/reports/ui-parity/lab-approved-fixture",
+      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — 8/8 loaded summary top/bottom bodies pixel-identical in Arabic/English and light/dark. Whole journey remains in progress.",
       "old_renderer_removed": false,
       "accepted": false
     },
@@ -481,6 +481,16 @@
       "scope": "Real transaction detail cancel → confirm-dialog recreation → create → already-linked state → management list/count. One definition per source under concurrent requests; stale/unnamed/non-eligible/suppressed sources rejected; financial history unchanged. Native USD definition retains its money/date/source, values through a 2020 source into a 2026 salary cycle, and never contributes the old transaction to current spending. Missing/suppressed rates remain unknown; inactive definitions do not poison current totals.",
       "precision_improvement": "The inherited prototype resolveMoney rounds the native/source ratio to two decimals before multiplication. Lab now rounds only the final SAR hint: 0.01 USD from a 20 USD / 75 SAR source becomes 0.04 SAR, rather than an intermediate zero. This intentionally improves an edited commitment forecast; no posted transaction or stored rate is changed.",
       "limitations": "Whole transaction-detail UI, source summary/navigation, transient visual variants, and remaining settings/backup/setup pages still require completion. No full native/process-death rerun claimed on this follow-up."
+    },
+    "commitment_summary_followup": {
+      "lab_jvm_passed": 345,
+      "lint": "passed",
+      "paired_pages": 18,
+      "paired_captures": 144,
+      "pixel_identical_bodies": 140,
+      "summary_pixel_identical_bodies": 8,
+      "native_scope": "Ten native cases passed in the first run (creation Activity, management screen/activity, clean setup journey, paired capture). Three typed-navigation tests passed after correcting only the test host scroll owner; card and loan Back return Home, user occurrence routes by definition id. Actual editor cancel/recreate/reopen/save returns to updated summary. Four preexisting account-detail bottom edge differences remain, maximum 6–7/255. No full-suite/process-death rerun or final-head CI acceptance claimed.",
+      "native_targeted_cases_passed": 13
     }
   },
   "implementation_notes": [
@@ -505,7 +515,8 @@
     "نُقلت إدارة الالتزامات ومحررها من SettingsCommitmentsScreen/SettingsCommitmentEditorScreen، بتبويبات النشط والمتوقف والسجل وإجراءات الفعلي. أُزيل محرر الالتزام العام وأزرار الإضافة والتعليم اليدوي للسداد ومساراتها ونصوصها الحصرية، وأصبحت اختبارات الحفظ تمر عبر واجهة التطبيق الجديدة. الصور المحملة للصفحتين متطابقة في 16 مقارنة؛ هذا لا يغلق ربط السداد والإنشاء من الحركة وملخص الالتزامات أو كل الحالات البصرية.",
     "رُبط سداد الالتزامات بالحركات المعتمدة المخزنة، باستخدام معرّف المصدر أو الاسم كما في الفعلي، ومنع استهلاك الحركة مرتين. تعرض الدفعة مبلغها وتاريخها الفعليين، وتُستخدم أسعار الصرف والرسوم المثبتة فقط. أُصلح أيضًا تعطل الملخص عند اختيار استحقاق خارج فترة الراتب؛ الاستحقاق معلومة عرض ولا يوسّع نطاق الحركات. لم يتغير تفسير الرسائل أو ML أو سلطة اعتماد الحركة.",
     "أُضيف إنشاء الالتزام من الحركة المعتمدة عبر تأكيد الفعلي، مع ربط التأكيد بمصدره الحالي ورفض المصدر المتغيّر أو الموقوف، ومنع تكرار الإنشاء. تُحفظ العملة والمبلغ والتاريخ الأصليون والرابط، وتُقرأ مصادر العملة الأجنبية القديمة قراءة مخصصة لا تدخل في صرف الفترة الحالية. يعرض مركز الإعدادات عدد النشط والمتوقف الحقيقي بدل صفر مشتق من الأصول.",
-    "تحسين دقة موثّق عن الحساب القديم: قيمة الالتزام الأجنبي المعدّلة تُقرب مرة واحدة عند ناتج الريال، بدل تقريب النسبة الوسيطة التي قد تجعل 0.01 USD تظهر بصفر. بقيت مبالغ الحركات الفعلية وأسعارها المثبتة وقواعد المحرك وML دون تغيير."
+    "تحسين دقة موثّق عن الحساب القديم: قيمة الالتزام الأجنبي المعدّلة تُقرب مرة واحدة عند ناتج الريال، بدل تقريب النسبة الوسيطة التي قد تجعل 0.01 USD تظهر بصفر. بقيت مبالغ الحركات الفعلية وأسعارها المثبتة وقواعد المحرك وML دون تغيير.",
+    "Commitments summary now uses the production label/date/badge/money/icon layout with source row names and no legacy twenty-row pagination. Typed rows open primary card/loan; user occurrences open the existing settings editor. Unique direct-launch state is discarded on exit, retained on recreation, and removed from the holder after leaving. Production sources remain untouched."
   ],
   "source_page_inventory": [
     {
@@ -575,9 +586,9 @@
     {
       "id": "commitments",
       "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
-      "loaded_state_paired": false,
+      "loaded_state_paired": true,
       "accepted": false,
-      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "remaining_gate": "Loaded summary top/bottom exact in both languages/themes. User direct editor/back/cancel/recreation/save verified in Activity; primary-card and loan details open correctly and Back returns Home. Empty/error/loading/long-list visual variants remain open.",
       "label_ar": "ملخص الالتزامات"
     },
     {
@@ -886,10 +897,10 @@
     },
     {
       "id": "DATA-002",
-      "finding_ar": "اكتمل ربط الإنشاء بالحركة المعتمدة وحفظ العملة الأصلية وقراءة مصدر التحويل القديم دون إدخاله في صرف الفترة الحالية. بقي ملخص الالتزامات والتنقل منه وحالات الواجهة البصرية غير الافتراضية بحاجة إلى إكمال.",
-      "action_ar": "نقل ملخص الالتزامات والتنقل إلى محرر الالتزام وصفحات القرض والبطاقة، ثم إكمال صور حالات التأكيد والخطأ والانتظار والعملات الأجنبية. تظل الرحلة الكاملة غير معتمدة.",
+      "finding_ar": "اكتمل إنشاء الالتزام من الحركة وحفظ عملته الأصلية، ونُقل الملخص وربط صفوفه بالمحرر وتفاصيل القرض والبطاقة. بقي إثبات الحالات البصرية غير الافتراضية وتفاصيل الحركة بالكامل.",
+      "action_ar": "إكمال صور حالات التأكيد والخطأ والانتظار والعملات الأجنبية وتفاصيل الحركة؛ تبقى الرحلة الكاملة غير معتمدة.",
       "status": "open",
-      "evidence": "BetaCommitmentCreationWorkflow; BetaCommitmentValuationCalculator; BetaCommitmentCreationTest; BetaCommitmentCreationActivityTest; BetaForeignCommitmentDeviceTest. Source detail/summary visual acceptance remains open."
+      "evidence": "BetaCommitmentCreationWorkflow; BetaCommitmentValuationCalculator; BetaCommitmentCreationTest; BetaCommitmentCreationActivityTest; BetaForeignCommitmentDeviceTest. Source detail/summary visual acceptance remains open. Summary loaded-state 8/8 pairs exact; actual Activity cancel/recreate/reopen/save returns to updated summary."
     },
     {
       "id": "NAV-001",
@@ -911,6 +922,13 @@
       "action_ar": "يُحسب التناسب بدقة ثم تُقرّب قيمة الريال النهائية فقط؛ القيمة الأصلية وسعر الحركة ودفترها لا تتغير.",
       "status": "fixed_pending_final_ci",
       "evidence": "smallForeignDefinitionRoundsOnceInsteadOfBecomingZeroAtTheRatioStep; native createAndEditRetainNativeMoneyWhileOldSourceValuesOnlyTheCurrentDefinition: 0.01 USD → 0.04 SAR from the persisted 20 USD / 75 SAR source."
+    },
+    {
+      "id": "UI-005",
+      "finding_ar": "ملخص الالتزامات كان يستبدل أسماء القرض والبطاقة بعناوين عامة، ويعرض حالة الدفع كنص، ولا يفتح محرر الالتزام اليدوي، ويفتح ملخص البطاقات بدل البطاقة الأساسية.",
+      "action_ar": "نقل عرض المصدر وشاراته وأيقوناته وإلغاء ترقيم الصفوف القديم، وربط كل نوع بتفاصيله. محرر الالتزام يعود إلى الملخص ويلغي المسودة عند الرجوع، مع حفظها عند إعادة إنشاء الشاشة.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "BetaCommitmentsSummary; 3 typed-navigation native tests passed; real Activity direct editor/cancel/recreate/save passed. All 8 summary capture bodies pixel-identical to frozen production source."
     }
   ]
 }

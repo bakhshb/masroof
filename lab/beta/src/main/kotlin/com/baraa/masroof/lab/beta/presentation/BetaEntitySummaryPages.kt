@@ -126,31 +126,26 @@ internal fun BetaLoansSummary(snapshot: DashboardSnapshot,limit: Int,enabled: Bo
 internal fun loanLabel(type: String)=stringResource(when(type) {"PERSONAL"->R.string.beta_approved_settings_loan_type_personal;"AUTO"->R.string.beta_approved_settings_loan_type_auto;"MORTGAGE"->R.string.beta_approved_settings_loan_type_mortgage;else->R.string.beta_asset_loan})
 
 @Composable
-internal fun BetaCommitmentsSummary(snapshot: DashboardSnapshot, summary: CommitmentsSummary, limit: Int, enabled: Boolean, onSelect: (AssetId)->Unit) {
+internal fun BetaCommitmentsSummary(summary: CommitmentsSummary, enabled: Boolean, onSelect: (CommitmentRow)->Unit) {
     val colors=MasroofThemeExtras.extendedColors
     val date=java.time.format.DateTimeFormatter.ofPattern("d MMM", androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
-    MasroofHeroCard(stringResource(R.string.beta_dash_remaining),betaSummaryMoney(summary.remaining),
-        stringResource(R.string.beta_dash_total)+" "+betaSummaryMoney(summary.total)+" · "+stringResource(R.string.beta_dash_paid)+" "+betaSummaryMoney(summary.paid),role=MasroofHeroRole.Liability,icon=MasroofOutlineIcons.CalendarCheck)
+    MasroofHeroCard(stringResource(R.string.beta_commitment_summary_dashboard_commitments_remaining),betaSummaryMoney(summary.remaining),
+        stringResource(R.string.beta_commitment_summary_dashboard_commitments_total)+" "+betaSummaryMoney(summary.total)+" · "+stringResource(R.string.beta_commitment_summary_dashboard_commitments_paid)+" "+betaSummaryMoney(summary.paid),role=MasroofHeroRole.Liability,icon=MasroofOutlineIcons.Wallet)
     MasroofCard {
-        if(summary.rows.isEmpty()) Text(stringResource(R.string.beta_dash_empty),Modifier.testTag("dash-empty"))
-        summary.rows.take(limit).forEach {row ->
+        if(summary.rows.isEmpty()) Text(stringResource(R.string.beta_commitment_summary_reference_no_commitments),Modifier.testTag("dash-empty"))
+        summary.rows.forEach {row ->
             val paid=row.status==PaymentStatus.PAID
-            val target=row.loanId ?: row.facilityId
             val tint=if(paid) colors.inflow else colors.liability
-            Row(Modifier.fillMaxWidth().clickable(enabled=enabled && target!=null) {target?.let(onSelect)}.padding(vertical=MasroofReference.rowVertical),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(MasroofReference.rowGap)) {
+            Row(Modifier.fillMaxWidth().testTag("commitment-summary-${row.occurrenceId}").clickable(enabled=enabled) {onSelect(row)}.padding(vertical=MasroofReference.rowVertical),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(MasroofReference.rowGap)) {
                 Surface(shape=MasroofShapes.small,color=if(paid) colors.inflowSoft else colors.liabilitySoft) {
-                    Box(Modifier.size(MasroofReference.iconBox),contentAlignment=Alignment.Center) {Icon(if(paid) MasroofOutlineIcons.CircleCheck else MasroofOutlineIcons.CalendarDays,null,Modifier.size(MasroofReference.icon),tint=tint)}
+                    Box(Modifier.size(MasroofReference.iconBox),contentAlignment=Alignment.Center) {Icon(if(paid) MasroofOutlineIcons.CircleCheck else MasroofOutlineIcons.CalendarCheck,null,Modifier.size(MasroofReference.icon),tint=tint)}
                 }
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
-                    Text(when {
-                        row.loanId!=null -> snapshot.loans.singleOrNull {it.id==row.loanId}?.let {it.label.takeIf(String::isNotBlank) ?: loanLabel(it.type)} ?: stringResource(R.string.beta_asset_loan)
-                        row.facilityId!=null -> stringResource(R.string.beta_asset_credit)
-                        else -> if(row.label.isBlank()) stringResource(R.string.beta_dash_commitments) else row.label
-                    },style=MaterialTheme.typography.bodyMedium)
+                    Text(row.label,style=MasroofReference.pair)
                     row.expectedDate?.let {Text(date.format(it),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-                    Text(stringResource(if(paid) R.string.beta_dash_paid else R.string.beta_dash_unpaid),style=MaterialTheme.typography.labelSmall,color=tint)
+                    ApprovedBadge(stringResource(if(paid) R.string.beta_commitment_summary_dashboard_commitments_status_paid else R.string.beta_commitment_summary_dashboard_commitments_status_unpaid),if(paid) MasroofCardAccent.Inflow else MasroofCardAccent.Liability)
                 }
-                Text(betaSummaryMoney(row.amount),style=MaterialTheme.typography.titleSmall)
+                MasroofReferenceMoney(betaSummaryMoney(row.amount),style=MaterialTheme.typography.titleSmall)
             }
             HorizontalDivider(color=colors.cardBorder)
         }

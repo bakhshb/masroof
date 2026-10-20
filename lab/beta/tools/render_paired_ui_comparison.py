@@ -11,7 +11,7 @@ import json
 
 folder = Path(__file__).resolve().parents[1]
 images = folder / 'build/reports/ui-parity'
-pages = {'cards': 'ملخص البطاقات', 'cardDetail': 'تفاصيل البطاقة الفرعية', 'loans': 'ملخص القروض', 'loanDetail': 'تفاصيل القرض', 'preferences': 'المظهر واللغة', 'home': 'الرئيسية', 'accounts': 'ملخص الحسابات', 'accountDetail': 'تفاصيل الحساب', 'merchants': 'التجار', 'daily': 'المصاريف اليومية', 'review': 'قائمة المراجعة', 'myAccounts': 'إدارة الحسابات', 'myCards': 'إدارة البطاقات', 'myLoans': 'إدارة القروض', 'transactions': 'قائمة الحركات', 'myCommitments': 'إدارة الالتزامات', 'commitmentEditor': 'محرر الالتزام'}
+pages = {'cards': 'ملخص البطاقات', 'cardDetail': 'تفاصيل البطاقة الفرعية', 'loans': 'ملخص القروض', 'loanDetail': 'تفاصيل القرض', 'preferences': 'المظهر واللغة', 'home': 'الرئيسية', 'accounts': 'ملخص الحسابات', 'accountDetail': 'تفاصيل الحساب', 'merchants': 'التجار', 'daily': 'المصاريف اليومية', 'review': 'قائمة المراجعة', 'myAccounts': 'إدارة الحسابات', 'myCards': 'إدارة البطاقات', 'myLoans': 'إدارة القروض', 'transactions': 'قائمة الحركات', 'myCommitments': 'إدارة الالتزامات', 'commitmentEditor': 'محرر الالتزام', 'commitments': 'ملخص الالتزامات'}
 entries = []
 image_cache = {}
 for page in pages:
@@ -44,7 +44,7 @@ for page in pages:
                         image_cache[digest] = 'data:image/webp;base64,' + base64.b64encode(buffer.getvalue()).decode()
                     entry[key] = digest
                 entries.append(entry)
-manifest = dict(production_commit='0d86c5d3', scope='Fifteen frozen-data native pages only; no whole-app acceptance.',
+manifest = dict(production_commit='0d86c5d3', scope=f'{len(pages)} frozen-data native pages only; no whole-app acceptance.',
                 entries=[{k: v for k, v in e.items() if k not in ['production', 'lab']} for e in entries])
 (folder/'UI_PAIRED_COMPARISON.json').write_text(json.dumps(manifest, indent=2)+'\n')
 html = '''<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>مقارنة مصروف والمختبر بالبيانات نفسها</title>
