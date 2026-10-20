@@ -90,6 +90,9 @@ class BetaSettingsActivityTest {
             compose.onNodeWithTag("asset-rename-name").assertTextContains("Travel card")
             compose.onNodeWithTag("asset-rename-save").performClick()
             compose.waitUntil(15000) {compose.onAllNodesWithTag("asset-rename-save").fetchSemanticsNodes().isEmpty()}
+            // Saving closes the dialog before the asynchronous registry snapshot is delivered.
+            // Wait for the persisted name to reach the page, not just for dialog dismissal.
+            compose.waitUntil(15000) {compose.onAllNodesWithText("Travel card •• 7271").fetchSemanticsNodes().isNotEmpty()}
             compose.onNodeWithText("Travel card •• 7271").assertExists()
             compose.waitForIdle()
             val automation=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation

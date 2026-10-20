@@ -3,7 +3,6 @@ package com.baraa.masroof.lab.beta.application
 import com.baraa.masroof.lab.finance.asset.AssetId
 import com.baraa.masroof.lab.finance.dashboard.*
 import com.baraa.masroof.lab.finance.posting.PostingKey
-import java.math.RoundingMode
 import java.time.LocalDate
 
 /** Presentation selection over authoritative facts, never a financial aggregation. */
@@ -26,14 +25,6 @@ object BetaDashboardExplorer {
         }.sortedWith(compareByDescending<TransactionFacts> { it.time.instant })
     }
 
-    fun filterTransactions(rows: List<TransactionFacts>, search: String, type: String?, asset: AssetId?): List<TransactionFacts> {
-        val text=search.trim()
-        return rows.filter {tx ->
-            (type==null || tx.effectiveType.name==type) &&
-            (asset==null || asset in tx.accounts || asset in tx.cards || asset in tx.debitSpendingCards || asset in tx.loans || tx.source==asset || tx.destination==asset) &&
-            (text.isEmpty() || listOfNotNull(tx.merchant,tx.counterparty,tx.primaryCardLast4,tx.amount.amount.toPlainString()).any {it.contains(text,true)})
-        }.sortedWith(compareByDescending<TransactionFacts> {it.time.instant})
-    }
 
     fun transaction(snapshot: DashboardSnapshot, key: PostingKey): TransactionFacts? = snapshot.transactions.singleOrNull { it.key == key }
 

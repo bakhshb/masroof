@@ -25,9 +25,6 @@ import java.time.format.DateTimeFormatter
 @Composable
 internal fun BetaScopeTransactionRows(snapshot: DashboardSnapshot, rows: List<TransactionFacts>,title: String,
     enabled: Boolean,onTransaction: (String)->Unit,complete: Boolean,account: AssetId?=null, showTitle: Boolean=true, tagPrefix: String="dash-transaction") {
-    val language = LocalConfiguration.current.locales[0].toLanguageTag()
-    val locale = LocalConfiguration.current.locales[0]
-    val labels=dashboardAssetLabels(snapshot)
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
         if (showTitle) ApprovedSectionTitle(title)
         when {
@@ -36,6 +33,19 @@ internal fun BetaScopeTransactionRows(snapshot: DashboardSnapshot, rows: List<Tr
                 style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             else -> MasroofCard {
                 rows.forEach { row ->
+                    BetaMovementRow(snapshot,row,enabled,onTransaction,account,tagPrefix)
+                }
+            }
+        }
+    }
+}
+
+/** Canonical source TransactionPreviewRow shared by lists and entity scopes. */
+@Composable internal fun BetaMovementRow(snapshot: DashboardSnapshot,row: TransactionFacts,enabled: Boolean,
+    onTransaction: (String)->Unit,account: AssetId?=null,tagPrefix: String="dash-transaction") {
+    val language=LocalConfiguration.current.locales[0].toLanguageTag()
+    val locale=LocalConfiguration.current.locales[0]
+    val labels=dashboardAssetLabels(snapshot)
                     val type = row.effectiveType
                     val direction = transactionDirection(row, account)
                     val inward = direction == BetaTransactionDirection.INWARD
@@ -55,8 +65,4 @@ internal fun BetaScopeTransactionRows(snapshot: DashboardSnapshot, rows: List<Tr
                         DateTimeFormatter.ofPattern("d MMM", locale).format(row.time.instant.atZone(row.time.zone).toLocalDate()) + " · " + value.substringAfterLast(' '),
                         reviewTypeIcon(type), color, background, Modifier.testTag("$tagPrefix-${row.key.transactionId}"),
                         onClick = if (enabled) ({ onTransaction(row.key.transactionId) }) else null)
-                }
-            }
-        }
-    }
 }

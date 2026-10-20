@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="beta_list_reference_all_types">كل أنواع الحركات</string>
+<string name="beta_list_reference_all_sources">كل الحسابات والبطاقات</string>
+<string name="beta_list_transaction_list_filter_sheet_title">تصفية الحركات</string>
+<string name="beta_list_transaction_list_search_hint">ابحث بالاسم أو المبلغ</string>
+<string name="beta_list_dashboard_summary_transactions_title">الحركات المالية (%1$d)</string>
+<string name="beta_list_transaction_list_clear_filters">مسح الفلاتر</string>
+<string name="beta_list_transaction_list_filter_apply">تطبيق</string>
+<string name="beta_list_transaction_list_multi_filter_hint">يمكنك اختيار أكثر من نوع أو حساب أو بطاقة — تُطبَّق كل الفلاتر معاً</string>
+<string name="beta_list_transaction_list_filter_type_section">نوع الحركة</string>
+<string name="beta_list_transaction_list_filter_all_types">الكل</string>
+<string name="beta_list_transaction_list_filter_account_section">الحساب</string>
+<string name="beta_list_transaction_list_filter_all_accounts">كل الحسابات</string>
+<string name="beta_list_transaction_list_filter_card_section">البطاقة</string>
+<string name="beta_list_transaction_list_filter_all_cards">كل البطاقات</string>
+<string name="beta_list_transaction_list_no_filter_results">لا توجد حركات مطابقة للفلتر</string>
+<string name="beta_list_dashboard_empty_period">لا توجد حركات في هذه الفترة</string>
+<string name="beta_list_transaction_list_title">الحركات المالية</string>
+<string name="beta_list_transaction_share">مشاركة</string>
+<string name="beta_list_transaction_share_list_heading">%1$s — حركات الفترة %2$s</string>
+<string name="beta_list_transaction_share_search">البحث</string>
+<string name="beta_list_transaction_share_types">النوع</string>
+<string name="beta_list_transaction_share_cards">البطاقة</string>
+<string name="beta_list_transaction_share_accounts">الحساب</string>
+<string name="beta_list_transaction_share_count">العدد</string>
+<string name="beta_list_transaction_share_total">المجموع</string>
+</resources>

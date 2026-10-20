@@ -101,6 +101,7 @@ class BetaActivity : ComponentActivity() {
                 var settingsCategory by rememberSaveable { mutableStateOf("HUB") }
                 var ownershipEditSuffix by rememberSaveable { mutableStateOf("") }
                 var initialAssetKind by rememberSaveable { mutableStateOf(AssetKind.ACCOUNT.name) }
+                var listShare by remember {mutableStateOf<BetaListShare?>(null)}
                 var dashboardPageTitle by remember {mutableStateOf<String?>(null)}
                 var reviewDetailOpen by remember {mutableStateOf(false)}
                 var dashboardDestination by rememberSaveable {mutableStateOf("OVERVIEW")}
@@ -269,6 +270,7 @@ class BetaActivity : ComponentActivity() {
                         onboarding!=BetaOnboardingStep.COMPLETE -> androidx.compose.ui.res.stringResource(R.string.beta_setup_continue)
                         else -> dashboardPageTitle
                     },
+                    secondaryActions={if(!settingsOpen && !reviewOpen && !notificationsOpen && dashboardDestination=="TRANSACTIONS") listShare?.let {BetaListShareAction(it)}},
                     onNavigateBack={onBackPressedDispatcher.onBackPressed()},
                     setupFooter = if(onboarding==BetaOnboardingStep.ASSETS && editBank==null && !settingsOpen && !developerToolsOpen) ({
                         androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxWidth().padding(com.baraa.masroof.ui.theme.MasroofSpacing.screenHorizontal),verticalArrangement=androidx.compose.foundation.layout.Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofSpacing.smallGap)) {
@@ -284,7 +286,7 @@ class BetaActivity : ComponentActivity() {
                     onOpenHome = { openRoute("HOME") },
                     onOpenTransactions = { openRoute("TRANSACTIONS") },
                     dashboardOwnsScroll=true,editorOwnsScroll=reviewOpen && loaded,
-                    dashboard = if (onboarding != BetaOnboardingStep.COMPLETE) null else ({ BetaDashboardPanel(dashboardWorkflow,ownsScroll=true,onDestinationChanged={dashboardDestination=it},transactionExtras={id,changed -> BetaPostedTransactionActions(shellContainer,id,{historyBusy=it},changed)}, showInternalHeader=false,onNotificationFacts={period,count -> notificationPeriod=period;notificationExcluded=count}, onPageTitle={dashboardPageTitle=it}, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, pendingCardCount=cardTasks.size,onCards={openRoute("SETTINGS");settingsCategory="CARDS";perform {null}},
+                    dashboard = if (onboarding != BetaOnboardingStep.COMPLETE) null else ({ BetaDashboardPanel(dashboardWorkflow,ownsScroll=true,onListShare={listShare=it},onDestinationChanged={dashboardDestination=it},transactionExtras={id,changed -> BetaPostedTransactionActions(shellContainer,id,{historyBusy=it},changed)}, showInternalHeader=false,onNotificationFacts={period,count -> notificationPeriod=period;notificationExcluded=count}, onPageTitle={dashboardPageTitle=it}, enabled = !busy && !historyBusy, controls = dashboardControls, preferences = dashboardPreferences, pendingCardCount=cardTasks.size,onCards={openRoute("SETTINGS");settingsCategory="CARDS";perform {null}},
                         requestedRoute = when(dashboardTab) {"TRANSACTIONS" -> "TRANSACTIONS";"CONFIGURATION" -> "CONFIGURATION";else -> "OVERVIEW"}, routeRequest = dashboardRequest, onPrimaryTabChanged = { dashboardTab = it }, onBusyChanged = { historyBusy = it }, onImport = { openRoute("HISTORY") }, onSetup = ::resumeSetup,onManageAssets={kind -> openRoute("SETTINGS");settingsCategory=when(kind) {AssetKind.ACCOUNT->"ACCOUNTS";AssetKind.LOAN->"LOANS";else->"CARDS"};perform {null}}) }),
                     onOpenDiscovery = { openRoute("DISCOVERY") },
                     onOpenHistory = { openRoute("HISTORY") },

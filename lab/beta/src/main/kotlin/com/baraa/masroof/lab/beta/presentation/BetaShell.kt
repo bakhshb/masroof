@@ -72,6 +72,7 @@ fun BetaShell(
     notificationCount: Int = 0,
     onOpenNotifications: () -> Unit = onOpenReview,
     developerWorkspaceRequest: Int = 0,
+    secondaryActions: @Composable androidx.compose.foundation.layout.RowScope.()->Unit = {},
 ) {
     var workspaceOpen by rememberSaveable { mutableStateOf(false) }
     var lastDeveloperRequest by rememberSaveable {mutableIntStateOf(0)}
@@ -122,7 +123,7 @@ fun BetaShell(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
         if(secondaryTitle!=null) com.baraa.masroof.ui.components.MasroofAppBar(
-            title=secondaryTitle,showLogo=false,
+            title=secondaryTitle,showLogo=false,actions=secondaryActions,
             navigation=onNavigateBack?.let {back -> {
                 ApprovedBackNavigationIcon(back,stringResource(R.string.beta_dash_back),!busy && returnEnabled,Modifier.testTag("beta-page-back"))
             }})

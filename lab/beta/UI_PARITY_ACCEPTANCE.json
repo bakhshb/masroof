@@ -38,7 +38,7 @@
       "previous_lab_renderers": [
         "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDashboardHome.kt"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
       "lab_visual_reference": "build/reports/ui-parity/lab-approved-fixture",
       "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — loaded-state top/bottom captures only; whole journey remains in progress.",
@@ -53,10 +53,10 @@
         "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDashboardPanel.kt",
         "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaPostedTransactionActions.kt"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
-      "lab_visual_reference": null,
-      "same_data_comparison": "UI_FINANCIAL_COMPARISON_AR.html — 20 resolved financial scenarios; SMS extraction and full device data are separate gates.",
+      "lab_visual_reference": "build/reports/ui-parity/lab-approved-fixture",
+      "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — all eight list bodies match; filter draft/cancel/apply, independent 120-row scrolling and filtered chooser payload verified. Detail/actions and complete failure/empty journeys still open.",
       "old_renderer_removed": false,
       "accepted": false
     },
@@ -126,7 +126,7 @@
       "previous_lab_renderers": [
         "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDashboardAnalysisPanel.kt"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "production_visual_reference": "lab/beta/build/reports/ui-parity/production",
       "lab_visual_reference": "build/reports/ui-parity/lab-approved-fixture",
       "same_data_comparison": "UI_PAIRED_COMPARISON_AR.html — loaded-state top/bottom captures only; whole journey remains in progress.",
@@ -247,7 +247,8 @@
     "BetaDashboardAnalysisPanel: replaced by approved daily/merchant pages; obsolete table/bar controls and 30 exclusive string keys removed.",
     "Duplicate Home transaction renderer: now uses the canonical scoped transaction rows.",
     "Hand-built review list layout: replaced by source ReviewListScreen content with fixed choices and independent list scrolling.",
-    "Generic settings asset/bank loop and ordinary management Add callbacks replaced by one source-derived BetaRegistryManagementPanel; explicit developer manual configuration remains separate."
+    "Generic settings asset/bank loop and ordinary management Add callbacks replaced by one source-derived BetaRegistryManagementPanel; explicit developer manual configuration remains separate.",
+    "Generic transaction list renderer, twenty-row pagination and single type/asset filter replaced by source toolbar, multi-filter draft and independent lazy list. TransactionPreviewRow is now one canonical BetaMovementRow reused by list and scoped pages."
   ],
   "removed_resource_keys": [
     "beta_asset_link_account",
@@ -317,19 +318,23 @@
     "beta_review_suppressed",
     "beta_review_time",
     "beta_review_time_help",
-    "beta_review_unavailable"
+    "beta_review_unavailable",
+    "beta_fix_search",
+    "beta_fix_filters",
+    "beta_fix_filter_account",
+    "beta_fix_no_matches"
   ],
   "verified_tests": {
-    "lab_jvm": 312,
+    "lab_jvm": 322,
     "bank_engine": 58,
     "finance_core": 180,
     "android16_full": {
-      "total": 191,
-      "passed": 191,
-      "duration": "6m37s including lint/JVM verification",
-      "scope": "Full Android 16 suite after source Home customization, six-section legacy preference compatibility and developer financial-settings routing. CI test-readiness follow-up is checked separately."
+      "passed": 199,
+      "total": 199,
+      "failed": 0,
+      "scope": "Full Android 16 suite after source transaction-list port and CI rename-readiness fix. Final digit-comparison refinement is validated separately by targeted filter tests. Final digit comparison and calculator placement passed all 322 JVM tests, lint, and four targeted native tests including the actual Activity."
     },
-    "ci": "CI/Lab passed at 9a1f20bf. Lab passed at 095900cd; CI 39398150976 failed on an async detail-readiness assertion. The assertion now waits for the restore action before checking all classification choices; final-head rerun is pending.",
+    "ci": "46bad459: one async card-rename assertion failed; persisted-name readiness fix verified locally, next-head CI pending.",
     "android16_followup": {
       "passed": 20,
       "scope": "Actual settings rename/recreation/reopen, approved header navigation in clean setup/shared navigation, full card/account manual configuration including known reference without repeating ownership."
@@ -344,8 +349,8 @@
       "scope": "Actual notification/read-state/review/back navigation, settings rename and shared navigation."
     },
     "paired_native_captures": {
-      "pairs": 112,
-      "body_pixel_identical": 108,
+      "pairs": 120,
+      "body_pixel_identical": 116,
       "pages": [
         "cards",
         "cardDetail",
@@ -360,7 +365,8 @@
         "review",
         "myAccounts",
         "myCards",
-        "myLoans"
+        "myLoans",
+        "transactions"
       ],
       "region": "1080×1755 captures; compare y=195 onward only. Top/bottom views only; long-page middle coverage and full journeys are separate gates.",
       "remaining_differences": "Four account-detail bottom captures: maximum channel difference 6–7/255, on rendered edges; retained as differences, not counted as pixel-identical."
@@ -390,7 +396,18 @@
       "android_final_ui_passed": 6,
       "process_death_phases_passed": 39,
       "previous_head_ci": "52581263: all GitHub checks passed; current follow-up checks run after push."
-    }
+    },
+    "transaction_list_followup": {
+      "jvm_total_passed": 322,
+      "new_filter_tests_passed": 6,
+      "android_filter_tests_passed": 3,
+      "scope": "Same-suffix bank-qualified selection; OR/AND filters; grouped amount search; source original-currency share total; saved draft/cancel/apply/reset; 120-row fixed toolbar and exact last-row navigation; Android chooser intercept proves sharing current filtered rows only. Final actual-Activity search → transaction detail → Back restores the same filter; Arabic digit input works; persisted financial/ownership counts remain unchanged.",
+      "android_final_targeted_passed": 4,
+      "android_full_passed": 199,
+      "paired_list_bodies_identical": 8,
+      "lint": "passed"
+    },
+    "report_visual_review": "Rendered the top and actionable audit sections with headless Chrome; inspected their PNGs. Scope is report readability, not application acceptance."
   },
   "implementation_notes": [
     "المرجع هو docs/DESIGN_SYSTEM.md وكود الفعلي عند 0d86c5d3. يوضح سجل المصادر الملفات والرموز المنقولة. لم يُعلن اكتمال نقل جميع الرحلات.",
@@ -407,6 +424,385 @@
     "النطاق هو المختبر فقط. لا تغييرات على app أو ui-kit أو قاعدة بيانات الفعلي أو منطق LessCode وBankEngine وML. لا جداول أو أعمدة جديدة في هذه الدفعة.",
     "أظهر CI سباق تزامن في الاختبار بعد فتح رسالة متجاهلة؛ أصبح الاختبار ينتظر اكتمال التفاصيل بظهور إجراء الاستعادة، ثم يفحص جميع خيارات التصنيف دون حذف أي تحقق.",
     "Registry management now uses source SettingsBankAccounts/Cards/Loans presentation, fixed followed/unconfirmed/stopped tabs and confirmation dialogs. Existing ownershipStatus columns are wired to registry visibility, dashboard snapshots and durable automatic replay. No new tables, columns or production changes. Full identity + revision is required for every tracking action; unresolved linked transfer ownership preserves the engine match-identity review gate.",
-    "إدارة الحسابات والبطاقات والقروض تستخدم تبويبات الفعلي وإجراءات الإيقاف والاستئناف ونوافذ التأكيد. أُزيل زر الإضافة العام من الإدارة العادية. استُخدمت أعمدة الملكية الموجودة دون أي جداول أو أعمدة جديدة. يظل اعتماد التحويل المرتبط محميًا عند تغيير ملكية أحد طرفيه، مع مراجعة واحدة بدل تكرار الرسالتين."
+    "إدارة الحسابات والبطاقات والقروض تستخدم تبويبات الفعلي وإجراءات الإيقاف والاستئناف ونوافذ التأكيد. أُزيل زر الإضافة العام من الإدارة العادية. استُخدمت أعمدة الملكية الموجودة دون أي جداول أو أعمدة جديدة. يظل اعتماد التحويل المرتبط محميًا عند تغيير ملكية أحد طرفيه، مع مراجعة واحدة بدل تكرار الرسالتين.",
+    "قائمة الحركات تستخدم الآن أدوات الفعلي والتمرير المستقل والبحث والفلاتر المتعددة والإلغاء/التطبيق وزر مشاركة القائمة المفلترة. أصلحت المقارنة عنوان الصفحة والمسافة السفلية وترتيب التعادل في التوقيت. تفاصيل الحركة وحالات بقية الصفحات تبقى مفتوحة."
+  ],
+  "source_page_inventory": [
+    {
+      "id": "home",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "الرئيسية"
+    },
+    {
+      "id": "transactions",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "قائمة الحركات"
+    },
+    {
+      "id": "accounts",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "ملخص الحسابات"
+    },
+    {
+      "id": "accountDetail",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "تفاصيل الحساب"
+    },
+    {
+      "id": "cards",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "ملخص البطاقات"
+    },
+    {
+      "id": "cardDetail",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "تفاصيل البطاقة"
+    },
+    {
+      "id": "loans",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "ملخص القروض"
+    },
+    {
+      "id": "loanDetail",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "تفاصيل القرض"
+    },
+    {
+      "id": "commitments",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "ملخص الالتزامات"
+    },
+    {
+      "id": "merchants",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "المصاريف حسب التاجر"
+    },
+    {
+      "id": "daily",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "المصاريف اليومية"
+    },
+    {
+      "id": "review",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "قائمة المراجعة"
+    },
+    {
+      "id": "settings",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "الإعدادات الرئيسية"
+    },
+    {
+      "id": "preferences",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "المظهر واللغة"
+    },
+    {
+      "id": "about",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "عن مصروف"
+    },
+    {
+      "id": "updates",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "التحديثات"
+    },
+    {
+      "id": "logs",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "سجلات التطبيق"
+    },
+    {
+      "id": "backup",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "البيانات والنسخ الاحتياطي"
+    },
+    {
+      "id": "exportBackup",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "تصدير نسخة"
+    },
+    {
+      "id": "restoreBackup",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "استعادة نسخة"
+    },
+    {
+      "id": "dataTools",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "أدوات البيانات"
+    },
+    {
+      "id": "notifications",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "الإشعارات"
+    },
+    {
+      "id": "flowIn",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "حركات الدخول"
+    },
+    {
+      "id": "flowOut",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "حركات الخروج"
+    },
+    {
+      "id": "commitmentEditor",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "تحرير الالتزام"
+    },
+    {
+      "id": "statement",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "مطابقة كشف الحساب"
+    },
+    {
+      "id": "onboarding",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "الإعداد الأولي"
+    },
+    {
+      "id": "bankRegistry",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "البنك المسجل"
+    },
+    {
+      "id": "myAccounts",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "إدارة الحسابات"
+    },
+    {
+      "id": "myCards",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "إدارة البطاقات"
+    },
+    {
+      "id": "myLoans",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": true,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "إدارة القروض"
+    },
+    {
+      "id": "myCommitments",
+      "source": "app/src/androidTest/kotlin/com/baraa/masroof/instrumentation/ApprovedFidelityMatrixTest.kt",
+      "loaded_state_paired": false,
+      "accepted": false,
+      "remaining_gate": "Complete navigation, action, empty/error/loading, recreation and visual-state evidence.",
+      "label_ar": "إدارة الالتزامات"
+    }
+  ],
+  "additional_state_gates": [
+    {
+      "id": "debitDetail",
+      "accepted": false,
+      "label_ar": "تفاصيل بطاقة مدى"
+    },
+    {
+      "id": "transactionDetail",
+      "accepted": false,
+      "label_ar": "تفاصيل الحركة وإجراءاتها ومشاركتها"
+    },
+    {
+      "id": "reviewDetail",
+      "accepted": false,
+      "label_ar": "تفاصيل المراجعة ومسار العودة"
+    },
+    {
+      "id": "manualClassification",
+      "accepted": false,
+      "label_ar": "التصنيف اليدوي والمبلغ والأصل الصحيح"
+    },
+    {
+      "id": "cardSetup",
+      "accepted": false,
+      "label_ar": "إعداد البطاقة وحفظ المسودة وإلغاؤها"
+    },
+    {
+      "id": "bankPicker",
+      "accepted": false,
+      "label_ar": "اختيار البنك والتنقل بين فئاته"
+    },
+    {
+      "id": "registryUnconfirmed",
+      "accepted": false,
+      "label_ar": "تأكيد الملكية غير المؤكدة والتعارض"
+    },
+    {
+      "id": "registryStopped",
+      "accepted": false,
+      "label_ar": "الإيقاف والاستئناف والتعطيل أثناء الحفظ"
+    },
+    {
+      "id": "startupError",
+      "accepted": false,
+      "label_ar": "فشل فتح البيانات وإعادة المحاولة"
+    },
+    {
+      "id": "emptyDashboard",
+      "accepted": false,
+      "label_ar": "حالات انعدام البيانات وفشل التحميل والتحديث"
+    },
+    {
+      "id": "middleOfLongPages",
+      "accepted": false,
+      "label_ar": "وسط القوائم الطويلة وأولها وآخرها"
+    },
+    {
+      "id": "finalHeadCI",
+      "accepted": false,
+      "label_ar": "نجاح GitHub CI على آخر تعديل"
+    }
+  ],
+  "audit_findings": [
+    {
+      "id": "CI-001",
+      "finding_ar": "اختبار التسمية كان يعتبر إغلاق النافذة دليلًا على وصول اسم البطاقة الجديد إلى الصفحة. هذا تزامن غير مضمون.",
+      "action_ar": "انتظار الاسم المحفوظ نفسه، مع إبقاء فحص الهوية والبيانات بعد إعادة الفتح.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "BetaSettingsActivityTest.approvedCardTitleRenameRestoresDraftAndPreservesIdentityOnReopen; previous failing GitHub job 118606034221."
+    },
+    {
+      "id": "UI-001",
+      "finding_ar": "قائمة الحركات تستخدم واجهة عامة وزر تحميل المزيد وفلاتر أحادية بدل واجهة الفعلي.",
+      "action_ar": "نقل أدوات الفعلي، قائمة مستقلة، فلاتر متعددة ذات مسودة، وإعادة استخدام عارض الحركة المعتمد نفسه.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "BetaDashboardTransactions, BetaTransactionListWorkflow, BetaTransactionListScreenTest. Native filter/share/restoration tests passed; all eight transaction-list capture bodies pixel-identical."
+    },
+    {
+      "id": "UI-002",
+      "finding_ar": "المقارنة كشفت عنوانًا مختلفًا ومسافة سفلية ناقصة وترتيبًا مختلفًا للحركات ذات التوقيت نفسه وزر مشاركة مفقودًا.",
+      "action_ar": "استخدام عنوان المصدر وترتيبه المستقر وإضافة المسافة والزر ومشاركة القائمة المفلترة عبر اختيار Android.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "transactions native paired captures; BetaListShare; BetaTransactionListWorkflow.shareTotal. Native filter/share/restoration tests passed; all eight transaction-list capture bodies pixel-identical."
+    },
+    {
+      "id": "UI-003",
+      "finding_ar": "تفاصيل الحركة وإجراءات الالتزام والمراجعة التفصيلية لم تثبت مطابقتها للمصدر.",
+      "action_ar": "نقلها ومقارنة حالات العرض والتنفيذ وإعادة الفتح قبل إغلاقها.",
+      "status": "open",
+      "evidence": "BetaDashboardTransactionDetail; BetaPostedTransactionActions; BetaReviewResolutionActions."
+    },
+    {
+      "id": "UI-004",
+      "finding_ar": "إدارة الالتزامات والنسخ الاحتياطي وبعض الإعدادات لا تزال تستخدم إجراءات المختبر العامة.",
+      "action_ar": "إكمال نقل واجهات الفعلي وربطها بمسارات المختبر دون الوصول لتخزين الفعلي.",
+      "status": "open",
+      "evidence": "BetaSettingsHubPanel; BetaDashboardConfigurationPanel; BetaSettingsPanel."
+    },
+    {
+      "id": "REPORT-001",
+      "finding_ar": "حالة لم يبدأ النقل للرئيسية والتحليل لم تعد تصف الكود الحالي، وعدد اللقطات لا يغطي كل صفحات المصدر.",
+      "action_ar": "تصحيح الحالة إلى قيد العمل وإضافة مخزون صفحات المصدر وحالات الإغلاق الإضافية؛ لا قبول كامل باللقطات وحدها.",
+      "status": "fixed",
+      "evidence": "source_page_inventory; additional_state_gates; completion_requires."
+    },
+    {
+      "id": "DATA-001",
+      "finding_ar": "إعداد الالتزامات الحالي يعيد إنشاء الصفوف ولا يعرض خصائص active وpauseIntervals وsourceTransactionId الموجودة؛ واجهة الفعلي تدعم أيضًا تكرارًا أسبوعيًا وسنويًا. نقل الشكل وحده لا يكفي.",
+      "action_ar": "إكمال نموذج الالتزام وإجراءاته وحفظ خصائصه وسجله، وربط الملخص والتعديل بنفس دورة حياة الفعلي.",
+      "status": "open",
+      "evidence": "RoomBetaDashboardConfiguration.BetaDashboardConfigurationDao.put/all; BetaRecurringCommitment; BetaCommitmentRecord; SettingsCommitmentsScreen."
+    },
+    {
+      "id": "SEARCH-001",
+      "finding_ar": "الأرقام في حقل البحث تُعرض غربية، لكن المقارنة كانت تستخدم الأرقام العربية الأصلية في الإدخال أو الاسم المستورد؛ قد تبدو القيمة صحيحة ولا تظهر الحركة.",
+      "action_ar": "توحيد الأرقام للمقارنة فقط مع إبقاء النص والبيانات المحفوظة كما هي، واختبار الإدخال العربي والفارسي والأسماء المستوردة.",
+      "status": "fixed_pending_final_ci",
+      "evidence": "BetaTransactionListWorkflow.matchesSearch; BetaTransactionListWorkflowTest; BetaTransactionListScreenTest."
+    }
   ]
 }

@@ -10,11 +10,7 @@
     <string name="beta_fix_duplicate_reason">This may be another notice for a saved transaction. Check before approving.</string>
     <string name="beta_fix_confirmed_only">Some cases are pending. Displayed amounts and transactions cover confirmed activity only, not a final total for the period.</string>
     <string name="beta_fix_commitments_unknown">Some due or payment information is missing. Known details remain available; manage commitments in Settings.</string>
-    <string name="beta_fix_search">Search transactions</string>
     <string name="beta_fix_all">All</string>
-    <string name="beta_fix_filters">Filter transactions</string>
-    <string name="beta_fix_filter_account">Account or card</string>
-    <string name="beta_fix_no_matches">No transactions match your search and filters.</string>
     <string name="beta_fix_not_recorded">Not available in messages</string>
     <string name="beta_fix_account_remaining">Account movement remaining</string>
     <string name="beta_fix_inflow">Inflow</string>

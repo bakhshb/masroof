@@ -33,7 +33,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     controls: BetaDashboardControls = UnavailableBetaDashboardControls,
     ownsScroll: Boolean = false,
     onDestinationChanged: (String)->Unit = {},
-    preferences: BetaDashboardViewPreferencesWorkflow? = null, requestedRoute: String? = null, routeRequest: Int = 0, onPrimaryTabChanged: (String) -> Unit = {}, onBusyChanged: (Boolean) -> Unit = {}, onImport: () -> Unit = {}, onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onPageTitle: (String?) -> Unit = {}, showInternalHeader: Boolean = true, onManageAssets: (com.baraa.masroof.lab.finance.asset.AssetKind)->Unit = {},onNotificationFacts: (String,Int)->Unit = {_,_->}, transactionExtras: (@Composable (String,(Boolean)->Unit)->Unit)? = null) {
+    preferences: BetaDashboardViewPreferencesWorkflow? = null, requestedRoute: String? = null, routeRequest: Int = 0, onPrimaryTabChanged: (String) -> Unit = {}, onBusyChanged: (Boolean) -> Unit = {}, onImport: () -> Unit = {}, onSetup: () -> Unit = onImport, pendingCardCount: Int = 0, onCards: () -> Unit = {}, onPageTitle: (String?) -> Unit = {},onListShare: (BetaListShare?)->Unit = {}, showInternalHeader: Boolean = true, onManageAssets: (com.baraa.masroof.lab.finance.asset.AssetKind)->Unit = {},onNotificationFacts: (String,Int)->Unit = {_,_->}, transactionExtras: (@Composable (String,(Boolean)->Unit)->Unit)? = null) {
     var controlsBusy by remember { mutableStateOf(false) }
     var homeLayoutOpen by rememberSaveable { mutableStateOf(false) }
     val pageStates=androidx.compose.runtime.saveable.rememberSaveableStateHolder()
@@ -112,14 +112,14 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
     }
     fun matches(id: AssetId) = id.bank.value == selectedBank && id.localId == selectedId
     val originalContent: @Composable () -> Unit = {
-        Box(Modifier.testTag("beta-dashboard")) {
-        Column(verticalArrangement = Arrangement.spacedBy(BetaSpacing.section), modifier = Modifier.testTag("dash-route-$route").semantics {selected=true}) {
+        Box((if(ownsScroll && route=="TRANSACTIONS" && selectedTransaction==null) Modifier.fillMaxSize() else Modifier).testTag("beta-dashboard")) {
+        Column(verticalArrangement = Arrangement.spacedBy(BetaSpacing.section), modifier = (if(ownsScroll && route=="TRANSACTIONS" && selectedTransaction==null) Modifier.fillMaxSize() else Modifier).testTag("dash-route-$route").semantics {selected=true}) {
             val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
             val displayedPeriod=activeWorkflow.query(month)
             val periodLabel = com.baraa.masroof.lab.beta.presentation.approved.approvedPeriodRange(
                 displayedPeriod.from.atZone(activeWorkflow.zone).toLocalDate(),displayedPeriod.until.minusNanos(1).atZone(activeWorkflow.zone).toLocalDate(),
                 locale,compact=route=="OVERVIEW" && selectedId==null)
-            if(route!="LOANS" && route!="CONFIGURATION" && selectedTransaction==null && (selectedId==null || result?.snapshot?.accounts?.any {matches(it.id)}==true)) {
+            if(route!="TRANSACTIONS" && route!="LOANS" && route!="CONFIGURATION" && selectedTransaction==null && (selectedId==null || result?.snapshot?.accounts?.any {matches(it.id)}==true)) {
                 if(route=="OVERVIEW" && selectedId==null) com.baraa.masroof.ui.dashboard.DashboardPeriodHeader(periodLabel, scope = {
                 Text(stringResource(R.string.beta_parity_salary_period), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -215,7 +215,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
                         "DAILY" -> BetaDailyExpensesPage(snapshot,interactive,DashboardSection.RUNTIME_SOURCE !in read.unavailableSections,
                             {selectedTransaction=it})
                     }
-                    if (selectedId == null && selectedTransaction == null && route == "TRANSACTIONS") BetaDashboardTransactions(snapshot, enabled = interactive, onTransaction = { selectedTransaction = it.transactionId }, complete = DashboardSection.RUNTIME_SOURCE !in read.unavailableSections)
+                    if (selectedId == null && selectedTransaction == null && route == "TRANSACTIONS") BetaDashboardTransactions(snapshot, enabled = interactive, onTransaction = { selectedTransaction = it.transactionId }, complete = DashboardSection.RUNTIME_SOURCE !in read.unavailableSections,bounded=ownsScroll,onShare=onListShare)
                     if (selectedId == null && selectedTransaction == null && route == "CONFIGURATION") BetaDashboardConfigurationPanel(controls, snapshot.creditFacilities, month, interactive,
                         onBusyChanged = { controlsBusy = it; onBusyChanged(it) }, onSaved = { retry++ })
                     }
@@ -237,6 +237,8 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
                 Box(Modifier.fillMaxWidth().padding(horizontal=com.baraa.masroof.ui.theme.MasroofSpacing.screenHorizontal)
                     .padding(top=com.baraa.masroof.ui.theme.MasroofSpacing.screenVertical,bottom=com.baraa.masroof.ui.theme.MasroofSpacing.screenVertical)) {content()}
             }
+        } else if(route=="TRANSACTIONS" && selectedTransaction==null) {
+            Box(Modifier.fillMaxSize().testTag(readyTag).padding(horizontal=com.baraa.masroof.ui.theme.MasroofSpacing.screenHorizontal).padding(bottom=com.baraa.masroof.ui.theme.MasroofSpacing.screenVertical)) {content()}
         } else {
             val scroll=rememberSaveable(route,selectedBank,selectedId,selectedTransaction,saver=androidx.compose.foundation.ScrollState.Saver) {androidx.compose.foundation.ScrollState(0)}
             Box(Modifier.fillMaxSize().testTag(readyTag).padding(horizontal=com.baraa.masroof.ui.theme.MasroofSpacing.screenHorizontal)
@@ -247,7 +249,7 @@ fun BetaDashboardPanel(workflow: BetaDashboardWorkflow, enabled: Boolean = true,
 
 private val dashboardRoutes = listOf("OVERVIEW" to R.string.beta_dash_summary, "ACCOUNTS" to R.string.beta_dash_accounts,
     "CARDS" to R.string.beta_dash_cards, "LOANS" to R.string.beta_dash_loans, "COMMITMENTS" to R.string.beta_dash_commitments,
-    "MERCHANTS" to R.string.beta_approved_dashboard_merchants_summary_title,"DAILY" to R.string.beta_approved_reference_daily_title, "TRANSACTIONS" to R.string.beta_transaction_title, "CONFIGURATION" to R.string.beta_controls_title)
+    "MERCHANTS" to R.string.beta_approved_dashboard_merchants_summary_title,"DAILY" to R.string.beta_approved_reference_daily_title, "TRANSACTIONS" to R.string.beta_list_transaction_list_title, "CONFIGURATION" to R.string.beta_controls_title)
 
 @Composable private fun DashCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     com.baraa.masroof.ui.components.MasroofCard {

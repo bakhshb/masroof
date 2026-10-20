@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="beta_list_reference_all_types">All transaction types</string>
+<string name="beta_list_reference_all_sources">All accounts and cards</string>
+<string name="beta_list_transaction_list_filter_sheet_title">Filter transactions</string>
+<string name="beta_list_transaction_list_search_hint">Search by name or amount</string>
+<string name="beta_list_dashboard_summary_transactions_title">Period transactions (%1$d)</string>
+<string name="beta_list_transaction_list_clear_filters">Clear filters</string>
+<string name="beta_list_transaction_list_filter_apply">Apply</string>
+<string name="beta_list_transaction_list_multi_filter_hint">You can select multiple types, accounts, or cards — all filters apply together</string>
+<string name="beta_list_transaction_list_filter_type_section">Transaction type</string>
+<string name="beta_list_transaction_list_filter_all_types">All</string>
+<string name="beta_list_transaction_list_filter_account_section">Account</string>
+<string name="beta_list_transaction_list_filter_all_accounts">All accounts</string>
+<string name="beta_list_transaction_list_filter_card_section">Card</string>
+<string name="beta_list_transaction_list_filter_all_cards">All cards</string>
+<string name="beta_list_transaction_list_no_filter_results">No transactions match the filter</string>
+<string name="beta_list_dashboard_empty_period">No transactions in this period</string>
+<string name="beta_list_transaction_list_title">Period transactions</string>
+<string name="beta_list_transaction_share">Share</string>
+<string name="beta_list_transaction_share_list_heading">%1$s — Period transactions %2$s</string>
+<string name="beta_list_transaction_share_search">Search</string>
+<string name="beta_list_transaction_share_types">Type</string>
+<string name="beta_list_transaction_share_cards">Card</string>
+<string name="beta_list_transaction_share_accounts">Account</string>
+<string name="beta_list_transaction_share_count">Count</string>
+<string name="beta_list_transaction_share_total">Total</string>
+</resources>

@@ -436,6 +436,41 @@
       "source_sha256": "0f954132ef5e0794b74e93ae8529b02dddcb9c46b4591b173c9888d3331ff979",
       "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaRegistryManagementPanel.kt",
       "adaptations": "Inline registry confirmation, source labels/icons/spacing; collision selection and lab ownership authority retained."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionListScreen.kt",
+      "symbol": "TransactionListScreen",
+      "source_sha256": "f065cd0de6eb115cd7520a32881b498edb87a3c9d92072ba3812c452f9178588",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDashboardTransactions.kt",
+      "adaptations": "Source visual layout, stable equal-time order, draft/cancel/apply/reset filters and filtered-list sharing. Lab selections retain complete bank-qualified registry identities. One canonical movement renderer; no presentation money aggregation or ledger writes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionListFilterPanel.kt",
+      "symbol": "TransactionListToolbar",
+      "source_sha256": "6b95e170a15e1cebe67501b7a0e6467f3324b9c48a3bf81c4a56a1d2abc9b99b",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDashboardTransactions.kt",
+      "adaptations": "Source visual layout, stable equal-time order, draft/cancel/apply/reset filters and filtered-list sharing. Lab selections retain complete bank-qualified registry identities. One canonical movement renderer; no presentation money aggregation or ledger writes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionListFilterBottomSheet.kt",
+      "symbol": "TransactionListFilterBottomSheet",
+      "source_sha256": "c3a4b9c75e03180f50963d4ec2131e1df114a9973a7713b85e9bdceb1ab01853",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaDashboardTransactions.kt",
+      "adaptations": "Source visual layout, stable equal-time order, draft/cancel/apply/reset filters and filtered-list sharing. Lab selections retain complete bank-qualified registry identities. One canonical movement renderer; no presentation money aggregation or ledger writes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionPreviewRow.kt",
+      "symbol": "TransactionPreviewRow",
+      "source_sha256": "bfe679893b5282b06807070e516394ea66b37c77e155b4c16c063a519a7b2095",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaScopeTransactionRows.kt",
+      "adaptations": "Source visual layout, stable equal-time order, draft/cancel/apply/reset filters and filtered-list sharing. Lab selections retain complete bank-qualified registry identities. One canonical movement renderer; no presentation money aggregation or ledger writes."
+    },
+    {
+      "source": "app/src/main/kotlin/com/baraa/masroof/presentation/dashboard/TransactionShareContent.kt",
+      "symbol": "transactionListShareText",
+      "source_sha256": "bc63454ad087957ecc77b29764cefd88c7b803cedae08f1a90f0c477d28fd6d4",
+      "destination": "lab/beta/src/main/kotlin/com/baraa/masroof/lab/beta/presentation/BetaListShare.kt",
+      "adaptations": "Source visual layout, stable equal-time order, draft/cancel/apply/reset filters and filtered-list sharing. Lab selections retain complete bank-qualified registry identities. One canonical movement renderer; no presentation money aggregation or ledger writes."
     }
   ],
   "adaptations": [

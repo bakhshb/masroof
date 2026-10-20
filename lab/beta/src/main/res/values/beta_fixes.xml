@@ -10,11 +10,7 @@
     <string name="beta_fix_duplicate_reason">قد تكون هذه نسخة أخرى من عملية محفوظة. تحقق قبل اعتمادها.</string>
     <string name="beta_fix_confirmed_only">توجد حالات معلّقة. الأرقام والحركات المعروضة تخص العمليات المعتمدة فقط وليست إجماليًا نهائيًا للفترة.</string>
     <string name="beta_fix_commitments_unknown">بعض معلومات الاستحقاق أو السداد غير متوفرة. يمكنك عرض التفاصيل المعروفة وإكمال بيانات الالتزامات من الإعدادات.</string>
-    <string name="beta_fix_search">البحث في العمليات</string>
     <string name="beta_fix_all">الكل</string>
-    <string name="beta_fix_filters">تصفية العمليات</string>
-    <string name="beta_fix_filter_account">الحساب أو البطاقة</string>
-    <string name="beta_fix_no_matches">لا توجد عمليات تطابق البحث والفلاتر.</string>
     <string name="beta_fix_not_recorded">غير متوفر في الرسائل</string>
     <string name="beta_fix_account_remaining">المتبقي من حركة الحساب</string>
     <string name="beta_fix_inflow">الوارد</string>

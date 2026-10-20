@@ -1,6 +1,6 @@
 package com.baraa.masroof.lab.beta.application
 
-/** Display policy only: stored financial facts and original SMS remain unchanged. */
+/** UI display/comparison policy only: stored financial facts and original SMS remain unchanged. */
 object BetaDisplayDigits {
     const val numberingSystem = "latn"
 
