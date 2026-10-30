@@ -97,8 +97,10 @@ def bundle():
     artifacts = {'app': ROOT / 'app/build/outputs/apk/debug/app-debug.apk',
                  'tests': ROOT / 'app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk',
                  'baseline': ROOT / 'app/build/upgrade-baseline/app/build/outputs/apk/debug/app-debug.apk'}
-    version = tomllib.loads((ROOT / 'gradle/libs.versions.toml').read_text())['versions']['androidxTestOrchestrator']
-    for key, group, name in [('orchestrator', 'androidx/test', 'orchestrator'), ('services', 'androidx/test/services', 'test-services')]:
+    versions = tomllib.loads((ROOT / 'gradle/libs.versions.toml').read_text())['versions']
+    for key, group, name, ref in [('orchestrator', 'androidx/test', 'orchestrator', 'androidxTestOrchestrator'),
+                                  ('services', 'androidx/test/services', 'test-services', 'androidxTestServices')]:
+        version = versions[ref]
         target = BUNDLE / f'{key}.apk'
         url = f'https://dl.google.com/dl/android/maven2/{group}/{name}/{version}/{name}-{version}.apk'
         with urllib.request.urlopen(url, timeout=60) as response: target.write_bytes(response.read())
