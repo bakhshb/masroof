@@ -27,6 +27,9 @@ internal class SettingsUpdateActions(
     private val canInstallPackages: () -> Boolean,
     private val onRequestInstallPermission: () -> Unit,
 ) {
+    /** Set only when the user tapped Install and was sent to grant the permission. */
+    private var installAwaitingPermission = false
+
     fun clearUpdateMessage() {
         settingsState.update { it.copy(updateMessage = null) }
     }
@@ -198,10 +201,12 @@ internal class SettingsUpdateActions(
         if (state !is AppUpdateUiState.ReadyToInstall) return
 
         if (!canInstallPackages()) {
+            installAwaitingPermission = true
             settingsState.update { it.copy(updateMessage = AppUpdateMessage.INSTALL_PERMISSION_REQUIRED) }
             onRequestInstallPermission()
             return
         }
+        installAwaitingPermission = false
 
         val apkFile = appUpdateService.updateApkFile(state.manifest)
         scope.launchLogged(appLogService, AppLogCategories.UPDATE, "Settings installPendingUpdate", onError = { settingsState.update { it.copy(updateMessage = AppUpdateMessage.INSTALL_FAILED) } }) {
@@ -212,8 +217,9 @@ internal class SettingsUpdateActions(
         }
     }
 
+    /** Runs on every resume; it resumes an install the user asked for, never starts one. */
     fun retryInstallAfterPermissionGranted() {
-        if (!canInstallPackages()) return
+        if (!installAwaitingPermission || !canInstallPackages()) return
         installPendingUpdate()
     }
 
