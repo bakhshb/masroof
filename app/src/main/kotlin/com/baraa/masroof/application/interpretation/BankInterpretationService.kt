@@ -55,7 +55,7 @@ class BankInterpretationService(
     private data class Attempt(val bank: String, val classifier: FamilyClassifier?, var requested: Boolean = false,
         var outcome: String = "RULES", var prediction: FamilyModel.Prediction? = null)
     private val attempt = ThreadLocal<Attempt>()
-    private fun engine() = PatternFactInterpreter(patterns())
+    private fun engine() = PatternFactInterpreter.of(patterns())
     private val familyAssist = FamilyAssist { input,title ->
         val trace = attempt.get()
         trace?.requested = true

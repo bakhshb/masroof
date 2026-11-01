@@ -36,6 +36,24 @@ class MessagePatternStoreTest {
         assertEquals(listOf(file.name), file.parentFile!!.listFiles()!!.map { it.name })
     }
 
+    /** Routing loads the document for every SMS; it is decoded again only when the file's text changes. */
+    @Test fun unchangedFileReusesTheDecodedDocumentAndAnyChangeIsSeen() = withFile { file ->
+        val store = MessagePatternStore(file)
+        store.saveBank(0, bank(pattern("STC", "STC Bank")))
+        val first = store.load()
+        assertSame(first, store.load())
+        assertSame(PatternFactInterpreter.of(first), PatternFactInterpreter.of(store.load()))
+
+        store.saveBank(1, bank(pattern("OTHER", "Other Bank")))
+        val afterSave = store.load()
+        assertNotSame(first, afterSave)
+        assertEquals(2L, afterSave.generation)
+
+        MessagePatternStore(file).restoreRaw(MessagePatternConfigurationCodec.encode(first))
+        assertEquals(first, store.load())
+        assertNotSame(afterSave, store.load())
+    }
+
     @Test fun manySavesKeepOnlyRecentRevisionsSoTheBankNeverFills() = withFile { file ->
         val first = pattern("STC", "STC Bank")
         val store = MessagePatternStore(file)
