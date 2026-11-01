@@ -142,6 +142,14 @@ class RoomFinancialTransactionRepository(
         dao.findLinkByRawSmsId(rawSmsId) != null
     }
 
+    override suspend fun getByIds(ids: Collection<String>): List<FinancialTransaction> = accessGate.withAccess {
+        reconstructBatch(RoomBatch.query(ids.distinct(), batchChunkSize) { chunk -> dao.listByIds(chunk) })
+    }
+
+    override suspend fun listLinkedRawSmsIds(rawSmsIds: Collection<String>): Set<String> = accessGate.withAccess {
+        RoomBatch.query(rawSmsIds.distinct(), batchChunkSize) { chunk -> dao.listLinkedRawSmsIds(chunk) }.toSet()
+    }
+
     override suspend fun listRawSmsIds(transactionId: String): List<String> = accessGate.withAccess {
         dao.listRawSmsIdsForTransaction(transactionId)
     }

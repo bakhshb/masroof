@@ -66,6 +66,7 @@ internal object SettingsViewModelTestSupport {
                             emptyList()
                         override suspend fun listForRawSmsIds(rawSmsIds: Collection<String>): List<UserCorrection> =
                             emptyList()
+                        override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.UserCorrection>()
                     },
                 ),
                 ownershipResolver = OwnershipResolver(

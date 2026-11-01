@@ -39,4 +39,7 @@ interface UserCorrectionDao {
         """,
     )
     suspend fun listForRawSmsIds(rawSmsIds: List<String>): List<UserCorrectionEntity>
+
+    @Query("SELECT * FROM user_correction ORDER BY targetRawSmsId ASC, createdAtEpochMillis ASC, id ASC")
+    suspend fun listAll(): List<UserCorrectionEntity>
 }

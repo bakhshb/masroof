@@ -185,6 +185,14 @@ interface FinancialTransactionDao {
         transactionIds: List<String>,
     ): List<FinancialTransactionRawSmsLinkEntity>
 
+    /** Callers keep [ids] under [RoomBatch.MAX_BIND_ARGS]. */
+    @Query("SELECT * FROM financial_transaction WHERE id IN (:ids) ORDER BY id")
+    suspend fun listByIds(ids: List<String>): List<FinancialTransactionEntity>
+
+    /** Callers keep [rawSmsIds] under [RoomBatch.MAX_BIND_ARGS]. */
+    @Query("SELECT rawSmsId FROM financial_transaction_raw_sms_link WHERE rawSmsId IN (:rawSmsIds)")
+    suspend fun listLinkedRawSmsIds(rawSmsIds: List<String>): List<String>
+
     @Query("SELECT COUNT(*) FROM financial_transaction")
     suspend fun count(): Int
 
