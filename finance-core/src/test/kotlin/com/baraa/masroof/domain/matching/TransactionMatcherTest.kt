@@ -249,6 +249,39 @@ class TransactionMatcherTest {
         assertFalse(TransactionMatcher.compatiblePair(outgoing, incoming))
     }
 
+    @Test
+    fun unrelatedAccountsWithoutReferenceStayUnpaired() {
+        val outgoing = outgoing(
+            reference = null,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.UNKNOWN, "9999"),
+            network = null,
+        )
+        val incoming = d360Incoming(localTime = defaultLocalTime.plusMinutes(1))
+
+        assertTrue(TransactionMatcher.findMutuallyUniquePairs(listOf(outgoing, incoming)).isEmpty())
+    }
+
+    @Test
+    fun matchingAccountOutsideTheWindowStaysUnpaired() {
+        val outgoing = outgoing(
+            reference = null,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.UNKNOWN, "6810"),
+            network = null,
+        )
+        val incoming = d360Incoming(localTime = defaultLocalTime.plusMinutes(30))
+
+        assertTrue(TransactionMatcher.findMutuallyUniquePairs(listOf(outgoing, incoming)).isEmpty())
+    }
+
+    private fun d360Incoming(localTime: LocalDateTime) = incoming(
+        reference = null,
+        localTime = localTime,
+        destination = AccountReference(Bank("D360"), "6810"),
+        network = null,
+    ).let { candidate -> candidate.copy(event = candidate.event.copy(bank = Bank("D360"))) }
+
     private fun outgoing(
         id: String = "out",
         rawSmsId: String = "raw-out",

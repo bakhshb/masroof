@@ -2,7 +2,6 @@ package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
-import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
@@ -384,101 +383,6 @@ class TransactionReconciliationServiceTest : ReconciliationTestFixture() {
         assertEquals(OwnershipStatus.UNKNOWN, OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository).resolveAccount(AccountReference(Bank.UNKNOWN, "6810")))
         assertEquals(2, accounts.listAll().size)
         assertNull(FinancialContainerIdFactory.accountId(AccountReference(Bank.UNKNOWN, "6810")))
-    }
-
-    @Test
-    fun matcher_requiresStrongBridge() {
-        val out = candidate(
-            id = "o",
-            raw = "ro",
-            family = MessageFamily.TRANSFER_OUT,
-            amount = money("10.00"),
-            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-            destination = AccountReference(Bank.UNKNOWN, "9999"),
-            sourceOwn = OwnershipStatus.OWNED,
-            destOwn = OwnershipStatus.UNKNOWN,
-            local = LocalDateTime.parse("2026-08-10T12:00:00"),
-        )
-        val inn = candidate(
-            id = "i",
-            raw = "ri",
-            family = MessageFamily.TRANSFER_IN,
-            amount = money("10.00"),
-            destination = AccountReference(Bank("D360"), "6810"),
-            sourceOwn = OwnershipStatus.UNKNOWN,
-            destOwn = OwnershipStatus.OWNED,
-            local = LocalDateTime.parse("2026-08-10T12:01:00"),
-            bank = Bank("D360"),
-        )
-        assertTrue(TransactionMatcher.findMutuallyUniquePairs(listOf(out, inn)).isEmpty())
-    }
-
-    @Test
-    fun matcher_outsideWindow_noMatch() {
-        val out = candidate(
-            id = "o",
-            raw = "ro",
-            family = MessageFamily.TRANSFER_OUT,
-            amount = money("10.00"),
-            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-            destination = AccountReference(Bank.UNKNOWN, "6810"),
-            sourceOwn = OwnershipStatus.OWNED,
-            destOwn = OwnershipStatus.UNKNOWN,
-            local = LocalDateTime.parse("2026-08-10T12:00:00"),
-        )
-        val inn = candidate(
-            id = "i",
-            raw = "ri",
-            family = MessageFamily.TRANSFER_IN,
-            amount = money("10.00"),
-            destination = AccountReference(Bank("D360"), "6810"),
-            sourceOwn = OwnershipStatus.UNKNOWN,
-            destOwn = OwnershipStatus.OWNED,
-            local = LocalDateTime.parse("2026-08-10T12:30:00"),
-            bank = Bank("D360"),
-        )
-        assertTrue(TransactionMatcher.findMutuallyUniquePairs(listOf(out, inn)).isEmpty())
-    }
-
-    @Test
-    fun matcher_ambiguousSameAmount_noAutoMatch() {
-        val out = candidate(
-            id = "o",
-            raw = "ro",
-            family = MessageFamily.TRANSFER_OUT,
-            amount = money("500.00"),
-            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-            destination = AccountReference(Bank.UNKNOWN, "6810"),
-            sourceOwn = OwnershipStatus.OWNED,
-            destOwn = OwnershipStatus.UNKNOWN,
-            local = LocalDateTime.parse("2026-08-10T12:00:00"),
-            ref = "SAME",
-        )
-        val b = candidate(
-            id = "b",
-            raw = "rb",
-            family = MessageFamily.TRANSFER_IN,
-            amount = money("500.00"),
-            destination = AccountReference(Bank("D360"), "6810"),
-            sourceOwn = OwnershipStatus.UNKNOWN,
-            destOwn = OwnershipStatus.OWNED,
-            local = LocalDateTime.parse("2026-08-10T12:01:00"),
-            bank = Bank("D360"),
-            ref = "SAME",
-        )
-        val c = candidate(
-            id = "c",
-            raw = "rc",
-            family = MessageFamily.TRANSFER_IN,
-            amount = money("500.00"),
-            destination = AccountReference(Bank("D360"), "6810"),
-            sourceOwn = OwnershipStatus.UNKNOWN,
-            destOwn = OwnershipStatus.OWNED,
-            local = LocalDateTime.parse("2026-08-10T12:02:00"),
-            bank = Bank("D360"),
-            ref = "SAME",
-        )
-        assertTrue(TransactionMatcher.findMutuallyUniquePairs(listOf(out, b, c)).isEmpty())
     }
 
     @Test
