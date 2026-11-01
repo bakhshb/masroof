@@ -5,6 +5,16 @@ import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.dashboard.GoldenLedgerCorpus
 import com.baraa.masroof.application.dashboard.GoldenLedgerRunner
 import com.baraa.masroof.application.dashboard.GoldenLedgerScenario
+import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.Confidence
+import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.MoneyDirection
+import com.baraa.masroof.parsing.finalize.ParseFinalizer
+import com.baraa.masroof.parsing.model.ParsedEventDetails
+import com.baraa.masroof.parsing.model.ParsedEventDraft
+import com.baraa.masroof.parsing.validator.DefaultParsedEventValidator
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 import kotlinx.coroutines.runBlocking
@@ -15,10 +25,31 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class AlJaziraFinancialParityTest {
+    @Test fun comparatorDetectsChangedAmountsDetailsGatesAndRemovedFields() {
+        val draft = ParsedEventDraft("probe", Bank.BANK_ALJAZIRA, MessageFamily.PURCHASE, MoneyDirection.OUTGOING,
+            Money.of("1", Currency.SAR), merchant = "SYNTHETIC", confidence = Confidence(1.0, listOf("engine:old", "rules:old")),
+            details = ParsedEventDetails(paymentDueDate = LocalDate.of(2026, 8, 1)))
+        val finalizer = ParseFinalizer(DefaultParsedEventValidator())
+        fun snapshot(value: ParsedEventDraft) = ParseParity.fields(finalizer.finalize(value, "evt-probe"))
+        val original = snapshot(draft)
+        assertTrue(ParseParity.differences(original, snapshot(draft.copy(
+            confidence = Confidence(1.0, listOf("engine:new", "rules:new"))))).isEmpty())
+        val changes = listOf(
+            "event.amount" to draft.copy(amount = Money.of("2", Currency.SAR)),
+            "details.paymentDueDate" to draft.copy(details = draft.details.copy(paymentDueDate = LocalDate.of(2026, 9, 1))),
+            "event.parseStatus" to draft.copy(confidence = Confidence(0.0, emptyList())),
+            "event.amount" to draft.copy(amount = null),
+        )
+        for ((field, changed) in changes) {
+            assertTrue("Missed change to $field", field in ParseParity.differences(original, snapshot(changed)))
+        }
+    }
+
     @Test fun isolatedLedgersKeepEveryFactLinkAndReviewAcrossRepeatImport() = runBlocking {
         val reports = mutableListOf<JsonObject>()
         val frozenFields = linkedMapOf<String, JsonElement>()
