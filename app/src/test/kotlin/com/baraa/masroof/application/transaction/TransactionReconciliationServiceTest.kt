@@ -10,6 +10,7 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
+import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.PurchaseChannel
@@ -881,4 +882,79 @@ class TransactionReconciliationServiceTest : ReconciliationTestFixture() {
         )
     }
 
+
+    /** A FEE row the heal cannot turn into a repayment is kept as is, not counted as a failure on every pass. */
+    @Test
+    fun staleFeeFinancingInstallment_withoutLoanType_staysFeeAndDoesNotFailReconciliation() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        persistEvent(
+            smsId = "sms-loan",
+            body = """
+                خصم: قسط تمويل
+                من: 3001
+                القسط: SAR 3,036.11
+            """.trimIndent(),
+            event = event(
+                id = "evt-loan",
+                rawSmsId = "sms-loan",
+                family = MessageFamily.FINANCING_INSTALLMENT,
+                amount = money("3036.11"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            ),
+            details = ParsedEventDetails(loanType = null),
+            at = Instant.parse("2026-08-27T01:10:00Z"),
+        )
+        val staleFee = com.baraa.masroof.domain.model.FinancialTransaction(
+            id = TransactionIdFactory.fromRawSmsIds(listOf("sms-loan")),
+            type = FinancialTransactionType.FEE,
+            amount = money("3036.11"),
+            occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+            sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = listOf("evt-loan"),
+        )
+        ftRepo.save(staleFee, listOf("sms-loan"))
+
+        val repair = reconciliation.repairLegacyTransfersDetailed()
+        val full = reconciliation.reconcileStoredEventsDetailed()
+
+        assertEquals(0, repair.summary.failed)
+        assertEquals(0, full.summary.failed)
+        assertEquals(FinancialTransactionType.FEE, ftRepo.listAll().single().type)
+    }
+
+    /** Ownership is a write; it needs the same parse-status gate as posting. */
+    @Test
+    fun financingInstallmentNotYetValidated_doesNotConfirmLoanOwnership() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        loans.observe(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL), "sms-loan")
+        persistEvent(
+            smsId = "sms-loan",
+            body = """
+                خصم: قسط تمويل
+                من: 3001
+                القسط: SAR 3,036.11
+                لـ: تمويل شخصي
+            """.trimIndent(),
+            event = event(
+                id = "evt-loan",
+                rawSmsId = "sms-loan",
+                family = MessageFamily.FINANCING_INSTALLMENT,
+                amount = money("3036.11"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                counterparty = "تمويل شخصي",
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+            details = ParsedEventDetails(loanType = LoanType.PERSONAL),
+            at = Instant.parse("2026-08-27T01:10:00Z"),
+        )
+
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(OwnershipStatus.UNKNOWN, loans.resolve(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)))
+        assertTrue(ftRepo.listAll().isEmpty())
+    }
 }
