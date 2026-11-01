@@ -31,6 +31,26 @@ class DeviceProtocolTest(unittest.TestCase):
         self.assertEqual(int(config['imageVersion'].split('.')[0]), config['api'])
         self.assertIn('api-level: ${{ needs.android-version.outputs.image-version }}', workflow)
 
+    def test_workflow_keeps_complete_coverage_and_clean_devices(self):
+        workflow = (device.ROOT / '.github/workflows/ci.yml').read_text()
+        app = workflow.split('  emulator-app:', 1)[1].split('  emulator-recovery:', 1)[0]
+        recovery = workflow.split('  emulator-recovery:', 1)[1].split('  emulator-lifecycle:', 1)[0]
+        self.assertIn('shard: [0, 1, 2, 3]', app)
+        self.assertIn('scripts/ci_device.py run --shard', app)
+        self.assertNotIn('gradlew', app)
+        self.assertIn('fail-fast: false', app)
+        self.assertIn('suite: [production]', recovery)
+        self.assertNotIn('gradlew', recovery)
+        self.assertIn('CI_DEVICE_BUNDLE:', recovery)
+        for section in [app, recovery]:
+            self.assertIn('name: shared-test-apks', section)
+            self.assertIn('-no-snapshot', section)
+            self.assertIn('if: always()', section)
+        gate = workflow.split('  emulator-smoke:', 1)[1]
+        self.assertIn('unit-test, static-analysis, emulator-app, emulator-lifecycle', gate)
+        self.assertIn('Require complete CI', gate)
+        self.assertIn('Require statement reconciliation screenshots', gate)
+
     def test_device_jobs_reserve_enough_internal_storage_for_api37(self):
         workflow = (device.ROOT / '.github/workflows/ci.yml').read_text()
         options = [line for line in workflow.splitlines() if 'emulator-options:' in line]
