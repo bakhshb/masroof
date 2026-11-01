@@ -809,11 +809,10 @@ class SettingsViewModel(
 
     fun setAccountType(account: ManagedAccountUi, accountType: AccountType) {
         updateRegistry {
-            settingsRegistryWorkflow.updateAccountType(
-                AccountReference(account.bank, account.maskedNumber),
-                accountType,
-            )
-            refreshReviewQueue()
+            val reference = AccountReference(account.bank, account.maskedNumber)
+            settingsRegistryWorkflow.updateAccountType(reference, accountType)
+            // Only this account's evidence can change; a full-history pass is not needed.
+            reconcileOwnershipChange(ReviewWorkflowService.OwnershipChange.Account(reference))
         }
         dismissAccountTypePicker()
     }

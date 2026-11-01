@@ -336,6 +336,37 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun setAccountType_reconcilesOnlyThatAccount() = runTest {
+        val accounts = FakeAccountRegistry(
+            AccountRegistryEntry.forTest(Bank.BANK_ALJAZIRA, "3003", OwnershipStatus.OWNED, firstSeenRawSmsId = "3", lastSeenRawSmsId = "3"),
+        )
+        val ownershipChanges = mutableListOf<com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange>()
+        val vm = viewModel(
+            accounts = accounts,
+            onRefreshReviewQueue = { error("An account type must not reconcile the whole history") },
+            onReconcileOwnership = { ownershipChanges += it },
+        )
+        vm.refresh()
+        advanceUntilIdle()
+
+        vm.setAccountType(
+            ManagedAccountUi(
+                id = com.baraa.masroof.domain.ids.RegistryEntityIdFactory.stableAccountId(Bank.BANK_ALJAZIRA.id, "3003"),
+                bank = Bank.BANK_ALJAZIRA,
+                maskedNumber = "3003",
+                ownership = OwnershipStatus.OWNED,
+            ),
+            com.baraa.masroof.domain.model.AccountType.SAVINGS,
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange.Account(AccountReference(Bank.BANK_ALJAZIRA, "3003"))),
+            ownershipChanges,
+        )
+    }
+
+    @Test
     fun confirmStopTracking_marksCardExternal() = runTest {
         val cards = FakeCardRegistry(
             CardRegistryEntry.forTest(
