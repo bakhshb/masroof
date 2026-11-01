@@ -13,6 +13,7 @@ import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
@@ -68,7 +69,11 @@ class PendingPatternsWorkflow(
         }
     }
 
-    suspend fun apply(bankId: String, generation: Long, reviewId: String? = null, patternId: String? = null): PendingPatternApplyReport = withContext(Dispatchers.IO) {
+    /**
+     * Runs to the end once started: leaving the screen must not stop between the reparse, which
+     * stores SUCCESS rows, and the batch finish that posts them or records their retry.
+     */
+    suspend fun apply(bankId: String, generation: Long, reviewId: String? = null, patternId: String? = null): PendingPatternApplyReport = withContext(Dispatchers.IO + NonCancellable) {
         accessGate.withAccess {
             val report = preview(bankId, generation, reviewId)
             val before = if (reviewId == null) report else preview(bankId, generation)

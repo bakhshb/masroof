@@ -7,6 +7,7 @@ import com.baraa.masroof.domain.model.*
 import com.baraa.masroof.engine.bank.patterns.PatternAccountRole
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.testsupport.TestStorageContext
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -134,6 +135,24 @@ class BundledPatternApprovalTest {
     }
 
     private lateinit var context: Context
+    /** Leaving the patterns screen cancels its scope; an apply that started must still post what it reparsed. */
+    @Test fun applyPendingFinishesWhenTheCallerIsCancelled() = runBlocking {
+        fixture { c ->
+            val w = c.messagePatternsWorkflow
+            c.processRawSmsUseCase.ingest(sms("pending", incoming))
+            val account = w.confirmPatternAccount(BARQ, "1234")
+            w.saveFinancial(w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_IN,
+                account.id, incoming, null, emptySet()))
+            val generation = w.catalog().generation
+
+            val job = launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { w.applyPending(BARQ, generation) }
+            job.cancel()
+            job.join()
+
+            assertEquals(1, c.financialTransactionRepository.listAll().size)
+        }
+    }
+
     private suspend fun fixture(block: suspend (AppContainer) -> Unit) {
         context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "bundled-${java.util.UUID.randomUUID()}")
         val container = AppContainer(context)
