@@ -70,7 +70,8 @@ internal class PrimaryFieldExtractor(
     fun identifier(field: ExtractionField): String? {
         val hits = labels(field).flatMap { label ->
             // Masked suffixes only (XX1234, **1234, 1234*, (1234)); a full IBAN or account number is never shortened.
-            Regex("(?m)^ *" + source.role(label).pattern + "[ \\t]*:?[ \\t]*\\(?((?:[a-z]{2})?[*x]*[0-9]{4})[*x]*\\)?(?![\\p{L}\\p{N}_])")
+            // A mask that continues after the digits (4567****1234) shows a prefix, not the last four, so it is no match.
+            Regex("(?m)^ *" + source.role(label).pattern + "[ \\t]*:?[ \\t]*\\(?((?:[a-z]{2})?[*x]*[0-9]{4})[*x]*\\)?(?![\\p{L}\\p{N}_*])")
                 .findAll(source.text).map { Hit(it.groupValues[1].takeLast(4), it.groups[1]!!.range) }.toList()
         }.filterNot { hit ->
             // A compact amount role (بـ25) must not double as an identifier.
@@ -84,7 +85,7 @@ internal class PrimaryFieldExtractor(
 
     fun card(): String? {
         val labeledCard = identifier(ExtractionField.CARD)
-        val pattern = Regex("(?m)^ *(?:بطاقة|card) *: *(?:credit|debit|ائتمانية|مدى)(?: +| *\\n+ *)(?:رقم|number) *: *([*x]*[0-9]{4})(?![\\p{L}\\p{N}_])")
+        val pattern = Regex("(?m)^ *(?:بطاقة|card) *: *(?:credit|debit|ائتمانية|مدى)(?: +| *\\n+ *)(?:رقم|number) *: *([*x]*[0-9]{4})(?![\\p{L}\\p{N}_*])")
         val hits = pattern.findAll(source.text).toList()
         val values = (listOfNotNull(labeledCard) + hits.map { it.groupValues[1].takeLast(4) }).distinct()
         if (values.size > 1) problem("CONFLICTING_CARD", Blocker.CONFLICTING_FACTS)

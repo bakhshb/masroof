@@ -33,6 +33,12 @@ class IndependentRuleInterpreterTest {
         assertNull(result.confidence)
     }
 
+    @Test fun maskWhoseDigitsAreAPrefix_isNeverTakenAsTheLastFour() {
+        val result = parse("Purchase\nAmount: SAR 42.35\nCard: 4567****1234\nMerchant: Synthetic Shop\n2026-10-17 13:00")
+        assertNotEquals("4567", result.facts.card?.last4)
+        assertEquals("1234", parse(purchase.replace("**1234", "1234**")).facts.card!!.last4)
+    }
+
     @Test fun utf16EvidenceSurvivesEmojiArabicDigitsMarksCrLfAndCompatibilityCharacters() {
         val body = "😀\r\nشِراء\r\nبمبلغ： ٤٢٫٣٥ SAR\r\nبطاقة: **١٢٣٤\r\nلدى: متجر أصلي\r\n٢٠٢٦-١٠-١٧ ١٣:٠٠"
         val result = parse(body)
