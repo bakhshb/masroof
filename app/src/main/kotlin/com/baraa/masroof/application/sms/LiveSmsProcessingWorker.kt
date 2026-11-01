@@ -11,7 +11,6 @@ import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
-import com.baraa.masroof.data.room.DatabaseRestartRequiredException
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -34,6 +33,8 @@ class LiveSmsProcessingWorker(
     private val onProcessed: () -> Unit = {},
     /** False while startup integrity repair has not succeeded; processing then waits for a retry. */
     private val startupReady: suspend () -> Boolean = { true },
+    /** True for the cancellation a restore uses to retire the database. */
+    private val isRestartRequired: (CancellationException) -> Boolean = { false },
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val rawSmsId = inputData.getString(KEY_RAW_SMS_ID)
@@ -47,10 +48,9 @@ class LiveSmsProcessingWorker(
             } finally {
                 onProcessed()
             }
-        } catch (_: DatabaseRestartRequiredException) {
-            // A restore retired this database; the work belongs to the next process.
-            return Result.retry()
         } catch (e: CancellationException) {
+            // A restore retires the database with a cancellation; that work belongs to the next process.
+            if (isRestartRequired(e)) return Result.retry()
             throw e
         } catch (e: Exception) {
             logUnexpectedFailure(stage = "process", e)
@@ -123,6 +123,7 @@ class LiveSmsProcessingWorker(
         private val processStoredSms: () -> ProcessStoredSmsUseCase,
         private val appLogService: AppLogService? = null,
         private val startupReady: suspend () -> Boolean = { true },
+        private val isRestartRequired: (CancellationException) -> Boolean = { false },
         private val onProcessed: () -> Unit = {},
     ) : WorkerFactory() {
         override fun createWorker(
@@ -131,7 +132,7 @@ class LiveSmsProcessingWorker(
             workerParameters: WorkerParameters,
         ): ListenableWorker? =
             if (workerClassName == LiveSmsProcessingWorker::class.java.name) {
-                LiveSmsProcessingWorker(appContext, workerParameters, processStoredSms(), appLogService, onProcessed, startupReady)
+                LiveSmsProcessingWorker(appContext, workerParameters, processStoredSms(), appLogService, onProcessed, startupReady, isRestartRequired)
             } else {
                 null
             }

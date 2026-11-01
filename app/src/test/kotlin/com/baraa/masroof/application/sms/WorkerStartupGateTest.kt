@@ -94,9 +94,12 @@ class WorkerStartupGateTest {
         TestListenableWorkerBuilder<LiveSmsProcessingWorker>(context)
             .setInputData(LiveSmsProcessingWorker.inputFor(rawSmsId))
             .setWorkerFactory(
-                LiveSmsProcessingWorker.Factory({ harness.processStored(rawSmsRepository = rawRepository) }, harness.appLog, { ready }) {
-                    signals.incrementAndGet()
-                },
+                LiveSmsProcessingWorker.Factory(
+                    processStoredSms = { harness.processStored(rawSmsRepository = rawRepository) },
+                    appLogService = harness.appLog,
+                    startupReady = { ready },
+                    isRestartRequired = { it is DatabaseRestartRequiredException },
+                ) { signals.incrementAndGet() },
             )
             .build()
 
