@@ -1,6 +1,5 @@
 package com.baraa.masroof.application.analytics
 
-import androidx.room.withTransaction
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.dashboard.*
 import com.baraa.masroof.domain.model.*
@@ -19,7 +18,9 @@ internal data class FinancialAnalysisRead(val service: DashboardService, val row
  */
 internal object FinancialAnalysisReader {
     suspend fun capture(c: AppContainer, start: Instant, end: Instant, zone: ZoneId, clock: Clock = Clock.system(zone)): FinancialAnalysisRead =
-        c.databaseAccessGate.withAccess { c.database.withTransaction {
+        // No write transaction: holding Room's write slot here blocked live SMS work for the whole read.
+        // A write during the read bumps the analytics generation, and that refresh runs again.
+        c.databaseAccessGate.withAccess {
             val accounts = c.accountRegistryRepository.listAll()
             val cards = c.cardRegistryRepository.listAll()
             val loans = c.loanRegistryRepository.listAll()
@@ -30,7 +31,7 @@ internal object FinancialAnalysisReader {
             var evidence = scope.load(periodRows, cards, end)
             val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(evidence.parsedRecords, evidence.rawSmsById, zone, end)
             val cardRows = if (statementStart < start) c.financialTransactionRepository.listOccurredBetween(statementStart, end) else emptyList()
-            val sources = commitments.mapNotNull { c.financialTransactionRepository.getById(it.sourceTransactionId) }
+            val sources = c.financialTransactionRepository.getByIds(commitments.map { it.sourceTransactionId })
             val payments = c.financialTransactionRepository.listByTypes(listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT))
             val rows = (periodRows + cardRows + sources + payments).distinctBy { it.id }.sortedWith(compareBy({ it.occurredAt }, { it.id }))
             evidence = scope.extend(evidence, rows)
@@ -39,8 +40,10 @@ internal object FinancialAnalysisReader {
                 override suspend fun load(transactions: Collection<FinancialTransaction>, registryCards: List<CardRegistryEntry>, periodEndExclusive: Instant) = copiedEvidence
                 override suspend fun extend(evidence: DashboardEvidence, transactions: Collection<FinancialTransaction>) = copiedEvidence
             }
+            val rowsById = rows.associateBy { it.id }
             val financial = object : FinancialTransactionRepository by c.financialTransactionRepository {
-                override suspend fun getById(id: String) = rows.firstOrNull { it.id == id }
+                override suspend fun getById(id: String) = rowsById[id]
+                override suspend fun getByIds(ids: Collection<String>) = ids.distinct().mapNotNull(rowsById::get)
                 override suspend fun listAll() = rows
                 override suspend fun listOccurredBetween(startInclusive: Instant, endExclusive: Instant) = rows.filter { it.occurredAt >= startInclusive && it.occurredAt < endExclusive }.asReversed()
                 override suspend fun listByTypes(types: Collection<FinancialTransactionType>) = rows.filter { it.type in types }
@@ -76,5 +79,5 @@ internal object FinancialAnalysisReader {
             }.toSet()
             FinancialAnalysisRead(service, rows, commitments.map { it.sourceTransactionId }.toSet(), retry, incompleteDays,
                 commitments.mapNotNull { it.recurrence?.name?.let { recurrence -> it.sourceTransactionId to recurrence } }.toMap())
-        } }
+        }
 }
