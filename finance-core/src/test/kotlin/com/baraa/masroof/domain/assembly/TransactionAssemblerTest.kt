@@ -320,6 +320,30 @@ class TransactionAssemblerTest {
         assertTrue(outcome is TransactionAssembler.Outcome.PendingMatch)
     }
 
+    /** The reconciler builds candidates only from gate-passing evidence, such as a user's financial confirmation. */
+    @Test
+    fun unmatchedOwnedOwned_userConfirmedLegNotYetValidated_stillPosts() {
+        val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
+            candidate = transferCandidate(
+                event = event(
+                    family = MessageFamily.TRANSFER_OUT,
+                    amount = money("2000.00"),
+                    source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                    destination = AccountReference(Bank.BANK_ALJAZIRA, "3002"),
+                    bankNetworkType = BankNetworkType.INTRA_BANK,
+                    status = ParseStatus.REVIEW_REQUIRED,
+                ),
+                sourceOwnership = OwnershipStatus.OWNED,
+                destinationOwnership = OwnershipStatus.OWNED,
+            ),
+        )
+
+        assertEquals(
+            FinancialTransactionType.SELF_TRANSFER,
+            (outcome as TransactionAssembler.Outcome.Assembled).transaction.type,
+        )
+    }
+
     @Test
     fun unmatchedOwnedOwned_withoutCounterpart_postsSelfTransfer() {
         val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(

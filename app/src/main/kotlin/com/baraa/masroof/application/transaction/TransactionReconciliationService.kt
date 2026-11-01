@@ -526,6 +526,7 @@ class TransactionReconciliationService(
         val pairs = TransactionMatcher.findMutuallyUniquePairs(stillOpen)
         val matchedEventIds = mutableSetOf<String>()
         val matchedRawSmsIds = mutableSetOf<String>()
+        val failedPairs = mutableListOf<Pair<String, String>>()
         for (pair in pairs) {
             if (pair.outgoing.event.id in matchedEventIds ||
                 pair.incoming.event.id in matchedEventIds
@@ -577,6 +578,12 @@ class TransactionReconciliationService(
                             failed++
                             failedRawSmsIds += pair.outgoing.event.rawSmsId
                             failedRawSmsIds += pair.incoming.event.rawSmsId
+                            failedPairs += pair.outgoing.event.rawSmsId to pair.incoming.event.rawSmsId
+                            // Pairing wins: neither leg may be posted alone as spending or income in this pass.
+                            matchedEventIds += pair.outgoing.event.id
+                            matchedEventIds += pair.incoming.event.id
+                            matchedRawSmsIds += pair.outgoing.event.rawSmsId
+                            matchedRawSmsIds += pair.incoming.event.rawSmsId
                         }
                     }
                 }
@@ -641,6 +648,19 @@ class TransactionReconciliationService(
         failed += upgraded.failed
         failedRawSmsIds += upgraded.failedRawSmsIds
         settledRawSmsIds += upgraded.settledRawSmsIds
+
+        // A pair save loses a race when another pass posted one leg first. If the stale-leg
+        // upgrade above then joined both legs into one transaction, the pair is complete.
+        for ((outgoing, incoming) in failedPairs) {
+            val joined = financialTransactionRepository.findByRawSmsId(outgoing)?.id
+            if (joined == null || joined != financialTransactionRepository.findByRawSmsId(incoming)?.id) continue
+            if (outgoing in upgraded.failedRawSmsIds || incoming in upgraded.failedRawSmsIds) continue
+            failed--
+            failedRawSmsIds -= outgoing
+            failedRawSmsIds -= incoming
+            settledRawSmsIds += outgoing
+            settledRawSmsIds += incoming
+        }
 
         val healedLoans = upgradeStaleFeeFinancingInstallments(records, scope)
         assembledSingle += healedLoans.assembledSingle
