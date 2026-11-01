@@ -63,7 +63,9 @@ fun SettingsCommitmentEditorScreen(
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
     var showTransactionDatePicker by rememberSaveable { mutableStateOf(false) }
     var showDueDatePicker by rememberSaveable { mutableStateOf(false) }
-    val parsedAmount = amountText.trim().toBigDecimalOrNull()
+    // Accept the forms people type: Arabic digits and decimal mark, and thousands separators.
+    val parsedAmount = com.baraa.masroof.application.analytics.normalizeAnalysisNumber(amountText)
+        .replace(",", "").replace("٬", "").toBigDecimalOrNull()
     val canSave = !saving && name.isNotBlank() && parsedAmount != null && parsedAmount.signum() > 0
 
     if (showDeleteConfirm) {

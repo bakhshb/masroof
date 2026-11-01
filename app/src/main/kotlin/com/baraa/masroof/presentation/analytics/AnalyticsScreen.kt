@@ -131,7 +131,10 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
         purchaseRange = 0
         endedAlert = alert == null || alert.resolved
         if (alert != null && !alert.resolved) {
-            focusedAlert = id; workflow.markAlert(id)
+            focusedAlert = id
+            // Opening the alert matters more than marking it read; a failed mark is logged, not thrown.
+            try { workflow.markAlert(id) } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { workflow.appLogService.warn("LAB_ANALYTICS", "Mark analysis alert read failed (${e.javaClass.simpleName})") }
             if (alert.kind == "PAYMENT") alert.evidenceId?.let(onOpenTransaction)
         }
         pendingTarget = null
