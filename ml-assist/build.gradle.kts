@@ -1,9 +1,21 @@
-plugins { kotlin("jvm") }
+plugins {
+    kotlin("jvm")
+    alias(libs.plugins.detekt)
+}
 apply(from = "../build-logic/pure-jvm-boundaries.gradle.kts")
 kotlin { jvmToolchain(21) }
 dependencies { testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
-    testRuntimeOnly(libs.junit.launcher) }
+    testRuntimeOnly(libs.junit.launcher)
+    detektPlugins(libs.detekt.formatting) }
+
+detekt {
+    config.setFrom("$rootDir/detekt.yml")
+    baseline = file("detekt-baseline.xml")
+    buildUponDefaultConfig = false
+    parallel = true
+}
+
 
 tasks.register<JavaExec>("trainRecurringSeed") {
     group = "verification"

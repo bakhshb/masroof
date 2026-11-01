@@ -12,6 +12,7 @@ dependencies {
 }
 detekt {
     config.setFrom("$rootDir/detekt.yml")
+    baseline = file("detekt-baseline.xml")
     buildUponDefaultConfig = false
     parallel = true
 }

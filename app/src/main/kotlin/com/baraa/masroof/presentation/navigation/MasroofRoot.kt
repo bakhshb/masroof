@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -211,7 +212,7 @@ private fun MasroofContent(
         if (top.destination == HomeDestination.Dashboard) dashboardViewModel.closeTransactionDetail() else push(HomeDestination.Dashboard)
     }
     val labCenterReturns by AnalyticsNavigation.centerReturns.collectAsState()
-    var consumedLabCenterReturn by rememberSaveable { mutableStateOf(labCenterReturns) }
+    var consumedLabCenterReturn by rememberSaveable { mutableLongStateOf(labCenterReturns) }
     LaunchedEffect(labCenterReturns) {
         if (labCenterReturns > consumedLabCenterReturn) pop()
         consumedLabCenterReturn = labCenterReturns

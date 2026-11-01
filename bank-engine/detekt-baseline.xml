@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LongMethod:PatternFactInterpreter.kt:PatternFactInterpreter$private fun interpret: Interpretation</ID>
+    <ID>LongMethod:RuleInterpreter.kt:RuleInterpreter$private fun interpretWithBanks: Interpretation</ID>
+  </CurrentIssues>
+</SmellBaseline>

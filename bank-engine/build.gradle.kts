@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm")
     `java-test-fixtures`
+    alias(libs.plugins.detekt)
 }
 apply(from = "../build-logic/pure-jvm-boundaries.gradle.kts")
 kotlin { jvmToolchain(21) }
@@ -10,7 +11,16 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.launcher)
     testImplementation(libs.kotlinx.serialization.json)
+    detektPlugins(libs.detekt.formatting)
 }
+
+detekt {
+    config.setFrom("$rootDir/detekt.yml")
+    baseline = file("detekt-baseline.xml")
+    buildUponDefaultConfig = false
+    parallel = true
+}
+
 
 // Boundary tests inspect files outside this module. Include those files in the test cache key.
 tasks.test {
