@@ -99,7 +99,7 @@ class DashboardSpendingTrendsTest {
     @Test
     fun registryLinkedDebitWithoutSmsAccount_includesPurchaseAndRefundInAccountChartAndMovements() {
         val accountId = FinancialContainerIdFactory.accountId(bank, "1111")
-        val cardId = FinancialContainerIdFactory.cardId(bank, "2210")!!
+        val cardId = FinancialContainerIdFactory.cardId(bank, "2210")
         val purchase = transaction("googlepay", "120", cardId).copy(linkedParsedEventIds = listOf("evt-purchase"))
         val refund = transaction("refund", "20", null).copy(type = FinancialTransactionType.REFUND,
             destinationContainerId = cardId, linkedParsedEventIds = listOf("evt-refund"))

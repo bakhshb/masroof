@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira
 
+import org.junit.Assume.assumeTrue
 import com.baraa.masroof.testsupport.EngineFixtureParser
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 
@@ -216,7 +217,7 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
 
     @Test
     fun validationFirewall_blocksDatedSuccessWhenSmsTimeIsImplausible() {
-        if (fixture.expected.occurredAt == null) return
+        assumeTrue("${fixture.id} has no SMS time", fixture.expected.occurredAt != null)
         val clockBeforeSms = Clock.fixed(Instant.parse("2020-01-01T00:00:00Z"), ZoneOffset.UTC)
         val pipeline = pipelineWith(DefaultParsedEventValidator(clock = clockBeforeSms))
         assertFirewall(pipeline.parse(input()), blockingCode = "V-015")

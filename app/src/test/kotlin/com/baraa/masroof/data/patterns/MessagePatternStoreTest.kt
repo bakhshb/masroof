@@ -33,7 +33,7 @@ class MessagePatternStoreTest {
         assertEquals(listOf(other), deleted.banks.single { it.bankId == "OTHER" }.patterns)
         assertThrows(IllegalArgumentException::class.java) { store.saveBank(4, bank(first.copy(revision = 3))) }
         assertEquals(deleted, store.load())
-        assertEquals(listOf(file.name), file.parentFile.listFiles()!!.map { it.name })
+        assertEquals(listOf(file.name), file.parentFile!!.listFiles()!!.map { it.name })
     }
 
     @Test fun manySavesKeepOnlyRecentRevisionsSoTheBankNeverFills() = withFile { file ->
@@ -102,7 +102,7 @@ class MessagePatternStoreTest {
                 .saveBank(1, bank(first.copy(revision = 2)))
         }
         assertArrayEquals(prior, file.readBytes())
-        assertEquals(listOf(file.name), file.parentFile.listFiles()!!.map { it.name })
+        assertEquals(listOf(file.name), file.parentFile!!.listFiles()!!.map { it.name })
     }
 
     @Test fun corruptAndUnsupportedDocumentsStayVisibleAndCannotBeOverwrittenByAnEdit() = withFile { file ->

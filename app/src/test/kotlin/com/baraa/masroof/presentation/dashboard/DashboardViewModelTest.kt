@@ -1,12 +1,11 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.testsupport.FakeAppLocaleRepository
 import com.baraa.masroof.testsupport.MutableCardRegistryRepository as FakeCardRegistry
 import com.baraa.masroof.testsupport.StubAccountRegistryRepository as FakeAccountRegistry
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.application.locale.AppLocale
-import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
@@ -278,7 +277,7 @@ class DashboardViewModelTest {
         assertEquals(currentPeriod, state.period)
         assertNotNull(state.summary)
         assertEquals(currentPeriod, state.summary!!.period)
-        assertEquals(Money.of("100.00", Currency.SAR), state.summary!!.spendingGross)
+        assertEquals(Money.of("100.00", Currency.SAR), state.summary.spendingGross)
         assertTrue(state.isCurrentPeriod)
     }
 
@@ -881,7 +880,7 @@ class DashboardViewModelTest {
                         override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
                         override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) = Unit
                         override suspend fun resolve(reference: AccountReference) = OwnershipStatus.UNKNOWN
-                        override suspend fun get(ref: com.baraa.masroof.domain.model.AccountReference) = null
+                        override suspend fun get(reference: com.baraa.masroof.domain.model.AccountReference) = null
                         override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
                         override suspend fun updateDisplayName(
                             reference: com.baraa.masroof.domain.model.AccountReference,
@@ -939,11 +938,6 @@ class DashboardViewModelTest {
             zoneId = zone,
             maintenanceCompletions = maintenanceCompletions,
         )
-
-    private class FakeAppLocaleRepository : AppLocaleRepository {
-        override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
-        override fun setLanguageTag(languageTag: String) = Unit
-    }
 
     private class FakeLayoutPreferencesRepository(
         private var snapshot: DashboardLayoutSnapshot = DashboardLayoutSnapshot.default(),

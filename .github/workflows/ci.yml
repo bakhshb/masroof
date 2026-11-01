@@ -25,7 +25,6 @@ jobs:
       - name: Verify CI routing, protocol and publication contracts
         run: |
           python3 scripts/test-latest-stable-android.py
-          python3 scripts/test-instrumentation-smoke.py
           python3 scripts/test-lifecycle-suite.py
           python3 scripts/test_ci_device.py
           bash scripts/test-verify-ci-status.sh

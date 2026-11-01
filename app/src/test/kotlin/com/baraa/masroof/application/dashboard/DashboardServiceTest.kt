@@ -1,11 +1,9 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.application.locale.AppLocale
-import com.baraa.masroof.application.locale.AppLocaleRepository
+import com.baraa.masroof.testsupport.FakeAppLocaleRepository
+import com.baraa.masroof.testsupport.StubAccountRegistryRepository
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.domain.model.AccountRegistryEntry
-import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -15,7 +13,6 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
-import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
@@ -261,8 +258,8 @@ class DashboardServiceTest {
         reviewRepo: ReviewRepository,
         parsedRepo: ParsedEventRepository = FakeParsedRepo(),
         rawRepo: RawSmsRepository = FakeRawRepo(),
-        accountRepo: AccountRegistryRepository = FakeAccountRepo(),
-        cardRepo: CardRegistryRepository = FakeCardRepo(),
+        accountRepo: AccountRegistryRepository = StubAccountRegistryRepository(),
+        cardRepo: CardRegistryRepository = NoOpCardRegistryRepository(),
         loanRepo: LoanRegistryRepository = FakeLoanRepo(),
         commitmentRepo: com.baraa.masroof.domain.repository.CommitmentRepository = NoOpCommitmentRepository(),
     ): DashboardService =
@@ -281,22 +278,6 @@ class DashboardServiceTest {
             clock = clock,
         )
 
-    private class FakeCardRepo(
-        entries: List<com.baraa.masroof.domain.model.CardRegistryEntry> = emptyList(),
-    ) : NoOpCardRegistryRepository(entries)
-
-    private class FakeAccountRepo(
-        private val entries: List<AccountRegistryEntry> = emptyList(),
-    ) : AccountRegistryRepository {
-        override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
-        override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) = Unit
-        override suspend fun resolve(reference: AccountReference): OwnershipStatus = OwnershipStatus.UNKNOWN
-        override suspend fun get(reference: AccountReference): AccountRegistryEntry? = null
-        override suspend fun listAll(): List<AccountRegistryEntry> = entries
-        override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
-        override suspend fun updateAccountType(reference: AccountReference, accountType: AccountType) = Unit
-    }
-
     private class FakeLoanRepo : LoanRegistryRepository {
         override suspend fun observe(reference: com.baraa.masroof.domain.model.LoanReference, rawSmsId: String) = Unit
         override suspend fun setOwnership(reference: com.baraa.masroof.domain.model.LoanReference, status: OwnershipStatus) = Unit
@@ -304,11 +285,6 @@ class DashboardServiceTest {
         override suspend fun get(reference: com.baraa.masroof.domain.model.LoanReference): com.baraa.masroof.domain.model.LoanRegistryEntry? = null
         override suspend fun listAll(): List<com.baraa.masroof.domain.model.LoanRegistryEntry> = emptyList()
         override suspend fun updateDisplayName(reference: com.baraa.masroof.domain.model.LoanReference, displayName: String?) = Unit
-    }
-
-    private class FakeAppLocaleRepository : AppLocaleRepository {
-        override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
-        override fun setLanguageTag(languageTag: String) = Unit
     }
 
     private class FakeParsedRepo(

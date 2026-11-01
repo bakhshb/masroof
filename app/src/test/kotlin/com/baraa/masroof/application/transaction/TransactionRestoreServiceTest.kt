@@ -317,7 +317,7 @@ class TransactionRestoreServiceTest {
     private class SingleTransactionRepository(
         private val transaction: FinancialTransaction,
     ) : FinancialTransactionRepository {
-        override suspend fun save(tx: FinancialTransaction, rawSmsIds: Collection<String>) =
+        override suspend fun save(transaction: FinancialTransaction, rawSmsIds: Collection<String>) =
             FinancialTransactionSaveResult.Saved
 
         override suspend fun getById(id: String): FinancialTransaction? =

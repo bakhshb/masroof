@@ -26,7 +26,7 @@ class RoleBoundDetailsTest {
         assertEquals(ParseStatus.SUCCESS,r.status)
         assertEquals("SAR",r.facts.internationalFee!!.currency.name)
         assertEquals("USD",r.facts.amount!!.currency.name)
-        assertEquals("1.40",r.facts.internationalFee!!.amount.toPlainString())
+        assertEquals("1.40",r.facts.internationalFee.amount.toPlainString())
         val noDefault=RuleLibrary.current().let {it.copy(rules=it.rules.map {rule ->rule.copy(observations=rule.observations-"fee.sar_unlabeled")})}
         assertEquals(ParseStatus.REVIEW_REQUIRED,parse(bare,noDefault).status)
         for(value in listOf("-1.40","1.4001","1.40 USD SAR","1.40 junk")) assertEquals(ParseStatus.REVIEW_REQUIRED,parse("$purchase\nرسوم العمليات الدولية: $value").status)
@@ -39,12 +39,12 @@ class RoleBoundDetailsTest {
         val r = parse(body)
         assertEquals(ParseStatus.SUCCESS, r.status)
         assertEquals("23.00", r.facts.amount!!.amount.toPlainString())
-        assertEquals("USD", r.facts.amount!!.currency.name)
+        assertEquals("USD", r.facts.amount.currency.name)
         assertEquals("SAR", r.facts.outstandingBalance!!.currency.name)
-        assertEquals("900.00", r.facts.outstandingBalance!!.amount.toPlainString())
+        assertEquals("900.00", r.facts.outstandingBalance.amount.toPlainString())
         assertEquals("USD", r.facts.labeledForeignAmount!!.currency.name)
         assertEquals("SAR", r.facts.internationalFee!!.currency.name)
-        assertEquals("1.99", r.facts.internationalFee!!.amount.toPlainString())
+        assertEquals("1.99", r.facts.internationalFee.amount.toPlainString())
         assertEquals(BigDecimal("3.756957"), r.facts.exchangeRate)
         listOf("dueAmount", "foreignAmount", "internationalFee", "exchangeRate").forEach { field ->
             val span = r.evidence.single { it.field == field }

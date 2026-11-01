@@ -43,6 +43,13 @@ class MoneyUiFormatterTest {
     }
 
     @Test
+    fun negativeAmounts_keepLocaleDirectionMark() {
+        assertEquals("\u200E-1,234.50 ر.س", MoneyUiFormatter.format(java.math.BigDecimal("-1234.50"), Currency.SAR, "ar"))
+        assertEquals("\u200E-18,500 USD", MoneyUiFormatter.format(java.math.BigDecimal("-18500"), Currency.USD, "ar-SA"))
+        assertEquals("-1,234.50 SAR", MoneyUiFormatter.format(java.math.BigDecimal("-1234.50"), Currency.SAR, "en-US"))
+    }
+
+    @Test
     fun currencyLabel_respectsLanguage() {
         assertEquals("SAR", MoneyUiFormatter.currencyLabel(Currency.SAR, AppLocale.TAG_EN))
         assertEquals("ر.س", MoneyUiFormatter.currencyLabel(Currency.SAR, AppLocale.TAG_AR))

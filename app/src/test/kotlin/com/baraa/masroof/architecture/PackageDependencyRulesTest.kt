@@ -30,6 +30,28 @@ class PackageDependencyRulesTest {
     }
 
     @Test
+    fun domainCoreParsingBank_doNotImportAndroidFrameworks() {
+        assertPackagesDoNotImport(
+            packages = listOf("domain", "core", "parsing", "bank"),
+            forbiddenImports = listOf("import android.", "import androidx."),
+        )
+    }
+
+    @Test
+    fun domain_doesNotDependOnHigherLayers() {
+        assertPackagesDoNotImport(
+            packages = listOf("domain"),
+            forbiddenImports = listOf(
+                "import com.baraa.masroof.parsing",
+                "import com.baraa.masroof.bank",
+                "import com.baraa.masroof.data",
+                "import com.baraa.masroof.presentation",
+                "import android.",
+            ),
+        )
+    }
+
+    @Test
     fun parsing_doesNotDependOnOuterLayers() {
         assertPackagesDoNotImport(
             packages = listOf("parsing"),

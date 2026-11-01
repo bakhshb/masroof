@@ -1,11 +1,10 @@
 package com.baraa.masroof.presentation.settings
 
+import com.baraa.masroof.testsupport.FakeAppLocaleRepository
 import com.baraa.masroof.testsupport.MutableCardRegistryRepository
 import com.baraa.masroof.testsupport.MutableCardRegistryRepository as TrackingCardRegistry
 import com.baraa.masroof.testsupport.StubAccountRegistryRepository
 
-import com.baraa.masroof.application.locale.AppLocale
-import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.backup.BackupImportOutcome
 import com.baraa.masroof.application.backup.BackupPackageKind
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
@@ -844,16 +843,6 @@ class SettingsViewModelTest {
             apkInstaller = SettingsViewModelTestFixtures.apkInstaller(),
             canInstallPackages = { true },
         )
-
-    private class FakeAppLocaleRepository : AppLocaleRepository {
-        private var tag: String = AppLocale.DEFAULT_TAG
-
-        override fun getLanguageTag(): String = tag
-
-        override fun setLanguageTag(languageTag: String) {
-            tag = languageTag
-        }
-    }
 
     private class FakeThemePreferencesRepository(
         private var mode: ThemeMode = ThemeMode.SYSTEM,

@@ -1,6 +1,10 @@
 package com.baraa.masroof.bank.patterns
 
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.integration.bank.NewEngineFixtureTest
+import com.baraa.masroof.parsing.model.BankDetectionResult
+import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.engine.bank.MoneyDirection
 import com.baraa.masroof.engine.bank.patterns.PatternFactContract
@@ -9,6 +13,7 @@ import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 import kotlinx.serialization.json.*
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.time.Instant
@@ -47,7 +52,7 @@ class ExistingBankParseSnapshotTest {
             }
         }
         File("src/test/resources/testdata").walkTopDown()
-            .filter { it.isFile && it.extension == "json" && it.parentFile.name != "multibank" }
+            .filter { it.isFile && it.extension == "json" && it.parentFile?.name != "multibank" }
             .sortedBy { it.invariantSeparatorsPath }
             .forEach { walk(it.relativeTo(File("src/test/resources/testdata")).invariantSeparatorsPath, Json.parseToJsonElement(it.readText()), "") }
         return out
@@ -65,5 +70,23 @@ class ExistingBankParseSnapshotTest {
         }
         if (System.getenv("MASROOF_UPDATE_PARSE_SNAPSHOT") == "1") snapshot.writeText(actual)
         assertEquals(snapshot.readText(), actual)
+    }
+
+    @Test fun defaultFixtureAdapterUsesBundledProductionDefinitions() {
+        val result = engineFixtureAdapter().parse(SmsParseInput("default-fixture", "AlJazira",
+            "Purchase\nAmount:10 SAR\nFrom account:4321\nMerchant:SHOP\nOn:2026-10-15 12:30",
+            Instant.parse("2026-10-20T12:00:00Z")))
+        assertTrue(result is ParseResult.Success)
+        assertTrue("engine:message-pattern-roles-v1" in (result as ParseResult.Success).event.confidence.reasons)
+    }
+
+    @Test fun everyEngineFixtureIsDetectedAsAlJazira() {
+        val adapter = bundledAlJaziraPatternAdapter()
+        val fixtures = NewEngineFixtureTest.cases().map { Json.parseToJsonElement(it.single().readText()).jsonObject }
+        assertTrue(fixtures.isNotEmpty())
+        for (row in fixtures) {
+            val detection = adapter.detect(row.getValue("sender").jsonPrimitive.content, row.getValue("body").jsonPrimitive.content)
+            assertEquals(row.getValue("id").jsonPrimitive.content, Bank.BANK_ALJAZIRA, (detection as? BankDetectionResult.Detected)?.bank)
+        }
     }
 }
