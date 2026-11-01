@@ -27,7 +27,9 @@ class AndroidKeystoreGitHubTokenEncryptor(
         try {
             seal(plaintext, loadOrCreateKey())
         } catch (first: Exception) {
-            deleteKey()
+            // Recreate the key only when the key itself is broken; a transient keystore error must not
+            // destroy the key that still decrypts the saved token.
+            if (first is java.security.InvalidKeyException || first is java.security.UnrecoverableKeyException) deleteKey()
             try {
                 seal(plaintext, loadOrCreateKey())
             } catch (second: Exception) {

@@ -131,6 +131,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
@@ -927,15 +928,18 @@ class AppContainer(
         }
     }
 
-    /** Retry a previously blocked startup maintenance attempt from the gated UI. */
-    suspend fun retryStartupMaintenance(): StartupMaintenanceOutcome {
+    /**
+     * Retry a previously blocked startup maintenance attempt from the gated UI. The work runs in the
+     * application scope, so a rotation that cancels the caller does not stop it between repair and rescheduling.
+     */
+    suspend fun retryStartupMaintenance(): StartupMaintenanceOutcome = applicationScope.async {
         val outcome = runStartupMaintenanceAttempt()
         startupMaintenanceOutcome.value = outcome
         if (outcome == StartupMaintenanceOutcome.READY) {
             runPostStartupBackgroundWork()
         }
-        return outcome
-    }
+        outcome
+    }.await()
 
     private suspend fun runStartupMaintenanceAttempt(): StartupMaintenanceOutcome =
         try {
