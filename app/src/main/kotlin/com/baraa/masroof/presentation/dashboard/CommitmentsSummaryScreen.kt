@@ -63,7 +63,7 @@ fun CommitmentsSummaryScreen(state: DashboardUiState, onBack: () -> Unit,
                         }
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
-                        MasroofText(row.displayName, style = MasroofReference.pair)
+                        MasroofText(commitmentRowName(row), style = MasroofReference.pair)
                         row.expectedDate?.let { MasroofText(date.format(it), style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         MasroofBadge(stringResource(if (paid) R.string.dashboard_commitments_status_paid else R.string.dashboard_commitments_status_unpaid),

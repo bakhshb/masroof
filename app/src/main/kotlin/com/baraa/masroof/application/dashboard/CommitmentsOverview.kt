@@ -6,6 +6,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
@@ -39,6 +40,8 @@ data class CommitmentDashboardRow(
     val loanKey: String? = null,
     val paymentTransactionId: String? = null,
     val paymentMatchIssue: CommitmentMatchIssue? = null,
+    /** Set for a loan without a user name, so screens show its localized type instead of [displayName]. */
+    val loanTypeFallback: LoanType? = null,
 )
 
 data class CommitmentsOverview(
@@ -288,6 +291,7 @@ object CommitmentsOverviewBuilder {
                 expectedDate = null,
                 status = if (paid) CommitmentPaymentStatus.PAID else CommitmentPaymentStatus.UNPAID,
                 loanKey = "${loan.bank.id}:${loan.loanType.name}",
+                loanTypeFallback = loan.loanType.takeIf { loan.customName == null },
             )
         }
 

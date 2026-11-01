@@ -88,6 +88,7 @@ object LoanOverviewBuilder {
                 latestInstallmentAsOf = installment?.second,
                 salaryPeriodPayment = periodPayment,
                 salaryPeriodLabel = salaryPeriodLabel,
+                customName = loan.displayName?.trim()?.takeIf { it.isNotEmpty() },
             )
         }.sortedBy { it.displayLabel }
 

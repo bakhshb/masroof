@@ -24,7 +24,7 @@ fun CommitmentsSection(overview: CommitmentsOverview, modifier: Modifier = Modif
     com.baraa.masroof.ui.dashboard.DashboardCommitmentBand(
         stringResource(R.string.reference_period_commitments),
         stringResource(R.string.reference_waiting_payment, formatLocalizedMoney(overview.remaining)),
-        pending.take(2).map { row -> com.baraa.masroof.application.locale.AppDigits.display(row.displayName +
+        pending.take(2).map { row -> com.baraa.masroof.application.locale.AppDigits.display(commitmentRowName(row) +
             (row.expectedDate?.let { " · " + DateTimeFormatter.ofPattern("d MMM", locale).format(it) } ?: "")) },
         modifier, details = if (onOpenCredit != null && pending.any { it.source == CommitmentDashboardSource.CREDIT_CARD }) ({
             com.baraa.masroof.presentation.common.MasroofTextButton(onClick = onOpenCredit) {
