@@ -663,10 +663,16 @@ class AppContainer(
 
     val workerFactory: WorkerFactory =
         DelegatingWorkerFactory().apply {
-            addFactory(LiveSmsProcessingWorker.Factory({ processStoredSmsUseCase }, appLogService) { maintenanceCompletionSignal.notifyCompleted() })
+            addFactory(
+                LiveSmsProcessingWorker.Factory({ processStoredSmsUseCase }, appLogService, ::startupFinancialReady) {
+                    maintenanceCompletionSignal.notifyCompleted()
+                },
+            )
             addFactory(
                 ExchangeRateEnrichmentWorker.Factory {
                     PendingExchangeRateEnricher {
+                        // A thrown error makes the worker retry once integrity repair has succeeded.
+                        check(startupFinancialReady()) { "Startup maintenance is not ready" }
                         if (exchangeRateEnrichmentWorkflow.enrichPending().persisted > 0) maintenanceCompletionSignal.notifyCompleted()
                     }
                 },
@@ -675,12 +681,14 @@ class AppContainer(
                 HistoricalDerivedRecoveryWorker.Factory(
                     recovery = { historicalDerivedRecovery },
                     appLogService = appLogService,
+                    startupReady = ::startupFinancialReady,
+                    onFinished = { maintenanceCompletionSignal.notifyCompleted() },
                 ),
             )
             addFactory(
                 LiveCaptureRecoveryWorker.Factory(
                     scanner = { historicalSmsScanner },
-                    startupReady = { awaitStartupMaintenance() == StartupMaintenanceOutcome.READY },
+                    startupReady = ::startupFinancialReady,
                     appLogService = appLogService,
                 ) { maintenanceCompletionSignal.notifyCompleted() },
             )
@@ -960,6 +968,9 @@ class AppContainer(
     suspend fun awaitPostStartupBackgroundWorkForTesting() {
         checkNotNull(startupMaintenanceJob) { "Startup maintenance has not been launched" }.join()
     }
+
+    /** Background financial writes wait for, and require, a successful integrity repair. */
+    private suspend fun startupFinancialReady(): Boolean = awaitStartupMaintenance() == StartupMaintenanceOutcome.READY
 
     /** Returns the safety outcome of the initial startup maintenance attempt. */
     suspend fun awaitStartupMaintenance(): StartupMaintenanceOutcome =
