@@ -170,10 +170,15 @@ internal class SettingsUpdateActions(
                 )
             }
             withContext(Dispatchers.IO) {
+                var shownStep = -1L
                 appUpdateService
                     .downloadUpdate(
                         manifest = manifest,
                         onProgress = { bytesRead, totalBytes ->
+                            // Progress arrives every 8 KB; the screen needs a new frame only per whole percent.
+                            val step = if (totalBytes > 0) bytesRead * 100 / totalBytes else bytesRead / PROGRESS_STEP_BYTES
+                            if (step == shownStep) return@downloadUpdate
+                            shownStep = step
                             settingsState.update {
                                 it.copy(
                                     updateState = AppUpdateUiState.Downloading(
@@ -288,5 +293,10 @@ internal class SettingsUpdateActions(
                 if (downloaded.exists()) downloaded.delete()
             }
         }
+    }
+
+    private companion object {
+        /** Unknown size: one progress update per 256 KiB. */
+        const val PROGRESS_STEP_BYTES = 256L * 1024
     }
 }

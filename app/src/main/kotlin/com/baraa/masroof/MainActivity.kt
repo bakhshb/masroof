@@ -176,8 +176,8 @@ class MainActivity : ComponentActivity() {
                 }
                 return@setContent
             }
-            val settingsState by settingsViewModel.uiState.collectAsState()
-            val themeMode = settingsState.themeMode
+            // Only the theme is needed here; collecting all of Settings redrew the app on every Settings change.
+            val themeMode by settingsViewModel.themeMode.collectAsState()
             val darkTheme = when (themeMode) {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true

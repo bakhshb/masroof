@@ -37,7 +37,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,6 +77,10 @@ class SettingsViewModel(
         ),
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    /** The app theme alone, so the activity root does not redraw for every Settings change. */
+    val themeMode: StateFlow<ThemeMode> = _uiState.map { it.themeMode }.distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, _uiState.value.themeMode)
     private val updates = SettingsUpdateActions(viewModelScope, _uiState, appUpdateService, updateCheckCoordinator,
         appLogService, apkInstaller, canInstallPackages, onRequestInstallPermission)
     private val backup = SettingsBackupActions(viewModelScope, _uiState, databaseBackupService, appLogService)
