@@ -137,6 +137,22 @@ class PackageDependencyRulesTest {
         )
     }
 
+    /** Screens show prepared facts: identity, ownership, policy and ledger rules stay in application and below. */
+    @Test
+    fun presentation_neverReachesFinancialIdentityOrPolicy() {
+        assertFilesDoNotImport(
+            files = kotlinFilesIn("presentation"),
+            forbiddenImports = listOf(
+                "com.baraa.masroof.domain.ids.",
+                "com.baraa.masroof.domain.rules.",
+                "com.baraa.masroof.domain.repository.",
+                "com.baraa.masroof.domain.ownership.",
+                "com.baraa.masroof.domain.assembly.",
+                "com.baraa.masroof.domain.matching.",
+            ),
+        )
+    }
+
     @Test
     fun presentation_navigation_doesNotConstructFinancialContainerIds() {
         assertPackagesDoNotImport(

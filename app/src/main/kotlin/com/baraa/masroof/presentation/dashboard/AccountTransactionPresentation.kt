@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.application.dashboard.EntityTransactionScope
 import com.baraa.masroof.domain.model.FinancialTransactionType
 
 /**
@@ -14,9 +15,11 @@ object AccountTransactionPresentation {
         tx: TransactionPreviewUi,
         ownedContainerId: String,
         ownedLast4s: Set<String>,
-    ): TransactionDirectionUi {
-        val isSource = matchesAccountContainer(tx.sourceContainerId, ownedContainerId, ownedLast4s)
-        val isDest = matchesAccountContainer(tx.destinationContainerId, ownedContainerId, ownedLast4s)
+    ): TransactionDirectionUi = directionForAccount(tx, EntityTransactionScope.account(ownedContainerId, ownedLast4s))
+
+    fun directionForAccount(tx: TransactionPreviewUi, account: EntityTransactionScope.Account): TransactionDirectionUi {
+        val isSource = EntityTransactionScope.matchesAccount(tx.sourceContainerId, account)
+        val isDest = EntityTransactionScope.matchesAccount(tx.destinationContainerId, account)
 
         return when (tx.type) {
             FinancialTransactionType.SELF_TRANSFER -> when {
@@ -49,16 +52,5 @@ object AccountTransactionPresentation {
             ->
                 TransactionTypePresentation.direction(tx.type)
         }
-    }
-
-    internal fun matchesAccountContainer(
-        containerId: String?,
-        ownedContainerId: String,
-        ownedLast4s: Set<String>,
-    ): Boolean {
-        if (containerId == null) return false
-        if (containerId == ownedContainerId) return true
-        if (!containerId.startsWith("account:")) return false
-        return containerId.substringAfterLast(':') in ownedLast4s
     }
 }
