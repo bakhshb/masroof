@@ -56,6 +56,11 @@ class RoomRawSmsRepository(
         RoomBatch.query(ids) { chunk -> dao.getByIds(chunk) }.map(RawSmsMapper::toDomain)
     }
 
+    override suspend fun receivedAtByIds(ids: Collection<String>): Map<String, java.time.Instant> = accessGate.withAccess {
+        RoomBatch.query(ids.distinct()) { chunk -> dao.receivedAtByIds(chunk) }
+            .associate { it.id to java.time.Instant.ofEpochMilli(it.receivedAtEpochMillis) }
+    }
+
     override suspend fun existsById(id: String): Boolean = accessGate.withAccess {
         dao.existsById(id)
     }

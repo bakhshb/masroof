@@ -15,6 +15,10 @@ interface ReviewItemDao {
     @Query("SELECT * FROM review_item WHERE rawSmsId = :rawSmsId LIMIT 1")
     suspend fun findByRawSmsId(rawSmsId: String): ReviewItemEntity?
 
+    /** Callers keep [rawSmsIds] under [RoomBatch.MAX_BIND_ARGS]. */
+    @Query("SELECT * FROM review_item WHERE rawSmsId IN (:rawSmsIds)")
+    suspend fun findByRawSmsIds(rawSmsIds: List<String>): List<ReviewItemEntity>
+
     @Query("SELECT * FROM review_item WHERE status = :status ORDER BY createdAtEpochMillis, id")
     suspend fun listByStatus(status: String): List<ReviewItemEntity>
 
@@ -76,8 +80,17 @@ interface ReviewItemDao {
         resolvedTransactionId: String?,
     ): Int
 
+    /**
+     * [mergeReasons] receives the stored reasons, read inside this transaction, so a bank
+     * selection written by a concurrent caller cannot be lost between the read and the write.
+     */
     @Transaction
-    suspend fun upsertRequiredAtomic(entity: ReviewItemEntity): ReviewItemEntity {
+    suspend fun upsertRequiredAtomic(entity: ReviewItemEntity, mergeReasons: (String?) -> String): ReviewItemEntity {
+        val stored = findByRawSmsId(entity.rawSmsId) ?: getById(entity.id)
+        return upsertRequiredMerged(entity.copy(reasons = mergeReasons(stored?.reasons)))
+    }
+
+    private suspend fun upsertRequiredMerged(entity: ReviewItemEntity): ReviewItemEntity {
         val inserted = insertIfAbsent(entity)
         if (inserted != -1L) {
             return entity

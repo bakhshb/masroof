@@ -108,6 +108,10 @@ interface FinancialTransactionRepository {
     suspend fun getByIds(ids: Collection<String>): List<FinancialTransaction> =
         ids.distinct().mapNotNull { getById(it) }
 
+    /** The transaction linked to each of [rawSmsIds], in one batch lookup. Unlinked ids are omitted. */
+    suspend fun findByRawSmsIds(rawSmsIds: Collection<String>): Map<String, FinancialTransaction> =
+        rawSmsIds.distinct().mapNotNull { id -> findByRawSmsId(id)?.let { id to it } }.toMap()
+
     /** The subset of [rawSmsIds] that is linked to a transaction, in one batch lookup. */
     suspend fun listLinkedRawSmsIds(rawSmsIds: Collection<String>): Set<String> =
         rawSmsIds.filterTo(linkedSetOf()) { isRawSmsLinked(it) }

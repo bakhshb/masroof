@@ -104,6 +104,10 @@ interface ParsedEventDao {
     @Query("SELECT * FROM parsed_event WHERE rawSmsId IN (:rawSmsIds)")
     suspend fun listByRawSmsIds(rawSmsIds: List<String>): List<ParsedEventEntity>
 
+    /** Callers keep [rawSmsIds] under [RoomBatch.MAX_BIND_ARGS]. Ids only, for linking transactions to events. */
+    @Query("SELECT rawSmsId, id FROM parsed_event WHERE rawSmsId IN (:rawSmsIds)")
+    suspend fun listEventIdsByRawSmsIds(rawSmsIds: List<String>): List<ParsedEventIdByRawSms>
+
     /** Callers keep [ids] under [RoomBatch.MAX_BIND_ARGS]. */
     @Query("SELECT * FROM parsed_event WHERE id IN (:ids)")
     suspend fun listByIds(ids: List<String>): List<ParsedEventEntity>
@@ -315,3 +319,6 @@ interface ParsedEventDao {
         upsert(entity)
     }
 }
+
+/** Projection of the two parsed-event ids a transaction link needs. */
+data class ParsedEventIdByRawSms(val rawSmsId: String, val id: String)

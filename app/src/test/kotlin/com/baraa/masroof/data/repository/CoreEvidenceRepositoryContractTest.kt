@@ -10,6 +10,9 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -62,6 +65,22 @@ class CoreEvidenceRepositoryContractTest {
             rawSms.insertIfAbsent(rawSms("sms-2", "device-1")),
         )
         assertNull(rawSms.getById("sms-2"))
+    }
+
+    /** A queue refresh racing a bank choice must never drop the user's selection. */
+    @Test
+    fun concurrentReviewUpserts_keepTheBankSelection() = runBlocking {
+        val selection = com.baraa.masroof.domain.model.ExplicitBankSelection.reasonFor(com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA)
+        repeat(20) { round ->
+            val id = "sms-race-$round"
+            rawSms.insertIfAbsent(rawSms(id, "device-race-$round"))
+            reviews.upsertRequired(id, ReviewKind.NEEDS_REVIEW, listOf("ambiguous_bank_route"), now)
+            listOf(listOf(selection), listOf("missing_amount")).map { reasons ->
+                async(Dispatchers.IO) { reviews.upsertRequired(id, ReviewKind.NEEDS_REVIEW, reasons, now) }
+            }.awaitAll()
+
+            assertTrue("round $round", selection in reviews.findByRawSmsId(id)!!.reasons)
+        }
     }
 
     @Test

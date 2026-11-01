@@ -63,6 +63,19 @@ class BatchLookupRepositoryContractTest {
     }
 
     @Test
+    fun rawSmsKeyedBatchLookups_matchPerIdLookups() = runBlocking {
+        (1..5).forEach { raw.insertIfAbsent(rawSms("sms-$it").copy(receivedAt = now.plusSeconds(it.toLong()))) }
+        (1..3).forEach { ledger.save(transaction("tx-$it"), listOf("sms-$it")) }
+        val reviews = RoomReviewRepository(db.reviewItemDao())
+        reviews.upsertRequired("sms-2", com.baraa.masroof.domain.model.ReviewKind.NEEDS_REVIEW, listOf("missing_amount"), now)
+        val ids = (1..5).map { "sms-$it" } + "sms-missing"
+
+        assertEquals(ids.mapNotNull { id -> ledger.findByRawSmsId(id)?.let { id to it } }.toMap(), ledger.findByRawSmsIds(ids))
+        assertEquals(ids.mapNotNull { id -> reviews.findByRawSmsId(id)?.let { id to it } }.toMap(), reviews.findByRawSmsIds(ids))
+        assertEquals(ids.mapNotNull { id -> raw.getById(id)?.let { id to it.receivedAt } }.toMap(), raw.receivedAtByIds(ids))
+    }
+
+    @Test
     fun correctionListAll_equalsCorrectionsForEveryStoredRawSms() = runBlocking {
         (1..3).forEach { raw.insertIfAbsent(rawSms("sms-$it")) }
         listOf("sms-2" to 2L, "sms-1" to 5L, "sms-2" to 1L).forEachIndexed { index, (target, minutes) ->
