@@ -188,23 +188,15 @@ object TransactionMatcher {
     ): Boolean {
         val aLocal = a.occurredAtLocal
         val bLocal = b.occurredAtLocal
-        if (aLocal != null && bLocal != null) {
-            val seconds = kotlin.math.abs(java.time.Duration.between(aLocal, bLocal).seconds)
-            return seconds <= TRANSFER_MATCH_WINDOW.seconds
-        }
-        if (aLocal == null && bLocal == null) {
-            val delta = kotlin.math.abs(
-                java.time.Duration.between(a.receivedAt, b.receivedAt).seconds,
-            )
-            return delta <= TRANSFER_MATCH_WINDOW.seconds
-        }
+        if (aLocal != null && bLocal != null) return within(java.time.Duration.between(aLocal, bLocal))
+        if (aLocal == null && bLocal == null) return within(java.time.Duration.between(a.receivedAt, b.receivedAt))
         val aEffective = a.effectiveOccurredAt ?: return false
         val bEffective = b.effectiveOccurredAt ?: return false
-        val mixedDelta = kotlin.math.abs(
-            java.time.Duration.between(aEffective, bEffective).seconds,
-        )
-        return mixedDelta <= TRANSFER_MATCH_WINDOW.seconds
+        return within(java.time.Duration.between(aEffective, bEffective))
     }
+
+    // Exact and symmetric: whole seconds rounded toward negative infinity, so -600.5 s and +600.5 s differed.
+    private fun within(delta: java.time.Duration): Boolean = delta.abs() <= TRANSFER_MATCH_WINDOW
 
     private fun hasStrongBridge(
         outgoing: TransferMatchCandidate,
