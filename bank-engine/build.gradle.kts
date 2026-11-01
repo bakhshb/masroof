@@ -12,13 +12,6 @@ dependencies {
     testImplementation(libs.kotlinx.serialization.json)
 }
 
-// Offline experiment only: separate JVMs for teaching and reloading persisted pattern definitions.
-tasks.register<JavaExec>("patternLifecycle") {
-    dependsOn(tasks.testClasses)
-    classpath = sourceSets["test"].runtimeClasspath
-    mainClass.set("com.baraa.masroof.engine.bank.experiment.PatternLifecycleCli")
-}
-
 // Boundary tests inspect files outside this module. Include those files in the test cache key.
 tasks.test {
     inputs.files(rootProject.fileTree(".") {
