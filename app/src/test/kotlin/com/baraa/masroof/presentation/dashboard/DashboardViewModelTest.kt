@@ -277,7 +277,7 @@ class DashboardViewModelTest {
         assertEquals(currentPeriod, state.period)
         assertNotNull(state.summary)
         assertEquals(currentPeriod, state.summary!!.period)
-        assertEquals(Money.of("100.00", Currency.SAR), state.summary!!.spendingGross)
+        assertEquals(Money.of("100.00", Currency.SAR), state.summary.spendingGross)
         assertTrue(state.isCurrentPeriod)
     }
 
@@ -879,7 +879,7 @@ class DashboardViewModelTest {
                         override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
                         override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) = Unit
                         override suspend fun resolve(reference: AccountReference) = OwnershipStatus.UNKNOWN
-                        override suspend fun get(ref: com.baraa.masroof.domain.model.AccountReference) = null
+                        override suspend fun get(reference: com.baraa.masroof.domain.model.AccountReference) = null
                         override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
                         override suspend fun updateDisplayName(
                             reference: com.baraa.masroof.domain.model.AccountReference,

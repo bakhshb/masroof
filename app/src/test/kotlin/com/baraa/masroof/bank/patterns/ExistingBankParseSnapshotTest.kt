@@ -52,7 +52,7 @@ class ExistingBankParseSnapshotTest {
             }
         }
         File("src/test/resources/testdata").walkTopDown()
-            .filter { it.isFile && it.extension == "json" && it.parentFile.name != "multibank" }
+            .filter { it.isFile && it.extension == "json" && it.parentFile?.name != "multibank" }
             .sortedBy { it.invariantSeparatorsPath }
             .forEach { walk(it.relativeTo(File("src/test/resources/testdata")).invariantSeparatorsPath, Json.parseToJsonElement(it.readText()), "") }
         return out

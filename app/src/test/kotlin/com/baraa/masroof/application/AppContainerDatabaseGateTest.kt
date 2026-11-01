@@ -19,16 +19,16 @@ class AppContainerDatabaseGateTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val container = (context as MasroofApplication).container
         val reads: List<suspend () -> Unit> = listOf(
-            { container.rawSmsRepository.listIdsByReceivedAt(); Unit },
-            { container.parsedEventRepository.listAll(); Unit },
-            { container.accountRegistryRepository.listAll(); Unit },
-            { container.cardRegistryRepository.listAll(); Unit },
-            { container.loanRegistryRepository.listAll(); Unit },
-            { container.commitmentRepository.listAll(); Unit },
-            { container.financialTransactionRepository.listAll(); Unit },
-            { container.reviewRepository.listAll(); Unit },
-            { container.processingRetryRepository.listRetryableRawSmsIds(); Unit },
-            { container.userCorrectionRepository.listForRawSmsId("irrelevant"); Unit },
+            { container.rawSmsRepository.listIdsByReceivedAt() },
+            { container.parsedEventRepository.listAll() },
+            { container.accountRegistryRepository.listAll() },
+            { container.cardRegistryRepository.listAll() },
+            { container.loanRegistryRepository.listAll() },
+            { container.commitmentRepository.listAll() },
+            { container.financialTransactionRepository.listAll() },
+            { container.reviewRepository.listAll() },
+            { container.processingRetryRepository.listRetryableRawSmsIds() },
+            { container.userCorrectionRepository.listForRawSmsId("irrelevant") },
         )
         container.databaseAccessGate.retire()
         reads.forEachIndexed { index, read ->

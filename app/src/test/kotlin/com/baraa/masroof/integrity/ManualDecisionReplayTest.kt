@@ -225,8 +225,8 @@ class ManualDecisionReplayTest {
             assertTrue("seed=$seed correction: $corrected", corrected is ReviewWorkflowResult.Success)
             val success = corrected as ReviewWorkflowResult.Success
             assertEquals("seed=$seed correction merchant", "TEST_CORRECTION", success.correction!!.correctedMerchant)
-            assertEquals("seed=$seed correction amount", amount, success.correction!!.correctedAmount)
-            assertEquals("seed=$seed correction family", MessageFamily.PURCHASE, success.correction!!.correctedType)
+            assertEquals("seed=$seed correction amount", amount, success.correction.correctedAmount)
+            assertEquals("seed=$seed correction family", MessageFamily.PURCHASE, success.correction.correctedType)
 
             ledger.replayProduction()
             val stored = ledger.corrections.latestForRawSmsId(rawId)!!
@@ -245,7 +245,7 @@ class ManualDecisionReplayTest {
                 assertEquals("seed=$seed correction resolution", ReviewResolutionKind.USER_CORRECTION, resolution)
                 assertEquals(
                     "seed=$seed correction movement",
-                    success.transaction!!.id,
+                    success.transaction.id,
                     world.ftRepo.findByRawSmsId(rawId)!!.id,
                 )
             }

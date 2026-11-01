@@ -293,7 +293,7 @@ class ReviewWorkflowServiceTest {
         assertEquals(ReviewStatus.RESOLVED, result.review.status)
         assertEquals(ReviewResolutionKind.USER_CORRECTION, result.review.resolutionKind)
         assertEquals(FinancialTransactionType.EXPENSE, result.transaction!!.type)
-        assertEquals(money("51.99"), result.transaction!!.amount)
+        assertEquals(money("51.99"), result.transaction.amount)
         assertEquals(bodyBefore, rawRepo.getById("sms-buy")!!.body)
         assertNull(parsedRepo.findByRawSmsId("sms-buy")!!.event.amount)
         assertEquals(parsedBefore.id, parsedRepo.findByRawSmsId("sms-buy")!!.event.id)
@@ -455,12 +455,12 @@ class ReviewWorkflowServiceTest {
             ReviewIdFactory.fromRawSmsId("sms-out"), ExternalTransferDirection.OUTGOING,
         ) as ReviewWorkflowResult.Success
         assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, result.transaction!!.type)
-        assertNotEquals(FinancialTransactionType.EXPENSE, result.transaction!!.type)
+        assertNotEquals(FinancialTransactionType.EXPENSE, result.transaction.type)
         assertEquals(
             FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
-            result.transaction!!.sourceContainerId,
+            result.transaction.sourceContainerId,
         )
-        assertNull(result.transaction!!.destinationContainerId)
+        assertNull(result.transaction.destinationContainerId)
         assertEquals(ReviewStatus.RESOLVED, result.review.status)
         assertEquals(ReviewResolutionKind.USER_EXTERNAL_TRANSFER, result.review.resolutionKind)
         assertNull(
@@ -520,11 +520,11 @@ class ReviewWorkflowServiceTest {
             ReviewIdFactory.fromRawSmsId("sms-in"), ExternalTransferDirection.INCOMING,
         ) as ReviewWorkflowResult.Success
         assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_IN, result.transaction!!.type)
-        assertNotEquals(FinancialTransactionType.INCOME, result.transaction!!.type)
-        assertNull(result.transaction!!.sourceContainerId)
+        assertNotEquals(FinancialTransactionType.INCOME, result.transaction.type)
+        assertNull(result.transaction.sourceContainerId)
         assertEquals(
             FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
-            result.transaction!!.destinationContainerId,
+            result.transaction.destinationContainerId,
         )
     }
 
@@ -577,7 +577,7 @@ class ReviewWorkflowServiceTest {
         ) as ReviewWorkflowResult.Success
         assertEquals(FinancialTransactionType.SELF_TRANSFER, result.transaction!!.type)
         assertEquals(1, ftRepo.listAll().size)
-        assertEquals(2, result.transaction!!.linkedParsedEventIds.size)
+        assertEquals(2, result.transaction.linkedParsedEventIds.size)
         assertTrue(ftRepo.isRawSmsLinked("sms-out"))
         assertTrue(ftRepo.isRawSmsLinked("sms-in"))
         assertEquals(ReviewStatus.RESOLVED, result.review.status)
@@ -1040,13 +1040,13 @@ class ReviewWorkflowServiceTest {
         ) as ReviewWorkflowResult.Success
 
         assertEquals(autoPurchase.occurredAt, purchase.transaction!!.occurredAt)
-        assertEquals(autoPurchase.occurredAtZone, purchase.transaction!!.occurredAtZone)
-        assertEquals(expected, purchase.transaction!!.occurredAt)
-        assertNotEquals(receivedAt, purchase.transaction!!.occurredAt)
+        assertEquals(autoPurchase.occurredAtZone, purchase.transaction.occurredAtZone)
+        assertEquals(expected, purchase.transaction.occurredAt)
+        assertNotEquals(receivedAt, purchase.transaction.occurredAt)
         assertEquals(autoTransfer.occurredAt, transfer.transaction!!.occurredAt)
-        assertEquals(autoTransfer.occurredAtZone, transfer.transaction!!.occurredAtZone)
-        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, transfer.transaction!!.type)
-        assertNotEquals(receivedAt, transfer.transaction!!.occurredAt)
+        assertEquals(autoTransfer.occurredAtZone, transfer.transaction.occurredAtZone)
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, transfer.transaction.type)
+        assertNotEquals(receivedAt, transfer.transaction.occurredAt)
     }
 
     @Test

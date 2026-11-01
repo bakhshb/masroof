@@ -15,14 +15,14 @@ class AnalyticsEvaluationRegressionTest {
     @Test fun everyCalendarHorizonHasItsOwnSamplesAndIntervalsExcludePartialToday() {
         val result = forecast(data(120), 120)
         assertEquals((1..31).toSet(), result.baseline!!.errors.keys)
-        assertTrue(result.baseline!!.errors.getValue(1).size > result.baseline!!.errors.getValue(7).size)
+        assertTrue(result.baseline.errors.getValue(1).size > result.baseline.errors.getValue(7).size)
         assertEquals(listOf(1, 7, 14, 28), result.evaluations.map { it.horizon })
         assertTrue(result.evaluations.all { it.mae == 0L && it.bias == 0L && it.count >= 8 })
         assertNull(result.lower); assertNull(result.upper)
         assertEquals(50000L, result.wholeDaysLower); assertEquals(50000L, result.wholeDaysUpper)
         val largerToday = forecast(data(120, { if (it == 120) 100000 else 10000 }), 120)
         assertEquals(result.wholeDaysLower, largerToday.wholeDaysLower)
-        assertEquals(result.baseline!!.signedErrors, largerToday.baseline!!.signedErrors)
+        assertEquals(result.baseline.signedErrors, largerToday.baseline!!.signedErrors)
         assertEquals(result.actual + 90000, largerToday.actual)
     }
 
@@ -43,7 +43,7 @@ class AnalyticsEvaluationRegressionTest {
         assertNotNull(result.model)
         assertFalse(result.model!!.accepted)
         assertEquals("NEEDS_EVALUATIONS", result.reason)
-        assertTrue(result.model!!.signedErrors[28].orEmpty().size < 8)
+        assertTrue(result.model.signedErrors[28].orEmpty().size < 8)
     }
 
     @Test fun ineligibleHistoricalOriginsDoNotReportAccuracy() {

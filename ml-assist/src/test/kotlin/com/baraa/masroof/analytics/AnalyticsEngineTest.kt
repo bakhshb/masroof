@@ -45,7 +45,7 @@ class AnalyticsEngineTest {
         val result = PurchaseForecaster.forecast(data, start + 150, start + 180, start + 160, 5, { ((it - start) % 30).toInt() })
         assertNotNull(result.model); assertTrue(result.model!!.weights.all { it.isFinite() })
         assertTrue(result.remaining!! >= 0)
-        if (result.model!!.accepted) assertTrue(result.model!!.modelMae <= result.model!!.baselineMae * .9)
+        if (result.model.accepted) assertTrue(result.model.modelMae <= result.model.baselineMae * .9)
     }
     @Test fun monthlyCadenceUsesCalendarAndAmountChangeNeedsThreePriorPayments() {
         val rows = listOf("2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30").mapIndexed { i, date ->

@@ -13,7 +13,7 @@ class BankRuleProfileCodecTest {
     @Test fun bundledProfileKeepsEveryLiteralRoleAndRefreshIdentity() {
         val original = AlJaziraRuleProfile.current()
         val encoded = BankRuleProfileCodec.encode(original)
-        File("build/reports/pattern-parity/aljazira-rules.json").apply { parentFile.mkdirs(); writeText(encoded) }
+        File("build/reports/pattern-parity/aljazira-rules.json").apply { parentFile!!.mkdirs(); writeText(encoded) }
         assertEquals(original, BankRuleProfileCodec.decode(encoded))
         val bundled = File("src/main/assets/bank-patterns/BANK_ALJAZIRA.patterns.json")
         assertTrue("Bundled profile missing; original profile exported under build/reports/pattern-parity", bundled.isFile)

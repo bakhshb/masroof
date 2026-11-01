@@ -23,7 +23,7 @@ import java.time.Instant
 class CardTransactionInvolvementResolverTest {
     @Test
     fun buildIndex_usesParsedCardRefAndContainerIds() {
-        val cardId = FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "2210")!!
+        val cardId = FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "2210")
         val txWithContainer = transaction(
             id = "container",
             source = cardId,

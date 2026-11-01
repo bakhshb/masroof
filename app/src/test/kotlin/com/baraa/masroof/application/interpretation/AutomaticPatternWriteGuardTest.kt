@@ -139,10 +139,9 @@ class AutomaticPatternWriteGuardTest {
                 edit = async(Dispatchers.Default) {
                     attempted.complete(Unit)
                     gate.withRestore { store.saveBank(1, store.load().banks.single().copy(patterns = listOf(pattern.copy(revision = 2, enabled = false)))) }
-                    Unit
                 }
                 attempted.await()
-                assertFalse(edit!!.isCompleted)
+                assertFalse(edit.isCompleted)
                 assertTrue(store.load().banks.single().currentPatterns.single().enabled)
                 FinancialTransactionSaveResult.Saved
             })

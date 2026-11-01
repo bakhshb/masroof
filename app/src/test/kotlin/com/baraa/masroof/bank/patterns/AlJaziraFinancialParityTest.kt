@@ -30,6 +30,8 @@ import java.time.LocalDate
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class AlJaziraFinancialParityTest {
+    private val prettyJson = Json { prettyPrint = true }
+
     @Test fun comparatorDetectsChangedAmountsDetailsGatesAndRemovedFields() {
         val draft = ParsedEventDraft("probe", Bank.BANK_ALJAZIRA, MessageFamily.PURCHASE, MoneyDirection.OUTGOING,
             Money.of("1", Currency.SAR), merchant = "SYNTHETIC", confidence = Confidence(1.0, listOf("engine:old", "rules:old")),
@@ -85,11 +87,11 @@ class AlJaziraFinancialParityTest {
             }
         }
         File("build/reports/pattern-parity/current-financial.json").apply {
-            parentFile.mkdirs()
-            writeText(Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), JsonArray(reports)))
+            parentFile!!.mkdirs()
+            writeText(prettyJson.encodeToString(JsonElement.serializer(), JsonArray(reports)))
         }
         File("build/reports/pattern-parity/current-financial-fields.json").writeText(
-            Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), JsonObject(frozenFields)))
+            prettyJson.encodeToString(JsonElement.serializer(), JsonObject(frozenFields)))
         val baseline = File("src/test/resources/testdata/pattern-parity/aljazira-financial-v1.json")
         assertTrue("Frozen financial reference missing; current fields exported under build/reports/pattern-parity", baseline.isFile)
         val frozen = Json.parseToJsonElement(baseline.readText()).jsonObject

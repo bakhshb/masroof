@@ -27,8 +27,8 @@ class InterpretationProvenanceTest {
             listOf("engine:current", "rules:current") + origin?.let { listOf("family_origin:$it", "model:test-model") }.orEmpty())), result.details)
     }
     @Test fun currentOriginSelectsTheExplanationWithoutUsingConfidenceOrActiveModel() {
-        assertEquals(InterpretationOrigin.ML, InterpretationProvenanceWorkflow.project(record())!!.origin)
-        assertEquals(InterpretationOrigin.HUMAN_TEMPLATE, InterpretationProvenanceWorkflow.project(record("HUMAN_TEMPLATE"))!!.origin)
+        assertEquals(InterpretationOrigin.ML, InterpretationProvenanceWorkflow.project(record()).origin)
+        assertEquals(InterpretationOrigin.HUMAN_TEMPLATE, InterpretationProvenanceWorkflow.project(record("HUMAN_TEMPLATE")).origin)
         assertEquals(InterpretationOrigin.RULES, InterpretationProvenanceWorkflow.project(record(null)).origin)
         assertEquals(InterpretationOrigin.UNAVAILABLE, InterpretationProvenanceWorkflow.project(record("RULES")).origin)
         val base = record()
@@ -36,9 +36,9 @@ class InterpretationProvenanceTest {
             base.copy(event = base.event.copy(confidence = base.event.confidence.copy(score = 0.01)))))
     }
     @Test fun incompleteInferenceIsPresentedAsAnUnapprovedSuggestion() {
-        assertTrue(InterpretationProvenanceWorkflow.project(record(status = ParseStatus.REVIEW_REQUIRED))!!.pendingReview)
-        assertTrue(InterpretationProvenanceWorkflow.project(record(), requiredReview = true)!!.pendingReview)
-        assertFalse(InterpretationProvenanceWorkflow.project(record())!!.pendingReview)
+        assertTrue(InterpretationProvenanceWorkflow.project(record(status = ParseStatus.REVIEW_REQUIRED)).pendingReview)
+        assertTrue(InterpretationProvenanceWorkflow.project(record(), requiredReview = true).pendingReview)
+        assertFalse(InterpretationProvenanceWorkflow.project(record()).pendingReview)
     }
     @Test fun manualAndUnavailableSourcesNeverClaimCurrentMlParticipation() {
         val base = record()
@@ -57,7 +57,7 @@ class InterpretationProvenanceTest {
     @Test fun metadataFailureIsExplicitAndCancellationPropagates() {
         fun workflow(failure: RuntimeException): InterpretationProvenanceWorkflow {
             fun <T> port(type: Class<T>, answer: (String) -> Any?): T = type.cast(java.lang.reflect.Proxy.newProxyInstance(
-                type.classLoader, arrayOf(type)) { _, method, _ -> answer(method.name) })
+                type.classLoader, arrayOf(type)) { _, method, _ -> answer(method.name) })!!
             val parsed = port(ParsedEventRepository::class.java) { name ->
                 check(name == "findByRawSmsId"); record()
             }
