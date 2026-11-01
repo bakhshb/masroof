@@ -38,7 +38,12 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
     fun interpretRouted(input: MessageInput, bank: com.baraa.masroof.finance.value.BankId): Interpretation =
         interpretWithBanks(input, setOf(bank))
 
-    private fun interpretWithBanks(input: MessageInput, banks: Set<com.baraa.masroof.finance.value.BankId>): Interpretation {
+    /** Same as [interpretRouted], with the assistance for this call, so one interpreter serves every caller. */
+    fun interpretRouted(input: MessageInput, bank: com.baraa.masroof.finance.value.BankId, assist: FamilyAssist?): Interpretation =
+        interpretWithBanks(input, setOf(bank), assist)
+
+    private fun interpretWithBanks(input: MessageInput, banks: Set<com.baraa.masroof.finance.value.BankId>,
+        familyAssist: FamilyAssist? = this.familyAssist): Interpretation {
         val blockers = linkedSetOf<Blocker>()
         val diagnostics = mutableListOf<InterpretationDiagnostic>()
         val evidence = mutableListOf<Evidence>()
@@ -78,14 +83,14 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
         val title = rawTitle.trimStart()
         val roleLabels = (snapshot.rules.flatMap { it.labels.values.flatten() + it.detailLabels.values.flatten() } +
             snapshot.network.sourceBankLabels + snapshot.network.destinationBankLabels + snapshot.network.networkLabels + ObservationExtractor.roleHeaders().values.flatten() + SECONDARY).distinct()
-        val rolePrefixes = roleLabels.map { Regex("^" + source.phrase(it).pattern) }
+        val rolePrefixes = roleLabels.map { CompiledPatterns.of("^" + source.phrase(it).pattern) }
         fun roleEnd(text: String) = rolePrefixes.mapNotNull { it.find(text)?.range?.last?.plus(1) }.maxOrNull() ?: 0
         val roleEnd = roleEnd(title)
         // Arabic conjunctions may join two independent family cues; never hide that collision.
         fun titleMatches(phrase: String) = (if (phrase.firstOrNull() in '\u0600'..'\u06ff') listOf(phrase, "و$phrase") else listOf(phrase))
             .flatMap { source.phrase(it).findAll(title).toList() }
             .filter { roleEnd == 0 || (it.range.first == 0 && it.range.last + 1 > roleEnd) }
-        if (Regex("^ *اسم المستفيد *: *[^\\n]+\\n+ *الاسم المختصر *: *[^\\n]+\\n+ *حالة *: *(?:غير نشط|نشط) *(?:\\n+ *(?:حساب|بنك|في) *: *[^\\n]+)*$").matches(source.text.trim())) {
+        if (CompiledPatterns.of("^ *اسم المستفيد *: *[^\\n]+\\n+ *الاسم المختصر *: *[^\\n]+\\n+ *حالة *: *(?:غير نشط|نشط) *(?:\\n+ *(?:حساب|بنك|في) *: *[^\\n]+)*$").matches(source.text.trim())) {
             evidence += source.evidence("notice.beneficiary.directory", "family", 0..(source.text.length - 1))
             return result(Facts(MessageFamily.NON_FINANCIAL), ParseStatus.NON_FINANCIAL)
         }
@@ -176,7 +181,7 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
         val secondaryRanges = details.reserved.toMutableList()
         // Reserve all known secondary roles even when the selected rule does not expose them.
         SECONDARY.forEach { label ->
-            Regex("(?m)^ *" + source.role(label).pattern + "[ \\t]*:?[ \\t]*" + MoneyGrammar.VALUE).findAll(source.text).forEach { secondaryRanges += it.range }
+            CompiledPatterns.of("(?m)^ *" + source.role(label).pattern + "[ \\t]*:?[ \\t]*" + MoneyGrammar.VALUE).findAll(source.text).forEach { secondaryRanges += it.range }
         }
         val primary = PrimaryFieldExtractor(source, ::labels, currency, secondaryRanges, evidence, ::problem, suffixLabels, AMOUNT_ROLES)
         val balance = primary.money(ExtractionField.AVAILABLE_BALANCE)

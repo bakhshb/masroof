@@ -8,7 +8,7 @@ internal fun otpEvidence(source: SourceText): List<Evidence> = (OTP_TERMS.flatMa
 } + GLUED_OTP.findAll(source.text)).map { source.evidence("security.otp", "family", it.range) }
 
 // "OTP1234": the code may touch the word.
-private val GLUED_OTP = Regex("(?<![\\p{L}\\p{N}_])otp(?=[0-9])")
+private val GLUED_OTP = CompiledPatterns.of("(?<![\\p{L}\\p{N}_])otp(?=[0-9])")
 
 private val OTP_TERMS = listOf("otp", "one time password", "one-time password", "password", "passcode", "pin",
     "verification code", "security code", "authentication code", "رمز التحقق", "رمز تحقق", "رمز التوثيق",
