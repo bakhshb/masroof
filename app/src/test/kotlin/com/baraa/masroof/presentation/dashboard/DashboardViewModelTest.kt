@@ -1,12 +1,11 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.testsupport.FakeAppLocaleRepository
 import com.baraa.masroof.testsupport.MutableCardRegistryRepository as FakeCardRegistry
 import com.baraa.masroof.testsupport.StubAccountRegistryRepository as FakeAccountRegistry
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.application.locale.AppLocale
-import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
@@ -938,11 +937,6 @@ class DashboardViewModelTest {
             zoneId = zone,
             maintenanceCompletions = maintenanceCompletions,
         )
-
-    private class FakeAppLocaleRepository : AppLocaleRepository {
-        override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
-        override fun setLanguageTag(languageTag: String) = Unit
-    }
 
     private class FakeLayoutPreferencesRepository(
         private var snapshot: DashboardLayoutSnapshot = DashboardLayoutSnapshot.default(),
