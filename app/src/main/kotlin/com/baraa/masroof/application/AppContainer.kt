@@ -613,6 +613,7 @@ class AppContainer(
             patternProcessing = com.baraa.masroof.application.ingestion.PatternEvidenceProtection(
                 reviewRepository, userCorrectionRepository, financialTransactionRepository, parsedEventRepository,
                 inTransaction = { work -> withDatabaseTransaction(work) })::run,
+            onHistoricalRetry = { HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext)) },
         )
 
     val explicitBankSelectionWorkflow: ExplicitBankSelectionWorkflow =
