@@ -13,8 +13,10 @@ data class CommitmentPaymentIdentity(val names: Set<String>, val billerCodes: Se
         } else names.intersect(other.names).isNotEmpty()
 
     companion object {
+        private val WHITESPACE = Regex("\\s+")
+
         fun normalize(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFC)
-            .trim().lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")
+            .trim().lowercase(Locale.ROOT).replace(WHITESPACE, " ")
         fun from(transaction: FinancialTransaction, records: Map<String, ParsedEventRecord> = emptyMap()): CommitmentPaymentIdentity {
             val facts = transaction.linkedParsedEventIds.mapNotNull { records[it]?.details }
             return CommitmentPaymentIdentity(
