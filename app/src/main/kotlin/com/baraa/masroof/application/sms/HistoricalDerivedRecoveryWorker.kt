@@ -13,6 +13,7 @@ import androidx.work.WorkerParameters
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.transaction.ReconciliationIncompleteException
+import com.baraa.masroof.data.room.DatabaseRestartRequiredException
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
 
@@ -36,11 +37,24 @@ class HistoricalDerivedRecoveryWorker(
     params: WorkerParameters,
     private val recovery: HistoricalDerivedRecovery,
     private val appLogService: AppLogService? = null,
+    private val startupReady: suspend () -> Boolean = { true },
+    /** Lets open screens reload; a pass can post rows even when it ends incomplete. */
+    private val onFinished: () -> Unit = {},
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result =
         try {
-            recovery.recoverPending()
-            Result.success()
+            if (!startupReady()) {
+                Result.retry()
+            } else {
+                try {
+                    recovery.recoverPending()
+                } finally {
+                    onFinished()
+                }
+                Result.success()
+            }
+        } catch (_: DatabaseRestartRequiredException) {
+            Result.retry()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -61,6 +75,8 @@ class HistoricalDerivedRecoveryWorker(
 
     class Factory(
         private val appLogService: AppLogService? = null,
+        private val startupReady: suspend () -> Boolean = { true },
+        private val onFinished: () -> Unit = {},
         private val recovery: () -> HistoricalDerivedRecovery,
     ) : WorkerFactory() {
         override fun createWorker(
@@ -74,6 +90,8 @@ class HistoricalDerivedRecoveryWorker(
                     workerParameters,
                     recovery(),
                     appLogService,
+                    startupReady,
+                    onFinished,
                 )
             } else {
                 null

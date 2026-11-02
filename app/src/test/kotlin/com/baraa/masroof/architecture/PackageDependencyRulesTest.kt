@@ -30,6 +30,28 @@ class PackageDependencyRulesTest {
     }
 
     @Test
+    fun domainCoreParsingBank_doNotImportAndroidFrameworks() {
+        assertPackagesDoNotImport(
+            packages = listOf("domain", "core", "parsing", "bank"),
+            forbiddenImports = listOf("import android.", "import androidx."),
+        )
+    }
+
+    @Test
+    fun domain_doesNotDependOnHigherLayers() {
+        assertPackagesDoNotImport(
+            packages = listOf("domain"),
+            forbiddenImports = listOf(
+                "import com.baraa.masroof.parsing",
+                "import com.baraa.masroof.bank",
+                "import com.baraa.masroof.data",
+                "import com.baraa.masroof.presentation",
+                "import android.",
+            ),
+        )
+    }
+
+    @Test
     fun parsing_doesNotDependOnOuterLayers() {
         assertPackagesDoNotImport(
             packages = listOf("parsing"),
@@ -112,6 +134,22 @@ class PackageDependencyRulesTest {
                 "import com.baraa.masroof.domain.rules.",
             ),
             allowedFiles = emptySet(),
+        )
+    }
+
+    /** Screens show prepared facts: identity, ownership, policy and ledger rules stay in application and below. */
+    @Test
+    fun presentation_neverReachesFinancialIdentityOrPolicy() {
+        assertFilesDoNotImport(
+            files = kotlinFilesIn("presentation"),
+            forbiddenImports = listOf(
+                "com.baraa.masroof.domain.ids.",
+                "com.baraa.masroof.domain.rules.",
+                "com.baraa.masroof.domain.repository.",
+                "com.baraa.masroof.domain.ownership.",
+                "com.baraa.masroof.domain.assembly.",
+                "com.baraa.masroof.domain.matching.",
+            ),
         )
     }
 

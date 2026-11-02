@@ -32,6 +32,21 @@ class TransactionMatcherTest {
         )
     }
 
+    /** The window is the same whichever leg arrives first, to the millisecond. */
+    @Test
+    fun receiptTimeWindowIsSymmetricAndExact() {
+        val out = outgoing(reference = "ref-1", localTime = null)
+        fun inAt(offsetMillis: Long) = incoming(reference = "ref-1", localTime = null)
+            .copy(receivedAt = out.receivedAt.plusMillis(offsetMillis))
+
+        for (offset in listOf(600_000L, -600_000L)) {
+            assertEquals(1, TransactionMatcher.findMutuallyUniquePairs(listOf(out, inAt(offset))).size, "offset $offset")
+        }
+        for (offset in listOf(600_500L, -600_500L)) {
+            assertEquals(0, TransactionMatcher.findMutuallyUniquePairs(listOf(out, inAt(offset))).size, "offset $offset")
+        }
+    }
+
     @Test
     fun doesNotMatchAmbiguousCandidates() {
         val outgoing = outgoing(reference = "ref-1")
@@ -248,6 +263,39 @@ class TransactionMatcherTest {
 
         assertFalse(TransactionMatcher.compatiblePair(outgoing, incoming))
     }
+
+    @Test
+    fun unrelatedAccountsWithoutReferenceStayUnpaired() {
+        val outgoing = outgoing(
+            reference = null,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.UNKNOWN, "9999"),
+            network = null,
+        )
+        val incoming = d360Incoming(localTime = defaultLocalTime.plusMinutes(1))
+
+        assertTrue(TransactionMatcher.findMutuallyUniquePairs(listOf(outgoing, incoming)).isEmpty())
+    }
+
+    @Test
+    fun matchingAccountOutsideTheWindowStaysUnpaired() {
+        val outgoing = outgoing(
+            reference = null,
+            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            destination = AccountReference(Bank.UNKNOWN, "6810"),
+            network = null,
+        )
+        val incoming = d360Incoming(localTime = defaultLocalTime.plusMinutes(30))
+
+        assertTrue(TransactionMatcher.findMutuallyUniquePairs(listOf(outgoing, incoming)).isEmpty())
+    }
+
+    private fun d360Incoming(localTime: LocalDateTime) = incoming(
+        reference = null,
+        localTime = localTime,
+        destination = AccountReference(Bank("D360"), "6810"),
+        network = null,
+    ).let { candidate -> candidate.copy(event = candidate.event.copy(bank = Bank("D360"))) }
 
     private fun outgoing(
         id: String = "out",

@@ -31,9 +31,9 @@ internal object SettingsViewModelTestFixtures {
 
                 override fun getToken(): String? = storedToken
 
-                override fun setToken(value: String): Boolean {
+                override fun setToken(token: String): Boolean {
                     if (!persistToken) return false
-                    storedToken = value
+                    storedToken = token
                     return true
                 }
 

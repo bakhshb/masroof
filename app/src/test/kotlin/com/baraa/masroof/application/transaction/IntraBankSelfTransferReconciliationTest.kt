@@ -976,8 +976,8 @@ class IntraBankSelfTransferReconciliationTest {
         val outParsed = parsedRepo.listAll().first { it.event.rawSmsId == outSmsId }
         val inParsed = parsedRepo.listAll().first { it.event.rawSmsId == inSmsId }
         val amount = Money.of("5500.00", Currency.SAR)
-        val sourceId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
-        val destId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")!!
+        val sourceId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
+        val destId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")
 
         ftRepo.save(
             com.baraa.masroof.domain.model.FinancialTransaction(

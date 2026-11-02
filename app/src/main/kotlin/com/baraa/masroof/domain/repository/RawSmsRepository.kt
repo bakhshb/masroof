@@ -20,6 +20,10 @@ interface RawSmsRepository {
 
     suspend fun existsById(id: String): Boolean
 
+    /** Receipt time of each stored id in [ids], without loading SMS bodies. */
+    suspend fun receivedAtByIds(ids: Collection<String>): Map<String, java.time.Instant> =
+        getByIds(ids).associate { it.id to it.receivedAt }
+
     suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms?
 
     /**

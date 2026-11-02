@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.contract
 
+import org.junit.Assume.assumeTrue
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.BankRoutingResult
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
@@ -73,7 +74,8 @@ class FiveBankSmsTest {
     }
 
     @Test fun privateCorpus_reportsCountsOnlyWhenExplicitlyProvided() {
-        val path = System.getenv("MASROOF_PRIVATE_CORPUS") ?: return
+        val path: String? = System.getenv("MASROOF_PRIVATE_CORPUS")
+        assumeTrue("MASROOF_PRIVATE_CORPUS is not set", path != null)
         val senders = rows.associate { it.text("sender") to it.text("bankId") }
         val counts = linkedMapOf<String, Int>()
         val findings = linkedMapOf<String, Int>()
@@ -81,7 +83,7 @@ class FiveBankSmsTest {
             PatternFactInterpreter(MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/$bank.patterns.json").readText()))
         }
         val diagnosticRows = mutableListOf<JsonElement>()
-        Json.parseToJsonElement(File(path).readText(Charsets.UTF_8).removePrefix("\uFEFF")).jsonArray.forEachIndexed { index, element ->
+        Json.parseToJsonElement(File(path!!).readText(Charsets.UTF_8).removePrefix("\uFEFF")).jsonArray.forEachIndexed { index, element ->
             val row = element.jsonObject
             val bank = senders.getValue(row.text("sender"))
             val input = MessageInput("private-$index", row.text("sender"), row.text("body"), Instant.now(), true)

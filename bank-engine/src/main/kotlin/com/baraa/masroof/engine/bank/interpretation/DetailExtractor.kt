@@ -45,13 +45,13 @@ internal class DetailExtractor(
 
     private fun text(field: String, identifier: Boolean = false): String? =
         one(field, entries(field).filter { entry ->
-            val accountRole = field == "counterparty" && entry.normalized.matches(Regex("[*x]*[0-9]{4}"))
+            val accountRole = field == "counterparty" && entry.normalized.matches(CompiledPatterns.of("[*x]*[0-9]{4}"))
             if (accountRole) { val span = source.evidence("scope", field, entry.range); evidence.removeAll { it.field == field && it.start == span.start && it.end == span.end } }
             !accountRole
         }.map { entry ->
             when {
                 entry.normalized.isBlank() || entry.original.length > 160 -> null
-                identifier && !entry.normalized.matches(Regex("[a-z0-9][a-z0-9_/-]{0,63}")) -> null
+                identifier && !entry.normalized.matches(CompiledPatterns.of("[a-z0-9][a-z0-9_/-]{0,63}")) -> null
                 // Normalize numeric codes (including Arabic digits) without changing opaque ID casing.
                 else -> if (field == "billerCode" && entry.normalized.all(Char::isDigit)) entry.normalized else entry.original
             }
@@ -64,7 +64,7 @@ internal class DetailExtractor(
         // Stable generic grammar, versioned with the engine. Not configurable executable rules.
         val fee = money("internationalFee")
         val rate = one("exchangeRate", entries("exchangeRate", reserve = true).map {
-            if (!it.normalized.matches(Regex("[0-9]{1,10}(?:\\.[0-9]{1,10})?"))) null
+            if (!it.normalized.matches(CompiledPatterns.of("[0-9]{1,10}(?:\\.[0-9]{1,10})?"))) null
             else it.normalized.toBigDecimalOrNull()?.takeIf { value -> value.signum() > 0 }?.stripTrailingZeros()
         })
         val date = one("paymentDueDate", entries("paymentDueDate").map {

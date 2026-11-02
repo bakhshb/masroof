@@ -14,11 +14,11 @@ internal class RoleLineReader(
     private val suffixLabels: Boolean = false,
 ) {
     private val prefixes = (bindings.values.flatten() + knownLabels).distinct().map {
-        SourceText(it).text.length to Regex("^ *" + source.phrase(it).pattern.removeSuffix("(?![\\p{L}\\p{N}_])") + "(?=[ \\t:0-9]|$)")
+        SourceText(it).text.length to CompiledPatterns.of("^ *" + source.phrase(it).pattern.removeSuffix("(?![\\p{L}\\p{N}_])") + "(?=[ \\t:0-9]|$)")
     }
 
     fun read(field: String): List<RoleLine> = bindings[field].orEmpty().distinct().flatMap { label ->
-        val pattern = Regex("(?m)^ *" + source.role(label).pattern + "(?<tail>[^\\n\\r]*)$")
+        val pattern = CompiledPatterns.of("(?m)^ *" + source.role(label).pattern + "(?<tail>[^\\n\\r]*)$")
         val prefix = pattern.findAll(source.text).mapNotNull { match ->
             val longest = prefixes.filter { it.second.containsMatchIn(match.value) }.maxOfOrNull { it.first } ?: 0
             if (longest > SourceText(label).text.length) return@mapNotNull null
@@ -37,7 +37,7 @@ internal class RoleLineReader(
                 }
             }
         }.toList()
-        val suffix = if (!suffixLabels) emptyList() else Regex("(?m)^ *(?<value>[^\\n\\r:]+?) *: *" + source.phrase(label).pattern + " *$")
+        val suffix = if (!suffixLabels) emptyList() else CompiledPatterns.of("(?m)^ *(?<value>[^\\n\\r:]+?) *: *" + source.phrase(label).pattern + " *$")
             .findAll(source.text).map { match ->
                 val value = match.groups["value"]!!
                 evidence += source.evidence("extract.role", field, match.range)

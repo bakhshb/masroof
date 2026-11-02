@@ -150,6 +150,7 @@ class DashboardProjectionBuilder(
             displayLocale = AppLocale.displayLocale(appLocaleRepository.getLanguageTag()),
             zoneId = zoneId,
             primaryCurrency = primaryCurrency,
+            periodRows = transactions,
         )
     }
 }

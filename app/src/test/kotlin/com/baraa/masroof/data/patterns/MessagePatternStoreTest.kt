@@ -33,7 +33,25 @@ class MessagePatternStoreTest {
         assertEquals(listOf(other), deleted.banks.single { it.bankId == "OTHER" }.patterns)
         assertThrows(IllegalArgumentException::class.java) { store.saveBank(4, bank(first.copy(revision = 3))) }
         assertEquals(deleted, store.load())
-        assertEquals(listOf(file.name), file.parentFile.listFiles()!!.map { it.name })
+        assertEquals(listOf(file.name), file.parentFile!!.listFiles()!!.map { it.name })
+    }
+
+    /** Routing loads the document for every SMS; it is decoded again only when the file's text changes. */
+    @Test fun unchangedFileReusesTheDecodedDocumentAndAnyChangeIsSeen() = withFile { file ->
+        val store = MessagePatternStore(file)
+        store.saveBank(0, bank(pattern("STC", "STC Bank")))
+        val first = store.load()
+        assertSame(first, store.load())
+        assertSame(PatternFactInterpreter.of(first), PatternFactInterpreter.of(store.load()))
+
+        store.saveBank(1, bank(pattern("OTHER", "Other Bank")))
+        val afterSave = store.load()
+        assertNotSame(first, afterSave)
+        assertEquals(2L, afterSave.generation)
+
+        MessagePatternStore(file).restoreRaw(MessagePatternConfigurationCodec.encode(first))
+        assertEquals(first, store.load())
+        assertNotSame(afterSave, store.load())
     }
 
     @Test fun manySavesKeepOnlyRecentRevisionsSoTheBankNeverFills() = withFile { file ->
@@ -102,7 +120,7 @@ class MessagePatternStoreTest {
                 .saveBank(1, bank(first.copy(revision = 2)))
         }
         assertArrayEquals(prior, file.readBytes())
-        assertEquals(listOf(file.name), file.parentFile.listFiles()!!.map { it.name })
+        assertEquals(listOf(file.name), file.parentFile!!.listFiles()!!.map { it.name })
     }
 
     @Test fun corruptAndUnsupportedDocumentsStayVisibleAndCannotBeOverwrittenByAnEdit() = withFile { file ->

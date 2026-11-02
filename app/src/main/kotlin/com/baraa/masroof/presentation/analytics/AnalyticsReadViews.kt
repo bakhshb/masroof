@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.analytics
 
+import com.baraa.masroof.presentation.common.launchLogged
 import com.baraa.masroof.presentation.navigation.AnalyticsNavigation
 
 import androidx.compose.foundation.layout.*
@@ -147,10 +148,10 @@ import java.time.ZoneId
                         }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             if (!alert.read) DropdownMenuItem(text = { Text(stringResource(R.string.lab_analysis_read)) }, onClick = {
-                                menu = false; scope.launch { workflow?.markAlert(alert.id) }
+                                menu = false; scope.launchLogged(workflow?.appLogService, "LAB_ANALYTICS", "Mark analysis alert read") { workflow?.markAlert(alert.id) }
                             })
                             DropdownMenuItem(text = { Text(stringResource(R.string.lab_analysis_snooze)) }, onClick = {
-                                menu = false; scope.launch { workflow?.markAlert(alert.id, snooze = true) }
+                                menu = false; scope.launchLogged(workflow?.appLogService, "LAB_ANALYTICS", "Snooze analysis alert") { workflow?.markAlert(alert.id, snooze = true) }
                             })
                         }
                     }

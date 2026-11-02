@@ -106,7 +106,8 @@ internal fun PatternTeachingScreen(
     LaunchedEffect(step, fieldIndex) {
         if (step != 1) return@LaunchedEffect
         val bound = bindings.singleOrNull { it.field == field }
-        val kinds = when (field) { "amount" -> listOf("MONEY"); "occurred_at" -> listOf("DATE_TIME", "DATE"); else -> emptyList() }
+        // occurred_at needs a time of day; a date-only value can never be approved for it, so it is not suggested.
+        val kinds = when (field) { "amount" -> listOf("MONEY"); "occurred_at" -> listOf("DATE_TIME"); else -> emptyList() }
         // Offer the first unbound money/date value so the common fields only need a confirmation tap.
         val suggested = kinds.firstNotNullOfOrNull { kind -> candidates.firstOrNull { candidate ->
             candidate.kind == kind && bindings.none { it.start < candidate.end && candidate.start < it.end }

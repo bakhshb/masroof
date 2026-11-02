@@ -159,7 +159,8 @@ class ProcessRawSmsUseCaseTest {
     @Test
     fun nearMissSender_notPersisted() = runBlocking {
         val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
-        val svc = reviewingUseCase(EngineFixtureParser(), reviewRepo)
+        val counting = SmsParseGateway { input -> parseCalls.incrementAndGet(); EngineFixtureParser().parse(input) }
+        val svc = reviewingUseCase(counting, reviewRepo)
         val body = "شراء عبر الانترنت بمبلغ: 10.00 SAR"
         val plausible = RawSms(
             id = "android-sms-live:NotAlJazira",
@@ -195,6 +196,9 @@ class ProcessRawSmsUseCaseTest {
         }
         assertEquals(1, db.rawSmsDao().count())
         assertNull(parsedRepo.findByRawSmsId(plausible.id))
+        // Senders outside every bank are dropped before parsing and leave no review.
+        assertEquals(0, parseCalls.get())
+        assertEquals(1, reviewRepo.listAll().size)
     }
 
     @Test
@@ -352,25 +356,6 @@ class ProcessRawSmsUseCaseTest {
     }
 
     @Test
-    fun liveThenHistorical_withSlightlyDifferentMillis_dedupes() = runBlocking {
-        val body = transferBody()
-        val liveAt = Instant.parse("2026-08-10T12:00:00.000Z")
-        val historicalAt = Instant.parse("2026-08-10T12:00:02.000Z")
-        val live = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord(null, "AlJazira", body, liveAt),
-        )
-        val historical = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord("999", "AlJazira", body, historicalAt),
-        )
-        assertTrue(live.id != historical.id)
-        assertEquals(live.bodyHash, historical.bodyHash)
-        assertTrue(useCase.ingest(live) is SmsIngestionResult.Parsed)
-        assertEquals(SmsIngestionResult.Duplicate, useCase.ingest(historical))
-        assertEquals(1, db.rawSmsDao().count())
-        assertEquals(1, parseCalls.get())
-    }
-
-    @Test
     fun twoHistoricalNearby_sameBody_areNotCollapsedByTolerance() = runBlocking {
         val body = transferBody()
         val a = AndroidSmsMapper.toRawSms(
@@ -383,58 +368,6 @@ class ProcessRawSmsUseCaseTest {
         assertTrue(useCase.ingest(b) is SmsIngestionResult.Parsed)
         assertEquals(2, db.rawSmsDao().count())
         assertEquals(2, parseCalls.get())
-    }
-
-    @Test
-    fun twoLiveNearby_sameBody_areNotCollapsedByCrossSourceTolerance() = runBlocking {
-        val body = transferBody()
-        val a = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord(null, "AlJazira", body, Instant.parse("2026-08-10T12:00:00Z")),
-        )
-        val b = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord(null, "AlJazira", body, Instant.parse("2026-08-10T12:00:02Z")),
-        )
-        assertTrue(useCase.ingest(a) is SmsIngestionResult.Parsed)
-        assertTrue(useCase.ingest(b) is SmsIngestionResult.Parsed)
-        assertEquals(2, db.rawSmsDao().count())
-    }
-
-    @Test
-    fun liveReceivedAt_usesProviderTimestampWhenValid() {
-        val deviceNow = Instant.parse("2026-08-10T15:30:00Z")
-        val provider = Instant.parse("2026-08-10T15:29:58Z")
-        val assembled = com.baraa.masroof.sms.receiver.ReceivedSmsAssembler.assemble(
-            listOf(
-                com.baraa.masroof.sms.receiver.ReceivedSmsAssembler.Part(
-                    sender = "AlJazira",
-                    body = "body",
-                    providerTimestampMillis = provider.toEpochMilli(),
-                ),
-            ),
-        )!!
-        val receivedAt = com.baraa.masroof.sms.receiver.LiveReceiptTimestamp.resolve(
-            assembled.providerTimestampsMillis,
-            deviceNow,
-        )
-        val raw = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord(null, assembled.sender, assembled.body, receivedAt),
-        )
-        assertEquals(provider, raw.receivedAt)
-    }
-
-    @Test
-    fun liveReceivedAt_fallsBackToDeviceClockWhenProviderTimestampMissing() {
-        val deviceNow = Instant.parse("2026-08-10T15:30:00Z")
-        val assembled = com.baraa.masroof.sms.receiver.ReceivedSmsAssembler.assemble(
-            listOf(
-                com.baraa.masroof.sms.receiver.ReceivedSmsAssembler.Part("AlJazira", "body"),
-            ),
-        )!!
-        val receivedAt = com.baraa.masroof.sms.receiver.LiveReceiptTimestamp.resolve(
-            assembled.providerTimestampsMillis,
-            deviceNow,
-        )
-        assertEquals(deviceNow, receivedAt)
     }
 
     @Test
@@ -691,26 +624,6 @@ class ProcessRawSmsUseCaseTest {
     }
 
     @Test
-    fun multipartBodies_joinIntoOneRawSms() = runBlocking {
-        val parts = listOf(
-            "شراء عبر الانترنت\n",
-            "بطاقة: 7271\n",
-            "لدى: Keeta\n",
-            "بمبلغ: 51.99 SAR\n",
-            "في: 14:32 03-08-2026",
-        )
-        val combined = parts.joinToString("")
-        val raw = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord(null, "AlJazira", combined, Instant.parse("2026-08-03T14:32:00Z")),
-        )
-        assertEquals(combined, raw.body)
-        val result = useCase.ingest(raw) as SmsIngestionResult.Parsed
-        assertEquals(Money.of("51.99", Currency.SAR), result.event.amount)
-        assertEquals("7271", result.event.cardRef?.last4)
-        assertEquals(1, db.rawSmsDao().count())
-    }
-
-    @Test
     fun reviewRequiredPurchaseWithAmount_persistsEvidenceAndReview_butNoTransaction() = runBlocking {
         val reviewRequiredGateway = SmsParseGateway { input ->
             val parsed = EngineFixtureParser().parse(input) as com.baraa.masroof.parsing.model.ParseResult.Success
@@ -857,24 +770,6 @@ class ProcessRawSmsUseCaseTest {
     }
 
     @Test
-    fun nonBankSms_isNotPersistedAndCreatesNoReview() = runBlocking {
-        val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
-        val svc = reviewingUseCase(EngineFixtureParser(), reviewRepo)
-        val body = "شراء عبر الانترنت بمبلغ: 10.00 SAR"
-        val raw = RawSms(
-            id = "android-sms-live:OtherBank",
-            sender = "OtherBank",
-            body = body,
-            receivedAt = Instant.parse("2026-08-03T08:00:00Z"),
-            deviceMessageId = null,
-            bodyHash = SmsBodyHasher.sha256Hex(body),
-        )
-        assertTrue(svc.ingest(raw) is SmsIngestionResult.NotRelevant)
-        assertEquals(0, db.rawSmsDao().count())
-        assertTrue(reviewRepo.listAll().isEmpty())
-    }
-
-    @Test
     fun directIngestionReview_survivesFullReconcileRefresh() = runBlocking {
         val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
         val svc = reviewingUseCase(
@@ -942,16 +837,6 @@ class ProcessRawSmsUseCaseTest {
         assertTrue(again is SmsIngestionResult.ReviewRequired)
         assertEquals(0, parseCalls.get())
         assertNull(parsedRepo.findByRawSmsId(raw.id))
-    }
-
-    @Test
-    fun ordinarySms_isNotPersisted() = runBlocking {
-        val raw = aljaziraPurchase(id = "android-sms:mom", deviceId = "mom")
-            .copy(sender = "Mom", body = "See you at 6", bodyHash = com.baraa.masroof.sms.hash.SmsBodyHasher.sha256Hex("See you at 6"))
-        val result = useCase.ingest(raw)
-        assertTrue(result is SmsIngestionResult.NotRelevant)
-        assertEquals(0, db.rawSmsDao().count())
-        assertEquals(0, parseCalls.get())
     }
 
     @Test

@@ -29,6 +29,8 @@ data class CleanData(val days: List<PurchaseDay>, val recurring: List<FinancialF
     val fingerprint: String)
 
 object FinancialCleaner {
+    // Recurring series and their accepted/rejected decisions are keyed by this grouping, so it stays as
+    // stored even where the dashboard's merchant key also joins spacing around punctuation.
     fun merchantKey(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFC)
         .trim().replace(Regex("\\s+"), " ").lowercase(Locale.ROOT)
 

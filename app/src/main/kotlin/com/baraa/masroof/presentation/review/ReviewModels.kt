@@ -4,7 +4,7 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ReviewKind
-import com.baraa.masroof.domain.rules.InformationalMessagePolicy
+import com.baraa.masroof.application.review.ReviewDismissPolicy
 
 data class ReviewListItemUi(
     val id: String,
@@ -138,9 +138,4 @@ fun ReviewKind.toUiLabelRes(): Int =
 fun shouldOfferNonFinancialDismiss(
     messageFamily: MessageFamily?,
     reasons: List<String>,
-): Boolean {
-    if (reasons.any { it == "non_financial_or_informational_message" }) {
-        return true
-    }
-    return InformationalMessagePolicy.shouldAutoIgnore(messageFamily)
-}
+): Boolean = ReviewDismissPolicy.offersNonFinancialDismiss(messageFamily, reasons)

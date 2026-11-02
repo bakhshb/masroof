@@ -34,8 +34,8 @@ class MultiBankLearningTest {
         // Scheduled refreshes are run below with this test's container, never by the app's own one.
         WorkManagerTestInitHelper.initializeTestWorkManager(app, Configuration.Builder().setExecutor(SynchronousExecutor())
             .setWorkerFactory(object : WorkerFactory() {
-                override fun createWorker(context: Context, name: String, params: WorkerParameters): ListenableWorker =
-                    object : Worker(context, params) { override fun doWork() = Result.success() }
+                override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
+                    object : Worker(appContext, workerParameters) { override fun doWork() = Result.success() }
             }).build())
         val context = TestStorageContext(app, "multi-bank-learning")
         val c = AppContainer(context)

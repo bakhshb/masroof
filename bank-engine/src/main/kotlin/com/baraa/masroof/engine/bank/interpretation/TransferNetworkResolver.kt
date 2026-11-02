@@ -50,7 +50,7 @@ internal class TransferNetworkResolver(
             val next = if (first >= 0) (first + 1 until lines.size).firstOrNull { lines[it].isNotBlank() } else null
             var offset = 0
             lines.forEachIndexed { index, line ->
-                val match = Regex("^ *\\[([^\\[\\]]+)] *$").matchEntire(line)
+                val match = CompiledPatterns.of("^ *\\[([^\\[\\]]+)] *$").matchEntire(line)
                 if (match != null) {
                     val title = first >= 0 && familyPhrases.any { source.phrase(it).containsMatchIn(lines[first]) }
                     val incoming = family == MessageFamily.TRANSFER_IN && rules.standaloneSourceBrackets

@@ -38,7 +38,13 @@ class CaptureBankSmsUseCase(
         require(bankScope == null || bankScopes == null)
         val scopes = bankScopes ?: bankScope?.let(::setOf)
         scopes?.let { require(it.isNotEmpty()); it.forEach(::requireSupportedBank) }
-        val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)
+        val route = try {
+            bankSmsRegistry.route(rawSms.sender, rawSms.body)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return failed(rawSms, e, logOutcome)
+        }
         // Scope filters evidence; it never selects an adapter or resolves a collision.
         if (scopes != null && !when (route) {
                 is BankRoutingResult.Matched -> route.adapter.bank in scopes
@@ -66,13 +72,7 @@ class CaptureBankSmsUseCase(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (logOutcome) {
-                appLogService?.error(
-                    AppLogCategories.INGEST,
-                    "Ingest failed for ${AppLogFormatting.maskSender(rawSms.sender)} (${e.javaClass.simpleName})",
-                )
-            }
-            return BankSmsCaptureResult.Failed(message = e.message ?: e::class.java.simpleName, cause = e)
+            return failed(rawSms, e, logOutcome)
         }
 
         return when (insertOutcome) {
@@ -95,6 +95,16 @@ class CaptureBankSmsUseCase(
                 BankSmsCaptureResult.Captured(rawSms = rawSms, route = route)
             }
         }
+    }
+
+    private fun failed(rawSms: RawSms, e: Exception, logOutcome: Boolean): BankSmsCaptureResult.Failed {
+        if (logOutcome) {
+            appLogService?.error(
+                AppLogCategories.INGEST,
+                "Ingest failed for ${AppLogFormatting.maskSender(rawSms.sender)} (${e.javaClass.simpleName})",
+            )
+        }
+        return BankSmsCaptureResult.Failed(message = e.message ?: e::class.java.simpleName, cause = e)
     }
 
     /**

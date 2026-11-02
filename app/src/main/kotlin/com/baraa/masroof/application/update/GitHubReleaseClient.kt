@@ -206,7 +206,12 @@ class GitHubReleaseClient(
         }
 
     private fun executeBody(request: Request, tokenWasProvided: Boolean): Result<okhttp3.ResponseBody> {
-        val response = httpClient.newCall(request).execute()
+        // A network failure is a result, so callers can log it and the worker can retry.
+        val response = try {
+            httpClient.newCall(request).execute()
+        } catch (e: java.io.IOException) {
+            return Result.failure(e)
+        }
         val body = response.body
         if (!response.isSuccessful) {
             val errorSnippet = body.string().take(200)

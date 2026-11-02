@@ -24,7 +24,8 @@ object LiveReceiptTimestamp {
         return valid.minOrNull() ?: deviceNow
     }
 
-    private val MAX_CARRIER_SKEW: Duration = Duration.ofDays(7)
+    /** Furthest a stored receipt time may be from the phone's arrival time. */
+    val MAX_CARRIER_SKEW: Duration = Duration.ofDays(7)
 
     private fun validInstant(millis: Long): Instant? {
         if (millis <= 0L) return null

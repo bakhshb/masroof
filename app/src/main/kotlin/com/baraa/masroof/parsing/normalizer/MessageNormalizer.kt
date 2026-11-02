@@ -35,7 +35,7 @@ class MessageNormalizer {
     }
 
     private fun collapseInternalSpaces(line: String): String =
-        line.replace(Regex("[ \\t\\u00A0]+"), " ")
+        line.replace(INTERNAL_SPACES, " ")
 
     private fun mapArabicIndicDigits(text: String): String {
         val chars = text.toCharArray()
@@ -47,4 +47,7 @@ class MessageNormalizer {
         }
         return String(chars)
     }
+
 }
+
+private val INTERNAL_SPACES = Regex("[ \\t\\u00A0]+")

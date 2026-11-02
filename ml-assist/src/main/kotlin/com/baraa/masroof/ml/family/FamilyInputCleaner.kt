@@ -23,6 +23,10 @@ object FamilyInputCleaner {
     const val FEATURES_VERSION = "bank-family-title-v2"
     private val spaces = Regex("\\s+")
     private val words = Regex("[\\p{L}]+")
+    private val controlsAndSeparators = Regex("[\\p{Cc}\\p{Z}]+")
+    private val identifiers = Regex("(?:https?://|www\\.)\\S+|\\S+@\\S+|(?i:sa[0-9]{6,}|btms[0-9]+)|[\\p{N}][\\p{N}.,:/+\\-]*")
+    private val currencyCodes = Regex("\\b(?:sar|usd|eur|gbp|aed)\\b", RegexOption.IGNORE_CASE)
+    private val characterTerm = Regex("c[3-5]:[\\p{L} ]+")
     // Reviewed structural vocabulary, not user names/merchants. New wording requires a versioned review.
     // Unknown words abstain rather than silently dropping a potentially important qualification.
     private val titleWords = """
@@ -50,13 +54,13 @@ object FamilyInputCleaner {
     fun clean(normalizedTitle: String, normalizedFieldLabels: List<String>): FamilyCleaningResult {
         if (normalizedTitle.length > 512 || normalizedFieldLabels.size > 128) return rejected(CleaningRejection.TOO_LARGE)
         fun compact(value: String) = value.filterNot { Character.getType(it) == Character.FORMAT.toInt() }
-            .replace(Regex("[\\p{Cc}\\p{Z}]+"), " ").replace(spaces, " ").trim()
+            .replace(controlsAndSeparators, " ").replace(spaces, " ").trim()
         var title = compact(normalizedTitle)
         // Explicit value fields are structural headings, never personal values.
         if (title.substringBefore(':').trim() in titleValueFields) title = title.substringBefore(':')
         // Entire mixed identifiers/links/emails disappear, never only their numeric part.
-        title = title.replace(Regex("(?:https?://|www\\.)\\S+|\\S+@\\S+|(?i:sa[0-9]{6,}|btms[0-9]+)|[\\p{N}][\\p{N}.,:/+\\-]*"), " ")
-        title = title.replace(Regex("\\b(?:sar|usd|eur|gbp|aed)\\b", RegexOption.IGNORE_CASE), " ")
+        title = title.replace(identifiers, " ")
+        title = title.replace(currencyCodes, " ")
         val tokens = words.findAll(title).map { it.value }.toList()
         if (tokens.isEmpty()) return rejected(CleaningRejection.EMPTY)
         if (tokens.size > 64) return rejected(CleaningRejection.TOO_LARGE)
@@ -77,7 +81,7 @@ object FamilyInputCleaner {
         count in 1..5 && term.length <= 260 && when {
             term.startsWith("w:") -> term.substring(2) in titleWords
             term.startsWith("b:") -> term.substring(2).split(' ').let { it.size == 2 && it.all(titleWords::contains) }
-            term.matches(Regex("c[3-5]:[\\p{L} ]+")) -> term.substring(3).length == term[1].digitToInt()
+            term.matches(characterTerm) -> term.substring(3).length == term[1].digitToInt()
             else -> false
         }
     }

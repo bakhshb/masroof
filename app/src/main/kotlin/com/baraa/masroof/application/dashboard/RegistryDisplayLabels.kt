@@ -47,7 +47,7 @@ object RegistryDisplayLabels {
         }
     }
 
-    private fun accountLast4(maskedNumber: String): String {
+    internal fun accountLast4(maskedNumber: String): String {
         val trimmed = maskedNumber.trim()
         return if (trimmed.length <= 4) trimmed else trimmed.takeLast(4)
     }

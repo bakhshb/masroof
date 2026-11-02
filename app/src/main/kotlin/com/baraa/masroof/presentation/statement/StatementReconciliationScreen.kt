@@ -64,7 +64,8 @@ fun StatementReconciliationRoute(
     val context = LocalContext.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val stream = context.contentResolver.openInputStream(uri)
+        // A revoked or offline document throws instead of returning null.
+        val stream = runCatching { context.contentResolver.openInputStream(uri) }.getOrNull()
         if (stream == null) {
             viewModel.onUnreadable()
         } else {

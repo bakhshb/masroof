@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,7 +64,6 @@ fun LongPullToRefreshBox(
     val maxPullPx = thresholdPx * 1.25f
     val isRefreshingState = rememberUpdatedState(isRefreshing)
     val onRefreshState = rememberUpdatedState(onRefresh)
-    val scrollOffsetState = rememberUpdatedState(scrollState.value)
 
     LaunchedEffect(pullDistance, thresholdPx) {
         if (pullDistance >= thresholdPx) {
@@ -75,10 +75,13 @@ fun LongPullToRefreshBox(
         }
     }
 
-    LaunchedEffect(scrollState.value) {
-        if (scrollState.value > 0) {
-            pullDistance = 0f
-            thresholdHeldSince = null
+    // Read the offset in a flow, not in composition, so scrolling does not recompose this box per pixel.
+    LaunchedEffect(scrollState) {
+        snapshotFlow { scrollState.value > 0 }.collect { scrolled ->
+            if (scrolled) {
+                pullDistance = 0f
+                thresholdHeldSince = null
+            }
         }
     }
 
@@ -107,7 +110,7 @@ fun LongPullToRefreshBox(
             ): Offset {
                 if (
                     !isRefreshingState.value &&
-                    scrollOffsetState.value == 0 &&
+                    scrollState.value == 0 &&
                     consumed.y == 0f &&
                     available.y > 0f &&
                     source == NestedScrollSource.UserInput
@@ -136,7 +139,7 @@ fun LongPullToRefreshBox(
                     var cancelledByScroll = false
                     awaitFirstDown(requireUnconsumed = false)
                     do {
-                        if (scrollOffsetState.value > 0) {
+                        if (scrollState.value > 0) {
                             cancelledByScroll = true
                             pullDistance = 0f
                             thresholdHeldSince = null
@@ -147,7 +150,7 @@ fun LongPullToRefreshBox(
                     if (
                         !isRefreshingState.value &&
                         !cancelledByScroll &&
-                        scrollOffsetState.value == 0
+                        scrollState.value == 0
                     ) {
                         val heldMs = thresholdHeldSince?.let { System.currentTimeMillis() - it } ?: 0L
                         val shouldRefresh =

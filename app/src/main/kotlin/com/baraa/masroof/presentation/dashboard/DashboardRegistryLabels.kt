@@ -6,7 +6,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
-import com.baraa.masroof.domain.ids.FinancialContainerIdParser
+import com.baraa.masroof.application.dashboard.EntityTransactionScope
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.formatCardLast4
 
@@ -92,10 +92,8 @@ fun accountDisplayLabel(
     accounts: List<OwnedAccountUi>,
     containerId: String,
 ): String? {
-    val bankId = containerId.removePrefix("account:").substringBefore(':').trim().takeIf { it.isNotEmpty() }
-        ?: return null
-    val masked = FinancialContainerIdParser.accountMaskedNumber(containerId) ?: return null
-    return accountDisplayLabel(context, accounts, Bank(bankId), masked)
+    val (bank, masked) = EntityTransactionScope.accountOf(containerId) ?: return null
+    return accountDisplayLabel(context, accounts, bank, masked)
 }
 
 @Composable
@@ -133,9 +131,7 @@ fun cardDisplayLabelFromTransaction(
     cards: List<OwnedCardUi>,
 ): String? {
     val last4 = row.cardLast4 ?: return null
-    val containerId = listOfNotNull(row.sourceContainerId, row.destinationContainerId)
-        .firstOrNull { it.startsWith("card:") }
-    val bank = containerId?.let { FinancialContainerIdParser.cardBankId(it)?.let(::Bank) }
+    val bank = EntityTransactionScope.cardBankOf(listOf(row.sourceContainerId, row.destinationContainerId))
     return if (bank != null) {
         cardDisplayLabel(cards, bank, last4)
     } else {

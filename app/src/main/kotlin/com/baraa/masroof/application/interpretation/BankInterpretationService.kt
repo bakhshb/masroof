@@ -55,7 +55,7 @@ class BankInterpretationService(
     private data class Attempt(val bank: String, val classifier: FamilyClassifier?, var requested: Boolean = false,
         var outcome: String = "RULES", var prediction: FamilyModel.Prediction? = null)
     private val attempt = ThreadLocal<Attempt>()
-    private fun engine() = PatternFactInterpreter(patterns())
+    private fun engine() = PatternFactInterpreter.of(patterns())
     private val familyAssist = FamilyAssist { input,title ->
         val trace = attempt.get()
         trace?.requested = true
@@ -140,25 +140,32 @@ class BankInterpretationService(
         changes.trySend(Unit)
     }
 
+    /**
+     * Every manual decision, read in a fixed number of batch queries: this runs inside the
+     * financial write transaction for each inferred write, so its cost must not grow per message.
+     */
     private suspend fun decisions(): List<Decision> {
         val result = mutableListOf<Decision>()
-        corrections.listForRawSmsIds(raw.listIdsByReceivedAt()).forEach { correction ->
+        corrections.listAll().forEach { correction ->
             result += Decision("correction:${correction.id}", correction.targetRawSmsId,
                 correction.correctedType?.let { MessageFamily.valueOf(it.name) },
                 correction.createdAt.toEpochMilli(), "USER_MESSAGE_FAMILY",
                 reason = if(correction.correctedType == null) "FIELDS_ONLY" else null)
         }
-        for (review in reviews.listAll().filter { it.status == ReviewStatus.RESOLVED && it.resolutionKind != null &&
-                it.resolutionKind != ReviewResolutionKind.AUTO_NO_LONGER_REQUIRED }) {
-            // USER_CORRECTION is settlement metadata for the append-only correction
-            // already read above, not a second human decision that can supersede it.
-            if(review.resolutionKind == ReviewResolutionKind.USER_CORRECTION) continue
+        // USER_CORRECTION is settlement metadata for the append-only correction
+        // already read above, not a second human decision that can supersede it.
+        val resolved = reviews.listAll().filter { it.status == ReviewStatus.RESOLVED && it.resolutionKind != null &&
+            it.resolutionKind != ReviewResolutionKind.AUTO_NO_LONGER_REQUIRED &&
+            it.resolutionKind != ReviewResolutionKind.USER_CORRECTION && it.resolvedAt != null }
+        val types = transactions.getByIds(resolved.mapNotNull { it.resolvedTransactionId }).associate { it.id to it.type }
+        val linked = transactions.listLinkedRawSmsIds(resolved.map { it.rawSmsId })
+        for (review in resolved) {
             val at = review.resolvedAt?.toEpochMilli() ?: continue
-            val type = review.resolvedTransactionId?.let { transactions.getById(it)?.type }
+            val type = review.resolvedTransactionId?.let(types::get)
             val financialDecision = review.resolutionKind in setOf(ReviewResolutionKind.USER_FINANCIAL_TYPE,
                 ReviewResolutionKind.USER_EXTERNAL_TRANSFER)
             val financialOnly = financialDecision &&
-                type == null && transactions.isRawSmsLinked(review.rawSmsId)
+                type == null && review.rawSmsId in linked
             val family = when(review.resolutionKind) {
                 ReviewResolutionKind.USER_NON_FINANCIAL -> MessageFamily.NON_FINANCIAL
                 ReviewResolutionKind.USER_FINANCIAL_TYPE -> type?.let(FamilyFeedbackPolicy::explicitFamily)?.let { MessageFamily.valueOf(it.name) }

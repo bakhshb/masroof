@@ -12,7 +12,6 @@ import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.room.MasroofDatabase
-import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
@@ -33,7 +32,6 @@ import org.junit.After
 import org.junit.Before
 import java.math.BigDecimal
 import java.time.Instant
-import java.time.LocalDateTime
 
 /** One fresh in-memory Room ledger per scenario; inherited setup/teardown never share state. */
 abstract class ReconciliationTestFixture {
@@ -136,34 +134,5 @@ abstract class ReconciliationTestFixture {
         bankNetworkType = network,
         confidence = Confidence(1.0),
         parseStatus = status,
-    )
-
-    protected fun candidate(
-        id: String,
-        raw: String,
-        family: MessageFamily,
-        amount: Money,
-        source: AccountReference? = null,
-        destination: AccountReference? = null,
-        sourceOwn: OwnershipStatus,
-        destOwn: OwnershipStatus,
-        local: LocalDateTime?,
-        bank: Bank = Bank.BANK_ALJAZIRA,
-        ref: String? = null,
-    ) = TransferMatchCandidate(
-        event = event(
-            id = id,
-            rawSmsId = raw,
-            family = family,
-            amount = amount,
-            bank = bank,
-            source = source,
-            destination = destination,
-        ),
-        transactionReference = ref,
-        occurredAtLocal = local,
-        receivedAt = Instant.parse("2026-08-10T09:00:00Z"),
-        sourceOwnership = sourceOwn,
-        destinationOwnership = destOwn,
     )
 }

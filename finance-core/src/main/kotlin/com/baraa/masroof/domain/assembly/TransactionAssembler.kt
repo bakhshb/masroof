@@ -194,6 +194,9 @@ object TransactionAssembler {
      * unmatched, so ambiguous same-window legs are not posted as four self-transfers.
      * A lone owned-owned leg may post so a later counterpart can heal it.
      * Local side not OWNED stays pending.
+     *
+     * Callers pass only candidates that already passed [isAutomationEligible], including a
+     * user's financial confirmation, so the owned-owned leg is not gated a second time.
      */
     fun assembleUnmatchedOwnedTransfer(
         candidate: TransferMatchCandidate,
@@ -229,6 +232,7 @@ object TransactionAssembler {
                 transactionOccurredAt = transactionOccurredAt,
                 occurredAtZone = TransactionTiming.zoneFor(event.bank, fallback = fallbackZone),
                 deferIntraBankPairing = false,
+                userConfirmed = true,
             )
         }
 
@@ -326,13 +330,13 @@ object TransactionAssembler {
             )
         }
 
-        val occurredAt = listOfNotNull(out.occurredAt, inn.occurredAt).minOrNull()
-            ?: TransactionTiming.earliestEffectiveOccurredAt(
-                candidates = listOf(pair.outgoing, pair.incoming),
-                zoneId = fallbackZone,
-            )
-            ?: minOf(pair.outgoing.receivedAt, pair.incoming.receivedAt)
+        // Both wall clocks are read in the zone the pair stores, so a later stale-link check that
+        // re-reads them with that zone finds the same instant instead of unlinking the pair.
         val zone = TransactionTiming.zoneFor(out.bank, fallback = fallbackZone)
+        val occurredAt = listOfNotNull(out.occurredAt, inn.occurredAt).minOrNull()
+            ?: listOf(pair.outgoing, pair.incoming)
+                .minOfOrNull { TransactionTiming.effectiveOccurredAt(it, fallbackZone, persistedZoneId = zone.id) }
+            ?: minOf(pair.outgoing.receivedAt, pair.incoming.receivedAt)
 
         val rawSmsIds = listOf(out.rawSmsId, inn.rawSmsId).sorted()
         val linked = listOf(out.id, inn.id).sorted()

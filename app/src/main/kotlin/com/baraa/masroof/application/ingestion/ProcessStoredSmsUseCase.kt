@@ -66,6 +66,8 @@ class ProcessStoredSmsUseCase(
     private val reviewRepository: ReviewRepository? = null,
     private val debugProcessHalt: DebugProcessHaltProbe = DebugProcessHaltProbe.NONE,
     private val patternProcessing: (suspend (String, suspend () -> SmsIngestionResult, suspend () -> SmsIngestionResult) -> SmsIngestionResult)? = null,
+    /** Enqueues the one historical recovery pass after an interactive retry row is written. */
+    private val onHistoricalRetry: (() -> Unit)? = null,
 ) {
     /** Processes evidence captured in this same attempt, reusing the capture's [route]. */
     suspend fun process(
@@ -115,10 +117,28 @@ class ProcessStoredSmsUseCase(
 
     /**
      * Re-runs parse for an already-stored RawSms and immediately refreshes derived state.
-     * Used by interactive/single-message retry paths.
+     * Used by interactive/single-message retry paths. No worker retries these, so an
+     * incomplete reconciliation records a durable historical retry for the RawSms.
      */
-    suspend fun reparseStored(rawSms: RawSms): SmsIngestionResult =
-        processStoredEvidence(rawSms, logOutcome = false, deriveImmediately = true)
+    suspend fun reparseStored(rawSms: RawSms): SmsIngestionResult {
+        val result = processStoredEvidence(rawSms, logOutcome = false, deriveImmediately = true)
+        if (result is SmsIngestionResult.DerivedIncomplete) retainHistoricalRetry(rawSms.id)
+        return result
+    }
+
+    private suspend fun retainHistoricalRetry(rawSmsId: String) {
+        val recovery = processingRecovery ?: return
+        try {
+            if (recovery.markExhaustedBatch(listOf(rawSmsId))) onHistoricalRetry?.invoke()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            appLogService?.warn(
+                AppLogCategories.INGEST,
+                "Interactive reparse retry not recorded id=${AppLogFormatting.maskId(rawSmsId)} (${e.javaClass.simpleName})",
+            )
+        }
+    }
 
     /**
      * Re-runs parse for an already-stored RawSms but only persists parse evidence.

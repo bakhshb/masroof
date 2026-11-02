@@ -47,20 +47,16 @@ class ReviewDetailLoader(
      * [ReviewWorkflowService.refreshReviewQueue]. Opening or reloading the list
      * does not reconcile history.
      */
-    suspend fun loadSummaries(): List<ReviewSummary> {
-        val summaries = mutableListOf<ReviewSummary>()
-        for (review in reviewWorkflowService.listRequiredReviews()) {
-            toSummary(review)?.let { summaries += it }
-        }
-        return summaries
-    }
+    suspend fun loadSummaries(): List<ReviewSummary> = summariesOf(reviewWorkflowService.listRequiredReviews())
 
-    suspend fun loadIgnoredSummaries(): List<ReviewSummary> {
-        val summaries = mutableListOf<ReviewSummary>()
-        for (review in reviewWorkflowService.listIgnoredReviews()) {
-            toSummary(review)?.let { summaries += it }
-        }
-        return summaries
+    /** The ignored list only grows, so its rows are read in batches rather than one message at a time. */
+    suspend fun loadIgnoredSummaries(): List<ReviewSummary> = summariesOf(reviewWorkflowService.listIgnoredReviews())
+
+    private suspend fun summariesOf(reviews: List<ReviewItem>): List<ReviewSummary> {
+        val ids = reviews.map { it.rawSmsId }
+        val raw = rawSmsRepository.getByIds(ids).associateBy { it.id }
+        val events = effectiveParsedEventProvider.listEffectiveByRawSmsIds(ids).associateBy { it.event.rawSmsId }
+        return reviews.map { review -> summaryOf(review, raw[review.rawSmsId], events[review.rawSmsId]?.event) }
     }
 
     suspend fun loadDetail(reviewId: String): ReviewDetail? {
@@ -78,30 +74,21 @@ class ReviewDetailLoader(
             MessageFamily.TRANSFER_IN -> MessageFamily.TRANSFER_OUT
             else -> return emptyList()
         }
-        val candidates = mutableListOf<ReviewSummary>()
-        for (review in reviewWorkflowService.listRequiredReviews()) {
-            if (review.id == forReviewId || review.kind != ReviewKind.PENDING_MATCH) continue
-            val summary = toSummary(review) ?: continue
-            if (summary.messageFamily == opposite && summary.amount == currentAmount) {
-                candidates += summary
-            }
-        }
-        return candidates
+        val pending = reviewWorkflowService.listRequiredReviews()
+            .filter { it.id != forReviewId && it.kind == ReviewKind.PENDING_MATCH }
+        return summariesOf(pending).filter { it.messageFamily == opposite && it.amount == currentAmount }
     }
 
-    private suspend fun toSummary(review: ReviewItem): ReviewSummary? {
-        val detail = toDetail(review) ?: return null
-        val title = detail.merchant?.takeIf { it.isNotBlank() }
-            ?: detail.counterparty?.takeIf { it.isNotBlank() }
-        return ReviewSummary(
-            review = review,
-            title = title,
-            amount = detail.amount,
-            messageFamily = detail.messageFamily,
-            receivedAt = detail.receivedAt,
-            body = detail.body,
-        )
-    }
+    /** List rows need no interpretation provenance; it is read only for an opened detail. */
+    private fun summaryOf(review: ReviewItem, raw: com.baraa.masroof.domain.model.RawSms?,
+        event: com.baraa.masroof.domain.model.ParsedEvent?): ReviewSummary = ReviewSummary(
+        review = review,
+        title = event?.merchant?.takeIf { it.isNotBlank() } ?: event?.counterparty?.takeIf { it.isNotBlank() },
+        amount = event?.amount,
+        messageFamily = event?.messageFamily,
+        receivedAt = raw?.receivedAt,
+        body = raw?.body,
+    )
 
     private suspend fun toDetail(review: ReviewItem): ReviewDetail? {
         val raw = rawSmsRepository.getById(review.rawSmsId)

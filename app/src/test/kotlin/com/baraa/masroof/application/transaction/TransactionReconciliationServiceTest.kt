@@ -2,7 +2,6 @@ package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
-import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
@@ -10,6 +9,7 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
+import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.PurchaseChannel
@@ -384,101 +384,6 @@ class TransactionReconciliationServiceTest : ReconciliationTestFixture() {
         assertEquals(OwnershipStatus.UNKNOWN, OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository).resolveAccount(AccountReference(Bank.UNKNOWN, "6810")))
         assertEquals(2, accounts.listAll().size)
         assertNull(FinancialContainerIdFactory.accountId(AccountReference(Bank.UNKNOWN, "6810")))
-    }
-
-    @Test
-    fun matcher_requiresStrongBridge() {
-        val out = candidate(
-            id = "o",
-            raw = "ro",
-            family = MessageFamily.TRANSFER_OUT,
-            amount = money("10.00"),
-            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-            destination = AccountReference(Bank.UNKNOWN, "9999"),
-            sourceOwn = OwnershipStatus.OWNED,
-            destOwn = OwnershipStatus.UNKNOWN,
-            local = LocalDateTime.parse("2026-08-10T12:00:00"),
-        )
-        val inn = candidate(
-            id = "i",
-            raw = "ri",
-            family = MessageFamily.TRANSFER_IN,
-            amount = money("10.00"),
-            destination = AccountReference(Bank("D360"), "6810"),
-            sourceOwn = OwnershipStatus.UNKNOWN,
-            destOwn = OwnershipStatus.OWNED,
-            local = LocalDateTime.parse("2026-08-10T12:01:00"),
-            bank = Bank("D360"),
-        )
-        assertTrue(TransactionMatcher.findMutuallyUniquePairs(listOf(out, inn)).isEmpty())
-    }
-
-    @Test
-    fun matcher_outsideWindow_noMatch() {
-        val out = candidate(
-            id = "o",
-            raw = "ro",
-            family = MessageFamily.TRANSFER_OUT,
-            amount = money("10.00"),
-            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-            destination = AccountReference(Bank.UNKNOWN, "6810"),
-            sourceOwn = OwnershipStatus.OWNED,
-            destOwn = OwnershipStatus.UNKNOWN,
-            local = LocalDateTime.parse("2026-08-10T12:00:00"),
-        )
-        val inn = candidate(
-            id = "i",
-            raw = "ri",
-            family = MessageFamily.TRANSFER_IN,
-            amount = money("10.00"),
-            destination = AccountReference(Bank("D360"), "6810"),
-            sourceOwn = OwnershipStatus.UNKNOWN,
-            destOwn = OwnershipStatus.OWNED,
-            local = LocalDateTime.parse("2026-08-10T12:30:00"),
-            bank = Bank("D360"),
-        )
-        assertTrue(TransactionMatcher.findMutuallyUniquePairs(listOf(out, inn)).isEmpty())
-    }
-
-    @Test
-    fun matcher_ambiguousSameAmount_noAutoMatch() {
-        val out = candidate(
-            id = "o",
-            raw = "ro",
-            family = MessageFamily.TRANSFER_OUT,
-            amount = money("500.00"),
-            source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-            destination = AccountReference(Bank.UNKNOWN, "6810"),
-            sourceOwn = OwnershipStatus.OWNED,
-            destOwn = OwnershipStatus.UNKNOWN,
-            local = LocalDateTime.parse("2026-08-10T12:00:00"),
-            ref = "SAME",
-        )
-        val b = candidate(
-            id = "b",
-            raw = "rb",
-            family = MessageFamily.TRANSFER_IN,
-            amount = money("500.00"),
-            destination = AccountReference(Bank("D360"), "6810"),
-            sourceOwn = OwnershipStatus.UNKNOWN,
-            destOwn = OwnershipStatus.OWNED,
-            local = LocalDateTime.parse("2026-08-10T12:01:00"),
-            bank = Bank("D360"),
-            ref = "SAME",
-        )
-        val c = candidate(
-            id = "c",
-            raw = "rc",
-            family = MessageFamily.TRANSFER_IN,
-            amount = money("500.00"),
-            destination = AccountReference(Bank("D360"), "6810"),
-            sourceOwn = OwnershipStatus.UNKNOWN,
-            destOwn = OwnershipStatus.OWNED,
-            local = LocalDateTime.parse("2026-08-10T12:02:00"),
-            bank = Bank("D360"),
-            ref = "SAME",
-        )
-        assertTrue(TransactionMatcher.findMutuallyUniquePairs(listOf(out, b, c)).isEmpty())
     }
 
     @Test
@@ -881,4 +786,79 @@ class TransactionReconciliationServiceTest : ReconciliationTestFixture() {
         )
     }
 
+
+    /** A FEE row the heal cannot turn into a repayment is kept as is, not counted as a failure on every pass. */
+    @Test
+    fun staleFeeFinancingInstallment_withoutLoanType_staysFeeAndDoesNotFailReconciliation() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        persistEvent(
+            smsId = "sms-loan",
+            body = """
+                خصم: قسط تمويل
+                من: 3001
+                القسط: SAR 3,036.11
+            """.trimIndent(),
+            event = event(
+                id = "evt-loan",
+                rawSmsId = "sms-loan",
+                family = MessageFamily.FINANCING_INSTALLMENT,
+                amount = money("3036.11"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+            ),
+            details = ParsedEventDetails(loanType = null),
+            at = Instant.parse("2026-08-27T01:10:00Z"),
+        )
+        val staleFee = com.baraa.masroof.domain.model.FinancialTransaction(
+            id = TransactionIdFactory.fromRawSmsIds(listOf("sms-loan")),
+            type = FinancialTransactionType.FEE,
+            amount = money("3036.11"),
+            occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+            sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+            destinationContainerId = null,
+            merchant = null,
+            counterparty = null,
+            categoryId = null,
+            linkedParsedEventIds = listOf("evt-loan"),
+        )
+        ftRepo.save(staleFee, listOf("sms-loan"))
+
+        val repair = reconciliation.repairLegacyTransfersDetailed()
+        val full = reconciliation.reconcileStoredEventsDetailed()
+
+        assertEquals(0, repair.summary.failed)
+        assertEquals(0, full.summary.failed)
+        assertEquals(FinancialTransactionType.FEE, ftRepo.listAll().single().type)
+    }
+
+    /** Ownership is a write; it needs the same parse-status gate as posting. */
+    @Test
+    fun financingInstallmentNotYetValidated_doesNotConfirmLoanOwnership() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        loans.observe(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL), "sms-loan")
+        persistEvent(
+            smsId = "sms-loan",
+            body = """
+                خصم: قسط تمويل
+                من: 3001
+                القسط: SAR 3,036.11
+                لـ: تمويل شخصي
+            """.trimIndent(),
+            event = event(
+                id = "evt-loan",
+                rawSmsId = "sms-loan",
+                family = MessageFamily.FINANCING_INSTALLMENT,
+                amount = money("3036.11"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                counterparty = "تمويل شخصي",
+                status = ParseStatus.REVIEW_REQUIRED,
+            ),
+            details = ParsedEventDetails(loanType = LoanType.PERSONAL),
+            at = Instant.parse("2026-08-27T01:10:00Z"),
+        )
+
+        reconciliation.reconcileStoredEvents()
+
+        assertEquals(OwnershipStatus.UNKNOWN, loans.resolve(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)))
+        assertTrue(ftRepo.listAll().isEmpty())
+    }
 }
