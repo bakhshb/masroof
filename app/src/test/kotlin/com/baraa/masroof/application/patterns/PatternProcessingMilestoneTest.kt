@@ -157,7 +157,8 @@ class PatternProcessingMilestoneTest {
                 .map { (field, value) -> PatternBinding(field, body.indexOf(value), body.indexOf(value) + value.length) }
             w.saveTeaching(w.teach(w.catalog().generation, "BANK_STC", "STC Bank", PatternOperation.PURCHASE, body, bindings))
             c.processRawSmsUseCase.ingest(sms("stc-card-pending", body))
-            val bundled = setOf("stc-internal-in", "stc-internal-out", "stc-local-in", "stc-qattah", "stc-sarie-in", "stc-top-up")
+            val bundled = setOf("stc-internal-in", "stc-internal-out", "stc-local-in", "stc-qattah", "stc-sarie-in", "stc-top-up",
+                "stc-qattah-ar", "stc-internal-out-ar")
             val patternId = w.catalog().banks.single { it.bankId == "BANK_STC" }.currentPatterns.single { it.id !in bundled }.id
             val approved = w.saveFinancial(w.previewFinancial(w.catalog().generation, "BANK_STC", patternId, PatternOperation.PURCHASE,
                 null, body, null, emptySet(), cardId = card.id))
@@ -404,14 +405,14 @@ class PatternProcessingMilestoneTest {
         }
     }
 
-    @Test fun allSixStcLayoutsCanBeExplicitlyApprovedWithoutInventingFundingCardsOrIncome() = runBlocking {
+    @Test fun everyStcLayoutCanBeExplicitlyApprovedWithoutInventingFundingCardsOrIncome() = runBlocking {
         fixture { c ->
             val w = c.messagePatternsWorkflow
             val account = w.confirmPatternAccount("BANK_STC", "4321")
             val rows = Json.parseToJsonElement(java.io.File("src/test/resources/testdata/patterns/stc-seed-v1.json").readText())
                 .jsonObject.getValue("rows").let { it as kotlinx.serialization.json.JsonArray }.map { it.jsonObject }
                 .filter { it.getValue("teach").jsonPrimitive.content == "true" }
-            assertEquals(6, rows.size)
+            assertEquals(8, rows.size)
             for (row in rows) {
                 val id = row.getValue("id").jsonPrimitive.content
                 val body = row.getValue("body").jsonPrimitive.content

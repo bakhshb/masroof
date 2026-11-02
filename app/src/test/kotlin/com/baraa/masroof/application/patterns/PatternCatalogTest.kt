@@ -13,7 +13,7 @@ class PatternCatalogTest {
         val patterns = catalog.banks.single().currentPatterns.associateBy { it.id }
         val incoming = patterns.getValue("barq.transfer-in")
         assertTrue("حوالة داخلية واردة" in incoming.recognitionPhrases)
-        assertEquals(listOf("من حساب", "حساب المرسل"), incoming.fieldLabels["source_account"])
+        assertEquals(listOf("من حساب", "حساب المرسل", "from a/c"), incoming.fieldLabels["source_account"])
         assertTrue(incoming.fields.isEmpty())
         assertTrue(incoming.canApprove)
         assertFalse(incoming.canEdit)
