@@ -57,6 +57,7 @@
   "com.baraa.masroof.instrumentation.SmsPersistenceRestartTest#processDeathAfterReviewUpdate_requiredReviewStaysUnposted": 1.108,
   "com.baraa.masroof.instrumentation.SmsPersistenceRestartTest#secondImport_ofTheSamePackage_keepsOneLedger": 1.257,
   "com.baraa.masroof.instrumentation.SmsPersistenceRestartTest#userNonFinancialResolution_survivesRestart_andStaysUnposted": 0.93,
+  "com.baraa.masroof.instrumentation.StartupBlockedRestoreTest#restorePageSurvivesRecreationAndBackReturnsToTheBlockedScreen": 1.442,
   "com.baraa.masroof.instrumentation.StartupGateRestorationTest#savedReady_doesNotExposeFinancialContentWhileNewMaintenanceIsPending": 1.755,
   "com.baraa.masroof.instrumentation.StatementReconciliationSmokeTest#statementImport_showsFourOutcomesAndSurvivesRecreate": 8.717,
   "com.baraa.masroof.integration.analytics.AnalyticsJourneyTest#forecastsKeepLedgerParityAcrossCorrectionsAndReopenAndUiDraftsOnlySaveExplicitly": 39.671,
