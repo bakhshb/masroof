@@ -195,6 +195,28 @@ class ReviewDetailLoaderTest {
             val matches = result.rows.flatMap { it.matches }.map { it.fields.getValue("amount").text }.sorted()
             assertEquals(listOf("10SAR", "250SAR"), matches)
             assertEquals(1, result.rows.count { it.status == com.baraa.masroof.application.patterns.PendingPatternStatus.NO_MATCH })
+            // A long queue from another bank first must not hide this bank's rows.
+            val otherBank = reviewRepo.listRequired().first { it.rawSmsId == "other-bank" }
+            val crowded = object : com.baraa.masroof.domain.repository.ReviewRepository by reviewRepo {
+                override suspend fun listRequired() = List(1_000) { otherBank.copy(id = "crowd-$it") } + reviewRepo.listRequired()
+            }
+            val crowdedReport = com.baraa.masroof.application.patterns.PendingPatternsWorkflow(store,
+                com.baraa.masroof.data.room.DatabaseAccessGate(), crowded, rawRepo,
+                RoomParsedEventRepository(db.parsedEventDao()), corrections, guardedTransactions,
+                com.baraa.masroof.bank.BankSmsRegistry(emptyList())).preview("STC", 1)
+            assertEquals(result.rows, crowdedReport.rows)
+            org.junit.Assert.assertFalse(crowdedReport.limited)
+            // This bank's own rows stop at the cap, and the report says so.
+            val first = reviewRepo.listRequired().first { it.rawSmsId == "first" }
+            val full = object : com.baraa.masroof.domain.repository.ReviewRepository by reviewRepo {
+                override suspend fun listRequired() = List(1_001) { first.copy(id = "own-$it") }
+            }
+            val fullReport = com.baraa.masroof.application.patterns.PendingPatternsWorkflow(store,
+                com.baraa.masroof.data.room.DatabaseAccessGate(), full, rawRepo,
+                RoomParsedEventRepository(db.parsedEventDao()), corrections, guardedTransactions,
+                com.baraa.masroof.bank.BankSmsRegistry(emptyList())).preview("STC", 1)
+            assertEquals(1_000, fullReport.rows.size)
+            org.junit.Assert.assertTrue(fullReport.limited)
             store.saveBank(1, bank.copy(patterns = listOf(pattern.copy(id = "competing"))))
             val conflict = preview.preview("STC", 2)
             assertEquals(2, conflict.rows.count { it.status == com.baraa.masroof.application.patterns.PendingPatternStatus.PATTERN_CONFLICT })

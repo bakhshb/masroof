@@ -159,6 +159,26 @@ class AnalyticsPersistenceTest {
         val valid = AnalyticsJson.format.encodeToString(AnalyticsArchive(alerts = listOf(good)))
         assertEquals("A valid archive is exported unchanged", valid, AnalyticsBackup.exportable(valid))
     }
+    @Test fun backupKeepsSnapshotsWithEveryRankedMerchant() {
+        val base = snapshot()
+        val components = listOf("PURCHASES", "CASH", "TRANSFERS", "REFUNDS").map { kind ->
+            com.baraa.masroof.application.dashboard.AnalysisSpendingGroup(kind, if (kind == "PURCHASES") base.actual else 0, emptyList())
+        }
+        val merchants = (1..12).map { index ->
+            com.baraa.masroof.application.dashboard.AnalysisSpendingGroup("merchant:shop-$index", 100L * (13 - index), listOf("t$index"), "Shop $index")
+        }
+        fun archive(groups: List<com.baraa.masroof.application.dashboard.AnalysisSpendingGroup>): String {
+            val s = base.copy(insights = com.baraa.masroof.application.dashboard.AnalysisSpendingInsights(components, groups, null))
+            return AnalyticsJson.format.encodeToString(AnalyticsArchive(snapshots = listOf(
+                AnalysisSnapshotRow("merchants", s.sourceHash, s.issuedAt, AnalyticsJson.format.encodeToString(s)))))
+        }
+        val many = archive(merchants)
+        AnalyticsBackup.validate(many)
+        assertEquals(many, AnalyticsBackup.exportable(many))
+        assertTrue(runCatching { AnalyticsBackup.validate(archive(merchants + merchants.first())) }.isFailure)
+        assertTrue(runCatching { AnalyticsBackup.validate(archive(listOf(merchants.first().copy(amount = 0)))) }.isFailure)
+        assertTrue(runCatching { AnalyticsBackup.validate(archive(listOf(merchants.first().copy(key = "PURCHASES")))) }.isFailure)
+    }
 
     @Test fun exportChecksTheCombinedFinancialAndAnalyticsSizeBeforeOpeningTheDestination() {
         val c = context()
