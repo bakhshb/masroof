@@ -38,11 +38,16 @@ class LiveCaptureRecoveryWorker(
     private val startupReady: suspend () -> Boolean,
     private val appLogService: AppLogService? = null,
     private val onFinished: () -> Unit = {},
+    private val requeueAfterStartup: (receivedAfter: Instant) -> Unit = {},
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val after = inputData.getLong(KEY_RECEIVED_AFTER, -1L).takeIf { it >= 0 } ?: return Result.failure()
         return try {
-            if (!startupReady()) return Result.retry()
+            if (!startupReady()) {
+                // A fresh request: waiting for startup must not use up this request's attempts.
+                requeueAfterStartup(Instant.ofEpochMilli(after))
+                return Result.success()
+            }
             val result = try {
                 scan(Instant.ofEpochMilli(after))
             } finally {
@@ -52,7 +57,7 @@ class LiveCaptureRecoveryWorker(
                 // A capture that failed again stored nothing; rows already stored come back as duplicates.
                 null -> if (result.failed > 0) retryOrGiveUp("capture") else Result.success()
                 is SmsScanFailure.DerivedIncomplete -> Result.success() // the batch keeps its own retry rows
-                SmsScanFailure.PermissionDenied -> Result.failure()
+                SmsScanFailure.PermissionDenied -> giveUp("permission")
                 is SmsScanFailure.ProviderError -> retryOrGiveUp("provider")
             }
         } catch (_: DatabaseRestartRequiredException) {
@@ -71,7 +76,13 @@ class LiveCaptureRecoveryWorker(
             "LiveCaptureRecoveryWorker scan incomplete attempt=${runAttemptCount + 1} " +
                 "retry_state=${if (exhausted) "exhausted" else "retry"} ($reason)",
         )
-        return if (exhausted) Result.failure() else Result.retry()
+        return if (exhausted) Result.success() else Result.retry()
+    }
+
+    // Success, not failure: a scan appended behind this one in the chain must still run.
+    private fun giveUp(reason: String): Result {
+        appLogService?.warn(AppLogCategories.SMS, "LiveCaptureRecoveryWorker gave up ($reason)")
+        return Result.success()
     }
 
     class Factory(
@@ -93,7 +104,7 @@ class LiveCaptureRecoveryWorker(
                     startupReady,
                     appLogService,
                     onFinished,
-                )
+                ) { enqueue(WorkManager.getInstance(appContext), it, STARTUP_WAIT_DELAY_SECONDS) }
             } else {
                 null
             }
@@ -106,6 +117,9 @@ class LiveCaptureRecoveryWorker(
 
         /** The default SMS app may write its inbox row after the live broadcast. */
         const val INITIAL_DELAY_SECONDS = 60L
+
+        /** Re-check delay while startup integrity repair is not ready. */
+        const val STARTUP_WAIT_DELAY_SECONDS = 15 * 60L
         private const val UNIQUE_WORK_PREFIX = "live-capture-recovery:"
 
         /**
@@ -114,15 +128,19 @@ class LiveCaptureRecoveryWorker(
          */
         fun uniqueWorkName(receivedAfter: Instant): String = "$UNIQUE_WORK_PREFIX${receivedAfter.epochSecond / 60}"
 
-        fun workRequest(receivedAfter: Instant): OneTimeWorkRequest =
+        fun workRequest(receivedAfter: Instant, delaySeconds: Long = INITIAL_DELAY_SECONDS): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<LiveCaptureRecoveryWorker>()
                 .setInputData(Data.Builder().putLong(KEY_RECEIVED_AFTER, receivedAfter.toEpochMilli()).build())
-                .setInitialDelay(INITIAL_DELAY_SECONDS, TimeUnit.SECONDS)
+                .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
                 .build()
 
-        fun enqueue(workManager: WorkManager, receivedAfter: Instant) {
-            workManager.enqueueUniqueWork(uniqueWorkName(receivedAfter), ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest(receivedAfter))
+        fun enqueue(workManager: WorkManager, receivedAfter: Instant, delaySeconds: Long = INITIAL_DELAY_SECONDS) {
+            workManager.enqueueUniqueWork(
+                uniqueWorkName(receivedAfter),
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                workRequest(receivedAfter, delaySeconds),
+            )
         }
     }
 }

@@ -205,7 +205,7 @@ private fun MasroofContent(
         dashboardViewModel.openTransactionDetail(id)
     }
 
-    // While a write for the open transaction runs, the detail stays; finishing that write closes it itself.
+    // While a write for the open transaction runs, the detail stays open; a pending alert waits until it closes.
     fun closeTransactionDetailUnlessBusy() {
         if (!dashboardState.reclassifying && !dashboardState.ignoring && !dashboardState.markingCommitment) {
             dashboardViewModel.closeTransactionDetail()

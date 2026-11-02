@@ -22,6 +22,7 @@ class LiveCaptureRecoveryWorkerTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val after = Instant.parse("2026-08-03T14:22:00Z")
     private var finished = 0
+    private val requeued = mutableListOf<Instant>()
 
     @Test
     fun cleanScan_succeedsFromTheInputBound() = runBlocking {
@@ -35,29 +36,31 @@ class LiveCaptureRecoveryWorkerTest {
     }
 
     @Test
-    fun captureThatFailsAgain_retriesThenGivesUp() = runBlocking {
+    fun captureThatFailsAgain_retriesThenGivesUpWithoutFailingTheChain() = runBlocking {
         val failed: suspend (Instant) -> SmsScanResult = { SmsScanResult(failed = 1) }
 
         assertEquals(ListenableWorker.Result.retry(), worker(scan = failed).doWork())
+        // Success, so a scan appended behind this one still runs.
         assertEquals(
-            ListenableWorker.Result.failure(),
+            ListenableWorker.Result.success(),
             worker(scan = failed, attempt = LiveCaptureRecoveryWorker.MAX_ATTEMPTS - 1).doWork(),
         )
     }
 
     @Test
-    fun startupNotReady_retriesWithoutScanning() = runBlocking {
+    fun startupNotReady_requeuesAFreshRequestWithoutScanning() = runBlocking {
         var scanned = false
 
-        val result = worker(scan = { scanned = true; SmsScanResult() }, ready = false).doWork()
+        val result = worker(scan = { scanned = true; SmsScanResult() }, ready = false, attempt = 3).doWork()
 
-        assertEquals(ListenableWorker.Result.retry(), result)
+        assertEquals(ListenableWorker.Result.success(), result)
+        assertEquals(listOf(after), requeued)
         assertEquals(false, scanned)
     }
 
     @Test
     fun failuresMapToTheirResults() = runBlocking {
-        assertEquals(ListenableWorker.Result.failure(), worker(scan = { SmsScanResult(failure = SmsScanFailure.PermissionDenied) }).doWork())
+        assertEquals(ListenableWorker.Result.success(), worker(scan = { SmsScanResult(failure = SmsScanFailure.PermissionDenied) }).doWork())
         assertEquals(ListenableWorker.Result.retry(), worker(scan = { SmsScanResult(failure = SmsScanFailure.ProviderError("x")) }).doWork())
         assertEquals(ListenableWorker.Result.retry(), worker(scan = { throw DatabaseRestartRequiredException() }).doWork())
         assertEquals(3, finished)
@@ -73,7 +76,7 @@ class LiveCaptureRecoveryWorkerTest {
             .setRunAttemptCount(attempt)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
-                    LiveCaptureRecoveryWorker(appContext, workerParameters, scan, { ready }, onFinished = { finished++ })
+                    LiveCaptureRecoveryWorker(appContext, workerParameters, scan, { ready }, onFinished = { finished++ }) { requeued += it }
             })
             .build()
 }
