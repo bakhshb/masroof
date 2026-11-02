@@ -15,25 +15,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import com.baraa.masroof.presentation.startup.StartupBlockedScreen
 import com.baraa.masroof.presentation.startup.rememberStartupMaintenanceOutcome
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.presentation.common.MasroofScreenBackground
 import androidx.core.content.ContextCompat
 import com.baraa.masroof.application.backup.BackupPackageFormat
@@ -50,11 +44,12 @@ import com.baraa.masroof.presentation.notification.NotificationCenterViewModel
 import com.baraa.masroof.presentation.notification.notificationCenterViewModelFactory
 import com.baraa.masroof.presentation.review.ReviewViewModel
 import com.baraa.masroof.presentation.review.reviewViewModelFactory
+import com.baraa.masroof.presentation.settings.BackupPage
+import com.baraa.masroof.presentation.settings.SettingsDataBackupScreen
 import com.baraa.masroof.presentation.settings.SettingsViewModel
 import com.baraa.masroof.presentation.settings.settingsViewModelFactory
 import com.baraa.masroof.presentation.statement.StatementReconciliationViewModel
 import com.baraa.masroof.presentation.statement.statementReconciliationViewModelFactory
-import com.baraa.masroof.ui.theme.MasroofSpacing
 import com.baraa.masroof.ui.theme.MasroofTheme
 import com.baraa.masroof.presentation.locale.AppLocaleContext
 import kotlinx.coroutines.launch
@@ -143,33 +138,38 @@ class MainActivity : ComponentActivity() {
                                 CircularProgressIndicator()
                             }
                         } else {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(MasroofSpacing.screenPaddingLarge),
-                                verticalArrangement = Arrangement.spacedBy(
-                                    MasroofSpacing.sectionGap,
-                                    Alignment.CenterVertically,
-                                ),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.startup_maintenance_blocked),
-                                    style = MaterialTheme.typography.bodyLarge,
+                            StartupBlockedScreen(
+                                onRetry = {
+                                    startupRetrying = true
+                                    startupScope.launch {
+                                        startupOutcome = container.retryStartupMaintenance()
+                                        startupFinancialReady =
+                                            startupOutcome == StartupMaintenanceOutcome.READY
+                                        startupRetrying = false
+                                    }
+                                },
+                            ) { onBack ->
+                                val blockedSettingsState by settingsViewModel.uiState.collectAsState()
+                                val blockedImportLauncher = rememberLauncherForActivityResult(
+                                    contract = ActivityResultContracts.OpenDocument(),
+                                ) { uri: Uri? -> if (uri != null) settingsViewModel.offerImport(uri) }
+                                SettingsDataBackupScreen(
+                                    state = blockedSettingsState,
+                                    onBack = onBack,
+                                    onReparseStored = {},
+                                    onExportPassphraseChange = {},
+                                    onImportPassphraseChange = settingsViewModel::onImportPassphraseChange,
+                                    onRequestExport = {},
+                                    onRequestImport = { blockedImportLauncher.launch(arrayOf("*/*")) },
+                                    onConfirmPendingImport = settingsViewModel::confirmPendingImport,
+                                    onCancelPendingImport = settingsViewModel::cancelPendingImport,
+                                    onClearBackupMessage = settingsViewModel::clearBackupMessage,
+                                    onRequestFxRateCorrection = {},
+                                    onConfirmFxRateCorrection = {},
+                                    onDismissFxRateCorrection = {},
+                                    page = BackupPage.Restore,
+                                    onVerifyPendingImport = settingsViewModel::verifyPendingImport,
                                 )
-                                Button(
-                                    onClick = {
-                                        startupRetrying = true
-                                        startupScope.launch {
-                                            startupOutcome = container.retryStartupMaintenance()
-                                            startupFinancialReady =
-                                                startupOutcome == StartupMaintenanceOutcome.READY
-                                            startupRetrying = false
-                                        }
-                                    },
-                                ) {
-                                    Text(stringResource(R.string.dashboard_retry))
-                                }
                             }
                         }
                     }
