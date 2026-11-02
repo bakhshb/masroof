@@ -189,6 +189,11 @@ class DashboardViewModel(
         load(activePeriod)
     }
 
+    /** First load only: a restored visit can open on Cards or Accounts, which read this state but never load it. */
+    fun ensureLoaded() {
+        if (_uiState.value.period == null) refresh()
+    }
+
     fun onAppResumed() {
         val granted = permissionStateProvider()
         _uiState.update { it.copy(smsPermissionGranted = granted) }

@@ -115,6 +115,21 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun ensureLoaded_loadsAFreshViewModelOnceAndLeavesALoadedOneAlone() = runTest {
+        val loader = FakeLoader()
+        loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
+        val vm = viewModel(loader)
+
+        vm.ensureLoaded()
+        advanceUntilIdle()
+        vm.ensureLoaded()
+        advanceUntilIdle()
+
+        assertEquals(listOf(currentPeriod), loader.calls)
+        assertEquals(Money.of("100.00", Currency.SAR), vm.uiState.value.summary!!.spendingGross)
+    }
+
+    @Test
     fun maintenanceCompletion_reloadsLoadedDashboardOnly() = runTest {
         val loader = FakeLoader()
         loader.put(currentPeriod, overview(currentPeriod, spending = "100.00"))
