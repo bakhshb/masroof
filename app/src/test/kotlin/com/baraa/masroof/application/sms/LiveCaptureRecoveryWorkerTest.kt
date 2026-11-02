@@ -50,6 +50,16 @@ class LiveCaptureRecoveryWorkerTest {
     }
 
     @Test
+    fun lastAttemptOfAnyRetryableFailure_requeuesUntilTheCap() = runBlocking {
+        val last = LiveCaptureRecoveryWorker.MAX_ATTEMPTS - 1
+        worker(scan = { SmsScanResult(failure = SmsScanFailure.ProviderError("x")) }, attempt = last).doWork()
+        worker(scan = { throw IllegalStateException() }, attempt = last).doWork()
+        worker(scan = { SmsScanResult(failed = 1) }, attempt = last, requeues = LiveCaptureRecoveryWorker.MAX_REQUEUES - 1).doWork()
+
+        assertEquals(listOf(after to 1, after to 1, after to LiveCaptureRecoveryWorker.MAX_REQUEUES), requeued)
+    }
+
+    @Test
     fun afterAboutAWeekOfRequests_givesUp() = runBlocking {
         val result = worker(
             scan = { SmsScanResult(failed = 1) },
@@ -93,6 +103,7 @@ class LiveCaptureRecoveryWorkerTest {
         assertEquals(ListenableWorker.Result.retry(), worker(scan = { SmsScanResult(failure = SmsScanFailure.ProviderError("x")) }).doWork())
         assertEquals(ListenableWorker.Result.retry(), worker(scan = { throw DatabaseRestartRequiredException() }).doWork())
         assertEquals(3, finished)
+        assertEquals(emptyList<Pair<Instant, Int>>(), requeued)
     }
 
     private fun worker(

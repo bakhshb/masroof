@@ -81,7 +81,13 @@ class LiveCaptureRecoveryWorker(
     private fun requeueOrGiveUp(after: Long, reason: String): Result {
         val requeues = inputData.getInt(KEY_REQUEUES, 0) + 1
         if (requeues > MAX_REQUEUES) return giveUp(reason)
-        requeue(Instant.ofEpochMilli(after), requeues)
+        try {
+            requeue(Instant.ofEpochMilli(after), requeues)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return giveUp("requeue ${e.javaClass.simpleName}")
+        }
         return Result.success()
     }
 
