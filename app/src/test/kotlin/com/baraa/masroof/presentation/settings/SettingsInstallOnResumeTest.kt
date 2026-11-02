@@ -23,6 +23,15 @@ class SettingsInstallOnResumeTest {
     private val state = MutableStateFlow(SettingsUiState(updateState = AppUpdateUiState.ReadyToInstall(manifest)))
     private var canInstall = true
     private var permissionRequests = 0
+    private val installs = mutableListOf<java.io.File>()
+
+    // A recording installer: the real one reaches FileProvider, whose static root cache
+    // would pin this test's cache directory for later tests in the same sandbox.
+    private val installer = object : com.baraa.masroof.application.update.ApkInstaller(
+        androidx.test.core.app.ApplicationProvider.getApplicationContext(),
+    ) {
+        override fun install(apkFile: java.io.File): Result<Unit> = Result.success(Unit).also { installs += apkFile }
+    }
 
     private fun actions(service: AppUpdateService = SettingsViewModelTestFixtures.appUpdateService()) = SettingsUpdateActions(
         scope = TestScope(UnconfinedTestDispatcher()),
@@ -30,7 +39,7 @@ class SettingsInstallOnResumeTest {
         appUpdateService = service,
         updateCheckCoordinator = SettingsViewModelTestFixtures.updateCheckCoordinator(),
         appLogService = SettingsViewModelTestFixtures.appLogService(),
-        apkInstaller = SettingsViewModelTestFixtures.apkInstaller(),
+        apkInstaller = installer,
         canInstallPackages = { canInstall },
         onRequestInstallPermission = { permissionRequests++ },
     )
@@ -44,6 +53,7 @@ class SettingsInstallOnResumeTest {
         shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(AppUpdateUiState.ReadyToInstall(manifest), state.value.updateState)
+        assertEquals(0, installs.size)
     }
 
     @Test
@@ -65,5 +75,6 @@ class SettingsInstallOnResumeTest {
         actions.retryInstallAfterPermissionGranted()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(AppUpdateUiState.ReadyToInstall(manifest), state.value.updateState)
+        assertEquals(1, installs.size)
     }
 }

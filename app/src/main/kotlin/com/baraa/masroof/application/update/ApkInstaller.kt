@@ -16,10 +16,10 @@ object InstallPermissionHelper {
         }
 }
 
-class ApkInstaller(
+open class ApkInstaller(
     private val context: Context,
 ) {
-    fun install(apkFile: File): Result<Unit> {
+    open fun install(apkFile: File): Result<Unit> {
         if (!apkFile.exists()) {
             return Result.failure(IllegalStateException("APK file not found"))
         }
