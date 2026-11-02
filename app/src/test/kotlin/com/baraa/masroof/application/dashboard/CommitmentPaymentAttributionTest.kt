@@ -69,4 +69,12 @@ class CommitmentPaymentAttributionTest {
         }
     }
 
+    /** A commitment groups a merchant the same way the dashboard does, including spacing around punctuation. */
+    @Test fun merchantSpacingAroundPunctuation_isTheSameMerchant() {
+        val samples = listOf("STC - Pay", "stc-pay", " STC -PAY ", "STC  -  Pay")
+        assertEquals(1, samples.map(CommitmentPaymentIdentity::normalize).distinct().size)
+        samples.forEach { assertEquals(MerchantNameNormalizer.key(it), CommitmentPaymentIdentity.normalize(it)) }
+        assertTrue(CommitmentPaymentIdentity(setOf(CommitmentPaymentIdentity.normalize("STC - Pay")))
+            .matches(CommitmentPaymentIdentity(setOf(CommitmentPaymentIdentity.normalize("stc-pay")))))
+    }
 }

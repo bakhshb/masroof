@@ -48,6 +48,7 @@ class AdvisoryLifecycleDeviceTest {
         try {
             val row=database.learning().history("raw").single()
             assertEquals("ML",row.origin)
+            assertFalse(row.assistRequested)
             assertNull(row.score)
             assertEquals("LEGACY_UNKNOWN",row.assistOutcome)
             assertTrue(database.learning().feedback().isEmpty())
@@ -72,9 +73,11 @@ class AdvisoryLifecycleDeviceTest {
             dao.coverage(listOf(gap))
             val archive=AnalyticsArchiveStore.export(database)
             AnalyticsArchiveStore.restore(database,null)
+            assertTrue(dao.coverage().isEmpty())
             AnalyticsArchiveStore.restore(database,archive)
             assertEquals(listOf(gap),dao.coverage())
             assertEquals(listOf(actual),dao.comparisons())
+            assertNotNull(AnalyticsArchiveStore.validate("{\"version\":1}"))
         } finally { database.close();context.deleteDatabase(name) }
     }
     @Test fun analyticsV3UpgradeKeepsLegacyRejectionSeparateFromExplicitFeedback() = runBlocking {

@@ -151,6 +151,7 @@ class TransactionRestoreServiceTest {
                         override suspend fun listForRawSmsIds(
                             rawSmsIds: Collection<String>,
                         ): List<com.baraa.masroof.domain.model.UserCorrection> = emptyList()
+                        override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.UserCorrection>()
                     },
                 ),
                 ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
@@ -316,7 +317,7 @@ class TransactionRestoreServiceTest {
     private class SingleTransactionRepository(
         private val transaction: FinancialTransaction,
     ) : FinancialTransactionRepository {
-        override suspend fun save(tx: FinancialTransaction, rawSmsIds: Collection<String>) =
+        override suspend fun save(transaction: FinancialTransaction, rawSmsIds: Collection<String>) =
             FinancialTransactionSaveResult.Saved
 
         override suspend fun getById(id: String): FinancialTransaction? =

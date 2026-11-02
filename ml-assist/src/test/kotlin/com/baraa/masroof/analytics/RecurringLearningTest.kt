@@ -31,7 +31,7 @@ class RecurringLearningTest {
         assertNotEquals(seed.weights, result.model!!.weights)
         val repeated = RecurringLearning.personalize(seed, rows + rows, examples(60))
         assertEquals(result.trainingSeries, repeated.trainingSeries)
-        assertEquals(result.model!!.weights, repeated.model!!.weights)
+        assertEquals(result.model.weights, repeated.model!!.weights)
     }
 
     @Test fun sparseOrWithdrawnFeedbackNeverPromotesAndIneligibleSeedStaysIneligible() {

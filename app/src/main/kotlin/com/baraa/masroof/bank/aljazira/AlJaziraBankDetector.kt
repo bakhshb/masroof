@@ -48,6 +48,10 @@ class AlJaziraBankDetector : BankDetector {
             "aljazirabank",
         )
 
+        private val FORMAT_AND_MARKS = Regex("[\\p{Cf}\\p{Mn}]")
+        private val NON_ALPHANUMERIC = Regex("[^a-z0-9]")
+        private val SENDER_SEPARATORS = Regex("[\\s\\-_.]+")
+
         /** Arabic sender labels (after normalization). */
         val ARABIC_SENDERS = setOf(
             "بنكالجزيرة",
@@ -57,7 +61,7 @@ class AlJaziraBankDetector : BankDetector {
         internal fun normalizeSender(sender: String): String {
             val cleaned = sender
                 .trim()
-                .replace(Regex("[\\p{Cf}\\p{Mn}]"), "")
+                .replace(FORMAT_AND_MARKS, "")
 
             val arabicKey = normalizeArabicSender(cleaned)
             if (arabicKey in ARABIC_SENDERS) {
@@ -66,7 +70,7 @@ class AlJaziraBankDetector : BankDetector {
 
             var latin = cleaned
                 .lowercase(Locale.ROOT)
-                .replace(Regex("[^a-z0-9]"), "")
+                .replace(NON_ALPHANUMERIC, "")
 
             if (latin.endsWith("ad") && latin.length > 2) {
                 val withoutPromoSuffix = latin.removeSuffix("ad")
@@ -98,6 +102,6 @@ class AlJaziraBankDetector : BankDetector {
                 .replace('آ', 'ا')
                 .replace('ى', 'ي')
                 .replace('ة', 'ه')
-                .replace(Regex("[\\s\\-_.]+"), "")
+                .replace(SENDER_SEPARATORS, "")
     }
 }

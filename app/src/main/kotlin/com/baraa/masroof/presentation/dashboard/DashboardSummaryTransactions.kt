@@ -1,7 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.presentation.common.MasroofSectionHeader
-import com.baraa.masroof.presentation.dashboard.AccountTransactionPresentation.matchesAccountContainer
 
 import com.baraa.masroof.ui.theme.MasroofSpacing
 
@@ -14,14 +13,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.CardTransactionInvolvementResolver
-import com.baraa.masroof.application.dashboard.CurrentAccountTransactionScope
-import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
-import com.baraa.masroof.domain.ids.FinancialContainerIdParser
+import com.baraa.masroof.application.dashboard.EntityTransactionScope
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanType
 
+/** Thin mapping of [EntityTransactionScope] decisions onto preview rows. */
 object DashboardSummaryTransactionFilter {
     fun forAccount(
         transactions: List<TransactionPreviewUi>,
@@ -29,16 +26,11 @@ object DashboardSummaryTransactionFilter {
         maskedNumber: String,
         involvementByTransactionId: Map<String, Set<String>> = emptyMap(),
     ): List<TransactionPreviewUi> {
-        val containerId = FinancialContainerIdFactory.accountId(bank, maskedNumber)
-        val last4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(listOf(maskedNumber))
+        val account = EntityTransactionScope.account(bank, maskedNumber)
         return transactions.mapNotNull { tx ->
-            val involvesAccount = matchesAccountContainer(tx.sourceContainerId, containerId, last4s) ||
-                matchesAccountContainer(tx.destinationContainerId, containerId, last4s) ||
-                involvementByTransactionId[tx.id].orEmpty().any { involvedId ->
-                    matchesAccountContainer(involvedId, containerId, last4s)
-                }
-            if (!involvesAccount) return@mapNotNull null
-            val direction = AccountTransactionPresentation.directionForAccount(tx, containerId, last4s)
+            if (!EntityTransactionScope.involvesAccount(account, tx.sourceContainerId, tx.destinationContainerId,
+                    involvementByTransactionId[tx.id].orEmpty())) return@mapNotNull null
+            val direction = AccountTransactionPresentation.directionForAccount(tx, account)
             if (direction == tx.direction) tx else tx.copy(direction = direction)
         }
     }
@@ -48,13 +40,8 @@ object DashboardSummaryTransactionFilter {
         bank: Bank,
         loanType: LoanType,
         involvementByTransactionId: Map<String, Set<String>> = emptyMap(),
-    ): List<TransactionPreviewUi> {
-        val loanContainerId = FinancialContainerIdFactory.loanId(bank, loanType)
-        return transactions.filter { tx ->
-            loanContainerId in involvementByTransactionId[tx.id].orEmpty() ||
-                (tx.type == FinancialTransactionType.LOAN_REPAYMENT &&
-                    tx.destinationContainerId == loanContainerId)
-        }
+    ): List<TransactionPreviewUi> = transactions.filter { tx ->
+        EntityTransactionScope.involvesLoan(bank, loanType, tx.type, tx.destinationContainerId, involvementByTransactionId[tx.id].orEmpty())
     }
 
     fun forDebitCard(
@@ -62,11 +49,8 @@ object DashboardSummaryTransactionFilter {
         bank: Bank,
         last4: String,
         debitSpendInvolvementByTransactionId: Map<String, Set<String>>,
-    ): List<TransactionPreviewUi> {
-        val cardKey = CardTransactionInvolvementResolver.cardKey(bank.id, last4)
-        return transactions.filter { tx ->
-            cardKey in debitSpendInvolvementByTransactionId[tx.id].orEmpty()
-        }
+    ): List<TransactionPreviewUi> = transactions.filter { tx ->
+        EntityTransactionScope.involvesDebitCard(bank, last4, debitSpendInvolvementByTransactionId[tx.id].orEmpty())
     }
 
     fun forCard(
@@ -74,29 +58,9 @@ object DashboardSummaryTransactionFilter {
         bank: Bank,
         last4: String,
         cardInvolvementByTransactionId: Map<String, Set<String>> = emptyMap(),
-    ): List<TransactionPreviewUi> {
-        val cardContainerId = FinancialContainerIdFactory.cardId(bank, last4)
-        val bankPrefix = "card:${bank.id}:"
-        val cardKey = CardTransactionInvolvementResolver.cardKey(bank.id, last4)
-        return transactions.filter { tx ->
-            if (cardKey in cardInvolvementByTransactionId[tx.id].orEmpty()) {
-                return@filter true
-            }
-            if (tx.sourceContainerId == cardContainerId || tx.destinationContainerId == cardContainerId) {
-                return@filter true
-            }
-            if (tx.cardLast4 != last4) return@filter false
-            val sourceBankId = FinancialContainerIdParser.cardBankId(tx.sourceContainerId)
-            val destinationBankId = FinancialContainerIdParser.cardBankId(tx.destinationContainerId)
-            if (sourceBankId != null && sourceBankId != bank.id) return@filter false
-            if (destinationBankId != null && destinationBankId != bank.id) return@filter false
-            when {
-                tx.sourceContainerId?.startsWith(bankPrefix) == true -> true
-                tx.destinationContainerId?.startsWith(bankPrefix) == true -> true
-                sourceBankId == null && destinationBankId == null -> true
-                else -> false
-            }
-        }
+    ): List<TransactionPreviewUi> = transactions.filter { tx ->
+        EntityTransactionScope.involvesCard(bank, last4, tx.sourceContainerId, tx.destinationContainerId, tx.cardLast4,
+            cardInvolvementByTransactionId[tx.id].orEmpty())
     }
 }
 

@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.detekt)
 }
 
 android {
@@ -20,4 +21,13 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.material3)
     testImplementation(libs.junit)
+    detektPlugins(libs.detekt.formatting)
 }
+
+detekt {
+    config.setFrom("$rootDir/detekt.yml")
+    baseline = file("detekt-baseline.xml")
+    buildUponDefaultConfig = false
+    parallel = true
+}
+

@@ -62,7 +62,8 @@ object AnalyticsNotifications {
             })
             val notification = NotificationCompat.Builder(context, CHANNEL).setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle(title).setContentText(row.title.ifBlank { context.getString(R.string.lab_analysis_title) })
-                .setContentIntent(pending).setOnlyAlertOnce(true).setAutoCancel(true).build()
+                .setContentIntent(pending).setOnlyAlertOnce(true).setAutoCancel(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).build()
             try { manager.notify("masroof-analysis", row.id.hashCode(), notification) } catch (_: SecurityException) { continue }
             database.analytics().alerts(listOf(row.copy(lastNotified = now)))
         }

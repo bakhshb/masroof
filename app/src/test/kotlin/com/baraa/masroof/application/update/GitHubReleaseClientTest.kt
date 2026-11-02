@@ -29,6 +29,17 @@ class GitHubReleaseClientTest {
         assertEquals("version.json asset not found in recent releases", result.exceptionOrNull()?.message)
     }
 
+    @Test
+    fun networkFailure_isReturnedAsIoFailure() {
+        val offline = OkHttpClient.Builder().addInterceptor { throw java.io.IOException("offline") }.build()
+
+        for (channel in UpdateChannel.entries) {
+            val result = GitHubReleaseClient(offline, owner = "test", repo = "masroof").fetchLatestManifest(channel)
+
+            assertTrue(result.exceptionOrNull() is java.io.IOException)
+        }
+    }
+
     private fun client(manifests: List<UpdateManifest>): GitHubReleaseClient {
         val httpClient = OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()

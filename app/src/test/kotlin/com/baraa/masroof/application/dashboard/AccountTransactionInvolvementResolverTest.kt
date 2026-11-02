@@ -31,7 +31,7 @@ class AccountTransactionInvolvementResolverTest {
             firstSeenRawSmsId = null,
             lastSeenRawSmsId = null,
         )
-        val containerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
+        val containerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
         val tx = tx(
             id = "cash",
             type = FinancialTransactionType.CASH_WITHDRAWAL,
@@ -63,7 +63,7 @@ class AccountTransactionInvolvementResolverTest {
             firstSeenRawSmsId = null,
             lastSeenRawSmsId = null,
         )
-        val containerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
+        val containerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
         val tx = tx(
             id = "cash-atm",
             type = FinancialTransactionType.CASH_WITHDRAWAL,
@@ -95,7 +95,7 @@ class AccountTransactionInvolvementResolverTest {
             firstSeenRawSmsId = null,
             lastSeenRawSmsId = null,
         )
-        val otherAccount = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
+        val otherAccount = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
         val tx = tx(
             id = "other",
             type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,

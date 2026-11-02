@@ -14,7 +14,7 @@ class ConfiguredPatternAdapters(private val store: MessagePatternStore,
     private val assistedInterpret: ((MessageInput, PatternFactInterpreter, String) -> Interpretation)? = null) {
     fun snapshot(): List<BankSmsAdapter> {
         val configuration = store.load()
-        val interpreter = PatternFactInterpreter(configuration)
+        val interpreter = PatternFactInterpreter.of(configuration)
         val assisted = assistedBanks(configuration)
         return configuration.banks.sortedBy { it.bankId }.map { bank ->
             MessagePatternSmsAdapter(bank, interpreter, assistedInterpret?.takeIf { bank.bankId in assisted }

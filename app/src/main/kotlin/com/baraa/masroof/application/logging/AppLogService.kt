@@ -201,8 +201,11 @@ class AppLogService(
         /** `IllegalStateException: Snapshot failed integrity_check ← SQLiteException`; digit runs are masked. */
         fun describe(error: Throwable): String = buildString {
             append(error.javaClass.simpleName)
-            error.message?.trim()?.takeIf { it.isNotEmpty() }?.let { append(": ").append(it.replace(Regex("[0-9]{4,}"), "####").take(160)) }
+            error.message?.trim()?.takeIf { it.isNotEmpty() }?.let { append(": ").append(it.replace(LONG_DIGIT_RUN, "####").take(160)) }
             error.cause?.takeIf { it !== error }?.let { append(" ← ").append(it.javaClass.simpleName) }
         }
     }
+
 }
+
+private val LONG_DIGIT_RUN = Regex("[0-9]{4,}")

@@ -173,7 +173,7 @@ private fun loanDisplayLabel(loan: ManagedLoanUi): String {
 }
 
 @Composable
-private fun loanTypeLabel(loanType: LoanType): String =
+internal fun loanTypeLabel(loanType: LoanType): String =
     when (loanType) {
         LoanType.PERSONAL -> stringResource(R.string.settings_loan_type_personal)
         LoanType.AUTO -> stringResource(R.string.settings_loan_type_auto)

@@ -62,16 +62,11 @@ data class OwnedAccount(
             summary: CurrentAccountSummary,
         ): OwnedAccount =
             OwnedAccount(
-                id = accountIdFromMasked(maskedNumber),
+                id = RegistryDisplayLabels.accountLast4(maskedNumber),
                 bank = bank,
                 maskedNumber = maskedNumber,
                 containerId = FinancialContainerIdFactory.accountId(bank, maskedNumber),
                 summary = summary,
             )
-
-        private fun accountIdFromMasked(maskedNumber: String): String {
-            val trimmed = maskedNumber.trim()
-            return if (trimmed.length <= 4) trimmed else trimmed.takeLast(4)
-        }
     }
 }

@@ -23,6 +23,10 @@ interface RawSmsDao {
     @Query("SELECT * FROM raw_sms WHERE id IN (:ids)")
     suspend fun getByIds(ids: List<String>): List<RawSmsEntity>
 
+    /** Callers keep [ids] under [RoomBatch.MAX_BIND_ARGS]. */
+    @Query("SELECT id, receivedAtEpochMillis FROM raw_sms WHERE id IN (:ids)")
+    suspend fun receivedAtByIds(ids: List<String>): List<RawSmsReceivedAt>
+
     @Query("SELECT EXISTS(SELECT 1 FROM raw_sms WHERE id = :id)")
     suspend fun existsById(id: String): Boolean
 
@@ -129,3 +133,6 @@ interface RawSmsDao {
     @Query("SELECT COUNT(*) FROM raw_sms")
     suspend fun count(): Int
 }
+
+/** Projection of [com.baraa.masroof.data.room.entity.RawSmsEntity] for time-only lookups. */
+data class RawSmsReceivedAt(val id: String, val receivedAtEpochMillis: Long)

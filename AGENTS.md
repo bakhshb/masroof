@@ -18,7 +18,7 @@
 
 **Financial core:** `finance-core` owns production `core.money`, financial value models, period/time policies, container/transaction identities, financial classification/impact, transfer matching/assembly and statement matching. Their original `com.baraa.masroof.core.money` / `com.baraa.masroof.domain.*` packages are preserved. Do not recreate these implementations in `app`. Core receives facts and returns in-memory decisions; repository access, ownership discovery/confirmation, reconciliation writes/retries, CSV I/O and dashboard aggregation remain in `app`. `bank-engine` may import only the existing `finance.value` contracts, never the financial decision policies. Both current Money contracts remain distinct. Extraction adds no schema migration, backfill or reparse.
 
-**ViewModels:** Call `application/*Workflow` facades only. No direct use of `domain.repository`, `domain.ownership`, or `domain.period` from presentation.
+**ViewModels:** Call `application` types only (workflows and services). No direct use of `domain.repository`, `domain.ownership`, or `domain.period` from ViewModels. No presentation file uses `domain.ids`, `domain.rules`, `domain.repository`, `domain.ownership`, `domain.assembly` or `domain.matching` (enforced in `PackageDependencyRulesTest`).
 
 **SMS:** Live intake = `IncomingSmsReceiver` → `LiveSmsIntake` → `CaptureBankSmsUseCase` (durable `RawSms`) → `LiveSmsWorkScheduler` → `LiveSmsProcessingWorker` → `ProcessStoredSmsUseCase`. Live `receivedAt` is the PDU service-center timestamp when valid (`LiveReceiptTimestamp`, earliest part for multipart); otherwise the injected device clock. Work input is the rawSmsId only — never SMS body/OTP text. Historical scan = `application/sms/HistoricalSmsScanner` → `HistoricalSmsBatchProcessor` (parse each row, then one discovery/reconcile/review pass per batch — never reconcile per historical SMS). `ProcessRawSmsUseCase` is only a capture-then-process facade. Do not add orchestration under `sms/`.
 
@@ -59,7 +59,7 @@
 - All money totals live in `application/dashboard/*Builder` and `*Calculator`.
 - Compose screens in `presentation/dashboard` must display pre-computed values only.
 - Do not sum transactions, classify Mada vs credit, or aggregate spending inside Composables.
-- Row-level facts (card last4, effective type, SAR equivalent) and owned account container ids come from `DashboardOverview.transactionFacts` / `ownedAccountContainerIds`; ViewModels and navigation never build container ids or call conversion helpers (enforced in `PackageDependencyRulesTest`).
+- Row-level facts (card last4, effective type, SAR equivalent) and owned account container ids come from `DashboardOverview.transactionFacts` / `ownedAccountContainerIds`; presentation never builds or parses container ids or calls conversion helpers; detail-screen scoping lives in `application/dashboard/EntityTransactionScope` (enforced in `PackageDependencyRulesTest`).
 - Classify card type via `ParsedEventDetails.cardSmsChannel` — not SMS body text in dashboard code. AlJazira credit includes an unlabeled `بطاقة` / `card` line plus available balance. A card line alone stays null. Debit markers still win.
 - Use helpers such as `CreditFacilitiesOverview.aggregateCreditSalaryPeriodSpending()`, `DebitCardOverview.salaryPeriodSpendingNet`, and `AccountsSummary.totalInflow`.
 - Credit facility due is one value per facility (primary + supplementaries share the statement due).

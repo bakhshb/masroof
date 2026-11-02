@@ -43,9 +43,8 @@ class FrankfurterForeignSarRateProvider(
                     if (!response.isSuccessful) return@runCatching null
                     val body = response.body?.string() ?: return@runCatching null
                     val json = JSONObject(body)
-                    if (!json.has("rate")) return@runCatching null
-                    val sar = json.getDouble("rate")
-                    BigDecimal.valueOf(sar)
+                    // A stored rate is never replaced, so only a positive number may be returned.
+                    json.optString("rate").toBigDecimalOrNull()?.takeIf { it.signum() > 0 }
                 }
             }.getOrNull()
         }

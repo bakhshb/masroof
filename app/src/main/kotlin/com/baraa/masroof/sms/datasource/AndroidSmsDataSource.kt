@@ -24,8 +24,10 @@ class AndroidSmsDataSource(
         val selection: String?
         val selectionArgs: Array<String>?
         if (receivedAfter != null) {
+            // The bound is on the stored receipt (carrier) time, which can follow DATE by up to the carrier skew.
+            // Query from earlier; the scanner applies the exact receipt-time bound to each row.
             selection = "${Telephony.Sms.DATE} >= ?"
-            selectionArgs = arrayOf(receivedAfter.toEpochMilli().toString())
+            selectionArgs = arrayOf(receivedAfter.minus(LiveReceiptTimestamp.MAX_CARRIER_SKEW).toEpochMilli().toString())
         } else {
             selection = null
             selectionArgs = null

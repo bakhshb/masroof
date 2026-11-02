@@ -1,0 +1,80 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LargeClass:AlJaziraParserRegressionTest.kt:AlJaziraParserRegressionTest</ID>
+    <ID>LargeClass:AppContainer.kt:AppContainer</ID>
+    <ID>LargeClass:CommitmentsOverviewBuilderTest.kt:CommitmentsOverviewBuilderTest</ID>
+    <ID>LargeClass:CurrentAccountSummaryCalculatorTest.kt:CurrentAccountSummaryCalculatorTest</ID>
+    <ID>LargeClass:DashboardViewModelTest.kt:DashboardViewModelTest</ID>
+    <ID>LargeClass:DatabaseBackupService.kt:DatabaseBackupService : DatabaseBackupGateway</ID>
+    <ID>LargeClass:DatabaseRestoreRecovery.kt:DatabaseRestoreRecovery</ID>
+    <ID>LargeClass:DatabaseRestoreRecoveryTest.kt:DatabaseRestoreRecoveryTest</ID>
+    <ID>LargeClass:IntraBankSelfTransferReconciliationTest.kt:IntraBankSelfTransferReconciliationTest</ID>
+    <ID>LargeClass:PatternProcessingMilestoneTest.kt:PatternProcessingMilestoneTest</ID>
+    <ID>LargeClass:ProcessRawSmsUseCaseTest.kt:ProcessRawSmsUseCaseTest</ID>
+    <ID>LargeClass:ReviewWorkflowServiceTest.kt:ReviewWorkflowServiceTest</ID>
+    <ID>LargeClass:ScopedReconciliationTest.kt:ScopedReconciliationTest</ID>
+    <ID>LargeClass:SettingsViewModel.kt:SettingsViewModel : ViewModel</ID>
+    <ID>LargeClass:SettingsViewModelTest.kt:SettingsViewModelTest</ID>
+    <ID>LargeClass:StatementReconciliationServiceTest.kt:StatementReconciliationServiceTest</ID>
+    <ID>LargeClass:TransactionReconciliationService.kt:TransactionReconciliationService</ID>
+    <ID>LargeClass:TransactionReconciliationServiceTest.kt:TransactionReconciliationServiceTest : ReconciliationTestFixture</ID>
+    <ID>LongMethod:AccountFlowClassifier.kt:AccountFlowClassifier$internal fun classifyWithAmount: List&lt;FlowAssignment&gt;</ID>
+    <ID>LongMethod:AnalysisExplanationViews.kt:@Composable internal fun AnalysisDataQuality</ID>
+    <ID>LongMethod:AnalyticsScreen.kt:@Composable fun AnalyticsRoute</ID>
+    <ID>LongMethod:AnalyticsWorkflow.kt:AnalyticsWorkflow$private suspend fun refreshOnWorker</ID>
+    <ID>LongMethod:AnalyticsWorkflow.kt:AnalyticsWorkflow$private suspend fun source: Source</ID>
+    <ID>LongMethod:BackupArchiveValidatorTest.kt:BoundedZipImportTest$@Test fun unsafeArchives_doNotCloseOrModifyTheLiveDatabase</ID>
+    <ID>LongMethod:BankInterpretationService.kt:BankInterpretationService$suspend fun synchronizeFeedback: String?</ID>
+    <ID>LongMethod:CanonicalCsvStatementParser.kt:CanonicalCsvStatementParser$private fun parseText: ParsedBankStatement</ID>
+    <ID>LongMethod:ConsistentBackupSnapshotTest.kt:ConsistentBackupSnapshotTest$private suspend fun assertConcurrentExport</ID>
+    <ID>LongMethod:CreditCardOverviewBuilder.kt:CreditCardOverviewBuilder$fun build: CreditCardsOverview</ID>
+    <ID>LongMethod:CreditCardOverviewBuilderTest.kt:CreditCardOverviewBuilderTest$@Test fun cardDueFromStatementOnly_notPurchaseOutstanding</ID>
+    <ID>LongMethod:CreditFacilityOverview.kt:CreditFacilityOverviewBuilder$fun build: CreditFacilitiesOverview</ID>
+    <ID>LongMethod:DashboardEvidenceQueriesTest.kt:DashboardEvidenceQueriesTest$@Test fun chronologicalFacts_ignoreLexicalIds_andDoNotBorrowFactsAfterAsOf</ID>
+    <ID>LongMethod:DashboardEvidenceQueriesTest.kt:DashboardEvidenceQueriesTest$@Test fun creditAndDebitEvidenceQueries_useExistingCardIndex</ID>
+    <ID>LongMethod:DashboardScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DashboardScreen</ID>
+    <ID>LongMethod:DashboardViewModel.kt:DashboardViewModel$private fun load</ID>
+    <ID>LongMethod:DatabaseBackupImportTest.kt:DatabaseBackupImportTest$@Test fun import_terminatedAfterEveryStage_restartsOntoOriginalOrCommittedDatabase</ID>
+    <ID>LongMethod:DatabaseBackupService.kt:DatabaseBackupService$private fun importOnIo: BackupImportOutcome</ID>
+    <ID>LongMethod:DesignCatalogScreen.kt:@Composable private fun ComponentSection</ID>
+    <ID>LongMethod:HistoricalSmsScanner.kt:HistoricalSmsScanner$private suspend fun scanOnDispatcher: SmsScanResult</ID>
+    <ID>LongMethod:IntegrityLedger.kt:internal suspend fun assertFinancialInvariants</ID>
+    <ID>LongMethod:LongPullToRefreshBox.kt:@Composable fun LongPullToRefreshBox</ID>
+    <ID>LongMethod:MainActivity.kt:MainActivity$override fun onCreate</ID>
+    <ID>LongMethod:MasroofBottomSheet.kt:@Composable fun MasroofBottomSheet</ID>
+    <ID>LongMethod:MasroofRoot.kt:@Composable private fun MasroofContent</ID>
+    <ID>LongMethod:MessagePatternsScreen.kt:@Composable fun MessagePatternsScreen</ID>
+    <ID>LongMethod:OnboardingScreen.kt:@Composable private fun OwnershipStep</ID>
+    <ID>LongMethod:PatternFinancialApprovalScreen.kt:@Composable internal fun PatternFinancialApprovalScreen</ID>
+    <ID>LongMethod:PatternTeachingScreen.kt:@Composable internal fun PatternTeachingScreen</ID>
+    <ID>LongMethod:ReviewScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ReviewDetailScreen</ID>
+    <ID>LongMethod:ReviewScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ReviewListScreen</ID>
+    <ID>LongMethod:ReviewWorkflowService.kt:ReviewWorkflowService$suspend fun resolveAsFinancialType: ReviewWorkflowResult</ID>
+    <ID>LongMethod:ReviewWorkflowService.kt:ReviewWorkflowService$suspend fun resolveSelfTransferPair: ReviewWorkflowResult</ID>
+    <ID>LongMethod:ReviewWorkflowService.kt:ReviewWorkflowService$suspend fun resolveTransferAsExternal: ReviewWorkflowResult</ID>
+    <ID>LongMethod:ReviewWorkflowServiceTest.kt:ReviewWorkflowServiceTest$@Test fun manualResolution_matchesAutomaticAlJaziraTimeAroundSalaryBoundary</ID>
+    <ID>LongMethod:ScopedReconciliationTest.kt:ScopedReconciliationTest$@Test fun boundedQueries_keepOnlyUnlinkedTransfersAndTypedRowsInsideTheRange</ID>
+    <ID>LongMethod:ScopedReconciliationTest.kt:ScopedReconciliationTest$private suspend fun ambiguousLocalOutcome: AmbiguousLocalOutcome</ID>
+    <ID>LongMethod:SettingsAboutScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsAboutScreen</ID>
+    <ID>LongMethod:SettingsBankAccountsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsBankAccountsScreen</ID>
+    <ID>LongMethod:SettingsBankCardsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsBankCardsScreen</ID>
+    <ID>LongMethod:SettingsBankLoansScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsBankLoansScreen</ID>
+    <ID>LongMethod:SettingsCommitmentEditorScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsCommitmentEditorScreen</ID>
+    <ID>LongMethod:SettingsCommitmentsScreen.kt:@Composable fun SettingsCommitmentsScreen</ID>
+    <ID>LongMethod:SettingsDataBackupScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsDataBackupScreen</ID>
+    <ID>LongMethod:SettingsDeleteDialog.kt:@Composable fun SettingsDeleteDialog</ID>
+    <ID>LongMethod:SettingsLogsScreen.kt:@Composable internal fun SettingsLogsContent</ID>
+    <ID>LongMethod:SettingsScreen.kt:@Composable fun SettingsRoute</ID>
+    <ID>LongMethod:StatementReconciliationScreen.kt:@Composable private fun ReportBody</ID>
+    <ID>LongMethod:StcSingleAccountJourneyTest.kt:StcSingleAccountJourneyTest$@Test fun importedMessagesUseTheExplicitOwnAccountWhileCounterpartyNumbersVaryAndDashboardShowsThePostedFlows</ID>
+    <ID>LongMethod:TransactionDetailScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun TransactionDetailScreen</ID>
+    <ID>LongMethod:TransactionListScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun TransactionListScreen</ID>
+    <ID>LongMethod:TransactionReclassificationService.kt:TransactionReclassificationService$suspend fun reclassify: ReclassificationResult</ID>
+    <ID>LongMethod:TransactionReconciliationService.kt:TransactionReconciliationService$private suspend fun reconcileRecordsDetailed: ReconciliationReport</ID>
+    <ID>LongMethod:TransactionReconciliationService.kt:TransactionReconciliationService$private suspend fun upgradeStaleExternalPairs: UpgradePassResult</ID>
+    <ID>LongMethod:TransactionReconciliationService.kt:TransactionReconciliationService$private suspend fun upgradeStaleFeeFinancingInstallments: UpgradePassResult</ID>
+    <ID>LongMethod:TransactionSarEquivalentResolver.kt:TransactionSarEquivalentResolver$suspend fun resolve: Map&lt;String, SarEquivalentResolution&gt;</ID>
+  </CurrentIssues>
+</SmellBaseline>

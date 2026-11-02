@@ -16,6 +16,8 @@ data class LoanOverview(
     val latestInstallmentAsOf: Instant? = null,
     val salaryPeriodPayment: SignedMoneyAmount,
     val salaryPeriodLabel: String?,
+    /** The user's name for the loan; null means screens show the localized loan type. */
+    val customName: String? = null,
 )
 
 data class LoansOverview(

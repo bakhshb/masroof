@@ -27,11 +27,13 @@ class CardsDashboardProjection(
             zoneId = zoneId,
             periodEndExclusive = periodEndExclusive,
         )
-        val cardQueryStart = minOf(
-            FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zoneId),
-            statementStart,
-        )
-        val cardTransactions = financialTransactionRepository.listOccurredBetween(
+        val periodStart = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zoneId)
+        val cardQueryStart = minOf(periodStart, statementStart)
+        // The period rows are already loaded; read only the earlier statement days. Both lists are newest first.
+        val cardTransactions = periodRows?.let { rows ->
+            if (cardQueryStart < periodStart) rows + financialTransactionRepository.listOccurredBetween(cardQueryStart, periodStart)
+            else rows
+        } ?: financialTransactionRepository.listOccurredBetween(
             startInclusive = cardQueryStart,
             endExclusive = periodEndExclusive,
         )

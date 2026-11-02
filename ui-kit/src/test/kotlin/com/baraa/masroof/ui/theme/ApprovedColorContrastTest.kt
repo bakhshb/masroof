@@ -29,6 +29,23 @@ class ApprovedColorContrastTest {
         }
     }
 
+    @Test
+    fun primaryPairsSupportLargeText_inLightAndDarkModes() {
+        listOf(
+            MasroofLightColors.OnPrimaryContainer to MasroofLightColors.PrimaryContainer,
+            MasroofLightColors.OnPrimary to MasroofLightColors.Primary,
+            MasroofDarkColors.OnPrimaryContainer to MasroofDarkColors.PrimaryContainer,
+            MasroofDarkColors.OnPrimary to MasroofDarkColors.Primary,
+        ).forEach { (foreground, background) ->
+            assertTrue("Primary text must reach 3:1", contrast(background, foreground) >= 3.0)
+        }
+    }
+
+    @Test
+    fun darkOnSurface_supportsNormalTextOnCardSurface() {
+        assertTrue(contrast(MasroofDarkColors.SurfaceContainer, MasroofDarkColors.OnSurface) >= 4.5)
+    }
+
     private fun contrast(first: Color, second: Color): Double {
         val a = luminance(first); val b = luminance(second)
         return (maxOf(a, b) + 0.05) / (minOf(a, b) + 0.05)

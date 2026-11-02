@@ -4,8 +4,8 @@ Captured before changing the production interpreter, adapter, financial policies
 or schema, from the production sources at `daa63747` (2026-10-26).
 The experiment branch adds test tools; it does not replace that interpreter.
 
-- `aljazira-parse-v1.json`: all 74 inputs selected by `NewEngineFixtureTest.cases()`,
-  including the ten reference inputs; 2,690 input/detection/outcome/field checks.
+- `existing-bank-parse-snapshot.txt`: the frozen parse outcome of every AlJazira/STC
+  fixture body, checked by `ExistingBankParseSnapshotTest`.
 - `aljazira-financial-v1.json`: seven existing independent golden-ledger scenarios;
   834 persisted-fact/link/review/registry/dashboard checks. Both isolated worlds
   must also satisfy the existing independent expected financial values.
@@ -18,7 +18,7 @@ those UUIDs are normalized across worlds. Each world's exact registry IDs must
 remain unchanged after repeat import. Transaction identities and evidence links
 are compared exactly. It does not install one APK over another.
 
-Run `:app:testDebugUnitTest --tests '*AlJazira*ParityTest'` on the documented
+Run `:app:testDebugUnitTest --tests '*AlJaziraFinancialParityTest' --tests '*ExistingBankParseSnapshotTest'` on the documented
 JDK 27 Gradle runtime; the Android test task launches the installed JDK 21 toolchain.
 Reports go to `app/build/reports/pattern-parity/`; tests never update these files.
 A changed corpus or baseline requires explicit review, not automatic regeneration
@@ -30,10 +30,9 @@ production parity. Device upgrade, backup/restore and learned-pattern cutover
 remain separate acceptance gates in
 [`docs/ALJAZIRA_SHARED_PATTERNS.md`](../../../../../../docs/ALJAZIRA_SHARED_PATTERNS.md).
 
-The candidate now reads `src/main/assets/bank-patterns/BANK_ALJAZIRA.rules.json`;
-the reference retains the original compiled profile. Both match the frozen files.
-`BankRuleProfileCodecTest` additionally requires complete profile equality and
-the exact same refresh fingerprint before the production container loads the asset.
+The candidate reads `src/main/assets/bank-patterns/BANK_ALJAZIRA.patterns.json`.
+`BankRuleProfileCodecTest` checks that the bundled definitions round-trip through the
+codec and keep the reference refresh fingerprint.
 
 On this host, mixed Robolectric test classes can fail loading native SQLite.
 The qualified run keeps native SQLite and the original assertions, and isolates

@@ -20,7 +20,7 @@ class RolePatternsTest {
         assertEquals("11.00", result.facts.amount!!.amount.toPlainString())
         assertEquals(BankId("BANK_OTHER"), result.facts.card!!.bank)
         assertTrue(result.patternProvenance!!.roleProfile)
-        assertEquals("bank.purchase", result.patternProvenance!!.patternId)
+        assertEquals("bank.purchase", result.patternProvenance.patternId)
     }
 
     @Test fun disabledRolesDoNotLoseSecurityOrCompetingFamilyEvidence() {

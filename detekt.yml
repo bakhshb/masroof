@@ -19,3 +19,13 @@ ktlint:
   UnusedImports:
     active: true
     autoCorrect: false
+
+# Size limits block new oversized code; existing offenders are listed in each module's detekt-baseline.xml.
+complexity:
+  active: true
+  LongMethod:
+    active: true
+    allowedLines: 80
+  LargeClass:
+    active: true
+    allowedLines: 600

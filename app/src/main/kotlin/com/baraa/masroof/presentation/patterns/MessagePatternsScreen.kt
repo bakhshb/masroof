@@ -77,11 +77,12 @@ fun MessagePatternsScreen(workflow: MessagePatternsWorkflow, initialBankId: Stri
         if (busy) return
         when {
             history -> history = false
-            approving -> approving = false
+            // Leaving the teach-then-approve flow drops the built-in it would replace, so a later approval cannot switch it off.
+            approving -> { approving = false; replacingPattern = null }
             selectedPattern != null && source != null -> onBack()
-            selectedPattern != null -> { selectedPattern = null; savedTeaching = false; savedApproval = false; applied = null }
+            selectedPattern != null -> { selectedPattern = null; savedTeaching = false; savedApproval = false; applied = null; replacingPattern = null }
             teaching && source != null -> onBack()
-            teaching -> teaching = false
+            teaching -> { teaching = false; replacingPattern = null }
             showPending -> showPending = false
             addingBank -> addingBank = false
             selectedBank != null && bankScope == null -> selectedBank = null

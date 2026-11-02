@@ -37,6 +37,8 @@ data class DashboardProjectionContext(
     val displayLocale: Locale,
     val zoneId: ZoneId,
     val primaryCurrency: Currency,
+    /** The stored period rows as read, newest first; null when the caller did not supply them. */
+    val periodRows: List<FinancialTransaction>? = null,
 ) {
     val parsedRecords: List<ParsedEventRecord> get() = evidence.parsedRecords
     val rawSmsById: Map<String, RawSms> get() = evidence.rawSmsById

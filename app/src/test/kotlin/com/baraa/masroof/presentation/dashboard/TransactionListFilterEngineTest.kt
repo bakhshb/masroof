@@ -240,7 +240,7 @@ class TransactionListFilterEngineTest {
             preview(type = FinancialTransactionType.EXPENSE, amount = "50", sourceAccountId = otherId),
         )
 
-        val available = TransactionListPresentationMapper.project(transactions = txs, ownedAccountContainerIds = setOf(ownedId!!), accountInvolvementByTransactionId = mapOf("cash" to setOf(ownedId)), filter = TransactionListFilterState()).availableAccounts
+        val available = TransactionListPresentationMapper.project(transactions = txs, ownedAccountContainerIds = setOf(ownedId), accountInvolvementByTransactionId = mapOf("cash" to setOf(ownedId)), filter = TransactionListFilterState()).availableAccounts
 
         assertEquals(listOf(ownedId), available)
     }
@@ -254,7 +254,7 @@ class TransactionListFilterEngineTest {
         val txs = listOf(
             preview(id = "cash", type = FinancialTransactionType.CASH_WITHDRAWAL, amount = "100"),
         )
-        val result = TransactionListPresentationMapper.project(transactions = txs, filter = TransactionListFilterState(accountContainerIds = setOf(accountId)), accountInvolvementByTransactionId = mapOf("cash" to setOf(accountId!!))).result
+        val result = TransactionListPresentationMapper.project(transactions = txs, filter = TransactionListFilterState(accountContainerIds = setOf(accountId)), accountInvolvementByTransactionId = mapOf("cash" to setOf(accountId))).result
 
         assertEquals(listOf("cash"), result.transactions.map { it.id })
     }
@@ -271,7 +271,7 @@ class TransactionListFilterEngineTest {
         )
         assertEquals(
             listOf(accountId),
-            TransactionListPresentationMapper.project(transactions = txs, ownedAccountContainerIds = setOf(accountId!!), filter = TransactionListFilterState()).availableAccounts,
+            TransactionListPresentationMapper.project(transactions = txs, ownedAccountContainerIds = setOf(accountId), filter = TransactionListFilterState()).availableAccounts,
         )
     }
 

@@ -159,7 +159,7 @@ class ScopedMutationReconciliationTest {
         assertEquals(ReviewStatus.RESOLVED, success.review.status)
         assertEquals(ReviewResolutionKind.USER_CORRECTION, success.review.resolutionKind)
         assertEquals(FinancialTransactionType.EXPENSE, success.transaction!!.type)
-        assertEquals(money("51.99"), success.transaction!!.amount)
+        assertEquals(money("51.99"), success.transaction.amount)
         assertNull(transactions.findByRawSmsId("sms-old"))
         assertNoGlobalScan()
         assertTrue(parsed.loadedRawSmsIdSets.flatten().contains("sms-buy"))

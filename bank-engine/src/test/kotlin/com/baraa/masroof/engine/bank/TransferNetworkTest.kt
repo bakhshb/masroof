@@ -108,7 +108,7 @@ class TransferNetworkTest {
         val r = parse(body)
         assertEquals(ParseStatus.SUCCESS, r.status)
         assertEquals(local, r.facts.sourceAccount!!.bank); assertEquals(remote, r.facts.destinationAccount!!.bank)
-        assertEquals("1234", r.facts.sourceAccount!!.maskedNumber); assertEquals("1234", r.facts.destinationAccount!!.maskedNumber)
+        assertEquals("1234", r.facts.sourceAccount.maskedNumber); assertEquals("1234", r.facts.destinationAccount.maskedNumber)
         assertTrue(r.evidence.any { it.field == "destinationBank" && it.slice(input(body)) == "بنك المستفيد: البنك الآخر" })
         assertTrue(r.evidence.all { it.end <= body.length })
     }

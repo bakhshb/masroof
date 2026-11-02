@@ -286,6 +286,13 @@ class TransactionReconstructionFixtureTest {
             return delegate.listByRawSmsIds(rawSmsIds)
         }
 
+        // Transaction reconstruction reads only the two ids it needs; it counts as the same chunked read.
+        override suspend fun listEventIdsByRawSmsIds(rawSmsIds: List<String>): List<com.baraa.masroof.data.room.dao.ParsedEventIdByRawSms> {
+            listByRawSmsIdsCalls += 1
+            rawSmsIdChunks += rawSmsIds
+            return delegate.listEventIdsByRawSmsIds(rawSmsIds)
+        }
+
         override suspend fun findByRawSmsId(rawSmsId: String): ParsedEventEntity? {
             findByRawSmsIdCalls += 1
             return delegate.findByRawSmsId(rawSmsId)

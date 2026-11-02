@@ -19,7 +19,7 @@ class IndependentRuleInterpreterTest {
         val result = parse(purchase + "\nAvailable balance: USD 120.50")
         assertEquals(ParseStatus.SUCCESS, result.status)
         assertEquals("42.35", result.facts.amount!!.amount.toPlainString())
-        assertEquals("SAR", result.facts.amount!!.currency.name)
+        assertEquals("SAR", result.facts.amount.currency.name)
         assertEquals("USD", result.facts.availableBalance!!.currency.name)
         assertEquals("1234", result.facts.card!!.last4)
         assertNull(result.facts.sourceAccount)
@@ -31,6 +31,13 @@ class IndependentRuleInterpreterTest {
         assertEquals(RuleInterpreter.VERSION, result.version.engine)
         assertTrue(result.version.rules.contains("literal-v1-r1-"))
         assertNull(result.confidence)
+    }
+
+    @Test fun maskWhoseDigitsAreAPrefix_isNeverTakenAsTheLastFour() {
+        val result = parse("Purchase\nAmount: SAR 42.35\nCard: 4567****1234\nMerchant: Synthetic Shop\n2026-10-17 13:00")
+        assertNotEquals("4567", result.facts.card?.last4)
+        assertTrue(result.facts.card == null || result.status != ParseStatus.SUCCESS, "${result.status} ${result.facts.card}")
+        assertEquals("1234", parse(purchase.replace("**1234", "1234**")).facts.card!!.last4)
     }
 
     @Test fun utf16EvidenceSurvivesEmojiArabicDigitsMarksCrLfAndCompatibilityCharacters() {
@@ -64,7 +71,7 @@ class IndependentRuleInterpreterTest {
             val r = parse("Purchase\nAmount: $value\nCard: **1234\nMerchant: Synthetic Shop\n2026-10-17 13:00")
             assertEquals(ParseStatus.SUCCESS, r.status, value)
             assertEquals("42.35", r.facts.amount!!.amount.toPlainString(), value)
-            assertEquals(code, r.facts.amount!!.currency.name, value)
+            assertEquals(code, r.facts.amount.currency.name, value)
         }
         assertEquals(1000, parse("Purchase\nAmount: 1,000.00SAR\nCard: **1234\nMerchant: Shop\n2026-10-17 13:00").facts.amount!!.amount.toInt())
         listOf("42.35SARX", "42.355SAR").forEach { value ->

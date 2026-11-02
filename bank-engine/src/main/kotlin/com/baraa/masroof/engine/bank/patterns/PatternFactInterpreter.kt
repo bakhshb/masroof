@@ -66,11 +66,15 @@ data class PatternProvenance(val configurationFingerprint: String, val patternId
 data class RoutedPreview(val interpretation: Interpretation, val matches: List<Pair<SavedMessagePattern, Preview>>)
 
 /** Immutable configuration snapshot. Routing has already selected the bank; sender detection is not repeated. */
-class PatternFactInterpreter(configuration: MessagePatternConfiguration) {
+class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
+    private val configuration get() = source
     private val snapshot = configuration.copy(banks = configuration.banks.map {
         it.copy(senders = it.senders.toList(), patterns = it.patterns.toList(), deletedPatternIds = it.deletedPatternIds.toSet())
     })
     val fingerprint: String = fingerprint(snapshot)
+
+    // The snapshot is immutable, so each bank's merged role profile is built and validated once.
+    private val roleInterpreters = java.util.concurrent.ConcurrentHashMap<String, RuleInterpreter>()
 
     fun interpretRouted(input: MessageInput, bank: BankId, familyAssist: FamilyAssist? = null): Interpretation =
         interpret(input, bank, familyAssist, null)
@@ -107,7 +111,8 @@ class PatternFactInterpreter(configuration: MessagePatternConfiguration) {
                 observe?.invoke(taught)
                 return unresolved("PATTERN_PROFILE_CONFLICT", Blocker.CONFLICTING_FACTS)
             }
-            RuleInterpreter(profile.copy(rules = profiles.flatMap { it.rules }), familyAssist).interpretRouted(input, bank)
+            roleInterpreters.getOrPut(bank.value) { RuleInterpreter(profile.copy(rules = profiles.flatMap { it.rules })) }
+                .interpretRouted(input, bank, familyAssist)
         }
         val roleMatches = roles.filter { pattern -> roleResult?.evidence?.any { it.field == "family" && it.ruleId == pattern.id } == true }
         val activeRoles = roleMatches.filter { it.enabled }
@@ -233,6 +238,15 @@ class PatternFactInterpreter(configuration: MessagePatternConfiguration) {
     }
 
     companion object {
+        @Volatile private var last: PatternFactInterpreter? = null
+
+        /**
+         * The interpreter for [configuration], reused while the caller passes the same instance. The pattern store
+         * returns one instance while its file is unchanged, so the fingerprint and compiled rules are built once.
+         */
+        fun of(configuration: MessagePatternConfiguration): PatternFactInterpreter =
+            last?.takeIf { it.source === configuration } ?: PatternFactInterpreter(configuration).also { last = it }
+
         /**
          * Fills only a role the message left empty from the user's approved link; a value the message names stays
          * the message's. Purchases and refunds take only a card, never a funding account.

@@ -142,6 +142,20 @@ class RoomFinancialTransactionRepository(
         dao.findLinkByRawSmsId(rawSmsId) != null
     }
 
+    override suspend fun getByIds(ids: Collection<String>): List<FinancialTransaction> = accessGate.withAccess {
+        reconstructBatch(RoomBatch.query(ids.distinct(), batchChunkSize) { chunk -> dao.listByIds(chunk) })
+    }
+
+    override suspend fun findByRawSmsIds(rawSmsIds: Collection<String>): Map<String, FinancialTransaction> = accessGate.withAccess {
+        val links = RoomBatch.query(rawSmsIds.distinct(), batchChunkSize) { chunk -> dao.listLinksForRawSmsIds(chunk) }
+        val byId = getByIds(links.map { it.transactionId }).associateBy { it.id }
+        links.mapNotNull { link -> byId[link.transactionId]?.let { link.rawSmsId to it } }.toMap()
+    }
+
+    override suspend fun listLinkedRawSmsIds(rawSmsIds: Collection<String>): Set<String> = accessGate.withAccess {
+        RoomBatch.query(rawSmsIds.distinct(), batchChunkSize) { chunk -> dao.listLinkedRawSmsIds(chunk) }.toSet()
+    }
+
     override suspend fun listRawSmsIds(transactionId: String): List<String> = accessGate.withAccess {
         dao.listRawSmsIdsForTransaction(transactionId)
     }
@@ -210,7 +224,7 @@ class RoomFinancialTransactionRepository(
             dao.listLinksForTransactions(chunk)
         }
         val eventIdByRawSmsId = RoomBatch.query(links.map { it.rawSmsId }, batchChunkSize) { chunk ->
-            parsedEventDao.listByRawSmsIds(chunk)
+            parsedEventDao.listEventIdsByRawSmsIds(chunk)
         }.associate { it.rawSmsId to it.id }
         val linkedEventIdsByTransaction = links.groupBy(
             keySelector = { it.transactionId },

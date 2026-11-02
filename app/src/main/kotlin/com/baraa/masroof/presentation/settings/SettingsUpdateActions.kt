@@ -27,6 +27,9 @@ internal class SettingsUpdateActions(
     private val canInstallPackages: () -> Boolean,
     private val onRequestInstallPermission: () -> Unit,
 ) {
+    /** Set only when the user tapped Install and was sent to grant the permission. */
+    private var installAwaitingPermission = false
+
     fun clearUpdateMessage() {
         settingsState.update { it.copy(updateMessage = null) }
     }
@@ -167,10 +170,15 @@ internal class SettingsUpdateActions(
                 )
             }
             withContext(Dispatchers.IO) {
+                var shownStep = -1L
                 appUpdateService
                     .downloadUpdate(
                         manifest = manifest,
                         onProgress = { bytesRead, totalBytes ->
+                            // Progress arrives every 8 KB; the screen needs a new frame only per whole percent.
+                            val step = if (totalBytes > 0) bytesRead * 100 / totalBytes else bytesRead / PROGRESS_STEP_BYTES
+                            if (step == shownStep) return@downloadUpdate
+                            shownStep = step
                             settingsState.update {
                                 it.copy(
                                     updateState = AppUpdateUiState.Downloading(
@@ -198,10 +206,12 @@ internal class SettingsUpdateActions(
         if (state !is AppUpdateUiState.ReadyToInstall) return
 
         if (!canInstallPackages()) {
+            installAwaitingPermission = true
             settingsState.update { it.copy(updateMessage = AppUpdateMessage.INSTALL_PERMISSION_REQUIRED) }
             onRequestInstallPermission()
             return
         }
+        installAwaitingPermission = false
 
         val apkFile = appUpdateService.updateApkFile(state.manifest)
         scope.launchLogged(appLogService, AppLogCategories.UPDATE, "Settings installPendingUpdate", onError = { settingsState.update { it.copy(updateMessage = AppUpdateMessage.INSTALL_FAILED) } }) {
@@ -212,8 +222,9 @@ internal class SettingsUpdateActions(
         }
     }
 
+    /** Runs on every resume; it resumes an install the user asked for, never starts one. */
     fun retryInstallAfterPermissionGranted() {
-        if (!canInstallPackages()) return
+        if (!installAwaitingPermission || !canInstallPackages()) return
         installPendingUpdate()
     }
 
@@ -282,5 +293,10 @@ internal class SettingsUpdateActions(
                 if (downloaded.exists()) downloaded.delete()
             }
         }
+    }
+
+    private companion object {
+        /** Unknown size: one progress update per 256 KiB. */
+        const val PROGRESS_STEP_BYTES = 256L * 1024
     }
 }

@@ -1,6 +1,8 @@
 
 package com.baraa.masroof.presentation.settings
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.clickable
@@ -47,7 +49,7 @@ fun SettingsAppScreen(languageTag: String, themeMode: ThemeMode, onBack: () -> U
                 MasroofText(stringResource(R.string.settings_language_title), style = MaterialTheme.typography.titleMedium)
                 listOf(AppLocale.TAG_AR to R.string.settings_language_arabic, AppLocale.TAG_EN to R.string.settings_language_english).forEach { (tag, label) ->
                     val current = AppLocale.isEnglish(tag) == AppLocale.isEnglish(languageTag)
-                    Row(Modifier.fillMaxWidth().clickable { onSelectLanguage(tag) }.padding(vertical = MasroofReference.rowVertical),
+                    Row(Modifier.fillMaxWidth().selectable(selected = current, role = Role.RadioButton) { onSelectLanguage(tag) }.padding(vertical = MasroofReference.rowVertical),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween) {
                         MasroofText(stringResource(label), style = MasroofReference.pair)

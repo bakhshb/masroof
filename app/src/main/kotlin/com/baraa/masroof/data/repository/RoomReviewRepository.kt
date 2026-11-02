@@ -2,6 +2,7 @@ package com.baraa.masroof.data.repository
 
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.dao.ReviewItemDao
+import com.baraa.masroof.data.room.dao.RoomBatch
 import com.baraa.masroof.data.room.mapper.ReviewItemMapper
 import com.baraa.masroof.domain.ids.ReviewIdFactory
 import com.baraa.masroof.domain.model.ExplicitBankSelection
@@ -22,6 +23,11 @@ class RoomReviewRepository(
 
     override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? = accessGate.withAccess {
         dao.findByRawSmsId(rawSmsId)?.let(ReviewItemMapper::toDomain)
+    }
+
+    override suspend fun findByRawSmsIds(rawSmsIds: Collection<String>): Map<String, ReviewItem> = accessGate.withAccess {
+        RoomBatch.query(rawSmsIds.distinct()) { chunk -> dao.findByRawSmsIds(chunk) }
+            .map(ReviewItemMapper::toDomain).associateBy { it.rawSmsId }
     }
 
     override suspend fun listRequired(): List<ReviewItem> = accessGate.withAccess {
@@ -49,15 +55,13 @@ class RoomReviewRepository(
         now: Instant,
     ): ReviewItem = accessGate.withAccess {
         val id = ReviewIdFactory.fromRawSmsId(rawSmsId)
-        val existingReasons = findByRawSmsId(rawSmsId)?.reasons.orEmpty()
-        val sortedReasons = ExplicitBankSelection.mergePreservedSelection(existingReasons, reasons)
         val entity = ReviewItemMapper.toEntity(
             ReviewItem(
                 id = id,
                 rawSmsId = rawSmsId,
                 kind = kind,
                 status = ReviewStatus.REQUIRED,
-                reasons = sortedReasons,
+                reasons = reasons,
                 createdAt = now,
                 updatedAt = now,
                 resolvedAt = null,
@@ -65,7 +69,12 @@ class RoomReviewRepository(
                 resolvedTransactionId = null,
             ),
         )
-        return@withAccess ReviewItemMapper.toDomain(dao.upsertRequiredAtomic(entity))
+        return@withAccess ReviewItemMapper.toDomain(
+            dao.upsertRequiredAtomic(entity) { stored ->
+                val existing = stored?.let(ReviewItemMapper::decodeReasons).orEmpty()
+                ReviewItemMapper.encodeReasons(ExplicitBankSelection.mergePreservedSelection(existing, reasons))
+            },
+        )
     }
 
     override suspend fun markResolved(

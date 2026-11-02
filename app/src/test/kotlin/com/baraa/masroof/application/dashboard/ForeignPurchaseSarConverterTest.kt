@@ -49,4 +49,25 @@ class ForeignPurchaseSarConverterTest {
         assertNotNull(sar)
         assertEquals(Money.of("50.80", Currency.SAR), sar)
     }
+
+    @Test
+    fun feeInPurchaseCurrency_isConvertedNotAddedAsSar() {
+        val sar = ForeignPurchaseSarConverter.foreignToSar(
+            foreignAmount = Money.of("23.00", Currency.USD),
+            exchangeRate = java.math.BigDecimal("3.756957"),
+            internationalFee = Money.of("2.50", Currency.USD),
+        )
+        // 86.41 + 2.50 * 3.756957 (9.39)
+        assertEquals(Money.of("95.80", Currency.SAR), sar)
+    }
+
+    @Test
+    fun feeInAnUnrelatedCurrency_isLeftOut() {
+        val sar = ForeignPurchaseSarConverter.foreignToSar(
+            foreignAmount = Money.of("23.00", Currency.USD),
+            exchangeRate = java.math.BigDecimal("3.756957"),
+            internationalFee = Money.of("2.50", Currency.EUR),
+        )
+        assertEquals(Money.of("86.41", Currency.SAR), sar)
+    }
 }

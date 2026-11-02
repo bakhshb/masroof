@@ -26,19 +26,19 @@ internal class PrimaryFieldExtractor(
      */
     fun money(field: ExtractionField, standalone: Boolean = false, titlePrefixes: List<String> = emptyList()): Money? {
         val hits = labels(field).flatMap { label ->
-            val pattern = Regex("(?m)^ *" + source.role(label).pattern + "[ \\t]*:?[ \\t]*" + MoneyGrammar.VALUE)
-            val reverse = if (suffixLabels) Regex("(?m)^ *" + MoneyGrammar.VALUE + "[ \\t]*:[ \\t]*" + source.phrase(label).pattern + " *$")
+            val pattern = CompiledPatterns.of("(?m)^ *" + source.role(label).pattern + "[ \\t]*:?[ \\t]*" + MoneyGrammar.VALUE)
+            val reverse = if (suffixLabels) CompiledPatterns.of("(?m)^ *" + MoneyGrammar.VALUE + "[ \\t]*:[ \\t]*" + source.phrase(label).pattern + " *$")
                 .findAll(source.text).toList() else emptyList()
             val matches = pattern.findAll(source.text).toList() + reverse
             val separate = if (field == ExtractionField.AMOUNT && currency != null) {
-                Regex("(?m)^ *" + source.role(label).pattern + "[ \\t]*:?[ \\t]*([^\\n\\r]+)$")
+                CompiledPatterns.of("(?m)^ *" + source.role(label).pattern + "[ \\t]*:?[ \\t]*([^\\n\\r]+)$")
                     .findAll(source.text).mapNotNull { row ->
                         MoneyGrammar.withCurrency(row.groupValues[1].trim(), currency)?.let { Hit(it, row.range) }
                     }.filterNot { overlaps(it.range) }.toList()
             } else emptyList()
-            Regex("(?m)^ *" + source.role(label).pattern).findAll(source.text).forEach { mention ->
+            CompiledPatterns.of("(?m)^ *" + source.role(label).pattern).findAll(source.text).forEach { mention ->
                 val longerRole = labels(field).any { other -> SourceText(other).text.length > SourceText(label).text.length &&
-                    Regex("(?m)^ *" + source.phrase(other).pattern).find(source.text, mention.range.first)?.range?.first == mention.range.first }
+                    CompiledPatterns.of("(?m)^ *" + source.phrase(other).pattern).find(source.text, mention.range.first)?.range?.first == mention.range.first }
                 if (!longerRole && (field != ExtractionField.AMOUNT || !overlaps(mention.range)) && matches.none { it.range.first == mention.range.first } && separate.none { it.range.first == mention.range.first })
                     problem("MALFORMED_${field.name}", Blocker.VALIDATION_ERROR)
             }
@@ -48,15 +48,15 @@ internal class PrimaryFieldExtractor(
                 if (value == null) { problem("INVALID_MONEY", Blocker.VALIDATION_ERROR); null }
                 else Hit(value, match.range)
             }
-        } + (if (standalone && field == ExtractionField.AMOUNT) Regex("(?m)^ *" + MoneyGrammar.VALUE + " *$")
+        } + (if (standalone && field == ExtractionField.AMOUNT) CompiledPatterns.of("(?m)^ *" + MoneyGrammar.VALUE + " *$")
             .findAll(source.text).filterNot { overlaps(it.range) }
             .mapNotNull { match -> MoneyGrammar.read(match)?.let { Hit(it, match.range) } }.toList() else emptyList()) +
             titlePrefixes.flatMap { prefix ->
-                Regex("^ *" + source.phrase(prefix).pattern + " +(?:ب *|بمبلغ *)?" + MoneyGrammar.VALUE)
+                CompiledPatterns.of("^ *" + source.phrase(prefix).pattern + " +(?:ب *|بمبلغ *)?" + MoneyGrammar.VALUE)
                     .findAll(source.text).mapNotNull { match -> MoneyGrammar.read(match)?.let { Hit(it, match.range) } }.toList()
             }
         val inline = if (field != ExtractionField.AMOUNT || inlineAmountRoles.isEmpty()) emptyList() else
-            Regex("(?<![\\p{L}\\p{N}_])و?(?:" + inlineAmountRoles.joinToString("|") { Regex.escape(SourceText(it).text) } + ")[ \\t]*" + MoneyGrammar.VALUE)
+            CompiledPatterns.of("(?<![\\p{L}\\p{N}_])و?(?:" + inlineAmountRoles.joinToString("|") { Regex.escape(SourceText(it).text) } + ")[ \\t]*" + MoneyGrammar.VALUE)
                 .findAll(source.text).filterNot { match -> overlaps(match.range) || hits.any { it.range.last >= match.range.first && match.range.last >= it.range.first } }
                 .mapNotNull { match -> MoneyGrammar.read(match)?.let { Hit(it, match.range) } }.toList()
         val allHits = hits + inline
@@ -70,7 +70,8 @@ internal class PrimaryFieldExtractor(
     fun identifier(field: ExtractionField): String? {
         val hits = labels(field).flatMap { label ->
             // Masked suffixes only (XX1234, **1234, 1234*, (1234)); a full IBAN or account number is never shortened.
-            Regex("(?m)^ *" + source.role(label).pattern + "[ \\t]*:?[ \\t]*\\(?((?:[a-z]{2})?[*x]*[0-9]{4})[*x]*\\)?(?![\\p{L}\\p{N}_])")
+            // A mask that continues after the digits (4567****1234) shows a prefix, not the last four, so it is no match.
+            CompiledPatterns.of("(?m)^ *" + source.role(label).pattern + "[ \\t]*:?[ \\t]*\\(?((?:[a-z]{2})?[*x]*[0-9]{4})[*x]*\\)?(?![\\p{L}\\p{N}_*])")
                 .findAll(source.text).map { Hit(it.groupValues[1].takeLast(4), it.groups[1]!!.range) }.toList()
         }.filterNot { hit ->
             // A compact amount role (بـ25) must not double as an identifier.
@@ -84,7 +85,7 @@ internal class PrimaryFieldExtractor(
 
     fun card(): String? {
         val labeledCard = identifier(ExtractionField.CARD)
-        val pattern = Regex("(?m)^ *(?:بطاقة|card) *: *(?:credit|debit|ائتمانية|مدى)(?: +| *\\n+ *)(?:رقم|number) *: *([*x]*[0-9]{4})(?![\\p{L}\\p{N}_])")
+        val pattern = CompiledPatterns.of("(?m)^ *(?:بطاقة|card) *: *(?:credit|debit|ائتمانية|مدى)(?: +| *\\n+ *)(?:رقم|number) *: *([*x]*[0-9]{4})[*x]*(?![\\p{L}\\p{N}_*])")
         val hits = pattern.findAll(source.text).toList()
         val values = (listOfNotNull(labeledCard) + hits.map { it.groupValues[1].takeLast(4) }).distinct()
         if (values.size > 1) problem("CONFLICTING_CARD", Blocker.CONFLICTING_FACTS)
@@ -94,10 +95,10 @@ internal class PrimaryFieldExtractor(
 
     fun merchant(): String? {
         val merchants = labels(ExtractionField.MERCHANT).flatMap { label ->
-            Regex("(?m)^ *" + source.phrase(label).pattern + "(?:[ \\t]*:[ \\t]*|[ \\t]+)([^\\n\\r]+)").findAll(source.text).map { match ->
+            CompiledPatterns.of("(?m)^ *" + source.phrase(label).pattern + "(?:[ \\t]*:[ \\t]*|[ \\t]+)([^\\n\\r]+)").findAll(source.text).map { match ->
                 val range = match.groups[1]!!.range
                 // A masked card/account suffix is a reference, not a merchant name.
-                if (source.text.substring(range).trim().matches(Regex("[*x]*[0-9]{4}[*x]*"))) return@map null
+                if (source.text.substring(range).trim().matches(CompiledPatterns.of("[*x]*[0-9]{4}[*x]*"))) return@map null
                 evidence += source.evidence("extract.merchant", "MERCHANT", range)
                 source.original(range).trim()
             }.filterNotNull().toList()

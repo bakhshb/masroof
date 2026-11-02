@@ -17,4 +17,7 @@ interface UserCorrectionRepository {
      * Ids with no corrections are omitted.
      */
     suspend fun listForRawSmsIds(rawSmsIds: Collection<String>): List<UserCorrection>
+
+    /** Every correction. Each one targets a stored RawSms, which the schema enforces. */
+    suspend fun listAll(): List<UserCorrection>
 }

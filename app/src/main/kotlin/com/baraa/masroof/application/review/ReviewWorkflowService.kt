@@ -104,7 +104,10 @@ class ReviewWorkflowService(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            val failedIds = report.failedRawSmsIds
+            // With no failed write, the rows still waiting are the ones whose review this report updates.
+            val failedIds = report.failedRawSmsIds.ifEmpty {
+                report.reviewCandidates.mapTo(linkedSetOf()) { it.rawSmsId } + report.settledRawSmsIds
+            }
             retainHistoricalRetry(failedIds, failureCount = report.summary.failed.coerceAtLeast(1))
             throw incomplete(
                 failedIds,
@@ -499,6 +502,8 @@ class ReviewWorkflowService(
         val event = record.event
         val amount = event.amount
             ?: return ReviewWorkflowResult.Rejected("missing_amount")
+        // A zero amount posts nothing real, whatever type the user chose.
+        if (amount.amount.signum() <= 0) return ReviewWorkflowResult.Rejected("missing_amount")
         val raw = rawSmsRepository.getById(review.rawSmsId)
             ?: return ReviewWorkflowResult.Rejected("raw_sms_missing")
 
@@ -509,7 +514,6 @@ class ReviewWorkflowService(
         // An explicit type may repair an unknown family; it cannot invent an owned endpoint.
         if (type in setOf(FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
                 FinancialTransactionType.EXTERNAL_TRANSFER_IN, FinancialTransactionType.SELF_TRANSFER)) {
-            if (amount.amount.signum() <= 0) return ReviewWorkflowResult.Rejected("missing_amount")
             val sourceOwned = event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) == OwnershipStatus.OWNED } == true
             val destinationOwned = event.destinationAccountRef?.let { ownershipResolver.resolveAccount(it) == OwnershipStatus.OWNED } == true
             if (type != FinancialTransactionType.EXTERNAL_TRANSFER_IN && (sourceAccountId == null || !sourceOwned))
@@ -547,7 +551,6 @@ class ReviewWorkflowService(
             FinancialTransactionType.LOAN_REPAYMENT -> {
                 val loanType = record.details.loanType
                     ?: return ReviewWorkflowResult.Rejected("loan_type_missing")
-                maybeConfirmLoanOwned(LoanReference(event.bank, loanType))
                 sourceAccountId to FinancialContainerIdFactory.loanId(event.bank, loanType)
             }
 
@@ -578,9 +581,16 @@ class ReviewWorkflowService(
                 reviewId = review.id,
                 resolutionKind = ReviewResolutionKind.USER_FINANCIAL_TYPE,
                 resolvedAt = clock.now(),
+                validateBeforeWrite = {
+                    effectiveParsedEventProvider.findEffectiveByRawSmsId(review.rawSmsId) == record
+                },
             ),
         ).also { result ->
             if (result is ReviewWorkflowResult.Success) {
+                // Ownership follows a saved repayment only; a rejected write must not confirm the loan.
+                if (type == FinancialTransactionType.LOAN_REPAYMENT) {
+                    record.details.loanType?.let { maybeConfirmLoanOwned(LoanReference(event.bank, it)) }
+                }
                 logReviewAction("Resolved as ${type.name.lowercase()}", reviewId)
             }
         }

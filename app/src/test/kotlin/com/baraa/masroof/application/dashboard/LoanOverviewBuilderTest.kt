@@ -317,6 +317,27 @@ class LoanOverviewBuilderTest {
         assertEquals(0, overview.loans.size)
     }
 
+    /** Screens localize an unnamed loan; the application layer must not hand them an English name to show. */
+    @Test
+    fun build_unnamedLoanHasNoCustomName_namedLoanKeepsIt() {
+        fun owned(id: String, type: LoanType, name: String?) = LoanRegistryEntry(
+            id = id, bank = Bank.BANK_ALJAZIRA, loanType = type, ownership = OwnershipStatus.OWNED,
+            displayName = name, firstSeenRawSmsId = "sms-$id", lastSeenRawSmsId = "sms-$id",
+        )
+        val overview = LoanOverviewBuilder.build(
+            salaryPeriod = period,
+            loans = listOf(owned("a", LoanType.PERSONAL, null), owned("b", LoanType.AUTO, "  Car  ")),
+            transactions = emptyList(),
+            parsedRecords = emptyList(),
+            rawSmsById = emptyMap(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = ZoneId.of("Asia/Riyadh"),
+        )
+
+        assertEquals(mapOf(LoanType.PERSONAL to null, LoanType.AUTO to "Car"), overview.loans.associate { it.loanType to it.customName })
+    }
+
     private fun financingInstallmentRecord(
         eventId: String,
         rawSmsId: String,

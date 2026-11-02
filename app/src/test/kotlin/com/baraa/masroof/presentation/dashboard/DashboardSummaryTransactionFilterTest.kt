@@ -50,7 +50,7 @@ class DashboardSummaryTransactionFilterTest {
 
     @Test
     fun forAccount_matchesSmsResolvedSourceViaInvolvementIndex() {
-        val containerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
+        val containerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
         val transactions = listOf(
             preview(id = "cash", source = null, destination = null),
         )
@@ -161,7 +161,7 @@ class DashboardSummaryTransactionFilterTest {
             transactions = transactions,
             bank = Bank.BANK_ALJAZIRA,
             loanType = LoanType.PERSONAL,
-            involvementByTransactionId = mapOf("legacy-fee" to setOf(loanContainerId!!)),
+            involvementByTransactionId = mapOf("legacy-fee" to setOf(loanContainerId)),
         )
 
         assertEquals(listOf("legacy-fee", "real-loan"), filtered.map { it.id })

@@ -19,7 +19,13 @@ object ForeignPurchaseSarConverter {
         val converted = foreignAmount.amount
             .multiply(exchangeRate)
             .setScale(Money.SCALE, RoundingMode.HALF_EVEN)
-        val fee = internationalFee?.amount ?: BigDecimal.ZERO.setScale(Money.SCALE)
+        // The fee is added in SAR: a fee in the purchase currency is converted at the same rate,
+        // and a fee in any other currency cannot be converted here, so it is left out.
+        val fee = when (internationalFee?.currency) {
+            Currency.SAR -> internationalFee.amount
+            foreignAmount.currency -> internationalFee.amount.multiply(exchangeRate).setScale(Money.SCALE, RoundingMode.HALF_EVEN)
+            else -> BigDecimal.ZERO.setScale(Money.SCALE)
+        }
         val total = converted.add(fee).setScale(Money.SCALE, RoundingMode.HALF_EVEN)
         return Money.of(total, Currency.SAR)
     }

@@ -44,8 +44,10 @@ class ProcessingRecovery(
      */
     suspend fun markExhaustedBatch(rawSmsIds: List<String>): Boolean {
         if (rawSmsIds.isEmpty()) return false
-        val affected = rawSmsIds.distinct().filter { rawSmsId ->
-            val review = reviewRepository.findByRawSmsId(rawSmsId)
+        val ids = rawSmsIds.distinct()
+        val reviews = reviewRepository.findByRawSmsIds(ids)
+        val affected = ids.filter { rawSmsId ->
+            val review = reviews[rawSmsId]
             review?.status != ReviewStatus.RESOLVED ||
                 review.resolutionKind != ReviewResolutionKind.USER_NON_FINANCIAL
         }

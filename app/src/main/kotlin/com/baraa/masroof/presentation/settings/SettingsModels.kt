@@ -39,19 +39,7 @@ data class ManagedCardUi(
     val cardRole: CardRole? = null,
     val parentCardLast4: String? = null,
     val linkedAccountMaskedNumber: String? = null,
-) {
-    val displayLabel: String
-        get() = displayName?.trim()?.takeIf { it.isNotEmpty() }
-            ?: when (cardRole) {
-                CardRole.PRIMARY -> "Primary ••$last4"
-                CardRole.SUPPLEMENTARY -> "Additional ••$last4"
-                CardRole.STANDALONE, null -> when (cardType) {
-                    CardType.DEBIT -> "Debit ••$last4"
-                    CardType.CREDIT -> "Credit ••$last4"
-                    null -> "••$last4"
-                }
-            }
-}
+)
 
 data class ManagedAccountUi(
     val id: String,
@@ -60,11 +48,7 @@ data class ManagedAccountUi(
     val ownership: OwnershipStatus,
     val displayName: String? = null,
     val accountType: AccountType = AccountType.CURRENT,
-) {
-    val displayLabel: String
-        get() = displayName?.trim()?.takeIf { it.isNotEmpty() }
-            ?: "Account ••${maskedNumber.takeLast(4)}"
-}
+)
 
 data class SettingsBankTreeUi(
     val bank: Bank,

@@ -13,6 +13,7 @@ import com.baraa.masroof.presentation.common.MasroofHeroCard
 import com.baraa.masroof.presentation.common.MasroofDetailRow
 import com.baraa.masroof.ui.theme.MasroofHeroRole
 import com.baraa.masroof.presentation.common.MasroofCard
+import com.baraa.masroof.presentation.settings.loanTypeLabel
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.ui.theme.MasroofThemeExtras
@@ -23,7 +24,7 @@ import java.time.format.DateTimeFormatter
 fun LoanSummaryTile(loan: LoanOverview, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val date = DateTimeFormatter.ofPattern("d MMM", LocalConfiguration.current.locales[0])
     val unavailable = stringResource(R.string.dashboard_value_unavailable)
-    EntitySummaryCard(loan.displayLabel, "", MasroofIcons.moneyMovement,
+    EntitySummaryCard(loanName(loan), "", MasroofIcons.moneyMovement,
         MasroofThemeExtras.extendedColors.liability, modifier, onClick, actionLabel = stringResource(R.string.reference_loan_details), bankLabel = com.baraa.masroof.presentation.settings.settingsBankLabel(loan.bank)) {
         MasroofDetailRow(stringResource(R.string.approved_loan_remaining), loan.remainingBalance?.let { formatLocalizedMoney(it) } ?: unavailable, dense = true)
         MasroofDetailRow(stringResource(R.string.approved_last_installment), loan.latestInstallmentAmount?.let { formatLocalizedMoney(it) } ?: unavailable, valueColor = MasroofThemeExtras.extendedColors.liability, dense = true)
@@ -42,19 +43,24 @@ fun LoanDetailSummaryCard(
     val date = DateTimeFormatter.ofPattern("d MMM", locale)
     val unavailable = stringResource(R.string.dashboard_value_unavailable)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
-        MasroofHeroCard(loan.displayLabel + " · " + stringResource(R.string.approved_loan_remaining),
+        MasroofHeroCard(loanName(loan) + " · " + stringResource(R.string.approved_loan_remaining),
             loan.remainingBalance?.let { formatLocalizedMoney(it) } ?: unavailable,
             subtitle = com.baraa.masroof.presentation.settings.settingsBankLabel(loan.bank), role = MasroofHeroRole.Liability)
         MasroofCard {
             com.baraa.masroof.presentation.common.MasroofText(stringResource(R.string.reference_loan_data), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
-            MasroofDetailRow(stringResource(R.string.reference_loan_type), stringResource(when (loan.loanType) {
-                com.baraa.masroof.domain.model.LoanType.PERSONAL -> R.string.settings_loan_type_personal
-                com.baraa.masroof.domain.model.LoanType.AUTO -> R.string.settings_loan_type_auto
-                com.baraa.masroof.domain.model.LoanType.MORTGAGE -> R.string.settings_loan_type_mortgage
-            }))
+            MasroofDetailRow(stringResource(R.string.reference_loan_type), loanTypeLabel(loan.loanType))
             MasroofDetailRow(stringResource(R.string.approved_last_installment), loan.latestInstallmentAmount?.let { formatLocalizedMoney(it) } ?: unavailable, valueColor = MasroofThemeExtras.extendedColors.liability)
             MasroofDetailRow(stringResource(R.string.approved_installment_date), loan.latestInstallmentAsOf?.let { date.format(it.atZone(zoneId)) } ?: unavailable)
             MasroofDetailRow(stringResource(R.string.approved_balance_date), loan.remainingBalanceAsOf?.let { date.format(it.atZone(zoneId)) } ?: unavailable)
         }
     }
 }
+
+/** The user's name for the loan, or its type in the app language. */
+@Composable
+internal fun loanName(loan: LoanOverview): String = loan.customName ?: loanTypeLabel(loan.loanType)
+
+/** A commitment row's name; an unnamed loan shows its type in the app language. */
+@Composable
+internal fun commitmentRowName(row: com.baraa.masroof.application.dashboard.CommitmentDashboardRow): String =
+    row.loanTypeFallback?.let { loanTypeLabel(it) } ?: row.displayName

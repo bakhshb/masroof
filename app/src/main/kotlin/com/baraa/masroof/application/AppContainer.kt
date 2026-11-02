@@ -114,6 +114,7 @@ import com.baraa.masroof.application.sms.DebugProcessHaltProbe
 import com.baraa.masroof.application.sms.DebugProcessHalt
 import com.baraa.masroof.application.sms.HistoricalDerivedRecovery
 import com.baraa.masroof.application.sms.HistoricalDerivedRecoveryWorker
+import com.baraa.masroof.application.sms.LiveCaptureRecoveryWorker
 import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
 import com.baraa.masroof.application.sms.LiveSmsIntake
@@ -130,6 +131,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
@@ -612,6 +614,7 @@ class AppContainer(
             patternProcessing = com.baraa.masroof.application.ingestion.PatternEvidenceProtection(
                 reviewRepository, userCorrectionRepository, financialTransactionRepository, parsedEventRepository,
                 inTransaction = { work -> withDatabaseTransaction(work) })::run,
+            onHistoricalRetry = { HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext)) },
         )
 
     val explicitBankSelectionWorkflow: ExplicitBankSelectionWorkflow =
@@ -653,14 +656,27 @@ class AppContainer(
                 HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
             },
             debugProcessHalt = debugProcessHaltProbe,
+            captureRecoveryScheduler = { receivedAfter ->
+                LiveCaptureRecoveryWorker.enqueue(WorkManager.getInstance(appContext), receivedAfter)
+            },
+            clock = clock,
         )
 
     val workerFactory: WorkerFactory =
         DelegatingWorkerFactory().apply {
-            addFactory(LiveSmsProcessingWorker.Factory({ processStoredSmsUseCase }, appLogService) { maintenanceCompletionSignal.notifyCompleted() })
+            addFactory(
+                LiveSmsProcessingWorker.Factory(
+                    processStoredSms = { processStoredSmsUseCase },
+                    appLogService = appLogService,
+                    startupReady = ::startupFinancialReady,
+                    isRestartRequired = { it is com.baraa.masroof.data.room.DatabaseRestartRequiredException },
+                ) { maintenanceCompletionSignal.notifyCompleted() },
+            )
             addFactory(
                 ExchangeRateEnrichmentWorker.Factory {
                     PendingExchangeRateEnricher {
+                        // A thrown error makes the worker retry once integrity repair has succeeded.
+                        check(startupFinancialReady()) { "Startup maintenance is not ready" }
                         if (exchangeRateEnrichmentWorkflow.enrichPending().persisted > 0) maintenanceCompletionSignal.notifyCompleted()
                     }
                 },
@@ -669,7 +685,16 @@ class AppContainer(
                 HistoricalDerivedRecoveryWorker.Factory(
                     recovery = { historicalDerivedRecovery },
                     appLogService = appLogService,
+                    startupReady = ::startupFinancialReady,
+                    onFinished = { maintenanceCompletionSignal.notifyCompleted() },
                 ),
+            )
+            addFactory(
+                LiveCaptureRecoveryWorker.Factory(
+                    scanner = { historicalSmsScanner },
+                    startupReady = ::startupFinancialReady,
+                    appLogService = appLogService,
+                ) { maintenanceCompletionSignal.notifyCompleted() },
             )
         }
 
@@ -903,15 +928,18 @@ class AppContainer(
         }
     }
 
-    /** Retry a previously blocked startup maintenance attempt from the gated UI. */
-    suspend fun retryStartupMaintenance(): StartupMaintenanceOutcome {
+    /**
+     * Retry a previously blocked startup maintenance attempt from the gated UI. The work runs in the
+     * application scope, so a rotation that cancels the caller does not stop it between repair and rescheduling.
+     */
+    suspend fun retryStartupMaintenance(): StartupMaintenanceOutcome = applicationScope.async {
         val outcome = runStartupMaintenanceAttempt()
         startupMaintenanceOutcome.value = outcome
         if (outcome == StartupMaintenanceOutcome.READY) {
             runPostStartupBackgroundWork()
         }
-        return outcome
-    }
+        outcome
+    }.await()
 
     private suspend fun runStartupMaintenanceAttempt(): StartupMaintenanceOutcome =
         try {
@@ -947,6 +975,9 @@ class AppContainer(
     suspend fun awaitPostStartupBackgroundWorkForTesting() {
         checkNotNull(startupMaintenanceJob) { "Startup maintenance has not been launched" }.join()
     }
+
+    /** Background financial writes wait for, and require, a successful integrity repair. */
+    private suspend fun startupFinancialReady(): Boolean = awaitStartupMaintenance() == StartupMaintenanceOutcome.READY
 
     /** Returns the safety outcome of the initial startup maintenance attempt. */
     suspend fun awaitStartupMaintenance(): StartupMaintenanceOutcome =

@@ -12,8 +12,8 @@ import java.time.LocalDate
 class AccountTransactionPresentationTest {
     @Test
     fun selfTransferToAccount_showsIncomingDirection() {
-        val account3002 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")!!
-        val account3001 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
+        val account3002 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")
+        val account3001 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
         val tx = preview(
             type = FinancialTransactionType.SELF_TRANSFER,
             source = account3001,
@@ -32,8 +32,8 @@ class AccountTransactionPresentationTest {
 
     @Test
     fun selfTransferFromAccount_showsOutgoingDirection() {
-        val account3002 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")!!
-        val account3001 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
+        val account3002 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")
+        val account3001 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
         val tx = preview(
             type = FinancialTransactionType.SELF_TRANSFER,
             source = account3002,
@@ -52,8 +52,8 @@ class AccountTransactionPresentationTest {
 
     @Test
     fun forAccount_adjustsDirectionsForFilteredRows() {
-        val account3002 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")!!
-        val account3001 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
+        val account3002 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")
+        val account3001 = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
         val incomingSelfTransfer = preview(
             id = "in",
             type = FinancialTransactionType.SELF_TRANSFER,

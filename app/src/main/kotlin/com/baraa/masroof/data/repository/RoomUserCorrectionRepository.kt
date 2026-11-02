@@ -30,4 +30,8 @@ class RoomUserCorrectionRepository(
         }.map(UserCorrectionMapper::toDomain)
         return@withAccess loaded.sortedWith(compareBy({ it.targetRawSmsId }, { it.createdAt }, { it.id }))
     }
+
+    override suspend fun listAll(): List<UserCorrection> = accessGate.withAccess {
+        dao.listAll().map(UserCorrectionMapper::toDomain)
+    }
 }

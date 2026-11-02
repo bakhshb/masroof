@@ -65,8 +65,8 @@ class ReplaceExclusiveStaleLinksTest {
         seedRawSms("sms-out", "out")
         seedRawSms("sms-in", "in")
         val amount = Money.of("5500.00", Currency.SAR)
-        val sourceId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
-        val destId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")!!
+        val sourceId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
+        val destId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")
 
         repo.save(
             FinancialTransaction(
@@ -128,8 +128,8 @@ class ReplaceExclusiveStaleLinksTest {
         seedRawSms("sms-out", "out")
         seedRawSms("sms-other", "other")
         val amount = Money.of("5500.00", Currency.SAR)
-        val sourceId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")!!
-        val destId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")!!
+        val sourceId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
+        val destId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3002")
 
         repo.save(
             FinancialTransaction(

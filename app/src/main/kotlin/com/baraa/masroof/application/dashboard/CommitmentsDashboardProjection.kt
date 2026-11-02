@@ -29,13 +29,9 @@ class CommitmentsDashboardProjection(
         creditFacilities: CreditFacilitiesOverview,
     ): CommitmentsDashboardSection = with(context) {
         val commitments = commitmentRepository.listAll()
-        val commitmentSourceTransactions = commitments.mapNotNull { commitment ->
-            if (commitment.sourceTransactionId in transactionIds) {
-                null
-            } else {
-                financialTransactionRepository.getById(commitment.sourceTransactionId)
-            }
-        }
+        val commitmentSourceTransactions = financialTransactionRepository.getByIds(
+            commitments.map { it.sourceTransactionId }.filterNot { it in transactionIds },
+        )
         val loansOverview = LoanOverviewBuilder.build(
             salaryPeriod = period,
             loans = loans,

@@ -25,7 +25,7 @@ class PatternInterpretationWritePolicy(private val store: MessagePatternStore,
             if (stamp.roleProfile != (pattern.roleProfile != null)) return false
             if (!pattern.enabled) return false
             if (!posted && (pattern.revision != stamp.revision ||
-                PatternFactInterpreter(configuration).fingerprint != stamp.fingerprint)) return false
+                PatternFactInterpreter.of(configuration).fingerprint != stamp.fingerprint)) return false
             for (binding in contract.accountBindings) {
                 if (binding.role == com.baraa.masroof.engine.bank.patterns.PatternAccountRole.CARD) {
                     val card = com.baraa.masroof.domain.model.CardReference(com.baraa.masroof.domain.model.Bank(binding.bank.value), binding.last4)

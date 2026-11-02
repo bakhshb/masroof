@@ -10,12 +10,18 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-/** Durable user definitions, never a rebuildable learning cache. No retained decoded state. */
+/**
+ * Durable user definitions, never a rebuildable learning cache. The decoded document is reused only
+ * while the file's text is byte-for-byte unchanged, so any writer, restore or other instance is seen.
+ */
 class MessagePatternStore(private val file: File, private val beforeReplace: () -> Unit = {}) {
     constructor(context: Context) : this(File(context.filesDir, "message-patterns/definitions.json"))
 
     fun load(): MessagePatternConfiguration = synchronized(lock) {
-        captureRaw()?.let(MessagePatternConfigurationCodec::decode) ?: MessagePatternConfiguration()
+        val raw = captureRaw() ?: return@synchronized MessagePatternConfiguration()
+        val path = file.absolutePath
+        decoded?.takeIf { it.path == path && it.raw == raw }?.configuration
+            ?: MessagePatternConfigurationCodec.decode(raw).also { decoded = Decoded(path, raw, it) }
     }
 
     /** Startup-only before this container admits work; interactive installation uses the exclusive access gate. */
@@ -147,5 +153,9 @@ class MessagePatternStore(private val file: File, private val beforeReplace: () 
 
         // ponytail: serialize local file operations process-wide; split by path only if multiple profiles need concurrent writes.
         private val lock = Any()
+
+        /** One slot: the app has one definitions file; tests that make many must not keep every copy. */
+        private class Decoded(val path: String, val raw: String, val configuration: MessagePatternConfiguration)
+        private var decoded: Decoded? = null
     }
 }

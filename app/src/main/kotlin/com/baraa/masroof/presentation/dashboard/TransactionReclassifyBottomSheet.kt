@@ -2,7 +2,7 @@ package com.baraa.masroof.presentation.dashboard
 
 import com.baraa.masroof.ui.theme.MasroofIconSizes
 import com.baraa.masroof.ui.theme.MasroofSpacing
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import com.baraa.masroof.R
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -66,12 +67,16 @@ fun TransactionReclassifyBottomSheet(
                 RECLASSIFY_TYPE_OPTIONS.forEach { type ->
                     val isCurrent = type == currentType
                     val isSelected = type == (selectedType ?: currentType)
+                    // One selectable radio row: TalkBack reads one target with its role and state.
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(enabled = !isCurrent && !saving) {
-                                onSelectType(type)
-                            }
+                            .selectable(
+                                selected = isSelected,
+                                enabled = !isCurrent && !saving,
+                                role = Role.RadioButton,
+                                onClick = { onSelectType(type) },
+                            )
                             .padding(
                         horizontal = MasroofSpacing.sectionHeaderGap,
                         vertical = MasroofSpacing.inlineGap,
@@ -80,9 +85,7 @@ fun TransactionReclassifyBottomSheet(
                     ) {
                         RadioButton(
                             selected = isSelected,
-                            onClick = {
-                                if (!isCurrent) onSelectType(type)
-                            },
+                            onClick = null,
                             enabled = !isCurrent && !saving,
                         )
                         Icon(

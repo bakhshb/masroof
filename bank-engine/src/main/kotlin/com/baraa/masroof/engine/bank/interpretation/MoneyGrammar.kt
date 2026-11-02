@@ -10,13 +10,13 @@ internal object MoneyGrammar {
     private const val CURRENCY = "(?:sar|sr|usd|eur|gbp|ريال سعودي|ريال|ر\\.س\\.?)"
     // The currency may touch the number (SAR100 / 100SAR); the lookahead still rejects 100SARX.
     const val VALUE = "(?:(?<c1>$CURRENCY)[ \\t]*(?<n1>$NUMBER)|(?<n2>$NUMBER)[ \\t]*(?<c2>$CURRENCY))(?![\\p{L}\\p{N}_.,+\\-−])"
-    private val entire = Regex(VALUE)
+    private val entire = CompiledPatterns.of(VALUE)
 
     fun parse(value: String): Money? = entire.matchEntire(value)?.let(::read)
 
     /** Only explicitly labelled principal currency may complete a bare positive magnitude. */
     fun withCurrency(magnitude: String, currency: String): Money? =
-        magnitude.takeIf { it.matches(Regex(NUMBER)) }?.let { parse("${currency.lowercase(Locale.ROOT)} $it") }
+        magnitude.takeIf { it.matches(CompiledPatterns.of(NUMBER)) }?.let { parse("${currency.lowercase(Locale.ROOT)} $it") }
 
     fun read(match: MatchResult): Money? {
         val number = (match.groups["n1"] ?: match.groups["n2"])?.value ?: return null

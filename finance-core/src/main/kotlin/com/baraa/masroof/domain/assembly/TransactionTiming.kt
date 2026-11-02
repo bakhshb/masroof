@@ -46,12 +46,6 @@ object TransactionTiming {
             persistedZoneId = persistedZoneId,
         )
 
-    fun earliestEffectiveOccurredAt(
-        candidates: List<TransferMatchCandidate>,
-        zoneId: ZoneId,
-    ): Instant? =
-        candidates.map { effectiveOccurredAt(it, zoneId) }.minOrNull()
-
     /**
      * Instant of an offset-less SMS wall clock.
      *

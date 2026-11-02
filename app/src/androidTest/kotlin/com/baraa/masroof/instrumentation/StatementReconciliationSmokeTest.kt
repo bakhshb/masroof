@@ -37,7 +37,6 @@ import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.R
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
@@ -503,10 +502,7 @@ class StatementReconciliationSmokeTest {
     }
 
     private fun mutationCounts(): MutationCounts = runBlocking(Dispatchers.IO) {
-        val field = application().container.javaClass.getDeclaredField("database")
-        field.isAccessible = true
-        val database = field.get(application().container) as MasroofDatabase
-        val sqlite = database.openHelper.readableDatabase
+        val sqlite = application().container.database.openHelper.readableDatabase
         fun count(table: String): Int {
             check(table in COUNTED_TABLES) { emulatorMessage("unexpected table $table") }
             sqlite.query(SimpleSQLiteQuery("SELECT COUNT(*) FROM $table")).use { cursor ->

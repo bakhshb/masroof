@@ -22,11 +22,6 @@ object LoanRepaymentAttribution {
         parsedRecordsById: Map<String, ParsedEventRecord>,
     ): Boolean = loanContainerId(tx, parsedRecordsById) != null
 
-    fun isLoanRepayment(
-        tx: FinancialTransaction,
-        parsedRecords: List<ParsedEventRecord>,
-    ): Boolean = isLoanRepayment(tx, parsedRecords.associateBy { it.event.id })
-
     fun loanContainerId(
         tx: FinancialTransaction,
         parsedRecordsById: Map<String, ParsedEventRecord>,

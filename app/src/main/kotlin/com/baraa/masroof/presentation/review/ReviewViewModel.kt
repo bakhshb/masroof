@@ -125,22 +125,32 @@ class ReviewViewModel(
         }
     }
 
+    /** The detail the user asked for last; an older load that finishes later is discarded. Main thread only. */
+    private var requestedDetailId: String? = null
+
     fun openDetail(reviewId: String) {
+        requestedDetailId = reviewId
+        // Not cancelled when another detail opens: the missing-amount reparse below writes financial state.
         viewModelScope.launch {
+            // A newer request owns the loading flag; with none pending (detail closed), clear it.
+            fun current() = (requestedDetailId == reviewId).also { latest ->
+                if (!latest && requestedDetailId == null) _uiState.update { it.copy(loading = false) }
+            }
             _uiState.update { it.copy(loading = true, error = null, message = null) }
             try {
                 var detail = detailLoader.loadDetail(reviewId) ?: run {
-                    _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
+                    if (current()) _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
                     return@launch
                 }
                 if (detail.review.reasons.contains("missing_amount")) {
                     reparseStoredSms(detail.review.rawSmsId)
                     detail = detailLoader.loadDetail(reviewId) ?: run {
-                        _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
+                        if (current()) _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
                         return@launch
                     }
                 }
                 val pairCandidates = pairCandidatesFor(detail)
+                if (!current()) return@launch
                 _uiState.update {
                     it.copy(
                         loading = false,
@@ -151,12 +161,13 @@ class ReviewViewModel(
             } catch (ce: CancellationException) {
                 throw ce
             } catch (caught: Exception) { appLogService?.failure(com.baraa.masroof.application.logging.AppLogCategories.REVIEW, "Review openDetail", caught);
-                _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
+                if (current()) _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
             }
         }
     }
 
     fun closeDetail() {
+        requestedDetailId = null
         _uiState.update { it.copy(selectedDetail = null, message = null, error = null, actionErrorDetail = null) }
     }
 

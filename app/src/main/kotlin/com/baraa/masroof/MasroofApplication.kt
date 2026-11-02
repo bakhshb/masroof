@@ -5,7 +5,6 @@ import android.content.Context
 import android.os.Build
 import androidx.work.Configuration
 import com.baraa.masroof.application.AppContainer
-import com.baraa.masroof.application.backup.DatabaseRestoreRecovery
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.sms.DebugProcessHalt
 import com.baraa.masroof.application.update.UpdateCheckScheduler
@@ -29,7 +28,7 @@ class MasroofApplication : Application(), Configuration.Provider {
         if (BuildConfig.DEBUG) {
             DebugProcessHalt.consumeScheduledResume(filesDir)
         }
-        DatabaseRestoreRecovery.recover(this)
+        // AppContainer runs restore recovery before it opens the database.
         container = AppContainer(this)
         // The log write is synchronous, so the entry survives the process dying right after.
         val previous = Thread.getDefaultUncaughtExceptionHandler()

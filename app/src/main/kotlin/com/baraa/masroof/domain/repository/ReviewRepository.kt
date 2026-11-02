@@ -13,6 +13,10 @@ interface ReviewRepository {
 
     suspend fun findByRawSmsId(rawSmsId: String): ReviewItem?
 
+    /** Reviews for [rawSmsIds] by RawSms id, in one batch lookup. Ids without a review are omitted. */
+    suspend fun findByRawSmsIds(rawSmsIds: Collection<String>): Map<String, ReviewItem> =
+        rawSmsIds.distinct().mapNotNull { id -> findByRawSmsId(id)?.let { id to it } }.toMap()
+
     suspend fun listRequired(): List<ReviewItem>
 
     suspend fun countRequired(): Int = listRequired().size

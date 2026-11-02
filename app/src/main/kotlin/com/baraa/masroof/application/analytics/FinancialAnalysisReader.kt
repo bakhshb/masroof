@@ -19,6 +19,8 @@ internal data class FinancialAnalysisRead(val service: DashboardService, val row
  */
 internal object FinancialAnalysisReader {
     suspend fun capture(c: AppContainer, start: Instant, end: Instant, zone: ZoneId, clock: Clock = Clock.system(zone)): FinancialAnalysisRead =
+        // One transaction: rows and evidence must come from the same commit, or a stored snapshot and its
+        // phone alert could mix two states (invalidations reach the generation check asynchronously).
         c.databaseAccessGate.withAccess { c.database.withTransaction {
             val accounts = c.accountRegistryRepository.listAll()
             val cards = c.cardRegistryRepository.listAll()
@@ -30,7 +32,7 @@ internal object FinancialAnalysisReader {
             var evidence = scope.load(periodRows, cards, end)
             val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(evidence.parsedRecords, evidence.rawSmsById, zone, end)
             val cardRows = if (statementStart < start) c.financialTransactionRepository.listOccurredBetween(statementStart, end) else emptyList()
-            val sources = commitments.mapNotNull { c.financialTransactionRepository.getById(it.sourceTransactionId) }
+            val sources = c.financialTransactionRepository.getByIds(commitments.map { it.sourceTransactionId })
             val payments = c.financialTransactionRepository.listByTypes(listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT))
             val rows = (periodRows + cardRows + sources + payments).distinctBy { it.id }.sortedWith(compareBy({ it.occurredAt }, { it.id }))
             evidence = scope.extend(evidence, rows)
@@ -39,8 +41,10 @@ internal object FinancialAnalysisReader {
                 override suspend fun load(transactions: Collection<FinancialTransaction>, registryCards: List<CardRegistryEntry>, periodEndExclusive: Instant) = copiedEvidence
                 override suspend fun extend(evidence: DashboardEvidence, transactions: Collection<FinancialTransaction>) = copiedEvidence
             }
+            val rowsById = rows.associateBy { it.id }
             val financial = object : FinancialTransactionRepository by c.financialTransactionRepository {
-                override suspend fun getById(id: String) = rows.firstOrNull { it.id == id }
+                override suspend fun getById(id: String) = rowsById[id]
+                override suspend fun getByIds(ids: Collection<String>) = ids.distinct().mapNotNull(rowsById::get)
                 override suspend fun listAll() = rows
                 override suspend fun listOccurredBetween(startInclusive: Instant, endExclusive: Instant) = rows.filter { it.occurredAt >= startInclusive && it.occurredAt < endExclusive }.asReversed()
                 override suspend fun listByTypes(types: Collection<FinancialTransactionType>) = rows.filter { it.type in types }

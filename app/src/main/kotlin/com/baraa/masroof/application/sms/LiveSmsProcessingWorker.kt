@@ -29,8 +29,12 @@ class LiveSmsProcessingWorker(
     params: WorkerParameters,
     private val processStoredSms: ProcessStoredSmsUseCase,
     private val appLogService: AppLogService? = null,
-    /** Lets an open dashboard reload after a successful pass. */
+    /** Lets an open dashboard reload after any pass, since a failed pass may still have written rows. */
     private val onProcessed: () -> Unit = {},
+    /** False while startup integrity repair has not succeeded; processing then waits for a retry. */
+    private val startupReady: suspend () -> Boolean = { true },
+    /** True for the cancellation a restore uses to retire the database. */
+    private val isRestartRequired: (CancellationException) -> Boolean = { false },
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val rawSmsId = inputData.getString(KEY_RAW_SMS_ID)
@@ -38,8 +42,15 @@ class LiveSmsProcessingWorker(
             ?: return Result.failure()
 
         val outcome = try {
-            processStoredSms.process(rawSmsId)
+            if (!startupReady()) return Result.retry()
+            try {
+                processStoredSms.process(rawSmsId)
+            } finally {
+                onProcessed()
+            }
         } catch (e: CancellationException) {
+            // A restore retires the database with a cancellation; that work belongs to the next process.
+            if (isRestartRequired(e)) return Result.retry()
             throw e
         } catch (e: Exception) {
             logUnexpectedFailure(stage = "process", e)
@@ -56,10 +67,7 @@ class LiveSmsProcessingWorker(
                 ProcessStoredSmsUseCase.REASON_REVIEW_NOT_PERSISTED -> Result.retry()
                 else -> retryOrGiveUp()
             }
-            else -> {
-                onProcessed()
-                Result.success()
-            }
+            else -> Result.success()
         }
     }
 
@@ -114,6 +122,8 @@ class LiveSmsProcessingWorker(
     class Factory(
         private val processStoredSms: () -> ProcessStoredSmsUseCase,
         private val appLogService: AppLogService? = null,
+        private val startupReady: suspend () -> Boolean = { true },
+        private val isRestartRequired: (CancellationException) -> Boolean = { false },
         private val onProcessed: () -> Unit = {},
     ) : WorkerFactory() {
         override fun createWorker(
@@ -122,7 +132,7 @@ class LiveSmsProcessingWorker(
             workerParameters: WorkerParameters,
         ): ListenableWorker? =
             if (workerClassName == LiveSmsProcessingWorker::class.java.name) {
-                LiveSmsProcessingWorker(appContext, workerParameters, processStoredSms(), appLogService, onProcessed)
+                LiveSmsProcessingWorker(appContext, workerParameters, processStoredSms(), appLogService, onProcessed, startupReady, isRestartRequired)
             } else {
                 null
             }
