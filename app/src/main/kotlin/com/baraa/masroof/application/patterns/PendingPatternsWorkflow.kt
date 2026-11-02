@@ -133,8 +133,9 @@ class PendingPatternsWorkflow(
                 else listOfNotNull(reviews.getById(reviewId)?.takeIf { it.status == ReviewStatus.REQUIRED })
             val rows = mutableListOf<PendingPatternRow>()
             var requiredReviewCount = 0
-            // ponytail: bounded interactive preview; add repository pagination if queues exceed 1,000 rows routinely.
-            for (batch in required.take(1_000).chunked(200)) {
+            var limited = false
+            // Bound shown rows per bank after routing, so another bank's queue cannot hide this one.
+            scan@ for (batch in required.chunked(200)) {
                 val parsed = parsedEvents.listByRawSmsIds(batch.map { it.rawSmsId }).associateBy { it.event.rawSmsId }
                 fun storedBankOf(review: ReviewItem) = ExplicitBankSelection.selectedBankId(review.reasons)
                     ?: parsed[review.rawSmsId]?.event?.bank?.takeUnless { it == Bank.UNKNOWN }?.id
@@ -159,6 +160,7 @@ class PendingPatternsWorkflow(
                     requiredReviewCount++
                     if (review.resolutionKind != null || review.rawSmsId in protected || transactions.isRawSmsLinked(review.rawSmsId) ||
                         event?.parseStatus == ParseStatus.SUCCESS) continue
+                    if (rows.size >= 1_000) { limited = true; break@scan }
                     if (candidates.size != 1) {
                         rows += PendingPatternRow(review.id, PendingPatternStatus.BANK_CONFLICT, emptyList())
                         continue
@@ -186,7 +188,7 @@ class PendingPatternsWorkflow(
                     rows += PendingPatternRow(review.id, status, if (status == PendingPatternStatus.MATCHED) chosen else matches)
                 }
             }
-            PendingPatternReport(generation, bankId, rows, required.size > 1_000, requiredReviewCount)
+            PendingPatternReport(generation, bankId, rows, limited, requiredReviewCount)
         }
     }
 }
