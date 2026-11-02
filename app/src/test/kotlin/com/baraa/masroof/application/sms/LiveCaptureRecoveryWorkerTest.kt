@@ -37,15 +37,28 @@ class LiveCaptureRecoveryWorkerTest {
     }
 
     @Test
-    fun captureThatFailsAgain_retriesThenGivesUpWithoutFailingTheChain() = runBlocking {
+    fun captureThatFailsAgain_retriesThenHandsOverToALaterRequest() = runBlocking {
         val failed: suspend (Instant) -> SmsScanResult = { SmsScanResult(failed = 1) }
 
         assertEquals(ListenableWorker.Result.retry(), worker(scan = failed).doWork())
-        // Success, so a scan appended behind this one still runs.
+        // Success, so a scan appended behind this one still runs; a later request keeps trying.
         assertEquals(
             ListenableWorker.Result.success(),
             worker(scan = failed, attempt = LiveCaptureRecoveryWorker.MAX_ATTEMPTS - 1).doWork(),
         )
+        assertEquals(listOf(after to 1), requeued)
+    }
+
+    @Test
+    fun afterAboutAWeekOfRequests_givesUp() = runBlocking {
+        val result = worker(
+            scan = { SmsScanResult(failed = 1) },
+            attempt = LiveCaptureRecoveryWorker.MAX_ATTEMPTS - 1,
+            requeues = LiveCaptureRecoveryWorker.MAX_REQUEUES,
+        ).doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        assertEquals(emptyList<Pair<Instant, Int>>(), requeued)
     }
 
     @Test
@@ -58,9 +71,9 @@ class LiveCaptureRecoveryWorkerTest {
     }
 
     @Test
-    fun startupWait_backsOffToSixHours() {
+    fun requeueDelay_backsOffToSixHours() {
         assertEquals(listOf(900L, 1800L, 3600L, 7200L, 14400L, 21600L, 21600L),
-            (1..7).map(LiveCaptureRecoveryWorker::startupWaitDelaySeconds))
+            (1..7).map(LiveCaptureRecoveryWorker::requeueDelaySeconds))
     }
 
     @Test
@@ -86,9 +99,10 @@ class LiveCaptureRecoveryWorkerTest {
         scan: suspend (Instant) -> SmsScanResult,
         ready: Boolean = true,
         attempt: Int = 0,
+        requeues: Int = 0,
     ): LiveCaptureRecoveryWorker =
         TestListenableWorkerBuilder<LiveCaptureRecoveryWorker>(context)
-            .setInputData(LiveCaptureRecoveryWorker.workRequest(after).workSpec.input)
+            .setInputData(LiveCaptureRecoveryWorker.workRequest(after, requeues = requeues).workSpec.input)
             .setRunAttemptCount(attempt)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
