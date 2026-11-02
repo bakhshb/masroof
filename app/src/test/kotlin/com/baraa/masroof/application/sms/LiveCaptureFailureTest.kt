@@ -41,6 +41,7 @@ class LiveCaptureFailureTest {
     private lateinit var rawRepo: RoomRawSmsRepository
     private val processingScheduled = mutableListOf<String>()
     private val recoveryScheduled = mutableListOf<Instant>()
+    private val catchUpScheduled = mutableListOf<Instant>()
     private val now = Instant.parse("2026-08-03T14:40:00Z")
 
     @Before
@@ -119,6 +120,24 @@ class LiveCaptureFailureTest {
         assertTrue(recoveryScheduled.isEmpty())
     }
 
+    @Test
+    fun missedSmsCatchUp_reReadsTheInboxFromTheNewestStoredSmsNotAfterNow() = runBlocking {
+        val capture = CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(engineFixtureAdapter())))
+        intake(capture).scheduleMissedSmsCatchUp()
+        assertTrue("nothing stored: no catch-up", catchUpScheduled.isEmpty())
+        intake(capture).ingest(live("2026-08-03T18:00:00Z"))
+        intake(capture).scheduleMissedSmsCatchUp()
+        assertTrue("only a receipt in the future: no anchor", catchUpScheduled.isEmpty())
+
+        intake(capture).ingest(live("2026-08-03T14:00:00Z"))
+        intake(capture).ingest(live("2026-08-03T14:32:00Z"))
+        // The receipt hours ahead of the device (stored above) must not hide what arrived before it.
+        intake(capture).scheduleMissedSmsCatchUp()
+
+        assertEquals(listOf(Instant.parse("2026-08-02T14:32:00Z")), catchUpScheduled)
+        assertTrue(recoveryScheduled.isEmpty())
+    }
+
     private fun intake(capture: CaptureBankSmsUseCase) = LiveSmsIntake(
         captureBankSms = capture,
         scheduler = { processingScheduled += it },
@@ -128,6 +147,7 @@ class LiveCaptureFailureTest {
         appLogService = AppLogService(ApplicationProvider.getApplicationContext()),
         captureRecoveryScheduler = { recoveryScheduled += it },
         clock = InstantClock { now },
+        missedSmsScheduler = { catchUpScheduled += it },
     )
 
     private fun throwingAdapter(): BankSmsAdapter {

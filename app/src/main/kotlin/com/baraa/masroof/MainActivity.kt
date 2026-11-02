@@ -124,6 +124,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             var startupOutcome by rememberStartupMaintenanceOutcome(container::awaitStartupMaintenance) { outcome ->
                 startupFinancialReady = outcome == StartupMaintenanceOutcome.READY
+                if (startupFinancialReady) container.scheduleMissedSmsCatchUp()
             }
             var startupRetrying by remember { mutableStateOf(false) }
             val startupScope = rememberCoroutineScope()
@@ -145,6 +146,7 @@ class MainActivity : ComponentActivity() {
                                         startupOutcome = container.retryStartupMaintenance()
                                         startupFinancialReady =
                                             startupOutcome == StartupMaintenanceOutcome.READY
+                                        if (startupFinancialReady) container.scheduleMissedSmsCatchUp()
                                         startupRetrying = false
                                     }
                                 },

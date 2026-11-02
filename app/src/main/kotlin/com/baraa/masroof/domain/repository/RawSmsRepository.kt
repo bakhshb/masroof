@@ -58,6 +58,9 @@ interface RawSmsRepository {
      */
     suspend fun listIdsAwaitingProcessing(): List<String> = emptyList()
 
+    /** Receipt time of the newest stored SMS not after [notAfter], or null when there is none. */
+    suspend fun newestReceivedAt(notAfter: java.time.Instant): java.time.Instant? = null
+
     /**
      * Live↔historical near-duplicate: same sender + bodyHash within
      * [fromInclusive]…[toInclusive], opposite deviceMessageId nullness.
