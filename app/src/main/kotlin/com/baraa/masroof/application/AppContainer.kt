@@ -957,6 +957,8 @@ class AppContainer(
     private suspend fun runPostStartupBackgroundWork() {
         interpretationService?.startLearning(database.invalidationTracker)
         analytics.start()
+        // Links first, so pending live SMS are processed with them.
+        messagePatternsWorkflow.linkWalletBuiltIns()
         liveSmsIntake.schedulePendingProcessing()
         enrichExchangeRatesBestEffort()
     }

@@ -189,4 +189,87 @@ class PatternApprovalWorkflow(private val store: MessagePatternStore, private va
             store.saveBank(current.generation, bank.copy(patterns = listOf(preview.pattern.copy(enabled = enable || preview.pattern.enabled))))
         }
     }
+
+    /**
+     * Wallet banks never name the user's own account, so one confirmed account covers the bank: when the user owns
+     * exactly one account there and every existing link names it plainly, each enabled built-in pattern that never had
+     * a link takes it. A built-in layout that matches one of the user's own approved patterns stays unlinked, so the two
+     * never conflict. shortcut: a link the user removed is not added back only while that removal is in the kept
+     * revision history (4 revisions; a bundled role upgrade resets it); store explicit refusals if that matters.
+     */
+    suspend fun linkWalletBuiltIns(builtInIds: Set<String>, bankIds: Collection<String>? = null): Unit = withContext(Dispatchers.IO) {
+        for (bankId in WALLET_BANKS.filter { bankIds == null || it in bankIds }) {
+            try {
+                // Read first; the exclusive gate is taken only when there is something to write, and the plan is rebuilt inside it.
+                if (gate.withAccess { walletLinks(store.load(), bankId, builtInIds) }.isEmpty()) continue
+                gate.withExclusiveAccess {
+                    val current = store.load()
+                    val linked = walletLinks(current, bankId, builtInIds)
+                    if (linked.isNotEmpty()) store.saveBank(current.generation, current.banks.single { it.bankId == bankId }.copy(patterns = linked))
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { continue } // the configuration or a restore moved on, or one bank failed; the next pass retries
+        }
+    }
+
+    private suspend fun walletLinks(current: MessagePatternConfiguration, bankId: String, builtInIds: Set<String>): List<SavedMessagePattern> {
+        val bank = current.banks.singleOrNull { it.bankId == bankId } ?: return emptyList()
+        val links = bank.currentPatterns.flatMap { it.factContract?.accountBindings.orEmpty() }.filter { it.role != PatternAccountRole.CARD }
+        // A link keyed by a number in the message means that number tells the user's accounts apart: nothing is assumed.
+        if (links.isEmpty() || links.any { it.field != null || it.bank.value != bankId }) return emptyList()
+        val last4 = links.map { it.last4 }.distinct().singleOrNull() ?: return emptyList()
+        if (ownedAccounts(bankId).map { it.maskedNumber } != listOf(last4)) return emptyList()
+        val own = bank.currentPatterns.filter { it.id !in builtInIds && it.roleProfile == null && it.factContract != null }
+        return bank.currentPatterns.filter { pattern ->
+            pattern.id in builtInIds && pattern.enabled &&
+                bank.patterns.none { it.id == pattern.id && !it.factContract?.accountBindings.isNullOrEmpty() } &&
+                // Role rules let a user's same-family pattern complete them, so only taught layouts can collide.
+                (pattern.roleProfile != null || own.none { mine -> overlaps(pattern, mine, bankId) })
+        }.mapNotNull { pattern -> walletLink(pattern, bankId, last4)?.let {
+            pattern.copy(revision = Math.addExact(pattern.revision, 1), factContract = it) } }
+    }
+
+    private fun walletLink(pattern: SavedMessagePattern, bankId: String, last4: String): PatternFactContract? {
+        val family = pattern.factContract?.family ?: MessageFamily.entries.firstOrNull { it.name == pattern.label } ?: return null
+        val fields = pattern.parts.filterIsInstance<FieldSlot>().filterNot { it.ignored }.map { it.field }
+        // A number that may name one of the user's own accounts needs the user's own reading of it.
+        if (family !in WALLET_ACCOUNT_FAMILIES || "card" in fields || fields.any { it in OWN_ACCOUNT_FIELDS }) return null
+        val incoming = family == MessageFamily.TRANSFER_IN
+        return PatternFactContract(family, if (incoming) MoneyDirection.INCOMING else MoneyDirection.OUTGOING, version = 2,
+            accountBindings = listOf(PatternAccountBinding(if (incoming) PatternAccountRole.DESTINATION else PatternAccountRole.SOURCE,
+                BankId(bankId), last4)),
+            // The remaining references (funding source, counterparty bank) name the other party; the linked account is the user's.
+            contextReferences = fields.filter { it in REFERENCE_FIELDS }.toSet())
+    }
+
+    /** shortcut: one synthetic sample per pattern; a layout differing only in a field's width can be missed. */
+    private fun overlaps(builtIn: SavedMessagePattern, mine: SavedMessagePattern, bankId: String): Boolean {
+        val body = sampleBody(mine)?.takeIf { mine.copy(enabled = true).preview(bankId, mine.sender, it) != null } ?: return false
+        return builtIn.copy(enabled = true).preview(bankId, builtIn.sender, body) != null
+    }
+
+    private fun sampleBody(pattern: SavedMessagePattern): String? = pattern.parts.joinToString("") { part -> when (part) {
+        is StaticText -> part.value
+        is FieldSlot -> when (part.kind) {
+            FieldKind.MONEY -> "100.00 SAR"
+            FieldKind.DECIMAL -> "100.00"
+            FieldKind.DIGITS -> "5".repeat(part.width.takeIf { it > 0 } ?: 4)
+            FieldKind.TEXT -> if (part.field in REFERENCE_FIELDS || part.field.endsWith("_account")) "**5555" else "TEST PERSON"
+            FieldKind.DATE_DMY_SHORT -> "02/10/26 22:01"
+            FieldKind.DATE_DMY_LONG -> "02-10-2026 22:01"
+            FieldKind.DATE_YMD -> "2026-10-02 22:01"
+            FieldKind.TIME_DMY_LONG -> "22:01 02-10-2026"
+            FieldKind.TIME_YMD -> "22:01 2026-10-02"
+            FieldKind.DATE_DMY_ONLY -> "02/10/2026"
+            FieldKind.DATE_YMD_ONLY -> "2026-10-02"
+        }
+    } }.takeIf { pattern.parts.isNotEmpty() }
+
+    private companion object {
+        val WALLET_BANKS = setOf("BANK_STC", "BANK_BARQ")
+        val OWN_ACCOUNT_FIELDS = setOf("source_account", "destination_account", "account_reference")
+        val REFERENCE_FIELDS = setOf("source_account", "destination_account", "account_reference", "funding_reference", "counterparty_bank")
+        val WALLET_ACCOUNT_FAMILIES = setOf(MessageFamily.TRANSFER_IN, MessageFamily.TRANSFER_OUT, MessageFamily.WITHDRAWAL,
+            MessageFamily.BILL_PAYMENT, MessageFamily.FEE, MessageFamily.FINANCING_INSTALLMENT)
+    }
 }
