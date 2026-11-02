@@ -39,6 +39,76 @@ class CreditCardOverviewBuilderTest {
     private val cardId8332 = FinancialContainerIdFactory.cardId(card8332)!!
 
     @Test
+    fun anotherBanksStatementNeitherStartsThisCardsPeriodNorHidesItsRows() {
+        val purchaseAt = Instant.parse("2026-08-09T12:00:00Z")
+        val purchase = rawSms("sms-7271", "Synthetic purchase", purchaseAt)
+        val ownStatementAt = Instant.parse("2026-08-05T09:00:00Z")
+        val ownStatement = rawSms("sms-3478-stmt", "Synthetic statement", ownStatementAt)
+        val snbCard = CardReference(Bank("BANK_SNB"), "1111")
+        val snbStatementAt = Instant.parse("2026-08-10T09:00:00Z")
+        val snbStatement = rawSms("sms-snb-stmt", "Synthetic SNB statement", snbStatementAt)
+        val base = listOf(
+            ParsedEventRecord(parsedEvent("pe-7271", purchase, card7271, purchaseAt), creditPurchaseDetails()),
+            ParsedEventRecord(parsedEvent("pe-3478-stmt", ownStatement, card3478, ownStatementAt, MessageFamily.NON_FINANCIAL),
+                statementDetails(Money.of("10.00", Currency.SAR), LocalDate.parse("2026-09-01"))),
+        )
+        val other = ParsedEventRecord(parsedEvent("pe-snb-stmt", snbStatement, snbCard, snbStatementAt, MessageFamily.NON_FINANCIAL)
+            .copy(bank = Bank("BANK_SNB")), statementDetails(Money.of("5.00", Currency.SAR), LocalDate.parse("2026-09-05")))
+        val raws = listOf(purchase, ownStatement, snbStatement).associateBy { it.id }
+        fun build(records: List<ParsedEventRecord>) = CreditCardOverviewBuilder.build(
+            salaryPeriod = salaryPeriod,
+            cardTransactions = listOf(cardExpense("tx-7271", cardId7271, "20.00", purchaseAt)),
+            parsedRecords = records,
+            rawSmsById = raws,
+            zoneId = zone,
+        ).cards.single { it.last4 == "7271" }
+        // 7271 has no statement of its own: it follows AlJazira's latest statement, not SNB's later one.
+        val alone = build(base)
+        val withSnb = build(base + other)
+        assertEquals(alone.statementPeriodLabel, withSnb.statementPeriodLabel)
+        assertEquals("20.00", withSnb.statementSpendingNet.amount.toPlainString())
+        // The load window still reaches AlJazira's older statement.
+        val loadStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(base + other, raws, zone,
+            Instant.parse("2026-08-12T00:00:00Z"))
+        assertTrue(!loadStart.isAfter(ownStatementAt))
+    }
+
+    @Test
+    fun statementWithoutACardStillStartsItsBanksWindow() {
+        val statementAt = Instant.parse("2026-08-05T09:00:00Z")
+        val statement = rawSms("sms-stmt", "Synthetic statement", statementAt)
+        val purchaseAt = Instant.parse("2026-08-07T12:00:00Z")
+        val purchase = rawSms("sms-7271", "Synthetic purchase", purchaseAt)
+        val cardless = parsedEvent("pe-stmt", statement, card7271, statementAt, MessageFamily.NON_FINANCIAL).copy(cardRef = null)
+        val records = listOf(
+            ParsedEventRecord(cardless, statementDetails(Money.of("10.00", Currency.SAR), LocalDate.parse("2026-09-01"))),
+            ParsedEventRecord(parsedEvent("pe-7271", purchase, card7271, purchaseAt), creditPurchaseDetails()),
+        )
+        val overview = CreditCardOverviewBuilder.build(
+            salaryPeriod = salaryPeriod,
+            cardTransactions = listOf(cardExpense("tx-7271", cardId7271, "20.00", purchaseAt)),
+            parsedRecords = records,
+            rawSmsById = listOf(statement, purchase).associateBy { it.id },
+            zoneId = zone,
+        )
+        val card = overview.cards.single()
+        assertEquals("20.00", card.statementSpendingNet.amount.toPlainString())
+        assertEquals(overview.aggregateStatementPeriodLabel, card.statementPeriodLabel)
+        assertTrue(card.statementPeriodLabel!!.startsWith("5 "))
+    }
+
+    @Test
+    fun staleStatementOfAReplacedCardDoesNotReachBackYears() {
+        val end = Instant.parse("2026-08-12T00:00:00Z")
+        val oldAt = Instant.parse("2025-03-05T09:00:00Z")
+        val old = rawSms("sms-old", "Synthetic old statement", oldAt)
+        val records = listOf(ParsedEventRecord(parsedEvent("pe-old", old, card8332, oldAt, MessageFamily.NON_FINANCIAL),
+            statementDetails(Money.of("10.00", Currency.SAR), LocalDate.parse("2025-04-01"))))
+        val start = CreditCardOverviewBuilder.resolveStatementSpendingStart(records, mapOf(old.id to old), zone, end)
+        assertTrue(start.isAfter(Instant.parse("2026-05-01T00:00:00Z")))
+    }
+
+    @Test
     fun cardDueFromStatementOnly_notPurchaseOutstanding() {
         val purchaseAt = Instant.parse("2026-08-11T17:05:00Z")
         val statementAt = Instant.parse("2026-08-10T09:00:00Z")
