@@ -4,7 +4,7 @@
     <string name="pattern_approval_example">Message %1$d · %2$s</string>
     <string name="pattern_approval_choose_imported">Choose an imported message</string>
     <string name="pattern_approval_manual_message">Use another example message</string>
-    <string name="pattern_approval_account_question">Which account receives this movement?</string>
+    <string name="pattern_approval_account_question">Which account does this movement use?</string>
     <string name="pattern_approval_confirmed_account">Your confirmed account</string>
     <string name="pattern_approval_add_account">Add account</string>
     <string name="pattern_approval_cancel_account">Cancel</string>

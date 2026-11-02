@@ -42,6 +42,36 @@ class PatternFinancialActivationJourneyTest {
         compose.waitUntil(10_000) { runCatching { compose.onNodeWithTag("pattern-financial-save").assertIsEnabled() }.isSuccess }
     }
 
+    @Test fun choosingTheAlreadySelectedOptionKeepsApprovalAvailable() = runBlocking {
+        val context = TestStorageContext(compose.activity, "financial-pattern-${java.util.UUID.randomUUID()}")
+        val c = AppContainer(context)
+        try {
+            val w = c.messagePatternsWorkflow
+            w.confirmPatternAccount("BANK_STC", "4321")
+            val qattah = "دفع قطة\nمبلغ:37.50 ر.س\nإلى:TEST PERSON\nفي:13/10/26 12:30"
+            c.processRawSmsUseCase.ingest(RawSms("qattah", "STC Bank", qattah, Instant.parse("2026-10-15T10:00:00Z"), "qattah",
+                SmsBodyHasher.sha256Hex(qattah)))
+            compose.setContent {
+                val localized = AppLocaleContext.wrap(LocalContext.current, "ar")
+                CompositionLocalProvider(LocalContext provides localized, LocalConfiguration provides localized.resources.configuration,
+                    androidx.activity.compose.LocalActivityResultRegistryOwner provides compose.activity) {
+                    MasroofTheme { Surface { MessagePatternsScreen(w, "BANK_STC", onBack = {}) } }
+                }
+            }
+            compose.waitUntil(10_000) { compose.onAllNodesWithTag("pattern-open-BANK_STC-stc-qattah-ar").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("pattern-open-BANK_STC-stc-qattah-ar").performScrollTo().performClick()
+            compose.onAllNodesWithText(ar(R.string.pattern_financial_approve))[0].performScrollTo().performClick()
+            compose.waitUntil(10_000) { runCatching { compose.onNodeWithTag("pattern-financial-save").assertIsEnabled() }.isSuccess }
+            val outgoing = AppLocaleContext.wrap(compose.activity, "ar").resources.getStringArray(R.array.pattern_operations)[
+                com.baraa.masroof.application.patterns.PatternOperation.TRANSFER_OUT.ordinal]
+            for (selected in listOf(outgoing, ar(R.string.pattern_financial_currency_from_message))) {
+                compose.onNode(hasText(selected) and hasClickAction()).performScrollTo().performClick()
+                compose.waitForIdle()
+                compose.onNodeWithTag("pattern-financial-save").assertIsEnabled()
+            }
+        } finally { c.close(); context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
+    }
+
     @Test fun singlePageApprovalUsesImportedExamplesAndPostsVaryingCounterpartyReferencesToTheSelectedAccount() = runBlocking {
         val context = TestStorageContext(compose.activity, "financial-pattern-${java.util.UUID.randomUUID()}")
         val c = AppContainer(context)

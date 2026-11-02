@@ -44,6 +44,7 @@
   "com.baraa.masroof.instrumentation.HardeningJourneySmokeTest#reviewRestore_persistsRestoredPurchaseAndReloads": 6.437,
   "com.baraa.masroof.instrumentation.HardeningJourneySmokeTest#startup_reachesFinancialUiWhenMaintenanceIsReady": 4.081,
   "com.baraa.masroof.instrumentation.LiveRetryRestartTest#failedFinancialProcessing_survivesWorkerRestart_andReplaysOnce": 1.007,
+  "com.baraa.masroof.instrumentation.PatternFinancialActivationJourneyTest#choosingTheAlreadySelectedOptionKeepsApprovalAvailable": 3.031,
   "com.baraa.masroof.instrumentation.PeriodDisplayLayoutTest#longEnglishPeriodDoesNotConsumeTheFoldedViewport": 2.107,
   "com.baraa.masroof.instrumentation.RestoreConcurrencyTest#sharedGate_preventsOldProcessAccessDuringSwapAndRequiresNewRoomInstance": 0.154,
   "com.baraa.masroof.instrumentation.RestoreConcurrencyTest#ungatedOldRoomRepository_reopensLivePathDuringOldParkedStage": 0.331,

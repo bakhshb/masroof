@@ -75,6 +75,8 @@ fun MasroofRoot(
     val notifications by notificationCenterViewModel.uiState.collectAsState()
     var homeStack by rememberSaveable(stateSaver = HomeBackStackSaver) { mutableStateOf(homeRootStack()) }
     val top = homeStack.top().destination
+    // After process death the saved stack may reopen on a Home sub-screen; Home itself would have loaded the dashboard.
+    LaunchedEffect(onboarding.step) { if (onboarding.step == OnboardingStep.HOME && top != HomeDestination.Dashboard) dashboardViewModel.ensureLoaded() }
     // Every stack change goes through here, so the rules for the shared ViewModels apply to each push, pop and tab.
     fun navigate(next: HomeBackStack) {
         val leaving = homeStack.top()

@@ -40,7 +40,7 @@ internal fun PatternFinancialApprovalScreen(workflow: MessagePatternsWorkflow, g
     var reference by remember { mutableStateOf(pattern.approval?.referenceField) }
     var referenceChosen by remember { mutableStateOf(pattern.referenceFields.isEmpty() || pattern.approval != null) }
     var currency by remember { mutableStateOf(pattern.approval?.currency) }
-    var preview by remember { mutableStateOf<PatternFinancialPreview?>(null) }
+    var checked by remember { mutableStateOf<Pair<List<Any?>, PatternFinancialPreview>?>(null) }
     var loading by remember { mutableStateOf(true) }
     var validating by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -52,6 +52,9 @@ internal fun PatternFinancialApprovalScreen(workflow: MessagePatternsWorkflow, g
     val ready = !loading && operation != null && (accountId != null || cardId != null) &&
         ("card" !in pattern.fields || cardId != null) && referenceChosen && body.isNotBlank() &&
         (!builtIn || operation != PatternOperation.CARD_PAYMENT || (accountId != null && cardId != null))
+    // A preview is valid only for the inputs it was checked with; re-choosing the same option keeps it.
+    val inputs = listOf(ready, body, operation, accountId, cardId, reference, referenceChosen, currency)
+    val preview = checked?.takeIf { it.first == inputs }?.second
     fun work(action: suspend () -> Unit) {
         if (busy) return
         busy = true; failed = false
@@ -84,11 +87,11 @@ internal fun PatternFinancialApprovalScreen(workflow: MessagePatternsWorkflow, g
         finally { loading = false }
     }
     // Validation is read-only. Every edit invalidates the preview before Save can be used.
-    LaunchedEffect(ready, body, operation, accountId, cardId, reference, referenceChosen, currency) {
-        preview = null; problem = null
+    LaunchedEffect(inputs) {
+        checked = null; problem = null
         if (ready) {
             validating = true
-            try { preview = workflow.previewFinancial(generation, pattern.bankId, pattern.id, requireNotNull(operation), accountId,
+            try { checked = inputs to workflow.previewFinancial(generation, pattern.bankId, pattern.id, requireNotNull(operation), accountId,
                 body, reference, contextFields, currency, cardId) }
             catch (e: CancellationException) { throw e }
             catch (e: PatternApprovalException) { problem = e.problem }
@@ -105,9 +108,9 @@ internal fun PatternFinancialApprovalScreen(workflow: MessagePatternsWorkflow, g
                 MasroofOutlinedButton({ work { loadOptions() } }) { Text(stringResource(R.string.dashboard_retry)) }
             }
             PatternApprovalMessage(examples, exampleIndex, body, readOnlyBody, !busy && !loading,
-                onSelect = { index -> exampleIndex = index; body = examples[index].body; preview = null },
-                onManual = { exampleIndex = null; body = ""; preview = null },
-                onBody = { body = it; preview = null })
+                onSelect = { index -> exampleIndex = index; body = examples[index].body },
+                onManual = { exampleIndex = null; body = "" },
+                onBody = { body = it })
             MasroofCard {
                 val select = stringResource(R.string.pattern_financial_select_operation)
                 val operations = pattern.operations
@@ -116,19 +119,21 @@ internal fun PatternFinancialApprovalScreen(workflow: MessagePatternsWorkflow, g
                     MasroofHintBox(stringResource(R.string.pattern_approval_link_help))
                 } else PatternChoice(listOf(select) + operations.map { operationNames[it.ordinal] },
                     operation?.let { operationNames[it.ordinal] } ?: select, !busy && !loading) {
-                    operation = operations.getOrNull(it - 1); reference = null
-                    referenceChosen = pattern.referenceFields.isEmpty(); preview = null
+                    if (operations.getOrNull(it - 1) != operation) {
+                        operation = operations.getOrNull(it - 1); reference = null
+                        referenceChosen = pattern.referenceFields.isEmpty()
+                    }
                 }
                 if (showAccounts) PatternApprovalAccounts(accounts, accountId, !busy && !loading,
-                    onChoose = { accountId = it; preview = null }, onConfirm = { last4 -> work {
+                    onChoose = { accountId = it }, onConfirm = { last4 -> work {
                         val account = workflow.confirmPatternAccount(pattern.bankId, last4)
-                        accounts = workflow.patternAccounts(pattern.bankId); accountId = account.id; preview = null
+                        accounts = workflow.patternAccounts(pattern.bankId); accountId = account.id
                     } })
                 if (showCards) {
                     val choose = stringResource(R.string.settings_pattern_select_card)
                     val names = cards.map { "${it.name.orEmpty()} • ${it.last4}" }
                     PatternChoice(listOf(choose) + names, cards.indexOfFirst { it.id == cardId }.takeIf { it >= 0 }?.let { names[it] } ?: choose, !busy) {
-                        cardId = cards.getOrNull(it - 1)?.id; preview = null
+                        cardId = cards.getOrNull(it - 1)?.id
                     }
                     if (cards.isEmpty()) MasroofGuidanceLabel(stringResource(R.string.settings_card_setup),
                         stringResource(R.string.settings_pattern_add_card_hint))
@@ -136,12 +141,12 @@ internal fun PatternFinancialApprovalScreen(workflow: MessagePatternsWorkflow, g
             }
             if (pattern.referenceFields.isNotEmpty()) PatternApprovalReferences(pattern, operation, reference, referenceChosen,
                 !busy && !loading, examples.getOrNull(exampleIndex ?: -1)?.fields.orEmpty()) {
-                reference = it; referenceChosen = true; preview = null
+                reference = it; referenceChosen = true
             }
             MasroofCard {
                 val fromMessage = stringResource(R.string.pattern_financial_currency_from_message)
                 if (!builtIn) PatternChoice(listOf(fromMessage) + Currency.entries.map { it.name }, currency?.name ?: fromMessage, !busy && !loading) {
-                    currency = Currency.entries.getOrNull(it - 1); preview = null
+                    currency = Currency.entries.getOrNull(it - 1)
                 }
                 if (validating) CircularProgressIndicator()
                 problem?.let { Text(stringResource(patternApprovalProblemText(it)), color = MaterialTheme.colorScheme.error,
