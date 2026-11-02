@@ -36,6 +36,9 @@ interface RawSmsDao {
     @Query("SELECT id FROM raw_sms ORDER BY receivedAtEpochMillis ASC, id ASC")
     suspend fun listIdsByReceivedAt(): List<String>
 
+    @Query("SELECT MAX(receivedAtEpochMillis) FROM raw_sms WHERE receivedAtEpochMillis <= :notAfterEpochMillis")
+    suspend fun newestReceivedAtEpochMillis(notAfterEpochMillis: Long): Long?
+
     @Query(
         """
         SELECT r.id FROM raw_sms r

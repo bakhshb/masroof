@@ -33,6 +33,7 @@ class LiveSmsIntake(
     private val debugProcessHalt: DebugProcessHaltProbe = DebugProcessHaltProbe.NONE,
     private val captureRecoveryScheduler: LiveCaptureRecoveryScheduler? = null,
     private val clock: InstantClock = InstantClock.System,
+    private val missedSmsScheduler: LiveCaptureRecoveryScheduler? = null,
 ) {
     /** Never throws except for cancellation (a retired database is a failed capture, not a cancellation): the receiver's scope has no handler, and a throw ends the process. */
     suspend fun ingest(rawSms: RawSms): BankSmsCaptureResult {
@@ -77,6 +78,25 @@ class LiveSmsIntake(
                 AppLogCategories.SMS,
                 "Scheduling the inbox re-read failed (${e::class.java.simpleName}); the next import recovers it",
             )
+        }
+    }
+
+    /**
+     * Android delivers no SMS to an app it keeps stopped (force stop, or swipe-away on some phones), so when the
+     * user opens the app the inbox is re-read after the newest stored SMS. The scan skips what was already stored.
+     * shortcut: with nothing stored yet there is no anchor and no catch-up; store an onboarding-completed time if that matters.
+     */
+    suspend fun scheduleMissedSmsCatchUp() {
+        val scheduler = missedSmsScheduler ?: return
+        try {
+            val now = clock.now()
+            // A carrier clock can run ahead of the device; a receipt after now would hide everything missed before it.
+            val anchor = rawSmsRepository.newestReceivedAt(notAfter = now) ?: return
+            scheduler.schedule(anchor.minus(MISSED_SMS_LOOKBACK))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            appLogService.warn(AppLogCategories.SMS, "Scheduling the missed-SMS inbox re-read failed (${e::class.java.simpleName})")
         }
     }
 
@@ -157,5 +177,8 @@ class LiveSmsIntake(
 
     private companion object {
         val CAPTURE_RECOVERY_LOOKBACK: Duration = Duration.ofMinutes(10)
+
+        /** Covers carrier clocks hours off the device; stored rows come back as duplicates. shortcut: a clock days ahead can still hide SMS; widen toward the 7-day accepted skew if that shows up. */
+        val MISSED_SMS_LOOKBACK: Duration = Duration.ofDays(1)
     }
 }
