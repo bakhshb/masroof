@@ -101,6 +101,10 @@ class RoomRawSmsRepository(
         dao.listIdsAwaitingProcessing()
     }
 
+    override suspend fun newestReceivedAt(notAfter: java.time.Instant): java.time.Instant? = accessGate.withAccess {
+        dao.newestReceivedAtEpochMillis(notAfter.toEpochMilli())?.let(java.time.Instant::ofEpochMilli)
+    }
+
     override suspend fun findCrossSourceNearDuplicate(
         sender: String,
         bodyHash: String,

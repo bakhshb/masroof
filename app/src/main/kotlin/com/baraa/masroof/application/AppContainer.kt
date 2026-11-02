@@ -656,6 +656,9 @@ class AppContainer(
                 HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
             },
             debugProcessHalt = debugProcessHaltProbe,
+            missedSmsScheduler = { receivedAfter ->
+                LiveCaptureRecoveryWorker.enqueue(WorkManager.getInstance(appContext), receivedAfter, delaySeconds = 0)
+            },
             captureRecoveryScheduler = { receivedAfter ->
                 LiveCaptureRecoveryWorker.enqueue(WorkManager.getInstance(appContext), receivedAfter)
             },
@@ -961,6 +964,14 @@ class AppContainer(
         messagePatternsWorkflow.linkWalletBuiltIns()
         liveSmsIntake.schedulePendingProcessing()
         enrichExchangeRatesBestEffort()
+    }
+
+    private val missedSmsCatchUpScheduled = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** Once per process, when the user opens the app ready to use: only a user launch brings a stopped app back. */
+    fun scheduleMissedSmsCatchUp() {
+        if (!onboardingPreferencesRepository.isOnboardingCompleted() || !missedSmsCatchUpScheduled.compareAndSet(false, true)) return
+        applicationScope.launch { liveSmsIntake.scheduleMissedSmsCatchUp() }
     }
 
     private suspend fun enrichExchangeRatesBestEffort() {
