@@ -58,6 +58,14 @@ class DeviceProtocolTest(unittest.TestCase):
         for line in options:
             self.assertIn('-partition-size 8192', line)
 
+    def test_device_jobs_free_runner_disk_before_creating_the_emulator(self):
+        workflow = (device.ROOT / '.github/workflows/ci.yml').read_text()
+        for job, following in [('  emulator-app:', '  emulator-recovery:'), ('  emulator-recovery:', '  emulator-lifecycle:')]:
+            section = workflow.split(job, 1)[1].split(following, 1)[0]
+            self.assertIn('- name: Free runner disk for the emulator', section)
+            self.assertLess(section.index('Free runner disk'), section.index('android-emulator-runner'))
+            self.assertNotIn('android', section.split('Free runner disk', 1)[1].split('      - ', 1)[0].split('sudo rm -rf', 1)[1].split('\n', 1)[0])
+
     def test_emulator_creation_uses_current_tools_instead_of_runner_preinstall(self):
         workflow = (device.ROOT / '.github/workflows/ci.yml').read_text()
         name = '      - name: Use current tools for emulator creation'
