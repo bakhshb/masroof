@@ -57,9 +57,8 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     private val localePrefs = context.getSharedPreferences(com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository.PREFS_NAME, Context.MODE_PRIVATE)
     private val preferenceListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> request() }
     private val generation = java.util.concurrent.atomic.AtomicLong()
-    private val observedTables = arrayOf("financial_transaction", "financial_transaction_raw_sms_link",
-        "parsed_event", "commitment", "account_registry", "card_registry", "loan_registry", "credit_facility", "processing_retry", "review_item", "user_correction")
-    private val observer = object : InvalidationTracker.Observer(observedTables) {
+    private val observer = object : InvalidationTracker.Observer("financial_transaction", "financial_transaction_raw_sms_link",
+        "parsed_event", "commitment", "account_registry", "card_registry", "loan_registry", "credit_facility", "processing_retry", "review_item", "user_correction") {
         override fun onInvalidated(tables: Set<String>) { request() }
     }
     @Synchronized fun start() {
@@ -250,9 +249,6 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         if (AnalyticsImportGate.active()) return@withLock // import completion calls request()
         val version = generation.get()
         val input = source()
-        // The read holds no transaction and invalidations arrive asynchronously: pull them now, so a
-        // write committed during the read bumps generation before anything is stored or published.
-        container.databaseAccessGate.withAccess { container.database.invalidationTracker.refresh(*observedTables) }
         val dao = store.analytics(); val prefs = dao.preferences() ?: AnalysisPreferencesRow(enabledAt = clock.millis())
         val comparisons = settleComparisons(input)
         val performance = ForecastPerformancePolicy.evaluate(comparisons)

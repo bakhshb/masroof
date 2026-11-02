@@ -37,7 +37,11 @@ class SettingsInstallOnResumeTest {
 
     @Test
     fun resumeWithADownloadedUpdate_doesNotStartTheInstaller() {
-        actions().retryInstallAfterPermissionGranted()
+        val service = SettingsViewModelTestFixtures.appUpdateService()
+        service.updateApkFile(manifest).apply { parentFile?.mkdirs(); writeBytes("fake-apk".toByteArray()) }
+
+        actions(service).retryInstallAfterPermissionGranted()
+        shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(AppUpdateUiState.ReadyToInstall(manifest), state.value.updateState)
     }

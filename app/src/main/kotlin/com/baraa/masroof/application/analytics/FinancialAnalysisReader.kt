@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.analytics
 
+import androidx.room.withTransaction
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.dashboard.*
 import com.baraa.masroof.domain.model.*
@@ -18,9 +19,9 @@ internal data class FinancialAnalysisRead(val service: DashboardService, val row
  */
 internal object FinancialAnalysisReader {
     suspend fun capture(c: AppContainer, start: Instant, end: Instant, zone: ZoneId, clock: Clock = Clock.system(zone)): FinancialAnalysisRead =
-        // No write transaction: holding Room's write slot here blocked live SMS work for the whole read.
-        // A write during the read bumps the analytics generation, and that refresh runs again.
-        c.databaseAccessGate.withAccess {
+        // One transaction: rows and evidence must come from the same commit, or a stored snapshot and its
+        // phone alert could mix two states (invalidations reach the generation check asynchronously).
+        c.databaseAccessGate.withAccess { c.database.withTransaction {
             val accounts = c.accountRegistryRepository.listAll()
             val cards = c.cardRegistryRepository.listAll()
             val loans = c.loanRegistryRepository.listAll()
@@ -79,5 +80,5 @@ internal object FinancialAnalysisReader {
             }.toSet()
             FinancialAnalysisRead(service, rows, commitments.map { it.sourceTransactionId }.toSet(), retry, incompleteDays,
                 commitments.mapNotNull { it.recurrence?.name?.let { recurrence -> it.sourceTransactionId to recurrence } }.toMap())
-        }
+        } }
 }

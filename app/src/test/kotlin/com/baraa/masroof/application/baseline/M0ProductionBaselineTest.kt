@@ -39,6 +39,22 @@ class M0ProductionBaselineTest {
     }
 
     @Test
+    fun releaseIdentityAndSigning_stayUnchangedAndPrivate() {
+        assertTrue(File("build.gradle.kts").readText().contains("applicationId = \"com.baraa.masroof\""))
+        val release = File("../.github/workflows/release.yml").readText()
+        assertTrue(release.contains("assembleRelease"))
+        assertTrue(release.contains("RELEASE_KEYSTORE_BASE64"))
+        assertTrue(release.contains("storePassword=\${RELEASE_KEYSTORE_PASSWORD}"))
+        assertFalse(release.contains("storePassword=\""))
+        val gitignore = File("../.gitignore").readText()
+        assertTrue(gitignore.contains("keystore.properties"))
+        assertTrue(gitignore.contains("*.keystore"))
+        val installer = File(sourceRoot, "application/update/ApkInstaller.kt").readText()
+        assertTrue(installer.contains("application/vnd.android.package-archive"))
+        assertTrue(installer.contains("Intent.ACTION_VIEW"))
+    }
+
+    @Test
     fun processingAndReleaseEntrypoints_exist() {
         listOf(
             "sms/receiver/IncomingSmsReceiver.kt",
