@@ -34,7 +34,7 @@ fun interface LiveCaptureRecoveryScheduler {
 class LiveCaptureRecoveryWorker(
     appContext: Context,
     params: WorkerParameters,
-    private val scanner: HistoricalSmsScanner,
+    private val scan: suspend (receivedAfter: Instant) -> SmsScanResult,
     private val startupReady: suspend () -> Boolean,
     private val appLogService: AppLogService? = null,
     private val onFinished: () -> Unit = {},
@@ -43,13 +43,15 @@ class LiveCaptureRecoveryWorker(
         val after = inputData.getLong(KEY_RECEIVED_AFTER, -1L).takeIf { it >= 0 } ?: return Result.failure()
         return try {
             if (!startupReady()) return Result.retry()
-            val failure = try {
-                scanner.scan(receivedAfter = Instant.ofEpochMilli(after)).failure
+            val result = try {
+                scan(Instant.ofEpochMilli(after))
             } finally {
                 onFinished()
             }
-            when (failure) {
-                null, is SmsScanFailure.DerivedIncomplete -> Result.success() // the batch keeps its own retry rows
+            when (result.failure) {
+                // A capture that failed again stored nothing; rows already stored come back as duplicates.
+                null -> if (result.failed > 0) retryOrGiveUp("capture") else Result.success()
+                is SmsScanFailure.DerivedIncomplete -> Result.success() // the batch keeps its own retry rows
                 SmsScanFailure.PermissionDenied -> Result.failure()
                 is SmsScanFailure.ProviderError -> retryOrGiveUp("provider")
             }
@@ -84,7 +86,14 @@ class LiveCaptureRecoveryWorker(
             workerParameters: WorkerParameters,
         ): ListenableWorker? =
             if (workerClassName == LiveCaptureRecoveryWorker::class.java.name) {
-                LiveCaptureRecoveryWorker(appContext, workerParameters, scanner(), startupReady, appLogService, onFinished)
+                LiveCaptureRecoveryWorker(
+                    appContext,
+                    workerParameters,
+                    { scanner().scan(receivedAfter = it) },
+                    startupReady,
+                    appLogService,
+                    onFinished,
+                )
             } else {
                 null
             }
@@ -94,19 +103,26 @@ class LiveCaptureRecoveryWorker(
         const val KEY_RECEIVED_AFTER = "received_after_epoch_millis"
         const val MAX_ATTEMPTS = 5
         const val BACKOFF_DELAY_SECONDS = 30L
+
+        /** The default SMS app may write its inbox row after the live broadcast. */
+        const val INITIAL_DELAY_SECONDS = 60L
         private const val UNIQUE_WORK_PREFIX = "live-capture-recovery:"
 
-        /** One pending re-read per minute of lost captures; overlapping scans are deduplicated by capture. */
+        /**
+         * One chain per minute of lost captures. A failure while a scan runs appends a fresh scan, so
+         * an SMS that reached the inbox after the running scan's query is still read.
+         */
         fun uniqueWorkName(receivedAfter: Instant): String = "$UNIQUE_WORK_PREFIX${receivedAfter.epochSecond / 60}"
 
         fun workRequest(receivedAfter: Instant): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<LiveCaptureRecoveryWorker>()
                 .setInputData(Data.Builder().putLong(KEY_RECEIVED_AFTER, receivedAfter.toEpochMilli()).build())
+                .setInitialDelay(INITIAL_DELAY_SECONDS, TimeUnit.SECONDS)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
                 .build()
 
         fun enqueue(workManager: WorkManager, receivedAfter: Instant) {
-            workManager.enqueueUniqueWork(uniqueWorkName(receivedAfter), ExistingWorkPolicy.KEEP, workRequest(receivedAfter))
+            workManager.enqueueUniqueWork(uniqueWorkName(receivedAfter), ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest(receivedAfter))
         }
     }
 }

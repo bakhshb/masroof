@@ -1,0 +1,79 @@
+package com.baraa.masroof.application.sms
+
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import androidx.work.ListenableWorker
+import androidx.work.WorkerFactory
+import androidx.work.WorkerParameters
+import androidx.work.testing.TestListenableWorkerBuilder
+import com.baraa.masroof.data.room.DatabaseRestartRequiredException
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import java.time.Instant
+
+/** The inbox re-read after a lost live capture retries until the SMS is stored. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
+class LiveCaptureRecoveryWorkerTest {
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+    private val after = Instant.parse("2026-08-03T14:22:00Z")
+    private var finished = 0
+
+    @Test
+    fun cleanScan_succeedsFromTheInputBound() = runBlocking {
+        val bounds = mutableListOf<Instant>()
+
+        val result = worker(scan = { bounds += it; SmsScanResult(inserted = 1) }).doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        assertEquals(listOf(after), bounds)
+        assertEquals(1, finished)
+    }
+
+    @Test
+    fun captureThatFailsAgain_retriesThenGivesUp() = runBlocking {
+        val failed: suspend (Instant) -> SmsScanResult = { SmsScanResult(failed = 1) }
+
+        assertEquals(ListenableWorker.Result.retry(), worker(scan = failed).doWork())
+        assertEquals(
+            ListenableWorker.Result.failure(),
+            worker(scan = failed, attempt = LiveCaptureRecoveryWorker.MAX_ATTEMPTS - 1).doWork(),
+        )
+    }
+
+    @Test
+    fun startupNotReady_retriesWithoutScanning() = runBlocking {
+        var scanned = false
+
+        val result = worker(scan = { scanned = true; SmsScanResult() }, ready = false).doWork()
+
+        assertEquals(ListenableWorker.Result.retry(), result)
+        assertEquals(false, scanned)
+    }
+
+    @Test
+    fun failuresMapToTheirResults() = runBlocking {
+        assertEquals(ListenableWorker.Result.failure(), worker(scan = { SmsScanResult(failure = SmsScanFailure.PermissionDenied) }).doWork())
+        assertEquals(ListenableWorker.Result.retry(), worker(scan = { SmsScanResult(failure = SmsScanFailure.ProviderError("x")) }).doWork())
+        assertEquals(ListenableWorker.Result.retry(), worker(scan = { throw DatabaseRestartRequiredException() }).doWork())
+        assertEquals(3, finished)
+    }
+
+    private fun worker(
+        scan: suspend (Instant) -> SmsScanResult,
+        ready: Boolean = true,
+        attempt: Int = 0,
+    ): LiveCaptureRecoveryWorker =
+        TestListenableWorkerBuilder<LiveCaptureRecoveryWorker>(context)
+            .setInputData(LiveCaptureRecoveryWorker.workRequest(after).workSpec.input)
+            .setRunAttemptCount(attempt)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
+                    LiveCaptureRecoveryWorker(appContext, workerParameters, scan, { ready }, onFinished = { finished++ })
+            })
+            .build()
+}

@@ -317,11 +317,13 @@ class TransactionReconciliationService(
         val settledRawSmsIds = linkedSetOf<String>()
         val postedSingleLegCounterparts = mutableListOf<TransferMatchCandidate>()
 
-        // Each iteration writes only its own record's link, so these batch reads stay current for the loop.
+        // Batch reads for the loop. Unlinking one leg also changes its pair's transaction, so the other
+        // leg reads that transaction fresh.
         val inScopeIds = records.map { it.event.rawSmsId }.filter { scope == null || it in scope.rawSmsIds }
         val reviewsByRawSmsId = reviewRepository?.findByRawSmsIds(inScopeIds).orEmpty()
         val linkedByRawSmsId = financialTransactionRepository.findByRawSmsIds(inScopeIds)
         val receivedAtByRawSmsId = rawSmsRepository.receivedAtByIds(inScopeIds)
+        val touchedTransactionIds = mutableSetOf<String>()
 
         for (record in records) {
             val event = record.event
@@ -351,7 +353,9 @@ class TransactionReconciliationService(
                     userConfirmed = true
                 }
             }
-            val linkedBefore = linkedByRawSmsId[event.rawSmsId]
+            val linkedBefore = linkedByRawSmsId[event.rawSmsId]?.let {
+                if (it.id in touchedTransactionIds) financialTransactionRepository.findByRawSmsId(event.rawSmsId) else it
+            }
             val receivedAtBefore = receivedAtByRawSmsId[event.rawSmsId]
             if (linkedBefore != null) {
                 if (
@@ -363,6 +367,7 @@ class TransactionReconciliationService(
                     // Family comes from the parsed event; the raw body is not reclassified.
                 } else if (shouldReleaseStaleSelfTransferLink(record, review, linkedBefore, receivedAtBefore)) {
                     financialTransactionRepository.unlinkRawSms(event.rawSmsId)
+                    touchedTransactionIds += linkedBefore.id
                 } else {
                     alreadyLinked++
                     settledRawSmsIds += event.rawSmsId

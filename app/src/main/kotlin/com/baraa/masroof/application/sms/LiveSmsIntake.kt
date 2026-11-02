@@ -5,6 +5,7 @@ import com.baraa.masroof.application.ingestion.CaptureBankSmsUseCase
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.data.room.DatabaseRestartRequiredException
 import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
@@ -33,7 +34,7 @@ class LiveSmsIntake(
     private val captureRecoveryScheduler: LiveCaptureRecoveryScheduler? = null,
     private val clock: InstantClock = InstantClock.System,
 ) {
-    /** Never throws except for cancellation: the receiver's scope has no handler, and a throw ends the process. */
+    /** Never throws except for cancellation (a retired database is a failed capture, not a cancellation): the receiver's scope has no handler, and a throw ends the process. */
     suspend fun ingest(rawSms: RawSms): BankSmsCaptureResult {
         val result = try {
             appLogService.info(
@@ -41,6 +42,9 @@ class LiveSmsIntake(
                 "Live SMS received from ${AppLogFormatting.maskSender(rawSms.sender)}",
             )
             captureBankSms.capture(rawSms)
+        } catch (e: DatabaseRestartRequiredException) {
+            // A restore retired the database: nothing was stored, and WorkManager keeps its own database.
+            BankSmsCaptureResult.Failed(message = e::class.java.simpleName, cause = e)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

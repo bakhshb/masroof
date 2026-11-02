@@ -11,6 +11,7 @@ import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
+import com.baraa.masroof.data.room.DatabaseRestartRequiredException
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
@@ -93,6 +94,18 @@ class LiveCaptureFailureTest {
         assertTrue(result is BankSmsCaptureResult.Failed)
         assertEquals(1, recoveryScheduled.size)
         assertEquals(0, db.rawSmsDao().count())
+    }
+
+    @Test
+    fun retiredDatabaseDuringRestore_schedulesAnInboxReRead() = runBlocking {
+        val retired = object : RawSmsRepository by rawRepo {
+            override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult = throw DatabaseRestartRequiredException()
+        }
+
+        val result = intake(CaptureBankSmsUseCase(retired, BankSmsRegistry(listOf(engineFixtureAdapter())))).ingest(live())
+
+        assertTrue(result is BankSmsCaptureResult.Failed)
+        assertEquals(1, recoveryScheduled.size)
     }
 
     @Test
