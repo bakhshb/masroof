@@ -205,11 +205,18 @@ private fun MasroofContent(
         dashboardViewModel.openTransactionDetail(id)
     }
 
+    // While a write for the open transaction runs, the detail stays; finishing that write closes it itself.
+    fun closeTransactionDetailUnlessBusy() {
+        if (!dashboardState.reclassifying && !dashboardState.ignoring && !dashboardState.markingCommitment) {
+            dashboardViewModel.closeTransactionDetail()
+        }
+    }
+
     val labTarget by AnalyticsNavigation.target.collectAsState()
     LaunchedEffect(labTarget) {
         if (labTarget == null) return@LaunchedEffect
         // A full-screen detail hides the dashboard, which is what opens the alert.
-        if (top.destination == HomeDestination.Dashboard) dashboardViewModel.closeTransactionDetail() else push(HomeDestination.Dashboard)
+        if (top.destination == HomeDestination.Dashboard) closeTransactionDetailUnlessBusy() else push(HomeDestination.Dashboard)
     }
     val labCenterReturns by AnalyticsNavigation.centerReturns.collectAsState()
     var consumedLabCenterReturn by rememberSaveable { mutableLongStateOf(labCenterReturns) }
@@ -251,12 +258,7 @@ private fun MasroofContent(
         // A closed detail has no owner; a detail opened without one (deep link, direct ViewModel call) belongs to the visible screen.
         LaunchedEffect(dashboardState.selectedTransactionId) { if (dashboardState.selectedTransactionId == null) transactionDetailOwner = null }
         val detailOnTop = dashboardState.selectedTransactionId != null && (transactionDetailOwner ?: top.id) == top.id
-        // While a write for the open transaction runs, Back stays on it; finishing that write closes the detail itself.
-        val closeTransactionDetail = {
-            if (!dashboardState.reclassifying && !dashboardState.ignoring && !dashboardState.markingCommitment) {
-                dashboardViewModel.closeTransactionDetail()
-            }
-        }
+        val closeTransactionDetail = { closeTransactionDetailUnlessBusy() }
         BackHandler {
             when {
                 detailOnTop -> closeTransactionDetail()

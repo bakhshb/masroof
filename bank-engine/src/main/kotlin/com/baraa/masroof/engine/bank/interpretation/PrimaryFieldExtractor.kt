@@ -85,7 +85,7 @@ internal class PrimaryFieldExtractor(
 
     fun card(): String? {
         val labeledCard = identifier(ExtractionField.CARD)
-        val pattern = CompiledPatterns.of("(?m)^ *(?:بطاقة|card) *: *(?:credit|debit|ائتمانية|مدى)(?: +| *\\n+ *)(?:رقم|number) *: *([*x]*[0-9]{4})(?![\\p{L}\\p{N}_*])")
+        val pattern = CompiledPatterns.of("(?m)^ *(?:بطاقة|card) *: *(?:credit|debit|ائتمانية|مدى)(?: +| *\\n+ *)(?:رقم|number) *: *([*x]*[0-9]{4})[*x]*(?![\\p{L}\\p{N}_*])")
         val hits = pattern.findAll(source.text).toList()
         val values = (listOfNotNull(labeledCard) + hits.map { it.groupValues[1].takeLast(4) }).distinct()
         if (values.size > 1) problem("CONFLICTING_CARD", Blocker.CONFLICTING_FACTS)

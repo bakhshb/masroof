@@ -36,6 +36,7 @@ class IndependentRuleInterpreterTest {
     @Test fun maskWhoseDigitsAreAPrefix_isNeverTakenAsTheLastFour() {
         val result = parse("Purchase\nAmount: SAR 42.35\nCard: 4567****1234\nMerchant: Synthetic Shop\n2026-10-17 13:00")
         assertNotEquals("4567", result.facts.card?.last4)
+        assertTrue(result.facts.card == null || result.status != ParseStatus.SUCCESS, "${result.status} ${result.facts.card}")
         assertEquals("1234", parse(purchase.replace("**1234", "1234**")).facts.card!!.last4)
     }
 
