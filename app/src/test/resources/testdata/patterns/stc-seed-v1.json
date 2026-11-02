@@ -179,6 +179,52 @@
         "reference": "*DE2F"
       },
       "teach": false
+    },
+    {
+      "id": "stc-qattah-ar",
+      "operation": "TRANSFER_OUT",
+      "body": "دفع قطة\nمبلغ:37.50 ر.س\nإلى:TEST PERSON A\nفي:13/10/26 12:30",
+      "fields": {
+        "amount": "37.50 ر.س",
+        "counterparty": "TEST PERSON A",
+        "occurred_at": "13/10/26 12:30"
+      },
+      "teach": true
+    },
+    {
+      "id": "stc-internal-out-ar",
+      "operation": "TRANSFER_OUT",
+      "body": "حوالة داخلية صادرة\nبـ:37.50ر.س\nإلى:TEST PERSON A\nالى:321\nفي:13/10/26 12:30",
+      "fields": {
+        "amount": "37.50ر.س",
+        "counterparty": "TEST PERSON A",
+        "account_reference": "321",
+        "occurred_at": "13/10/26 12:30"
+      },
+      "teach": true
+    },
+    {
+      "id": "stc-qattah-ar",
+      "operation": "TRANSFER_OUT",
+      "body": "دفع قطة\nمبلغ:82.75 ر.س\nإلى:TEST PERSON B\nفي:14/10/26 09:15",
+      "fields": {
+        "amount": "82.75 ر.س",
+        "counterparty": "TEST PERSON B",
+        "occurred_at": "14/10/26 09:15"
+      },
+      "teach": false
+    },
+    {
+      "id": "stc-internal-out-ar",
+      "operation": "TRANSFER_OUT",
+      "body": "حوالة داخلية صادرة\nبـ:82.75ر.س\nإلى:TEST PERSON B\nالى:654\nفي:14/10/26 09:15",
+      "fields": {
+        "amount": "82.75ر.س",
+        "counterparty": "TEST PERSON B",
+        "account_reference": "654",
+        "occurred_at": "14/10/26 09:15"
+      },
+      "teach": false
     }
   ]
 }
