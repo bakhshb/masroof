@@ -6,6 +6,7 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
+import com.baraa.masroof.application.ingestion.DerivedProcessingStage
 import com.baraa.masroof.data.room.DatabaseRestartRequiredException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -22,7 +23,7 @@ class LiveCaptureRecoveryWorkerTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val after = Instant.parse("2026-08-03T14:22:00Z")
     private var finished = 0
-    private val requeued = mutableListOf<Instant>()
+    private val requeued = mutableListOf<Pair<Instant, Int>>()
 
     @Test
     fun cleanScan_succeedsFromTheInputBound() = runBlocking {
@@ -48,13 +49,28 @@ class LiveCaptureRecoveryWorkerTest {
     }
 
     @Test
+    fun captureThatFailsAgainInAnIncompleteBatch_stillRetries() = runBlocking {
+        val result = worker(scan = {
+            SmsScanResult(failed = 1, failure = SmsScanFailure.DerivedIncomplete(DerivedProcessingStage.entries.first()))
+        }).doWork()
+
+        assertEquals(ListenableWorker.Result.retry(), result)
+    }
+
+    @Test
+    fun startupWait_backsOffToSixHours() {
+        assertEquals(listOf(900L, 1800L, 3600L, 7200L, 14400L, 21600L, 21600L),
+            (1..7).map(LiveCaptureRecoveryWorker::startupWaitDelaySeconds))
+    }
+
+    @Test
     fun startupNotReady_requeuesAFreshRequestWithoutScanning() = runBlocking {
         var scanned = false
 
         val result = worker(scan = { scanned = true; SmsScanResult() }, ready = false, attempt = 3).doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
-        assertEquals(listOf(after), requeued)
+        assertEquals(listOf(after to 1), requeued)
         assertEquals(false, scanned)
     }
 
@@ -76,7 +92,7 @@ class LiveCaptureRecoveryWorkerTest {
             .setRunAttemptCount(attempt)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
-                    LiveCaptureRecoveryWorker(appContext, workerParameters, scan, { ready }, onFinished = { finished++ }) { requeued += it }
+                    LiveCaptureRecoveryWorker(appContext, workerParameters, scan, { ready }, onFinished = { finished++ }) { at, waits -> requeued += at to waits }
             })
             .build()
 }

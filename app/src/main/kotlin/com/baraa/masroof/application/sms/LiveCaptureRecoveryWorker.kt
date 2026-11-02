@@ -38,14 +38,14 @@ class LiveCaptureRecoveryWorker(
     private val startupReady: suspend () -> Boolean,
     private val appLogService: AppLogService? = null,
     private val onFinished: () -> Unit = {},
-    private val requeueAfterStartup: (receivedAfter: Instant) -> Unit = {},
+    private val requeueAfterStartup: (receivedAfter: Instant, startupWaits: Int) -> Unit = { _, _ -> },
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val after = inputData.getLong(KEY_RECEIVED_AFTER, -1L).takeIf { it >= 0 } ?: return Result.failure()
         return try {
             if (!startupReady()) {
                 // A fresh request: waiting for startup must not use up this request's attempts.
-                requeueAfterStartup(Instant.ofEpochMilli(after))
+                requeueAfterStartup(Instant.ofEpochMilli(after), inputData.getInt(KEY_STARTUP_WAITS, 0) + 1)
                 return Result.success()
             }
             val result = try {
@@ -56,7 +56,8 @@ class LiveCaptureRecoveryWorker(
             when (result.failure) {
                 // A capture that failed again stored nothing; rows already stored come back as duplicates.
                 null -> if (result.failed > 0) retryOrGiveUp("capture") else Result.success()
-                is SmsScanFailure.DerivedIncomplete -> Result.success() // the batch keeps its own retry rows
+                // The batch keeps retry rows for what it stored; a capture that failed again has none.
+                is SmsScanFailure.DerivedIncomplete -> if (result.failed > 0) retryOrGiveUp("capture") else Result.success()
                 SmsScanFailure.PermissionDenied -> giveUp("permission")
                 is SmsScanFailure.ProviderError -> retryOrGiveUp("provider")
             }
@@ -104,7 +105,7 @@ class LiveCaptureRecoveryWorker(
                     startupReady,
                     appLogService,
                     onFinished,
-                ) { enqueue(WorkManager.getInstance(appContext), it, STARTUP_WAIT_DELAY_SECONDS) }
+                ) { after, waits -> enqueue(WorkManager.getInstance(appContext), after, startupWaitDelaySeconds(waits), waits) }
             } else {
                 null
             }
@@ -118,8 +119,13 @@ class LiveCaptureRecoveryWorker(
         /** The default SMS app may write its inbox row after the live broadcast. */
         const val INITIAL_DELAY_SECONDS = 60L
 
-        /** Re-check delay while startup integrity repair is not ready. */
-        const val STARTUP_WAIT_DELAY_SECONDS = 15 * 60L
+        const val KEY_STARTUP_WAITS = "startup_waits"
+        private const val STARTUP_WAIT_FIRST_SECONDS = 15 * 60L
+        private const val STARTUP_WAIT_MAX_SECONDS = 6 * 60 * 60L
+
+        /** Re-check delay while startup integrity repair is not ready: 15 min, doubling, at most 6 h. */
+        fun startupWaitDelaySeconds(waits: Int): Long =
+            (STARTUP_WAIT_FIRST_SECONDS shl (waits - 1).coerceIn(0, 5)).coerceAtMost(STARTUP_WAIT_MAX_SECONDS)
         private const val UNIQUE_WORK_PREFIX = "live-capture-recovery:"
 
         /**
@@ -128,18 +134,28 @@ class LiveCaptureRecoveryWorker(
          */
         fun uniqueWorkName(receivedAfter: Instant): String = "$UNIQUE_WORK_PREFIX${receivedAfter.epochSecond / 60}"
 
-        fun workRequest(receivedAfter: Instant, delaySeconds: Long = INITIAL_DELAY_SECONDS): OneTimeWorkRequest =
+        fun workRequest(receivedAfter: Instant, delaySeconds: Long = INITIAL_DELAY_SECONDS, startupWaits: Int = 0): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<LiveCaptureRecoveryWorker>()
-                .setInputData(Data.Builder().putLong(KEY_RECEIVED_AFTER, receivedAfter.toEpochMilli()).build())
+                .setInputData(
+                    Data.Builder()
+                        .putLong(KEY_RECEIVED_AFTER, receivedAfter.toEpochMilli())
+                        .putInt(KEY_STARTUP_WAITS, startupWaits)
+                        .build(),
+                )
                 .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY_SECONDS, TimeUnit.SECONDS)
                 .build()
 
-        fun enqueue(workManager: WorkManager, receivedAfter: Instant, delaySeconds: Long = INITIAL_DELAY_SECONDS) {
+        fun enqueue(
+            workManager: WorkManager,
+            receivedAfter: Instant,
+            delaySeconds: Long = INITIAL_DELAY_SECONDS,
+            startupWaits: Int = 0,
+        ) {
             workManager.enqueueUniqueWork(
                 uniqueWorkName(receivedAfter),
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
-                workRequest(receivedAfter, delaySeconds),
+                workRequest(receivedAfter, delaySeconds, startupWaits),
             )
         }
     }
