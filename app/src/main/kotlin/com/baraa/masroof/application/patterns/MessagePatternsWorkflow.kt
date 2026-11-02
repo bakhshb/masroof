@@ -35,7 +35,25 @@ class MessagePatternsWorkflow(
     suspend fun previewFinancial(generation: Long, bankId: String, patternId: String, operation: PatternOperation, accountId: String?,
         body: String, referenceField: String?, contextReferences: Set<String>, currency: com.baraa.masroof.core.money.Currency? = null, cardId: String? = null) =
         requireNotNull(activation).preview(generation, bankId, patternId, operation, accountId, body, referenceField, contextReferences, currency?.let { com.baraa.masroof.finance.value.Currency.valueOf(it.name) }, cardId)
-    suspend fun saveFinancial(preview: PatternFinancialPreview) = requireNotNull(activation).save(preview)
+    /** The approval, then any wallet links it enables; returns the configuration after both. */
+    suspend fun saveFinancial(preview: PatternFinancialPreview): com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration {
+        val saved = requireNotNull(activation).save(preview)
+        linkWalletBuiltIns(setOf(preview.pattern.bankId))
+        return withContext(ioDispatcher) { accessGate.withAccess { store.load() } }.takeIf { it.generation > saved.generation } ?: saved
+    }
+
+    /** Best effort: a failed link leaves the built-in patterns waiting for approval, never a half-saved approval. */
+    suspend fun linkWalletBuiltIns(bankIds: Set<String>? = null) {
+        val activation = activation ?: return
+        try {
+            load()
+            activation.linkWalletBuiltIns(bundledBanks.flatMap { bank -> bank.patterns.map { it.id } }.toSet(), bankIds)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            reportFailure("linkWalletBuiltIns", e)
+        }
+    }
     suspend fun applyPending(bankId: String, generation: Long, reviewId: String? = null, patternId: String? = null) =
         requireNotNull(pendingPreview).apply(bankId, generation, reviewId, patternId)
     suspend fun approvalExamples(bankId: String, generation: Long, patternId: String) =
