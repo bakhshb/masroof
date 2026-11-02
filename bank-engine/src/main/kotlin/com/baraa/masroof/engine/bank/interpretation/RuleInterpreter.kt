@@ -76,7 +76,20 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
         }
         // The first meaningful line supplies the family cue; party/reference fields cannot do so.
         val first = source.text.indexOfFirst(Char::isLetterOrDigit)
-        val lineStart = if (first < 0) 0 else source.text.lastIndexOf('\n', first).let { it + 1 }
+        var lineStart = if (first < 0) 0 else source.text.lastIndexOf('\n', first).let { it + 1 }
+        val firstEnd = source.text.indexOf('\n', lineStart).let { if (it < 0) source.text.length else it }
+        // A fixed courtesy header is not financial authority. Only a configured balance/statement
+        // title on the next meaningful line may follow it.
+        if (source.text.substring(lineStart, firstEnd).trim() in COURTESY_HEADERS) {
+            val next = (firstEnd until source.text.length).firstOrNull { source.text[it].isLetterOrDigit() }
+            if (next != null) {
+                val nextStart = source.text.lastIndexOf('\n', next) + 1
+                val nextEnd = source.text.indexOf('\n', nextStart).let { if (it < 0) source.text.length else it }
+                val nextTitle = source.text.substring(nextStart, nextEnd).trimStart()
+                if (snapshot.rules.any { rule -> rule.family == MessageFamily.BALANCE_NOTICE &&
+                        rule.phrases.any { source.phrase(it).find(nextTitle)?.range?.first == 0 } }) lineStart = nextStart
+            }
+        }
         val lineEnd = source.text.indexOf('\n', lineStart).let { if (it < 0) source.text.length else it }
         val rawTitle = source.text.substring(lineStart, lineEnd)
         val leading = rawTitle.length - rawTitle.trimStart().length
@@ -87,14 +100,18 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
         fun roleEnd(text: String) = rolePrefixes.mapNotNull { it.find(text)?.range?.last?.plus(1) }.maxOrNull() ?: 0
         val roleEnd = roleEnd(title)
         // Arabic conjunctions may join two independent family cues; never hide that collision.
-        fun titleMatches(phrase: String) = (if (phrase.firstOrNull() in '\u0600'..'\u06ff') listOf(phrase, "و$phrase") else listOf(phrase))
+        // A statement title may itself be the card's label («…الائتمانية **8765»).
+        fun titleMatches(phrase: String, balanceTitle: Boolean = false) = (if (phrase.firstOrNull() in '\u0600'..'\u06ff') listOf(phrase, "و$phrase") else listOf(phrase))
             .flatMap { source.phrase(it).findAll(title).toList() }
-            .filter { roleEnd == 0 || (it.range.first == 0 && it.range.last + 1 > roleEnd) }
+            .filter { roleEnd == 0 || (it.range.first == 0 &&
+                (it.range.last + 1 > roleEnd || balanceTitle && it.range.last + 1 == roleEnd)) }
         if (CompiledPatterns.of("^ *اسم المستفيد *: *[^\\n]+\\n+ *الاسم المختصر *: *[^\\n]+\\n+ *حالة *: *(?:غير نشط|نشط) *(?:\\n+ *(?:حساب|بنك|في) *: *[^\\n]+)*$").matches(source.text.trim())) {
             evidence += source.evidence("notice.beneficiary.directory", "family", 0..(source.text.length - 1))
             return result(Facts(MessageFamily.NON_FINANCIAL), ParseStatus.NON_FINANCIAL)
         }
-        val spansByRule = snapshot.rules.associateWith { rule -> rule.phrases.flatMap(::titleMatches).map { it.range } }
+        val spansByRule = snapshot.rules.associateWith { rule ->
+            rule.phrases.flatMap { titleMatches(it, rule.family == MessageFamily.BALANCE_NOTICE) }.map { it.range }
+        }
         val candidates = snapshot.rules.filter { rule -> spansByRule.getValue(rule).isNotEmpty() && rule.excludes.none(::contains) }
         // A configured compound title (e.g. refund of a purchase) consumes its nested literal,
         // but independent movement cues on another span still conflict.
@@ -255,6 +272,7 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
         private val SECONDARY = listOf("رسوم:", "available balance", "balance", "الرصيد المتاح", "الرصيد", "due amount", "outstanding balance", "المبلغ المستحق", "fee amount", "مبلغ الرسوم", "tax amount", "مبلغ الضريبة", "minimum amount", "minimum payment", "الحد الادني للسداد", "foreign amount", "المبلغ الاجنبي", "international fee", "رسوم العمليات الدولية")
         private val AMOUNT_ROLES = listOf("ب", "بقيمة", "بمبلغ")
         private val INFORMATIONAL = setOf(MessageFamily.NON_FINANCIAL, MessageFamily.BALANCE_NOTICE)
+        private val COURTESY_HEADERS = setOf("عزيزي العميل،", "عزيزي العميل,")
         private val SUPPORTED = INFORMATIONAL + setOf(MessageFamily.PURCHASE, MessageFamily.REFUND, MessageFamily.WITHDRAWAL, MessageFamily.FEE, MessageFamily.CARD_PAYMENT, MessageFamily.BILL_PAYMENT, MessageFamily.FINANCING_INSTALLMENT, MessageFamily.TRANSFER_IN, MessageFamily.TRANSFER_OUT)
     }
 }

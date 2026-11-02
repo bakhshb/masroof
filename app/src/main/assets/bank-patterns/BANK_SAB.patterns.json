@@ -1607,6 +1607,142 @@
               ]
             }
           }
+        },
+        {
+          "id": "sab.card-statement",
+          "sender": "SAB",
+          "label": "BALANCE_NOTICE",
+          "revision": 1,
+          "enabled": true,
+          "parts": [],
+          "factContract": {
+            "version": 1,
+            "family": "BALANCE_NOTICE",
+            "direction": "OUTGOING",
+            "currency": null,
+            "sourceAccountBank": null,
+            "destinationAccountBank": null,
+            "cardBank": null
+          },
+          "roleProfile": {
+            "schema": 1,
+            "revision": 1,
+            "rules": [
+              {
+                "id": "sab.card-statement",
+                "family": "BALANCE_NOTICE",
+                "direction": "OUTGOING",
+                "operator": "CONTAINS_TOKEN_PHRASE",
+                "phrases": [
+                  "تم إصدار كشف حساب بطاقة Visa Noon الائتمانية",
+                  "تم إصدار كشف حساب بطاقة Visa الائتمانية",
+                  "تم إصدار كشف حساب بطاقة Mastercard الائتمانية"
+                ],
+                "excludes": [],
+                "labels": {
+                  "CARD": [
+                    "تم إصدار كشف حساب بطاقة Visa Noon الائتمانية",
+                    "تم إصدار كشف حساب بطاقة Visa الائتمانية",
+                    "تم إصدار كشف حساب بطاقة Mastercard الائتمانية"
+                  ]
+                },
+                "detailLabels": {
+                  "dueAmount": [
+                    "المبلغ المستحق"
+                  ],
+                  "paymentDueDate": [
+                    "تاريخ الاستحقاق"
+                  ]
+                },
+                "observations": {
+                  "card.statement": [
+                    "كشف"
+                  ]
+                }
+              }
+            ],
+            "network": {
+              "bankAliases": {
+                "BANK_ALJAZIRA": [
+                  "AlJazira",
+                  "Bank AlJazira",
+                  "AlJazira Bank",
+                  "بنك الجزيرة",
+                  "بنك الجزيره"
+                ],
+                "BANK_D360": [
+                  "بنك دال ثلاثمائة وستون",
+                  "D360 Bank",
+                  "D360 بنك"
+                ],
+                "BANK_RIYAD": [
+                  "بنك الرياض",
+                  "Riyad Bank"
+                ],
+                "BANK_ANB": [
+                  "ARAB NATIONAL BANK",
+                  "البنك العربي الوطني"
+                ],
+                "BANK_SNB": [
+                  "SNB",
+                  "SNB-AlAhli",
+                  "NCBKSARI",
+                  "ALAHLI BANK",
+                  "البنك الأهلي السعودي",
+                  "البنك الاهلي"
+                ],
+                "BANK_BARQ": [
+                  "barq",
+                  "برق"
+                ],
+                "BANK_SAB": [
+                  "SAB",
+                  "ساب",
+                  "البنك الأول",
+                  "البنك السعودي البريطاني ساب"
+                ],
+                "BANK_ALINMA": [
+                  "alinma",
+                  "الإنماء",
+                  "مصرف الإنماء",
+                  "AL INMA BANK",
+                  "INMA BANK"
+                ],
+                "BANK_EMIRATES_NBD": [
+                  "EmiratesNBD",
+                  "بنك الإمارات دبي الوطني"
+                ],
+                "BANK_ALRAJHI": [
+                  "RAJHI BANK",
+                  "AL RAJHI BANK",
+                  "الراجحي",
+                  "مصرف الراجحي"
+                ]
+              },
+              "sourceBankLabels": [
+                "من بنك",
+                "البنك المرسل",
+                "source bank"
+              ],
+              "destinationBankLabels": [
+                "الى بنك",
+                "إلى بنك",
+                "البنك المستفيد",
+                "destination bank"
+              ],
+              "standaloneDestinationBrackets": true,
+              "networkLabels": [
+                "bank network",
+                "network",
+                "شبكة الحوالة"
+              ],
+              "standaloneSourceBrackets": true,
+              "unidentifiedExternalBankMarkers": [
+                "بنك",
+                "bank"
+              ]
+            }
+          }
         }
       ]
     }
