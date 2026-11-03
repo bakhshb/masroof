@@ -79,6 +79,24 @@ object MasroofLineChart {
         return ValueRange(low, high)
     }
 
+    /**
+     * Visual only: the one day that is more than 4x the next-highest would flatten every other day,
+     * so the axis stops just above the rest and that day is drawn at the top with its real amount.
+     */
+    fun cappedOutlierIndex(values: List<BigDecimal>): Int? {
+        if (values.size < 3) return null
+        val highest = values.indices.maxByOrNull { values[it] } ?: return null
+        val next = values.filterIndexed { i, _ -> i != highest }.max()
+        return highest.takeIf { next.signum() > 0 && values[highest] > next.multiply(BigDecimal(4)) }
+    }
+
+    /** The plotted axis range; amounts, labels and selection always keep the exact values. */
+    fun chartRange(values: List<BigDecimal>, reference: BigDecimal, showAverage: Boolean, capOutlier: Boolean): ValueRange {
+        val capped = if (capOutlier) cappedOutlierIndex(values) else null
+        val shown = values.filterIndexed { i, _ -> i != capped }
+        return referenceRange(if (showAverage) shown + reference else shown)
+    }
+
     fun nearestPointIndex(x: Float, width: Float, pointCount: Int): Int? {
         if (pointCount <= 0 || width <= 0f) return null
         if (pointCount == 1) return 0
@@ -147,7 +165,8 @@ fun MasroofInteractiveLineChart(values: List<BigDecimal>, referenceValue: BigDec
     modifier: Modifier = Modifier, selectedPointIndex: Int? = null,
     onPointSelected: ((Int) -> Unit)? = null, pointLabel: (Int) -> String = { "" },
     role: MasroofHeroRole = MasroofHeroRole.Brand,
-    axisLabel: (Int) -> String = { "" }, currencyLabel: String = "", showAverage: Boolean = false, displayText: (String) -> String = { it }, expectedFromIndex: Int? = null) {
+    axisLabel: (Int) -> String = { "" }, currencyLabel: String = "", showAverage: Boolean = false, displayText: (String) -> String = { it }, expectedFromIndex: Int? = null,
+    cappedLabel: ((Int) -> String)? = null) {
     if (values.isEmpty()) return
     val selected = MasroofLineChartLayout.coerceSelectedIndex(selectedPointIndex, values.size)
     val mirror = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -157,8 +176,9 @@ fun MasroofInteractiveLineChart(values: List<BigDecimal>, referenceValue: BigDec
     val surface = MaterialTheme.colorScheme.surface
     val textMeasurer = rememberTextMeasurer()
     val labelStyle = MasroofReference.chartLabel.copy(color = muted)
-    val range = remember(values, referenceValue, showAverage) {
-        MasroofLineChart.referenceRange(if (showAverage) values + referenceValue else values)
+    val capped = if (cappedLabel != null) remember(values) { MasroofLineChart.cappedOutlierIndex(values) } else null
+    val range = remember(values, referenceValue, showAverage, capped) {
+        MasroofLineChart.chartRange(values, referenceValue, showAverage, capOutlier = capped != null)
     }
     val density = LocalDensity.current
     val left = with(density) { MasroofReference.chartLeft.toPx() }
@@ -222,7 +242,7 @@ fun MasroofInteractiveLineChart(values: List<BigDecimal>, referenceValue: BigDec
         val width = (size.width - left - right).coerceAtLeast(1f)
         val plotHeight = (size.height - top - bottom).coerceAtLeast(1f)
         fun point(index: Int) = Offset(left + MasroofLineChartLayout.xForPoint(index, width, values.size, mirror),
-            MasroofLineChartLayout.yFor(values[index], range, top, plotHeight))
+            MasroofLineChartLayout.yFor(values[index].min(range.maximum), range, top, plotHeight))
         fun label(text: String, x: Float, y: Float, rightAligned: Boolean = false) {
             val result = textMeasurer.measure(displayText(text), style = labelStyle)
             drawText(result, topLeft = Offset(if (rightAligned) x - result.size.width else x, y - result.firstBaseline))
@@ -268,6 +288,11 @@ fun MasroofInteractiveLineChart(values: List<BigDecimal>, referenceValue: BigDec
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashStroke, dash)))
             drawCircle(surface, selectedRadius, p)
             drawCircle(line, selectedRadius, p, style = Stroke(stroke))
+        }
+        capped?.let { index ->
+            val layout = textMeasurer.measure(displayText(cappedLabel!!(index)), style = labelStyle.copy(color = line))
+            val x = MasroofLineChartLayout.tooltipLeft(point(index).x, layout.size.width.toFloat(), size.width, left)
+            drawText(layout, topLeft = Offset(x, top + selectedRadius + tickBaseline))
         }
         val tickIndices = if (values.size <= 4) values.indices.toList() else
             listOf(0, (values.lastIndex * 4.0 / 13.0).roundToInt(), (values.lastIndex * 9.0 / 13.0).roundToInt(), values.lastIndex).distinct()

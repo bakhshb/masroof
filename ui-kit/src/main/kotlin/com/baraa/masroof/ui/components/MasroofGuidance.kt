@@ -65,7 +65,7 @@ fun MasroofGuidanceButton(
     }
     Box(modifier.size(MasroofGuidanceStyle.iconSize)) {
         Box(modifier = Modifier.size(MasroofGuidanceStyle.iconSize).clickable(role = Role.Button) { open = !open }) {
-            Icon(MasroofOutlineIcons.CircleAlert, description,
+            Icon(MasroofOutlineIcons.Info, description,
                 tint = contentColor, modifier = Modifier.size(MasroofGuidanceStyle.iconSize))
         }
         if (open) {

@@ -26,11 +26,11 @@ fun AccountPeriodSummaryCard(summary: CurrentAccountSummary, modifier: Modifier 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         MasroofHeroCard(title, formatLocalizedMoney(movement.remaining), subtitle,
             role = MasroofHeroRole.Account, guidance = stringResource(R.string.dashboard_account_remaining_calculated_hint))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MasroofReference.metricGap)) {
+        com.baraa.masroof.presentation.common.MasroofMetricRow { tile ->
             MasroofMetric(stringResource(R.string.dashboard_total_inflow), formatLocalizedMoney(movement.inflow),
-                colors.inflow, Modifier.weight(1f))
+                colors.inflow, tile)
             MasroofMetric(stringResource(R.string.dashboard_total_spent), formatLocalizedMoney(movement.outflow),
-                colors.outflow, Modifier.weight(1f))
+                colors.outflow, tile)
         }
         SpendingTrendSection(trend, stringResource(R.string.approved_account_daily),
             explanation = stringResource(R.string.reference_account_detail_scope), role = MasroofHeroRole.Account,

@@ -6,6 +6,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.node.LayoutModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.invalidateMeasurement
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -53,7 +61,7 @@ fun MasroofFitText(text: AnnotatedString, style: TextStyle, modifier: Modifier =
     color: Color = Color.Unspecified, textAlign: TextAlign? = null) {
     val measurer = rememberTextMeasurer()
     // Propagated min width keeps textAlign working when the caller fills the row.
-    BoxWithConstraints(modifier, propagateMinConstraints = true) {
+    BoxWithConstraints(modifier.then(FitTextIntrinsicsElement(text, style, measurer)), propagateMinConstraints = true) {
         val fit = remember(text, style, constraints.maxWidth) { measurer.fitScale(text, style, constraints.maxWidth) }
         val scale = fit ?: MASROOF_FIT_MIN_SCALE
         Text(text.scaledBy(scale), color = color, style = style.scaledBy(scale), textAlign = textAlign,
@@ -65,3 +73,36 @@ fun MasroofFitText(text: AnnotatedString, style: TextStyle, modifier: Modifier =
 fun MasroofFitText(text: String, style: TextStyle, modifier: Modifier = Modifier,
     color: Color = Color.Unspecified, textAlign: TextAlign? = null) =
     MasroofFitText(AnnotatedString(text), style, modifier, color, textAlign)
+
+/** BoxWithConstraints cannot answer intrinsics; measure the same fitted text directly so IntrinsicSize rows work. */
+private data class FitTextIntrinsicsElement(val text: AnnotatedString, val style: TextStyle,
+    val measurer: TextMeasurer) : ModifierNodeElement<FitTextIntrinsicsNode>() {
+    override fun create() = FitTextIntrinsicsNode(text, style, measurer)
+    override fun update(node: FitTextIntrinsicsNode) {
+        node.text = text; node.style = style; node.measurer = measurer
+        node.invalidateMeasurement()
+    }
+}
+
+private class FitTextIntrinsicsNode(var text: AnnotatedString, var style: TextStyle,
+    var measurer: TextMeasurer) : Modifier.Node(), LayoutModifierNode {
+    override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
+        val placeable = measurable.measure(constraints)
+        return layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+    }
+
+    private fun height(width: Int): Int {
+        val fit = measurer.fitScale(text, style, width)
+        val scale = fit ?: MASROOF_FIT_MIN_SCALE
+        return measurer.measure(text.scaledBy(scale), style.scaledBy(scale), softWrap = fit == null,
+            maxLines = if (fit != null) 1 else Int.MAX_VALUE, constraints = Constraints(maxWidth = width)).size.height
+    }
+
+    private fun width(scale: Float): Int =
+        measurer.measure(text.scaledBy(scale), style.scaledBy(scale), softWrap = false, maxLines = 1).size.width
+
+    override fun IntrinsicMeasureScope.minIntrinsicHeight(measurable: IntrinsicMeasurable, width: Int) = height(width)
+    override fun IntrinsicMeasureScope.maxIntrinsicHeight(measurable: IntrinsicMeasurable, width: Int) = height(width)
+    override fun IntrinsicMeasureScope.minIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int) = width(MASROOF_FIT_MIN_SCALE)
+    override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int) = width(1f)
+}

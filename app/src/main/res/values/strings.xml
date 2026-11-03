@@ -588,7 +588,7 @@
     <string name="approved_account_daily">المصاريف اليومية للحساب</string>
     <string name="approved_accounts_daily">المصاريف اليومية لجميع الحسابات</string>
     <string name="approved_credit_daily">المصاريف اليومية للبطاقات الائتمانية</string>
-    <string name="approved_all_expenses">جميع المصاريف اليومية</string>
+    <string name="approved_all_expenses">كل المصروفات</string>
     <string name="approved_loan_remaining">المبلغ المتبقي</string>
     <string name="approved_last_installment">آخر قسط مسجل</string>
     <string name="approved_installment_date">تاريخ آخر قسط</string>
@@ -604,8 +604,8 @@
     <string name="guidance_about">توضيح: %1$s</string>
     <string name="approved_card_expense_basis">تشمل المشتريات والفواتير والرسوم، بعد خصم الاستردادات. لا تشمل سداد البطاقة أو التحويل بين حساباتك أو أقساط القروض.</string>
 
-    <string name="dashboard_daily_purchases">المشتريات اليومية</string>
-    <string name="dashboard_chart_average_value">المتوسط %1$s</string>
+    <string name="dashboard_daily_purchases">مشتريات ونقد</string>
+    <string name="dashboard_chart_average_value">متوسط هذا العرض %1$s</string>
     <string name="dashboard_chart_no_elapsed_days">لم تبدأ هذه الفترة بعد؛ لا توجد أيام منقضية لعرض المصاريف أو حساب المتوسط.</string>
     <string name="dashboard_purchases_trend_basis">تشمل مشتريات بطاقات الائتمان ومدى والسحب النقدي والتحويلات الخارجية الصادرة، بعد خصم الاستردادات المرتبطة بالبطاقات. تستبعد الفواتير وأقساط القروض والرسوم المستقلة وسداد البطاقات والتحويلات بين حساباتك. المتوسط يحسب على أيام الفترة المنقضية، بما فيها الأيام بلا مصاريف.</string>
     <string name="dashboard_all_trend_basis">تشمل المشتريات والفواتير والرسوم وأقساط القروض والسحب النقدي والتحويلات الخارجية الصادرة، بعد خصم الاستردادات. تستبعد سداد البطاقات والتحويلات بين حساباتك لتجنب التكرار. المتوسط يحسب على أيام الفترة المنقضية، بما فيها الأيام بلا مصاريف.</string>

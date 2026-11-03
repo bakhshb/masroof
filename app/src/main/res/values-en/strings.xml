@@ -580,7 +580,7 @@
     <string name="approved_account_daily">Daily account expenses</string>
     <string name="approved_accounts_daily">Daily expenses across accounts</string>
     <string name="approved_credit_daily">Daily credit card expenses</string>
-    <string name="approved_all_expenses">All daily expenses</string>
+    <string name="approved_all_expenses">All expenses</string>
     <string name="approved_loan_remaining">Remaining loan amount</string>
     <string name="approved_last_installment">Last recorded installment</string>
     <string name="approved_installment_date">Last installment date</string>
@@ -596,8 +596,8 @@
     <string name="guidance_about">About %1$s</string>
     <string name="approved_card_expense_basis">Includes purchases, bills and ordinary fees, less refunds. Excludes card settlements, self-transfers and loan repayments.</string>
 
-    <string name="dashboard_daily_purchases">Daily purchases</string>
-    <string name="dashboard_chart_average_value">Average %1$s</string>
+    <string name="dashboard_daily_purchases">Purchases &amp; cash</string>
+    <string name="dashboard_chart_average_value">Avg for this view %1$s</string>
     <string name="dashboard_chart_no_elapsed_days">This period has not started. There are no elapsed days to display expenses or calculate an average.</string>
     <string name="dashboard_purchases_trend_basis">Includes credit and Mada purchases, cash withdrawals and outgoing external transfers, less card-attributed refunds. Excludes bills, loan repayments, standalone fees, card settlements and transfers between your own accounts. The average uses elapsed period days, including zero-spend days.</string>
     <string name="dashboard_all_trend_basis">Includes purchases, bills, fees, loan repayments, cash withdrawals and outgoing external transfers, less refunds. Card settlements and transfers between your own accounts are excluded to avoid duplicates. The average uses elapsed period days, including zero-spend days.</string>

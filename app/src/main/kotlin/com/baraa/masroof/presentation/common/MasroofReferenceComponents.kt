@@ -21,6 +21,15 @@ fun MasroofMetric(label: String, value: String, color: Color,
     }
 }
 
+/** Side-by-side tiles share one height, so their amounts line up when one label wraps. */
+@Composable
+fun MasroofMetricRow(modifier: Modifier = Modifier, gap: androidx.compose.ui.unit.Dp = MasroofReference.metricGap,
+    content: @Composable RowScope.(tile: Modifier) -> Unit) {
+    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(gap)) {
+        content(Modifier.weight(1f).fillMaxHeight())
+    }
+}
+
 @Composable
 fun MasroofAverageBand(value: String, periodHint: String, guidance: String?,
     modifier: Modifier = Modifier) {

@@ -36,9 +36,9 @@ fun DashboardSummaryHeroCard(spec: DashboardSummaryHeroSpec, modifier: Modifier 
         MasroofHeroCard(title = spec.primary.title, value = spec.primary.amount, role = role, subtitle = spec.subtitle,
             guidance = listOfNotNull(spec.primary.hint, spec.footerHint).distinct().joinToString("\n\n"))
         if (spec.secondary.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.metricGap)) {
+            com.baraa.masroof.presentation.common.MasroofMetricRow { tile ->
                 spec.secondary.forEach { metric -> com.baraa.masroof.presentation.common.MasroofMetric(metric.title, metric.amount,
-                    resolveMetricToneColor(metric.tone, metric.signedAmount), Modifier.weight(1f)) }
+                    resolveMetricToneColor(metric.tone, metric.signedAmount), tile) }
             }
         }
     }
