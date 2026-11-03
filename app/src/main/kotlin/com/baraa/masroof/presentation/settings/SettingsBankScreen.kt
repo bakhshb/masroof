@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.Bank
@@ -37,10 +38,10 @@ fun SettingsBankScreen(
             stopped = summary.stoppedAccountCount,
         ),
         emptyLabel = stringResource(R.string.settings_accounts_empty),
-        followedUnregisteredRes = R.string.settings_hub_accounts_subtitle,
-        followedOnlyRes = R.string.settings_hub_accounts_subtitle_followed_only,
-        stoppedOnlyRes = R.string.settings_hub_accounts_subtitle_stopped_only,
-        followedStoppedRes = R.string.settings_hub_accounts_subtitle_followed_stopped,
+        followedUnregisteredRes = R.plurals.settings_hub_accounts_subtitle,
+        followedOnlyRes = R.plurals.settings_hub_accounts_subtitle_followed_only,
+        stoppedOnlyRes = R.plurals.settings_hub_accounts_subtitle_stopped_only,
+        followedStoppedRes = R.plurals.settings_hub_accounts_subtitle_followed_stopped,
     )
     val cardsSubtitle = formatRegistryCategorySubtitle(
         state = resolveRegistryCategorySubtitle(
@@ -49,13 +50,13 @@ fun SettingsBankScreen(
             stopped = summary.stoppedCardCount,
         ),
         emptyLabel = stringResource(R.string.settings_cards_empty),
-        followedUnregisteredRes = R.string.settings_hub_cards_subtitle,
-        followedOnlyRes = R.string.settings_hub_cards_subtitle_followed_only,
-        stoppedOnlyRes = R.string.settings_hub_cards_subtitle_stopped_only,
-        followedStoppedRes = R.string.settings_hub_cards_subtitle_followed_stopped,
+        followedUnregisteredRes = R.plurals.settings_hub_cards_subtitle,
+        followedOnlyRes = R.plurals.settings_hub_cards_subtitle_followed_only,
+        stoppedOnlyRes = R.plurals.settings_hub_cards_subtitle_stopped_only,
+        followedStoppedRes = R.plurals.settings_hub_cards_subtitle_followed_stopped,
     )
     val loansSubtitle = if (summary.loanCount > 0) {
-        stringResource(R.string.settings_bank_summary_loans, summary.loanCount)
+        pluralStringResource(R.plurals.settings_bank_summary_loans, summary.loanCount, summary.loanCount)
     } else {
         stringResource(R.string.settings_loans_empty)
     }
@@ -71,20 +72,17 @@ fun SettingsBankScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
         ) {
-            com.baraa.masroof.presentation.common.MasroofCard {
-                com.baraa.masroof.presentation.common.MasroofText(settingsBankLabel(bank), style = MaterialTheme.typography.titleMedium)
-                definition?.let {
-                    com.baraa.masroof.presentation.common.MasroofText(bankSupportLabel(it), style = MaterialTheme.typography.bodySmall)
-                    com.baraa.masroof.presentation.common.MasroofText(it.senders.joinToString(), style = MaterialTheme.typography.bodySmall)
+            definition?.let {
+                val (support, accent) = bankSupportLabel(it)
+                com.baraa.masroof.presentation.common.MasroofCard {
+                    androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        com.baraa.masroof.presentation.common.MasroofText(stringResource(R.string.settings_bank_reading_messages),
+                            androidx.compose.ui.Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        com.baraa.masroof.presentation.common.MasroofBadge(support, accent)
+                    }
                 }
-            }
-            if (definition != null) com.baraa.masroof.presentation.common.MasroofButton(onImport,
-                modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
-                com.baraa.masroof.presentation.common.MasroofText(stringResource(R.string.pattern_import_bank))
-            }
-            else com.baraa.masroof.presentation.common.MasroofOutlinedButton(onEditBank,
-                modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
-                com.baraa.masroof.presentation.common.MasroofText(stringResource(R.string.settings_bank_setup_messages))
             }
             com.baraa.masroof.presentation.common.MasroofCard {
                 com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_bank_accounts_title), accountsSubtitle, MasroofIcons.moneyMovement, onOpenAccounts)
@@ -95,8 +93,19 @@ fun SettingsBankScreen(
                 com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_statement_reconciliation_title), stringResource(R.string.settings_statement_reconciliation_subtitle), MasroofIcons.recentTransactions, onStatement, divider = definition != null)
                 if (definition != null) {
                     com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_bank_teaching), stringResource(R.string.pattern_teach), MasroofIcons.sms, onOpenPatterns)
-                    com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_bank_details), stringResource(R.string.settings_bank_senders), MasroofIcons.moneyMovement, onEditBank, divider = false)
+                    com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_bank_details),
+                        if (definition.senders.isEmpty()) stringResource(R.string.settings_bank_senders)
+                        else pluralStringResource(R.plurals.settings_bank_sender_count, definition.senders.size, definition.senders.size),
+                        MasroofIcons.moneyMovement, onEditBank, divider = false)
                 }
+            }
+            if (definition != null) com.baraa.masroof.presentation.common.MasroofOutlinedButton(onImport,
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
+                com.baraa.masroof.presentation.common.MasroofText(stringResource(R.string.pattern_import_bank))
+            }
+            else com.baraa.masroof.presentation.common.MasroofOutlinedButton(onEditBank,
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
+                com.baraa.masroof.presentation.common.MasroofText(stringResource(R.string.settings_bank_setup_messages))
             }
 
         }
@@ -162,8 +171,9 @@ internal fun formatRegistryCategorySubtitle(
     when (state) {
         RegistryCategorySubtitleState.Empty -> emptyLabel
         is RegistryCategorySubtitleState.FollowedUnregistered -> {
-            val base = stringResource(
+            val base = pluralStringResource(
                 followedUnregisteredRes,
+                state.followed,
                 state.followed,
                 state.unregistered,
             )
@@ -173,17 +183,20 @@ internal fun formatRegistryCategorySubtitle(
                 base
             }
         }
-        is RegistryCategorySubtitleState.FollowedStopped -> stringResource(
+        is RegistryCategorySubtitleState.FollowedStopped -> pluralStringResource(
             followedStoppedRes,
+            state.followed,
             state.followed,
             state.stopped,
         )
-        is RegistryCategorySubtitleState.StoppedOnly -> stringResource(
+        is RegistryCategorySubtitleState.StoppedOnly -> pluralStringResource(
             stoppedOnlyRes,
             state.stopped,
+            state.stopped,
         )
-        is RegistryCategorySubtitleState.FollowedOnly -> stringResource(
+        is RegistryCategorySubtitleState.FollowedOnly -> pluralStringResource(
             followedOnlyRes,
+            state.followed,
             state.followed,
         )
     }

@@ -42,8 +42,10 @@ class CardSetupInteractionTest {
             SettingsRegistryCardRow(card, false, { stopped = true }, {}, { target = it }, {})
             SettingsCardSetupSheet(target, null, listOf(card), emptyList(), false, false, { target = null }, {})
         } }
+        compose.onNodeWithTag("registry-more-actions").performClick()
         compose.onNodeWithText(context.getString(com.baraa.masroof.R.string.reference_stop_tracking)).performClick()
         compose.runOnIdle { assertTrue(stopped) }
+        compose.onNodeWithTag("registry-more-actions").performClick()
         compose.onAllNodesWithText(context.getString(com.baraa.masroof.R.string.settings_card_setup)).assertCountEquals(1)
         compose.onNodeWithText(context.getString(com.baraa.masroof.R.string.settings_card_setup)).performClick()
         if (card.cardType == CardType.CREDIT) {

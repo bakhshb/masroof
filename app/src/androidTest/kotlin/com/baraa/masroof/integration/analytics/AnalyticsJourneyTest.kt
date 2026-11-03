@@ -325,7 +325,7 @@ class AnalyticsJourneyTest {
             compose.onNodeWithText(text(R.string.lab_analysis_snooze, "en")).performClick()
             awaitAnalysis(workflow) { it.alerts.first { row -> row.id == alert.id }.snoozedUntil > 0 }
             compose.onNodeWithTag("lab-alert-${alert.id}").assertDoesNotExist()
-            compose.onNodeWithText(text(R.string.lab_analysis_settings, "en")).performClick()
+            compose.onNodeWithText(text(R.string.lab_analysis_settings, "en")).performScrollTo().performClick()
             compose.onNodeWithText(text(R.string.lab_analysis_budget_section, "en")).assertIsDisplayed()
         } finally {
             compose.runOnUiThread { showing = false }; compose.waitForIdle()

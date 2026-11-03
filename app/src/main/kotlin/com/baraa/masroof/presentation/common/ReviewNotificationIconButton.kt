@@ -12,6 +12,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.ui.theme.MasroofReference
@@ -27,7 +28,7 @@ fun ReviewNotificationIconButton(reviewCount: Int, onClick: () -> Unit, modifier
             border = BorderStroke(MasroofSpacing.borderWidth, colors.cardBorder)) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(MasroofIcons.notifications,
-                    if (reviewCount > 0) stringResource(R.string.notification_center_badge_count, reviewCount)
+                    if (reviewCount > 0) pluralStringResource(R.plurals.notification_center_badge_count, reviewCount, reviewCount)
                     else stringResource(R.string.notification_center_title),
                     Modifier.size(MasroofReference.icon))
             }

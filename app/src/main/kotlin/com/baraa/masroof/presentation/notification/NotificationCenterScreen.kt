@@ -60,6 +60,11 @@ internal fun NotificationCenterScreen(
         title = stringResource(R.string.notification_center_title),
         onBack = onBack,
         backContentDescription = stringResource(R.string.review_back),
+        actions = {
+            val unread = com.baraa.masroof.presentation.analytics.notificationUnreadCount(state)
+            if (unread > 0) Text(androidx.compose.ui.res.pluralStringResource(R.plurals.notification_center_new_count, unread, unread),
+                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
     ) { contentModifier ->
         com.baraa.masroof.presentation.analytics.AnalysisNotificationContent(state, contentModifier) { item, divider ->
             NotificationCenterRow(item, { onOpenNotification(item) }, divider)

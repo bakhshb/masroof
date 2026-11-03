@@ -16,7 +16,6 @@
     <string name="reference_period_average">حتى %1$s · %2$d يومًا</string>
     <string name="reference_accounts_scope">تشمل الحوالات الخارجية الصادرة والفواتير وأقساط القروض وسداد البطاقة الائتمانية والمشتريات غير الائتمانية والسحب النقدي والرسوم المرتبطة بحساباتك، بعد خصم استردادات الحساب. تستبعد الحوالات الداخلية ومشتريات الائتمان واسترداداته والعمليات الواردة.</string>
     <string name="reference_details">التفاصيل</string>
-    <string name="reference_backup_title">النسخ الاحتياطي</string>
     <string name="reference_export_title">إنشاء نسخة مشفّرة</string>
     <string name="reference_restore_title">استعادة نسخة</string>
     <string name="reference_waiting_payment">%1$s بانتظار السداد</string>
@@ -38,7 +37,7 @@
     <string name="reference_unconfirmed">غير مؤكدة</string>
     <string name="reference_stopped">متوقفة</string>
     <string name="reference_manage_accounts">حساباتي · الإدارة</string>
-    <string name="reference_manage_cards">بطاقاتي · الإدارة</string>
+    <string name="reference_manage_cards">إدارة البطاقات</string>
     <string name="reference_manage_loans">قروضي · الإدارة</string>
     <string name="reference_review_evidence">عرض الأدلة والخيارات</string>
     <string name="reference_unread">جديد</string>

@@ -85,25 +85,6 @@ private fun SettingsRenameDialog(
 }
 
 @Composable
-fun SettingsCardMetadataActions(
-    enabled: Boolean,
-    onRename: () -> Unit,
-    onPickNetwork: () -> Unit,
-    includeRename: Boolean = true,
-    onStop: (() -> Unit)? = null,
-    onDelete: (() -> Unit)? = null,
-) {
-    androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth().padding(top = MasroofSpacing.sectionGap),
-        horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.smallGap),
-        verticalArrangement = Arrangement.spacedBy(MasroofSpacing.smallGap)) {
-        if (includeRename) com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.settings_action_rename), onRename, enabled = enabled)
-        com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.settings_card_setup), onPickNetwork, enabled = enabled)
-        onStop?.let { com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.reference_stop_tracking), it, enabled = enabled, warning = true) }
-        onDelete?.let { SettingsDeleteAction(it, enabled) }
-    }
-}
-
-@Composable
 fun cardNetworkLabel(network: CardNetwork): String =
     when (network) {
         CardNetwork.MADA -> stringResource(R.string.card_network_mada)
