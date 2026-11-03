@@ -58,11 +58,11 @@ fun DailyExpensesScreen(state: DashboardUiState, onBack: () -> Unit, onOpenTrans
             explanation = stringResource(if (scope == "all") R.string.dashboard_all_trend_basis
                 else if (state.creditFacilities?.debitCards?.any { CardOwnershipKey.of(it) == scope } == true)
                     R.string.dashboard_mada_trend_basis else R.string.approved_card_expense_basis))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MasroofReference.metricGap)) {
+        com.baraa.masroof.presentation.common.MasroofMetricRow { tile ->
             MasroofMetric(stringResource(R.string.reference_before_refunds), formatLocalizedMoney(point.beforeRefunds),
-                MasroofThemeExtras.extendedColors.outflow, Modifier.weight(1f))
+                MasroofThemeExtras.extendedColors.outflow, tile)
             MasroofMetric(stringResource(R.string.reference_day_refunds), formatLocalizedMoney(point.refunds),
-                MasroofThemeExtras.extendedColors.inflow, Modifier.weight(1f))
+                MasroofThemeExtras.extendedColors.inflow, tile)
         }
         val ids = trend.transactionIdsByDate[point.date].orEmpty()
         DashboardSummaryTransactionsSection(state.allTransactions.filter { it.id in ids }, onOpenTransaction,

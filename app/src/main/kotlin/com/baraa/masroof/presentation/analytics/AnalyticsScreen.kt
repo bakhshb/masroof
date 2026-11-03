@@ -59,9 +59,21 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
     val state by workflow.state.collectAsState()
     val value = state.snapshot
     MasroofCard(Modifier.fillMaxWidth().clickable(onClick = onOpen).testTag("lab-forecast-entry")) {
-        MasroofSectionHeader(title = stringResource(R.string.lab_analysis_period), icon = MasroofIcons.analysis,
-            onViewAll = onOpen, viewAllLabel = stringResource(R.string.lab_analysis_open))
-        Status(state)
+        val (label, guidance) = statusRes(state)
+        val status = stringResource(label)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
+            MasroofSectionHeader(title = stringResource(R.string.lab_analysis_period), icon = MasroofIcons.analysis,
+                onViewAll = onOpen, viewAllLabel = stringResource(R.string.lab_analysis_open), modifier = Modifier.weight(1f))
+            guidance?.let { MasroofGuidanceButton(status, stringResource(it)) }
+        }
+        val locale = LocalConfiguration.current.locales[0]
+        Text(value?.let { snapshot ->
+            val issued = Instant.ofEpochMilli(snapshot.issuedAt).atZone(ZoneId.systemDefault())
+            stringResource(R.string.home_forecast_status_line, status, if (state.updating) stringResource(R.string.lab_analysis_updating)
+                else stringResource(R.string.home_forecast_updated_at, DateTimeFormatter.ofPattern("d MMM", locale).format(issued),
+                    DateTimeFormatter.ofPattern("HH:mm", locale).format(issued)))
+        } ?: status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         value?.total?.let { Amount(stringResource(R.string.lab_analysis_expected_total), it) }
         if (value != null && value.total == null) Amount(stringResource(R.string.lab_analysis_actual), value.actual)
         Text(stringResource(R.string.lab_analysis_sections), style = MaterialTheme.typography.bodySmall,
@@ -69,7 +81,7 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
     }
 }
 
-@Composable private fun Status(state: AnalysisUiState) {
+private fun statusRes(state: AnalysisUiState): Pair<Int, Int?> {
     val label = when {
         state.unavailable -> R.string.lab_analysis_failed
         state.snapshot == null -> R.string.lab_analysis_preparing
@@ -85,6 +97,11 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
         R.string.lab_analysis_quality_warning -> R.string.lab_analysis_quality_hint
         else -> null
     }
+    return label to guidance
+}
+
+@Composable private fun Status(state: AnalysisUiState) {
+    val (label, guidance) = statusRes(state)
     MasroofGuidanceLabel(stringResource(label), guidance?.let { stringResource(it) },
         style = MaterialTheme.typography.labelMedium, contentColor = MaterialTheme.colorScheme.primary)
     state.snapshot?.let { Text(if (state.updating) stringResource(R.string.lab_analysis_updating)

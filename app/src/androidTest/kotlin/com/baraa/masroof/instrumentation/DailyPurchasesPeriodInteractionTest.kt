@@ -81,7 +81,7 @@ class DailyPurchasesPeriodInteractionTest {
             assertAverageLine(trends.purchases, night)
             capture("purchases-$lang-$appearance")
             val purchasesHelp = context.getString(R.string.dashboard_purchases_trend_basis)
-            compose.onNodeWithContentDescription(context.getString(R.string.guidance_about, context.getString(R.string.dashboard_daily_purchases))).performClick()
+            compose.onNodeWithContentDescription(context.getString(R.string.guidance_about, context.getString(R.string.home_daily_spending_title))).performClick()
             compose.onNodeWithText(purchasesHelp).assertIsDisplayed()
             pressDeviceBack(compose)
             compose.onNodeWithTag("guidance-popup").assertDoesNotExist()
@@ -89,7 +89,7 @@ class DailyPurchasesPeriodInteractionTest {
             selectDay(trends.overall, lang, first = false)
             assertAverageLine(trends.overall, night)
             capture("all-expenses-$lang-$appearance")
-            compose.onNodeWithContentDescription(context.getString(R.string.guidance_about, context.getString(R.string.approved_all_expenses))).performClick()
+            compose.onNodeWithContentDescription(context.getString(R.string.guidance_about, context.getString(R.string.home_daily_spending_title))).performClick()
             compose.onNodeWithText(context.getString(R.string.dashboard_all_trend_basis)).assertIsDisplayed()
             pressDeviceBack(compose)
             compose.onNodeWithTag("home-chart-scope-0").performClick().assertIsSelected()
@@ -202,7 +202,7 @@ class DailyPurchasesPeriodInteractionTest {
     private fun assertAverageLine(trend: DailySpendingTrend, dark: Boolean) {
         val bitmap = compose.onNodeWithTag("daily-expenses-chart").captureToImage().asAndroidBitmap()
         val density = bitmap.height / MasroofReference.chartHeight.value
-        val range = com.baraa.masroof.ui.components.MasroofLineChart.referenceRange(trend.points.map { it.spending.amount } + trend.averageDailySpending.amount)
+        val range = com.baraa.masroof.ui.components.MasroofLineChart.chartRange(trend.points.map { it.spending.amount }, trend.averageDailySpending.amount, showAverage = true, capOutlier = true)
         val plotHeight = bitmap.height - (MasroofReference.chartTop.value + MasroofReference.chartBottom.value) * density
         val fraction = trend.averageDailySpending.amount.subtract(range.minimum).toFloat() / range.span.toFloat()
         val y = MasroofReference.chartTop.value * density + plotHeight * (1 - fraction)

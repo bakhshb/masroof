@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.material3.IconButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -81,6 +82,9 @@ private fun SpendingTrendCard(trend: DailySpendingTrend?, title: String, modifie
     val point = trend.points[index]
     val labels = trend.points.map { "${date.format(it.date)} · ${formatLocalizedMoney(it.spending)}" }
     val currency = MoneyUiFormatter.currencyLabel(point.spending.currency, locale.toLanguageTag())
+    // Visual scaling only: the selected amount, tooltip and labels keep the exact values.
+    val cappedLabel = remember(trend.points) { com.baraa.masroof.ui.components.MasroofLineChart.cappedOutlierIndex(trend.points.map { it.spending.amount }) }
+        ?.let { trend.points[it] }?.let { stringResource(R.string.chart_capped_day_label, formatLocalizedMoney(it.spending), date.format(it.date)) }
     MasroofCard(modifier) {
         ChartHeader(title, explanation, onCustomize)
         customLabel?.let { MasroofText(it, style = MaterialTheme.typography.bodySmall,
@@ -95,7 +99,10 @@ private fun SpendingTrendCard(trend: DailySpendingTrend?, title: String, modifie
             Modifier.testTag("daily-expenses-chart"), index,
             onPointSelected = { selected = it; onDaySelected?.invoke(trend.points[it].date) },
             pointLabel = { labels[it] }, role = role, axisLabel = { tick.format(trend.points[it].date) },
-            currencyLabel = currency, showAverage = showAverage)
+            currencyLabel = currency, showAverage = showAverage, cappedLabel = cappedLabel?.let { text -> { text } })
+        if (cappedLabel != null)
+            MasroofText(stringResource(R.string.chart_capped_day_note), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
