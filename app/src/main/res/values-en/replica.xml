@@ -1,17 +1,11 @@
 <resources>
-<string name="lab_ml_source">Assisted by machine learning</string>
+<string name="lab_ml_source">Suggested by on-device learning</string>
 <string name="lab_template_source">Learned from your previous correction</string>
-<string name="lab_inferred_family">Inferred message type: %1$s</string>
-<string name="lab_family_assist_role">Contribution: identifying the message type. The engine extracts the amount and account from the message.</string>
+<string name="lab_inferred_family">Read as: %1$s</string>
 <string name="lab_inference_pending">This suggestion is not approved yet. Follow the review reason and actions below.</string>
-<string name="lab_rules_source">Understood by the engine</string>
 <string name="lab_manual_source">Type set by your decision</string>
 <string name="lab_unresolved_source">Message not fully understood</string>
 <string name="lab_unavailable_source">Understanding source unavailable</string>
-<string name="lab_rules_role">Source: engine rules. Machine learning did not contribute to this message type.</string>
-<string name="lab_manual_role">Current source: your manual decision. No automated inference is authoritative for the current type.</string>
-<string name="lab_unresolved_role">A reliable message type was not identified; there is no accepted machine-learning suggestion.</string>
-<string name="lab_unavailable_role">The current source could not be verified. This does not indicate machine-learning participation.</string>
 <string name="lab_understanding_pending">This message still needs review; identifying its type does not mean the transaction is posted.</string>
 <string name="lab_owned_transfer_requires_self">The other account is yours. Choose transfer between my accounts.</string>
 <string name="lab_same_transfer_account">The transfer accounts must be different.</string>

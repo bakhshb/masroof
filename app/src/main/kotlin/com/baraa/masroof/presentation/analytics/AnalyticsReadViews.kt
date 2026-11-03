@@ -23,6 +23,7 @@ import com.baraa.masroof.presentation.common.*
 import com.baraa.masroof.presentation.common.MasroofText as Text
 import com.baraa.masroof.presentation.dashboard.*
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.ui.theme.MasroofSpacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -112,36 +113,42 @@ import java.time.ZoneId
 }
 
 /** Original and analytics rows share one list/card. Analytics read state remains in its existing store. */
-@Composable fun AnalysisNotificationContent(state: NotificationCenterUiState, modifier: Modifier,
-    originalRow: @Composable (NotificationItem, Boolean) -> Unit) {
+@Composable fun AnalysisNotificationContent(state: NotificationCenterUiState, analysis: AnalysisUiState, alerts: List<com.baraa.masroof.data.analytics.AnalysisAlertRow>,
+    modifier: Modifier, originalRow: @Composable (NotificationItem, Boolean) -> Unit) {
     // The original notification screen also renders independently in the design matrix.
     // Only expose analysis actions when its workflow is supplied by the app root.
     val workflow = LocalAnalyticsWorkflow.current
-    val analysis = workflow?.state?.collectAsState()?.value ?: AnalysisUiState()
     val scope = rememberCoroutineScope()
-    val now = currentAnalysisTime()
-    val alerts = visibleAnalysisAlerts(analysis, now)
-    val unread = state.unreadCount + alerts.count { !it.read }
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        if (workflow != null) MasroofTextButton(onClick = { AnalyticsNavigation.open("settings", fromCenter = true) }) { Text(stringResource(R.string.lab_analysis_settings)) }
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         if (state.loading && state.items.isEmpty() && alerts.isEmpty()) CircularProgressIndicator()
         else if (state.items.isEmpty() && alerts.isEmpty()) Text(stringResource(R.string.notification_center_empty))
         else MasroofCard {
-            Text(stringResource(R.string.notification_center_title), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.notification_center_badge_count, unread), style = MaterialTheme.typography.bodySmall)
             state.items.forEachIndexed { i, item -> originalRow(item, i != state.items.lastIndex || alerts.isNotEmpty()) }
             alerts.forEachIndexed { i, alert ->
                 var menu by remember(alert.id) { mutableStateOf(false) }
                 Row(Modifier.fillMaxWidth().testTag("lab-alert-container-${alert.id}"), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    MasroofReferenceNavigationRow(title = stringResource(when (alert.kind) {
+                    val kindLabel = stringResource(when (alert.kind) {
                         "DUE" -> R.string.lab_analysis_due_alert
                         "PAYMENT" -> R.string.lab_analysis_payment_alert
                         "ACTUAL" -> R.string.lab_analysis_actual_alert
                         else -> R.string.lab_analysis_budget_alert
-                    }), subtitle = listOf(alert.title, formatLocalizedMoney(analysisAmount(alert.amount))).filter { it.isNotBlank() }.joinToString(" · "),
+                    })
+                    val amount = formatLocalizedMoney(analysisAmount(alert.amount))
+                    val dueDay = alert.dueEpochDay()
+                    // A named due alert leads with the commitment name and shows its amount and due date.
+                    val named = alert.kind == "DUE" && alert.title.isNotBlank()
+                    val due = analysis.dueFor(alert)
+                    val title = com.baraa.masroof.application.analytics.CommitmentNames.dueAlert(
+                        androidx.compose.ui.platform.LocalContext.current, alert, due)
+                    MasroofReferenceNavigationRow(title = if (named) title else kindLabel,
+                        subtitle = if (named && dueDay != null) stringResource(R.string.notification_due_subtitle, amount,
+                            formatLocalizedTransactionDate(java.time.LocalDate.ofEpochDay(dueDay)))
+                        else if (named) amount
+                        else listOf(alert.title, amount).filter { it.isNotBlank() }.joinToString(" · "),
                         icon = MasroofIcons.notifications, modifier = Modifier.weight(1f).testTag("lab-alert-${alert.id}"),
                         status = if (alert.read) null else stringResource(R.string.reference_unread), showChevron = false,
-                        divider = i != alerts.lastIndex, onClick = { AnalyticsNavigation.open(alert.id, fromCenter = true) })
+                        divider = i != alerts.lastIndex, onClick = { AnalyticsNavigation.open(alert.id, fromCenter = true) },
+                        iconDescription = kindLabel.takeIf { named })
                     Box {
                         androidx.compose.material3.IconButton(onClick = { menu = true }) {
                             androidx.compose.material3.Icon(MasroofIcons.more, stringResource(R.string.lab_analysis_actions), Modifier.size(com.baraa.masroof.ui.theme.MasroofIconSizes.md))
@@ -158,8 +165,16 @@ import java.time.ZoneId
                 }
             }
         }
+        if (workflow != null) MasroofCard {
+            MasroofReferenceNavigationRow(stringResource(R.string.lab_analysis_settings), stringResource(R.string.notification_settings_row_subtitle),
+                MasroofIcons.settings, { AnalyticsNavigation.open("settings", fromCenter = true) }, divider = false)
+        }
     }
 }
+
+/** Analysis state read once per Notification Center, so the top-bar count and the list share one clock. */
+@Composable fun notificationAnalysisState(): AnalysisUiState =
+    LocalAnalyticsWorkflow.current?.state?.collectAsState()?.value ?: AnalysisUiState()
 
 @Composable internal fun currentAnalysisTime(): Long {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }

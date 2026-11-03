@@ -64,6 +64,10 @@ class AnalyticsReadModelsTest {
         assertEquals(1, visible.count { !it.read })
         assertEquals(listOf("snoozed", "new", "read"), visibleAnalysisAlerts(state, 101).map { it.id })
     }
+    @Test fun dueAlertExposesItsDueDayFromThePolicyKey() {
+        assertEquals(20398L, AnalysisAlertRow("due:commitment:abc:20398", "DUE", "Google", 4999, 1, 1).dueEpochDay())
+        assertNull(AnalysisAlertRow("payment:key:20398", "PAYMENT", "", 1, 1, 1).dueEpochDay())
+    }
     @Test fun arabicAndPersianDigitsAndDecimalSeparatorNormalizeWithoutSilentlyFixingInvalidInput() {
         assertEquals("1200.50", normalizeAnalysisNumber(" ١٢٠٠٫٥٠ "))
         assertEquals("30", normalizeAnalysisNumber("۳۰"))

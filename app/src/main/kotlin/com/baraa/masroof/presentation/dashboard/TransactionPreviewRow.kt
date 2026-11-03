@@ -15,7 +15,7 @@ fun TransactionPreviewRow(
     onClick: (() -> Unit)? = null,
 ) {
     val colors = MasroofThemeExtras.extendedColors
-    val inward = row.direction in listOf(TransactionDirectionUi.INCOME, TransactionDirectionUi.INWARD, TransactionDirectionUi.TRANSFER_IN)
+    val inward = row.direction.isInward
     val transfer = row.direction == TransactionDirectionUi.NEUTRAL
     val (color, background) = when (row.type) {
         com.baraa.masroof.domain.model.FinancialTransactionType.LOAN_REPAYMENT -> colors.liability to colors.liabilitySoft
@@ -26,11 +26,14 @@ fun TransactionPreviewRow(
     val money = formatLocalizedMoney(row.amount)
     val formatted = money.substringBeforeLast(' ')
     val currency = money.substringAfterLast(' ')
-    val sign = if (inward) "+" else if (transfer) "" else "−"
     com.baraa.masroof.ui.dashboard.DashboardTransactionRow(
         com.baraa.masroof.application.locale.AppDigits.display(title),
-        com.baraa.masroof.application.locale.AppDigits.display(transactionTypeLabel(row.typeLabelResHint) +
-            (cardDisplayLabelFromTransaction(row, ownedCards)?.let { " · " + it } ?: "")),
-        sign + formatted, formatLocalizedTransactionDate(row.localDate) + " · " + currency,
+        com.baraa.masroof.application.locale.AppDigits.display(previewSubtitle(title, transactionTypeLabel(row.typeLabelResHint),
+            cardDisplayLabelFromTransaction(row, ownedCards))),
+        row.direction.amountSign + formatted, formatLocalizedTransactionDate(row.localDate) + " · " + currency,
         MasroofIcons.transactionType(row.typeLabelResHint), color, background, modifier, onClick)
 }
+
+/** The type is left out when the title already says it, unless nothing else would remain. */
+internal fun previewSubtitle(title: String, typeLabel: String, cardLabel: String?): String =
+    if (cardLabel == null) typeLabel else if (typeLabel == title) cardLabel else "$typeLabel · $cardLabel"

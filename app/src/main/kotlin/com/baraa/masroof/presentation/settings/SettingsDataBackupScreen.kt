@@ -135,7 +135,7 @@ fun SettingsDataBackupScreen(
     }
     MasroofSecondaryScaffold(
         title = stringResource(when (page) {
-            BackupPage.Hub -> R.string.reference_backup_title
+            BackupPage.Hub -> R.string.settings_data_backup_section
             BackupPage.Export -> R.string.reference_export_title
             BackupPage.Restore -> R.string.reference_restore_title
             BackupPage.Tools -> R.string.settings_data_tools_title
@@ -151,7 +151,6 @@ fun SettingsDataBackupScreen(
         ) {
             if (page == BackupPage.Hub) {
                 com.baraa.masroof.presentation.common.MasroofCard {
-                    Text(stringResource(R.string.reference_backup_title), style = MaterialTheme.typography.titleMedium)
                     com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.reference_export_title),
                         stringResource(R.string.settings_export_subtitle), MasroofIcons.export, { onOpenPage(BackupPage.Export) })
                     com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.reference_restore_title),

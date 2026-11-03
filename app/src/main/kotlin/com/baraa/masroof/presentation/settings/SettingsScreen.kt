@@ -48,6 +48,8 @@ fun SettingsRoute(
     reviewRequiredCount: Int,
     onBack: () -> Unit,
     onOpenReview: () -> Unit,
+    /** The hub shows a back arrow when Settings was opened above another screen, not from its tab. */
+    showHubBack: Boolean = false,
     pendingLaunch: SettingsLaunchRequest? = null,
     onPendingLaunchConsumed: () -> Unit = {},
     onLocaleChanged: () -> Unit,
@@ -124,7 +126,7 @@ fun SettingsRoute(
     when (val current = destination) {
         SettingsDestination.Hub -> SettingsHubScreen(
             state = state,
-            onBack = { popOrExit() },
+            onBack = if (showHubBack) ({ popOrExit() }) else null,
             onOpenBanks = { navigateTo(SettingsDestination.Banks) },
             onOpenCommitments = { navigateTo(SettingsDestination.MyCommitments) },
             onOpenApp = { navigateTo(SettingsDestination.App) },
@@ -475,18 +477,18 @@ private fun SettingsBankHubLoadingScreen(
 @Composable
 internal fun SettingsHubScreen(
     state: SettingsUiState,
-    onBack: () -> Unit,
     onOpenBanks: () -> Unit,
     onOpenCommitments: () -> Unit,
     onOpenApp: () -> Unit,
     onOpenDataBackup: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenLearning: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
 ) {
     MasroofSecondaryScaffold(
         title = stringResource(R.string.settings_title),
         onBack = onBack,
-        backContentDescription = stringResource(R.string.settings_back),
+        backContentDescription = onBack?.let { stringResource(R.string.settings_back) },
     ) { contentModifier ->
         if (state.loading) {
             Column(contentModifier.fillMaxSize(), verticalArrangement = Arrangement.Center,
@@ -513,8 +515,6 @@ internal fun SettingsHubScreen(
                 com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_about_section),
                     stringResource(R.string.settings_about_subtitle, state.appVersion), MasroofIcons.periodHint, onOpenAbout, divider = false)
             }
-            Text(stringResource(R.string.reference_tracking_note), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.error?.let { Text(stringResource(R.string.settings_update_failed), color = MaterialTheme.colorScheme.error) }
         }
     }

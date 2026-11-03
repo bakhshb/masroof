@@ -6,7 +6,10 @@ import com.baraa.masroof.data.analytics.AnalysisPreferencesRow
 import kotlinx.serialization.Serializable
 
 @Serializable data class AnalysisDay(val day: Long, val actual: Long?, val forecast: Long?)
-@Serializable data class AnalysisDue(val id: String, val name: String, val amount: Long, val day: Long?, val confirmed: Boolean)
+/** [source] and [loanTypeFallback] let screens name a commitment due the way the commitments list does. */
+@Serializable data class AnalysisDue(val id: String, val name: String, val amount: Long, val day: Long?, val confirmed: Boolean,
+    val source: com.baraa.masroof.application.dashboard.CommitmentDashboardSource? = null,
+    val loanTypeFallback: com.baraa.masroof.domain.model.LoanType? = null)
 @Serializable data class AnalysisCandidate(val key: String, val name: String, val amount: Long, val lower: Long,
     val upper: Long, val nextDay: Long, val cadence: String, val sourceIds: List<String>, val latestDay: Long,
     val latestAmount: Long, val referenceAmount: Long?, val increased: Boolean, val overdue: Boolean = false,
@@ -92,6 +95,23 @@ internal fun purchasePeriodHistory(data: CleanData, currentStart: Long): List<An
 
 fun visibleAnalysisAlerts(state: AnalysisUiState, now: Long): List<com.baraa.masroof.data.analytics.AnalysisAlertRow> =
     state.alerts.filter { !it.resolved && it.snoozedUntil <= now }.sortedByDescending { it.observedAt }
+
+/** The id of this due's DUE alert, `due:<id>:<day>`; the one place the format is built. */
+val AnalysisDue.alertId: String get() = "due:$id:$day"
+
+/** A card due's alert, recognisable from its id after the due leaves the snapshot. */
+fun com.baraa.masroof.data.analytics.AnalysisAlertRow.isCardDue(): Boolean =
+    kind == "DUE" && id.startsWith("due:" + com.baraa.masroof.application.dashboard.CREDIT_COMMITMENT_KEY_PREFIX)
+
+/** Due epoch day of a DUE alert, the last part of [alertId]. */
+fun com.baraa.masroof.data.analytics.AnalysisAlertRow.dueEpochDay(): Long? =
+    if (kind == "DUE") id.substringAfterLast(':').toLongOrNull() else null
+
+/** The snapshot due a DUE alert was raised for, matching the `due:<id>:<day>` key from [AnalysisAlertPolicy]. */
+fun AnalysisSnapshot.dueFor(alert: com.baraa.masroof.data.analytics.AnalysisAlertRow): AnalysisDue? =
+    if (alert.kind == "DUE") dues.firstOrNull { it.alertId == alert.id } else null
+
+fun AnalysisUiState.dueFor(alert: com.baraa.masroof.data.analytics.AnalysisAlertRow): AnalysisDue? = snapshot?.dueFor(alert)
 
 fun normalizeAnalysisNumber(value: String): String = value.trim().map { c ->
     when { c == '٫' -> '.'; c.isDigit() -> Character.digit(c, 10).toString().single(); else -> c }

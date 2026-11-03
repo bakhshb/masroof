@@ -1,0 +1,9 @@
+<resources>
+    <string name="home_daily_spending_title">Daily spending</string>
+    <string name="home_daily_spending_purchases_scope">Card purchases, cash withdrawals and outgoing transfers</string>
+    <string name="home_avg_daily_all_expenses">Avg daily · all expenses</string>
+    <string name="home_forecast_status_line">%1$s · %2$s</string>
+    <string name="chart_capped_day_label">↑ %1$s · %2$s</string>
+    <string name="chart_capped_day_note">One very high day is capped so other days stay readable</string>
+    <string name="home_mada_card_last4">Mada ···%1$s</string>
+</resources>

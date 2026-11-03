@@ -60,11 +60,15 @@ fun DashboardMetric(value: String, color: Color, modifier: Modifier = Modifier,
     Surface(modifier, shape = MasroofComponentShapes.radius16,
         color = MasroofThemeExtras.extendedColors.cardSurface,
         border = BorderStroke(MasroofSpacing.borderWidth, MasroofThemeExtras.extendedColors.cardBorder)) {
-        Column(Modifier.fillMaxWidth().padding(MasroofSpacing.compactCardContentPadding + MasroofSpacing.borderWidth)) {
+        // A taller sibling tile stretches this one; the amount stays at the bottom so both line up.
+        Column(Modifier.fillMaxWidth().padding(MasroofSpacing.compactCardContentPadding + MasroofSpacing.borderWidth),
+            verticalArrangement = Arrangement.SpaceBetween) {
             label()
-            Spacer(Modifier.height(MasroofReference.shortcutGap))
-            MasroofReferenceMoney(value, style = MasroofReference.metricValue, color = color)
-            Spacer(Modifier.height(MasroofSpacing.hairlineGap))
+            Column {
+                Spacer(Modifier.height(MasroofReference.shortcutGap))
+                MasroofReferenceMoney(value, style = MasroofReference.metricValue, color = color)
+                Spacer(Modifier.height(MasroofSpacing.hairlineGap))
+            }
         }
     }
 }

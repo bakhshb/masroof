@@ -16,8 +16,6 @@
     <string name="reference_period_average">Through %1$s · %2$d days</string>
     <string name="reference_accounts_scope">Includes outgoing external transfers, bills, loan installments, credit card settlements, non-credit purchases, cash withdrawals and fees attributed to your accounts, less account refunds. Excludes transfers between your own accounts, credit purchases and refunds, and incoming movements.</string>
     <string name="reference_details">Details</string>
-    <string name="reference_tracking_note">Financial summaries are on Home. Ownership, names and tracking are managed here.</string>
-    <string name="reference_backup_title">Backup</string>
     <string name="reference_export_title">Create encrypted backup</string>
     <string name="reference_restore_title">Restore backup</string>
     <string name="reference_waiting_payment">%1$s awaiting payment</string>
@@ -39,7 +37,7 @@
     <string name="reference_unconfirmed">Unconfirmed</string>
     <string name="reference_stopped">Paused</string>
     <string name="reference_manage_accounts">My accounts · Manage</string>
-    <string name="reference_manage_cards">My cards · Manage</string>
+    <string name="reference_manage_cards">Manage cards</string>
     <string name="reference_manage_loans">My loans · Manage</string>
     <string name="reference_review_evidence">View evidence and options</string>
     <string name="reference_unread">New</string>

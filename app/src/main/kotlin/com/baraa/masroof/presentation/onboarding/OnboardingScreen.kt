@@ -598,7 +598,7 @@ private fun OwnershipStep(
             state.bankCatalog?.banks.orEmpty().filter { it.bankId in state.selectedBankIds && it.currentPatterns.none { pattern -> pattern.canApply } }.forEach { bank ->
                 MasroofCard {
                     Text(settingsBankLabel(Bank(bank.bankId)), style = MaterialTheme.typography.titleMedium)
-                    Text(bankSupportLabel(bank))
+                    Text(bankSupportLabel(bank).first)
                     Text(stringResource(R.string.onboarding_bank_teach_later), style = MaterialTheme.typography.bodySmall)
                 }
             }

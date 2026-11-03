@@ -129,9 +129,9 @@ class AccountCreditChartInteractionTest {
                     compose.onNodeWithTag("daily-expenses-average").assertExists()
                     val bitmap = chart.captureToImage().asAndroidBitmap()
                     val density = bitmap.height / MasroofReference.chartHeight.value
-                    val range = com.baraa.masroof.ui.components.MasroofLineChart.referenceRange(trend.points.map { it.spending.amount } + trend.averageDailySpending.amount)
+                    val range = com.baraa.masroof.ui.components.MasroofLineChart.chartRange(trend.points.map { it.spending.amount }, trend.averageDailySpending.amount, showAverage = true, capOutlier = true)
                     val height = bitmap.height - (MasroofReference.chartTop.value + MasroofReference.chartBottom.value) * density
-                    val fraction = trend.averageDailySpending.amount.subtract(range.minimum).toFloat() / range.span.toFloat()
+                    val fraction = trend.averageDailySpending.amount.min(range.maximum).subtract(range.minimum).toFloat() / range.span.toFloat()
                     val y = MasroofReference.chartTop.value * density + height * (1 - fraction)
                     assertTrue("Credit scope average line must be rendered: $id/$lang/$night",
                         AverageLinePixels.matches(bitmap, y,

@@ -121,7 +121,7 @@ fun SettingsAboutScreen(
                     stringResource(R.string.settings_bank_support_hint), style = MaterialTheme.typography.titleMedium)
                 bankCatalog?.banks.orEmpty().forEach { bank ->
                     Text(bank.displayName ?: settingsBankLabel(com.baraa.masroof.domain.model.Bank(bank.bankId)), style = MaterialTheme.typography.titleSmall)
-                    Text(bankSupportLabel(bank), style = MaterialTheme.typography.bodySmall)
+                    Text(bankSupportLabel(bank).first, style = MaterialTheme.typography.bodySmall)
                 }
                 OutlinedButton(onOpenBanks, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_bank_manage)) }
             }

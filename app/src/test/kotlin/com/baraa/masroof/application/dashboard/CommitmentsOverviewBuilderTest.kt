@@ -488,6 +488,43 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun cardsAndCommitments_agreeOnPaidAndUnpaidFacilityDues() {
+        val paidFacility = creditFacility(due = Money.of("500.00", Currency.SAR), last4 = "7271")
+        val unpaidFacility = creditFacility(due = Money.of("300.00", Currency.SAR), last4 = "1234")
+        val payment = transaction(
+            id = "payment-7271",
+            merchant = "Card payment",
+            amount = "500",
+            at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
+            type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
+            destinationContainerId = "card:${Bank.BANK_ALJAZIRA.id}:7271",
+        )
+        val facilities = CreditFacilitiesOverview(listOf(paidFacility, unpaidFacility), emptyList(), Currency.SAR)
+
+        val commitments = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = emptyList(),
+            creditFacilities = facilities,
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(payment),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+        // The Cards screen reads the facilities after this same step in DashboardProjectionBuilder.
+        val cards = facilities.withPaidDues(commitments.paidCreditFacilityKeys)
+
+        val statusByKey = commitments.rows.associate { it.creditFacilityKey to it.status }
+        cards.facilities.forEach { facility ->
+            assertEquals(statusByKey[facility.facilityKey] == CommitmentPaymentStatus.PAID, facility.facilityDuePaid)
+        }
+        assertEquals(CommitmentPaymentStatus.PAID, statusByKey[paidFacility.facilityKey])
+        assertEquals(CommitmentPaymentStatus.UNPAID, statusByKey[unpaidFacility.facilityKey])
+        assertTrue(!cards.allFacilityDuesPaid)
+        assertTrue(cards.copy(facilities = cards.facilities.take(1)).allFacilityDuesPaid)
+    }
+
+    @Test
     fun paidCreditCardStatement_doesNotReappearUnpaidInLaterSalaryPeriod() {
         val facility = creditFacility(
             due = Money.of("500.00", Currency.SAR),

@@ -34,18 +34,19 @@ class CardSetupInteractionTest {
     )
 
     private fun verifySingleSetupAction(card: ManagedCardUi) {
-        val context = com.baraa.masroof.presentation.locale.AppLocaleContext.wrap(
-            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext, language)
         var stopped = false
         compose.setContent { TestTheme {
             var target by remember { mutableStateOf<ManagedCardUi?>(null) }
             SettingsRegistryCardRow(card, false, { stopped = true }, {}, { target = it }, {})
             SettingsCardSetupSheet(target, null, listOf(card), emptyList(), false, false, { target = null }, {})
         } }
-        compose.onNodeWithText(context.getString(com.baraa.masroof.R.string.reference_stop_tracking)).performClick()
+        // The overflow menu is a popup outside the test's locale override, so its items are found by tag.
+        compose.onNodeWithTag("registry-more-actions").performClick()
+        compose.onNodeWithTag("registry-stop-tracking-action").performClick()
         compose.runOnIdle { assertTrue(stopped) }
-        compose.onAllNodesWithText(context.getString(com.baraa.masroof.R.string.settings_card_setup)).assertCountEquals(1)
-        compose.onNodeWithText(context.getString(com.baraa.masroof.R.string.settings_card_setup)).performClick()
+        compose.onNodeWithTag("registry-more-actions").performClick()
+        compose.onAllNodesWithTag("registry-card-setup-action").assertCountEquals(1)
+        compose.onNodeWithTag("registry-card-setup-action").performClick()
         if (card.cardType == CardType.CREDIT) {
             compose.onNodeWithTag("card-role-PRIMARY").assertExists()
             compose.onNodeWithTag("card-account-").assertDoesNotExist()

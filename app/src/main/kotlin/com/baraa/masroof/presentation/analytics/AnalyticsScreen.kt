@@ -59,9 +59,15 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
     val state by workflow.state.collectAsState()
     val value = state.snapshot
     MasroofCard(Modifier.fillMaxWidth().clickable(onClick = onOpen).testTag("lab-forecast-entry")) {
-        MasroofSectionHeader(title = stringResource(R.string.lab_analysis_period), icon = MasroofIcons.analysis,
-            onViewAll = onOpen, viewAllLabel = stringResource(R.string.lab_analysis_open))
-        Status(state)
+        val (label, guidance) = statusRes(state)
+        val status = stringResource(label)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
+            MasroofSectionHeader(title = stringResource(R.string.lab_analysis_period), icon = MasroofIcons.analysis,
+                onViewAll = onOpen, viewAllLabel = stringResource(R.string.lab_analysis_open), modifier = Modifier.weight(1f))
+            guidance?.let { MasroofGuidanceButton(status, stringResource(it)) }
+        }
+        Text(updatedLine(state)?.let { stringResource(R.string.home_forecast_status_line, status, it) } ?: status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         value?.total?.let { Amount(stringResource(R.string.lab_analysis_expected_total), it) }
         if (value != null && value.total == null) Amount(stringResource(R.string.lab_analysis_actual), value.actual)
         Text(stringResource(R.string.lab_analysis_sections), style = MaterialTheme.typography.bodySmall,
@@ -69,7 +75,7 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
     }
 }
 
-@Composable private fun Status(state: AnalysisUiState) {
+private fun statusRes(state: AnalysisUiState): Pair<Int, Int?> {
     val label = when {
         state.unavailable -> R.string.lab_analysis_failed
         state.snapshot == null -> R.string.lab_analysis_preparing
@@ -85,11 +91,19 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
         R.string.lab_analysis_quality_warning -> R.string.lab_analysis_quality_hint
         else -> null
     }
+    return label to guidance
+}
+
+@Composable private fun Status(state: AnalysisUiState) {
+    val (label, guidance) = statusRes(state)
     MasroofGuidanceLabel(stringResource(label), guidance?.let { stringResource(it) },
         style = MaterialTheme.typography.labelMedium, contentColor = MaterialTheme.colorScheme.primary)
-    state.snapshot?.let { Text(if (state.updating) stringResource(R.string.lab_analysis_updating)
-        else stringResource(R.string.lab_analysis_updated, timestamp(it.issuedAt)),
-        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    updatedLine(state)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+}
+
+/** One "updating" / "last result" line for the home entry and the analysis screen. */
+@Composable private fun updatedLine(state: AnalysisUiState): String? = state.snapshot?.let {
+    if (state.updating) stringResource(R.string.lab_analysis_updating) else stringResource(R.string.lab_analysis_updated, timestamp(it.issuedAt))
 }
 
 @Composable fun AnalyticsRoute(onBack: () -> Unit, onOpenTransaction: (String) -> Unit,
@@ -244,10 +258,11 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
                             }
                         }
                         state.snapshot?.dues?.forEach { due ->
-                            FocusAnalysisItem(focusedAlert == "due:${due.id}:${due.day}", { focusedAlert = null }) {
+                            FocusAnalysisItem(focusedAlert == due.alertId, { focusedAlert = null }) {
                             MasroofCard {
                                 com.baraa.masroof.ui.components.MasroofTimelineRow(
-                                    com.baraa.masroof.application.locale.AppDigits.display(due.name),
+                                    com.baraa.masroof.application.locale.AppDigits.display(
+                                        com.baraa.masroof.application.analytics.CommitmentNames.name(androidx.compose.ui.platform.LocalContext.current, due.source, due.name, due.loanTypeFallback)),
                                     com.baraa.masroof.application.locale.AppDigits.display(due.day?.let { day(it) }.orEmpty()), active = due.confirmed)
                                 Amount(stringResource(if (due.confirmed) R.string.lab_analysis_confirmed else R.string.lab_analysis_estimated), due.amount)
                             }

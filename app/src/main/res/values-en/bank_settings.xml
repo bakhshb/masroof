@@ -3,7 +3,7 @@
     <string name="settings_banks_title">Banks</string>
     <string name="settings_banks_empty">Add a bank and its SMS sender to get started.</string>
     <string name="settings_add_bank">Add bank</string>
-    <string name="settings_banks_subtitle">Accounts, cards, loans and messages for each bank</string>
+    <string name="settings_banks_subtitle">Accounts, cards and loans for each bank</string>
     <string name="settings_bank_details">Bank details and senders</string>
     <string name="settings_bank_senders">Bank SMS senders</string>
     <string name="settings_bank_extra_sender">Additional sender · optional</string>
@@ -12,10 +12,10 @@
     <string name="settings_bank_save_failed">Could not save the bank. Check the details and that the sender is not assigned to another bank, then retry.</string>
     <string name="settings_bank_registry_only">Registered accounts or cards · SMS setup is pending</string>
     <string name="settings_bank_needs_teaching">Message teaching is pending</string>
-    <string name="settings_bank_bundled">Bundled patterns are ready</string>
-    <string name="settings_bank_needs_approval">Patterns need approval</string>
-    <string name="settings_bank_partly_approved">Some patterns are approved; others need review</string>
-    <string name="settings_bank_approved">Approved patterns; other formats may need teaching</string>
+    <string name="settings_bank_bundled">Ready</string>
+    <string name="settings_bank_needs_approval">Needs review</string>
+    <string name="settings_bank_partly_approved">Needs review</string>
+    <string name="settings_bank_approved">Ready · some messages may need teaching</string>
     <string name="settings_bank_support_title">Bank message support</string>
     <string name="settings_bank_support_hint">Add a bank and its senders, then teach its message formats. Support covers available, approved patterns.</string>
     <string name="settings_bank_manage">Manage banks</string>
@@ -32,7 +32,7 @@
     <string name="settings_import_open_bank">View bank accounts and cards</string>
     <string name="settings_import_no_selected_bank_sms">No messages for the selected banks were found in this period.</string>
     <string name="settings_data_tools_title">Data tools</string>
-    <string name="settings_data_tools_hint">Reanalyse stored messages and review exchange rate corrections</string>
+    <string name="settings_data_tools_hint">Re-read stored messages and fix exchange rates</string>
     <string name="settings_corrections_scope">This page shows correction insights across the app. Teach message fields and approve patterns inside each bank.</string>
     <string name="settings_current_version">Current version: %1$s</string>
     <string name="settings_statement_bank_scope_hint">The bank in the file must match this selection. Only exact, registered owned accounts are compared.</string>
@@ -46,5 +46,5 @@
     <string name="settings_pattern_select_card">Owned card</string>
     <string name="settings_pattern_add_card_hint">Add the card and confirm its type and ownership on the bank page first.</string>
     <string name="settings_bank_setup_messages">Set up messages for this bank</string>
-    <string name="settings_bank_patterns_disabled">Message patterns are disabled</string>
+    <string name="settings_bank_patterns_disabled">Off</string>
 </resources>

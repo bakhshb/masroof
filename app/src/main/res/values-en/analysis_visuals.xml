@@ -32,7 +32,7 @@
     <string name="analysis_no_due_hint">Payments appear here by due date.</string>
     <string name="analysis_commitments_separate">Commitments are separate from the spending forecast</string>
     <string name="analysis_learning_settings">Message correction insights</string>
-    <string name="analysis_learning_settings_hint">Learning bank message types; this does not measure spending forecast accuracy.</string>
+    <string name="analysis_learning_settings_hint">How well Masroof reads your bank messages</string>
     <string name="analysis_actual_legend">■ Actual</string>
     <string name="analysis_expected_legend">▨ Estimated</string>
     <string name="analysis_history_trend">How did this period’s forecast change?</string>

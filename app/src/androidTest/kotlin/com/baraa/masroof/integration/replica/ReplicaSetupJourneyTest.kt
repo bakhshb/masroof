@@ -166,7 +166,7 @@ class ReplicaSetupJourneyTest {
             // Analytics settings opened from the existing center return to that center on Cancel.
             compose.onNode(hasContentDescription("unread notification", substring = true) or
                 hasContentDescription(text(R.string.notification_center_title))).performClick()
-            compose.onNodeWithText(text(R.string.lab_analysis_settings)).performClick()
+            compose.onNodeWithText(text(R.string.lab_analysis_settings)).performScrollTo().performClick()
             compose.onNodeWithText(text(R.string.lab_analysis_budget_section)).assertIsDisplayed()
             compose.onNodeWithText(text(R.string.lab_analysis_cancel)).performScrollTo().performClick()
             compose.onAllNodesWithText(text(R.string.notification_center_title)).onFirst().assertIsDisplayed()

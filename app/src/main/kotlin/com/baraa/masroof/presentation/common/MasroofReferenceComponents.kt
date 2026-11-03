@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.common
 
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Surface
@@ -18,6 +19,15 @@ fun MasroofMetric(label: String, value: String, color: Color,
     modifier: Modifier = Modifier, guidance: String? = null) {
     com.baraa.masroof.ui.dashboard.DashboardMetric(value, color, modifier) {
         MasroofGuidanceLabel(label, guidance)
+    }
+}
+
+/** Side-by-side tiles share one height, so their amounts line up when one label wraps. */
+@Composable
+fun MasroofMetricRow(modifier: Modifier = Modifier, gap: androidx.compose.ui.unit.Dp = MasroofReference.metricGap,
+    content: @Composable RowScope.(tile: Modifier) -> Unit) {
+    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(gap)) {
+        content(Modifier.weight(1f).fillMaxHeight())
     }
 }
 
@@ -49,7 +59,9 @@ fun MasroofAverageBand(value: String, periodHint: String, guidance: String?,
 @Composable
 fun MasroofReferenceNavigationRow(title: String, subtitle: String, icon: ImageVector,
     onClick: () -> Unit, modifier: Modifier = Modifier, divider: Boolean = true,
-    status: String? = null, showChevron: Boolean = true, badges: List<Pair<String, MasroofCardAccent>> = emptyList()) {
+    status: String? = null, showChevron: Boolean = true, badges: List<Pair<String, MasroofCardAccent>> = emptyList(),
+    subtitleColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified,
+    iconDescription: String? = null) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
     // Narrow rows (card width, not screen width) stack the badge under the subtitle so neither text is squeezed.
     val stackStatus = maxWidth < MasroofReference.inlineStatusMinWidth
@@ -60,13 +72,13 @@ fun MasroofReferenceNavigationRow(title: String, subtitle: String, icon: ImageVe
             horizontalArrangement = Arrangement.spacedBy(MasroofReference.rowGap)) {
             Surface(shape = MasroofShapes.small, color = MasroofThemeExtras.extendedColors.accountSoft) {
                 Box(Modifier.size(MasroofReference.iconBox), contentAlignment = Alignment.Center) {
-                    Icon(icon, null, Modifier.size(MasroofReference.icon), tint = MasroofThemeExtras.extendedColors.account)
+                    Icon(icon, iconDescription, Modifier.size(MasroofReference.icon), tint = MasroofThemeExtras.extendedColors.account)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MasroofReference.metadataGap)) {
                 MasroofText(title, style = MasroofReference.pair.copy(fontWeight = MasroofFontWeights.semiBold))
                 MasroofText(subtitle, style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    color = subtitleColor.takeOrElse { MaterialTheme.colorScheme.onSurfaceVariant })
                 if (stackStatus) status?.let { MasroofBadge(it, MasroofCardAccent.Liability) }
                 // Several states wrap under the subtitle; side by side they would squeeze the title.
                 if (badges.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.smallGap),

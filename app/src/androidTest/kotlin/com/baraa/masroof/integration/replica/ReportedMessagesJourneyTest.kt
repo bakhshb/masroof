@@ -92,8 +92,10 @@ class ReportedMessagesJourneyTest {
                 compose.runOnUiThread {dashboard.openTransactionDetail(row.id)}
                 compose.waitUntil(20_000) {!dashboard.uiState.value.selectedTransactionSmsLoading && dashboard.uiState.value.selectedTransactionSms.isNotEmpty()}
                 compose.onNodeWithTag("interpretation_provenance").performScrollTo().assertIsDisplayed()
-                compose.onNodeWithText(host.getString(R.string.lab_rules_source)).assertExists()
-                compose.onNodeWithText(host.getString(R.string.lab_rules_role)).assertExists()
+                compose.onNodeWithText(host.getString(R.string.lab_ml_source)).assertDoesNotExist()
+                val family=mapOf("100.00" to R.string.review_family_transfer_out,"300.00" to R.string.review_family_purchase,
+                    "16.23" to R.string.review_family_bill_payment).getValue(row.amount.amount.toPlainString())
+                compose.onNodeWithText(host.getString(R.string.lab_inferred_family,host.getString(family))).performScrollTo().assertIsDisplayed()
                 screenshot("reported-${row.amount.amount.toPlainString().replace('.','-')}-dark")
             }
         } finally {compose.runOnUiThread {store.clear()};c.close();TestRuntime.reset(host)}
@@ -110,7 +112,7 @@ class ReportedMessagesJourneyTest {
             }
             lateinit var viewModel: ReviewViewModel
             compose.runOnUiThread {viewModel=ViewModelProvider(store,reviewViewModelFactory(c))[ReviewViewModel::class.java]}
-            compose.setContent {MasroofTheme(darkTheme=true) {MasroofScreenBackground {ReviewRoute(viewModel,{})}}}
+            compose.setContent {MasroofTheme(darkTheme=true) {MasroofScreenBackground {ReviewRoute(viewModel)}}}
             compose.waitUntil(20_000) {!viewModel.uiState.value.loading && viewModel.uiState.value.items.size==1}
             val item=viewModel.uiState.value.items.single()
             compose.runOnUiThread {viewModel.openDetail(item.id)}

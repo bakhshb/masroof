@@ -39,11 +39,11 @@ fun DashboardQuickSummaryRow(
     modifier: Modifier = Modifier,
 ) {
     if (trend == null) return
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
+    com.baraa.masroof.presentation.common.MasroofMetricRow(modifier, MasroofSpacing.cardInnerGap) { tile ->
         if (showExpense) MasroofMetric(stringResource(R.string.approved_total_expenses), formatLocalizedMoney(trend.totalSpending),
-            resolveMetricToneColor(spendingMetricTone(trend.totalSpending)), modifier = Modifier.weight(1f))
-        if (showIncome) MasroofMetric(stringResource(R.string.approved_daily_average), formatLocalizedMoney(trend.averageDailySpending),
-            MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f),
+            resolveMetricToneColor(spendingMetricTone(trend.totalSpending)), modifier = tile)
+        if (showIncome) MasroofMetric(stringResource(R.string.home_avg_daily_all_expenses), formatLocalizedMoney(trend.averageDailySpending),
+            MaterialTheme.colorScheme.primary, modifier = tile,
             guidance = stringResource(R.string.approved_average_basis, trend.points.size))
     }
 }

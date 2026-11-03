@@ -28,6 +28,32 @@ class MasroofLineChartTest {
     }
 
     @Test
+    fun cappedOutlier_onlyWhenOneDayIsMoreThanFourTimesTheNext() {
+        fun values(vararg v: String) = v.map(::BigDecimal)
+        assertEquals(2, MasroofLineChart.cappedOutlierIndex(values("500", "700", "29600", "300")))
+        assertEquals(null, MasroofLineChart.cappedOutlierIndex(values("500", "700", "2800", "300")))
+        assertEquals(null, MasroofLineChart.cappedOutlierIndex(values("29600", "29600", "300")))
+        assertEquals(null, MasroofLineChart.cappedOutlierIndex(values("0", "0", "900")))
+        assertEquals(null, MasroofLineChart.cappedOutlierIndex(values("100", "9000")))
+    }
+
+    @Test
+    fun chartRange_stopsJustAboveTheOtherDaysWhenCapped() {
+        val values = listOf("500", "700", "29600", "300").map(::BigDecimal)
+        assertEquals(BigDecimal("800"), MasroofLineChart.chartRange(values, BigDecimal("400"), showAverage = true, capOutlier = true).maximum)
+        assertEquals(MasroofLineChart.referenceRange(values), MasroofLineChart.chartRange(values, BigDecimal.ZERO, showAverage = false, capOutlier = false))
+    }
+
+    @Test
+    fun chartRange_ignoresTheAverageRaisedByTheCappedDay() {
+        val values = listOf("100", "150", "120", "5000", "80").map(::BigDecimal)
+        val average = values.reduce(BigDecimal::add).divide(BigDecimal(values.size))
+        assertEquals(BigDecimal("1090"), average)
+        assertEquals(BigDecimal("200"), MasroofLineChart.chartRange(values, average, showAverage = true, capOutlier = true).maximum)
+        assertEquals(BigDecimal("5500"), MasroofLineChart.chartRange(values, average, showAverage = true, capOutlier = false).maximum)
+    }
+
+    @Test
     fun nearestPointIndex_selectsClosestPointAndClampsToChartBounds() {
         assertEquals(0, MasroofLineChart.nearestPointIndex(x = -10f, width = 100f, pointCount = 3))
         assertEquals(1, MasroofLineChart.nearestPointIndex(x = 54f, width = 100f, pointCount = 3))

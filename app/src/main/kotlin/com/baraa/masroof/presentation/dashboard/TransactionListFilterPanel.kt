@@ -45,7 +45,7 @@ fun TransactionListToolbar(
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
-            MasroofText(stringResource(R.string.dashboard_summary_transactions_title, filteredCount), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            MasroofText(androidx.compose.ui.res.pluralStringResource(R.plurals.transaction_list_count, filteredCount, filteredCount), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
             if (filterActive) TextButton(onClearFilters) { MasroofText(stringResource(R.string.transaction_list_clear_filters)) }
         }
     }

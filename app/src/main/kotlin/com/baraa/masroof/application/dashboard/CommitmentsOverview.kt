@@ -53,6 +53,11 @@ data class CommitmentsOverview(
 ) {
     val hasContent: Boolean get() = rows.isNotEmpty()
 
+    /** Facilities whose in-period statement due is paid; the Cards screen reads this same decision. */
+    val paidCreditFacilityKeys: Set<String>
+        get() = rows.filter { it.source == CommitmentDashboardSource.CREDIT_CARD && it.status == CommitmentPaymentStatus.PAID }
+            .mapNotNull { it.creditFacilityKey }.toSet()
+
     /** Unpaid rows, nearest due date first; rows without a date go last. Ties keep name order. */
     val upcomingUnpaid: List<CommitmentDashboardRow>
         get() = rows.filter { it.status == CommitmentPaymentStatus.UNPAID }
@@ -71,6 +76,9 @@ data class CommitmentsOverview(
         }
     }
 }
+
+/** Key prefix of a credit facility's commitment row; due alerts carry it inside their id. */
+const val CREDIT_COMMITMENT_KEY_PREFIX = "credit:"
 
 object CommitmentsOverviewBuilder {
     fun build(
@@ -234,13 +242,13 @@ object CommitmentsOverviewBuilder {
                 sarEquivalents = sarEquivalents,
             )
             CommitmentDashboardRow(
-                key = "credit:${facility.bank.id}:${facility.primaryLast4}",
+                key = CREDIT_COMMITMENT_KEY_PREFIX + facility.facilityKey,
                 source = CommitmentDashboardSource.CREDIT_CARD,
                 displayName = facility.primaryLast4,
                 amount = due.amount,
                 expectedDate = due.dueDate,
                 status = if (paid) CommitmentPaymentStatus.PAID else CommitmentPaymentStatus.UNPAID,
-                creditFacilityKey = "${facility.bank.id}:${facility.primaryLast4}",
+                creditFacilityKey = facility.facilityKey,
             )
         }
 

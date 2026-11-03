@@ -453,12 +453,21 @@ class ReviewViewModel(
             titleRes = if (summary.title != null) null
                 else if (summary.messageFamily in setOf(MessageFamily.PURCHASE, MessageFamily.REFUND)) com.baraa.masroof.R.string.transaction_unknown_merchant
                 else summary.messageFamily.toUiLabelRes(),
-            smsBody = summary.body?.trim().orEmpty().ifEmpty { "—" },
+            smsBody = summary.body?.trim().orEmpty().ifEmpty { "—" }
+                .let { maskIgnoredCodes(it, summary.messageFamily, isIgnoredReview(review)) },
             amountLabel = summary.amount?.let { MoneyUiFormatter.format(it, languageTag) },
             dateLabel = dateLabel,
             reasonLabel = review.reasons.firstOrNull().orEmpty(),
             dismissibleAsNonFinancial = dismissible,
             ignored = isIgnoredReview(review),
+            sender = summary.sender,
+            bankId = summary.bankId,
+            ignoredReasonRes = if (!isIgnoredReview(review)) null else when (summary.messageFamily) {
+                MessageFamily.OTP -> com.baraa.masroof.R.string.review_ignored_reason_otp
+                MessageFamily.BALANCE_NOTICE -> com.baraa.masroof.R.string.review_ignored_reason_balance
+                null, MessageFamily.UNKNOWN -> com.baraa.masroof.R.string.review_family_unknown
+                else -> com.baraa.masroof.R.string.review_ignored_reason_not_transaction
+            },
         )
     }
 
@@ -547,4 +556,16 @@ class ReviewViewModel(
             "card_payment_ownership_unresolved",
         )
     }
+}
+
+private val OTP_DIGITS = Regex("\\p{Nd}{3,}")
+
+// A standalone 4–8 digit run, not part of an amount, a longer number or a masked card (*1234).
+private val CODE_LIKE_DIGITS = Regex("(?<![\\p{Nd}.,٫٬*•·])\\p{Nd}{4,8}(?![\\p{Nd},٫٬]|[.]\\p{Nd})")
+
+/** An ignored code still works for a while, so the list never shows its digits, even when the rules did not label it OTP. */
+internal fun maskIgnoredCodes(body: String, family: MessageFamily?, ignored: Boolean): String = when {
+    family == MessageFamily.OTP -> body.replace(OTP_DIGITS, "••••")
+    ignored -> body.replace(CODE_LIKE_DIGITS, "••••")
+    else -> body
 }

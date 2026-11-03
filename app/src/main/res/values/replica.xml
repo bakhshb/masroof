@@ -1,17 +1,11 @@
 <resources>
-<string name="lab_ml_source">بمساعدة تعلّم الآلة</string>
+<string name="lab_ml_source">اقترحها التعلّم على جهازك</string>
 <string name="lab_template_source">تعلّم من تصحيحك السابق</string>
-<string name="lab_inferred_family">النوع المستنتج: %1$s</string>
-<string name="lab_family_assist_role">المساهمة: تحديد نوع الرسالة. يستخرج المحرك المبلغ والحساب من نص الرسالة.</string>
+<string name="lab_inferred_family">فُهمت كـ: %1$s</string>
 <string name="lab_inference_pending">هذا اقتراح لم يُعتمد بعد؛ اتبع سبب المراجعة والخطوات الموضحة أدناه.</string>
-<string name="lab_rules_source">فهمها المحرك</string>
 <string name="lab_manual_source">النوع بقرارك اليدوي</string>
 <string name="lab_unresolved_source">لم يكتمل فهم الرسالة</string>
 <string name="lab_unavailable_source">مصدر الفهم غير متاح</string>
-<string name="lab_rules_role">المصدر: قواعد المحرك. لم يساهم تعلّم الآلة في تحديد نوع هذه الرسالة.</string>
-<string name="lab_manual_role">المصدر الحالي: قرارك اليدوي. لا يوجد استنتاج آلي معتمد للنوع الحالي.</string>
-<string name="lab_unresolved_role">لم يتم تحديد نوع موثوق للرسالة؛ لا يوجد اقتراح معتمد من تعلّم الآلة.</string>
-<string name="lab_unavailable_role">تعذر التحقق من مصدر الفهم الحالي. لا يعني ذلك مشاركة تعلّم الآلة.</string>
 <string name="lab_understanding_pending">ما زالت الرسالة بحاجة للمراجعة؛ معرفة النوع لا تعني اكتمال تسجيل الحركة.</string>
 <string name="lab_owned_transfer_requires_self">الطرف الآخر حساب لك. اختر تحويل بين حساباتي.</string>
 <string name="lab_same_transfer_account">يجب أن يكون حسابا التحويل مختلفين.</string>

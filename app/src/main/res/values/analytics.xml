@@ -6,7 +6,7 @@
     <string name="lab_analysis_expected_total">المتوقع بنهاية الفترة</string>
     <string name="lab_analysis_actual">صرفت حتى الآن</string>
     <string name="lab_analysis_remaining">المتوقع لبقية الفترة</string>
-    <string name="lab_analysis_sections">المشتريات · الالتزامات</string>
+    <string name="lab_analysis_sections">يشمل المشتريات والالتزامات</string>
     <string name="lab_analysis_need_data">يظهر التقدير بعد فترتي راتب مكتملتين و56 يومًا من السجل المغطى. نعرض مشترياتك الفعلية حتى تكتمل البيانات.</string>
     <string name="lab_analysis_preparing">جارٍ إعداد التوقع</string>
     <string name="lab_analysis_failed">تعذر التحليل؛ ستتم إعادة المحاولة مع التحديث التالي</string>

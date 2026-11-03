@@ -45,6 +45,7 @@ fun SettingsRegistryItemCard(
     endAction: (@Composable () -> Unit)? = null,
     footer: (@Composable () -> Unit)? = null,
     onTitleClick: (() -> Unit)? = null,
+    headerAction: (@Composable () -> Unit)? = null,
     accent: com.baraa.masroof.presentation.common.MasroofCardAccent = if (icon == MasroofIcons.cardPayment)
         com.baraa.masroof.presentation.common.MasroofCardAccent.Credit else com.baraa.masroof.presentation.common.MasroofCardAccent.Account,
 ) {
@@ -76,6 +77,7 @@ fun SettingsRegistryItemCard(
                 if (showBankLabel) Text(settingsBankLabel(bank), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            headerAction?.invoke()
         }
         footer?.invoke()
         endAction?.let { action -> Row(Modifier.padding(top = MasroofSpacing.cardInnerGap)) { action() } }

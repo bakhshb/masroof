@@ -276,14 +276,11 @@ fun TransactionDetailScreen(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 MasroofAmountText(
-                    amount = formatLocalizedMoney(transaction.amount),
+                    amount = transaction.direction.amountSign + formatLocalizedMoney(transaction.amount),
                     role = MasroofAmountRole.Hero,
-                    color = when (transaction.direction) {
-                        TransactionDirectionUi.INCOME,
-                        TransactionDirectionUi.INWARD,
-                        TransactionDirectionUi.TRANSFER_IN,
-                        -> extended.inflow
-                        TransactionDirectionUi.OUTWARD -> extended.outflow
+                    color = when {
+                        transaction.direction.isInward -> extended.inflow
+                        transaction.direction == TransactionDirectionUi.OUTWARD -> extended.outflow
                         else -> MaterialTheme.colorScheme.onSurface
                     },
                     modifier = Modifier.padding(top = MasroofSpacing.sectionHeaderGap),
@@ -386,11 +383,7 @@ fun TransactionDetailScreen(
                     }
                     com.baraa.masroof.presentation.interpretation.InterpretationProvenanceCard(evidence.provenance)
                     MasroofCard {
-                        Text(
-                            evidence.body,
-                            textAlign = TextAlign.Start,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
+                        com.baraa.masroof.presentation.common.SmsBodyText(evidence.body)
                     }
                 }
             }

@@ -56,10 +56,7 @@ import com.baraa.masroof.presentation.common.MasroofAmountText
 import com.baraa.masroof.presentation.review.ReviewReasonLabels
 
 @Composable
-fun ReviewRoute(
-    viewModel: ReviewViewModel,
-    onBack: () -> Unit,
-) {
+fun ReviewRoute(viewModel: ReviewViewModel, onBack: (() -> Unit)? = null) {
     val state by viewModel.uiState.collectAsState()
     // Every Review visit shares this ViewModel, so each visit saves the message it shows (and whether it is teaching it)
     // and reopens it when it returns. Only the id is saved; the message text is read again from the database.
@@ -123,11 +120,11 @@ fun ReviewRoute(
     } else {
         ReviewListScreen(
             state = state,
-            onBack = onBack,
             onRefresh = viewModel::refresh,
             onOpen = ::open,
             onDismissAllInformational = viewModel::dismissAllInformational,
             onListModeChange = viewModel::setListMode,
+            onBack = onBack,
         )
     }
 }
@@ -136,16 +133,17 @@ fun ReviewRoute(
 @Composable
 internal fun ReviewListScreen(
     state: ReviewUiState,
-    onBack: () -> Unit,
     onRefresh: () -> Unit,
     onOpen: (String) -> Unit,
     onDismissAllInformational: () -> Unit,
     onListModeChange: (ReviewListMode) -> Unit,
+    /** `null` on the Review tab root; set when Review was opened above another screen. */
+    onBack: (() -> Unit)? = null,
 ) {
     MasroofSecondaryScaffold(
         title = stringResource(R.string.review_title),
         onBack = onBack,
-        backContentDescription = stringResource(R.string.review_back),
+        backContentDescription = onBack?.let { stringResource(R.string.review_back) },
     ) { contentModifier ->
         Column(modifier = contentModifier.fillMaxSize()) {
             androidx.compose.foundation.layout.FlowRow(
@@ -228,11 +226,12 @@ internal fun ReviewListScreen(
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(Modifier.height(MasroofSpacing.sectionGap))
-                    IconTextButton(
-                        onClick = onBack,
-                        icon = MasroofIcons.backToCurrent,
-                        text = stringResource(R.string.review_back),
+                    if (state.listMode == ReviewListMode.PENDING) Text(
+                        stringResource(R.string.review_empty_body),
+                        modifier = Modifier.fillMaxWidth().padding(top = MasroofSpacing.inlineGap),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -270,7 +269,8 @@ internal fun ReviewListScreen(
                         }
                     }
                     items(state.items, key = { it.id }) { item ->
-                        ReviewListCard(item = item, onClick = { onOpen(item.id) })
+                        if (item.ignored) ReviewIgnoredRow(item = item, onClick = { onOpen(item.id) })
+                        else ReviewListCard(item = item, onClick = { onOpen(item.id) })
                     }
                     item { Spacer(Modifier.height(MasroofSpacing.screenVertical)) }
                 }
@@ -299,6 +299,33 @@ internal fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
         Spacer(Modifier.height(MasroofSpacing.sectionGap))
         com.baraa.masroof.presentation.common.MasroofButton(onClick, Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.reference_review_evidence))
+        }
+    }
+}
+
+/** One compact tappable row per ignored message; it opens the same evidence and restore options. */
+@Composable
+internal fun ReviewIgnoredRow(item: ReviewListItemUi, onClick: () -> Unit) {
+    val sender = item.sender ?: item.bankId?.let { com.baraa.masroof.presentation.settings.LocalSettingsBankNames.current[it] }
+    MasroofCard(modifier = Modifier.testTag("review-ignored-row").clickable(onClickLabel = stringResource(R.string.reference_review_evidence),
+        role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
+            Column(Modifier.weight(1f)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(sender ?: "—", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text(item.dateLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                com.baraa.masroof.presentation.common.SmsBodyText(item.smsBody, Modifier.fillMaxWidth(), maxLines = 1,
+                    style = MaterialTheme.typography.bodySmall)
+                item.ignoredReasonRes?.let {
+                    Text(stringResource(it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Icon(if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl)
+                MasroofIcons.periodPrevious else MasroofIcons.periodNext, null, Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.icon),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -357,7 +384,7 @@ internal fun ReviewDetailScreen(
                 detail.amountLabel?.let { MasroofAmountText(it, MasroofAmountRole.Hero) }
                 detail.sender?.let { IconLabelRow(MasroofIcons.sender, stringResource(R.string.review_sender, it)) }
                 IconLabelRow(MasroofIcons.calendar, stringResource(R.string.review_date, detail.dateLabel))
-                Text(detail.body, textAlign = TextAlign.Start, color = MaterialTheme.colorScheme.onSurface)
+                com.baraa.masroof.presentation.common.SmsBodyText(detail.body)
             }
             detail.resolvedAtLabel?.let {
                 IconLabelRow(

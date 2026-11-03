@@ -60,6 +60,9 @@ class RegistryDeleteScreensTest {
     private fun deleteOnEveryTab(names: List<String>): List<StopTrackingTarget> {
         tabs.forEachIndexed { index, (_, tab) ->
             compose.onNodeWithText(ar(tab)).performClick()
+            // Followed cards keep Delete in the row's overflow menu.
+            if (compose.onAllNodesWithTag("registry-more-actions").fetchSemanticsNodes().isNotEmpty())
+                compose.onNodeWithTag("registry-more-actions").performScrollTo().performClick()
             compose.onNodeWithTag("registry-delete-action").performScrollTo().performClick()
             compose.onNodeWithTag("registry-delete-name").assert(hasText(names[index], substring = true))
             compose.onNodeWithTag("registry-delete-cancel").performClick()

@@ -24,6 +24,8 @@ class ReviewDetailLoader(
         val messageFamily: MessageFamily?,
         val receivedAt: Instant?,
         val body: String?,
+        val sender: String? = null,
+        val bankId: String? = null,
     )
 
     data class ReviewDetail(
@@ -88,6 +90,8 @@ class ReviewDetailLoader(
         messageFamily = event?.messageFamily,
         receivedAt = raw?.receivedAt,
         body = raw?.body,
+        sender = raw?.sender?.takeIf { it.isNotBlank() },
+        bankId = event?.bank?.id?.takeUnless { it == com.baraa.masroof.domain.model.Bank.UNKNOWN.id },
     )
 
     private suspend fun toDetail(review: ReviewItem): ReviewDetail? {

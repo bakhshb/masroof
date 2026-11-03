@@ -216,6 +216,42 @@ class CreditFacilityOverviewBuilderTest {
         assertEquals("3001", facilities.debitCards.single().linkedAccountMaskedNumber)
     }
 
+    @Test
+    fun facilityAvailableLimit_isTheLatestAvailableReadingAcrossItsCards() {
+        fun withAvailable(last4: String, available: String, at: String, updatedAt: String) =
+            row(last4, "0.00").copy(snapshot = CreditCardBalanceSnapshot(
+                availableBalance = Money.of(available, Currency.SAR), dueAmount = null, dueDate = null,
+                statementIssuedAt = null, updatedAt = Instant.parse(updatedAt), availableBalanceAt = Instant.parse(at)))
+        val overview = CreditCardsOverview(
+            cards = listOf(
+                // The primary's snapshot was updated last, but by a statement; its available reading is older.
+                withAvailable("7271", "16491.13", at = "2026-10-30T08:00:00Z", updatedAt = "2026-11-04T08:00:00Z"),
+                withAvailable("3478", "15895.04", at = "2026-11-03T08:00:00Z", updatedAt = "2026-11-03T08:00:00Z"),
+                withAvailable("5555", "18077.68", at = "2026-10-20T08:00:00Z", updatedAt = "2026-10-20T08:00:00Z"),
+            ),
+            aggregateStatementPeriodLabel = null,
+            salaryPeriodLabel = null,
+            currency = Currency.SAR,
+        )
+        val registry = listOf(
+            card("7271", CardRole.PRIMARY),
+            card("3478", CardRole.SUPPLEMENTARY, parent = "7271"),
+            card("5555", CardRole.SUPPLEMENTARY, parent = "7271"),
+        )
+
+        val facility = CreditFacilityOverviewBuilder.build(overview, registry).facilities.single()
+
+        assertEquals(Money.of("15895.04", Currency.SAR), facility.latestAvailableBalance)
+        assertEquals(Instant.parse("2026-11-03T08:00:00Z"), facility.latestAvailableBalanceAt)
+    }
+
+    @Test
+    fun facilityAvailableLimit_isNullWithoutAnyReading() {
+        val overview = CreditCardsOverview(listOf(row("1111", "0.00", due = "10.00")), null, null, Currency.SAR)
+        val facility = CreditFacilityOverviewBuilder.build(overview, listOf(card("1111", CardRole.STANDALONE))).facilities.single()
+        assertNull(facility.latestAvailableBalance)
+    }
+
     private fun row(
         last4: String,
         amount: String,

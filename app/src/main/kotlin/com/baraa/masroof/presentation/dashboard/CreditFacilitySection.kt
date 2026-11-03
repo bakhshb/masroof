@@ -68,21 +68,15 @@ fun CreditFacilityCard(facility: CreditFacilityOverview, cardNetworksByLast4: Ma
     allowInlineExpand: Boolean = true, onOpenCard: ((CreditCardDashboardRow) -> Unit)? = null,
     trends: Map<String, com.baraa.masroof.application.dashboard.DailySpendingTrend> = emptyMap(),
 ) {
-    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
-    val date = java.time.format.DateTimeFormatter.ofPattern("d MMM", locale)
+    // Facility due and available limit show once in the Cards hero, not on every card.
     Column(modifier, verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         facility.allCards.forEach { row ->
             EntitySummaryCard(row.displayLabel(ownedCards), stringResource(if (row.last4 == facility.primaryLast4)
                 R.string.dashboard_credit_facility_primary else R.string.dashboard_credit_facility_additional),
                 MasroofIcons.cardPayment, MasroofThemeExtras.extendedColors.card, onClick = onOpenCard?.let { open -> { open(row) } },
                 actionLabel = stringResource(R.string.reference_card_details), bankLabel = com.baraa.masroof.presentation.settings.settingsBankLabel(row.bank)) {
-                val unavailable = stringResource(R.string.dashboard_value_unavailable)
                 com.baraa.masroof.presentation.common.MasroofDetailRow(stringResource(R.string.reference_salary_spending), formatLocalizedMoney(row.salaryPeriodSpendingNet), dense = true)
                 com.baraa.masroof.presentation.common.MasroofDetailRow(stringResource(R.string.reference_statement_spending), formatLocalizedMoney(row.statementSpendingNet), dense = true)
-                com.baraa.masroof.presentation.common.MasroofDetailRow(stringResource(R.string.approved_available_balance), row.snapshot?.availableBalance?.let { formatLocalizedMoney(it) } ?: unavailable, dense = true)
-                com.baraa.masroof.presentation.common.MasroofDetailRow(stringResource(R.string.approved_due_amount), facility.facilityDue?.amount?.let { formatLocalizedMoney(it) } ?: unavailable,
-                    guidance = if (row.last4 != facility.primaryLast4) stringResource(R.string.approved_shared_due) else null, valueColor = MasroofThemeExtras.extendedColors.liability, dense = true)
-                com.baraa.masroof.presentation.common.MasroofDetailRow(stringResource(R.string.approved_due_date), facility.facilityDue?.dueDate?.let(date::format) ?: unavailable, dense = true)
                 trends[CardOwnershipKey.of(row)]?.let { CardReferenceAverage(it, inCard = true) }
             }
         }

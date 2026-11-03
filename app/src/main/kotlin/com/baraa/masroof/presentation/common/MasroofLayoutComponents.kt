@@ -55,7 +55,8 @@ fun MasroofAppBar(
 @Composable
 fun MasroofSecondaryScaffold(
     title: String,
-    onBack: () -> Unit,
+    /** `null` on a bottom-tab root: the tab bar and system Back already navigate. */
+    onBack: (() -> Unit)?,
     backContentDescription: String?,
     modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},

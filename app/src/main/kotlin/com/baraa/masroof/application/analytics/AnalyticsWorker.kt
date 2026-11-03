@@ -61,13 +61,20 @@ object AnalyticsNotifications {
                 else -> R.string.lab_analysis_budget_alert
             })
             val notification = NotificationCompat.Builder(context, CHANNEL).setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentTitle(title).setContentText(row.title.ifBlank { context.getString(R.string.lab_analysis_title) })
+                .setContentTitle(title).setContentText(phoneAlertText(context, row, snapshot))
                 .setContentIntent(pending).setOnlyAlertOnce(true).setAutoCancel(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).build()
             try { manager.notify("masroof-analysis", row.id.hashCode(), notification) } catch (_: SecurityException) { continue }
             database.analytics().alerts(listOf(row.copy(lastNotified = now)))
         }
     }
+}
+
+/** Due alerts are named exactly like the in-app list. */
+private fun phoneAlertText(context: Context, row: com.baraa.masroof.data.analytics.AnalysisAlertRow, snapshot: AnalysisSnapshot): String = when {
+    row.title.isBlank() -> context.getString(R.string.lab_analysis_title)
+    row.kind == "DUE" -> CommitmentNames.dueAlert(context, row, snapshot.dueFor(row))
+    else -> row.title
 }
 
 /** Included in the existing durable financial restore journal, including rollback. */

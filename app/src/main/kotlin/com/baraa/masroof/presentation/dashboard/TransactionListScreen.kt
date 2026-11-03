@@ -41,10 +41,13 @@ fun TransactionListScreen(
     transactions: List<TransactionPreviewUi>,
     projection: TransactionListProjectionUi,
     onFilterChanged: (TransactionListFilterState) -> Unit,
-    onBack: () -> Unit,
     onOpenTransaction: (String) -> Unit,
     ownedCards: List<OwnedCardUi> = emptyList(),
     ownedAccounts: List<OwnedAccountUi> = emptyList(),
+    /** The period shown in the pill; [periodLabel] stays the full label for shared text. */
+    periodRangeLabel: String = periodLabel,
+    /** `null` on the Transactions tab root; set when the list was opened above another screen. */
+    onBack: (() -> Unit)? = null,
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedTypeNames by rememberSaveable { mutableStateOf(listOf<String>()) }
@@ -90,7 +93,7 @@ fun TransactionListScreen(
     MasroofSecondaryScaffold(
         title = stringResource(R.string.transaction_list_title),
         onBack = onBack,
-        backContentDescription = stringResource(R.string.review_back),
+        backContentDescription = onBack?.let { stringResource(R.string.review_back) },
         actions = {
             ShareActionIcon(
                 enabled = canShare,
@@ -141,7 +144,7 @@ fun TransactionListScreen(
         ) {
             Column(header.layoutModifier) {
                 TransactionListToolbar(
-                    periodLabel = periodLabel,
+                    periodLabel = periodRangeLabel,
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
                     onOpenFilters = { filtersSheetOpen = true },

@@ -167,6 +167,26 @@ class ReviewListRefreshTest {
     }
 
     @Test
+    fun ignoredRow_showsSenderReasonAndHidesCodeDigits() = runTest {
+        World().use { world ->
+            val body = "رمز التحقق 4821 لا تشاركه"
+            world.rawRepo.insertIfAbsent(RawSms("sms-otp", "AlJazira", body, Instant.parse("2026-08-10T09:30:00Z"), "sms-otp", SmsBodyHasher.sha256Hex(body)))
+            world.persistPurchase(smsId = "sms-otp", eventId = "pe-otp", amount = null, last4 = null, family = MessageFamily.OTP)
+            val reviewId = world.requireReview("sms-otp", "user_ignored_transaction")
+            world.reviewRepo.markResolved(id = reviewId, resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
+                resolvedAt = clock.now(), resolvedTransactionId = null)
+
+            world.viewModel.setListMode(ReviewListMode.IGNORED)
+            advanceUntilIdle()
+
+            val row = world.viewModel.uiState.value.items.single()
+            assertEquals("AlJazira", row.sender)
+            assertEquals("رمز التحقق •••• لا تشاركه", row.smsBody)
+            assertEquals(com.baraa.masroof.R.string.review_ignored_reason_otp, row.ignoredReasonRes)
+        }
+    }
+
+    @Test
     fun restoreFollowUp_doesNotRunFullReconciliation() = runTest {
         World().use { world ->
             world.confirmCardOwned("7271")
@@ -274,7 +294,7 @@ class ReviewListRefreshTest {
             .setQueryExecutor(Executor { it.run() })
             .setTransactionExecutor(Executor { it.run() })
             .build()
-        private val rawRepo = RoomRawSmsRepository(db.rawSmsDao())
+        val rawRepo = RoomRawSmsRepository(db.rawSmsDao())
         val parsed = CountingParsedEvents(RoomParsedEventRepository(db.parsedEventDao()))
         private val financial = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         val transactions = financial
