@@ -454,8 +454,7 @@ class ReviewViewModel(
                 else if (summary.messageFamily in setOf(MessageFamily.PURCHASE, MessageFamily.REFUND)) com.baraa.masroof.R.string.transaction_unknown_merchant
                 else summary.messageFamily.toUiLabelRes(),
             smsBody = summary.body?.trim().orEmpty().ifEmpty { "—" }
-                // An ignored code still works for a while, so the list never shows its digits.
-                .let { if (summary.messageFamily == MessageFamily.OTP) it.replace(Regex("\\p{Nd}{3,}"), "••••") else it },
+                .let { maskIgnoredCodes(it, summary.messageFamily, isIgnoredReview(review)) },
             amountLabel = summary.amount?.let { MoneyUiFormatter.format(it, languageTag) },
             dateLabel = dateLabel,
             reasonLabel = review.reasons.firstOrNull().orEmpty(),
@@ -557,4 +556,16 @@ class ReviewViewModel(
             "card_payment_ownership_unresolved",
         )
     }
+}
+
+private val OTP_DIGITS = Regex("\\p{Nd}{3,}")
+
+// A standalone 4–8 digit run, not part of an amount, a longer number or a masked card (*1234).
+private val CODE_LIKE_DIGITS = Regex("(?<![\\p{Nd}.,٫٬*•·])\\p{Nd}{4,8}(?![\\p{Nd},٫٬]|[.]\\p{Nd})")
+
+/** An ignored code still works for a while, so the list never shows its digits, even when the rules did not label it OTP. */
+internal fun maskIgnoredCodes(body: String, family: MessageFamily?, ignored: Boolean): String = when {
+    family == MessageFamily.OTP -> body.replace(OTP_DIGITS, "••••")
+    ignored -> body.replace(CODE_LIKE_DIGITS, "••••")
+    else -> body
 }

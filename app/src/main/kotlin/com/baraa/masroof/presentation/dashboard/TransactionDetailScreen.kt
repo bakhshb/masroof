@@ -275,14 +275,8 @@ fun TransactionDetailScreen(
                     transactionTitle(transaction),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                // Same sign as the list row: + in, none for a transfer between own accounts, − out.
-                val sign = when (transaction.direction) {
-                    TransactionDirectionUi.INCOME, TransactionDirectionUi.INWARD, TransactionDirectionUi.TRANSFER_IN -> "+"
-                    TransactionDirectionUi.NEUTRAL -> ""
-                    else -> "−"
-                }
                 MasroofAmountText(
-                    amount = sign + formatLocalizedMoney(transaction.amount),
+                    amount = transaction.direction.amountSign + formatLocalizedMoney(transaction.amount),
                     role = MasroofAmountRole.Hero,
                     color = when (transaction.direction) {
                         TransactionDirectionUi.INCOME,

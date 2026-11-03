@@ -113,15 +113,12 @@ import java.time.ZoneId
 }
 
 /** Original and analytics rows share one list/card. Analytics read state remains in its existing store. */
-@Composable fun AnalysisNotificationContent(state: NotificationCenterUiState, modifier: Modifier,
-    originalRow: @Composable (NotificationItem, Boolean) -> Unit) {
+@Composable fun AnalysisNotificationContent(state: NotificationCenterUiState, analysis: AnalysisUiState, alerts: List<com.baraa.masroof.data.analytics.AnalysisAlertRow>,
+    modifier: Modifier, originalRow: @Composable (NotificationItem, Boolean) -> Unit) {
     // The original notification screen also renders independently in the design matrix.
     // Only expose analysis actions when its workflow is supplied by the app root.
     val workflow = LocalAnalyticsWorkflow.current
-    val analysis = workflow?.state?.collectAsState()?.value ?: AnalysisUiState()
     val scope = rememberCoroutineScope()
-    val now = currentAnalysisTime()
-    val alerts = visibleAnalysisAlerts(analysis, now)
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         if (state.loading && state.items.isEmpty() && alerts.isEmpty()) CircularProgressIndicator()
         else if (state.items.isEmpty() && alerts.isEmpty()) Text(stringResource(R.string.notification_center_empty))
@@ -141,8 +138,8 @@ import java.time.ZoneId
                     // A named due alert leads with the commitment name and shows its amount and due date.
                     val named = alert.kind == "DUE" && alert.title.isNotBlank()
                     val due = analysis.dueFor(alert)
-                    val title = if (due != null) com.baraa.masroof.presentation.dashboard.commitmentName(due.source, due.name, due.loanTypeFallback)
-                        else alert.title
+                    val title = com.baraa.masroof.application.analytics.CommitmentNames.dueAlert(
+                        androidx.compose.ui.platform.LocalContext.current, alert, due)
                     MasroofReferenceNavigationRow(title = if (named) title else kindLabel,
                         subtitle = if (named && dueDay != null) stringResource(R.string.notification_due_subtitle, amount,
                             formatLocalizedTransactionDate(java.time.LocalDate.ofEpochDay(dueDay)))
@@ -175,11 +172,9 @@ import java.time.ZoneId
     }
 }
 
-/** Unread original notifications plus visible unread analysis alerts, shown once in the top bar. */
-@Composable fun notificationUnreadCount(state: NotificationCenterUiState): Int {
-    val analysis = LocalAnalyticsWorkflow.current?.state?.collectAsState()?.value ?: AnalysisUiState()
-    return state.unreadCount + visibleAnalysisAlerts(analysis, currentAnalysisTime()).count { !it.read }
-}
+/** Analysis state read once per Notification Center, so the top-bar count and the list share one clock. */
+@Composable fun notificationAnalysisState(): AnalysisUiState =
+    LocalAnalyticsWorkflow.current?.state?.collectAsState()?.value ?: AnalysisUiState()
 
 @Composable internal fun currentAnalysisTime(): Long {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }

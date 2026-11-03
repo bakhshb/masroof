@@ -53,23 +53,20 @@ data class CreditFacilitiesOverview(
 
     /** Every facility contributes once. Unknown or mixed-currency dues are not guessed. */
     val totalFacilityDue: Money?
-        get() {
-            val unique = facilities.distinctBy { it.facilityKey }
-            if (unique.isEmpty() || unique.any { it.facilityDue == null }) return null
-            val amounts = unique.map { it.facilityDue!!.amount }
-            if (amounts.any { it.currency != amounts.first().currency }) return null
-            return amounts.reduce { total, amount -> total + amount }
-        }
+        get() = sumDues(facilities.distinctBy { it.facilityKey })
+
     /** Like [totalFacilityDue], over the facilities whose statement due is not paid yet. */
     val unpaidFacilityDue: Money?
-        get() {
-            val unpaid = facilities.distinctBy { it.facilityKey }.filterNot { it.facilityDuePaid }
-            if (unpaid.isEmpty()) return Money.of("0", currency)
-            if (unpaid.any { it.facilityDue == null }) return null
-            val amounts = unpaid.map { it.facilityDue!!.amount }
-            if (amounts.any { it.currency != amounts.first().currency }) return null
-            return amounts.reduce { total, amount -> total + amount }
-        }
+        get() = facilities.distinctBy { it.facilityKey }.filterNot { it.facilityDuePaid }
+            .let { unpaid -> if (unpaid.isEmpty()) Money.of("0", currency) else sumDues(unpaid) }
+
+    private fun sumDues(unique: List<CreditFacilityOverview>): Money? {
+        if (unique.isEmpty() || unique.any { it.facilityDue == null }) return null
+        val amounts = unique.map { it.facilityDue!!.amount }
+        if (amounts.any { it.currency != amounts.first().currency }) return null
+        return amounts.reduce { total, amount -> total + amount }
+    }
+
     val hasContent: Boolean
         get() = facilities.isNotEmpty() || debitCards.isNotEmpty()
 

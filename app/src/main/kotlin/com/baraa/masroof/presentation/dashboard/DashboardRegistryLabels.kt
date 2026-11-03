@@ -103,9 +103,7 @@ fun cardDisplayLabel(
     last4: String,
 ): String {
     val match = cards.find { it.bank == bank && it.last4 == last4 }
-    val custom = DashboardRegistryLabels.customName(match?.displayName)
-    if (custom != null) return custom
-    return stringResource(R.string.dashboard_credit_card_last4, formatCardLast4(last4))
+    return cardDisplayLabel(LocalContext.current, match, last4)
 }
 
 @Composable
@@ -118,11 +116,14 @@ fun cardDisplayLabel(
     context: Context,
     cards: List<OwnedCardUi>,
     last4: String,
-): String {
-    val match = cards.find { it.last4 == last4 }
+): String = cardDisplayLabel(context, cards.find { it.last4 == last4 }, last4)
+
+/** A custom name wins; a registry Mada card says Mada; any other card stays "Card", since rows do not know credit vs debit. */
+private fun cardDisplayLabel(context: Context, match: OwnedCardUi?, last4: String): String {
     val custom = DashboardRegistryLabels.customName(match?.displayName)
     if (custom != null) return custom
-    return context.getString(R.string.dashboard_credit_card_last4, formatCardLast4(last4))
+    val res = if (match?.cardNetwork == com.baraa.masroof.domain.model.CardNetwork.MADA) R.string.home_mada_card_last4 else R.string.dashboard_credit_card_last4
+    return context.getString(res, formatCardLast4(last4))
 }
 
 @Composable

@@ -70,11 +70,11 @@ object AnalyticsNotifications {
     }
 }
 
-/** Card dues are stored as bare last4; name them like the commitments list does. */
-private fun phoneAlertText(context: Context, row: com.baraa.masroof.data.analytics.AnalysisAlertRow, snapshot: AnalysisSnapshot): String {
-    if (row.title.isBlank()) return context.getString(R.string.lab_analysis_title)
-    val isCard = snapshot.dueFor(row)?.source == com.baraa.masroof.application.dashboard.CommitmentDashboardSource.CREDIT_CARD
-    return if (isCard) context.getString(R.string.entities_credit_card_last4, row.title.trim()) else row.title
+/** Due alerts are named exactly like the in-app list. */
+private fun phoneAlertText(context: Context, row: com.baraa.masroof.data.analytics.AnalysisAlertRow, snapshot: AnalysisSnapshot): String = when {
+    row.title.isBlank() -> context.getString(R.string.lab_analysis_title)
+    row.kind == "DUE" -> CommitmentNames.dueAlert(context, row, snapshot.dueFor(row))
+    else -> row.title
 }
 
 /** Included in the existing durable financial restore journal, including rollback. */

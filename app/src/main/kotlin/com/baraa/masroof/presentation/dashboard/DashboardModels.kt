@@ -50,6 +50,12 @@ enum class TransactionDirectionUi {
     INCOME,
     TRANSFER_IN,
     NEUTRAL,
+    ;
+
+    val isInward: Boolean get() = this == INCOME || this == INWARD || this == TRANSFER_IN
+
+    /** One sign for list and detail: + in, none for a transfer between own accounts, − out. */
+    val amountSign: String get() = if (isInward) "+" else if (this == NEUTRAL) "" else "−"
 }
 
 data class TransactionSmsEvidenceUi(

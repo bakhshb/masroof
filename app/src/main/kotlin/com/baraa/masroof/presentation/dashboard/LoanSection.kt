@@ -71,8 +71,5 @@ internal fun commitmentName(
     source: com.baraa.masroof.application.dashboard.CommitmentDashboardSource?,
     displayName: String,
     loanTypeFallback: com.baraa.masroof.domain.model.LoanType?,
-): String = when {
-    source == com.baraa.masroof.application.dashboard.CommitmentDashboardSource.CREDIT_CARD ->
-        stringResource(R.string.entities_credit_card_last4, com.baraa.masroof.presentation.common.formatCardLast4(displayName))
-    else -> loanTypeFallback?.let { loanTypeLabel(it) } ?: displayName
-}
+): String = com.baraa.masroof.application.analytics.CommitmentNames.name(
+    androidx.compose.ui.platform.LocalContext.current, source, displayName, loanTypeFallback)

@@ -160,7 +160,7 @@ fun CardsSummaryScreen(
                 com.baraa.masroof.presentation.common.MasroofHeroCard(
                     stringResource(R.string.approved_total_expenses),
                     formatLocalizedMoney(followedFacilities.aggregateDebitSalaryPeriodSpending()),
-                    subtitle = if (debitTrend != null && !debitTrend.hasRefunds) stringResource(R.string.entities_no_refunds) else null,
+                    subtitle = if (debitTrend?.spentWithoutRefunds == true) stringResource(R.string.entities_no_refunds) else null,
                     role = com.baraa.masroof.ui.theme.MasroofHeroRole.Account,
                 )
                 // With no refunds the two tiles would only repeat the hero amount.

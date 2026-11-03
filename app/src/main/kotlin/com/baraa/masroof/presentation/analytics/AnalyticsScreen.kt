@@ -67,13 +67,7 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
                 onViewAll = onOpen, viewAllLabel = stringResource(R.string.lab_analysis_open), modifier = Modifier.weight(1f))
             guidance?.let { MasroofGuidanceButton(status, stringResource(it)) }
         }
-        val locale = LocalConfiguration.current.locales[0]
-        Text(value?.let { snapshot ->
-            val issued = Instant.ofEpochMilli(snapshot.issuedAt).atZone(ZoneId.systemDefault())
-            stringResource(R.string.home_forecast_status_line, status, if (state.updating) stringResource(R.string.lab_analysis_updating)
-                else stringResource(R.string.home_forecast_updated_at, DateTimeFormatter.ofPattern("d MMM", locale).format(issued),
-                    DateTimeFormatter.ofPattern("HH:mm", locale).format(issued)))
-        } ?: status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(updatedLine(state)?.let { stringResource(R.string.home_forecast_status_line, status, it) } ?: status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         value?.total?.let { Amount(stringResource(R.string.lab_analysis_expected_total), it) }
         if (value != null && value.total == null) Amount(stringResource(R.string.lab_analysis_actual), value.actual)
         Text(stringResource(R.string.lab_analysis_sections), style = MaterialTheme.typography.bodySmall,
@@ -104,9 +98,12 @@ private fun statusRes(state: AnalysisUiState): Pair<Int, Int?> {
     val (label, guidance) = statusRes(state)
     MasroofGuidanceLabel(stringResource(label), guidance?.let { stringResource(it) },
         style = MaterialTheme.typography.labelMedium, contentColor = MaterialTheme.colorScheme.primary)
-    state.snapshot?.let { Text(if (state.updating) stringResource(R.string.lab_analysis_updating)
-        else stringResource(R.string.lab_analysis_updated, timestamp(it.issuedAt)),
-        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    updatedLine(state)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+}
+
+/** One "updating" / "last result" line for the home entry and the analysis screen. */
+@Composable private fun updatedLine(state: AnalysisUiState): String? = state.snapshot?.let {
+    if (state.updating) stringResource(R.string.lab_analysis_updating) else stringResource(R.string.lab_analysis_updated, timestamp(it.issuedAt))
 }
 
 @Composable fun AnalyticsRoute(onBack: () -> Unit, onOpenTransaction: (String) -> Unit,

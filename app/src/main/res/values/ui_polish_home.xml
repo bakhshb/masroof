@@ -3,7 +3,6 @@
     <string name="home_daily_spending_purchases_scope">مشتريات البطاقات والسحب النقدي والتحويلات الصادرة</string>
     <string name="home_avg_daily_all_expenses">المتوسط اليومي · كل المصروفات</string>
     <string name="home_forecast_status_line">%1$s · %2$s</string>
-    <string name="home_forecast_updated_at">آخر تحديث %1$s، %2$s</string>
     <string name="chart_capped_day_label">↑ %1$s · %2$s</string>
     <string name="chart_capped_day_note">يوم واحد مرتفع جدًا، قصّرناه في الرسم حتى تظهر بقية الأيام بوضوح</string>
     <string name="home_mada_card_last4">مدى ···%1$s</string>
