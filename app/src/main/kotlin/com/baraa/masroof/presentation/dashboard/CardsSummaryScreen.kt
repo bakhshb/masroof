@@ -146,7 +146,7 @@ fun CardsSummaryScreen(
                 com.baraa.masroof.presentation.common.MasroofChoice(stringResource(R.string.reference_mada_tab), !creditSelected, { creditSelected = false })
             }
             if (creditSelected && followedFacilities.facilities.isNotEmpty()) {
-                DashboardSummaryHeroCard(spec = creditFacilitiesSummaryHeroSpec(followedFacilities, locale))
+                CreditFacilitiesSummaryHero(followedFacilities, locale)
                 com.baraa.masroof.presentation.common.MasroofMetricRow { tile ->
                     com.baraa.masroof.presentation.common.MasroofMetric(stringResource(R.string.reference_salary_spending),
                         formatLocalizedMoney(followedFacilities.aggregateCreditSalaryPeriodSpending()), com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.card, tile)
@@ -156,12 +156,15 @@ fun CardsSummaryScreen(
                 SpendingTrendSection(state.spendingTrends?.creditCards, stringResource(R.string.approved_credit_daily), role = com.baraa.masroof.ui.theme.MasroofHeroRole.Card,
                     showAverage = true, chartKey = "credit")
             } else {
+                val debitTrend = state.spendingTrends?.debitCards
                 com.baraa.masroof.presentation.common.MasroofHeroCard(
                     stringResource(R.string.approved_total_expenses),
                     formatLocalizedMoney(followedFacilities.aggregateDebitSalaryPeriodSpending()),
+                    subtitle = if (debitTrend != null && !debitTrend.hasRefunds) stringResource(R.string.entities_no_refunds) else null,
                     role = com.baraa.masroof.ui.theme.MasroofHeroRole.Account,
                 )
-                state.spendingTrends?.debitCards?.let { trend ->
+                // With no refunds the two tiles would only repeat the hero amount.
+                debitTrend?.takeIf { it.hasRefunds }?.let { trend ->
                     com.baraa.masroof.presentation.common.MasroofMetricRow { tile ->
                         com.baraa.masroof.presentation.common.MasroofMetric(stringResource(R.string.dashboard_expenses_before_refunds), formatLocalizedMoney(trend.totalBeforeRefunds),
                             com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.outflow, tile)

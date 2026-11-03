@@ -20,7 +20,14 @@ data class CreditFacilityOverview(
     val aggregateStatementPeriodLabel: String?,
     val salaryPeriodLabel: String?,
     val currency: Currency,
+    /** Latest available-balance reading across this facility's cards, by message time. */
+    val latestAvailableBalance: Money? = null,
+    val latestAvailableBalanceAt: java.time.Instant? = null,
+    /** Set from the commitments decision ([CommitmentsOverview.paidCreditFacilityKeys]) so both screens agree. */
+    val facilityDuePaid: Boolean = false,
 ) {
+    val facilityKey: String get() = "${bank.id}:$primaryLast4"
+
     val allCards: List<CreditCardDashboardRow>
         get() = listOf(primary) + supplementaries
 
@@ -47,7 +54,7 @@ data class CreditFacilitiesOverview(
     /** Every facility contributes once. Unknown or mixed-currency dues are not guessed. */
     val totalFacilityDue: Money?
         get() {
-            val unique = facilities.distinctBy { "${it.bank.id}:${it.primaryLast4}" }
+            val unique = facilities.distinctBy { it.facilityKey }
             if (unique.isEmpty() || unique.any { it.facilityDue == null }) return null
             val amounts = unique.map { it.facilityDue!!.amount }
             if (amounts.any { it.currency != amounts.first().currency }) return null
@@ -55,6 +62,13 @@ data class CreditFacilitiesOverview(
         }
     val hasContent: Boolean
         get() = facilities.isNotEmpty() || debitCards.isNotEmpty()
+
+    /** True only when every facility has a statement due and each one is paid. */
+    val allFacilityDuesPaid: Boolean
+        get() = facilities.isNotEmpty() && facilities.all { it.facilityDue != null && it.facilityDuePaid }
+
+    fun withPaidDues(paidFacilityKeys: Set<String>): CreditFacilitiesOverview =
+        copy(facilities = facilities.map { it.copy(facilityDuePaid = it.facilityKey in paidFacilityKeys) })
 }
 
 data class DebitCardOverview(
@@ -177,6 +191,9 @@ object CreditFacilityOverviewBuilder {
         supplementaries: List<CreditCardDashboardRow>,
     ): CreditFacilityOverview {
         val all = listOf(primary) + supplementaries
+        val latestAvailable = all.mapNotNull { it.snapshot }
+            .filter { it.availableBalance != null && it.availableBalanceAt != null }
+            .maxByOrNull { it.availableBalanceAt!! }
         return CreditFacilityOverview(
             bank = primary.bank,
             primary = primary,
@@ -188,6 +205,8 @@ object CreditFacilityOverviewBuilder {
                 ?: overview.aggregateStatementPeriodLabel,
             salaryPeriodLabel = overview.salaryPeriodLabel,
             currency = overview.currency,
+            latestAvailableBalance = latestAvailable?.availableBalance,
+            latestAvailableBalanceAt = latestAvailable?.availableBalanceAt,
         )
     }
 

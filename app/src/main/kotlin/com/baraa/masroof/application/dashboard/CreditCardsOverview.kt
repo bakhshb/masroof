@@ -12,6 +12,8 @@ data class CreditCardBalanceSnapshot(
     val dueDate: LocalDate?,
     val statementIssuedAt: Instant?,
     val updatedAt: Instant,
+    /** When [availableBalance] was read; null when no available-balance message exists. */
+    val availableBalanceAt: Instant? = null,
 )
 
 data class CreditCardDashboardRow(

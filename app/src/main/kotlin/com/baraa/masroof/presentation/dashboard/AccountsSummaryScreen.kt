@@ -6,6 +6,9 @@ import com.baraa.masroof.presentation.common.MasroofSectionHeader
 
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofText as Text
@@ -89,38 +92,40 @@ fun AccountsSummaryScreen(
         MasroofSectionHeader(title = stringResource(R.string.reference_followed_accounts))
 
         val hierarchy = state.bankHierarchy
-        when {
-            state.ownedAccounts.isEmpty() -> {
-                Text(
-                    stringResource(R.string.dashboard_accounts_summary_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        if (state.ownedAccounts.isEmpty()) {
+            Text(
+                stringResource(R.string.dashboard_accounts_summary_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            val accounts = if (hierarchy != null && hierarchy.hasContent) {
+                hierarchy.banks.flatMap { bankTree ->
+                    ((bankTree.savingsAccounts + bankTree.walletAccounts).map { it.bank to it.maskedNumber } +
+                        bankTree.currentAccounts.map { it.bank to it.maskedNumber })
+                        .mapNotNull { (bank, maskedNumber) -> resolveOwnedAccountUi(state.ownedAccounts, bank, maskedNumber) }
+                }
+            } else {
+                state.ownedAccounts
             }
-
-            hierarchy != null && hierarchy.hasContent -> {
-                hierarchy.banks.forEach { bankTree ->
-                    val accounts = (bankTree.savingsAccounts + bankTree.walletAccounts)
-                        .map { it.bank to it.maskedNumber } +
-                        bankTree.currentAccounts.map { it.bank to it.maskedNumber }
-                    accounts.forEach { (bank, maskedNumber) ->
-                        resolveOwnedAccountUi(state.ownedAccounts, bank, maskedNumber)?.let { account ->
-                            AccountsSummaryAccountCard(
-                                account = account,
-                                onClick = { onOpenAccount(account) },
-                            )
-                        }
+            // hasActivity is precomputed; accounts without a summary stay full cards.
+            val (idle, active) = accounts.partition { it.periodSummary?.hasActivity == false }
+            active.forEach { account -> AccountsSummaryAccountCard(account = account, onClick = { onOpenAccount(account) }) }
+            if (idle.isNotEmpty()) {
+                var expanded by rememberSaveable { mutableStateOf(false) }
+                com.baraa.masroof.presentation.common.MasroofCard(androidx.compose.ui.Modifier.clickable(
+                    onClickLabel = stringResource(R.string.reference_details), role = androidx.compose.ui.semantics.Role.Button) { expanded = !expanded }) {
+                    androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text(stringResource(R.string.entities_no_activity), androidx.compose.ui.Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(idle.joinToString(" · ") { "···" + DashboardRegistryLabels.accountLast4(it.maskedNumber) },
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        androidx.compose.material3.Icon(
+                            if (expanded) androidx.compose.material.icons.Icons.Filled.KeyboardArrowUp else androidx.compose.material.icons.Icons.Filled.KeyboardArrowDown,
+                            null, androidx.compose.ui.Modifier.size(com.baraa.masroof.ui.theme.MasroofIconSizes.lg), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            }
-
-            else -> {
-                state.ownedAccounts.forEach { account ->
-                    AccountsSummaryAccountCard(
-                        account = account,
-                        onClick = { onOpenAccount(account) },
-                    )
-                }
+                if (expanded) idle.forEach { account -> AccountsSummaryAccountCard(account = account, onClick = { onOpenAccount(account) }) }
             }
         }
     }

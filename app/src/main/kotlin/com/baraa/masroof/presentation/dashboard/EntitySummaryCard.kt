@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,7 +23,9 @@ internal fun EntitySummaryCard(title: String, subtitle: String, icon: ImageVecto
     bankLabel: String? = null,
     actionLabel: String = androidx.compose.ui.res.stringResource(com.baraa.masroof.R.string.reference_details),
     content: @Composable ColumnScope.() -> Unit) {
-    MasroofCard(modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)) {
+    // The whole card opens details; actionLabel names the click for accessibility services.
+    MasroofCard(modifier.then(if (onClick != null) Modifier.clickable(onClickLabel = actionLabel,
+        role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
             androidx.compose.material3.Surface(shape = com.baraa.masroof.ui.theme.MasroofShapes.small,
@@ -40,16 +43,11 @@ internal fun EntitySummaryCard(title: String, subtitle: String, icon: ImageVecto
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = com.baraa.masroof.ui.theme.MasroofFontWeights.semiBold), contentColor = MaterialTheme.colorScheme.onSurface)
             }
             bankLabel?.let { Text(it, Modifier.widthIn(max = com.baraa.masroof.ui.theme.MasroofReference.statusBadgeMaxWidth), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (onClick != null) Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.KeyboardArrowRight, null,
+                Modifier.size(MasroofIconSizes.lg), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(com.baraa.masroof.ui.theme.MasroofReference.chartHeadGap))
         if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         content()
-        if (onClick != null) {
-            Spacer(Modifier.height(MasroofSpacing.cardInnerGap))
-            androidx.compose.material3.Button(onClick = onClick, modifier = Modifier.fillMaxWidth(),
-                shape = com.baraa.masroof.ui.theme.MasroofShapes.small) {
-                Text(actionLabel)
-            }
-        }
     }
 }

@@ -35,6 +35,7 @@ fun MasroofHeroCard(
     modifier: Modifier = Modifier,
     guidance: String? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
+    badge: (@Composable () -> Unit)? = null,
 ) {
     com.baraa.masroof.ui.components.MasroofHeroCard(
         title = com.baraa.masroof.application.locale.AppDigits.display(title),
@@ -43,7 +44,12 @@ fun MasroofHeroCard(
         role = role, modifier = modifier,
         icon = if (role == MasroofHeroRole.Card) MasroofIcons.cardPayment else MasroofIcons.appLogo,
         titleContent = { titleModifier, foreground ->
-            MasroofGuidanceLabel(title, guidance, titleModifier, style = MasroofReference.pair, contentColor = foreground)
+            if (badge == null) MasroofGuidanceLabel(title, guidance, titleModifier, style = MasroofReference.pair, contentColor = foreground)
+            else Row(titleModifier, verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
+                MasroofGuidanceLabel(title, guidance, Modifier.weight(1f, fill = false), style = MasroofReference.pair, contentColor = foreground)
+                badge()
+            }
         }, footer = footer)
 }
 

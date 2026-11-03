@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="entities_statement_amount">مبلغ الكشف</string>
+    <string name="entities_due_paid_caption">الاستحقاق %1$s · تم تسجيل السداد</string>
+    <string name="entities_available_limit">الحد المتاح</string>
+    <string name="entities_latest_bank_message">آخر رسالة من البنك · %1$s</string>
+    <string name="entities_credit_card_last4">بطاقة ائتمانية ···%1$s</string>
+    <string name="entities_no_activity">لا توجد حركة في هذه الفترة</string>
+    <string name="entities_no_refunds">لا توجد مرتجعات في هذه الفترة</string>
+</resources>

@@ -28,6 +28,7 @@ data class DailySpendingTrend(
         else SpendingAmounts.sum(points.map { it.beforeRefunds })
     val totalRefunds: SignedMoneyAmount get() = if (points.isEmpty()) SignedMoneyAmount.zero(averageDailySpending.currency)
         else SpendingAmounts.sum(points.map { it.refunds })
+    val hasRefunds: Boolean get() = totalRefunds.amount.signum() != 0
     val totalSpending: SignedMoneyAmount
         get() = if (points.isEmpty()) SignedMoneyAmount.zero(averageDailySpending.currency)
             else SpendingAmounts.sum(points.map { it.spending })
