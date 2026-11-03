@@ -405,7 +405,7 @@
     <string name="dashboard_cash_withdrawals">Cash withdrawals</string>
     <string name="dashboard_self_transfers">Transfers between my accounts</string>
     <string name="dashboard_recent_title">Recent transactions</string>
-<string name="transaction_list_title">Period transactions</string>
+<string name="transaction_list_title">Transactions</string>
     <string name="transaction_list_search_hint">Search by name or amount</string>
     <string name="transaction_list_filter_sheet_title">Filter transactions</string>
     <string name="transaction_list_filter_apply">Apply</string>
@@ -500,7 +500,7 @@
     <string name="review_detail_title">Review details</string>
     <string name="review_back">Back</string>
     <string name="review_count">%1$d transaction(s) need review</string>
-    <string name="review_empty">No transactions need review right now.</string>
+    <string name="review_empty">You’re all caught up</string>
     <string name="review_ignored_empty">No ignored or non-financial messages.</string>
     <string name="review_tab_pending">Pending review</string>
     <string name="review_tab_ignored">Ignored</string>

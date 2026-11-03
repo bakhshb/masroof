@@ -19,6 +19,10 @@ data class ReviewListItemUi(
     val ignored: Boolean = false,
     /** Localized title used when the SMS named no merchant or counterparty. */
     val titleRes: Int? = null,
+    val sender: String? = null,
+    val bankId: String? = null,
+    /** Short reason an ignored message is not posted, from its parsed family. */
+    val ignoredReasonRes: Int? = null,
 )
 
 data class ReviewBankChoiceUi(

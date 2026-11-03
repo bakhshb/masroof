@@ -3,7 +3,7 @@
     <string name="settings_banks_title">Banks</string>
     <string name="settings_banks_empty">Add a bank and its SMS sender to get started.</string>
     <string name="settings_add_bank">Add bank</string>
-    <string name="settings_banks_subtitle">Accounts, cards, loans and messages for each bank</string>
+    <string name="settings_banks_subtitle">Accounts, cards and loans for each bank</string>
     <string name="settings_bank_details">Bank details and senders</string>
     <string name="settings_bank_senders">Bank SMS senders</string>
     <string name="settings_bank_extra_sender">Additional sender · optional</string>

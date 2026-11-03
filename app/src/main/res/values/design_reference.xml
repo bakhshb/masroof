@@ -16,7 +16,6 @@
     <string name="reference_period_average">حتى %1$s · %2$d يومًا</string>
     <string name="reference_accounts_scope">تشمل الحوالات الخارجية الصادرة والفواتير وأقساط القروض وسداد البطاقة الائتمانية والمشتريات غير الائتمانية والسحب النقدي والرسوم المرتبطة بحساباتك، بعد خصم استردادات الحساب. تستبعد الحوالات الداخلية ومشتريات الائتمان واسترداداته والعمليات الواردة.</string>
     <string name="reference_details">التفاصيل</string>
-    <string name="reference_tracking_note">الملخصات المالية في الرئيسية؛ إعدادات الملكية والتسمية والمتابعة هنا.</string>
     <string name="reference_backup_title">النسخ الاحتياطي</string>
     <string name="reference_export_title">إنشاء نسخة مشفّرة</string>
     <string name="reference_restore_title">استعادة نسخة</string>

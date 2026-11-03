@@ -275,8 +275,14 @@ fun TransactionDetailScreen(
                     transactionTitle(transaction),
                     style = MaterialTheme.typography.titleMedium,
                 )
+                // Same sign as the list row: + in, none for a transfer between own accounts, − out.
+                val sign = when (transaction.direction) {
+                    TransactionDirectionUi.INCOME, TransactionDirectionUi.INWARD, TransactionDirectionUi.TRANSFER_IN -> "+"
+                    TransactionDirectionUi.NEUTRAL -> ""
+                    else -> "−"
+                }
                 MasroofAmountText(
-                    amount = formatLocalizedMoney(transaction.amount),
+                    amount = sign + formatLocalizedMoney(transaction.amount),
                     role = MasroofAmountRole.Hero,
                     color = when (transaction.direction) {
                         TransactionDirectionUi.INCOME,
@@ -386,11 +392,7 @@ fun TransactionDetailScreen(
                     }
                     com.baraa.masroof.presentation.interpretation.InterpretationProvenanceCard(evidence.provenance)
                     MasroofCard {
-                        Text(
-                            evidence.body,
-                            textAlign = TextAlign.Start,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
+                        com.baraa.masroof.presentation.common.SmsBodyText(evidence.body)
                     }
                 }
             }

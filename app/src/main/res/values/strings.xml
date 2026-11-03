@@ -411,7 +411,7 @@
     <string name="dashboard_cash_withdrawals">سحب نقدي</string>
     <string name="dashboard_self_transfers">تحويلات بين حساباتي</string>
     <string name="dashboard_recent_title">الحركات المالية الأخيرة</string>
-<string name="transaction_list_title">الحركات المالية</string>
+<string name="transaction_list_title">الحركات</string>
     <string name="transaction_list_search_hint">ابحث بالاسم أو المبلغ</string>
     <string name="transaction_list_filter_sheet_title">تصفية الحركات</string>
     <string name="transaction_list_filter_apply">تطبيق</string>
@@ -508,7 +508,7 @@
     <string name="review_detail_title">تفاصيل المراجعة</string>
     <string name="review_back">رجوع</string>
     <string name="review_count">%1$d حركة تحتاج مراجعة</string>
-    <string name="review_empty">لا توجد حركات تحتاج مراجعة حالياً.</string>
+    <string name="review_empty">كل شيء تمت مراجعته</string>
     <string name="review_ignored_empty">لا توجد حركات متجاهلة أو غير مالية.</string>
     <string name="review_tab_pending">بانتظار المراجعة</string>
     <string name="review_tab_ignored">متجاهلة</string>

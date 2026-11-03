@@ -390,10 +390,7 @@ private fun MasroofContent(
                     )
                 },
             )
-            HomeDestination.Review -> ReviewRoute(
-                viewModel = reviewViewModel,
-                onBack = ::pop,
-            )
+            HomeDestination.Review -> ReviewRoute(viewModel = reviewViewModel)
             HomeDestination.AllTransactions -> {
                 Box(modifier = Modifier.fillMaxSize()) {
                     TransactionListScreen(
@@ -401,10 +398,12 @@ private fun MasroofContent(
                         transactions = dashboardState.allTransactions,
                         projection = dashboardState.transactionListProjection,
                         onFilterChanged = dashboardViewModel::setTransactionListQuery,
-                        onBack = ::pop,
                         onOpenTransaction = ::openTransaction,
                         ownedCards = dashboardState.ownedCards,
                         ownedAccounts = dashboardState.ownedAccounts,
+                        periodRangeLabel = dashboardState.period?.let {
+                            com.baraa.masroof.presentation.dashboard.FinancialPeriodUiFormatter.formatRange(androidx.compose.ui.platform.LocalContext.current, it, compact = true)
+                        } ?: dashboardState.periodLabel,
                     )
                     if (detailOnTop) showTransactionDetail(
                         dashboardState = dashboardState,

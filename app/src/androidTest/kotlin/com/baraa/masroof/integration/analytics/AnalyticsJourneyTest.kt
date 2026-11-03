@@ -489,7 +489,7 @@ class AnalyticsJourneyTest {
                         when (mode) {
                             0 -> com.baraa.masroof.presentation.settings.SettingsHubScreen(
                                 com.baraa.masroof.presentation.settings.SettingsUiState(loading = false),
-                                {}, {}, {}, {}, {}, {}, onOpenLearning = { mode = 1 })
+                                {}, {}, {}, {}, {}, onOpenLearning = { mode = 1 })
                             1 -> MessageLearningSettingsScreen { mode = 0 }
                             else -> com.baraa.masroof.presentation.debug.DesignCatalogScreen { mode = 0 }
                         }

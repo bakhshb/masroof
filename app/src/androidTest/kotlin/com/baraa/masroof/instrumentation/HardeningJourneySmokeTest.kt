@@ -105,7 +105,7 @@ class HardeningJourneySmokeTest {
         openReviewQueue()
         awaitText(text(R.string.review_empty), scroll = false)
         clickText(text(R.string.review_tab_ignored))
-        clickText(text(R.string.reference_review_evidence), scroll = true)
+        clickTag("review-ignored-row")
         clickTag(REVIEW_RESTORE_AS_IS_TEST_TAG)
         waitUntil("ignored list empty or restore failure") {
             textExists(text(R.string.review_ignored_empty)) ||

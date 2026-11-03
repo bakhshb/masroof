@@ -16,7 +16,6 @@
     <string name="reference_period_average">Through %1$s · %2$d days</string>
     <string name="reference_accounts_scope">Includes outgoing external transfers, bills, loan installments, credit card settlements, non-credit purchases, cash withdrawals and fees attributed to your accounts, less account refunds. Excludes transfers between your own accounts, credit purchases and refunds, and incoming movements.</string>
     <string name="reference_details">Details</string>
-    <string name="reference_tracking_note">Financial summaries are on Home. Ownership, names and tracking are managed here.</string>
     <string name="reference_backup_title">Backup</string>
     <string name="reference_export_title">Create encrypted backup</string>
     <string name="reference_restore_title">Restore backup</string>

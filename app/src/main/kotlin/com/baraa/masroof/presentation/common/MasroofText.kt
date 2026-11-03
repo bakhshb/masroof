@@ -52,3 +52,10 @@ fun MasroofText(text: AnnotatedString, modifier: Modifier = Modifier,
     val displayed = AnnotatedString(AppDigits.display(text.text), text.spanStyles, text.paragraphStyles)
     Text(displayed, modifier, color = color, style = style)
 }
+
+/** A raw SMS body: each paragraph takes its direction from its own text, so Arabic lines read right to left. */
+@Composable
+fun SmsBodyText(body: String, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE, style: TextStyle = LocalTextStyle.current) =
+    MasroofText(body, modifier, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Start,
+        overflow = TextOverflow.Ellipsis, maxLines = maxLines,
+        style = style.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Content))

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="review_empty_hint">New bank messages that need a decision will show here.</string>
+    <string name="review_ignored_reason_otp">Verification code</string>
+    <string name="review_ignored_reason_not_transaction">Not a transaction</string>
+    <string name="review_ignored_reason_balance">Balance notice</string>
+    <plurals name="transaction_list_count">
+        <item quantity="one">%1$d transaction</item>
+        <item quantity="other">%1$d transactions</item>
+    </plurals>
+</resources>

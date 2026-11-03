@@ -166,7 +166,6 @@ class ApprovedFidelityMatrixTest {
                 transactions = financial.allTransactions,
                 projection = TransactionListPresentationMapper.project(financial.allTransactions, TransactionListFilterState()),
                 onFilterChanged = {},
-                onBack = {},
                 onOpenTransaction = {},
                 ownedCards = financial.ownedCards,
                 ownedAccounts = financial.ownedAccounts
@@ -227,7 +226,6 @@ class ApprovedFidelityMatrixTest {
             )
             "review" -> ReviewListScreen(
                 state = reviewState,
-                onBack = {},
                 onRefresh = {},
                 onOpen = {},
                 onDismissAllInformational = {},
@@ -235,7 +233,6 @@ class ApprovedFidelityMatrixTest {
             )
             "settings" -> SettingsHubScreen(
                 state = settingsState,
-                onBack = {},
                 onOpenBanks = {},
                 onOpenCommitments = {},
                 onOpenApp = {},

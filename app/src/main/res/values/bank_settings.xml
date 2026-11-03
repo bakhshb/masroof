@@ -3,7 +3,7 @@
     <string name="settings_banks_title">البنوك</string>
     <string name="settings_banks_empty">أضف بنكًا ومرسل رسائله للبدء.</string>
     <string name="settings_add_bank">إضافة بنك</string>
-    <string name="settings_banks_subtitle">الحسابات والبطاقات والقروض ورسائل كل بنك</string>
+    <string name="settings_banks_subtitle">الحسابات والبطاقات والقروض لكل بنك</string>
     <string name="settings_bank_details">بيانات البنك والمرسلون</string>
     <string name="settings_bank_senders">مرسلو رسائل البنك</string>
     <string name="settings_bank_extra_sender">مرسل إضافي · اختياري</string>
