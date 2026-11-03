@@ -60,9 +60,9 @@ data class CreditFacilitiesOverview(
         get() = facilities.distinctBy { it.facilityKey }.filterNot { it.facilityDuePaid }
             .let { unpaid -> if (unpaid.isEmpty()) Money.of("0", currency) else sumDues(unpaid) }
 
-    private fun sumDues(unique: List<CreditFacilityOverview>): Money? {
-        if (unique.isEmpty() || unique.any { it.facilityDue == null }) return null
-        val amounts = unique.map { it.facilityDue!!.amount }
+    private fun sumDues(distinct: List<CreditFacilityOverview>): Money? {
+        if (distinct.isEmpty() || distinct.any { it.facilityDue == null }) return null
+        val amounts = distinct.map { it.facilityDue!!.amount }
         if (amounts.any { it.currency != amounts.first().currency }) return null
         return amounts.reduce { total, amount -> total + amount }
     }

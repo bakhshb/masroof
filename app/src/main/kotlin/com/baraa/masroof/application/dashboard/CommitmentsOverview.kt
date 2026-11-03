@@ -77,6 +77,9 @@ data class CommitmentsOverview(
     }
 }
 
+/** Key prefix of a credit facility's commitment row; due alerts carry it inside their id. */
+const val CREDIT_COMMITMENT_KEY_PREFIX = "credit:"
+
 object CommitmentsOverviewBuilder {
     fun build(
         salaryPeriod: FinancialPeriod,
@@ -239,7 +242,7 @@ object CommitmentsOverviewBuilder {
                 sarEquivalents = sarEquivalents,
             )
             CommitmentDashboardRow(
-                key = "credit:${facility.facilityKey}",
+                key = CREDIT_COMMITMENT_KEY_PREFIX + facility.facilityKey,
                 source = CommitmentDashboardSource.CREDIT_CARD,
                 displayName = facility.primaryLast4,
                 amount = due.amount,

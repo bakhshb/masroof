@@ -28,7 +28,7 @@ internal object AnalysisAlertPolicy {
                 add("budget:${snapshot.periodStart}:$it", "BUDGET", "", snapshot.total!!, false)
             }
             if (prefs.dueAlerts) snapshot.dues.filter { it.confirmed && it.day != null && it.day in today..(today + prefs.reminderDays) }
-                .forEach { add("due:${it.id}:${it.day}", "DUE", it.name, it.amount, true) }
+                .forEach { add(it.alertId, "DUE", it.name, it.amount, true) }
             if (prefs.paymentAlerts) candidates.filter { it.increased }.forEach {
                 add("payment:${it.key}:${it.sourceIds.last()}", "PAYMENT", it.name, it.latestAmount, true, it.sourceIds.last())
             }

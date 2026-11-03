@@ -96,13 +96,20 @@ internal fun purchasePeriodHistory(data: CleanData, currentStart: Long): List<An
 fun visibleAnalysisAlerts(state: AnalysisUiState, now: Long): List<com.baraa.masroof.data.analytics.AnalysisAlertRow> =
     state.alerts.filter { !it.resolved && it.snoozedUntil <= now }.sortedByDescending { it.observedAt }
 
-/** Due epoch day of a DUE alert; [AnalysisAlertPolicy] keys due alerts as `due:<id>:<day>`. */
+/** The id of this due's DUE alert, `due:<id>:<day>`; the one place the format is built. */
+val AnalysisDue.alertId: String get() = "due:$id:$day"
+
+/** A card due's alert, recognisable from its id after the due leaves the snapshot. */
+fun com.baraa.masroof.data.analytics.AnalysisAlertRow.isCardDue(): Boolean =
+    kind == "DUE" && id.startsWith("due:" + com.baraa.masroof.application.dashboard.CREDIT_COMMITMENT_KEY_PREFIX)
+
+/** Due epoch day of a DUE alert, the last part of [alertId]. */
 fun com.baraa.masroof.data.analytics.AnalysisAlertRow.dueEpochDay(): Long? =
     if (kind == "DUE") id.substringAfterLast(':').toLongOrNull() else null
 
 /** The snapshot due a DUE alert was raised for, matching the `due:<id>:<day>` key from [AnalysisAlertPolicy]. */
 fun AnalysisSnapshot.dueFor(alert: com.baraa.masroof.data.analytics.AnalysisAlertRow): AnalysisDue? =
-    if (alert.kind == "DUE") dues.firstOrNull { "due:${it.id}:${it.day}" == alert.id } else null
+    if (alert.kind == "DUE") dues.firstOrNull { it.alertId == alert.id } else null
 
 fun AnalysisUiState.dueFor(alert: com.baraa.masroof.data.analytics.AnalysisAlertRow): AnalysisDue? = snapshot?.dueFor(alert)
 

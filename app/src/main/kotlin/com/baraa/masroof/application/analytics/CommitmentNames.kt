@@ -28,12 +28,12 @@ object CommitmentNames {
     }
 
     /**
-     * A DUE alert's name from its snapshot due; once the due has left the snapshot, the
-     * `due:credit:` key from [AnalysisAlertPolicy] still marks a card, whose stored title is only last4.
+     * A DUE alert's name from its snapshot due; once the due has left the snapshot, its id
+     * still marks a card, whose stored title is only last4.
      */
     fun dueAlert(context: Context, alert: AnalysisAlertRow, due: AnalysisDue?): String = when {
         due != null -> name(context, due.source, due.name, due.loanTypeFallback)
-        alert.id.startsWith("due:credit:") -> name(context, CommitmentDashboardSource.CREDIT_CARD, alert.title, null)
+        alert.isCardDue() -> name(context, CommitmentDashboardSource.CREDIT_CARD, alert.title, null)
         else -> alert.title
     }
 }

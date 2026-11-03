@@ -63,13 +63,6 @@ internal fun loanName(loan: LoanOverview): String = loan.customName ?: loanTypeL
 /** A commitment row's name; an unnamed loan shows its type in the app language. */
 @Composable
 internal fun commitmentRowName(row: com.baraa.masroof.application.dashboard.CommitmentDashboardRow): String =
-    commitmentName(row.source, row.displayName, row.loanTypeFallback)
+    com.baraa.masroof.application.analytics.CommitmentNames.name(
+        androidx.compose.ui.platform.LocalContext.current, row.source, row.displayName, row.loanTypeFallback)
 
-/** One naming rule for commitment rows and their due alerts: a card shows "Credit card ···last4". */
-@Composable
-internal fun commitmentName(
-    source: com.baraa.masroof.application.dashboard.CommitmentDashboardSource?,
-    displayName: String,
-    loanTypeFallback: com.baraa.masroof.domain.model.LoanType?,
-): String = com.baraa.masroof.application.analytics.CommitmentNames.name(
-    androidx.compose.ui.platform.LocalContext.current, source, displayName, loanTypeFallback)

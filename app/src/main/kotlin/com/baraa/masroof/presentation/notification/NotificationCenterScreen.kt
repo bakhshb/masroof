@@ -57,7 +57,8 @@ internal fun NotificationCenterScreen(
     onOpenNotification: (NotificationItem) -> Unit,
 ) {
     val analysis = com.baraa.masroof.presentation.analytics.notificationAnalysisState()
-    val alerts = com.baraa.masroof.application.analytics.visibleAnalysisAlerts(analysis, com.baraa.masroof.presentation.analytics.currentAnalysisTime())
+    val now = com.baraa.masroof.presentation.analytics.currentAnalysisTime()
+    val alerts = androidx.compose.runtime.remember(analysis, now) { com.baraa.masroof.application.analytics.visibleAnalysisAlerts(analysis, now) }
     MasroofSecondaryScaffold(
         title = stringResource(R.string.notification_center_title),
         onBack = onBack,

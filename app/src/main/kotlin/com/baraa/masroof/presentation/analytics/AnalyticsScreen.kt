@@ -258,11 +258,11 @@ private fun statusRes(state: AnalysisUiState): Pair<Int, Int?> {
                             }
                         }
                         state.snapshot?.dues?.forEach { due ->
-                            FocusAnalysisItem(focusedAlert == "due:${due.id}:${due.day}", { focusedAlert = null }) {
+                            FocusAnalysisItem(focusedAlert == due.alertId, { focusedAlert = null }) {
                             MasroofCard {
                                 com.baraa.masroof.ui.components.MasroofTimelineRow(
                                     com.baraa.masroof.application.locale.AppDigits.display(
-                                        com.baraa.masroof.presentation.dashboard.commitmentName(due.source, due.name, due.loanTypeFallback)),
+                                        com.baraa.masroof.application.analytics.CommitmentNames.name(androidx.compose.ui.platform.LocalContext.current, due.source, due.name, due.loanTypeFallback)),
                                     com.baraa.masroof.application.locale.AppDigits.display(due.day?.let { day(it) }.orEmpty()), active = due.confirmed)
                                 Amount(stringResource(if (due.confirmed) R.string.lab_analysis_confirmed else R.string.lab_analysis_estimated), due.amount)
                             }

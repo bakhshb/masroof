@@ -278,12 +278,9 @@ fun TransactionDetailScreen(
                 MasroofAmountText(
                     amount = transaction.direction.amountSign + formatLocalizedMoney(transaction.amount),
                     role = MasroofAmountRole.Hero,
-                    color = when (transaction.direction) {
-                        TransactionDirectionUi.INCOME,
-                        TransactionDirectionUi.INWARD,
-                        TransactionDirectionUi.TRANSFER_IN,
-                        -> extended.inflow
-                        TransactionDirectionUi.OUTWARD -> extended.outflow
+                    color = when {
+                        transaction.direction.isInward -> extended.inflow
+                        transaction.direction == TransactionDirectionUi.OUTWARD -> extended.outflow
                         else -> MaterialTheme.colorScheme.onSurface
                     },
                     modifier = Modifier.padding(top = MasroofSpacing.sectionHeaderGap),
