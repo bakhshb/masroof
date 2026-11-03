@@ -232,7 +232,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             }.distinct()
             val dues = current.commitmentsOverview.rows.filter { it.status == CommitmentPaymentStatus.UNPAID }.mapNotNull {
                 if (it.amount.currency != Currency.SAR) null else AnalysisDue(it.key, it.displayName,
-                    it.amount.amount.movePointRight(2).longValueExact(), it.expectedDate?.toEpochDay(), true)
+                    it.amount.amount.movePointRight(2).longValueExact(), it.expectedDate?.toEpochDay(), true, it.source, it.loanTypeFallback)
             }
             val committed = read.committed
             val decisions = store.analytics().candidates().filter { it.status != "SUGGESTED" }.sortedBy { it.id }.map { it.id to it.status }

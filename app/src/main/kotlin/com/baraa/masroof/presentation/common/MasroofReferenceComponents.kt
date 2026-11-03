@@ -60,7 +60,8 @@ fun MasroofAverageBand(value: String, periodHint: String, guidance: String?,
 fun MasroofReferenceNavigationRow(title: String, subtitle: String, icon: ImageVector,
     onClick: () -> Unit, modifier: Modifier = Modifier, divider: Boolean = true,
     status: String? = null, showChevron: Boolean = true, badges: List<Pair<String, MasroofCardAccent>> = emptyList(),
-    subtitleColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified) {
+    subtitleColor: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified,
+    iconDescription: String? = null) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
     // Narrow rows (card width, not screen width) stack the badge under the subtitle so neither text is squeezed.
     val stackStatus = maxWidth < MasroofReference.inlineStatusMinWidth
@@ -71,7 +72,7 @@ fun MasroofReferenceNavigationRow(title: String, subtitle: String, icon: ImageVe
             horizontalArrangement = Arrangement.spacedBy(MasroofReference.rowGap)) {
             Surface(shape = MasroofShapes.small, color = MasroofThemeExtras.extendedColors.accountSoft) {
                 Box(Modifier.size(MasroofReference.iconBox), contentAlignment = Alignment.Center) {
-                    Icon(icon, null, Modifier.size(MasroofReference.icon), tint = MasroofThemeExtras.extendedColors.account)
+                    Icon(icon, iconDescription, Modifier.size(MasroofReference.icon), tint = MasroofThemeExtras.extendedColors.account)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MasroofReference.metadataGap)) {

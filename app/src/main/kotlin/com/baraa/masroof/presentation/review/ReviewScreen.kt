@@ -56,7 +56,7 @@ import com.baraa.masroof.presentation.common.MasroofAmountText
 import com.baraa.masroof.presentation.review.ReviewReasonLabels
 
 @Composable
-fun ReviewRoute(viewModel: ReviewViewModel) {
+fun ReviewRoute(viewModel: ReviewViewModel, onBack: (() -> Unit)? = null) {
     val state by viewModel.uiState.collectAsState()
     // Every Review visit shares this ViewModel, so each visit saves the message it shows (and whether it is teaching it)
     // and reopens it when it returns. Only the id is saved; the message text is read again from the database.
@@ -124,6 +124,7 @@ fun ReviewRoute(viewModel: ReviewViewModel) {
             onOpen = ::open,
             onDismissAllInformational = viewModel::dismissAllInformational,
             onListModeChange = viewModel::setListMode,
+            onBack = onBack,
         )
     }
 }
@@ -136,11 +137,13 @@ internal fun ReviewListScreen(
     onOpen: (String) -> Unit,
     onDismissAllInformational: () -> Unit,
     onListModeChange: (ReviewListMode) -> Unit,
+    /** `null` on the Review tab root; set when Review was opened above another screen. */
+    onBack: (() -> Unit)? = null,
 ) {
     MasroofSecondaryScaffold(
         title = stringResource(R.string.review_title),
-        onBack = null,
-        backContentDescription = null,
+        onBack = onBack,
+        backContentDescription = onBack?.let { stringResource(R.string.review_back) },
     ) { contentModifier ->
         Column(modifier = contentModifier.fillMaxSize()) {
             androidx.compose.foundation.layout.FlowRow(

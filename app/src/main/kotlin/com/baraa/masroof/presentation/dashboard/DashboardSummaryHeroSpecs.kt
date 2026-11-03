@@ -59,7 +59,8 @@ fun CreditFacilitiesSummaryHero(overview: CreditFacilitiesOverview, locale: Loca
     }
     com.baraa.masroof.presentation.common.MasroofHeroCard(
         title = stringResource(if (paid) R.string.entities_statement_amount else R.string.dashboard_credit_card_aggregate_due),
-        value = overview.totalFacilityDue?.let { MoneyUiFormatter.format(it, locale.toLanguageTag()) }
+        // Some (not all) paid: the hero shows only what is still due.
+        value = (if (!paid && overview.facilities.any { it.facilityDuePaid }) overview.unpaidFacilityDue else overview.totalFacilityDue)?.let { MoneyUiFormatter.format(it, locale.toLanguageTag()) }
             ?: stringResource(R.string.dashboard_value_unavailable),
         subtitle = subtitle,
         role = com.baraa.masroof.ui.theme.MasroofHeroRole.Card,
@@ -72,6 +73,7 @@ fun CreditFacilitiesSummaryHero(overview: CreditFacilitiesOverview, locale: Loca
                     facility.primaryLast4.takeIf { it.isNotBlank() }?.let { stringResource(R.string.dashboard_credit_card_last4, it) },
                     facility.facilityDue?.amount?.let { MoneyUiFormatter.format(it, locale.toLanguageTag()) },
                     facility.facilityDue?.dueDate?.let { stringResource(R.string.entities_facility_due_on, longDate.format(it)) },
+                    if (facility.facilityDuePaid) stringResource(R.string.entities_paid_badge) else null,
                     facility.latestAvailableBalance?.let {
                         stringResource(R.string.entities_facility_available, MoneyUiFormatter.format(it, locale.toLanguageTag()))
                     },

@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.navigation
 
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -89,6 +91,18 @@ class HomeBackStackTest {
         assertEquals(homeRootStack().top(), stack.entries.first())
         assertEquals(HomeDestination.Review, stack.top().destination)
         assertEquals(100, stack.top().id)
+    }
+
+    @Test
+    fun backArrow_showsOnlyForScreensOpenedAboveAnother() {
+        assertFalse(homeRootStack().topShowsBack())
+        val reviewTab = switchHomeTab(homeRootStack(), HomeDestination.Review)
+        assertFalse(reviewTab.topShowsBack())
+        val reviewLink = pushHome(pushHome(homeRootStack(), HomeDestination.Settings), HomeDestination.Review)
+        assertTrue(reviewLink.topShowsBack())
+        // A tab visit stays a tab root after a save and restore.
+        assertEquals(reviewTab, HomeBackStackSaver.restore(save(reviewTab)))
+        assertFalse(HomeBackStackSaver.restore(save(reviewTab))!!.topShowsBack())
     }
 
     @Test

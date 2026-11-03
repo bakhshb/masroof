@@ -140,14 +140,18 @@ import java.time.ZoneId
                     val dueDay = alert.dueEpochDay()
                     // A named due alert leads with the commitment name and shows its amount and due date.
                     val named = alert.kind == "DUE" && alert.title.isNotBlank()
-                    MasroofReferenceNavigationRow(title = if (named) alert.title else kindLabel,
+                    val due = analysis.dueFor(alert)
+                    val title = if (due != null) com.baraa.masroof.presentation.dashboard.commitmentName(due.source, due.name, due.loanTypeFallback)
+                        else alert.title
+                    MasroofReferenceNavigationRow(title = if (named) title else kindLabel,
                         subtitle = if (named && dueDay != null) stringResource(R.string.notification_due_subtitle, amount,
                             formatLocalizedTransactionDate(java.time.LocalDate.ofEpochDay(dueDay)))
                         else if (named) amount
                         else listOf(alert.title, amount).filter { it.isNotBlank() }.joinToString(" · "),
                         icon = MasroofIcons.notifications, modifier = Modifier.weight(1f).testTag("lab-alert-${alert.id}"),
                         status = if (alert.read) null else stringResource(R.string.reference_unread), showChevron = false,
-                        divider = i != alerts.lastIndex, onClick = { AnalyticsNavigation.open(alert.id, fromCenter = true) })
+                        divider = i != alerts.lastIndex, onClick = { AnalyticsNavigation.open(alert.id, fromCenter = true) },
+                        iconDescription = kindLabel.takeIf { named })
                     Box {
                         androidx.compose.material3.IconButton(onClick = { menu = true }) {
                             androidx.compose.material3.Icon(MasroofIcons.more, stringResource(R.string.lab_analysis_actions), Modifier.size(com.baraa.masroof.ui.theme.MasroofIconSizes.md))

@@ -62,8 +62,17 @@ internal fun loanName(loan: LoanOverview): String = loan.customName ?: loanTypeL
 
 /** A commitment row's name; an unnamed loan shows its type in the app language. */
 @Composable
-internal fun commitmentRowName(row: com.baraa.masroof.application.dashboard.CommitmentDashboardRow): String = when {
-    row.source == com.baraa.masroof.application.dashboard.CommitmentDashboardSource.CREDIT_CARD ->
-        stringResource(R.string.entities_credit_card_last4, com.baraa.masroof.presentation.common.formatCardLast4(row.displayName))
-    else -> row.loanTypeFallback?.let { loanTypeLabel(it) } ?: row.displayName
+internal fun commitmentRowName(row: com.baraa.masroof.application.dashboard.CommitmentDashboardRow): String =
+    commitmentName(row.source, row.displayName, row.loanTypeFallback)
+
+/** One naming rule for commitment rows and their due alerts: a card shows "Credit card ···last4". */
+@Composable
+internal fun commitmentName(
+    source: com.baraa.masroof.application.dashboard.CommitmentDashboardSource?,
+    displayName: String,
+    loanTypeFallback: com.baraa.masroof.domain.model.LoanType?,
+): String = when {
+    source == com.baraa.masroof.application.dashboard.CommitmentDashboardSource.CREDIT_CARD ->
+        stringResource(R.string.entities_credit_card_last4, com.baraa.masroof.presentation.common.formatCardLast4(displayName))
+    else -> loanTypeFallback?.let { loanTypeLabel(it) } ?: displayName
 }

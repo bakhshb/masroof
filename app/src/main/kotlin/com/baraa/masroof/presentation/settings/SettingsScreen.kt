@@ -48,6 +48,8 @@ fun SettingsRoute(
     reviewRequiredCount: Int,
     onBack: () -> Unit,
     onOpenReview: () -> Unit,
+    /** The hub shows a back arrow when Settings was opened above another screen, not from its tab. */
+    showHubBack: Boolean = false,
     pendingLaunch: SettingsLaunchRequest? = null,
     onPendingLaunchConsumed: () -> Unit = {},
     onLocaleChanged: () -> Unit,
@@ -124,6 +126,7 @@ fun SettingsRoute(
     when (val current = destination) {
         SettingsDestination.Hub -> SettingsHubScreen(
             state = state,
+            onBack = if (showHubBack) ({ popOrExit() }) else null,
             onOpenBanks = { navigateTo(SettingsDestination.Banks) },
             onOpenCommitments = { navigateTo(SettingsDestination.MyCommitments) },
             onOpenApp = { navigateTo(SettingsDestination.App) },
@@ -480,11 +483,12 @@ internal fun SettingsHubScreen(
     onOpenDataBackup: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenLearning: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
 ) {
     MasroofSecondaryScaffold(
         title = stringResource(R.string.settings_title),
-        onBack = null,
-        backContentDescription = null,
+        onBack = onBack,
+        backContentDescription = onBack?.let { stringResource(R.string.settings_back) },
     ) { contentModifier ->
         if (state.loading) {
             Column(contentModifier.fillMaxSize(), verticalArrangement = Arrangement.Center,

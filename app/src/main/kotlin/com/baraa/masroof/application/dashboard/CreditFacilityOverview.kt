@@ -60,6 +60,12 @@ data class CreditFacilitiesOverview(
             if (amounts.any { it.currency != amounts.first().currency }) return null
             return amounts.reduce { total, amount -> total + amount }
         }
+    /** [totalFacilityDue] without the facilities whose statement due is already paid. */
+    val unpaidFacilityDue: Money?
+        get() = totalFacilityDue?.let { total ->
+            facilities.distinctBy { it.facilityKey }.filter { it.facilityDuePaid }
+                .fold(total) { remaining, facility -> remaining - facility.facilityDue!!.amount }
+        }
     val hasContent: Boolean
         get() = facilities.isNotEmpty() || debitCards.isNotEmpty()
 

@@ -139,6 +139,22 @@ class AnalyticsPersistenceTest {
         assertTrue(rows.all { it.confirmed })
         assertEquals(rows.map { it.id }, AnalysisAlertPolicy.evaluate(s.copy(issuedAt = HOUR), emptyList(), rows, prefs, 10).map { it.id })
     }
+    @Test fun dueAlertFindsItsCommitmentSourceSoScreensCanNameTheCard() {
+        val card = AnalysisDue("credit:aljazira:7271", "7271", 500, 13, true,
+            com.baraa.masroof.application.dashboard.CommitmentDashboardSource.CREDIT_CARD)
+        val loan = AnalysisDue("loan:aljazira:AUTO", "Auto loan", 900, 12, true,
+            com.baraa.masroof.application.dashboard.CommitmentDashboardSource.LOAN, com.baraa.masroof.domain.model.LoanType.AUTO)
+        val s = snapshot().copy(dues = listOf(card, loan))
+        val rows = AnalysisAlertPolicy.evaluate(s, emptyList(), emptyList(), AnalysisPreferencesRow(), 10)
+        val state = AnalysisUiState(snapshot = s, alerts = rows)
+        assertEquals(card, state.dueFor(rows.single { it.title == "7271" }))
+        assertEquals(loan, state.dueFor(rows.single { it.title == "Auto loan" }))
+        val restored = AnalyticsJson.format.decodeFromString<AnalysisDue>(AnalyticsJson.format.encodeToString(loan))
+        assertEquals(loan, restored)
+        // Snapshots stored before the source was carried still decode, with no source.
+        assertNull(AnalyticsJson.format.decodeFromString<AnalysisDue>(
+            "{\"id\":\"x\",\"name\":\"X\",\"amount\":1,\"day\":1,\"confirmed\":true}").source)
+    }
     @Test fun phonePolicyEnforcesSevenSilentDaysSourceFreshnessAndNotificationDeduplication() {
         val week = 7 * 24 * HOUR
         val s = snapshot(week + 1)

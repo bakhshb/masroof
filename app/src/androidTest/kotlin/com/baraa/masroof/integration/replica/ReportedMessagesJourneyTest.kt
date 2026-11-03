@@ -93,6 +93,9 @@ class ReportedMessagesJourneyTest {
                 compose.waitUntil(20_000) {!dashboard.uiState.value.selectedTransactionSmsLoading && dashboard.uiState.value.selectedTransactionSms.isNotEmpty()}
                 compose.onNodeWithTag("interpretation_provenance").performScrollTo().assertIsDisplayed()
                 compose.onNodeWithText(host.getString(R.string.lab_ml_source)).assertDoesNotExist()
+                val family=mapOf("100.00" to R.string.review_family_transfer_out,"300.00" to R.string.review_family_purchase,
+                    "16.23" to R.string.review_family_bill_payment).getValue(row.amount.amount.toPlainString())
+                compose.onNodeWithText(host.getString(R.string.lab_inferred_family,host.getString(family))).performScrollTo().assertIsDisplayed()
                 screenshot("reported-${row.amount.amount.toPlainString().replace('.','-')}-dark")
             }
         } finally {compose.runOnUiThread {store.clear()};c.close();TestRuntime.reset(host)}
