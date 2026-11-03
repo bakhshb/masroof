@@ -7,7 +7,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.CommitmentPaymentStatus
 import com.baraa.masroof.application.dashboard.CommitmentDashboardSource
 import com.baraa.masroof.application.dashboard.CommitmentsOverview
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
@@ -19,7 +18,7 @@ fun CommitmentsSection(overview: CommitmentsOverview, modifier: Modifier = Modif
     onOpenCredit: (() -> Unit)? = null) {
     if (!overview.hasContent) return
     val colors = MasroofThemeExtras.extendedColors
-    val pending = overview.rows.filter { it.status == CommitmentPaymentStatus.UNPAID }
+    val pending = overview.upcomingUnpaid
     val locale = LocalConfiguration.current.locales[0]
     com.baraa.masroof.ui.dashboard.DashboardCommitmentBand(
         stringResource(R.string.reference_period_commitments),
