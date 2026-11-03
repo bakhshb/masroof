@@ -64,6 +64,16 @@ class SpendingAmountsTest {
     }
 
     @Test
+    fun unpaidFacilityDue_ignoresAPaidForeignCurrencyFacility() {
+        val due = StatementDueSnapshot(Money.of("300", Currency.SAR), Instant.parse("2026-08-01T09:00:00Z"), LocalDate.parse("2026-09-01"))
+        val sar = facilitySpending("0", "0", due)
+        val usd = sar.copy(primary = sar.primary.copy(last4 = "2222"), facilityDue = due.copy(amount = Money.of("80", Currency.USD)))
+        val overview = CreditFacilitiesOverview(listOf(sar, usd), emptyList(), Currency.SAR).withPaidDues(setOf(usd.facilityKey))
+        assertEquals(null, overview.totalFacilityDue)
+        assertEquals(Money.of("300", Currency.SAR), overview.unpaidFacilityDue)
+    }
+
+    @Test
     fun totalFacilityDue_doesNotInventUnknownOrMixedCurrencyDues() {
         val due = StatementDueSnapshot(Money.of("100", Currency.SAR), Instant.parse("2026-08-01T09:00:00Z"), null)
         val first = facilitySpending("0", "0", due)

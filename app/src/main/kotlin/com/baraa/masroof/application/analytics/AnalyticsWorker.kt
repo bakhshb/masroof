@@ -61,13 +61,20 @@ object AnalyticsNotifications {
                 else -> R.string.lab_analysis_budget_alert
             })
             val notification = NotificationCompat.Builder(context, CHANNEL).setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentTitle(title).setContentText(row.title.ifBlank { context.getString(R.string.lab_analysis_title) })
+                .setContentTitle(title).setContentText(phoneAlertText(context, row, snapshot))
                 .setContentIntent(pending).setOnlyAlertOnce(true).setAutoCancel(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).build()
             try { manager.notify("masroof-analysis", row.id.hashCode(), notification) } catch (_: SecurityException) { continue }
             database.analytics().alerts(listOf(row.copy(lastNotified = now)))
         }
     }
+}
+
+/** Card dues are stored as bare last4; name them like the commitments list does. */
+private fun phoneAlertText(context: Context, row: com.baraa.masroof.data.analytics.AnalysisAlertRow, snapshot: AnalysisSnapshot): String {
+    if (row.title.isBlank()) return context.getString(R.string.lab_analysis_title)
+    val isCard = snapshot.dueFor(row)?.source == com.baraa.masroof.application.dashboard.CommitmentDashboardSource.CREDIT_CARD
+    return if (isCard) context.getString(R.string.entities_credit_card_last4, row.title.trim()) else row.title
 }
 
 /** Included in the existing durable financial restore journal, including rollback. */

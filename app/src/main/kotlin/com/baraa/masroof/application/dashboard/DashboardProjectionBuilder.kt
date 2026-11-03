@@ -64,7 +64,7 @@ class DashboardProjectionBuilder(
         val bankHierarchy = BankHierarchyBuilder.build(
             ownedAccounts = context.ownedAccounts,
             accountsFleet = accounts.accountsFleet,
-            creditFacilities = cards.creditFacilities,
+            creditFacilities = creditFacilities,
             loans = context.loans,
         )
 

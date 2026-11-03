@@ -101,8 +101,10 @@ fun com.baraa.masroof.data.analytics.AnalysisAlertRow.dueEpochDay(): Long? =
     if (kind == "DUE") id.substringAfterLast(':').toLongOrNull() else null
 
 /** The snapshot due a DUE alert was raised for, matching the `due:<id>:<day>` key from [AnalysisAlertPolicy]. */
-fun AnalysisUiState.dueFor(alert: com.baraa.masroof.data.analytics.AnalysisAlertRow): AnalysisDue? =
-    if (alert.kind == "DUE") snapshot?.dues?.firstOrNull { "due:${it.id}:${it.day}" == alert.id } else null
+fun AnalysisSnapshot.dueFor(alert: com.baraa.masroof.data.analytics.AnalysisAlertRow): AnalysisDue? =
+    if (alert.kind == "DUE") dues.firstOrNull { "due:${it.id}:${it.day}" == alert.id } else null
+
+fun AnalysisUiState.dueFor(alert: com.baraa.masroof.data.analytics.AnalysisAlertRow): AnalysisDue? = snapshot?.dueFor(alert)
 
 fun normalizeAnalysisNumber(value: String): String = value.trim().map { c ->
     when { c == '٫' -> '.'; c.isDigit() -> Character.digit(c, 10).toString().single(); else -> c }

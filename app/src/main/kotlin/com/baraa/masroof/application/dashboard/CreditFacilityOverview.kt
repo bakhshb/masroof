@@ -60,11 +60,15 @@ data class CreditFacilitiesOverview(
             if (amounts.any { it.currency != amounts.first().currency }) return null
             return amounts.reduce { total, amount -> total + amount }
         }
-    /** [totalFacilityDue] without the facilities whose statement due is already paid. */
+    /** Like [totalFacilityDue], over the facilities whose statement due is not paid yet. */
     val unpaidFacilityDue: Money?
-        get() = totalFacilityDue?.let { total ->
-            facilities.distinctBy { it.facilityKey }.filter { it.facilityDuePaid }
-                .fold(total) { remaining, facility -> remaining - facility.facilityDue!!.amount }
+        get() {
+            val unpaid = facilities.distinctBy { it.facilityKey }.filterNot { it.facilityDuePaid }
+            if (unpaid.isEmpty()) return Money.of("0", currency)
+            if (unpaid.any { it.facilityDue == null }) return null
+            val amounts = unpaid.map { it.facilityDue!!.amount }
+            if (amounts.any { it.currency != amounts.first().currency }) return null
+            return amounts.reduce { total, amount -> total + amount }
         }
     val hasContent: Boolean
         get() = facilities.isNotEmpty() || debitCards.isNotEmpty()
