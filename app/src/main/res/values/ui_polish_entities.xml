@@ -7,4 +7,11 @@
     <string name="entities_credit_card_last4">بطاقة ائتمانية ···%1$s</string>
     <string name="entities_no_activity">لا توجد حركة في هذه الفترة</string>
     <string name="entities_no_refunds">لا توجد مرتجعات في هذه الفترة</string>
+    <string name="entities_paid_badge">✓ مدفوع</string>
+    <string name="entities_facility_due_on">الاستحقاق %1$s</string>
+    <string name="entities_facility_available">المتاح %1$s</string>
+    <string name="entities_idle_expand">عرض الحسابات</string>
+    <string name="entities_idle_collapse">إخفاء الحسابات</string>
+    <string name="entities_state_expanded">موسّع</string>
+    <string name="entities_state_collapsed">مطوي</string>
 </resources>

@@ -204,7 +204,7 @@ class DailyPurchasesPeriodInteractionTest {
         val density = bitmap.height / MasroofReference.chartHeight.value
         val range = com.baraa.masroof.ui.components.MasroofLineChart.chartRange(trend.points.map { it.spending.amount }, trend.averageDailySpending.amount, showAverage = true, capOutlier = true)
         val plotHeight = bitmap.height - (MasroofReference.chartTop.value + MasroofReference.chartBottom.value) * density
-        val fraction = trend.averageDailySpending.amount.subtract(range.minimum).toFloat() / range.span.toFloat()
+        val fraction = trend.averageDailySpending.amount.min(range.maximum).subtract(range.minimum).toFloat() / range.span.toFloat()
         val y = MasroofReference.chartTop.value * density + plotHeight * (1 - fraction)
         val foreground = (if (dark) MasroofDarkColors.OnSurfaceVariant else MasroofLightColors.OnSurfaceVariant).toArgb()
         val background = (if (dark) MasroofDarkColors.Surface else MasroofLightColors.Surface).toArgb()

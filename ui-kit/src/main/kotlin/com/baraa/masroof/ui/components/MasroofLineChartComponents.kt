@@ -94,7 +94,8 @@ object MasroofLineChart {
     fun chartRange(values: List<BigDecimal>, reference: BigDecimal, showAverage: Boolean, capOutlier: Boolean): ValueRange {
         val capped = if (capOutlier) cappedOutlierIndex(values) else null
         val shown = values.filterIndexed { i, _ -> i != capped }
-        return referenceRange(if (showAverage) shown + reference else shown)
+        // The average is pulled up by the capped day itself, so it is clamped to the top like that day.
+        return referenceRange(if (showAverage && capped == null) shown + reference else shown)
     }
 
     fun nearestPointIndex(x: Float, width: Float, pointCount: Int): Int? {
@@ -258,7 +259,7 @@ fun MasroofInteractiveLineChart(values: List<BigDecimal>, referenceValue: BigDec
             label(number, left - tickOffset, y + tickBaseline, true)
         }
         if (showAverage) {
-            val averageY = MasroofLineChartLayout.yFor(referenceValue, range, top, plotHeight)
+            val averageY = MasroofLineChartLayout.yFor(referenceValue.min(range.maximum), range, top, plotHeight)
             drawLine(muted, Offset(left, averageY), Offset(left + width, averageY),
                 MasroofReference.averageLineStroke.toPx(), pathEffect = PathEffect.dashPathEffect(
                     floatArrayOf(MasroofReference.averageDash.toPx(), MasroofReference.averageDash.toPx())))

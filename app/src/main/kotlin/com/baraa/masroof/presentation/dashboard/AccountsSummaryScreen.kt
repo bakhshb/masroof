@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.dashboard
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import com.baraa.masroof.presentation.common.MasroofSectionHeader
@@ -113,12 +115,20 @@ fun AccountsSummaryScreen(
             active.forEach { account -> AccountsSummaryAccountCard(account = account, onClick = { onOpenAccount(account) }) }
             if (idle.isNotEmpty()) {
                 var expanded by rememberSaveable { mutableStateOf(false) }
-                com.baraa.masroof.presentation.common.MasroofCard(androidx.compose.ui.Modifier.clickable(
-                    onClickLabel = stringResource(R.string.reference_details), role = androidx.compose.ui.semantics.Role.Button) { expanded = !expanded }) {
+                val stateLabel = stringResource(if (expanded) R.string.entities_state_expanded else R.string.entities_state_collapsed)
+                val unknownLast4 = com.baraa.masroof.presentation.common.formatCardLast4(null)
+                val masked = idle.mapNotNull { account ->
+                    DashboardRegistryLabels.accountLast4(account.maskedNumber).takeIf { it != unknownLast4 }
+                        ?.let { stringResource(R.string.dashboard_account_item, it) }
+                }
+                com.baraa.masroof.presentation.common.MasroofCard(androidx.compose.ui.Modifier
+                    .semantics { stateDescription = stateLabel }
+                    .clickable(onClickLabel = stringResource(if (expanded) R.string.entities_idle_collapse else R.string.entities_idle_expand),
+                        role = androidx.compose.ui.semantics.Role.Button) { expanded = !expanded }) {
                     androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Text(stringResource(R.string.entities_no_activity), androidx.compose.ui.Modifier.weight(1f),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(idle.joinToString(" · ") { "···" + DashboardRegistryLabels.accountLast4(it.maskedNumber) },
+                        if (masked.isNotEmpty()) Text(masked.joinToString(" · "),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         androidx.compose.material3.Icon(
                             if (expanded) androidx.compose.material.icons.Icons.Filled.KeyboardArrowUp else androidx.compose.material.icons.Icons.Filled.KeyboardArrowDown,

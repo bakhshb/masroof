@@ -7,4 +7,11 @@
     <string name="entities_credit_card_last4">Credit card ···%1$s</string>
     <string name="entities_no_activity">No activity this period</string>
     <string name="entities_no_refunds">No refunds this period</string>
+    <string name="entities_paid_badge">✓ Paid</string>
+    <string name="entities_facility_due_on">due %1$s</string>
+    <string name="entities_facility_available">available %1$s</string>
+    <string name="entities_idle_expand">Show accounts</string>
+    <string name="entities_idle_collapse">Hide accounts</string>
+    <string name="entities_state_expanded">Expanded</string>
+    <string name="entities_state_collapsed">Collapsed</string>
 </resources>

@@ -45,6 +45,15 @@ class MasroofLineChartTest {
     }
 
     @Test
+    fun chartRange_ignoresTheAverageRaisedByTheCappedDay() {
+        val values = listOf("100", "150", "120", "5000", "80").map(::BigDecimal)
+        val average = values.reduce(BigDecimal::add).divide(BigDecimal(values.size))
+        assertEquals(BigDecimal("1090"), average)
+        assertEquals(BigDecimal("200"), MasroofLineChart.chartRange(values, average, showAverage = true, capOutlier = true).maximum)
+        assertEquals(BigDecimal("5500"), MasroofLineChart.chartRange(values, average, showAverage = true, capOutlier = false).maximum)
+    }
+
+    @Test
     fun nearestPointIndex_selectsClosestPointAndClampsToChartBounds() {
         assertEquals(0, MasroofLineChart.nearestPointIndex(x = -10f, width = 100f, pointCount = 3))
         assertEquals(1, MasroofLineChart.nearestPointIndex(x = 54f, width = 100f, pointCount = 3))

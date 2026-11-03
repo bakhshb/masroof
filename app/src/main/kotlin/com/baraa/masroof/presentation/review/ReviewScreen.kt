@@ -304,7 +304,8 @@ internal fun ReviewListCard(item: ReviewListItemUi, onClick: () -> Unit) {
 @Composable
 internal fun ReviewIgnoredRow(item: ReviewListItemUi, onClick: () -> Unit) {
     val sender = item.sender ?: item.bankId?.let { com.baraa.masroof.presentation.settings.LocalSettingsBankNames.current[it] }
-    MasroofCard(modifier = Modifier.testTag("review-ignored-row").clickable(onClick = onClick)) {
+    MasroofCard(modifier = Modifier.testTag("review-ignored-row").clickable(onClickLabel = stringResource(R.string.reference_review_evidence),
+        role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
             Column(Modifier.weight(1f)) {

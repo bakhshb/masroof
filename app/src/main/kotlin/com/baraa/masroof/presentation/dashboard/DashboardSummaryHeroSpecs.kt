@@ -64,9 +64,21 @@ fun CreditFacilitiesSummaryHero(overview: CreditFacilitiesOverview, locale: Loca
         subtitle = subtitle,
         role = com.baraa.masroof.ui.theme.MasroofHeroRole.Card,
         badge = if (paid) ({
-            com.baraa.masroof.presentation.common.MasroofBadge("✓ " + stringResource(R.string.dashboard_commitments_status_paid), MasroofCardAccent.Inflow)
+            com.baraa.masroof.presentation.common.MasroofBadge(stringResource(R.string.entities_paid_badge), MasroofCardAccent.Inflow)
         }) else null,
-        footer = single?.latestAvailableBalance?.let { available -> {
+        footer = if (overview.facilities.size > 1) ({
+            overview.facilities.forEach { facility ->
+                val line = listOfNotNull(
+                    facility.primaryLast4.takeIf { it.isNotBlank() }?.let { stringResource(R.string.dashboard_credit_card_last4, it) },
+                    facility.facilityDue?.amount?.let { MoneyUiFormatter.format(it, locale.toLanguageTag()) },
+                    facility.facilityDue?.dueDate?.let { stringResource(R.string.entities_facility_due_on, longDate.format(it)) },
+                    facility.latestAvailableBalance?.let {
+                        stringResource(R.string.entities_facility_available, MoneyUiFormatter.format(it, locale.toLanguageTag()))
+                    },
+                ).joinToString(" · ")
+                com.baraa.masroof.presentation.common.MasroofText(line, style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+            }
+        }) else single?.latestAvailableBalance?.let { available -> {
             androidx.compose.foundation.layout.Row(androidx.compose.ui.Modifier.fillMaxWidth(),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 com.baraa.masroof.presentation.common.MasroofText(stringResource(R.string.entities_available_limit),

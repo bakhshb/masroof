@@ -235,11 +235,11 @@ internal fun SettingsRegistryCardRow(
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text(stringResource(R.string.settings_card_setup)) },
-                        onClick = { menu = false; onPickCardNetwork(card) })
+                        onClick = { menu = false; onPickCardNetwork(card) }, enabled = !updating)
                     DropdownMenuItem(text = { Text(stringResource(R.string.reference_stop_tracking)) },
-                        onClick = { menu = false; onRequestStopTracking(card) })
+                        onClick = { menu = false; onRequestStopTracking(card) }, enabled = !updating)
                     DropdownMenuItem(text = { Text(stringResource(R.string.registry_delete), color = MaterialTheme.colorScheme.error) },
-                        onClick = { menu = false; onRequestDelete(card) }, modifier = Modifier.testTag("registry-delete-action"))
+                        onClick = { menu = false; onRequestDelete(card) }, enabled = !updating, modifier = Modifier.testTag("registry-delete-action"))
                 }
             }
         },
