@@ -53,6 +53,11 @@ data class CommitmentsOverview(
 ) {
     val hasContent: Boolean get() = rows.isNotEmpty()
 
+    /** Unpaid rows, nearest due date first; rows without a date go last. Ties keep name order. */
+    val upcomingUnpaid: List<CommitmentDashboardRow>
+        get() = rows.filter { it.status == CommitmentPaymentStatus.UNPAID }
+            .sortedWith(compareBy<CommitmentDashboardRow> { it.expectedDate == null }.thenBy { it.expectedDate })
+
     companion object {
         fun empty(currency: Currency = Currency.SAR): CommitmentsOverview {
             val zero = Money.zero(currency)

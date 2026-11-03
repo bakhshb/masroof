@@ -70,6 +70,14 @@ data class ForecastComparisonRow(@PrimaryKey val id: String, val periodStart: Lo
     @Query("DELETE FROM recurring_candidate") suspend fun clearCandidates()
     @Query("DELETE FROM analysis_alert") suspend fun clearAlerts()
     @Query("DELETE FROM analysis_preferences") suspend fun clearPreferences()
+    /** Every refresh adds a snapshot; only the newest [keep] are ever read (see [recentSnapshots]). */
+    @Query("DELETE FROM analysis_snapshot WHERE rowid NOT IN (SELECT rowid FROM analysis_snapshot ORDER BY rowid DESC LIMIT :keep)")
+    suspend fun pruneSnapshots(keep: Int)
+    /** Every refresh adds a model; keeps the newest [keep] Huber models and the newest [keep] baselines. */
+    @Query("DELETE FROM analysis_model WHERE rowid NOT IN (" +
+        "SELECT rowid FROM analysis_model WHERE id NOT LIKE 'baseline:%' ORDER BY rowid DESC LIMIT :keep) " +
+        "AND rowid NOT IN (SELECT rowid FROM analysis_model WHERE id LIKE 'baseline:%' ORDER BY rowid DESC LIMIT :keep)")
+    suspend fun pruneModels(keep: Int)
 }
 
 @Database(entities = [AnalysisSnapshotRow::class, AnalysisModelRow::class, RecurringCandidateRow::class,

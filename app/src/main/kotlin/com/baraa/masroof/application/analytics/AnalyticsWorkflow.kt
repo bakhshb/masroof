@@ -327,6 +327,9 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             dao.candidates(candidates.map { c -> RecurringCandidateRow(c.key,
                 status(c) ?: if (c.sourceIds.any { it in input.committed }) "ACCEPTED" else "SUGGESTED", json.encodeToString(c)) })
             dao.alerts(alerts)
+            // Without this the tables grow on every refresh, and each refresh decodes every stored model.
+            dao.pruneSnapshots(KEPT_SNAPSHOTS)
+            dao.pruneModels(KEPT_MODELS)
         }
         if (generation.get() != version) { request(); return@withLock }
         loadCached(); finishUi(input)
@@ -540,6 +543,9 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     }
     companion object {
         private const val SIX_HOURS_MS = 6 * 3600_000L
+        /** Matches [com.baraa.masroof.data.analytics.AnalyticsDao.recentSnapshots], the oldest snapshot ever read. */
+        private const val KEPT_SNAPSHOTS = 20
+        private const val KEPT_MODELS = 5
         fun from(context: Context): AnalyticsWorkflow = (context.applicationContext as MasroofApplication).container.analytics
     }
 }

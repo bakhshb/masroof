@@ -28,6 +28,19 @@ class AnalyticsPersistenceTest {
         })
     }
     @After fun cleanup() { directories.forEach { it.deleteRecursively() } }
+    @Test fun pruningKeepsOnlyTheNewestSnapshotsAndModelsOfEachKind() = runBlocking {
+        val c = context(); c.deleteDatabase(AnalyticsDatabase.NAME)
+        val db = AnalyticsDatabase.open(c)
+        try {
+            val dao = db.analytics()
+            (1..30).forEach { dao.snapshot(AnalysisSnapshotRow("s$it", "a".repeat(64), it.toLong(), "{}")) }
+            (1..8).forEach { dao.model(AnalysisModelRow("huber$it", "{}")); dao.model(AnalysisModelRow("baseline:$it", "{}")) }
+            dao.pruneSnapshots(20); dao.pruneModels(5)
+            assertEquals((11..30).map { "s$it" }, dao.snapshots().map { it.id })
+            assertEquals("s30", dao.latest()?.id)
+            assertEquals(((4..8).map { "huber$it" } + (4..8).map { "baseline:$it" }).toSet(), dao.models().map { it.id }.toSet())
+        } finally { db.close() }
+    }
     @Test fun sidecarReopensAndArchiveRoundTripsWithoutCopyingLedger() = runBlocking {
         val c = context(); c.deleteDatabase(AnalyticsDatabase.NAME)
         val db = AnalyticsDatabase.open(c)

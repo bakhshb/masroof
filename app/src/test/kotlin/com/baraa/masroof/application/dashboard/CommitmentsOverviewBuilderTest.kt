@@ -1080,4 +1080,22 @@ class CommitmentsOverviewBuilderTest {
             salaryPeriodLabel = null,
             currency = Currency.SAR,
         )
+
+    @Test
+    fun upcomingUnpaid_ordersByNearestDueDateWithUndatedLast() {
+        fun row(name: String, date: String?, status: CommitmentPaymentStatus = CommitmentPaymentStatus.UNPAID) =
+            CommitmentDashboardRow(name, CommitmentDashboardSource.USER, name, Money.of("10.00", Currency.SAR),
+                date?.let(LocalDate::parse), status)
+        // Rows arrive in name order, as the builder sorts them.
+        val overview = CommitmentsOverview(
+            rows = listOf(row("ChatGPT", "2026-11-21"), row("Gym", null), row("Rent", "2026-11-01", CommitmentPaymentStatus.PAID),
+                row("YouTube", "2026-11-06")),
+            total = Money.of("40.00", Currency.SAR),
+            paid = Money.of("10.00", Currency.SAR),
+            remaining = Money.of("30.00", Currency.SAR),
+            currency = Currency.SAR,
+        )
+
+        assertEquals(listOf("YouTube", "ChatGPT", "Gym"), overview.upcomingUnpaid.map { it.displayName })
+    }
 }
