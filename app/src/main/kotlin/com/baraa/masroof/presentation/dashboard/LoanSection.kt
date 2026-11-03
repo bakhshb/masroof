@@ -27,9 +27,9 @@ fun LoanSummaryTile(loan: LoanOverview, modifier: Modifier = Modifier, onClick: 
     EntitySummaryCard(loanName(loan), "", MasroofIcons.moneyMovement,
         MasroofThemeExtras.extendedColors.liability, modifier, onClick, actionLabel = stringResource(R.string.reference_loan_details), bankLabel = com.baraa.masroof.presentation.settings.settingsBankLabel(loan.bank)) {
         MasroofDetailRow(stringResource(R.string.approved_loan_remaining), loan.remainingBalance?.let { formatLocalizedMoney(it) } ?: unavailable, dense = true)
-        MasroofDetailRow(stringResource(R.string.approved_last_installment), loan.latestInstallmentAmount?.let { formatLocalizedMoney(it) } ?: unavailable, valueColor = MasroofThemeExtras.extendedColors.liability, dense = true)
-        MasroofDetailRow(stringResource(R.string.approved_installment_date), loan.latestInstallmentAsOf?.let { date.format(it.atZone(ZoneId.systemDefault())) } ?: unavailable, dense = true)
-        MasroofDetailRow(stringResource(R.string.approved_balance_date), loan.remainingBalanceAsOf?.let { date.format(it.atZone(ZoneId.systemDefault())) } ?: unavailable, dense = true)
+        MasroofDetailRow(stringResource(R.string.approved_last_installment), loan.latestInstallmentAmount?.let { amount ->
+            formatLocalizedMoney(amount) + (loan.latestInstallmentAsOf?.let { " · " + date.format(it.atZone(ZoneId.systemDefault())) } ?: "")
+        } ?: unavailable, valueColor = MasroofThemeExtras.extendedColors.liability, dense = true)
     }
 }
 
@@ -62,5 +62,8 @@ internal fun loanName(loan: LoanOverview): String = loan.customName ?: loanTypeL
 
 /** A commitment row's name; an unnamed loan shows its type in the app language. */
 @Composable
-internal fun commitmentRowName(row: com.baraa.masroof.application.dashboard.CommitmentDashboardRow): String =
-    row.loanTypeFallback?.let { loanTypeLabel(it) } ?: row.displayName
+internal fun commitmentRowName(row: com.baraa.masroof.application.dashboard.CommitmentDashboardRow): String = when {
+    row.source == com.baraa.masroof.application.dashboard.CommitmentDashboardSource.CREDIT_CARD ->
+        stringResource(R.string.entities_credit_card_last4, com.baraa.masroof.presentation.common.formatCardLast4(row.displayName))
+    else -> row.loanTypeFallback?.let { loanTypeLabel(it) } ?: row.displayName
+}

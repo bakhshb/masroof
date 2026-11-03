@@ -246,6 +246,7 @@ object CreditCardOverviewBuilder {
             dueDate = latestStatement?.dueDate,
             statementIssuedAt = latestStatement?.updatedAt,
             updatedAt = updatedAt,
+            availableBalanceAt = latestAvailable?.updatedAt,
         )
     }
 

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="entities_statement_amount">Statement amount</string>
+    <string name="entities_due_paid_caption">Due %1$s · payment recorded</string>
+    <string name="entities_available_limit">Available limit</string>
+    <string name="entities_latest_bank_message">Latest bank message · %1$s</string>
+    <string name="entities_credit_card_last4">Credit card ···%1$s</string>
+    <string name="entities_no_activity">No activity this period</string>
+    <string name="entities_no_refunds">No refunds this period</string>
+</resources>

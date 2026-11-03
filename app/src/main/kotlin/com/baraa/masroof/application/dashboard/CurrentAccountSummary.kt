@@ -16,6 +16,9 @@ data class CurrentAccountSummary(
 ) {
     val currency: Currency get() = inflow.currency
 
+    /** False when nothing moved in or out of the account this period. */
+    val hasActivity: Boolean get() = inflow.total.amount.signum() != 0 || outflow.total.amount.signum() != 0
+
     val netMovement: SignedMoneyAmount
         get() {
             val net = inflow.coreTotal.amount
