@@ -93,6 +93,10 @@ internal fun purchasePeriodHistory(data: CleanData, currentStart: Long): List<An
 fun visibleAnalysisAlerts(state: AnalysisUiState, now: Long): List<com.baraa.masroof.data.analytics.AnalysisAlertRow> =
     state.alerts.filter { !it.resolved && it.snoozedUntil <= now }.sortedByDescending { it.observedAt }
 
+/** Due epoch day of a DUE alert; [AnalysisAlertPolicy] keys due alerts as `due:<id>:<day>`. */
+fun com.baraa.masroof.data.analytics.AnalysisAlertRow.dueEpochDay(): Long? =
+    if (kind == "DUE") id.substringAfterLast(':').toLongOrNull() else null
+
 fun normalizeAnalysisNumber(value: String): String = value.trim().map { c ->
     when { c == '٫' -> '.'; c.isDigit() -> Character.digit(c, 10).toString().single(); else -> c }
 }.joinToString("")

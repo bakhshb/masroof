@@ -12,7 +12,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofText as Text
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.testTag
+import com.baraa.masroof.domain.model.CardNetwork
+import com.baraa.masroof.domain.model.CardRole
+import com.baraa.masroof.domain.model.CardType
+import com.baraa.masroof.ui.theme.MasroofIconSizes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -92,10 +104,6 @@ fun SettingsBankCardsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(SettingsSpacing.sectionGap),
         ) {
-            onAddManual?.let { action -> com.baraa.masroof.presentation.common.MasroofOutlinedButton(action,
-                enabled = !state.updating, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.settings_add_card_manual))
-            } }
             SettingsScreenHeader(
                 bank = bank,
                 hint = stringResource(R.string.settings_cards_hint),
@@ -140,38 +148,18 @@ fun SettingsBankCardsScreen(
 
             if (referenceTab == "followed" && followedCards.isNotEmpty()) {
 
-                if (bankTree != null) {
-                    bankTree.creditCards.forEach { card ->
-                        SettingsRegistryCardRow(
-                            card = card,
-                            updating = state.updating,
-                            onRequestStopTracking = onRequestStopTracking,
-                            onRenameCard = onRenameCard,
-                            onPickCardNetwork = onPickCardNetwork,
-                            onRequestDelete = { deleteActions.onRequest(StopTrackingTarget.Card(it)) },
-                        )
-                    }
-                    bankTree.allDebitCards.forEach { card ->
-                        SettingsRegistryCardRow(
-                            card = card,
-                            updating = state.updating,
-                            onRequestStopTracking = onRequestStopTracking,
-                            onRenameCard = onRenameCard,
-                            onPickCardNetwork = onPickCardNetwork,
-                            onRequestDelete = { deleteActions.onRequest(StopTrackingTarget.Card(it)) },
-                        )
-                    }
-                } else {
-                    followedCards.forEach { card ->
-                        SettingsRegistryCardRow(
-                            card = card,
-                            updating = state.updating,
-                            onRequestStopTracking = onRequestStopTracking,
-                            onRenameCard = onRenameCard,
-                            onPickCardNetwork = onPickCardNetwork,
-                            onRequestDelete = { deleteActions.onRequest(StopTrackingTarget.Card(it)) },
-                        )
-                    }
+                val cards = bankTree?.let { primaryFirst(it.creditCards) + it.allDebitCards.map { card -> card to false } }
+                    ?: primaryFirst(followedCards)
+                cards.forEach { (card, nested) ->
+                    SettingsRegistryCardRow(
+                        card = card,
+                        updating = state.updating,
+                        onRequestStopTracking = onRequestStopTracking,
+                        onRenameCard = onRenameCard,
+                        onPickCardNetwork = onPickCardNetwork,
+                        onRequestDelete = { deleteActions.onRequest(StopTrackingTarget.Card(it)) },
+                        modifier = if (nested) Modifier.padding(start = MasroofSpacing.largeGap) else Modifier,
+                    )
                 }
             }
 
@@ -198,8 +186,26 @@ fun SettingsBankCardsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+            onAddManual?.let { action -> com.baraa.masroof.presentation.common.MasroofOutlinedButton(action,
+                enabled = !state.updating, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.settings_add_card_manual))
+            } }
         }
     }
+}
+
+/**
+ * Primary and standalone cards first (by last four), each followed by its supplementary cards.
+ * The flag marks a supplementary card shown under its primary.
+ */
+internal fun primaryFirst(cards: List<ManagedCardUi>): List<Pair<ManagedCardUi, Boolean>> {
+    val (supplementary, primary) = cards.partition { it.cardRole == CardRole.SUPPLEMENTARY }
+    val placed = mutableSetOf<String>()
+    val ordered = primary.sortedBy { it.last4 }.flatMap { parent ->
+        listOf(parent to false) + supplementary.filter { it.parentCardLast4 == parent.last4 }.sortedBy { it.last4 }
+            .onEach { placed += it.id }.map { it to true }
+    }
+    return ordered + supplementary.filter { it.id !in placed }.sortedBy { it.last4 }.map { it to false }
 }
 
 @Composable
@@ -210,13 +216,33 @@ internal fun SettingsRegistryCardRow(
     onRenameCard: (ManagedCardUi) -> Unit,
     onPickCardNetwork: (ManagedCardUi) -> Unit,
     onRequestDelete: (ManagedCardUi) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val title = registryLabel(card)
     SettingsRegistryItemCard(
         icon = MasroofIcons.cardPayment,
         bank = card.bank,
-        title = registryLabel(card),
+        title = title,
+        modifier = modifier,
         showBankLabel = false,
         onTitleClick = { onRenameCard(card) },
+        headerAction = {
+            var menu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { menu = true }, enabled = !updating, modifier = Modifier.testTag("registry-more-actions")) {
+                    Icon(MasroofIcons.more, stringResource(R.string.settings_card_more_actions, title),
+                        Modifier.size(MasroofIconSizes.md))
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.settings_card_setup)) },
+                        onClick = { menu = false; onPickCardNetwork(card) })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.reference_stop_tracking)) },
+                        onClick = { menu = false; onRequestStopTracking(card) })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.registry_delete), color = MaterialTheme.colorScheme.error) },
+                        onClick = { menu = false; onRequestDelete(card) }, modifier = Modifier.testTag("registry-delete-action"))
+                }
+            }
+        },
         footer = {
             cardSubtitle(card)?.let { subtitle ->
                 Text(
@@ -226,23 +252,20 @@ internal fun SettingsRegistryCardRow(
                     modifier = Modifier.padding(top = MasroofSpacing.inlineGap),
                 )
             }
-            SettingsCardMetadataActions(
-                enabled = !updating,
-                onRename = { onRenameCard(card) },
-                onPickNetwork = { onPickCardNetwork(card) },
-                includeRename = false,
-                onStop = { onRequestStopTracking(card) },
-                onDelete = { onRequestDelete(card) },
-            )
         },
     )
 }
 
 @Composable
 private fun cardSubtitle(card: ManagedCardUi): String? {
+    // An unnamed card's title already says Mada or Primary/Supplementary; do not repeat it here.
+    val unnamed = card.displayName.isNullOrBlank()
+    val titleShowsNetwork = unnamed && card.cardNetwork == CardNetwork.MADA
+    val titleShowsRole = unnamed && !titleShowsNetwork && card.cardType != null && card.cardType != CardType.DEBIT &&
+        (card.cardRole == CardRole.PRIMARY || card.cardRole == CardRole.SUPPLEMENTARY)
     val parts = buildList {
-        card.cardNetwork?.let { add(cardNetworkLabel(it)) }
-        card.cardRole?.let { add(cardRoleLabel(it)) }
+        card.cardNetwork?.takeIf { !titleShowsNetwork }?.let { add(cardNetworkLabel(it)) }
+        card.cardRole?.takeIf { !titleShowsRole }?.let { add(cardRoleLabel(it)) }
         card.linkedAccountMaskedNumber?.let {
             add(stringResource(R.string.settings_linked_account_suffix, it.takeLast(4)))
         }

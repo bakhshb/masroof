@@ -25,7 +25,7 @@ internal fun SettingsImportBankChoices(banks: List<PatternBankView>, selected: S
             stringResource(R.string.settings_import_scope_hint), style = MaterialTheme.typography.titleMedium)
         MasroofSheetChoices(banks.map { it.bankId }, selected, { id ->
             val bank = banks.single { it.bankId == id }
-            settingsBankLabel(Bank(id)) + "\n" + bankSupportLabel(bank)
+            settingsBankLabel(Bank(id)) + "\n" + bankSupportLabel(bank).first
         }, { if (enabled) onToggle(it) }, { "import-bank-$it" })
     }
 }

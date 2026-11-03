@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_bank_reading_messages">قراءة الرسائل</string>
+    <plurals name="settings_bank_sender_count">
+        <item quantity="zero">لا يوجد مرسلون</item>
+        <item quantity="one">مرسل رسائل واحد</item>
+        <item quantity="two">مرسلا رسائل</item>
+        <item quantity="few">%d مرسلين للرسائل</item>
+        <item quantity="many">%d مرسلًا للرسائل</item>
+        <item quantity="other">%d مرسل للرسائل</item>
+    </plurals>
+    <plurals name="settings_hub_accounts_subtitle">
+        <item quantity="zero">لا حسابات • %2$d غير مسجّل</item>
+        <item quantity="one">حساب واحد • %2$d غير مسجّل</item>
+        <item quantity="two">حسابان • %2$d غير مسجّل</item>
+        <item quantity="few">%1$d حسابات • %2$d غير مسجّل</item>
+        <item quantity="many">%1$d حسابًا • %2$d غير مسجّل</item>
+        <item quantity="other">%1$d حساب • %2$d غير مسجّل</item>
+    </plurals>
+    <plurals name="settings_hub_accounts_subtitle_followed_only">
+        <item quantity="zero">لا حسابات</item>
+        <item quantity="one">حساب واحد</item>
+        <item quantity="two">حسابان</item>
+        <item quantity="few">%1$d حسابات</item>
+        <item quantity="many">%1$d حسابًا</item>
+        <item quantity="other">%1$d حساب</item>
+    </plurals>
+    <plurals name="settings_hub_accounts_subtitle_stopped_only">
+        <item quantity="zero">لا حسابات متوقفة</item>
+        <item quantity="one">حساب متوقف واحد</item>
+        <item quantity="two">حسابان متوقفان</item>
+        <item quantity="few">%1$d حسابات متوقفة</item>
+        <item quantity="many">%1$d حسابًا متوقفًا</item>
+        <item quantity="other">%1$d حساب متوقف</item>
+    </plurals>
+    <plurals name="settings_hub_accounts_subtitle_followed_stopped">
+        <item quantity="zero">لا حسابات • %2$d متوقف</item>
+        <item quantity="one">حساب واحد • %2$d متوقف</item>
+        <item quantity="two">حسابان • %2$d متوقف</item>
+        <item quantity="few">%1$d حسابات • %2$d متوقف</item>
+        <item quantity="many">%1$d حسابًا • %2$d متوقف</item>
+        <item quantity="other">%1$d حساب • %2$d متوقف</item>
+    </plurals>
+    <plurals name="settings_hub_cards_subtitle">
+        <item quantity="zero">لا بطاقات • %2$d غير مسجّلة</item>
+        <item quantity="one">بطاقة واحدة • %2$d غير مسجّلة</item>
+        <item quantity="two">بطاقتان • %2$d غير مسجّلة</item>
+        <item quantity="few">%1$d بطاقات • %2$d غير مسجّلة</item>
+        <item quantity="many">%1$d بطاقة • %2$d غير مسجّلة</item>
+        <item quantity="other">%1$d بطاقة • %2$d غير مسجّلة</item>
+    </plurals>
+    <plurals name="settings_hub_cards_subtitle_followed_only">
+        <item quantity="zero">لا بطاقات</item>
+        <item quantity="one">بطاقة واحدة</item>
+        <item quantity="two">بطاقتان</item>
+        <item quantity="few">%1$d بطاقات</item>
+        <item quantity="many">%1$d بطاقة</item>
+        <item quantity="other">%1$d بطاقة</item>
+    </plurals>
+    <plurals name="settings_hub_cards_subtitle_stopped_only">
+        <item quantity="zero">لا بطاقات متوقفة</item>
+        <item quantity="one">بطاقة متوقفة واحدة</item>
+        <item quantity="two">بطاقتان متوقفتان</item>
+        <item quantity="few">%1$d بطاقات متوقفة</item>
+        <item quantity="many">%1$d بطاقة متوقفة</item>
+        <item quantity="other">%1$d بطاقة متوقفة</item>
+    </plurals>
+    <plurals name="settings_hub_cards_subtitle_followed_stopped">
+        <item quantity="zero">لا بطاقات • %2$d متوقفة</item>
+        <item quantity="one">بطاقة واحدة • %2$d متوقفة</item>
+        <item quantity="two">بطاقتان • %2$d متوقفة</item>
+        <item quantity="few">%1$d بطاقات • %2$d متوقفة</item>
+        <item quantity="many">%1$d بطاقة • %2$d متوقفة</item>
+        <item quantity="other">%1$d بطاقة • %2$d متوقفة</item>
+    </plurals>
+    <plurals name="settings_bank_summary_loans">
+        <item quantity="zero">لا قروض</item>
+        <item quantity="one">قرض واحد</item>
+        <item quantity="two">قرضان</item>
+        <item quantity="few">%1$d قروض</item>
+        <item quantity="many">%1$d قرضًا</item>
+        <item quantity="other">%1$d قرض</item>
+    </plurals>
+    <plurals name="notification_center_badge_count">
+        <item quantity="zero">لا إشعارات غير مقروءة</item>
+        <item quantity="one">إشعار واحد غير مقروء</item>
+        <item quantity="two">إشعاران غير مقروءين</item>
+        <item quantity="few">%1$d إشعارات غير مقروءة</item>
+        <item quantity="many">%1$d إشعارًا غير مقروء</item>
+        <item quantity="other">%1$d إشعار غير مقروء</item>
+    </plurals>
+    <plurals name="notification_center_new_count">
+        <item quantity="zero">لا جديد</item>
+        <item quantity="one">واحد جديد</item>
+        <item quantity="two">اثنان جديدان</item>
+        <item quantity="few">%1$d جديدة</item>
+        <item quantity="many">%1$d جديدًا</item>
+        <item quantity="other">%1$d جديد</item>
+    </plurals>
+    <string name="notification_due_subtitle">%1$s · يستحق %2$s</string>
+    <string name="notification_settings_row_subtitle">اختر ما ينبّهك إليه مصروف</string>
+    <string name="settings_card_more_actions">إجراءات البطاقة %1$s</string>
+</resources>

@@ -48,10 +48,6 @@
     <string name="settings_action_resume_short">Track</string>
     <string name="settings_stop_account_confirm_title">Stop tracking this account?</string>
     <string name="settings_stop_account_confirm_body">Account ...%1$s will no longer count as one of yours — its transfers may be classified as external.</string>
-    <string name="settings_hub_accounts_subtitle">%1$d account(s) • %2$d unregistered</string>
-    <string name="settings_hub_accounts_subtitle_followed_only">%1$d account(s)</string>
-    <string name="settings_hub_accounts_subtitle_stopped_only">%1$d stopped account(s)</string>
-    <string name="settings_hub_accounts_subtitle_followed_stopped">%1$d account(s) • %2$d stopped</string>
     <string name="settings_cards_section">My cards</string>
     <string name="settings_cards_hint">Tracked cards appear on the dashboard. Stopped cards are hidden.</string>
     <string name="settings_cards_empty">No registered cards yet.</string>
@@ -103,10 +99,6 @@
     <string name="settings_about_privacy_body">Messages are parsed locally on your device. Financial SMS content is not uploaded. App updates may contact GitHub using your personal token.</string>
     <string name="settings_hub_review_title">Review transactions</string>
     <string name="settings_hub_review_subtitle_count">%1$d transaction(s) need review</string>
-    <string name="settings_hub_cards_subtitle">%1$d card(s) • %2$d unregistered</string>
-    <string name="settings_hub_cards_subtitle_followed_only">%1$d card(s)</string>
-    <string name="settings_hub_cards_subtitle_stopped_only">%1$d stopped card(s)</string>
-    <string name="settings_hub_cards_subtitle_followed_stopped">%1$d card(s) • %2$d stopped</string>
     <string name="settings_bank_category_stopped_suffix"> • %1$d stopped</string>
     <string name="settings_app_section">App</string>
     <string name="settings_app_hub_subtitle">%1$s • %2$s</string>
@@ -154,7 +146,6 @@
     <string name="settings_bank_accounts_title">Accounts</string>
     <string name="settings_bank_cards_title">Cards</string>
     <string name="settings_bank_loans_title">Loans</string>
-    <string name="settings_bank_summary_loans">%1$d loan(s)</string>
     <string name="settings_loans_hint">Loans discovered from bank SMS.</string>
     <string name="settings_loans_empty">No loans registered yet.</string>
     <string name="settings_loans_unregistered">Unregistered</string>
@@ -272,7 +263,6 @@
     <string name="onboarding_restore_invalid">Backup file is invalid or incompatible</string>
     <string name="dashboard_open_settings">Settings</string>
 <string name="notification_center_title">Notifications</string>
-    <string name="notification_center_badge_count">%1$d unread notification(s)</string>
     <string name="notification_center_empty">No alerts right now.</string>
     <string name="notification_center_sms_permission_title">SMS permission is off</string>
     <string name="notification_center_sms_permission_body">Allow Masroof to read SMS to import bank transactions.</string>

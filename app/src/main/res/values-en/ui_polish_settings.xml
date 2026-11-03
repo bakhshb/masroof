@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_bank_reading_messages">Reading messages</string>
+    <plurals name="settings_bank_sender_count">
+        <item quantity="one">%d SMS sender</item>
+        <item quantity="other">%d SMS senders</item>
+    </plurals>
+    <plurals name="settings_hub_accounts_subtitle">
+        <item quantity="one">%1$d account • %2$d unregistered</item>
+        <item quantity="other">%1$d accounts • %2$d unregistered</item>
+    </plurals>
+    <plurals name="settings_hub_accounts_subtitle_followed_only">
+        <item quantity="one">%1$d account</item>
+        <item quantity="other">%1$d accounts</item>
+    </plurals>
+    <plurals name="settings_hub_accounts_subtitle_stopped_only">
+        <item quantity="one">%1$d stopped account</item>
+        <item quantity="other">%1$d stopped accounts</item>
+    </plurals>
+    <plurals name="settings_hub_accounts_subtitle_followed_stopped">
+        <item quantity="one">%1$d account • %2$d stopped</item>
+        <item quantity="other">%1$d accounts • %2$d stopped</item>
+    </plurals>
+    <plurals name="settings_hub_cards_subtitle">
+        <item quantity="one">%1$d card • %2$d unregistered</item>
+        <item quantity="other">%1$d cards • %2$d unregistered</item>
+    </plurals>
+    <plurals name="settings_hub_cards_subtitle_followed_only">
+        <item quantity="one">%1$d card</item>
+        <item quantity="other">%1$d cards</item>
+    </plurals>
+    <plurals name="settings_hub_cards_subtitle_stopped_only">
+        <item quantity="one">%1$d stopped card</item>
+        <item quantity="other">%1$d stopped cards</item>
+    </plurals>
+    <plurals name="settings_hub_cards_subtitle_followed_stopped">
+        <item quantity="one">%1$d card • %2$d stopped</item>
+        <item quantity="other">%1$d cards • %2$d stopped</item>
+    </plurals>
+    <plurals name="settings_bank_summary_loans">
+        <item quantity="one">%1$d loan</item>
+        <item quantity="other">%1$d loans</item>
+    </plurals>
+    <plurals name="notification_center_badge_count">
+        <item quantity="one">%1$d unread notification</item>
+        <item quantity="other">%1$d unread notifications</item>
+    </plurals>
+    <plurals name="notification_center_new_count">
+        <item quantity="one">%1$d new</item>
+        <item quantity="other">%1$d new</item>
+    </plurals>
+    <string name="notification_due_subtitle">%1$s · due %2$s</string>
+    <string name="notification_settings_row_subtitle">Choose what Masroof notifies you about</string>
+    <string name="settings_card_more_actions">Actions for card %1$s</string>
+</resources>

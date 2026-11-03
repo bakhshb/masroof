@@ -1,6 +1,7 @@
 package com.baraa.masroof.presentation.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.navigation.SettingsDestination
@@ -67,10 +68,10 @@ fun SettingsRegistryCategory.bankRowSubtitle(summary: SettingsBankSummaryUi): St
                 stopped = summary.stoppedAccountCount,
             ),
             emptyLabel = stringResource(R.string.settings_accounts_empty),
-            followedUnregisteredRes = R.string.settings_hub_accounts_subtitle,
-            followedOnlyRes = R.string.settings_hub_accounts_subtitle_followed_only,
-            stoppedOnlyRes = R.string.settings_hub_accounts_subtitle_stopped_only,
-            followedStoppedRes = R.string.settings_hub_accounts_subtitle_followed_stopped,
+            followedUnregisteredRes = R.plurals.settings_hub_accounts_subtitle,
+            followedOnlyRes = R.plurals.settings_hub_accounts_subtitle_followed_only,
+            stoppedOnlyRes = R.plurals.settings_hub_accounts_subtitle_stopped_only,
+            followedStoppedRes = R.plurals.settings_hub_accounts_subtitle_followed_stopped,
         )
         SettingsRegistryCategory.Cards -> formatRegistryCategorySubtitle(
             state = resolveRegistryCategorySubtitle(
@@ -79,13 +80,13 @@ fun SettingsRegistryCategory.bankRowSubtitle(summary: SettingsBankSummaryUi): St
                 stopped = summary.stoppedCardCount,
             ),
             emptyLabel = stringResource(R.string.settings_cards_empty),
-            followedUnregisteredRes = R.string.settings_hub_cards_subtitle,
-            followedOnlyRes = R.string.settings_hub_cards_subtitle_followed_only,
-            stoppedOnlyRes = R.string.settings_hub_cards_subtitle_stopped_only,
-            followedStoppedRes = R.string.settings_hub_cards_subtitle_followed_stopped,
+            followedUnregisteredRes = R.plurals.settings_hub_cards_subtitle,
+            followedOnlyRes = R.plurals.settings_hub_cards_subtitle_followed_only,
+            stoppedOnlyRes = R.plurals.settings_hub_cards_subtitle_stopped_only,
+            followedStoppedRes = R.plurals.settings_hub_cards_subtitle_followed_stopped,
         )
         SettingsRegistryCategory.Loans -> if (summary.loanCount > 0) {
-            stringResource(R.string.settings_bank_summary_loans, summary.loanCount)
+            pluralStringResource(R.plurals.settings_bank_summary_loans, summary.loanCount, summary.loanCount)
         } else {
             stringResource(R.string.settings_loans_empty)
         }

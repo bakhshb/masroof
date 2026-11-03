@@ -12,10 +12,10 @@
     <string name="settings_bank_save_failed">تعذّر حفظ البنك. تحقق من البيانات ومن أن المرسل غير مرتبط ببنك آخر، ثم أعد المحاولة.</string>
     <string name="settings_bank_registry_only">حسابات أو بطاقات مسجلة · لم تُضبط الرسائل بعد</string>
     <string name="settings_bank_needs_teaching">بانتظار تعليم الرسائل</string>
-    <string name="settings_bank_bundled">أنماط مدمجة جاهزة</string>
-    <string name="settings_bank_needs_approval">أنماط تحتاج اعتمادًا</string>
-    <string name="settings_bank_partly_approved">بعض الأنماط معتمدة؛ صيغ أخرى تحتاج مراجعة</string>
-    <string name="settings_bank_approved">أنماط معتمدة؛ قد تحتاج صيغ أخرى للتعليم</string>
+    <string name="settings_bank_bundled">جاهز</string>
+    <string name="settings_bank_needs_approval">يحتاج مراجعة</string>
+    <string name="settings_bank_partly_approved">يحتاج مراجعة</string>
+    <string name="settings_bank_approved">جاهز · قد تحتاج بعض الرسائل للتعليم</string>
     <string name="settings_bank_support_title">دعم رسائل البنوك</string>
     <string name="settings_bank_support_hint">يمكن إضافة بنك ومرسليه وتعليم صيغ رسائله. يقتصر الفهم على الأنماط المتاحة والمعتمدة.</string>
     <string name="settings_bank_manage">إدارة البنوك</string>
@@ -32,7 +32,7 @@
     <string name="settings_import_open_bank">عرض حسابات البنك وبطاقاته</string>
     <string name="settings_import_no_selected_bank_sms">لم يُعثر على رسائل للبنوك المحددة ضمن هذه الفترة.</string>
     <string name="settings_data_tools_title">أدوات البيانات</string>
-    <string name="settings_data_tools_hint">إعادة تحليل الرسائل المخزنة ومراجعة تحويلات العملات</string>
+    <string name="settings_data_tools_hint">إعادة قراءة الرسائل المخزنة وتصحيح أسعار الصرف</string>
     <string name="settings_corrections_scope">هذه الصفحة تعرض أثر التصحيحات على مستوى التطبيق. تعليم حقول الرسالة واعتماد النمط متاحان داخل كل بنك.</string>
     <string name="settings_current_version">الإصدار الحالي: %1$s</string>
     <string name="settings_statement_bank_scope_hint">يجب أن يطابق البنك في الملف البنك المحدد هنا. تُقارن الحسابات المملوكة والمسجلة فقط.</string>
@@ -46,5 +46,5 @@
     <string name="settings_pattern_select_card">البطاقة المملوكة</string>
     <string name="settings_pattern_add_card_hint">أضف البطاقة وأكّد نوعها وملكيتها من صفحة البنك أولًا.</string>
     <string name="settings_bank_setup_messages">تعريف رسائل هذا البنك</string>
-    <string name="settings_bank_patterns_disabled">أنماط الرسائل متوقفة</string>
+    <string name="settings_bank_patterns_disabled">متوقف</string>
 </resources>
