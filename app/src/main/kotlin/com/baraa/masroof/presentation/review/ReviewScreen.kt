@@ -224,7 +224,7 @@ internal fun ReviewListScreen(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     if (state.listMode == ReviewListMode.PENDING) Text(
-                        stringResource(R.string.review_empty_hint),
+                        stringResource(R.string.review_empty_body),
                         modifier = Modifier.fillMaxWidth().padding(top = MasroofSpacing.inlineGap),
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodySmall,

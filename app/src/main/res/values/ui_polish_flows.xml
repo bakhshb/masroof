@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="review_empty_hint">ستظهر هنا رسائل البنك الجديدة التي تحتاج قرارك.</string>
+    <string name="review_empty_body">ستظهر هنا رسائل البنك الجديدة التي تحتاج قرارك.</string>
     <string name="review_ignored_reason_otp">رمز تحقق</string>
     <string name="review_ignored_reason_not_transaction">ليست حركة مالية</string>
     <string name="review_ignored_reason_balance">إشعار رصيد</string>
