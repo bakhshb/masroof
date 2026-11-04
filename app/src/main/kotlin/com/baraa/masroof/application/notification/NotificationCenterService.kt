@@ -70,15 +70,6 @@ class NotificationCenterService(
             )
         }
 
-        snapshot.rescanStatusName?.let { statusName ->
-            items += NotificationItem(
-                id = rescanId(statusName),
-                type = NotificationType.RESCAN_STATUS,
-                rescanStatusName = statusName,
-                action = NotificationAction.DISMISS_RESCAN,
-            )
-        }
-
         snapshot.updateReadyVersion?.let { version ->
             items += NotificationItem(
                 id = updateReadyId(version),
@@ -121,8 +112,6 @@ class NotificationCenterService(
         private const val FOREIGN_CURRENCY_PREFIX: String = "foreign_currency:"
 
         fun foreignCurrencyId(periodKey: String): String = "$FOREIGN_CURRENCY_PREFIX$periodKey"
-
-        fun rescanId(statusName: String): String = "rescan:$statusName"
 
         fun updateAvailableId(version: String): String = "update_available:$version"
 

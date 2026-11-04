@@ -140,17 +140,6 @@ enum class DashboardError {
     LOAD_FAILED,
 }
 
-enum class SmsRescanStatus {
-    OK,
-    ALREADY_UP_TO_DATE,
-    NEEDS_REVIEW,
-    NO_MESSAGES,
-    NO_BANK_SMS,
-    NO_TRANSACTIONS,
-    PERMISSION_DENIED,
-    FAILED,
-}
-
 object TransactionDirectionPresentation {
     fun icon(direction: TransactionDirectionUi): ImageVector =
         when (direction) {

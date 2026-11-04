@@ -274,7 +274,6 @@
     <string name="notification_center_unregistered_cards_title">بطاقات غير مسجّلة</string>
     <string name="notification_center_unregistered_accounts_title">حسابات غير مسجّلة</string>
     <string name="notification_center_unregistered_accounts_body">%1$d حساب يحتاج تأكيد الملكية</string>
-    <string name="notification_center_rescan_title">نتيجة استيراد الرسائل</string>
     <string name="dashboard_unregistered_cards_body">بطاقة غير مسجّلة — أكّدها من الإعدادات.</string>
     <string name="dashboard_unregistered_cards_more">وب %1$d بطاقة غير مسجّلة أخرى — أكّدها من الإعدادات.</string>
     <string name="dashboard_manage_cards_in_settings">إدارة البطاقات</string>
@@ -467,10 +466,8 @@
     <string name="dashboard_rescan_already_up_to_date">الرسائل مُستوردة مسبقاً — لا توجد رسائل جديدة في الفترة</string>
     <string name="dashboard_rescan_needs_review">وُجدت رسائل جديدة — راجعها من «مراجعة الحركات»</string>
     <string name="dashboard_rescan_no_messages">لا توجد رسائل في الفترة المحددة</string>
-    <string name="dashboard_rescan_no_bank_sms">لا توجد رسائل بنك الجزيرة في صندوق الوارد</string>
     <string name="dashboard_rescan_no_transactions">وُجدت رسائل جديدة لكن لم تُحوَّل إلى حركات. قد تحتاج تأكيد ملكية الحساب/البطاقة أو مراجعة لاحقة.</string>
     <string name="dashboard_rescan_failed">تعذر استيراد الرسائل</string>
-    <string name="dashboard_rescan_permission_denied">لا يمكن استيراد الرسائل بدون صلاحية الوصول للرسائل</string>
     <string name="dashboard_sms_permission_title">صلاحية الرسائل غير مفعّلة</string>
     <string name="dashboard_sms_permission_body">لاستيراد الحركات البنكية من صندوق الرسائل، اسمح لمصروف بقراءة الرسائل. السحب للتحديث يعيد تحميل البيانات فقط بدون هذه الصلاحية.</string>
     <string name="dashboard_sms_permission_grant">السماح بقراءة الرسائل</string>

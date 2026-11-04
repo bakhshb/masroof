@@ -7,7 +7,6 @@ data class NotificationCenterExternalState(
     /** Language-independent period identity (its start date) for the read state. */
     val periodKey: String = "",
     val excludedForeignCurrencyCount: Int = 0,
-    val rescanStatusName: String? = null,
     val updateAvailableVersion: String? = null,
     val updateReadyVersion: String? = null,
 )

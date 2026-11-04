@@ -84,7 +84,6 @@ class NotificationCenterViewModelTest {
         private var ids: Set<String> = emptySet()
         override fun getReadIds(): Set<String> = ids
         override fun markRead(id: String) { ids = ids + id }
-        override fun clearRead(id: String) { ids = ids - id }
         override fun setReadIds(ids: Set<String>) { this.ids = ids }
     }
 }

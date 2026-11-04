@@ -5,7 +5,5 @@ interface NotificationPreferencesRepository {
 
     fun markRead(id: String)
 
-    fun clearRead(id: String)
-
     fun setReadIds(ids: Set<String>)
 }
