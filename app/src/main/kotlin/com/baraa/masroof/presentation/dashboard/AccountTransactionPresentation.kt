@@ -11,12 +11,6 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
  * shown as spending.
  */
 object AccountTransactionPresentation {
-    fun directionForAccount(
-        tx: TransactionPreviewUi,
-        ownedContainerId: String,
-        ownedLast4s: Set<String>,
-    ): TransactionDirectionUi = directionForAccount(tx, EntityTransactionScope.account(ownedContainerId, ownedLast4s))
-
     fun directionForAccount(tx: TransactionPreviewUi, account: EntityTransactionScope.Account): TransactionDirectionUi {
         val isSource = EntityTransactionScope.matchesAccount(tx.sourceContainerId, account)
         val isDest = EntityTransactionScope.matchesAccount(tx.destinationContainerId, account)
