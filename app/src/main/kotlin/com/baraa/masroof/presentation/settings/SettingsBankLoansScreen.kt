@@ -3,12 +3,8 @@ package com.baraa.masroof.presentation.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
-import com.baraa.masroof.ui.theme.MasroofSpacing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -101,7 +97,12 @@ fun SettingsBankLoansScreen(
                         accent = com.baraa.masroof.presentation.common.MasroofCardAccent.Liability,
                         bank = loan.bank,
                         title = loanDisplayLabel(loan),
-                        showBankLabel = true,
+                        showBankLabel = false,
+                        headerAction = {
+                            SettingsDeleteOnlyMenu(loanDisplayLabel(loan), !state.updating) {
+                                deleteActions.onRequest(StopTrackingTarget.Loan(loan))
+                            }
+                        },
                         footer = {
                             AccountOwnershipInlinePrompt(
                                 enabled = !state.updating,
@@ -109,8 +110,6 @@ fun SettingsBankLoansScreen(
                                 onConfirmOwned = { onConfirmOwned(loan) },
                                 onMarkExternal = { onMarkExternal(loan) },
                             )
-                            SettingsDeleteAction({ deleteActions.onRequest(StopTrackingTarget.Loan(loan)) }, !state.updating,
-                                Modifier.padding(top = MasroofSpacing.cardInnerGap))
                         },
                     )
                 }
@@ -124,32 +123,33 @@ fun SettingsBankLoansScreen(
                         accent = com.baraa.masroof.presentation.common.MasroofCardAccent.Liability,
                         bank = loan.bank,
                         title = loanDisplayLabel(loan),
-                        showBankLabel = true,
-                        endAction = {
-                            SettingsStopTrackingButton(
-                                onClick = { onRequestStopTracking(loan) },
-                                enabled = !state.updating,
-                                contentDescription = stringResource(R.string.settings_stop_loan_tracking),
-                            )
-                            Spacer(Modifier.width(MasroofSpacing.smallGap))
-                            SettingsDeleteAction({ deleteActions.onRequest(StopTrackingTarget.Loan(loan)) }, !state.updating)
+                        showBankLabel = false,
+                        headerAction = {
+                            SettingsRegistryMoreMenu(stringResource(R.string.settings_item_more_actions, loanDisplayLabel(loan)),
+                                !state.updating, listOf(
+                                    SettingsRowAction(stringResource(R.string.reference_stop_tracking), "registry-stop-tracking-action") {
+                                        onRequestStopTracking(loan)
+                                    },
+                                    SettingsRowAction(stringResource(R.string.registry_delete), "registry-delete-action", danger = true) {
+                                        deleteActions.onRequest(StopTrackingTarget.Loan(loan))
+                                    },
+                                ))
                         },
                     )
                 }
             }
 
             if (referenceTab == "stopped" && stoppedLoans.isNotEmpty()) {
-                SettingsGroupTitle(stringResource(R.string.settings_loans_stopped))
                 stoppedLoans.forEach { loan ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.moneyMovement,
                         accent = com.baraa.masroof.presentation.common.MasroofCardAccent.Liability,
                         bank = loan.bank,
                         title = loanDisplayLabel(loan),
-                        showBankLabel = true,
-                        endAction = {
-                            SettingsStoppedItemActions({ onResumeTracking(loan) },
-                                { deleteActions.onRequest(StopTrackingTarget.Loan(loan)) }, !state.updating)
+                        showBankLabel = false,
+                        headerAction = {
+                            SettingsStoppedItemMenu(loanDisplayLabel(loan), !state.updating, { onResumeTracking(loan) },
+                                { deleteActions.onRequest(StopTrackingTarget.Loan(loan)) })
                         },
                     )
                 }

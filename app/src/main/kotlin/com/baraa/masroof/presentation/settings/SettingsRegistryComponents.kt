@@ -1,30 +1,32 @@
 package com.baraa.masroof.presentation.settings
 
 import com.baraa.masroof.ui.theme.MasroofOpacity
-import com.baraa.masroof.ui.theme.MasroofSpacing
 import com.baraa.masroof.ui.theme.MasroofSizes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import com.baraa.masroof.presentation.common.MasroofOutlinedButton as OutlinedButton
 import com.baraa.masroof.presentation.common.MasroofText as Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.graphics.Color
+import com.baraa.masroof.ui.theme.MasroofIconSizes
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -42,7 +44,6 @@ fun SettingsRegistryItemCard(
     title: String,
     modifier: Modifier = Modifier,
     showBankLabel: Boolean = true,
-    endAction: (@Composable () -> Unit)? = null,
     footer: (@Composable () -> Unit)? = null,
     onTitleClick: (() -> Unit)? = null,
     headerAction: (@Composable () -> Unit)? = null,
@@ -80,46 +81,47 @@ fun SettingsRegistryItemCard(
             headerAction?.invoke()
         }
         footer?.invoke()
-        endAction?.let { action -> Row(Modifier.padding(top = MasroofSpacing.cardInnerGap)) { action() } }
     }
 }
 
+internal class SettingsRowAction(val label: String, val tag: String? = null, val danger: Boolean = false, val onClick: () -> Unit)
+
+/** The ⋮ menu every registry row uses, so accounts, cards and loans look and act the same. */
 @Composable
-fun SettingsStopTrackingButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    contentDescription: String,
-) {
-    com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.reference_stop_tracking),
-        onClick, modifier.semantics { this.contentDescription = contentDescription }, enabled, warning = true)
+internal fun SettingsRegistryMoreMenu(contentDescription: String, enabled: Boolean, actions: List<SettingsRowAction>) {
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { menu = true }, enabled = enabled, modifier = Modifier.testTag("registry-more-actions")) {
+            Icon(MasroofIcons.more, contentDescription, Modifier.size(MasroofIconSizes.md))
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            actions.forEach { action ->
+                DropdownMenuItem(
+                    text = { Text(action.label, color = if (action.danger) MaterialTheme.colorScheme.error else Color.Unspecified) },
+                    onClick = { menu = false; action.onClick() },
+                    enabled = enabled,
+                    modifier = action.tag?.let { Modifier.testTag(it) } ?: Modifier,
+                )
+            }
+        }
+    }
 }
 
+/** Track again and Delete, for a row on the Stopped tab. */
 @Composable
-fun SettingsResumeTrackingButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier,
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = MaterialTheme.colorScheme.primary,
-        ),
-    ) {
-        Icon(
-            imageVector = MasroofIcons.success,
-            contentDescription = null,
-            modifier = Modifier.size(MasroofSpacing.screenHorizontal),
-        )
-        Spacer(Modifier.width(MasroofSpacing.inlineGap))
-        Text(
-            stringResource(R.string.settings_action_resume_short),
-            style = MaterialTheme.typography.labelLarge,
-        )
-    }
+internal fun SettingsStoppedItemMenu(title: String, enabled: Boolean, onResume: () -> Unit, onDelete: () -> Unit) {
+    SettingsRegistryMoreMenu(stringResource(R.string.settings_item_more_actions, title), enabled, listOf(
+        SettingsRowAction(stringResource(R.string.settings_action_resume_short), "registry-resume-action", onClick = onResume),
+        SettingsRowAction(stringResource(R.string.registry_delete), "registry-delete-action", danger = true, onClick = onDelete),
+    ))
+}
+
+/** Delete only, for a row on the Unconfirmed tab whose main question stays in the card. */
+@Composable
+internal fun SettingsDeleteOnlyMenu(title: String, enabled: Boolean, onDelete: () -> Unit) {
+    SettingsRegistryMoreMenu(stringResource(R.string.settings_item_more_actions, title), enabled, listOf(
+        SettingsRowAction(stringResource(R.string.registry_delete), "registry-delete-action", danger = true, onClick = onDelete),
+    ))
 }
 
 @Composable

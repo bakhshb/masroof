@@ -36,9 +36,9 @@
     <string name="reference_followed">أتابعها</string>
     <string name="reference_unconfirmed">غير مؤكدة</string>
     <string name="reference_stopped">متوقفة</string>
-    <string name="reference_manage_accounts">حساباتي · الإدارة</string>
+    <string name="reference_manage_accounts">إدارة الحسابات</string>
     <string name="reference_manage_cards">إدارة البطاقات</string>
-    <string name="reference_manage_loans">قروضي · الإدارة</string>
+    <string name="reference_manage_loans">إدارة القروض</string>
     <string name="reference_review_evidence">عرض الأدلة والخيارات</string>
     <string name="reference_unread">جديد</string>
     <string name="reference_initial_setup">الإعداد الأولي</string>

@@ -44,7 +44,6 @@
     <string name="settings_accounts_hint">Tracked accounts are used to classify transfers (between my accounts / external). Stopped accounts are not counted as yours.</string>
     <string name="settings_accounts_empty">No registered accounts yet.</string>
     <string name="settings_accounts_unregistered">Unregistered</string>
-    <string name="settings_accounts_stopped">Stopped</string>
     <string name="settings_action_resume_short">Track</string>
     <string name="settings_stop_account_confirm_title">Stop tracking this account?</string>
     <string name="settings_stop_account_confirm_body">Account ...%1$s will no longer count as one of yours — its transfers may be classified as external.</string>
@@ -52,7 +51,6 @@
     <string name="settings_cards_hint">Tracked cards appear on the dashboard. Stopped cards are hidden.</string>
     <string name="settings_cards_empty">No registered cards yet.</string>
     <string name="settings_cards_unregistered">Unregistered</string>
-    <string name="settings_cards_stopped">Stopped</string>
 <string name="settings_stop_confirm_title">Stop tracking this card?</string>
     <string name="settings_stop_confirm_body">Card ...%1$s will no longer appear on the dashboard and its purchases will not count toward your spending.</string>
     <string name="settings_stop_confirm_action">Stop tracking</string>
@@ -150,8 +148,6 @@
     <string name="settings_loans_empty">No loans registered yet.</string>
     <string name="settings_loans_unregistered">Unregistered</string>
     <string name="settings_loans_followed">My loans</string>
-    <string name="settings_loans_stopped">Stopped</string>
-    <string name="settings_stop_loan_tracking">Stop tracking loan</string>
     <string name="settings_stop_loan_confirm_title">Stop tracking this loan?</string>
     <string name="settings_stop_loan_confirm_body">%1$s will no longer count as one of your loans — it will be hidden from the loans summary.</string>
     <string name="settings_loan_type_personal">Personal loan</string>

@@ -7,28 +7,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofText as Text
 import com.baraa.masroof.presentation.common.MasroofTextButton as TextButton
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.testTag
-import com.baraa.masroof.ui.theme.MasroofIconSizes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.AccountType
@@ -129,18 +120,21 @@ fun SettingsBankAccountsScreen(
                 SettingsGroupTitle(stringResource(R.string.settings_accounts_unregistered))
                 unregisteredAccounts.forEach { account ->
                     SettingsRegistryItemCard(
-                        icon = MasroofIcons.externalIn,
+                        icon = MasroofIcons.moneyMovement,
                         bank = account.bank,
                         title = registryLabel(account),
                         showBankLabel = false,
+                        headerAction = {
+                            SettingsDeleteOnlyMenu(registryLabel(account), !state.updating) {
+                                deleteActions.onRequest(StopTrackingTarget.Account(account))
+                            }
+                        },
                         footer = {
                             AccountOwnershipInlinePrompt(
                                 enabled = !state.updating,
                                 onConfirmOwned = { onConfirmOwned(account) },
                                 onMarkExternal = { onMarkExternal(account) },
                             )
-                            SettingsDeleteAction({ deleteActions.onRequest(StopTrackingTarget.Account(account)) }, !state.updating,
-                                Modifier.padding(top = MasroofSpacing.cardInnerGap))
                         },
                     )
                 }
@@ -195,16 +189,15 @@ fun SettingsBankAccountsScreen(
             }
 
             if (referenceTab == "stopped" && stoppedAccounts.isNotEmpty()) {
-                SettingsGroupTitle(stringResource(R.string.settings_accounts_stopped))
                 stoppedAccounts.forEach { account ->
                     SettingsRegistryItemCard(
-                        icon = MasroofIcons.externalIn,
+                        icon = MasroofIcons.moneyMovement,
                         bank = account.bank,
                         title = registryLabel(account),
                         showBankLabel = false,
-                        endAction = {
-                            SettingsStoppedItemActions({ onResumeTracking(account) },
-                                { deleteActions.onRequest(StopTrackingTarget.Account(account)) }, !state.updating)
+                        headerAction = {
+                            SettingsStoppedItemMenu(registryLabel(account), !state.updating, { onResumeTracking(account) },
+                                { deleteActions.onRequest(StopTrackingTarget.Account(account)) })
                         },
                     )
                 }
@@ -235,22 +228,12 @@ internal fun SettingsRegistryAccountRow(
     SettingsRegistryItemCard(MasroofIcons.moneyMovement, account.bank, title, showBankLabel = false,
         onTitleClick = { onRenameAccount(account) },
         headerAction = {
-            var menu by remember { mutableStateOf(false) }
-            Box {
-                IconButton(onClick = { menu = true }, enabled = !updating, modifier = Modifier.testTag("registry-more-actions")) {
-                    Icon(MasroofIcons.more, stringResource(R.string.settings_account_more_actions, title), Modifier.size(MasroofIconSizes.md))
-                }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text(stringResource(R.string.settings_action_rename)) },
-                        onClick = { menu = false; onRenameAccount(account) }, enabled = !updating)
-                    DropdownMenuItem(text = { Text(stringResource(R.string.settings_account_type_title)) },
-                        onClick = { menu = false; onPickAccountType(account) }, enabled = !updating)
-                    DropdownMenuItem(text = { Text(stringResource(R.string.reference_stop_tracking)) },
-                        onClick = { menu = false; onRequestStopTracking(account) }, enabled = !updating, modifier = Modifier.testTag("registry-stop-tracking-action"))
-                    DropdownMenuItem(text = { Text(stringResource(R.string.registry_delete), color = MaterialTheme.colorScheme.error) },
-                        onClick = { menu = false; onRequestDelete(account) }, enabled = !updating, modifier = Modifier.testTag("registry-delete-action"))
-                }
-            }
+            SettingsRegistryMoreMenu(stringResource(R.string.settings_account_more_actions, title), !updating, listOf(
+                SettingsRowAction(stringResource(R.string.settings_action_rename)) { onRenameAccount(account) },
+                SettingsRowAction(stringResource(R.string.settings_account_type_title)) { onPickAccountType(account) },
+                SettingsRowAction(stringResource(R.string.reference_stop_tracking), "registry-stop-tracking-action") { onRequestStopTracking(account) },
+                SettingsRowAction(stringResource(R.string.registry_delete), "registry-delete-action", danger = true) { onRequestDelete(account) },
+            ))
         },
         footer = {
             // An unnamed account's title already is its type.

@@ -6,30 +6,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofText as Text
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.testTag
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
-import com.baraa.masroof.ui.theme.MasroofIconSizes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.Bank
@@ -133,14 +124,17 @@ fun SettingsBankCardsScreen(
                         bank = card.bank,
                         title = registryLabel(card),
                         showBankLabel = false,
+                        headerAction = {
+                            SettingsDeleteOnlyMenu(registryLabel(card), !state.updating) {
+                                deleteActions.onRequest(StopTrackingTarget.Card(card))
+                            }
+                        },
                         footer = {
                             CardOwnershipInlinePrompt(
                                 enabled = !state.updating,
                                 onConfirmOwned = { onConfirmOwned(card) },
                                 onMarkExternal = { onMarkExternal(card) },
                             )
-                            SettingsDeleteAction({ deleteActions.onRequest(StopTrackingTarget.Card(card)) }, !state.updating,
-                                Modifier.padding(top = MasroofSpacing.cardInnerGap))
                         },
                     )
                 }
@@ -164,16 +158,15 @@ fun SettingsBankCardsScreen(
             }
 
             if (referenceTab == "stopped" && stoppedCards.isNotEmpty()) {
-                SettingsGroupTitle(stringResource(R.string.settings_cards_stopped))
                 stoppedCards.forEach { card ->
                     SettingsRegistryItemCard(
                         icon = MasroofIcons.cardPayment,
                         bank = card.bank,
                         title = registryLabel(card),
                         showBankLabel = false,
-                        endAction = {
-                            SettingsStoppedItemActions({ onResumeTracking(card) },
-                                { deleteActions.onRequest(StopTrackingTarget.Card(card)) }, !state.updating)
+                        headerAction = {
+                            SettingsStoppedItemMenu(registryLabel(card), !state.updating, { onResumeTracking(card) },
+                                { deleteActions.onRequest(StopTrackingTarget.Card(card)) })
                         },
                     )
                 }
@@ -227,21 +220,11 @@ internal fun SettingsRegistryCardRow(
         showBankLabel = false,
         onTitleClick = { onRenameCard(card) },
         headerAction = {
-            var menu by remember { mutableStateOf(false) }
-            Box {
-                IconButton(onClick = { menu = true }, enabled = !updating, modifier = Modifier.testTag("registry-more-actions")) {
-                    Icon(MasroofIcons.more, stringResource(R.string.settings_card_more_actions, title),
-                        Modifier.size(MasroofIconSizes.md))
-                }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text(stringResource(R.string.settings_card_setup)) },
-                        onClick = { menu = false; onPickCardNetwork(card) }, enabled = !updating, modifier = Modifier.testTag("registry-card-setup-action"))
-                    DropdownMenuItem(text = { Text(stringResource(R.string.reference_stop_tracking)) },
-                        onClick = { menu = false; onRequestStopTracking(card) }, enabled = !updating, modifier = Modifier.testTag("registry-stop-tracking-action"))
-                    DropdownMenuItem(text = { Text(stringResource(R.string.registry_delete), color = MaterialTheme.colorScheme.error) },
-                        onClick = { menu = false; onRequestDelete(card) }, enabled = !updating, modifier = Modifier.testTag("registry-delete-action"))
-                }
-            }
+            SettingsRegistryMoreMenu(stringResource(R.string.settings_card_more_actions, title), !updating, listOf(
+                SettingsRowAction(stringResource(R.string.settings_card_setup), "registry-card-setup-action") { onPickCardNetwork(card) },
+                SettingsRowAction(stringResource(R.string.reference_stop_tracking), "registry-stop-tracking-action") { onRequestStopTracking(card) },
+                SettingsRowAction(stringResource(R.string.registry_delete), "registry-delete-action", danger = true) { onRequestDelete(card) },
+            ))
         },
         footer = {
             cardSubtitle(card)?.let { subtitle ->
