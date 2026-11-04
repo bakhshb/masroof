@@ -94,11 +94,9 @@ class SettingsViewModel(
     /** Bank display names for home screens; only the pattern catalog, not the full settings refresh. */
     fun loadBankCatalog() {
         if (_uiState.value.bankCatalog != null) return
-        viewModelScope.launch {
-            try {
-                val catalog = messagePatternsWorkflow?.catalog() ?: return@launch
-                _uiState.update { if (it.bankCatalog == null) it.copy(bankCatalog = catalog) else it }
-            } catch (ce: CancellationException) { throw ce } catch (caught: Exception) { appLogService.failure(com.baraa.masroof.application.logging.AppLogCategories.SETTINGS, "Settings loadBankCatalog", caught); }
+        launchLogged(appLogService, AppLogCategories.SETTINGS, "Settings loadBankCatalog") {
+            val catalog = messagePatternsWorkflow?.catalog() ?: return@launchLogged
+            _uiState.update { if (it.bankCatalog == null) it.copy(bankCatalog = catalog) else it }
         }
     }
 
@@ -118,7 +116,7 @@ class SettingsViewModel(
                 )
             }
             // An update-state failure must not leave `loading` stuck (it disables onboarding actions).
-            try { updates.restorePendingUpdateState() } catch (_: Exception) {
+            try { updates.restorePendingUpdateState() } catch (ce: CancellationException) { throw ce } catch (_: Exception) {
                 appLogService.error(com.baraa.masroof.application.logging.AppLogCategories.UPDATE, "Pending update state restore failed")
             }
             try {
@@ -504,7 +502,7 @@ class SettingsViewModel(
     fun exportBackup(uri: Uri) = backup.exportBackup(uri)
     fun importBackup(uri: Uri, passphrase: CharArray = CharArray(0), confirmLegacyPlaintext: Boolean = false) = backup.importBackup(uri, passphrase, confirmLegacyPlaintext)
     private fun updateRegistry(onUpdated: () -> Unit = {}, action: suspend () -> Unit) {
-        if (_uiState.value.updating) return
+        if (_uiState.value.updating || _uiState.value.reparsingStored || _uiState.value.importingSms) return
         viewModelScope.launch {
             _uiState.update { it.copy(updating = true, error = null) }
             try {
@@ -526,6 +524,9 @@ class SettingsViewModel(
             }
         }
     }
+
+    /** A new sheet must not open showing an earlier action's failure. */
+    fun clearError() = _uiState.update { it.copy(error = null) }
 
     fun addManualAccount(bankId: String, last4: String, name: String?, onSaved: () -> Unit) {
         if (_uiState.value.bankCatalog != null && _uiState.value.bankSummaries.none { it.bank.id == bankId }) {
@@ -575,10 +576,18 @@ class SettingsViewModel(
     }
 
     fun saveCommitment(commitmentId: String, draft: SettingsCommitmentsWorkflow.CommitmentEditorDraft) {
-        launchLogged(appLogService, AppLogCategories.SETTINGS, "Settings saveCommitment", onError = { _uiState.update { it.copy(error = SettingsError.UPDATE_FAILED) } }, onFinally = { _uiState.update { it.copy(savingCommitment = false) } }) {
-            _uiState.update { it.copy(savingCommitment = true) }
+        commitmentWrite("Settings saveCommitment") {
             settingsCommitmentsWorkflow.update(commitmentId, draft)
             applyCommitments(settingsCommitmentsWorkflow.listAll())
+        }
+    }
+
+    /** One commitment write at a time: each is read-then-write, so overlapping taps would lose an update. */
+    private fun commitmentWrite(action: String, block: suspend () -> Unit) {
+        if (_uiState.value.savingCommitment) return
+        _uiState.update { it.copy(savingCommitment = true) }
+        launchLogged(appLogService, AppLogCategories.SETTINGS, action, onError = { _uiState.update { it.copy(error = SettingsError.UPDATE_FAILED) } }, onFinally = { _uiState.update { it.copy(savingCommitment = false) } }) {
+            block()
         }
     }
 
@@ -587,14 +596,14 @@ class SettingsViewModel(
     }
 
     fun toggleCommitmentActive(commitmentId: String) {
-        launchLogged(appLogService, AppLogCategories.SETTINGS, "Settings toggleCommitmentActive", onError = { _uiState.update { it.copy(error = SettingsError.UPDATE_FAILED) } }) {
+        commitmentWrite("Settings toggleCommitmentActive") {
             settingsCommitmentsWorkflow.toggleActive(commitmentId)
             applyCommitments(settingsCommitmentsWorkflow.listAll())
         }
     }
 
     fun deleteCommitment(commitmentId: String, onDeleted: () -> Unit = {}) {
-        launchLogged(appLogService, AppLogCategories.SETTINGS, "Settings deleteCommitment", onError = { _uiState.update { it.copy(error = SettingsError.UPDATE_FAILED) } }) {
+        commitmentWrite("Settings deleteCommitment") {
             settingsCommitmentsWorkflow.delete(commitmentId)
             applyCommitments(settingsCommitmentsWorkflow.listAll())
             onDeleted()

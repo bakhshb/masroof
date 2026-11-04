@@ -31,7 +31,7 @@ fun SettingsUpdatesScreen(updateChannel: UpdateChannel, githubTokenConfigured: B
             UpdateSectionCard(updateChannel, onSelectUpdateChannel, githubTokenConfigured, token,
                 { token = it }, { onSaveGithubToken(token); token = "" },
                 { token = ""; onClearGithubToken() }, updateState, { onClearUpdateMessage(); onCheckForUpdates() }, onDownloadUpdate, onInstallUpdate, message = updateMessage)
-            updateMessage?.let {
+            updateMessageOutsideCard(updateState, updateMessage)?.let {
                 com.baraa.masroof.presentation.common.MasroofText(resolveUpdateMessage(it))
             }
         }

@@ -51,8 +51,10 @@ fun SettingsDataBackupScreen(
     var showRestoreConfirm by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     var exportConfirmation by com.baraa.masroof.presentation.common.rememberSensitiveInput()
     val cancelOnLeave by androidx.compose.runtime.rememberUpdatedState(onCancelPendingImport)
+    val activity = androidx.activity.compose.LocalActivity.current
     androidx.compose.runtime.DisposableEffect(page) {
-        onDispose { if (page == BackupPage.Restore) cancelOnLeave() }
+        // Rotation or a theme switch recreates the activity; the pending restore lives in the ViewModel and must survive it.
+        onDispose { if (page == BackupPage.Restore && activity?.isChangingConfigurations != true) cancelOnLeave() }
     }
     if (state.fxRateCorrectionAwaitingConfirm) {
         AlertDialog(
@@ -97,16 +99,16 @@ fun SettingsDataBackupScreen(
     }
     if (state.awaitingImportConfirm && (showRestoreConfirm || !state.backupVerified)) {
         AlertDialog(
-            onDismissRequest = onCancelPendingImport,
+            onDismissRequest = { showRestoreConfirm = false; onCancelPendingImport() },
             title = { Text(stringResource(R.string.settings_import_confirm_title)) },
             text = { Text(stringResource(R.string.settings_import_confirm_body)) },
             confirmButton = {
-                TextButton(onClick = onConfirmPendingImport) {
+                TextButton(onClick = { showRestoreConfirm = false; onConfirmPendingImport() }) {
                     Text(stringResource(R.string.settings_import_confirm_action))
                 }
             },
             dismissButton = {
-                TextButton(onClick = onCancelPendingImport) {
+                TextButton(onClick = { showRestoreConfirm = false; onCancelPendingImport() }) {
                     Text(stringResource(R.string.settings_cancel))
                 }
             },

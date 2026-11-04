@@ -35,13 +35,13 @@ fun SettingsCommitmentsScreen(
     onToggle: (ManagedCommitmentUi) -> Unit = {},
     onDelete: (ManagedCommitmentUi) -> Unit = {},
 ) {
-    var deleteTarget by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<ManagedCommitmentUi?>(null) }
-    deleteTarget?.let { target ->
-        androidx.compose.material3.AlertDialog(onDismissRequest = { deleteTarget = null },
+    var deleteTargetId by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    (state.activeCommitments + state.disabledCommitments).find { it.id == deleteTargetId }?.let { target ->
+        androidx.compose.material3.AlertDialog(onDismissRequest = { deleteTargetId = null },
             title = { Text(stringResource(R.string.settings_commitment_delete_confirm_title)) },
             text = { Text(stringResource(R.string.settings_commitment_delete_confirm_body)) },
-            confirmButton = { com.baraa.masroof.presentation.common.MasroofTextButton({ deleteTarget = null; onDelete(target) }) { Text(stringResource(R.string.reference_delete)) } },
-            dismissButton = { com.baraa.masroof.presentation.common.MasroofTextButton({ deleteTarget = null }) { Text(stringResource(R.string.settings_cancel)) } })
+            confirmButton = { com.baraa.masroof.presentation.common.MasroofTextButton({ deleteTargetId = null; onDelete(target) }) { Text(stringResource(R.string.reference_delete)) } },
+            dismissButton = { com.baraa.masroof.presentation.common.MasroofTextButton({ deleteTargetId = null }) { Text(stringResource(R.string.settings_cancel)) } })
     }
     MasroofSecondaryScaffold(
         title = stringResource(R.string.reference_manage_commitments),
@@ -93,8 +93,8 @@ fun SettingsCommitmentsScreen(
                                 formatLocalizedTransactionDate(commitment.transactionDate))
                             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.smallGap), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.smallGap)) {
                                 com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.reference_edit), { onOpenCommitment(commitment) })
-                                com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(if (commitment.active) R.string.reference_pause else R.string.settings_commitment_enable), { onToggle(commitment) })
-                                com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.reference_delete), { deleteTarget = commitment }, danger = true)
+                                com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(if (commitment.active) R.string.reference_pause else R.string.settings_commitment_enable), { onToggle(commitment) }, enabled = !state.savingCommitment)
+                                com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.reference_delete), { deleteTargetId = commitment.id }, enabled = !state.savingCommitment, danger = true)
                             }
                         }
 
