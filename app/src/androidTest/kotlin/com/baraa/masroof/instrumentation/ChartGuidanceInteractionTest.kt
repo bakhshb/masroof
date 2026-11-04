@@ -59,6 +59,23 @@ class ChartGuidanceInteractionTest {
     }
 
     @Test
+    fun helpButton_opensFromATapBesideTheIconWithoutGrowingItsSlot() {
+        compose.setContent { MasroofTheme { Surface {
+            androidx.compose.foundation.layout.Box(Modifier.padding(MasroofSpacing.minimumTouchTarget)) {
+                com.baraa.masroof.presentation.common.MasroofGuidanceButton("Why", "Because", Modifier.testTag("help"))
+            }
+        } } }
+        val help = compose.onNodeWithTag("help")
+            .assertWidthIsEqualTo(com.baraa.masroof.ui.theme.MasroofGuidanceStyle.iconSize)
+            .assertHeightIsEqualTo(com.baraa.masroof.ui.theme.MasroofGuidanceStyle.iconSize)
+        // Just outside the drawn icon, still inside the app's minimum touch target around it.
+        val outsideIcon = (MasroofSpacing.minimumTouchTarget - com.baraa.masroof.ui.theme.MasroofGuidanceStyle.iconSize) / 2 -
+            MasroofSpacing.borderWidth
+        help.performTouchInput { click(Offset(-outsideIcon.toPx(), centerY)) }
+        compose.onNodeWithTag("guidance-popup").assertIsDisplayed()
+    }
+
+    @Test
     fun chartAndHelp_workInBothLanguagesAndThemes_withCorrectTouchDirection() {
         val language = mutableStateOf("ar")
         val dark = mutableStateOf(false)
