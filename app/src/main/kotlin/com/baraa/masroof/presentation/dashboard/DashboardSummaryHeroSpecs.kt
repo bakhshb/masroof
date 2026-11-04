@@ -7,7 +7,6 @@ import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.AccountsSummary
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
 import com.baraa.masroof.application.dashboard.LoansOverview
-import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.dashboard.aggregateRemainingBalance
 import com.baraa.masroof.core.money.Money

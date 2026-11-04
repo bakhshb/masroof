@@ -26,7 +26,6 @@ import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.ui.theme.MasroofSpacing
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.ZoneId
 
 @Composable internal fun HistoricalPurchases(state: AnalysisUiState, count: Int) {

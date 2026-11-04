@@ -4,7 +4,6 @@ import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofText as Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CommitmentDashboardSource
@@ -12,7 +11,6 @@ import com.baraa.masroof.application.dashboard.CommitmentsOverview
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.ui.theme.MasroofThemeExtras
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun CommitmentsSection(overview: CommitmentsOverview, modifier: Modifier = Modifier,

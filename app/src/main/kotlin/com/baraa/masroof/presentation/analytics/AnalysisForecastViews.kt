@@ -13,7 +13,6 @@ import com.baraa.masroof.application.analytics.*
 import com.baraa.masroof.application.locale.AppDigits
 import com.baraa.masroof.presentation.common.*
 import com.baraa.masroof.presentation.common.MasroofText as Text
-import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.ui.components.MasroofForecastSplit
 import com.baraa.masroof.ui.components.MasroofDailyBar
 import com.baraa.masroof.ui.components.MasroofDailyBarChart

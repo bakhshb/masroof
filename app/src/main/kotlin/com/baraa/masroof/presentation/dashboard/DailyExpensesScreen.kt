@@ -10,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.common.MasroofHeroCard
@@ -19,7 +18,6 @@ import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.ui.theme.MasroofReference
 import com.baraa.masroof.ui.theme.MasroofThemeExtras
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun DailyExpensesScreen(state: DashboardUiState, onBack: () -> Unit, onOpenTransaction: (String) -> Unit) {

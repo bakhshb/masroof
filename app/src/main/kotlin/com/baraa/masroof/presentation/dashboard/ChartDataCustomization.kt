@@ -1,14 +1,12 @@
 package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.*
 import com.baraa.masroof.presentation.common.MasroofBottomSheet
-import com.baraa.masroof.presentation.common.MasroofText
 import com.baraa.masroof.ui.theme.*
 
 val LocalChartDataWorkflow = staticCompositionLocalOf {

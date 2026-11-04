@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import com.baraa.masroof.ui.theme.MasroofReference
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.DailySpendingTrend
@@ -12,7 +11,6 @@ import com.baraa.masroof.presentation.common.MasroofAverageBand
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
-import java.time.format.DateTimeFormatter
 
 @Composable
 internal fun CardReferenceAverage(trend: DailySpendingTrend, inCard: Boolean = false) {

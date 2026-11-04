@@ -2,24 +2,18 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CommitmentDashboardRow
-import com.baraa.masroof.application.dashboard.CommitmentDashboardSource
 import com.baraa.masroof.application.dashboard.CommitmentMatchIssue
 import com.baraa.masroof.application.dashboard.CommitmentPaymentStatus
 import com.baraa.masroof.presentation.common.MasroofBadge
@@ -34,10 +28,8 @@ import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.ui.theme.MasroofHeroRole
 import com.baraa.masroof.ui.theme.MasroofReference
-import com.baraa.masroof.ui.theme.MasroofShapes
 import com.baraa.masroof.ui.theme.MasroofSpacing
 import com.baraa.masroof.ui.theme.MasroofThemeExtras
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun CommitmentsSummaryScreen(state: DashboardUiState, onBack: () -> Unit,

@@ -2,15 +2,8 @@ package com.baraa.masroof.presentation.settings
 
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
-import com.baraa.masroof.ui.theme.MasroofSpacing
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofFormField as OutlinedTextField
 import com.baraa.masroof.presentation.common.MasroofText as Text
 import com.baraa.masroof.presentation.common.MasroofTextButton as TextButton
@@ -22,7 +15,6 @@ import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardRole
-import com.baraa.masroof.presentation.common.formatCardLast4
 
 @Composable
 fun SettingsRenameCardDialog(

@@ -12,7 +12,6 @@ import com.baraa.masroof.application.analytics.*
 import com.baraa.masroof.application.dashboard.AnalysisSpendingGroup
 import com.baraa.masroof.presentation.common.*
 import com.baraa.masroof.presentation.common.MasroofText as Text
-import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 
 @Composable internal fun spendingGroupName(group: AnalysisSpendingGroup): String = group.name ?: stringResource(when (group.key) {
     "CASH" -> R.string.lab_analysis_component_cash
