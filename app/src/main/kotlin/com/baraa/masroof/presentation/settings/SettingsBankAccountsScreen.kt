@@ -14,7 +14,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofText as Text
 import com.baraa.masroof.presentation.common.MasroofTextButton as TextButton
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.testTag
+import com.baraa.masroof.ui.theme.MasroofIconSizes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -222,17 +231,33 @@ internal fun SettingsRegistryAccountRow(
     onPickAccountType: (ManagedAccountUi) -> Unit,
     onRequestDelete: (ManagedAccountUi) -> Unit,
 ) {
-    SettingsRegistryItemCard(MasroofIcons.moneyMovement, account.bank, registryLabel(account), showBankLabel = false,
-        footer = {
-            Text(accountTypeLabel(account.accountType), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = MasroofSpacing.sectionGap))
-            debitCards.forEach { debit -> Text(stringResource(R.string.dashboard_account_linked_mada_label, registryLabel(debit)),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = MasroofSpacing.sectionGap), horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.smallGap), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.smallGap)) {
-                com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.settings_action_rename), { onRenameAccount(account) }, enabled = !updating)
-                com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.settings_account_type_title), { onPickAccountType(account) }, enabled = !updating)
-                com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.reference_stop_tracking), { onRequestStopTracking(account) }, enabled = !updating, warning = true)
-                SettingsDeleteAction({ onRequestDelete(account) }, !updating)
+    val title = registryLabel(account)
+    SettingsRegistryItemCard(MasroofIcons.moneyMovement, account.bank, title, showBankLabel = false,
+        onTitleClick = { onRenameAccount(account) },
+        headerAction = {
+            var menu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { menu = true }, enabled = !updating, modifier = Modifier.testTag("registry-more-actions")) {
+                    Icon(MasroofIcons.more, stringResource(R.string.settings_account_more_actions, title), Modifier.size(MasroofIconSizes.md))
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.settings_action_rename)) },
+                        onClick = { menu = false; onRenameAccount(account) }, enabled = !updating)
+                    DropdownMenuItem(text = { Text(stringResource(R.string.settings_account_type_title)) },
+                        onClick = { menu = false; onPickAccountType(account) }, enabled = !updating)
+                    DropdownMenuItem(text = { Text(stringResource(R.string.reference_stop_tracking)) },
+                        onClick = { menu = false; onRequestStopTracking(account) }, enabled = !updating, modifier = Modifier.testTag("registry-stop-tracking-action"))
+                    DropdownMenuItem(text = { Text(stringResource(R.string.registry_delete), color = MaterialTheme.colorScheme.error) },
+                        onClick = { menu = false; onRequestDelete(account) }, enabled = !updating, modifier = Modifier.testTag("registry-delete-action"))
+                }
             }
+        },
+        footer = {
+            // An unnamed account's title already is its type.
+            if (!account.displayName.isNullOrBlank()) Text(accountTypeLabel(account.accountType), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = MasroofSpacing.inlineGap))
+            debitCards.forEach { debit -> Text(stringResource(R.string.dashboard_account_linked_mada_label, registryLabel(debit)),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = MasroofSpacing.inlineGap)) }
         })
 }

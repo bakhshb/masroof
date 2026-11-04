@@ -92,7 +92,8 @@ fun SettingsBankScreen(
             com.baraa.masroof.presentation.common.MasroofCard {
                 com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_statement_reconciliation_title), stringResource(R.string.settings_statement_reconciliation_subtitle), MasroofIcons.recentTransactions, onStatement, divider = definition != null)
                 if (definition != null) {
-                    com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_bank_teaching), stringResource(R.string.pattern_teach), MasroofIcons.sms, onOpenPatterns)
+                    com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_bank_teaching),
+                        pluralStringResource(R.plurals.teaching_patterns_count, definition.currentPatterns.size, definition.currentPatterns.size), MasroofIcons.sms, onOpenPatterns)
                     com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_bank_details),
                         if (definition.senders.isEmpty()) stringResource(R.string.settings_bank_senders)
                         else pluralStringResource(R.plurals.settings_bank_sender_count, definition.senders.size, definition.senders.size),
