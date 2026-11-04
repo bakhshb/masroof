@@ -15,4 +15,8 @@ val verifyPureJvmDependencies = tasks.register("verifyPureJvmDependencies") {
         }
     }
 }
-tasks.named("test") { dependsOn(verifyPureJvmDependencies) }
+// The pure modules use Jupiter; Android and Robolectric retain their native runner.
+tasks.named<Test>("test") {
+    useJUnitPlatform()
+    dependsOn(verifyPureJvmDependencies)
+}

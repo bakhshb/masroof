@@ -463,9 +463,6 @@ class ReviewWorkflowService(
         }
     }
 
-    suspend fun resolveAsIgnored(reviewId: String): ReviewWorkflowResult =
-        resolveAsNonFinancial(reviewId)
-
     suspend fun resolveAsNonFinancial(reviewId: String): ReviewWorkflowResult {
         val review = reviewRepository.getById(reviewId)
             ?: return ReviewWorkflowResult.Rejected("review_not_found")
@@ -633,16 +630,7 @@ class ReviewWorkflowService(
             rawSmsIds = rawSmsIds,
             retryState = "historical_batch",
         )
-        val recovery = processingRecovery ?: return
-        if (!recovery.markExhaustedBatch(rawSmsIds.toList())) return
-        val schedule = onHistoricalRetry ?: return
-        try {
-            schedule()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // The retry set is durable. Startup enqueues the one batch worker.
-        }
+        processingRecovery?.markForHistoricalRetry(rawSmsIds.toList(), onHistoricalRetry)
     }
 
     private fun incomplete(

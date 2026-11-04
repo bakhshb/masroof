@@ -12,7 +12,6 @@ import com.baraa.masroof.application.analytics.*
 import com.baraa.masroof.application.dashboard.AnalysisSpendingGroup
 import com.baraa.masroof.presentation.common.*
 import com.baraa.masroof.presentation.common.MasroofText as Text
-import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 
 @Composable internal fun spendingGroupName(group: AnalysisSpendingGroup): String = group.name ?: stringResource(when (group.key) {
     "CASH" -> R.string.lab_analysis_component_cash
@@ -29,18 +28,21 @@ import com.baraa.masroof.presentation.locale.formatLocalizedMoney
     }
 }
 
+/** The data-quality headline shared by the forecast entry card and the quality screen. */
+internal fun qualityStatusRes(snapshot: AnalysisSnapshot): Int = when {
+    snapshot.quality.blocked -> R.string.lab_analysis_quality_warning
+    snapshot.status != "READY" -> R.string.lab_analysis_quality_insufficient
+    snapshot.method == "WEEKDAY_MEDIAN" -> R.string.lab_analysis_quality_initial
+    else -> R.string.lab_analysis_quality_personal
+}
+
 @Composable internal fun AnalysisDataQuality(snapshot: AnalysisSnapshot, workflow: AnalyticsWorkflow, onOpenTransaction: (String) -> Unit,
     onOpenReview: () -> Unit, onRequestSmsPermission: () -> Unit, onRescan: () -> Unit) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val quality = snapshot.quality
     MasroofCard(Modifier.testTag("analysis-data-quality")) {
         Column(verticalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofSpacing.cardInnerGap)) {
-            MasroofGuidanceLabel(stringResource(when {
-                quality.blocked -> R.string.lab_analysis_quality_warning
-                snapshot.status != "READY" -> R.string.lab_analysis_quality_insufficient
-                snapshot.method == "WEEKDAY_MEDIAN" -> R.string.lab_analysis_quality_initial
-                else -> R.string.lab_analysis_quality_personal
-            }), if (snapshot.status != "READY") stringResource(R.string.lab_analysis_need_data) else stringResource(R.string.lab_analysis_quality_hint),
+            MasroofGuidanceLabel(stringResource(qualityStatusRes(snapshot)), if (snapshot.status != "READY") stringResource(R.string.lab_analysis_need_data) else stringResource(R.string.lab_analysis_quality_hint),
                 style = MaterialTheme.typography.titleMedium, contentColor = MaterialTheme.colorScheme.primary)
             Text(stringResource(R.string.lab_analysis_quality_coverage, quality.coveredDays, snapshot.completedPeriods), style = MaterialTheme.typography.bodySmall)
         }

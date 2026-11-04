@@ -153,7 +153,6 @@ internal class SettingsUpdateActions(
                 is AppUpdateUiState.ReadyToInstall -> state.manifest
                 else -> return
             }
-        if (settingsState.value.updateState is AppUpdateUiState.Downloading) return
 
         scope.launchLogged(appLogService, AppLogCategories.UPDATE, "Settings downloadUpdate", onError = {
             settingsState.update {

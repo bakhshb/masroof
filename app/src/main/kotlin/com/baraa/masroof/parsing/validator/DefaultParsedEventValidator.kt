@@ -1,10 +1,11 @@
 package com.baraa.masroof.parsing.validator
 
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.parsing.model.AmountSourceKind
+import com.baraa.masroof.parsing.model.FINANCIAL_FAMILY_DIRECTIONS
 import com.baraa.masroof.parsing.model.ParsedEventDraft
+import com.baraa.masroof.parsing.model.isFinancialFamily
 import java.time.Clock
 import java.time.LocalDateTime
 
@@ -37,7 +38,7 @@ class DefaultParsedEventValidator(
         val findings = mutableListOf<ValidationFinding>()
         val family = draft.messageFamily
 
-        if (family != null && family.isFinancial) {
+        if (family != null && family.isFinancialFamily) {
             findings += validateFinancialStructure(draft, family)
         }
 
@@ -74,7 +75,7 @@ class DefaultParsedEventValidator(
             findings += finding("V-010", "Financial amount must be positive, was ${amount.amount.toPlainString()}")
         }
 
-        val allowed = ALLOWED_DIRECTIONS.getValue(family)
+        val allowed = FINANCIAL_FAMILY_DIRECTIONS.getValue(family)
         val direction = draft.direction
         if (direction == null || direction !in allowed) {
             findings += finding("V-011", "Direction $direction is inconsistent with family $family (expected $allowed)")
@@ -209,30 +210,7 @@ class DefaultParsedEventValidator(
         severity = ValidationSeverity.ERROR,
     )
 
-    private val MessageFamily.isFinancial: Boolean
-        get() = this in ALLOWED_DIRECTIONS
-
     private companion object {
         private val SUFFIX_SHAPE = Regex("""[0-9]{4}""")
-
-        private val OUTGOING = setOf(MoneyDirection.OUTGOING)
-        private val INCOMING = setOf(MoneyDirection.INCOMING)
-
-        /**
-         * Financial families and the directions their parse facts may carry. Direction is
-         * relative to the referenced account or card, so a card payment may be reported
-         * from either side.
-         */
-        private val ALLOWED_DIRECTIONS: Map<MessageFamily, Set<MoneyDirection>> = mapOf(
-            MessageFamily.PURCHASE to OUTGOING,
-            MessageFamily.TRANSFER_IN to INCOMING,
-            MessageFamily.TRANSFER_OUT to OUTGOING,
-            MessageFamily.CARD_PAYMENT to setOf(MoneyDirection.OUTGOING, MoneyDirection.INCOMING),
-            MessageFamily.BILL_PAYMENT to OUTGOING,
-            MessageFamily.FINANCING_INSTALLMENT to OUTGOING,
-            MessageFamily.WITHDRAWAL to OUTGOING,
-            MessageFamily.REFUND to INCOMING,
-            MessageFamily.FEE to OUTGOING,
-        )
     }
 }

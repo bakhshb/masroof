@@ -3,13 +3,13 @@ package com.baraa.masroof.domain.statement
 import com.baraa.masroof.domain.assembly.BankTransactionTimePolicy
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
+import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.util.Locale
 
 enum class StatementComparisonStatus {
     MATCHED,
@@ -77,13 +77,12 @@ object StatementMatchPolicy {
      * [FinancialContainerIdFactory]. Suffix equality is not enough.
      */
     fun qualifiedAccount(containerId: String?): QualifiedAccount? {
-        if (!FinancialContainerIdParser.isBankQualifiedAccountId(containerId)) return null
+        // A non-null bank id also proves a non-empty masked part.
         val bankId = FinancialContainerIdParser.accountBankId(containerId) ?: return null
         val masked = containerId!!
             .removePrefix("account:")
             .substringAfter(':')
             .trim()
-        if (bankId.isEmpty() || masked.isEmpty()) return null
         val bank = Bank.fromId(bankId)
         if (bank == Bank.UNKNOWN) return null
         val expected = FinancialContainerIdFactory.accountId(bank, masked)
@@ -91,12 +90,8 @@ object StatementMatchPolicy {
         return QualifiedAccount(bank, masked)
     }
 
-    fun zoneForPostedMovement(bank: Bank, persistedZoneId: String?): ZoneId? {
-        BankTransactionTimePolicy.fixedZone(bank)?.let { return it }
-        if (persistedZoneId.isNullOrBlank()) return null
-        val parsed = runCatching { ZoneId.of(persistedZoneId) }.getOrNull() ?: return null
-        return BankTransactionTimePolicy.resolve(bank, persistedZoneId, parsed)
-    }
+    fun zoneForPostedMovement(bank: Bank, persistedZoneId: String?): ZoneId? =
+        BankTransactionTimePolicy.zoneOrNull(bank, persistedZoneId)
 
     /**
      * Zone for statement lines of [bank]. Fixed zones win. Otherwise exactly one
@@ -124,8 +119,7 @@ object StatementMatchPolicy {
         return Duration.between(statementTime, ledgerLocal).abs() <= BOOKING_TIME_WINDOW
     }
 
-    fun normalizeReference(value: String?): String =
-        value?.trim()?.lowercase(Locale.ROOT).orEmpty()
+    fun normalizeReference(value: String?): String = TransactionMatcher.normalizedReference(value)
 
     /**
      * A blank statement reference adds no constraint. A supplied reference is

@@ -8,7 +8,6 @@ import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -16,7 +15,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -46,27 +44,6 @@ class CoreEvidenceRepositoryContractTest {
         database.close()
     }
 
-    @Test
-    fun rawSmsInsert_isIdempotentForTheSameEvidence() = runBlocking {
-        val evidence = rawSms(id = "sms-1", deviceMessageId = "device-1")
-
-        assertEquals(RawSmsInsertResult.Inserted, rawSms.insertIfAbsent(evidence))
-        assertEquals(RawSmsInsertResult.AlreadyExists, rawSms.insertIfAbsent(evidence))
-        assertEquals(evidence, rawSms.getById("sms-1"))
-        assertTrue(rawSms.existsById("sms-1"))
-    }
-
-    @Test
-    fun rawSmsInsert_rejectsSameDeviceMessageIdAcrossDifferentRows() = runBlocking {
-        assertEquals(RawSmsInsertResult.Inserted, rawSms.insertIfAbsent(rawSms("sms-1", "device-1")))
-
-        assertEquals(
-            RawSmsInsertResult.AlreadyExists,
-            rawSms.insertIfAbsent(rawSms("sms-2", "device-1")),
-        )
-        assertNull(rawSms.getById("sms-2"))
-    }
-
     /** A queue refresh racing a bank choice must never drop the user's selection. */
     @Test
     fun concurrentReviewUpserts_keepTheBankSelection() = runBlocking {
@@ -81,6 +58,7 @@ class CoreEvidenceRepositoryContractTest {
 
             assertTrue("round $round", selection in reviews.findByRawSmsId(id)!!.reasons)
         }
+        assertEquals(20, reviews.countRequired())
     }
 
     @Test
@@ -93,6 +71,7 @@ class CoreEvidenceRepositoryContractTest {
             now = now,
         )
         assertEquals(listOf("missing_amount"), initial.reasons)
+        assertEquals(1, reviews.countRequired())
 
         val resolved = reviews.markResolved(
             id = initial.id,
@@ -110,6 +89,7 @@ class CoreEvidenceRepositoryContractTest {
         assertEquals(ReviewStatus.RESOLVED, resolved.status)
         assertEquals(resolved, afterRefresh)
         assertTrue(reviews.listRequired().isEmpty())
+        assertEquals(0, reviews.countRequired())
     }
 
     private fun rawSms(id: String, deviceMessageId: String) = RawSms(

@@ -1,20 +1,12 @@
 package com.baraa.masroof.ui.components
 
-import com.baraa.masroof.ui.theme.MasroofFontWeights
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import com.baraa.masroof.ui.theme.MasroofShapes
 import com.baraa.masroof.ui.theme.MasroofSpacing
 import com.baraa.masroof.ui.theme.MasroofThemeExtras
@@ -64,61 +56,5 @@ fun MasroofHorizontalBar(
                 .height(MasroofSpacing.accentBarHeight)
                 .background(fillColor, MasroofShapes.small),
         )
-    }
-}
-
-@Composable
-fun MasroofRankedBarRow(
-    title: String,
-    value: String,
-    progress: Float,
-    modifier: Modifier = Modifier,
-    subtitle: String? = null,
-    style: MasroofHorizontalBarStyle = MasroofHorizontalBarStyle.Default,
-    onClick: (() -> Unit)? = null,
-) {
-    val extended = MasroofThemeExtras.extendedColors
-    val valueColor = when (style) {
-        MasroofHorizontalBarStyle.Default -> MaterialTheme.colorScheme.primary
-        MasroofHorizontalBarStyle.Inflow -> extended.inflow
-        MasroofHorizontalBarStyle.Outflow -> extended.outflow
-    }
-
-    MasroofCard(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    title,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = MasroofFontWeights.semiBold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    value,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = MasroofFontWeights.bold),
-                    color = valueColor,
-                )
-            }
-            MasroofHorizontalBar(
-                progress = progress,
-                style = style,
-            )
-            subtitle?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
     }
 }

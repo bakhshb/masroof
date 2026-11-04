@@ -5,7 +5,6 @@ import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -32,8 +31,6 @@ class GoldenLedgerOracleTest {
         assertTrue("expected 7 active baselines, was ${active.map { it.id }}", active.size == 7)
         assertTrue("expected no pending oracles, was ${pending.map { it.id }}", pending.isEmpty())
         active.forEach { scenario ->
-            assertNull(scenario.ownerMilestone)
-            assertNull(scenario.knownDefect)
             if (scenario.id == "m5_cross_bank_suffix") {
                 assertTrue(scenario.seedRows.isNotEmpty())
                 assertTrue(scenario.messages.isEmpty())

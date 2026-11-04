@@ -27,9 +27,6 @@ interface RawSmsDao {
     @Query("SELECT id, receivedAtEpochMillis FROM raw_sms WHERE id IN (:ids)")
     suspend fun receivedAtByIds(ids: List<String>): List<RawSmsReceivedAt>
 
-    @Query("SELECT EXISTS(SELECT 1 FROM raw_sms WHERE id = :id)")
-    suspend fun existsById(id: String): Boolean
-
     @Query("SELECT * FROM raw_sms WHERE deviceMessageId = :deviceMessageId LIMIT 1")
     suspend fun findByDeviceMessageId(deviceMessageId: String): RawSmsEntity?
 
@@ -80,35 +77,6 @@ interface RawSmsDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertProviderAlias(alias: RawSmsProviderAliasEntity): Long
-
-    /**
-     * Cross-source live↔historical near-duplicate lookup.
-     *
-     * When [requireDeviceMessageIdNull] is true, finds live rows
-     * (deviceMessageId IS NULL). When false, finds historical rows
-     * (deviceMessageId IS NOT NULL).
-     */
-    @Query(
-        """
-        SELECT * FROM raw_sms
-        WHERE sender = :sender
-          AND bodyHash = :bodyHash
-          AND receivedAtEpochMillis BETWEEN :fromMillis AND :toMillis
-          AND (
-            (:requireDeviceMessageIdNull = 1 AND deviceMessageId IS NULL)
-            OR
-            (:requireDeviceMessageIdNull = 0 AND deviceMessageId IS NOT NULL)
-          )
-        LIMIT 1
-        """,
-    )
-    suspend fun findCrossSourceNearDuplicate(
-        sender: String,
-        bodyHash: String,
-        fromMillis: Long,
-        toMillis: Long,
-        requireDeviceMessageIdNull: Boolean,
-    ): RawSmsEntity?
 
     @Query(
         """

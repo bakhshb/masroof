@@ -13,7 +13,6 @@ import com.baraa.masroof.application.analytics.*
 import com.baraa.masroof.application.locale.AppDigits
 import com.baraa.masroof.presentation.common.*
 import com.baraa.masroof.presentation.common.MasroofText as Text
-import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.ui.components.MasroofForecastSplit
 import com.baraa.masroof.ui.components.MasroofDailyBar
 import com.baraa.masroof.ui.components.MasroofDailyBarChart
@@ -23,8 +22,7 @@ import java.time.LocalDate
 
 @Composable internal fun AnalysisQualityEntry(snapshot: AnalysisSnapshot, onOpen: () -> Unit) {
     MasroofCard(Modifier.clickable(onClick = onOpen).testTag("analysis-quality-entry")) {
-        MasroofSectionHeader(stringResource(if (snapshot.quality.blocked) R.string.lab_analysis_quality_warning else if (snapshot.status != "READY")
-            R.string.lab_analysis_quality_insufficient else if (snapshot.method == "WEEKDAY_MEDIAN") R.string.lab_analysis_quality_initial else R.string.lab_analysis_quality_personal),
+        MasroofSectionHeader(stringResource(qualityStatusRes(snapshot)),
             onViewAll = onOpen, viewAllLabel = stringResource(R.string.analysis_quality_open))
         Text(stringResource(R.string.lab_analysis_quality_coverage, snapshot.quality.coveredDays, snapshot.completedPeriods), style = MaterialTheme.typography.bodySmall)
     }

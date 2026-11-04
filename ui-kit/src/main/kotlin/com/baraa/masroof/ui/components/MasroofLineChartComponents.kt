@@ -5,37 +5,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.absoluteOffset
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.AbsoluteAlignment
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import com.baraa.masroof.ui.theme.MasroofBadgeShape
 import com.baraa.masroof.ui.theme.MasroofSpacing
 import com.baraa.masroof.ui.theme.MasroofThemeExtras
 import java.math.BigDecimal
@@ -54,17 +42,6 @@ object MasroofLineChart {
     ) {
         val span: BigDecimal
             get() = maximum.subtract(minimum)
-    }
-
-    fun valueRange(values: List<BigDecimal>, reference: BigDecimal): ValueRange {
-        val allValues = values + reference + BigDecimal.ZERO
-        val minimum = allValues.minOrNull() ?: BigDecimal.ZERO
-        val maximum = allValues.maxOrNull() ?: BigDecimal.ZERO
-        return if (minimum == maximum) {
-            ValueRange(BigDecimal.ZERO, BigDecimal.ONE)
-        } else {
-            ValueRange(minimum, maximum)
-        }
     }
 
     /** This is visual axis scaling only, matching the approved SVG headroom. */
@@ -149,16 +126,6 @@ internal object MasroofLineChartLayout {
         if (pointCount <= 0) return null
         return index?.takeIf { it in 0 until pointCount }
     }
-}
-
-@Composable
-fun MasroofLineChart(values: List<BigDecimal>, referenceValue: BigDecimal, labels: LineChartLabels,
-    modifier: Modifier = Modifier, selectedPointIndex: Int? = null,
-    onPointSelected: ((Int) -> Unit)? = null, pointLabel: (Int) -> String = { "" },
-    role: MasroofHeroRole = MasroofHeroRole.Brand,
-    axisLabel: (Int) -> String = { "" }, currencyLabel: String = "", showAverage: Boolean = false, displayText: (String) -> String = { it }) {
-    MasroofInteractiveLineChart(values, referenceValue, labels, modifier, selectedPointIndex,
-        onPointSelected, pointLabel, role, axisLabel, currencyLabel, showAverage, displayText)
 }
 
 @Composable

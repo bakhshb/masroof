@@ -13,7 +13,6 @@ import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.MerchantSpendingOverview
-import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.ExchangeRateSource
@@ -94,7 +93,6 @@ data class DashboardUiState(
     val periodAdjustmentHint: String? = null,
     val summary: MonthlyFinancialSummary? = null,
     val currentAccount: CurrentAccountSummary? = null,
-    val spendingSplit: SpendingSplitSummary? = null,
     val creditFacilities: CreditFacilitiesOverview? = null,
     val loansOverview: LoansOverview? = null,
     val commitmentsOverview: CommitmentsOverview = CommitmentsOverview.empty(),
@@ -107,7 +105,6 @@ data class DashboardUiState(
     val allTransactions: List<TransactionPreviewUi> = emptyList(),
     val isCurrentPeriod: Boolean = true,
     val error: DashboardError? = null,
-    val reparsingStored: Boolean = false,
     val selectedTransactionId: String? = null,
     val labSelectedTransaction: TransactionPreviewUi? = null,
     val selectedTransactionSms: List<TransactionSmsEvidenceUi> = emptyList(),
@@ -138,17 +135,6 @@ data class DashboardUiState(
 
 enum class DashboardError {
     LOAD_FAILED,
-}
-
-enum class SmsRescanStatus {
-    OK,
-    ALREADY_UP_TO_DATE,
-    NEEDS_REVIEW,
-    NO_MESSAGES,
-    NO_BANK_SMS,
-    NO_TRANSACTIONS,
-    PERMISSION_DENIED,
-    FAILED,
 }
 
 object TransactionDirectionPresentation {

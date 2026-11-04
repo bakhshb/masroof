@@ -242,7 +242,6 @@ class PackageDependencyRulesTest {
             ".replaceExclusiveStaleLinks(",
             ".deleteIfExclusiveRawSmsLink(",
             ".unlinkRawSms(",
-            ".linkRawSmsIfAbsent(",
         )
         files.forEach { file ->
             assertTrue("${file.path} must exist", file.isFile)
@@ -277,7 +276,6 @@ class PackageDependencyRulesTest {
             ".updateAppliedExchangeRate(",
             ".deleteIfExclusiveRawSmsLink(",
             ".unlinkRawSms(",
-            ".linkRawSmsIfAbsent(",
             ".replaceExclusiveStaleLinks(",
         )
         files.forEach { file ->

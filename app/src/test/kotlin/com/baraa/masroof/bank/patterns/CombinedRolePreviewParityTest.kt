@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.patterns
 
+import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.engine.bank.MessageFamily
 import com.baraa.masroof.engine.bank.MessageInput
@@ -7,7 +8,6 @@ import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
 import com.baraa.masroof.finance.value.BankId
 import java.time.Instant
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -44,7 +44,7 @@ class CombinedRolePreviewParityTest {
     }
 
     @Test fun refundWordingOverAPurchaseIsOneRefundRole() {
-        val configuration = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/BANK_ALJAZIRA.patterns.json").readText())
+        val configuration = bundledPatterns("BANK_ALJAZIRA")
         val body = "استرداد مبلغ عملية شراء عبر نقاط البيع\nبطاقة: 7271\nلدى: TEST_SHOP_C\nبمبلغ: 89.50 SAR\nفي: 2026-08-04 18:20"
         val routed = PatternFactInterpreter(configuration).previewRouted(MessageInput("refund", "AlJazira", body, Instant.EPOCH, true), BankId("BANK_ALJAZIRA"))
         assertEquals(listOf("bank.refund"), routed.matches.map { it.first.id })

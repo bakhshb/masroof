@@ -28,7 +28,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -78,6 +77,7 @@ class MasroofDatabasePersistenceTest {
         assertEquals(RawSmsInsertResult.AlreadyExists, rawSmsRepo.insertIfAbsent(sms))
         assertEquals(RawSmsInsertResult.AlreadyExists, rawSmsRepo.insertIfAbsent(sms.copy(id = "r2-other")))
         assertEquals(1, db.rawSmsDao().count())
+        assertEquals(sms, rawSmsRepo.getById("r2"))
     }
 
     @Test
@@ -107,6 +107,7 @@ class MasroofDatabasePersistenceTest {
         assertEquals(RawSmsInsertResult.Inserted, rawSmsRepo.insertIfAbsent(a))
         assertEquals(RawSmsInsertResult.AlreadyExists, rawSmsRepo.insertIfAbsent(b))
         assertEquals(a, rawSmsRepo.findByDeviceMessageId("device-9"))
+        assertNull(rawSmsRepo.getById("d2"))
     }
 
     @Test
@@ -346,7 +347,6 @@ class MasroofDatabasePersistenceTest {
         parsedEventRepo.deleteByRawSmsId(sms.id)
         assertNull(parsedEventRepo.findByRawSmsId(sms.id))
         assertEquals(sms, rawSmsRepo.getById(sms.id))
-        assertTrue(rawSmsRepo.existsById(sms.id))
     }
 
     @Test

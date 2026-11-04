@@ -41,21 +41,6 @@ object AndroidSmsMapper {
         )
     }
 
-    fun toRawSms(
-        providerMessageId: String?,
-        sender: String,
-        body: String,
-        receivedAtEpochMillis: Long,
-    ): RawSms =
-        toRawSms(
-            ProviderSmsRecord(
-                providerMessageId = providerMessageId,
-                sender = sender,
-                body = body,
-                receivedAt = Instant.ofEpochMilli(receivedAtEpochMillis),
-            ),
-        )
-
     fun rawSmsId(
         providerMessageId: String?,
         sender: String,

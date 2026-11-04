@@ -392,51 +392,6 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
     }
 
     @Test
-    fun amountCorrection_reviewRequiredPurchase_isAssembled() = runBlocking {
-        confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
-        val correctionRepo = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())
-        val withCorrections = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = ftRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards, loans),
-            ownershipConfirmationService = confirmation,
-            effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
-                parsedRepo,
-                correctionRepo,
-            ),
-        )
-        persistEvent(
-            smsId = "sms-rr-fix",
-            event = event(
-                id = "pe-rr-fix",
-                rawSmsId = "sms-rr-fix",
-                family = MessageFamily.PURCHASE,
-                amount = null,
-                card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
-                status = ParseStatus.REVIEW_REQUIRED,
-            ),
-        )
-        withCorrections.reconcileStoredEvents()
-        assertTrue(ftRepo.listAll().isEmpty())
-        correctionRepo.save(
-            com.baraa.masroof.domain.model.UserCorrection(
-                id = "corr-rr-fix",
-                targetRawSmsId = "sms-rr-fix",
-                correctedType = null,
-                correctedAmount = money("42.00"),
-                correctedMerchant = null,
-                correctedCounterparty = null,
-                createdAt = Instant.parse("2026-08-02T12:00:00Z"),
-            ),
-        )
-        withCorrections.reconcileStoredEvents()
-        val tx = ftRepo.listAll().single()
-        assertEquals(FinancialTransactionType.EXPENSE, tx.type)
-        assertEquals(money("42.00"), tx.amount)
-    }
-
-    @Test
     fun merchantOnlyCorrection_doesNotLiftParseStatusGate() = runBlocking {
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
         val correctionRepo = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())

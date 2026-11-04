@@ -11,7 +11,6 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 data class CurrentAccountTransactionScope(
     val ownedContainerIds: Set<String>,
-    val ownedAccountLast4s: Set<String>,
     val mode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
     val ownedDebitCardContainerIds: Set<String> = emptySet(),
     val debitCardLinkedAccountIds: Map<String, String> = emptyMap(),
@@ -112,11 +111,9 @@ data class CurrentAccountTransactionScope(
 
     fun isBillPayment(
         tx: FinancialTransaction,
-        billPaymentTxIds: Set<String>,
         parsedRecordsById: Map<String, ParsedEventRecord>,
     ): Boolean {
         if (tx.type == FinancialTransactionType.BILL_PAYMENT) return true
-        if (tx.id in billPaymentTxIds) return true
         return linkedRecords(tx, parsedRecordsById).any { record ->
             record.event.messageFamily == MessageFamily.BILL_PAYMENT
         }

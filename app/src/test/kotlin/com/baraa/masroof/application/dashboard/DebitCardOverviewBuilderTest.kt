@@ -83,7 +83,6 @@ class DebitCardOverviewBuilderTest {
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             zoneId = zoneId,
         )
 
@@ -145,7 +144,6 @@ class DebitCardOverviewBuilderTest {
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             zoneId = zoneId,
         )
 
@@ -199,7 +197,6 @@ class DebitCardOverviewBuilderTest {
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             zoneId = zoneId,
         )
 
@@ -245,7 +242,6 @@ class DebitCardOverviewBuilderTest {
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             zoneId = zoneId,
         )
 

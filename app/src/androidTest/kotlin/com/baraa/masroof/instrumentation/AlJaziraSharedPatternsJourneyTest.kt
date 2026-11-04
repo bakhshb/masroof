@@ -10,7 +10,6 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.baraa.masroof.R
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.domain.model.*
@@ -56,11 +55,9 @@ class AlJaziraSharedPatternsJourneyTest {
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("pattern-open-$bankId-bank.purchase").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("pattern-open-$bankId-bank.purchase").performScrollTo().performClick()
             compose.onNodeWithTag(toggle).performScrollTo()
-            compose.waitForIdle()
-            ScreenshotArtifactWriter.publish(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot(), "pattern-aljazira", "ready-light")
+            ScreenshotArtifactWriter.capture(compose, "pattern-aljazira", "ready-light")
             compose.runOnIdle { dark.value = true }
-            compose.waitForIdle()
-            ScreenshotArtifactWriter.publish(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot(), "pattern-aljazira", "ready-dark")
+            ScreenshotArtifactWriter.capture(compose, "pattern-aljazira", "ready-dark")
             compose.onNodeWithTag(toggle).performClick()
             compose.waitUntil(10_000) { runBlocking { !c.messagePatternsWorkflow.load().banks.single { it.bankId == bankId }.currentPatterns.single { it.id == "bank.purchase" }.enabled } }
             c.processRawSmsUseCase.ingest(raw("pending"))

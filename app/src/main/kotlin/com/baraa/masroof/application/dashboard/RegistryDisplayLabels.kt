@@ -11,8 +11,10 @@ object RegistryDisplayLabels {
     fun accountLabel(entry: AccountRegistryEntry): String {
         val custom = entry.displayName?.trim().orEmpty()
         if (custom.isNotEmpty()) return custom
-        return "Account ••${accountLast4(entry.maskedNumber)}"
+        return defaultAccountLabel(entry.maskedNumber)
     }
+
+    internal fun defaultAccountLabel(maskedNumber: String): String = "Account ••${accountLast4(maskedNumber)}"
 
     fun cardLabel(entry: CardRegistryEntry): String {
         val custom = entry.displayName?.trim().orEmpty()

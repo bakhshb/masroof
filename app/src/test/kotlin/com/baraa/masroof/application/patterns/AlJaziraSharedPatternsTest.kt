@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.uniqueStorageContext
+import com.baraa.masroof.testsupport.withAppContainer
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.AppContainer
@@ -25,11 +27,8 @@ class AlJaziraSharedPatternsTest {
     private val bankId = Bank.BANK_ALJAZIRA.id
     private val body = "Purchase\nAmount:10 SAR\nFrom account:4321\nMerchant:SHOP\nOn:2026-10-15 12:30"
     private fun raw(id: String) = RawSms(id, "Bank-AlJazira-AD", body, Instant.parse("2026-10-15T10:00:00Z"), id, SmsBodyHasher.sha256Hex(body))
-    private suspend fun fixture(block: suspend (AppContainer) -> Unit) {
-        val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "aljazira-pattern-${java.util.UUID.randomUUID()}")
-        val c = AppContainer(context)
-        try { withTimeout(20_000) { block(c) } } finally { c.close(); context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
-    }
+    private suspend fun fixture(block: suspend (AppContainer) -> Unit) =
+        withAppContainer(uniqueStorageContext("aljazira-pattern"), block = block)
 
     @Test fun actualIntakeUsesSharedDefinitionsAndDisableRestoreNeverRewritesPostedEvidence() = runBlocking {
         fixture { c ->

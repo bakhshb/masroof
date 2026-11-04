@@ -378,6 +378,7 @@ class TransactionReconciliationServiceTest : ReconciliationTestFixture() {
         assertEquals(2, tx.linkedParsedEventIds.size)
         assertEquals(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"), tx.sourceContainerId)
         assertEquals(FinancialContainerIdFactory.accountId(Bank("D360"), "6810"), tx.destinationContainerId)
+        assertEquals("account:D360:6810", tx.destinationContainerId)
         assertFalse(tx.sourceContainerId!!.contains("UNKNOWN"))
         assertFalse(tx.destinationContainerId!!.contains("UNKNOWN"))
         assertNull(accounts.get(AccountReference(Bank.UNKNOWN, "6810")))
@@ -617,47 +618,6 @@ class TransactionReconciliationServiceTest : ReconciliationTestFixture() {
         } catch (_: IllegalArgumentException) {
         }
         assertFalse(RegistryIdentity.isKnownBank(Bank.UNKNOWN))
-    }
-
-    @Test
-    fun matchedUnknownBridge_doesNotPersistUnknownContainerId() = runBlocking {
-        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
-        confirmation.confirmAccountOwned(AccountReference(Bank("D360"), "6810"))
-        val t = LocalDateTime.parse("2026-08-10T12:00:00")
-        persistEvent(
-            smsId = "sms-out-u",
-            event = event(
-                id = "pe-out-u",
-                rawSmsId = "sms-out-u",
-                family = MessageFamily.TRANSFER_OUT,
-                amount = money("500.00"),
-                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-                destination = AccountReference(Bank.UNKNOWN, "6810"),
-                network = BankNetworkType.INTER_BANK,
-            ),
-            details = ParsedEventDetails(occurredAtLocal = t),
-            at = Instant.parse("2026-08-10T09:00:00Z"),
-        )
-        persistEvent(
-            smsId = "sms-in-u",
-            event = event(
-                id = "pe-in-u",
-                rawSmsId = "sms-in-u",
-                bank = Bank("D360"),
-                family = MessageFamily.TRANSFER_IN,
-                amount = money("500.00"),
-                destination = AccountReference(Bank("D360"), "6810"),
-                network = BankNetworkType.INTER_BANK,
-            ),
-            details = ParsedEventDetails(occurredAtLocal = t.plusMinutes(1)),
-            at = Instant.parse("2026-08-10T09:01:00Z"),
-        )
-        reconciliation.reconcileStoredEvents()
-        val tx = ftRepo.listAll().single()
-        assertEquals(FinancialTransactionType.SELF_TRANSFER, tx.type)
-        assertEquals("account:D360:6810", tx.destinationContainerId)
-        assertNotEquals("account:UNKNOWN:6810", tx.destinationContainerId)
-        assertNotEquals("account:UNKNOWN:6810", tx.sourceContainerId)
     }
 
     @Test

@@ -22,7 +22,6 @@ import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.presentation.dashboard.MoneyUiFormatter
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -131,37 +130,33 @@ class ReviewViewModel(
     fun openDetail(reviewId: String) {
         requestedDetailId = reviewId
         // Not cancelled when another detail opens: the missing-amount reparse below writes financial state.
-        viewModelScope.launch {
-            // A newer request owns the loading flag; with none pending (detail closed), clear it.
-            fun current() = (requestedDetailId == reviewId).also { latest ->
-                if (!latest && requestedDetailId == null) _uiState.update { it.copy(loading = false) }
-            }
+        // A newer request owns the loading flag; with none pending (detail closed), clear it.
+        fun current() = (requestedDetailId == reviewId).also { latest ->
+            if (!latest && requestedDetailId == null) _uiState.update { it.copy(loading = false) }
+        }
+        launchLogged(appLogService, AppLogCategories.REVIEW, "Review openDetail", onError = {
+            if (current()) _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
+        }) {
             _uiState.update { it.copy(loading = true, error = null, message = null) }
-            try {
-                var detail = detailLoader.loadDetail(reviewId) ?: run {
-                    if (current()) _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
-                    return@launch
-                }
-                if (detail.review.reasons.contains("missing_amount")) {
-                    reparseStoredSms(detail.review.rawSmsId)
-                    detail = detailLoader.loadDetail(reviewId) ?: run {
-                        if (current()) _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
-                        return@launch
-                    }
-                }
-                val pairCandidates = pairCandidatesFor(detail)
-                if (!current()) return@launch
-                _uiState.update {
-                    it.copy(
-                        loading = false,
-                        selectedDetail = toDetailUi(detail, pairCandidates),
-                        error = null,
-                    )
-                }
-            } catch (ce: CancellationException) {
-                throw ce
-            } catch (caught: Exception) { appLogService?.failure(com.baraa.masroof.application.logging.AppLogCategories.REVIEW, "Review openDetail", caught);
+            var detail = detailLoader.loadDetail(reviewId) ?: run {
                 if (current()) _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
+                return@launchLogged
+            }
+            if (detail.review.reasons.contains("missing_amount")) {
+                reparseStoredSms(detail.review.rawSmsId)
+                detail = detailLoader.loadDetail(reviewId) ?: run {
+                    if (current()) _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) }
+                    return@launchLogged
+                }
+            }
+            val pairCandidates = pairCandidatesFor(detail)
+            if (!current()) return@launchLogged
+            _uiState.update {
+                it.copy(
+                    loading = false,
+                    selectedDetail = toDetailUi(detail, pairCandidates),
+                    error = null,
+                )
             }
         }
     }
@@ -207,32 +202,28 @@ class ReviewViewModel(
     fun selectBank(bankId: String) {
         val reviewId = _uiState.value.selectedDetail?.id ?: return
         val rawSmsId = _uiState.value.selectedDetail?.rawSmsId ?: return
-        viewModelScope.launch {
+        launchLogged(appLogService, AppLogCategories.REVIEW, "Review selectBank", onError = {
+            _uiState.update { it.copy(resolving = false, error = ReviewError.ACTION_FAILED) }
+        }) {
             _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
-            try {
-                selectBankAndReparse(rawSmsId, bankId)
-                val detail = detailLoader.loadDetail(reviewId)
-                if (detail == null || detail.review.status == ReviewStatus.RESOLVED) {
-                    refreshAfterAction(message = ReviewMessage.RESOLVED, closeDetail = true)
-                    return@launch
-                }
-                val pairCandidates = pairCandidatesFor(detail)
-                val stillChoosing = ExplicitBankSelection.offersBankChoice(detail.review.reasons)
-                _uiState.update {
-                    it.copy(
-                        loading = false,
-                        resolving = false,
-                        selectedDetail = toDetailUi(detail, pairCandidates),
-                        message = if (stillChoosing) ReviewMessage.STILL_NEEDS_REVIEW else null,
-                        error = null,
-                    )
-                }
-                applySummaries(detailLoader.loadSummaries())
-            } catch (ce: CancellationException) {
-                throw ce
-            } catch (caught: Exception) { appLogService?.failure(com.baraa.masroof.application.logging.AppLogCategories.REVIEW, "Review selectBank", caught);
-                _uiState.update { it.copy(resolving = false, error = ReviewError.ACTION_FAILED) }
+            selectBankAndReparse(rawSmsId, bankId)
+            val detail = detailLoader.loadDetail(reviewId)
+            if (detail == null || detail.review.status == ReviewStatus.RESOLVED) {
+                refreshAfterAction(message = ReviewMessage.RESOLVED, closeDetail = true)
+                return@launchLogged
             }
+            val pairCandidates = pairCandidatesFor(detail)
+            val stillChoosing = ExplicitBankSelection.offersBankChoice(detail.review.reasons)
+            _uiState.update {
+                it.copy(
+                    loading = false,
+                    resolving = false,
+                    selectedDetail = toDetailUi(detail, pairCandidates),
+                    message = if (stillChoosing) ReviewMessage.STILL_NEEDS_REVIEW else null,
+                    error = null,
+                )
+            }
+            applySummaries(detailLoader.loadSummaries())
         }
     }
 
@@ -292,46 +283,42 @@ class ReviewViewModel(
         _uiState.value.selectedDetail?.ownershipCard
 
     private fun runOwnershipAction(owned: Boolean, cardRef: CardReference) {
-        viewModelScope.launch {
+        launchLogged(appLogService, AppLogCategories.REVIEW, "Review runOwnershipAction", onError = {
+            _uiState.update { it.copy(resolving = false, error = ReviewError.ACTION_FAILED) }
+        }) {
             _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
-            try {
-                if (owned) {
-                    reviewOwnershipWorkflow.confirmCardOwned(cardRef)
-                } else {
-                    reviewOwnershipWorkflow.markCardExternal(cardRef)
+            if (owned) {
+                reviewOwnershipWorkflow.confirmCardOwned(cardRef)
+            } else {
+                reviewOwnershipWorkflow.markCardExternal(cardRef)
+            }
+            reviewWorkflowService.reconcileOwnershipChange(
+                ReviewWorkflowService.OwnershipChange.Card(cardRef),
+            )
+            val reviewId = _uiState.value.selectedDetail?.id
+            if (reviewId != null) {
+                val detail = detailLoader.loadDetail(reviewId)
+                if (detail == null) {
+                    refreshAfterAction(
+                        message = ReviewMessage.RESOLVED,
+                        closeDetail = true,
+                    )
+                    return@launchLogged
                 }
-                reviewWorkflowService.reconcileOwnershipChange(
-                    ReviewWorkflowService.OwnershipChange.Card(cardRef),
-                )
-                val reviewId = _uiState.value.selectedDetail?.id
-                if (reviewId != null) {
-                    val detail = detailLoader.loadDetail(reviewId)
-                    if (detail == null) {
-                        refreshAfterAction(
-                            message = ReviewMessage.RESOLVED,
-                            closeDetail = true,
-                        )
-                        return@launch
-                    }
-                    val pairCandidates = pairCandidatesFor(detail)
-                    _uiState.update {
-                        it.copy(
-                            loading = false,
-                            resolving = false,
-                            selectedDetail = toDetailUi(detail, pairCandidates),
-                            message = ReviewMessage.RESOLVED,
-                            error = null,
-                        )
-                    }
-                    applySummaries(detailLoader.loadSummaries())
-                } else {
-                    applySummaries(detailLoader.loadSummaries())
-                    _uiState.update { it.copy(resolving = false, message = ReviewMessage.RESOLVED) }
+                val pairCandidates = pairCandidatesFor(detail)
+                _uiState.update {
+                    it.copy(
+                        loading = false,
+                        resolving = false,
+                        selectedDetail = toDetailUi(detail, pairCandidates),
+                        message = ReviewMessage.RESOLVED,
+                        error = null,
+                    )
                 }
-            } catch (ce: CancellationException) {
-                throw ce
-            } catch (caught: Exception) { appLogService?.failure(com.baraa.masroof.application.logging.AppLogCategories.REVIEW, "Review runOwnershipAction", caught);
-                _uiState.update { it.copy(resolving = false, error = ReviewError.ACTION_FAILED) }
+                applySummaries(detailLoader.loadSummaries())
+            } else {
+                applySummaries(detailLoader.loadSummaries())
+                _uiState.update { it.copy(resolving = false, message = ReviewMessage.RESOLVED) }
             }
         }
     }
@@ -508,7 +495,6 @@ class ReviewViewModel(
             provenance = detail.provenance,
             bankId = detail.bankId,
             dateLabel = dateLabel,
-            messageFamilyLabel = family?.name,
             messageFamily = family,
             amountLabel = detail.amount?.let { MoneyUiFormatter.format(it, languageTag) },
             merchant = detail.merchant,
@@ -528,7 +514,6 @@ class ReviewViewModel(
             ownershipCard = ownershipCard,
             showOwnershipActions = !ignored && ownershipCard != null,
             showRestoreActions = ignored,
-            readOnly = false,
             resolvedAtLabel = resolvedAtLabel,
             bankChoices = bankChoicesFor(review, ignored),
         )

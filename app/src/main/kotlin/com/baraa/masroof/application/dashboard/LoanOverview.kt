@@ -29,8 +29,7 @@ data class LoansOverview(
 }
 
 fun LoansOverview.aggregateRemainingBalance(): Money? {
-    if (loans.any { it.remainingBalance == null }) return null
-    val balances = loans.mapNotNull { it.remainingBalance }
+    val balances = loans.map { it.remainingBalance ?: return null }
     if (balances.isEmpty()) return null
     if (balances.any { it.currency != balances.first().currency }) return null
     return balances.reduce { acc, balance -> acc + balance }

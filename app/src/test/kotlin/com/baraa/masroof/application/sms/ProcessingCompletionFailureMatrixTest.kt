@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.TestSmsBodies.OTP_BODY
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.ListenableWorker
@@ -101,15 +103,7 @@ class ProcessingCompletionFailureMatrixTest {
 
         val scheduled = mutableListOf<String>()
         val historicalSchedules = AtomicInteger(0)
-        val restarted = LiveSmsIntake(
-            captureBankSms = harness.capture,
-            scheduler = { scheduled += it },
-            rawSmsRepository = harness.rawRepo,
-            reviewRepository = harness.reviewRepo,
-            processingRetryRepository = harness.processingRetryRepo,
-            appLogService = harness.appLog,
-            batchRecoveryScheduler = { historicalSchedules.incrementAndGet() },
-        )
+        val restarted = harness.intake(batchRecoveryScheduler = { historicalSchedules.incrementAndGet() }, scheduler = { scheduled += it })
         assertEquals(1, restarted.schedulePendingProcessing())
         assertEquals(listOf(raw.id), scheduled)
         assertEquals(0, historicalSchedules.get())
@@ -123,7 +117,7 @@ class ProcessingCompletionFailureMatrixTest {
         assertTrue(logged.contains("retry_state="))
         assertFalse(logged.contains("Keeta"))
         assertFalse(logged.contains("conflict-existing"))
-        assertFalse(logged.contains(LiveSmsProcessingHarness.PURCHASE_BODY))
+        assertFalse(logged.contains(PURCHASE_BODY))
 
         harness.nonthrowingSaveConflicts.set(0)
         assertEquals(
@@ -167,7 +161,7 @@ class ProcessingCompletionFailureMatrixTest {
         val first = LiveSmsProcessingHarness.liveSms(at = "2026-08-12T10:00:00Z")
         val second = LiveSmsProcessingHarness.liveSms(at = "2026-08-12T11:00:00Z")
         val otp = LiveSmsProcessingHarness.liveSms(
-            body = LiveSmsProcessingHarness.OTP_BODY,
+            body = OTP_BODY,
             at = "2026-08-12T12:00:00Z",
         )
         val schedules = AtomicInteger(0)

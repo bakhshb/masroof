@@ -170,12 +170,6 @@ interface FinancialTransactionRepository {
      * evidence links remain (e.g. releasing a leg wrongly merged onto another date).
      */
     suspend fun unlinkRawSms(rawSmsId: String): Boolean
-
-    /**
-     * Attaches an additional RawSms evidence row to an existing transaction when the
-     * same transfer was assembled twice from separate bank messages.
-     */
-    suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean
 }
 
 sealed interface FinancialTransactionSaveResult {

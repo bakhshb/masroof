@@ -197,9 +197,7 @@ class DashboardViewModel(
     }
 
     fun onAppResumed() {
-        val granted = permissionStateProvider()
-        _uiState.update { it.copy(smsPermissionGranted = granted) }
-        // Granting SMS access does not select banks or authorise a historical import.
+        // refresh() re-reads the SMS permission. Granting SMS access does not select banks or authorise a historical import.
         refresh()
     }
 
@@ -436,7 +434,6 @@ class DashboardViewModel(
                         periodAdjustmentHint = periodAdjustmentHint,
                         summary = null,
                         currentAccount = null,
-                        spendingSplit = null,
                         creditFacilities = null,
                         loansOverview = null,
                         commitmentsOverview = CommitmentsOverview.empty(),
@@ -482,7 +479,6 @@ class DashboardViewModel(
                         periodAdjustmentHint = loadedHint,
                         summary = overview.summary,
                         currentAccount = overview.currentAccount,
-                        spendingSplit = overview.spendingSplit,
                         creditFacilities = overview.creditFacilities,
                         loansOverview = overview.loansOverview,
                         commitmentsOverview = overview.commitmentsOverview,

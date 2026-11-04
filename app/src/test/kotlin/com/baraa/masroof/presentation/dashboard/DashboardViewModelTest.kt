@@ -3,6 +3,7 @@ package com.baraa.masroof.presentation.dashboard
 import com.baraa.masroof.testsupport.FakeAppLocaleRepository
 import com.baraa.masroof.testsupport.MutableCardRegistryRepository as FakeCardRegistry
 import com.baraa.masroof.testsupport.StubAccountRegistryRepository as FakeAccountRegistry
+import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -22,13 +23,11 @@ import com.baraa.masroof.application.dashboard.DashboardTransactionFacts
 import com.baraa.masroof.application.dashboard.DashboardTransactionFactsBuilder
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
-import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -513,7 +512,6 @@ class DashboardViewModelTest {
                 period = currentPeriod,
                 summary = MonthlyFinancialSummary.empty(currentPeriod, Currency.SAR),
                 currentAccount = emptyCurrentAccount(),
-                spendingSplit = emptySpendingSplit(),
                 transactions = listOf(tx),
                 creditFacilities = emptyCreditFacilities(),
                 ownedAccountPeriodSummaries = emptyList(),
@@ -608,7 +606,6 @@ class DashboardViewModelTest {
                 transactionCount = transactionCount,
             ),
             currentAccount = emptyCurrentAccount(),
-            spendingSplit = emptySpendingSplit(),
             transactions = emptyList(),
             creditFacilities = emptyCreditFacilities(),
             ownedAccountPeriodSummaries = emptyList(),
@@ -642,13 +639,6 @@ class DashboardViewModelTest {
     companion object {
         fun emptyCurrentAccount(currency: Currency = Currency.SAR): CurrentAccountSummary =
             CurrentAccountSummary.zero(currency)
-
-        fun emptySpendingSplit(currency: Currency = Currency.SAR): SpendingSplitSummary =
-            SpendingSplitSummary(
-                currency = currency,
-                totalSpending = Money.zero(currency),
-                creditCardPurchases = SignedMoneyAmount.zero(currency),
-            )
     }
 
     @Test
@@ -804,49 +794,8 @@ class DashboardViewModelTest {
         permissionStateProvider: () -> Boolean = { permissionGranted },
         maintenanceCompletions: kotlinx.coroutines.flow.Flow<Unit> = kotlinx.coroutines.flow.emptyFlow(),
         smsEvidenceLoader: TransactionSmsEvidenceLoader = TransactionSmsEvidenceLoader(
-            financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
-                override suspend fun save(
-                    transaction: FinancialTransaction,
-                    rawSmsIds: Collection<String>,
-                ) = com.baraa.masroof.domain.repository.FinancialTransactionSaveResult.Saved
-
-                override suspend fun getById(id: String) = null
-                override suspend fun findByRawSmsId(rawSmsId: String) = null
-                override suspend fun listAll() = emptyList<FinancialTransaction>()
-                override suspend fun listOccurredBetween(
-                    startInclusive: java.time.Instant,
-                    endExclusive: java.time.Instant,
-                ) = emptyList<FinancialTransaction>()
-
-                override suspend fun isRawSmsLinked(rawSmsId: String) = false
-                override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
-                override suspend fun update(transaction: FinancialTransaction) = false
-                override suspend fun updateAppliedExchangeRate(
-                    id: String,
-                    exchangeRate: java.math.BigDecimal,
-                    source: com.baraa.masroof.domain.model.ExchangeRateSource,
-                ) = false
-                override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
-                override suspend fun unlinkRawSms(rawSmsId: String) = false
-
-                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
-            },
-            rawSmsRepository = object : com.baraa.masroof.domain.repository.RawSmsRepository {
-                override suspend fun insertIfAbsent(rawSms: com.baraa.masroof.domain.model.RawSms) =
-                    com.baraa.masroof.domain.repository.RawSmsInsertResult.Inserted
-
-                override suspend fun getById(id: String) = null
-                override suspend fun existsById(id: String) = false
-                override suspend fun findByDeviceMessageId(deviceMessageId: String) = null
-                override suspend fun listIdsByReceivedAt(): List<String> = emptyList()
-                override suspend fun findCrossSourceNearDuplicate(
-                    sender: String,
-                    bodyHash: String,
-                    fromInclusive: java.time.Instant,
-                    toInclusive: java.time.Instant,
-                    lookingForLiveRow: Boolean,
-                ) = null
-            },
+            financialTransactionRepository = SettingsViewModelTestSupport.emptyFinancialTransactionRepository(),
+            rawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
         ),
     ): DashboardViewModel =
         DashboardViewModel(
@@ -861,75 +810,13 @@ class DashboardViewModelTest {
             smsEvidenceLoader = smsEvidenceLoader,
             permissionStateProvider = permissionStateProvider,
             reclassificationService = TransactionReclassificationService(
-                financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
-                    override suspend fun save(
-                        transaction: FinancialTransaction,
-                        rawSmsIds: Collection<String>,
-                    ) = com.baraa.masroof.domain.repository.FinancialTransactionSaveResult.Saved
-
-                    override suspend fun getById(id: String) = null
-                    override suspend fun findByRawSmsId(rawSmsId: String) = null
-                    override suspend fun listAll() = emptyList<FinancialTransaction>()
-                    override suspend fun listOccurredBetween(
-                        startInclusive: java.time.Instant,
-                        endExclusive: java.time.Instant,
-                    ) = emptyList<FinancialTransaction>()
-
-                    override suspend fun isRawSmsLinked(rawSmsId: String) = false
-                    override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
-                    override suspend fun update(transaction: FinancialTransaction) = false
-                    override suspend fun updateAppliedExchangeRate(
-                        id: String,
-                        exchangeRate: java.math.BigDecimal,
-                        source: com.baraa.masroof.domain.model.ExchangeRateSource,
-                    ) = false
-                    override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
-                override suspend fun unlinkRawSms(rawSmsId: String) = false
-
-                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
-                },
+                financialTransactionRepository = SettingsViewModelTestSupport.emptyFinancialTransactionRepository(),
                 effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
-                    object : com.baraa.masroof.parsing.repository.ParsedEventRepository {
-                        override suspend fun save(
-                            event: com.baraa.masroof.domain.model.ParsedEvent,
-                            details: com.baraa.masroof.parsing.model.ParsedEventDetails,
-                        ) = Unit
-
-                        override suspend fun getById(id: String) = null
-                        override suspend fun findByRawSmsId(rawSmsId: String) = null
-                        override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
-                        override suspend fun listAll() = emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
-
-                        override suspend fun listReceivedBetween(
-                            startInclusive: java.time.Instant,
-                            endExclusive: java.time.Instant,
-                        ) = emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
-                    },
-                    object : com.baraa.masroof.domain.repository.UserCorrectionRepository {
-                        override suspend fun save(correction: com.baraa.masroof.domain.model.UserCorrection) = Unit
-                        override suspend fun latestForRawSmsId(rawSmsId: String) = null
-                        override suspend fun listForRawSmsId(rawSmsId: String) = emptyList<com.baraa.masroof.domain.model.UserCorrection>()
-                        override suspend fun listForRawSmsIds(rawSmsIds: Collection<String>) =
-                            emptyList<com.baraa.masroof.domain.model.UserCorrection>()
-                        override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.UserCorrection>()
-                    },
+                    SettingsViewModelTestSupport.emptyParsedEventRepository(),
+                    SettingsViewModelTestSupport.emptyUserCorrectionRepository(),
                 ),
                 ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
-                    object : com.baraa.masroof.domain.repository.AccountRegistryRepository {
-                        override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
-                        override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) = Unit
-                        override suspend fun resolve(reference: AccountReference) = OwnershipStatus.UNKNOWN
-                        override suspend fun get(reference: com.baraa.masroof.domain.model.AccountReference) = null
-                        override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
-                        override suspend fun updateDisplayName(
-                            reference: com.baraa.masroof.domain.model.AccountReference,
-                            displayName: String?,
-                        ) = Unit
-                        override suspend fun updateAccountType(
-                            reference: com.baraa.masroof.domain.model.AccountReference,
-                            accountType: com.baraa.masroof.domain.model.AccountType,
-                        ) = Unit
-                    },
+                    SettingsViewModelTestSupport.emptyAccountRegistry(),
                     NoOpCardRegistryRepository(),
                     com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
                 ),
@@ -943,32 +830,7 @@ class DashboardViewModelTest {
             dashboardCommitmentsWorkflow = DashboardCommitmentsWorkflow(
                 commitmentFromTransactionService = CommitmentFromTransactionService(
                     commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
-                    financialTransactionRepository = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository {
-                        override suspend fun save(
-                            transaction: FinancialTransaction,
-                            rawSmsIds: Collection<String>,
-                        ) = com.baraa.masroof.domain.repository.FinancialTransactionSaveResult.Saved
-
-                        override suspend fun getById(id: String) = null
-                        override suspend fun findByRawSmsId(rawSmsId: String) = null
-                        override suspend fun listAll() = emptyList<FinancialTransaction>()
-                        override suspend fun listOccurredBetween(
-                            startInclusive: java.time.Instant,
-                            endExclusive: java.time.Instant,
-                        ) = emptyList<FinancialTransaction>()
-
-                        override suspend fun isRawSmsLinked(rawSmsId: String) = false
-                        override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
-                        override suspend fun update(transaction: FinancialTransaction) = false
-                        override suspend fun updateAppliedExchangeRate(
-                            id: String,
-                            exchangeRate: java.math.BigDecimal,
-                            source: com.baraa.masroof.domain.model.ExchangeRateSource,
-                        ) = false
-                        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
-                        override suspend fun unlinkRawSms(rawSmsId: String) = false
-                        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
-                    },
+                    financialTransactionRepository = SettingsViewModelTestSupport.emptyFinancialTransactionRepository(),
                 ),
                 commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
             ),
@@ -1019,7 +881,6 @@ class DashboardViewModelTest {
                     period = period,
                     summary = MonthlyFinancialSummary.empty(period, Currency.SAR),
                     currentAccount = DashboardViewModelTest.emptyCurrentAccount(),
-                    spendingSplit = DashboardViewModelTest.emptySpendingSplit(),
                     transactions = emptyList(),
                     creditFacilities = CreditFacilitiesOverview(
                         facilities = emptyList(),

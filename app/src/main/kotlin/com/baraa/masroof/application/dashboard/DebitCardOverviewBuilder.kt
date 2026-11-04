@@ -32,7 +32,6 @@ object DebitCardOverviewBuilder {
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
         ownedAccountContainerIds: Set<String>,
-        ownedAccountLast4s: Set<String>,
         zoneId: ZoneId,
         displayLocale: Locale = Locale.forLanguageTag(AppLocale.TAG_AR),
     ): DebitCardSpendBuildResult {
@@ -59,7 +58,6 @@ object DebitCardOverviewBuilder {
             parsedRecords = parsedRecords,
         )
         val context = AccountFlowClassifier.buildContext(
-            transactions = transactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
@@ -71,7 +69,6 @@ object DebitCardOverviewBuilder {
             val scope = DebitCardSpendClassifier.scopeFor(
                 entry = entry,
                 ownedAccountContainerIds = ownedAccountContainerIds,
-                ownedAccountLast4s = ownedAccountLast4s,
             )
 
             var gross = Money.zero(primaryCurrency)

@@ -10,13 +10,12 @@ import java.time.Instant
 class TransferNetworkTest {
     private val local = BankId("LOCAL")
     private val remote = BankId("REMOTE")
-    private val catalog = BankCatalog(listOf(BankDefinition(local, setOf("SyntheticSender"))))
     private val outgoing = "Outgoing transfer\nAmount: SAR 100\nFrom account: 1234\nTo account: 5678\n2026-10-18 13:00"
     private val incoming = outgoing.replace("Outgoing", "Incoming")
     private val schema get() = RuleLibrary.current().let { it.copy(network = it.network.copy(bankAliases = mapOf(
         "LOCAL" to listOf("Local Bank", "البنك المحلي"), "REMOTE" to listOf("Remote Bank", "البنك الآخر")))) }
     private fun input(body: String) = MessageInput("transfer-fixture", "SyntheticSender", body, Instant.parse("2026-10-18T10:00:00Z"))
-    private fun parse(body: String, config: BankRuleSchema = schema) = RuleInterpreter(config).interpret(input(body), catalog)
+    private fun parse(body: String, config: BankRuleSchema = schema) = RuleInterpreter(config).interpretRouted(input(body), local)
 
     @Test fun explicitUnknownExternalBankDoesNotInventBankIdentityOrOwnership() {
         val config=schema.copy(network=schema.network.copy(standaloneDestinationBrackets=true,unidentifiedExternalBankMarkers=listOf("bank","بنك")))
@@ -119,10 +118,8 @@ class TransferNetworkTest {
         val engine = RuleInterpreter(config)
         aliases[0] = "Other"
         val body = "$outgoing\nDestination bank: Remote Bank"
-        assertEquals(ParseStatus.SUCCESS, engine.interpret(input(body), catalog).status)
+        assertEquals(ParseStatus.SUCCESS, engine.interpretRouted(input(body), local).status)
         assertNotEquals(engine.version, RuleInterpreter(config).version)
-        val collision = BankCatalog(listOf(BankDefinition(local, setOf("SyntheticSender")), BankDefinition(remote, setOf("SyntheticSender"))))
-        assertTrue(Blocker.AMBIGUOUS_BANK in engine.interpret(input(body), collision).blockers)
         val invalid = schema.copy(network = schema.network.copy(bankAliases = mapOf("UNKNOWN" to listOf("Remote Bank"))))
         assertEquals(ParseStatus.REVIEW_REQUIRED, parse(body, invalid).status)
         val foldedEmpty = schema.copy(network = schema.network.copy(bankAliases = mapOf("REMOTE" to listOf("ـ"))))

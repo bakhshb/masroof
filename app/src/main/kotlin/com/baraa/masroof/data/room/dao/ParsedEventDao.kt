@@ -291,10 +291,6 @@ interface ParsedEventDao {
     )
     suspend fun listFirstDebitCardFacts(cardLast4s: List<String>): List<ParsedEventEntity>
 
-    /**
-     * Replace the current parse result for a RawSms (same or new event id).
-     * Deletes any existing row for [entity.rawSmsId], then inserts [entity].
-     */
     @Query(
         """
         INSERT OR REPLACE INTO processing_retry (rawSmsId, createdAtEpochMillis, mode)
@@ -313,6 +309,10 @@ interface ParsedEventDao {
         if (entity.parseStatus != "NON_FINANCIAL") markHistoricalIntent(entity.rawSmsId, requiredAt)
     }
 
+    /**
+     * Replace the current parse result for a RawSms (same or new event id).
+     * Deletes any existing row for [entity.rawSmsId], then inserts [entity].
+     */
     @Transaction
     suspend fun replaceForRawSms(entity: ParsedEventEntity) {
         deleteByRawSmsId(entity.rawSmsId)

@@ -50,7 +50,7 @@ class AppUpdateService(
                     },
                 )
             },
-            onFailure = { error -> Result.failure(mapGitHubError(error, token)) },
+            onFailure = { error -> Result.failure(mapGitHubError(error)) },
         )
     }
 
@@ -71,7 +71,7 @@ class AppUpdateService(
                         Result.success(downloaded)
                     }
                 },
-                onFailure = { error -> Result.failure(mapGitHubError(error, token)) },
+                onFailure = { error -> Result.failure(mapGitHubError(error)) },
             )
     }
 
@@ -91,7 +91,7 @@ class AppUpdateService(
     fun isUpdateStillNeeded(manifest: UpdateManifest): Boolean =
         updateChecker.isUpdateAvailable(manifest)
 
-    private fun mapGitHubError(error: Throwable, @Suppress("UNUSED_PARAMETER") token: String?): Throwable =
+    private fun mapGitHubError(error: Throwable): Throwable =
         when {
             error is GitHubRequestException && error.requiresToken ->
                 PrivateRepoRequiresTokenException()

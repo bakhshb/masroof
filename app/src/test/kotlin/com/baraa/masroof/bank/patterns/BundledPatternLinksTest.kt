@@ -1,7 +1,7 @@
 package com.baraa.masroof.bank.patterns
 
+import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.bank.InterpretationDraftMapper
-import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.engine.bank.Interpretation
 import com.baraa.masroof.engine.bank.MessageFamily
@@ -19,7 +19,6 @@ import com.baraa.masroof.engine.bank.patterns.SavedMessagePattern
 import com.baraa.masroof.engine.bank.patterns.StaticText
 import com.baraa.masroof.finance.value.BankId
 import com.baraa.masroof.parsing.model.ParseResult
-import java.io.File
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -117,7 +116,7 @@ class BundledPatternLinksTest {
     private fun link(role: PatternAccountRole, last4: String) = PatternAccountBinding(role, barq, last4)
 
     private fun run(patternId: String, body: String, vararg links: PatternAccountBinding): Interpretation {
-        val base = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/BANK_BARQ.patterns.json").readText())
+        val base = bundledPatterns("BANK_BARQ")
         val config = base.copy(banks = base.banks.map { bank -> bank.copy(patterns = bank.patterns.map { pattern ->
             if (pattern.id != patternId || links.isEmpty()) pattern
             else pattern.copy(factContract = pattern.factContract!!.copy(version = 2, accountBindings = links.toList()))

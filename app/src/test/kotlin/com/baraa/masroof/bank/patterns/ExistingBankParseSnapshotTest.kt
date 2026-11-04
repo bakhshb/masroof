@@ -1,11 +1,11 @@
 package com.baraa.masroof.bank.patterns
 
+import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.integration.bank.NewEngineFixtureTest
 import com.baraa.masroof.parsing.model.BankDetectionResult
 import com.baraa.masroof.parsing.model.ParseResult
-import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.engine.bank.MoneyDirection
 import com.baraa.masroof.engine.bank.patterns.PatternFactContract
 import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
@@ -28,7 +28,7 @@ class ExistingBankParseSnapshotTest {
     private val snapshot = File("src/test/resources/testdata/pattern-parity/existing-bank-parse-snapshot.txt")
 
     private val stc = run {
-        val configuration = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/BANK_STC.patterns.json").readText())
+        val configuration = bundledPatterns("BANK_STC")
         val bank = configuration.banks.single()
         val approved = bank.copy(patterns = bank.patterns.map {
             if (it.id == "stc-qattah") it.copy(factContract = PatternFactContract(com.baraa.masroof.engine.bank.MessageFamily.TRANSFER_OUT, MoneyDirection.OUTGOING)) else it

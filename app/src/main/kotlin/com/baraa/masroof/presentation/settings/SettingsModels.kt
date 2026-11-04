@@ -105,12 +105,6 @@ data class SettingsBankSummaryUi(
 
     val cardCount: Int
         get() = followedCardCount + unregisteredCardCount + stoppedCardCount
-
-    val hasContent: Boolean
-        get() = accountCount > 0 || cardCount > 0 || loanCount > 0
-
-    val unregisteredCount: Int
-        get() = unregisteredAccountCount + unregisteredCardCount
 }
 
 /** One confirmation can be active at a time; this draft is never persisted. */
@@ -189,7 +183,6 @@ data class SettingsUiState(
     val exportingLogs: Boolean = false,
     val logMessage: LogMessage? = null,
     val fxRateCorrectionUpdatable: Int = 0,
-    val fxRateCorrectionManualFollowUp: Int = 0,
     val fxRateCorrectionRunning: Boolean = false,
     val fxRateCorrectionAwaitingConfirm: Boolean = false,
 ) {

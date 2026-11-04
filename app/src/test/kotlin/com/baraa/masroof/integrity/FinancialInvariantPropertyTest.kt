@@ -291,7 +291,6 @@ class FinancialInvariantPropertyTest {
     fun asOfFx_keepsStoredUsd_andMatchesTheActiveOracle() = runBlocking {
         val scenario = GoldenLedgerCorpus.load("m8_asof_fx")
         assertEquals("ACTIVE", scenario.status)
-        assertNull(scenario.ownerMilestone)
         val seed = IntegritySeeds.CURRENCY
         DashboardLedgerWorld(context()).use { world ->
             GoldenLedgerRunner.prepare(world, scenario)

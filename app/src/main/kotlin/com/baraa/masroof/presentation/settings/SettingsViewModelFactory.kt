@@ -20,7 +20,6 @@ fun settingsViewModelFactory(
             appLocaleRepository = container.appLocaleRepository,
             themePreferencesRepository = container.themePreferencesRepository,
             databaseBackupService = container.databaseBackupService,
-            refreshReviewQueue = { container.refreshReviewQueue() },
             reconcileOwnershipChange = { change ->
                 container.reviewWorkflowService.reconcileOwnershipChange(change)
             },

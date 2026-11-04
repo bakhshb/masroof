@@ -6,11 +6,9 @@ import com.baraa.masroof.data.room.dao.CardRegistryDao
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
 import com.baraa.masroof.data.room.mapper.RegistryMapper
 import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
-import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
-import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.ownership.RegistryIdentity
@@ -103,64 +101,6 @@ class RoomCardRegistryRepository(
         val last4 = requireLast4(reference)
         requireExisting(reference.bank.id, last4)
         requireUpdated(dao.updateCardType(reference.bank.id, last4, cardType?.name))
-    }
-
-    override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference): Unit = accessGate.withAccess<Unit> {
-        val last4 = requireLast4(card)
-        RegistryIdentity.requireKnownBank(account.bank, "CardRegistry.linkDebitToAccount")
-        require(card.bank == account.bank) { "cross_bank_link" }
-        requireExisting(card.bank.id, last4)
-        val masked = account.maskedNumber?.trim().orEmpty()
-        require(masked.isNotEmpty()) { "account_masked_number_required" }
-        dao.linkDebitAtomic(
-            bankId = card.bank.id,
-            last4 = last4,
-            linkedAccountBankId = account.bank.id,
-            linkedAccountMaskedNumber = masked,
-            defaultMadaWhenNetworkMissing = true,
-        )
-        requireExisting(card.bank.id, last4)
-    }
-
-    override suspend fun markAsDebit(reference: CardReference): Unit = accessGate.withAccess<Unit> {
-        val last4 = requireLast4(reference)
-        requireExisting(reference.bank.id, last4)
-        dao.markDebitAtomic(
-            bankId = reference.bank.id,
-            last4 = last4,
-            defaultMadaWhenNetworkMissing = true,
-        )
-        requireExisting(reference.bank.id, last4)
-    }
-
-    override suspend fun setPrimaryCard(reference: CardReference): Unit = accessGate.withAccess<Unit> {
-        val last4 = requireLast4(reference)
-        val existing = requireExisting(reference.bank.id, last4)
-        if (existing.cardType == CardType.DEBIT.name) {
-            throw IllegalArgumentException("debit_card_cannot_be_primary")
-        }
-        dao.promoteToPrimaryAtomic(reference.bank.id, last4)
-        requireExisting(reference.bank.id, last4)
-    }
-
-    override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String): Unit = accessGate.withAccess<Unit> {
-        val last4 = requireLast4(reference)
-        val parentLast4 = primaryLast4.trim()
-        require(parentLast4.isNotEmpty()) { "primaryLast4 required" }
-        require(last4 != parentLast4) { "cannot_be_own_parent" }
-        val parent = dao.get(reference.bank.id, parentLast4)
-            ?: throw IllegalArgumentException("primary_not_found")
-        require(parent.cardRole == CardRole.PRIMARY.name) { "parent_not_primary" }
-        requireExisting(reference.bank.id, last4)
-        dao.setSupplementaryAtomic(reference.bank.id, last4, parentLast4)
-        requireExisting(reference.bank.id, last4)
-    }
-
-    override suspend fun clearCardRole(reference: CardReference): Unit = accessGate.withAccess<Unit> {
-        val last4 = requireLast4(reference)
-        requireExisting(reference.bank.id, last4)
-        dao.clearFacilityRoleAtomic(reference.bank.id, last4)
-        requireExisting(reference.bank.id, last4)
     }
 
     private fun requireLast4(reference: CardReference): String {

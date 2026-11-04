@@ -1,6 +1,5 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardReference

@@ -24,6 +24,3 @@ tasks.test {
         rootProject.fileTree("app/src/main/kotlin") { include("**/*.kt") },
     ).withPathSensitivity(PathSensitivity.RELATIVE)
 }
-
-// The pure modules use Jupiter; Android and Robolectric retain their native runner.
-tasks.test { useJUnitPlatform() }

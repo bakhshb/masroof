@@ -138,12 +138,6 @@ class StatementReconciliationViewModelTest {
         ledgerOnlyCount = 0,
         ledgerOnlyDebit = BigDecimal.ZERO.setScale(2),
         ledgerOnlyCredit = BigDecimal.ZERO.setScale(2),
-        ambiguousStatementCount = 0,
-        ambiguousStatementDebit = BigDecimal.ZERO.setScale(2),
-        ambiguousStatementCredit = BigDecimal.ZERO.setScale(2),
-        ambiguousLedgerCount = 0,
-        ambiguousLedgerDebit = BigDecimal.ZERO.setScale(2),
-        ambiguousLedgerCredit = BigDecimal.ZERO.setScale(2),
         unsupportedCount = 0,
     )
 }

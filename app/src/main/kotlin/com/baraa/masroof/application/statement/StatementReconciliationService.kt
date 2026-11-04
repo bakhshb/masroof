@@ -32,10 +32,7 @@ class StatementReconciliationService(
         val coverage = statement.coverage
         val period = coverage.periodStart to coverage.periodEnd
         val accounts = comparisonAccounts(statement)
-        val periodByAccount = accounts
-            .map { accountKey(it.bank, it.accountMasked) }
-            .distinct()
-            .associateWith { period }
+        val accountKeys = accounts.mapTo(mutableSetOf()) { accountKey(it.bank, it.accountMasked) }
         val padding = StatementMatchPolicy.BOOKING_WINDOW_DAYS + StatementMatchPolicy.QUERY_SUPERSET_PADDING_DAYS
         val start = coverage.periodStart
             .minusDays(padding)
@@ -51,7 +48,7 @@ class StatementReconciliationService(
         val statementZones = accounts.map { it.bank }.distinct().associateWith { bank ->
             StatementMatchPolicy.zoneForStatementBank(bank, storedZones[bank].orEmpty())
         }
-        val ledgerSides = projectLedger(posted, statementZones, periodByAccount, referencesByTransaction)
+        val ledgerSides = projectLedger(posted, statementZones, accountKeys, period, referencesByTransaction)
         val statementSides = statement.entries.map { entry ->
             StatementSide(
                 entry = entry,
@@ -59,7 +56,7 @@ class StatementReconciliationService(
             )
         }
         val paired = pair(statementSides, ledgerSides)
-        return buildReport(statement, paired, periodByAccount)
+        return buildReport(statement, paired, period)
     }
 
     private fun comparisonAccounts(
@@ -85,7 +82,8 @@ class StatementReconciliationService(
     private fun projectLedger(
         posted: List<FinancialTransaction>,
         statementZones: Map<Bank, java.time.ZoneId?>,
-        periodByAccount: Map<String, Pair<LocalDate, LocalDate>>,
+        accountKeys: Set<String>,
+        period: Pair<LocalDate, LocalDate>,
         referencesByTransaction: Map<String, Set<String>>,
     ): List<LedgerSide> {
         val sides = mutableListOf<LedgerSide>()
@@ -96,7 +94,8 @@ class StatementReconciliationService(
                 containerId = transaction.sourceContainerId,
                 endpoint = StatementMatchPolicy.AccountEndpoint.SOURCE,
                 statementZones = statementZones,
-                periodByAccount = periodByAccount,
+                accountKeys = accountKeys,
+                period = period,
                 references = references,
             )
             sides += side(
@@ -104,7 +103,8 @@ class StatementReconciliationService(
                 containerId = transaction.destinationContainerId,
                 endpoint = StatementMatchPolicy.AccountEndpoint.DESTINATION,
                 statementZones = statementZones,
-                periodByAccount = periodByAccount,
+                accountKeys = accountKeys,
+                period = period,
                 references = references,
             )
         }
@@ -116,12 +116,12 @@ class StatementReconciliationService(
         containerId: String?,
         endpoint: StatementMatchPolicy.AccountEndpoint,
         statementZones: Map<Bank, java.time.ZoneId?>,
-        periodByAccount: Map<String, Pair<LocalDate, LocalDate>>,
+        accountKeys: Set<String>,
+        period: Pair<LocalDate, LocalDate>,
         references: Set<String>,
     ): List<LedgerSide> {
         val account = StatementMatchPolicy.qualifiedAccount(containerId) ?: return emptyList()
-        val key = accountKey(account.bank, account.accountMasked)
-        val period = periodByAccount[key] ?: return emptyList()
+        if (accountKey(account.bank, account.accountMasked) !in accountKeys) return emptyList()
         val direction = StatementMatchPolicy.cashDirection(transaction.type, endpoint)
         val zone = StatementMatchPolicy.zoneForPostedMovement(account.bank, transaction.occurredAtZone)
         val bankComparable = statementZones[account.bank] != null
@@ -215,7 +215,7 @@ class StatementReconciliationService(
     private fun buildReport(
         statement: ParsedBankStatement,
         paired: Paired,
-        periodByAccount: Map<String, Pair<LocalDate, LocalDate>>,
+        period: Pair<LocalDate, LocalDate>,
     ): StatementReconciliationReport {
         val statementLines = paired.statementSides.mapIndexed { index, side ->
             val ledgerIndex = paired.matched[index]
@@ -277,7 +277,7 @@ class StatementReconciliationService(
             counts = counts,
             statementLines = statementLines,
             ledgerLines = ledgerLines,
-            totals = totals(statementLines, ledgerLines, periodByAccount),
+            totals = totals(statementLines, ledgerLines, period),
             balances = statement.balances,
             balanceCheck = balanceCheck(statement),
             matchedFleetPaymentCount = fleet,
@@ -288,13 +288,12 @@ class StatementReconciliationService(
     private fun totals(
         statementLines: List<StatementLineComparison>,
         ledgerLines: List<LedgerLineComparison>,
-        periodByAccount: Map<String, Pair<LocalDate, LocalDate>>,
+        period: Pair<LocalDate, LocalDate>,
     ): List<StatementCurrencyTotal> {
         val keys = linkedSetOf<TotalKey>()
         statementLines.forEach { keys += TotalKey(it.entry.bank.id, it.entry.accountMasked, it.entry.amount.currency) }
         ledgerLines.forEach { keys += TotalKey(it.bank.id, it.accountMasked, it.currency) }
         return keys.map { key ->
-            val period = periodByAccount.getValue(accountKey(Bank.fromId(key.bankId), key.accountMasked))
             val statementForKey = statementLines.filter {
                 it.entry.bank.id == key.bankId &&
                     it.entry.accountMasked == key.accountMasked &&
@@ -318,12 +317,6 @@ class StatementReconciliationService(
                 ledgerOnlyCount = ledgerForKey.count { it.status == StatementComparisonStatus.LEDGER_ONLY },
                 ledgerOnlyDebit = sumLedger(ledgerForKey, StatementComparisonStatus.LEDGER_ONLY, StatementDirection.DEBIT),
                 ledgerOnlyCredit = sumLedger(ledgerForKey, StatementComparisonStatus.LEDGER_ONLY, StatementDirection.CREDIT),
-                ambiguousStatementCount = statementForKey.count { it.status == StatementComparisonStatus.AMBIGUOUS },
-                ambiguousStatementDebit = sum(statementForKey, StatementComparisonStatus.AMBIGUOUS, StatementDirection.DEBIT),
-                ambiguousStatementCredit = sum(statementForKey, StatementComparisonStatus.AMBIGUOUS, StatementDirection.CREDIT),
-                ambiguousLedgerCount = ledgerForKey.count { it.status == StatementComparisonStatus.AMBIGUOUS },
-                ambiguousLedgerDebit = sumLedger(ledgerForKey, StatementComparisonStatus.AMBIGUOUS, StatementDirection.DEBIT),
-                ambiguousLedgerCredit = sumLedger(ledgerForKey, StatementComparisonStatus.AMBIGUOUS, StatementDirection.CREDIT),
                 unsupportedCount = statementForKey.count { it.status == StatementComparisonStatus.UNSUPPORTED } +
                     ledgerForKey.count { it.status == StatementComparisonStatus.UNSUPPORTED },
             )

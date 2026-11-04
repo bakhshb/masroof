@@ -12,7 +12,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.test.platform.app.InstrumentationRegistry
 import com.baraa.masroof.R
 import com.baraa.masroof.application.settings.DeleteBlocker
 import com.baraa.masroof.core.money.Currency
@@ -53,11 +52,7 @@ class RegistryDeleteJourneyTest {
         compose.waitForIdle()
     }
 
-    private fun capture(name: String) {
-        compose.waitForIdle()
-        val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
-        try { ScreenshotArtifactWriter.publish(bitmap, "registry-delete", name) } finally { bitmap.recycle() }
-    }
+    private fun capture(name: String) = ScreenshotArtifactWriter.capture(compose, "registry-delete", name)
 
     @Test fun unlinkedAccountDeletesOnlyAfterTheCopiedNameIsPasted() {
         var deleted = false

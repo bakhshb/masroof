@@ -1,10 +1,10 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.testsupport.RoomReviewWiring
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
-import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionRestoreService
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
@@ -12,11 +12,9 @@ import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
-import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ids.ReviewIdFactory
 import com.baraa.masroof.domain.model.AccountReference
@@ -37,7 +35,6 @@ import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -84,48 +81,28 @@ class ScopedMutationReconciliationTest {
         ftDelegate = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         transactions = CountingFinancialTransactionRepository(ftDelegate)
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
-        val correctionRepo = RoomUserCorrectionRepository(db.userCorrectionDao())
-        val accounts = RoomAccountRegistryRepository.from(db)
-        val cards = RoomCardRegistryRepository.from(db)
-        val loans = RoomLoanRegistryRepository.from(db)
-        confirmation = OwnershipConfirmationService(accounts, cards, loans)
-        val resolver = OwnershipResolver(accounts, cards, loans)
-        val effective = EffectiveParsedEventProvider(parsed, correctionRepo)
-        val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsed,
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = transactions,
-            ownershipResolver = resolver,
-            ownershipConfirmationService = confirmation,
-            effectiveParsedEventProvider = effective,
-            reviewRepository = reviewRepo,
-        )
-        val updater = ReviewQueueUpdater(reviewRepo, transactions, clock)
-        workflow = ReviewWorkflowService(
-            reviewRepository = reviewRepo,
-            userCorrectionRepository = correctionRepo,
-            financialTransactionRepository = transactions,
-            rawSmsRepository = rawRepo,
-            ownershipResolver = resolver,
-            ownershipConfirmationService = confirmation,
-            effectiveParsedEventProvider = effective,
-            parsedEventRepository = parsed,
-            reconciliationService = reconciliation,
-            reviewQueueUpdater = updater,
-            manualReviewResolutionRepository = RoomManualReviewResolutionRepository(db, transactions),
+        val wiring = RoomReviewWiring(
+            db = db,
             clock = clock,
+            raw = rawRepo,
+            parsed = parsed,
+            ledger = transactions,
+            reviews = reviewRepo,
+            reconcileWithConfirmation = true,
         )
+        confirmation = wiring.confirmation
+        workflow = wiring.workflow
         restore = TransactionRestoreService(
             reviewRepository = reviewRepo,
             financialTransactionRepository = transactions,
-            reconciliation = reconciliation,
+            reconciliation = wiring.reconciliation,
             reclassification = TransactionReclassificationService(
                 financialTransactionRepository = transactions,
-                effectiveParsedEventProvider = effective,
-                ownershipResolver = resolver,
+                effectiveParsedEventProvider = wiring.effective,
+                ownershipResolver = wiring.resolver,
             ),
             clock = clock,
-            reviewQueueUpdater = updater,
+            reviewQueueUpdater = wiring.updater,
         )
     }
 
@@ -416,35 +393,8 @@ class ScopedMutationReconciliationTest {
         financial: FinancialTransactionRepository,
         reviews: RoomReviewRepository,
         raw: RoomRawSmsRepository,
-    ): ReviewWorkflowService {
-        val corrections = RoomUserCorrectionRepository(database.userCorrectionDao())
-        val accounts = RoomAccountRegistryRepository.from(database)
-        val cards = RoomCardRegistryRepository.from(database)
-        val loans = RoomLoanRegistryRepository.from(database)
-        val resolver = OwnershipResolver(accounts, cards, loans)
-        val effective = EffectiveParsedEventProvider(parsedEvents, corrections)
-        return ReviewWorkflowService(
-            reviewRepository = reviews,
-            userCorrectionRepository = corrections,
-            financialTransactionRepository = financial,
-            rawSmsRepository = raw,
-            ownershipResolver = resolver,
-            ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
-            effectiveParsedEventProvider = effective,
-            parsedEventRepository = parsedEvents,
-            reconciliationService = TransactionReconciliationService(
-                parsedEventRepository = parsedEvents,
-                rawSmsRepository = raw,
-                financialTransactionRepository = financial,
-                ownershipResolver = resolver,
-                effectiveParsedEventProvider = effective,
-                reviewRepository = reviews,
-            ),
-            reviewQueueUpdater = ReviewQueueUpdater(reviews, financial, clock),
-            manualReviewResolutionRepository = RoomManualReviewResolutionRepository(database, financial),
-            clock = clock,
-        )
-    }
+    ): ReviewWorkflowService =
+        RoomReviewWiring(database, clock, raw = raw, parsed = parsedEvents, ledger = financial, reviews = reviews).workflow
 
     private suspend fun persistPurchase(
         smsId: String,

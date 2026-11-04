@@ -36,7 +36,7 @@ object MonthlyFinancialSummaryCalculator {
         var selfTransfers = Money.zero(primaryCurrency)
 
         for (tx in transactions) {
-            val amount = effectiveAmount(tx, primaryCurrency, sarEquivalents) ?: continue
+            val amount = TransactionAmountResolver.effectiveAmount(tx, primaryCurrency, sarEquivalents) ?: continue
             when (tx.type) {
                 FinancialTransactionType.EXPENSE,
                 FinancialTransactionType.BILL_PAYMENT,
@@ -95,10 +95,4 @@ object MonthlyFinancialSummaryCalculator {
             excludedOtherCurrencyCount = excludedOtherCurrencyCount,
         )
     }
-
-    private fun effectiveAmount(
-        tx: FinancialTransaction,
-        primaryCurrency: Currency,
-        sarEquivalents: Map<String, Money>,
-    ): Money? = TransactionAmountResolver.effectiveAmount(tx, primaryCurrency, sarEquivalents)
 }

@@ -18,8 +18,6 @@ interface RawSmsRepository {
     suspend fun getByIds(ids: Collection<String>): List<RawSms> =
         ids.distinct().mapNotNull { getById(it) }
 
-    suspend fun existsById(id: String): Boolean
-
     /** Receipt time of each stored id in [ids], without loading SMS bodies. */
     suspend fun receivedAtByIds(ids: Collection<String>): Map<String, java.time.Instant> =
         getByIds(ids).associate { it.id to it.receivedAt }
@@ -32,9 +30,6 @@ interface RawSmsRepository {
      */
     suspend fun findByProviderMessageId(providerMessageId: String): RawSms? =
         findByDeviceMessageId(providerMessageId)
-
-    /** RawSms id already linked to this inbox provider id, if the link is an alias. */
-    suspend fun findProviderAliasRawSmsId(providerMessageId: String): String? = null
 
     /** Subset of [rawSmsIds] that already have a provider alias. */
     suspend fun providerAliasRawSmsIds(rawSmsIds: Collection<String>): Set<String> = emptySet()
@@ -62,25 +57,14 @@ interface RawSmsRepository {
     suspend fun newestReceivedAt(notAfter: java.time.Instant): java.time.Instant? = null
 
     /**
-     * Live↔historical near-duplicate: same sender + bodyHash within
-     * [fromInclusive]…[toInclusive], opposite deviceMessageId nullness.
+     * Live↔historical near-duplicates: same sender + bodyHash within
+     * [fromInclusive]…[toInclusive], opposite deviceMessageId nullness; up to two rows
+     * so capture can tell a unique twin from an ambiguous pair. Ordered by receipt
+     * time, then id. A live-row lookup skips rows that already carry a provider alias.
      *
      * @param lookingForLiveRow when true, match rows with null deviceMessageId
      * (incoming is historical). When false, match rows with non-null
      * deviceMessageId (incoming is live).
-     */
-    suspend fun findCrossSourceNearDuplicate(
-        sender: String,
-        bodyHash: String,
-        fromInclusive: Instant,
-        toInclusive: Instant,
-        lookingForLiveRow: Boolean,
-    ): RawSms?
-
-    /**
-     * Same match as [findCrossSourceNearDuplicate], up to two rows so capture can
-     * tell a unique twin from an ambiguous pair. Ordered by receipt time, then id.
-     * A live-row lookup skips rows that already carry a provider alias.
      */
     suspend fun listCrossSourceNearDuplicates(
         sender: String,
@@ -88,15 +72,7 @@ interface RawSmsRepository {
         fromInclusive: Instant,
         toInclusive: Instant,
         lookingForLiveRow: Boolean,
-    ): List<RawSms> = listOfNotNull(
-        findCrossSourceNearDuplicate(
-            sender = sender,
-            bodyHash = bodyHash,
-            fromInclusive = fromInclusive,
-            toInclusive = toInclusive,
-            lookingForLiveRow = lookingForLiveRow,
-        ),
-    )
+    ): List<RawSms>
 }
 
 /**

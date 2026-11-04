@@ -2,7 +2,6 @@ package com.baraa.masroof.application.dashboard
 
 data class AccountsDashboardSection(
     val fleet: CurrentAccountSummary,
-    val spendingSplit: SpendingSplitSummary,
     val perAccount: List<OwnedAccountPeriodSummary>,
     val accountsFleet: AccountsSummary,
     val flowDetail: CurrentAccountFlowDetailGrouping,
@@ -27,18 +26,11 @@ object AccountsDashboardProjection {
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
                 ownedAccountContainerIds = ownedAccountContainerIds,
-                ownedAccountLast4s = ownedAccountLast4s,
                 debitCardScope = debitCardScope,
             )
             val fleet = CurrentAccountSummaryCalculator.summarize(flowDetail, primaryCurrency, sarEquivalents)
             AccountsDashboardSection(
                 fleet = fleet,
-                spendingSplit = CurrentAccountSummaryCalculator.spendingSplit(
-                    transactions = transactions,
-                    currentAccount = fleet,
-                    sarEquivalents = sarEquivalents,
-                    debitCardScope = debitCardScope,
-                ),
                 perAccount = perAccount,
                 accountsFleet = AccountsSummary.fromSummaries(
                     accounts = ownedAccounts.map { it.bank to it.maskedNumber },

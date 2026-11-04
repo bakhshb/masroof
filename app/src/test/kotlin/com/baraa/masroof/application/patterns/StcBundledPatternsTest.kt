@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.data.patterns.MessagePatternStore
 import com.baraa.masroof.data.room.DatabaseAccessGate
@@ -13,7 +14,7 @@ import java.nio.file.Files
 
 class StcBundledPatternsTest {
     @Test fun sarieTransferMatchesAnEmptyAccountLineWithoutInventingAnAccountReference() {
-        val bank = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/BANK_STC.patterns.json").readText()).banks.single()
+        val bank = bundledPatterns("BANK_STC").banks.single()
         val body = "Inward transfer (SARIE)\n100.00 SAR\nFrom TEST PERSON\nFrom BJAZ\nAccount \n02-09-2026 08:01\nRef. No. *8PJ7"
         for (accountLine in listOf("Account ", "Account", "Account   ")) {
             val text = body.replace("Account ", accountLine)
@@ -22,7 +23,6 @@ class StcBundledPatternsTest {
             assertEquals(mapOf("amount" to "100.00 SAR", "counterparty" to "TEST PERSON", "counterparty_bank" to "BJAZ",
                 "occurred_at" to "02-09-2026 08:01", "reference" to "*8PJ7"), match.second.fields.mapValues { it.value.raw })
             match.second.fields.values.forEach { assertEquals(it.raw, text.substring(it.start, it.end)) }
-            assertFalse(match.second.financialPostingAllowed)
         }
         for (invalid in listOf(body.replace("Account \n", ""), body.replace("100.00 SAR", ""),
             body.replace("TEST PERSON", ""), body.replace("BJAZ", ""), body.replace("02-09-2026 08:01", ""),
@@ -64,7 +64,6 @@ class StcBundledPatternsTest {
             assertEquals(row.text("id"), match.first.id)
             assertEquals(row.text("operation"), match.second.label)
             assertEquals(row.getValue("fields").jsonObject.mapValues { it.value.jsonPrimitive.content }, match.second.fields.mapValues { it.value.raw })
-            assertFalse(match.second.financialPostingAllowed)
             assertNull(SavedMessagePattern.unique(bank.currentPatterns, "BANK_ALJAZIRA", "STC Bank", row.text("body")))
             assertNull(SavedMessagePattern.unique(bank.currentPatterns, "BANK_STC", "Other Bank", row.text("body")))
             assertNull(SavedMessagePattern.unique(bank.currentPatterns, "BANK_STC", "STC Bank", row.text("body") + "\nCancelled"))

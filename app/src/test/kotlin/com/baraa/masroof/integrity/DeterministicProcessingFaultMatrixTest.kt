@@ -7,7 +7,6 @@ import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.sms.HistoricalBatchDerivedResult
 import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
-import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -41,7 +40,7 @@ class DeterministicProcessingFaultMatrixTest {
     fun afterRawSmsCapture_failureThenReplayPostsOnce() = runBlocking {
         val seed = IntegritySeeds.FAULT
         DashboardLedgerWorld(context()).use { world ->
-            val ledger = preparedPurchaseLedger(world)
+            val ledger = purchaseLedger(world)
             ledger.faults.parsedSaveFailures = 1
             val batch = ledger.openBatch()
             val failed = batch.ingestProvider(purchaseRow())
@@ -67,7 +66,7 @@ class DeterministicProcessingFaultMatrixTest {
     fun afterParsedEventSave_failureThenReplayPostsOnce() = runBlocking {
         val seed = IntegritySeeds.FAULT
         DashboardLedgerWorld(context()).use { world ->
-            val ledger = preparedPurchaseLedger(world)
+            val ledger = purchaseLedger(world)
             val batch = ledger.openBatch()
             assertTrue(batch.ingestProvider(purchaseRow()) is SmsIngestionResult.Parsed)
             val rawId = world.rawRepo.listIdsByReceivedAt().single()
@@ -99,7 +98,7 @@ class DeterministicProcessingFaultMatrixTest {
     fun beforeLinkReplace_failureThenReplayPostsOnce() = runBlocking {
         val seed = IntegritySeeds.FAULT
         DashboardLedgerWorld(context()).use { world ->
-            val ledger = preparedTransferLedger(world)
+            val ledger = transferLedger(world)
             val batch = ledger.openBatch()
             ingestAll(batch, transferPair())
             seedStaleExternals(world)
@@ -137,7 +136,7 @@ class DeterministicProcessingFaultMatrixTest {
     fun afterLinkReplace_committedWriteThenReplayDoesNotDuplicate() = runBlocking {
         val seed = IntegritySeeds.FAULT
         DashboardLedgerWorld(context()).use { world ->
-            val ledger = preparedTransferLedger(world)
+            val ledger = transferLedger(world)
             val batch = ledger.openBatch()
             ingestAll(batch, transferPair())
             seedStaleExternals(world)
@@ -163,9 +162,9 @@ class DeterministicProcessingFaultMatrixTest {
     fun beforeReviewUpsert_failureThenReplayKeepsTheTieReviewable() = runBlocking {
         val seed = IntegritySeeds.FAULT
         DashboardLedgerWorld(context()).use { world ->
-            val ledger = preparedTransferLedger(world)
+            val ledger = transferLedger(world)
             val batch = ledger.openBatch()
-            ingestAll(batch, ambiguousTie())
+            ingestAll(batch, ambiguousTie("fault"))
             ledger.faults.reviewBeforeFailures = 1
 
             val finished = batch.finish()
@@ -195,9 +194,9 @@ class DeterministicProcessingFaultMatrixTest {
     fun afterReviewUpsert_partialReviewThenReplayDoesNotForgetIt() = runBlocking {
         val seed = IntegritySeeds.FAULT
         DashboardLedgerWorld(context()).use { world ->
-            val ledger = preparedTransferLedger(world)
+            val ledger = transferLedger(world)
             val batch = ledger.openBatch()
-            ingestAll(batch, ambiguousTie())
+            ingestAll(batch, ambiguousTie("fault"))
             ledger.faults.reviewAfterFailures = 1
 
             val finished = batch.finish()
@@ -231,7 +230,7 @@ class DeterministicProcessingFaultMatrixTest {
     fun beforeClearingRecovery_keepsTheRetry_thenReplayClearsItOnce() = runBlocking {
         val seed = IntegritySeeds.FAULT
         DashboardLedgerWorld(context()).use { world ->
-            val ledger = preparedPurchaseLedger(world)
+            val ledger = purchaseLedger(world)
             val batch = ledger.openBatch()
             assertTrue(batch.ingestProvider(purchaseRow()) is SmsIngestionResult.Parsed)
             val rawId = world.rawRepo.listIdsByReceivedAt().single()
@@ -265,7 +264,7 @@ class DeterministicProcessingFaultMatrixTest {
     fun nonthrowingConflict_failedCountIsIncomplete_thenReplayPostsOnce() = runBlocking {
         val seed = IntegritySeeds.FAULT
         DashboardLedgerWorld(context()).use { world ->
-            val ledger = preparedPurchaseLedger(world)
+            val ledger = purchaseLedger(world)
             val batch = ledger.openBatch()
             val ingested = batch.ingestProvider(purchaseRow()) as SmsIngestionResult.Parsed
             ledger.faults.conflictSaves = true
@@ -296,30 +295,12 @@ class DeterministicProcessingFaultMatrixTest {
         }
     }
 
-    private suspend fun preparedPurchaseLedger(world: DashboardLedgerWorld): IntegrityLedger {
-        ownAccounts(world, listOf("3001"))
-        ownCard(world, "2210", CardType.DEBIT)
-        return IntegrityLedger(world)
-    }
-
-    private suspend fun preparedTransferLedger(world: DashboardLedgerWorld): IntegrityLedger {
-        ownAccounts(world, listOf("3001", "3002"))
-        return IntegrityLedger(world)
-    }
-
     private fun purchaseRow(): ProviderSmsRecord =
         providerRow("fault-purchase", bakeryPurchaseBody(), "2026-09-05T06:15:00Z")
 
     private fun transferPair(): List<ProviderSmsRecord> = listOf(
         providerRow("fault-out", intraOut("2026-09-03 10:38"), "2026-09-03T07:38:00Z"),
         providerRow("fault-in", intraIn("2026-09-03 10:38"), "2026-09-03T07:38:05Z"),
-    )
-
-    private fun ambiguousTie(): List<ProviderSmsRecord> = listOf(
-        providerRow("fault-tie-out-a", intraOut("2026-09-02 10:00"), "2026-09-02T07:00:00Z"),
-        providerRow("fault-tie-out-b", intraOut("2026-09-02 10:00"), "2026-09-02T07:00:01Z"),
-        providerRow("fault-tie-in-a", intraIn("2026-09-02 10:00"), "2026-09-02T07:00:02Z"),
-        providerRow("fault-tie-in-b", intraIn("2026-09-02 10:00"), "2026-09-02T07:00:03Z"),
     )
 
     private suspend fun ingestAll(

@@ -1,6 +1,7 @@
 package com.baraa.masroof.integration.bank
 
-import com.baraa.masroof.engine.bank.MessageInput
+import com.baraa.masroof.testsupport.detailsOrNull
+import com.baraa.masroof.testsupport.eventOrNull
 import com.baraa.masroof.engine.bank.interpretation.RuleInterpreter
 import com.baraa.masroof.engine.bank.rules.AlJaziraRuleProfile
 import com.baraa.masroof.finance.value.BankId
@@ -23,8 +24,8 @@ class NewEngineFixtureTest(private val file: File) {
             fixture.getValue("body").jsonPrimitive.content,Instant.parse("2026-10-20T12:00:00Z"))
         val engine = RuleInterpreter(AlJaziraRuleProfile.current())
         val actual = InterpretationTestAdapter { engine.interpretRouted(it,BankId("BANK_ALJAZIRA")) }.parse(input)
-        fun event(r: ParseResult) = when(r) { is ParseResult.Success -> r.event; is ParseResult.NonFinancial -> r.event; is ParseResult.ReviewRequired -> r.event; is ParseResult.Partial -> r.event; else -> null }
-        fun details(r: ParseResult) = when(r) { is ParseResult.Success -> r.details; is ParseResult.NonFinancial -> r.details; is ParseResult.ReviewRequired -> r.details; is ParseResult.Partial -> r.details; else -> null }
+        fun event(r: ParseResult) = r.eventOrNull()
+        fun details(r: ParseResult) = r.detailsOrNull()
         val e = event(actual)
         assertNotNull("$file outcome=$actual",e)
         val errors = mutableListOf<String>()

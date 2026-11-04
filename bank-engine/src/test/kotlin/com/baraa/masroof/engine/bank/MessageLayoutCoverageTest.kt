@@ -9,9 +9,8 @@ import java.time.Instant
 
 class MessageLayoutCoverageTest {
     private val bank = BankId("UNRELATED_BANK")
-    private fun parse(body: String): Interpretation = RuleInterpreter(RuleLibrary.current()).interpret(
-        MessageInput("layout", "OtherSender", body, Instant.parse("2026-10-18T00:00:00Z")),
-        BankCatalog(listOf(BankDefinition(bank, setOf("OtherSender")))))
+    private fun parse(body: String): Interpretation = RuleInterpreter(RuleLibrary.current()).interpretRouted(
+        MessageInput("layout", "OtherSender", body, Instant.parse("2026-10-18T00:00:00Z")), bank)
 
     @Test fun atmWithdrawalKeepsParenthesizedMadaCardSeparateFromAccount() {
         val body = "سحب نقدي داخلي صراف الي\nمكان السحب: JEDDAH-بنك الرياض\nبطاقة (مدى):8219 \nحساب رقم: 3001\nبمبلغ: SAR 100.00\nفي: 2026-10-22 05:26"
@@ -103,9 +102,8 @@ class MessageLayoutCoverageTest {
         val schema = RuleLibrary.current().let { base -> base.copy(rules = base.rules.map {
             if (it.family == MessageFamily.PURCHASE) it.copy(phrases = it.phrases + "purchase refund") else it
         }) }
-        val conflict = RuleInterpreter(schema).interpret(MessageInput("conflict", "OtherSender",
-            "purchase refund\nCard:4567\nAmount:12 SAR\nDate:2026-08-03 14:32", Instant.EPOCH),
-            BankCatalog(listOf(BankDefinition(bank, setOf("OtherSender")))))
+        val conflict = RuleInterpreter(schema).interpretRouted(MessageInput("conflict", "OtherSender",
+            "purchase refund\nCard:4567\nAmount:12 SAR\nDate:2026-08-03 14:32", Instant.EPOCH), bank)
         assertEquals(ParseStatus.REVIEW_REQUIRED, conflict.status)
     }
 

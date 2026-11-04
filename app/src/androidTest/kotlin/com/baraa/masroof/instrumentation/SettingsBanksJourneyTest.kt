@@ -12,7 +12,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.baraa.masroof.R
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.domain.model.Bank
@@ -57,14 +56,7 @@ class SettingsBanksJourneyTest {
     private fun input(tag: String, value: String) {
         compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag(tag))).performTextInput(value)
     }
-    private fun capture(name: String) {
-        compose.waitForIdle()
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.waitForIdleSync()
-        // Compose idleness precedes the SurfaceFlinger frame (same capture protocol as the fidelity matrix).
-        Thread.sleep(250)
-        ScreenshotArtifactWriter.publish(instrumentation.uiAutomation.takeScreenshot(), "bank-settings", name)
-    }
+    private fun capture(name: String) = ScreenshotArtifactWriter.capture(compose, "bank-settings", name)
 
     @Test fun manageBankPickDatesAndSaveManualEntriesThroughTheUnifiedSettings() = runBlocking {
         val context = TestStorageContext(compose.activity, "settings-banks-${java.util.UUID.randomUUID()}")

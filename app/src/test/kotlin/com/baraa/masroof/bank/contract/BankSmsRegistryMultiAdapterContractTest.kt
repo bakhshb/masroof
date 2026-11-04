@@ -16,17 +16,6 @@ class BankSmsRegistryMultiAdapterContractTest {
     private val cases = BankSmsAdapterContractTest.cases()
 
     @Test
-    fun registry_routesStubAndProductionAdaptersIndependently() {
-        val registry = BankSmsRegistry(adapters = cases.map { it.adapter })
-
-        val alJazira = registry.route("AlJazira", "purchase body")
-        val stub = registry.route(StubBankSmsAdapter.SENDER, "any body")
-
-        assertTrue(alJazira is BankRoutingResult.Matched)
-        assertTrue(stub is BankRoutingResult.Matched)
-    }
-
-    @Test
     fun crossAdapterSenderSamples_areClaimedByExactlyOneAdapter() {
         for (case in cases) {
             for (sms in case.allSenderSamples()) {

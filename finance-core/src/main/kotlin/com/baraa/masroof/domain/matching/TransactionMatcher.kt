@@ -148,7 +148,8 @@ object TransactionMatcher {
         return PairRank.WINDOW
     }
 
-    private fun normalizedReference(value: String?): String =
+    /** Trimmed, case-folded reference; statement matching uses the same reading. */
+    fun normalizedReference(value: String?): String =
         value?.trim()?.lowercase(Locale.ROOT).orEmpty()
 
     private fun referencesConflict(

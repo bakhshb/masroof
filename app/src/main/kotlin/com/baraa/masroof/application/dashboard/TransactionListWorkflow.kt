@@ -48,14 +48,12 @@ data class TransactionListQuery(
     /** Bank-qualified `bankId:last4` card keys, so two banks' cards with one last4 stay apart. */
     val cardKeys: Set<String> = emptySet(),
     val accountContainerIds: Set<String> = emptySet(),
-    val transactionIds: Set<String> = emptySet(),
 ) {
     val isActive: Boolean
         get() = searchQuery.isNotBlank() ||
             types.isNotEmpty() ||
             cardKeys.isNotEmpty() ||
-            accountContainerIds.isNotEmpty() ||
-            transactionIds.isNotEmpty()
+            accountContainerIds.isNotEmpty()
 }
 
 data class TransactionListFilterResult(
@@ -87,8 +85,7 @@ internal object TransactionListProjectionCalculator {
         accountInvolvementByTransactionId: Map<String, Set<String>> = emptyMap(),
     ): TransactionListFilterResult {
         val selected = transactions.withIndex().filter { (_, tx) ->
-            matchesTransactionIds(tx, filter.transactionIds) &&
-                matchesTypes(tx, filter.types) &&
+            matchesTypes(tx, filter.types) &&
                 matchesCards(tx, filter.cardKeys) &&
                 matchesAccounts(tx, filter.accountContainerIds, accountInvolvementByTransactionId) &&
                 matchesSearch(tx, filter.searchQuery)
@@ -127,11 +124,6 @@ internal object TransactionListProjectionCalculator {
         val present = (fromContainers + fromInvolvement).toSet()
         return present.intersect(ownedAccountContainerIds).sorted()
     }
-
-    private fun matchesTransactionIds(
-        tx: TransactionListRow,
-        transactionIds: Set<String>,
-    ): Boolean = transactionIds.isEmpty() || tx.id in transactionIds
 
     private fun matchesTypes(
         tx: TransactionListRow,
@@ -176,7 +168,6 @@ internal object TransactionListProjectionCalculator {
 
         normalized.toBigDecimalOrNull()?.let { queryAmount ->
             if (amount.compareTo(queryAmount) == 0) return true
-            if (plain.startsWith(normalized) || fixed.startsWith(normalized)) return true
         }
         return false
     }

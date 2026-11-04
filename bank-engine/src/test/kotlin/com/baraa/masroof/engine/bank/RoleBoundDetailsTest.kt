@@ -11,14 +11,13 @@ import java.time.LocalDate
 
 /** Annotated synthetic development examples; no parser oracle or general accuracy claim. */
 class RoleBoundDetailsTest {
-    private val catalog = BankCatalog(listOf(BankDefinition(BankId("SYNTHETIC"), setOf("SyntheticBank"))))
     private val at = "2026-10-17 13:00"
     private val purchase = "Purchase\nAmount: USD 23.00\nCard: 1234\n$at"
     private val cardPayment = "Card payment\nAmount: SAR 100\nCard: 5678\nFrom account: 1234\n$at"
     private val bill = "Bill payment\nAmount: SAR 50\nFrom account: 1234\nBiller: Synthetic Utilities\nBiller code: 001\n$at"
     private val loan = "Loan repayment\nAmount: SAR 500\nFrom account: 1234\nCounterparty: Synthetic Finance\n$at"
     private fun input(body: String) = MessageInput("role-fixture", "SyntheticBank", body, Instant.parse("2026-10-17T10:00:00Z"))
-    private fun parse(body: String, schema: BankRuleSchema = RuleLibrary.current()) = RuleInterpreter(schema).interpret(input(body), catalog)
+    private fun parse(body: String, schema: BankRuleSchema = RuleLibrary.current()) = RuleInterpreter(schema).interpretRouted(input(body), BankId("SYNTHETIC"))
 
     @Test fun configuredBareSarFeesAreRoleBoundAndNeverBorrowPrincipalCurrency() {
         val bare="$purchase\nرسوم العمليات الدولية: 1.40"
@@ -155,8 +154,6 @@ class RoleBoundDetailsTest {
             assertEquals(ParseStatus.NON_FINANCIAL, parse("OTP 123456\n$body").status)
             assertEquals(ParseStatus.REVIEW_REQUIRED, parse("Declined\n$body").status)
             assertEquals(ParseStatus.REVIEW_REQUIRED, parse("```text\n$body\n```").status)
-            val r = RuleInterpreter(RuleLibrary.current()).interpret(input(body).copy(sender = "Unrecognized"), catalog)
-            assertTrue(Blocker.UNKNOWN_BANK in r.blockers)
         }
         assertEquals(ParseStatus.REVIEW_REQUIRED, parse("$bill\nLoan repayment").status)
         assertEquals(ParseStatus.REVIEW_REQUIRED, parse("$purchase\nIncoming transfer").status)

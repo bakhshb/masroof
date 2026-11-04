@@ -15,7 +15,6 @@ import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.EntityTransactionScope
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanType
 
 /** Thin mapping of [EntityTransactionScope] decisions onto preview rows. */

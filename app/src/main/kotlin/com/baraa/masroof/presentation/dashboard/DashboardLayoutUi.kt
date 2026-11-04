@@ -17,17 +17,8 @@ fun Modifier.dashboardSectionFrame(
 ): Modifier {
     if (!editing) return this
     val extended = MasroofThemeExtras.extendedColors
-    val padding = when (size) {
-        DashboardSectionSize.SMALL -> MasroofSpacing.none
-        DashboardSectionSize.MEDIUM -> MasroofSpacing.none
-        DashboardSectionSize.LARGE -> MasroofSpacing.hairlineGap
-    }
-    val editBorder = if (editing) {
-        Modifier.border(MasroofSpacing.borderWidth, extended.inflow.copy(alpha = MasroofOpacity.subtle), MasroofComponentShapes.radius16)
-    } else {
-        Modifier
-    }
+    val padding = if (size == DashboardSectionSize.LARGE) MasroofSpacing.hairlineGap else MasroofSpacing.none
     return this
         .padding(vertical = padding)
-        .then(editBorder)
+        .border(MasroofSpacing.borderWidth, extended.inflow.copy(alpha = MasroofOpacity.subtle), MasroofComponentShapes.radius16)
 }

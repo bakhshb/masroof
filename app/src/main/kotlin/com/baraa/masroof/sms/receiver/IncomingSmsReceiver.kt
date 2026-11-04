@@ -31,9 +31,7 @@ class IncomingSmsReceiver : BroadcastReceiver() {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             return
         }
-        if (BuildConfig.DEBUG) {
-            DebugSmsPduExtra.materialize(intent)
-        }
+        DebugSmsPduExtra.materialize(intent)
 
         val app = context.applicationContext as? MasroofApplication
         if (app == null) {

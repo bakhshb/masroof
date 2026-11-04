@@ -139,8 +139,5 @@ class SavedMessagePattern(val id: String, val bankId: String, val sender: String
             }
             return SavedMessagePattern(id, bankId, sender, label, parts = parts).also { it.validate() }
         }
-
-        fun unique(patterns: List<SavedMessagePattern>, bankId: String, sender: String, body: String): Pair<SavedMessagePattern, Preview>? =
-            patterns.mapNotNull { pattern -> pattern.preview(bankId, sender, body)?.let { pattern to it } }.singleOrNull()
     }
 }

@@ -1,5 +1,8 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.TestSmsBodies.OTP_BODY
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
+import com.baraa.masroof.testsupport.TestSmsBodies.COLLIDING_TRANSFER_BODY
 import android.content.Context
 import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
@@ -56,8 +59,8 @@ class RecognizedSmsOutcomeInvariantTest {
 
     @Test
     fun finishedLiveWork_coversEveryTerminalOutcome() = runBlocking {
-        val purchase = capture(LiveSmsProcessingHarness.PURCHASE_BODY)
-        val otp = capture(LiveSmsProcessingHarness.OTP_BODY)
+        val purchase = capture(PURCHASE_BODY)
+        val otp = capture(OTP_BODY)
         val collision = capture(COLLIDING_TRANSFER_BODY)
         assertEquals(ListenableWorkerResult.SUCCESS, runWorker(purchase))
         assertEquals(ListenableWorkerResult.SUCCESS, runWorker(otp))
@@ -67,7 +70,7 @@ class RecognizedSmsOutcomeInvariantTest {
         assertEquals(TerminalOutcome.NON_FINANCIAL, outcomeOf(otp))
         assertEquals(TerminalOutcome.REVIEW_PENDING, outcomeOf(collision))
 
-        val exhaustedId = capture(LiveSmsProcessingHarness.PURCHASE_BODY, at = "2026-08-04T09:00:00Z")
+        val exhaustedId = capture(PURCHASE_BODY, at = "2026-08-04T09:00:00Z")
         val exhausted = harness.processStored(
             derivedFailures = DerivedFailureInjection(
                 reconciliationFailuresRemaining = AtomicInteger(Int.MAX_VALUE),
@@ -94,7 +97,7 @@ class RecognizedSmsOutcomeInvariantTest {
         ).startBatch()
         val purchase = LiveSmsProcessingHarness.liveSms()
         val otp = LiveSmsProcessingHarness.liveSms(
-            body = LiveSmsProcessingHarness.OTP_BODY,
+            body = OTP_BODY,
             at = "2026-08-03T15:00:00Z",
         )
 
@@ -181,8 +184,9 @@ class RecognizedSmsOutcomeInvariantTest {
                 reasons: List<String>,
                 now: Instant,
             ) = harness.reviewRepo.upsertRequired(rawSmsId, kind, reasons, now).also {
+                // The first review row is written, then the review update fails.
                 reviewsWritten += 1
-                if (reviewsWritten >= 1) throw IOException("review update failed")
+                throw IOException("review update failed")
             }
         }
         val liveScheduled = mutableListOf<String>()
@@ -220,15 +224,7 @@ class RecognizedSmsOutcomeInvariantTest {
         val reviewed = affected.count { harness.reviewRepo.findByRawSmsId(it) != null }
         assertTrue(reviewed in 1 until affected.size)
 
-        val intake = LiveSmsIntake(
-            captureBankSms = harness.capture,
-            scheduler = { liveScheduled += it },
-            rawSmsRepository = harness.rawRepo,
-            reviewRepository = harness.reviewRepo,
-            processingRetryRepository = harness.processingRetryRepo,
-            appLogService = harness.appLog,
-            batchRecoveryScheduler = { startupScheduled.incrementAndGet() },
-        )
+        val intake = harness.intake(batchRecoveryScheduler = { startupScheduled.incrementAndGet() }, scheduler = { liveScheduled += it })
         assertEquals(0, intake.schedulePendingProcessing())
         assertTrue(liveScheduled.isEmpty())
         assertEquals(1, batchScheduled.get())
@@ -321,15 +317,7 @@ class RecognizedSmsOutcomeInvariantTest {
 
         val liveScheduled = mutableListOf<String>()
         val batchScheduled = AtomicInteger(0)
-        val intake = LiveSmsIntake(
-            captureBankSms = harness.capture,
-            scheduler = { liveScheduled += it },
-            rawSmsRepository = harness.rawRepo,
-            reviewRepository = harness.reviewRepo,
-            processingRetryRepository = harness.processingRetryRepo,
-            appLogService = harness.appLog,
-            batchRecoveryScheduler = { batchScheduled.incrementAndGet() },
-        )
+        val intake = harness.intake(batchRecoveryScheduler = { batchScheduled.incrementAndGet() }, scheduler = { liveScheduled += it })
         assertEquals(0, intake.schedulePendingProcessing())
         assertTrue(liveScheduled.isEmpty())
         assertEquals(1, batchScheduled.get())
@@ -339,7 +327,7 @@ class RecognizedSmsOutcomeInvariantTest {
 
     @Test
     fun finalProcessingErrorPersistenceFailure_doesNotEndTheWorker() = runBlocking {
-        val rawId = capture(LiveSmsProcessingHarness.PURCHASE_BODY, at = "2026-08-04T08:00:00Z")
+        val rawId = capture(PURCHASE_BODY, at = "2026-08-04T08:00:00Z")
         val exhausted = harness.processStored(
             derivedFailures = DerivedFailureInjection(
                 reconciliationFailuresRemaining = AtomicInteger(Int.MAX_VALUE),
@@ -379,7 +367,7 @@ class RecognizedSmsOutcomeInvariantTest {
         )
         val ids = kinds.mapIndexed { index, kind ->
             val rawId = capture(
-                LiveSmsProcessingHarness.PURCHASE_BODY,
+                PURCHASE_BODY,
                 at = receivedAt[index],
             )
             val created = harness.reviewRepo.upsertRequired(
@@ -417,7 +405,7 @@ class RecognizedSmsOutcomeInvariantTest {
 
     @Test
     fun resolvedNonFinancialReview_staysClosedAfterExhaustedDerivedProcessing() = runBlocking {
-        val rawId = capture(LiveSmsProcessingHarness.PURCHASE_BODY, at = "2026-08-06T09:00:00Z")
+        val rawId = capture(PURCHASE_BODY, at = "2026-08-06T09:00:00Z")
         val created = harness.reviewRepo.upsertRequired(
             rawSmsId = rawId,
             kind = ReviewKind.NEEDS_REVIEW,
@@ -523,13 +511,4 @@ class RecognizedSmsOutcomeInvariantTest {
     }
 
     private enum class ListenableWorkerResult { SUCCESS, RETRY, FAILURE }
-
-    private companion object {
-        val COLLIDING_TRANSFER_BODY = """
-            حوالة واردة
-            حوالة صادرة
-            مبلغ: SAR 50.00
-            في: 2026-08-05 11:00
-        """.trimIndent()
-    }
 }

@@ -34,5 +34,4 @@ object TestRuntime {
                 context.getSharedPreferences(it.name.removeSuffix(".xml"), Context.MODE_PRIVATE).edit().clear().commit()
             }
     }
-    fun enableLive(context: Context) = Unit
 }

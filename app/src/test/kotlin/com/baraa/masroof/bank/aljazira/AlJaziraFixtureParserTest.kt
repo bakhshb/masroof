@@ -1,5 +1,7 @@
 package com.baraa.masroof.bank.aljazira
 
+import com.baraa.masroof.testsupport.detailsOrNull
+import com.baraa.masroof.testsupport.eventOrNull
 import org.junit.Assume.assumeTrue
 import com.baraa.masroof.testsupport.EngineFixtureParser
 import com.baraa.masroof.testsupport.engineFixtureAdapter
@@ -25,7 +27,6 @@ import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.SmsParseInput
-import com.baraa.masroof.parsing.finalize.ParseFinalizer
 import com.baraa.masroof.parsing.validator.AutomaticUsePolicy
 import com.baraa.masroof.parsing.validator.DefaultParsedEventValidator
 import org.junit.Assert.assertEquals
@@ -94,6 +95,7 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
         assertEquals(fixture.id, Bank.BANK_ALJAZIRA, e.bank)
         assertEquals(fixture.id, MessageFamily.valueOf(expected.messageFamily), e.messageFamily)
         assertEquals(fixture.id, ParseStatus.valueOf(expected.parseStatus), e.parseStatus)
+        assertResultVariantMatchesStatus(result, e.parseStatus)
 
         assertEquals(fixture.id, expected.direction?.let { MoneyDirection.valueOf(it) }, e.direction)
         assertEquals(fixture.id, expected.purchaseChannel?.let { PurchaseChannel.valueOf(it) }, e.purchaseChannel)
@@ -163,6 +165,17 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
 
         assertFalse(result.toString().contains("SELF_TRANSFER"))
         assertFalse(result.toString().contains(TransferOwnershipType.SELF_TRANSFER.name))
+    }
+
+    /** The sealed ParseResult variant agrees with the event status. */
+    private fun assertResultVariantMatchesStatus(result: ParseResult, status: ParseStatus) {
+        val expected = when (status) {
+            ParseStatus.SUCCESS -> ParseResult.Success::class.java
+            ParseStatus.NON_FINANCIAL -> ParseResult.NonFinancial::class.java
+            ParseStatus.REVIEW_REQUIRED -> ParseResult.ReviewRequired::class.java
+            else -> return
+        }
+        assertTrue("${fixture.id}: $result", expected.isInstance(result))
     }
 
     /**
@@ -308,14 +321,10 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
     )
 
     private fun unpack(result: ParseResult): Pair<ParsedEvent?, ParsedEventDetails?> = when (result) {
-        is ParseResult.Success -> result.event to result.details
-        is ParseResult.Partial -> result.event to result.details
-        is ParseResult.ReviewRequired -> result.event to result.details
-        is ParseResult.NonFinancial -> result.event to result.details
         is ParseResult.Invalid -> result.draft?.let {
             runCatching { it.copy(parseStatus = it.parseStatus ?: ParseStatus.INVALID).toParsedEvent("evt-${fixture.id}") }.getOrNull()
         } to result.draft?.details
-        is ParseResult.Unsupported -> null to null
+        else -> result.eventOrNull() to result.detailsOrNull()
     }
 
     companion object {

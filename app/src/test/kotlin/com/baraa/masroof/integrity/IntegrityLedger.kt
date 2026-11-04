@@ -3,7 +3,6 @@ package com.baraa.masroof.integrity
 import com.baraa.masroof.application.dashboard.GoldenExpected
 import com.baraa.masroof.application.dashboard.GoldenLedgerRunner
 import com.baraa.masroof.application.dashboard.GoldenLedgerScenario
-import com.baraa.masroof.application.dashboard.GoldenLedgerSnapshot
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
@@ -59,7 +58,6 @@ import kotlin.random.Random
  */
 internal object IntegritySeeds {
     const val FORWARD = 20261009
-    const val REVERSE = 20261010
     const val LIVE_INBOX = 151515
     const val INSIDE_WINDOW = 180055
     const val AFTER_WINDOW = 200011
@@ -399,6 +397,27 @@ internal fun seededOrders(
     return orders.map { it.key to it.value }
 }
 
+/** Owned account 3001 with debit card 2210. */
+internal suspend fun purchaseLedger(world: DashboardLedgerWorld): IntegrityLedger {
+    ownAccounts(world, listOf("3001"))
+    ownCard(world, "2210", CardType.DEBIT)
+    return IntegrityLedger(world)
+}
+
+/** Owned accounts 3001 and 3002. */
+internal suspend fun transferLedger(world: DashboardLedgerWorld): IntegrityLedger {
+    ownAccounts(world, listOf("3001", "3002"))
+    return IntegrityLedger(world)
+}
+
+/** Two equal outgoing and two equal incoming intra-bank legs: no unique pair exists. */
+internal fun ambiguousTie(prefix: String): List<ProviderSmsRecord> = listOf(
+    providerRow("$prefix-tie-out-a", intraOut("2026-09-02 10:00"), "2026-09-02T07:00:00Z"),
+    providerRow("$prefix-tie-out-b", intraOut("2026-09-02 10:00"), "2026-09-02T07:00:01Z"),
+    providerRow("$prefix-tie-in-a", intraIn("2026-09-02 10:00"), "2026-09-02T07:00:02Z"),
+    providerRow("$prefix-tie-in-b", intraIn("2026-09-02 10:00"), "2026-09-02T07:00:03Z"),
+)
+
 internal suspend fun ownAccounts(world: DashboardLedgerWorld, masks: List<String>) {
     for (mask in masks) {
         world.accounts.setOwnership(
@@ -464,15 +483,12 @@ internal suspend fun assertFinancialInvariants(
     world: DashboardLedgerWorld,
     seed: Int,
     label: String,
-    retriesMustBeClear: Boolean = true,
 ) {
     val prefix = "seed=$seed $label"
     val retryIds = RoomProcessingRetryRepository(world.db.processingRetryDao())
         .listRetryableRawSmsIds()
         .toSet()
-    if (retriesMustBeClear) {
-        assertTrue("$prefix retry rows remain $retryIds", retryIds.isEmpty())
-    }
+    assertTrue("$prefix retry rows remain $retryIds", retryIds.isEmpty())
     val corrections = RoomUserCorrectionRepository(world.db.userCorrectionDao())
     val linkOwners = linkedMapOf<String, String>()
     for (transaction in world.ftRepo.listAll()) {

@@ -156,15 +156,7 @@ class ChartGuidanceInteractionTest {
         compose.runOnIdle { assertEquals(1, actions) }
     }
 
-    private fun capture(name: String) {
-        compose.waitForIdle()
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.waitForIdleSync()
-        android.os.SystemClock.sleep(250)
-        val screenshot = instrumentation.uiAutomation.takeScreenshot() ?: error("Screenshot missing")
-        try { ScreenshotArtifactWriter.publish(screenshot, "masroof-chart-guidance", name) }
-        finally { screenshot.recycle() }
-    }
+    private fun capture(name: String) = ScreenshotArtifactWriter.capture(compose, "masroof-chart-guidance", name)
 
     private fun pressOutsidePopup() {
         // Inject through Android's window manager: a Popup lives in a separate window.

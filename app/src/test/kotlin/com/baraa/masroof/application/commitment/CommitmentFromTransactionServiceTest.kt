@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.commitment
 
+import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Commitment
@@ -7,8 +8,6 @@ import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.repository.CommitmentRepository
-import com.baraa.masroof.domain.repository.FinancialTransactionRepository
-import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
@@ -40,18 +39,31 @@ class CommitmentFromTransactionServiceTest {
     }
 
     @Test
-    fun createFromTransaction_duplicateInsert_returnsAlreadyExists() = runBlocking {
+    fun createFromTransaction_insertRaceWithAStoredRow_returnsAlreadyExists() = runBlocking {
         val tx = transaction(id = "tx-netflix")
-        val repository = ThrowOnDuplicateCommitmentRepository()
-        val service = CommitmentFromTransactionService(
-            commitmentRepository = repository,
-            financialTransactionRepository = FakeFinancialTransactionRepository(listOf(tx)),
-            zoneId = zone,
-            clock = clock,
-        )
+        val stored = ThrowOnDuplicateCommitmentRepository()
+        // A concurrent writer stores the row between the pre-check and this insert.
+        val racing = object : CommitmentRepository by stored {
+            override suspend fun create(commitment: Commitment) {
+                stored.create(commitment)
+                throw IllegalStateException("duplicate sourceTransactionId")
+            }
+        }
+        val service = CommitmentFromTransactionService(racing, FakeFinancialTransactionRepository(listOf(tx)), zone, clock)
 
-        assertEquals(CommitmentCreationResult.Success, service.createFromTransaction(tx.id))
         assertEquals(CommitmentCreationResult.AlreadyExists, service.createFromTransaction(tx.id))
+        assertEquals(1, stored.created.size)
+    }
+
+    @Test
+    fun createFromTransaction_failedInsertWithoutARow_isRejected() = runBlocking {
+        val tx = transaction(id = "tx-netflix")
+        val failing = object : CommitmentRepository by ThrowOnDuplicateCommitmentRepository() {
+            override suspend fun create(commitment: Commitment): Unit = throw IllegalStateException("disk full")
+        }
+        val service = CommitmentFromTransactionService(failing, FakeFinancialTransactionRepository(listOf(tx)), zone, clock)
+
+        assertEquals(CommitmentCreationResult.Rejected("create_failed"), service.createFromTransaction(tx.id))
     }
 
     @Test
@@ -67,6 +79,7 @@ class CommitmentFromTransactionServiceTest {
 
         assertEquals(CommitmentCreationResult.Success, service.createFromTransaction(tx.id))
         assertEquals(CommitmentRecurrence.MONTHLY, repository.created.single().recurrence)
+        assertEquals(CommitmentCreationResult.AlreadyExists, service.createFromTransaction(tx.id))
     }
 
     @Test
@@ -104,15 +117,8 @@ class CommitmentFromTransactionServiceTest {
 
     private class FakeFinancialTransactionRepository(
         private val all: List<FinancialTransaction>,
-    ) : FinancialTransactionRepository {
-        override suspend fun save(
-            transaction: FinancialTransaction,
-            rawSmsIds: Collection<String>,
-        ): FinancialTransactionSaveResult = FinancialTransactionSaveResult.Saved
-
+    ) : EmptyFinancialTransactionRepository() {
         override suspend fun getById(id: String): FinancialTransaction? = all.firstOrNull { it.id == id }
-
-        override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
 
         override suspend fun listAll(): List<FinancialTransaction> = all
 
@@ -121,24 +127,6 @@ class CommitmentFromTransactionServiceTest {
             endExclusive: Instant,
         ): List<FinancialTransaction> =
             all.filter { !it.occurredAt.isBefore(startInclusive) && it.occurredAt.isBefore(endExclusive) }
-
-        override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
-
-        override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
-
-        override suspend fun update(transaction: FinancialTransaction): Boolean = false
-
-        override suspend fun updateAppliedExchangeRate(
-            id: String,
-            exchangeRate: java.math.BigDecimal,
-            source: com.baraa.masroof.domain.model.ExchangeRateSource,
-        ): Boolean = false
-
-        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
-
-        override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
-
-        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
     }
 
     private class ThrowOnDuplicateCommitmentRepository : CommitmentRepository {
@@ -163,6 +151,5 @@ class CommitmentFromTransactionServiceTest {
 
         override suspend fun listAll(): List<Commitment> = bySource.values.toList()
 
-        override suspend fun listActive(): List<Commitment> = bySource.values.filter { it.active }
     }
 }

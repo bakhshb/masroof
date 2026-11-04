@@ -24,16 +24,12 @@ object OwnedAccountPeriodSummaryCalculator {
     ): List<OwnedAccountPeriodSummary> =
         ownedAccounts.map { account ->
             val containerId = FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
-            val last4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
-                listOf(account.maskedNumber),
-            )
             val summary = CurrentAccountSummaryCalculator.summarize(
                 transactions = transactions,
                 parsedRecords = parsedRecords,
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
                 ownedAccountContainerIds = setOf(containerId),
-                ownedAccountLast4s = last4s,
                 scopeMode = AccountFlowScopeMode.SingleAccount,
                 debitCardScope = debitCardScope,
             )

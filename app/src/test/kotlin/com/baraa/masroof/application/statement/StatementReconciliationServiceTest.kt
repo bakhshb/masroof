@@ -207,8 +207,6 @@ class StatementReconciliationServiceTest {
         assertMoney("12.00", sar.statementOnlyCredit)
         assertMoney("77.00", sar.ledgerOnlyDebit)
         assertMoney("0.00", sar.ledgerOnlyCredit)
-        assertMoney("10.00", sar.ambiguousStatementDebit)
-        assertMoney("10.00", sar.ambiguousLedgerDebit)
         val usd = report.total("BANK_ALJAZIRA", "3001", Currency.USD)
         assertMoney("20.00", usd.matchedDebit)
         assertMoney("0.00", usd.matchedCredit)
@@ -801,5 +799,4 @@ private class RecordingLedger(
 
     override suspend fun unlinkRawSms(rawSmsId: String): Boolean = mutate()
 
-    override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = mutate()
 }

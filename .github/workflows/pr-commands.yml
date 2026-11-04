@@ -34,5 +34,4 @@ jobs:
           COMMENT_AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
           REPO: ${{ github.repository }}
         run: |
-          chmod +x scripts/handle-pr-comment.sh
           ./scripts/handle-pr-comment.sh

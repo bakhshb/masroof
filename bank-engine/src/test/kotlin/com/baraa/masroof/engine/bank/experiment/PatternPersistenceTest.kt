@@ -45,7 +45,6 @@ class PatternPersistenceTest {
         for (amount in listOf("5", "500", "1250.75", "1,250.50")) {
             val result = requireNotNull(pattern.preview("EXAMPLE_BANK", "Sender", body.replace("50", amount)))
             assertEquals(amount, result.fields.getValue("amount").raw)
-            assertFalse(result.financialPostingAllowed)
         }
         for (invalid in listOf("-5", "5.123", "1,25", "garbage", "1".repeat(161))) {
             assertNull(pattern.preview("EXAMPLE_BANK", "Sender", body.replace("50", invalid)))
@@ -98,7 +97,6 @@ class PatternPersistenceTest {
         val (body, expected) = example.variant(1)
         val match = requireNotNull(SavedMessagePattern.unique(listOf(pattern), "EXAMPLE_BANK", "STC Bank", body))
         assertEquals(expected, match.second.fields.mapValues { it.value.raw })
-        assertFalse(match.second.financialPostingAllowed)
     }
 
     @Test fun scopesDisableRevisionsAndConflicts() {

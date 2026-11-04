@@ -391,11 +391,7 @@ object CommitmentsOverviewBuilder {
     private fun isDateInPeriod(
         date: LocalDate,
         salaryPeriod: FinancialPeriod,
-    ): Boolean {
-        val anchorDate = date
-        return !anchorDate.isBefore(salaryPeriod.startDate) &&
-            anchorDate.isBefore(salaryPeriod.endDateExclusive)
-    }
+    ): Boolean = !date.isBefore(salaryPeriod.startDate) && date.isBefore(salaryPeriod.endDateExclusive)
 
     private data class MatchedCommitmentPayment(
         val transactionId: String,

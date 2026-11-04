@@ -384,7 +384,6 @@ private fun MasroofContent(
                         action = action,
                         settingsState = settingsState,
                         onRequestPermissions = onRequestPermissions,
-                        onOpenAppSettings = onOpenAppSettings,
                         onOpenReview = { push(HomeDestination.Review) },
                         onOpenSettings = { launch -> openSettings(launch = launch) },
                     )
@@ -514,20 +513,17 @@ private fun handleNotificationAction(
     action: NotificationAction,
     settingsState: com.baraa.masroof.presentation.settings.SettingsUiState,
     onRequestPermissions: () -> Unit,
-    onOpenAppSettings: () -> Unit,
     onOpenReview: () -> Unit,
     onOpenSettings: (SettingsLaunchRequest) -> Unit,
 ) {
     when (action) {
         NotificationAction.REQUEST_SMS_PERMISSION -> onRequestPermissions()
-        NotificationAction.OPEN_APP_SETTINGS -> onOpenAppSettings()
         NotificationAction.OPEN_REVIEW -> onOpenReview()
         NotificationAction.OPEN_SETTINGS_CARDS,
         NotificationAction.OPEN_SETTINGS_ACCOUNTS,
         NotificationAction.OPEN_SETTINGS_ABOUT,
         -> resolveNotificationSettingsLaunch(action, settingsState)?.let(onOpenSettings)
 
-        NotificationAction.DISMISS_RESCAN,
         NotificationAction.MARK_READ_ONLY -> Unit
     }
 }

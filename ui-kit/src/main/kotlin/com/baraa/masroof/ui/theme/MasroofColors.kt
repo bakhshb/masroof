@@ -13,15 +13,10 @@ object MasroofPalette {
     val Liability = Color(0xFFB45309)
     val LiabilitySoft = Color(0xFFFFFBEB)
     val Inflow = Color(0xFF047857)
-    val InflowSoft = Color(0xFFECFDF5)
     val Outflow = Color(0xFFB91C1C)
-    val OutflowSoft = Color(0xFFFEF2F2)
-    val Highlight = Color(0xFFFFF7ED)
-    val HighlightBorder = Color(0xFFFED7AA)
     val Text = Color(0xFF1A1F24)
     val Muted = Color(0xFF6B7280)
     val Border = Color(0xFFE5E7EB)
-    val HintBackground = Color(0xFFF9FAFB)
 }
 
 object MasroofLightColors {
@@ -94,8 +89,6 @@ data class MasroofExtendedColors(
     val inflowSoft: Color,
     val outflow: Color,
     val outflowSoft: Color,
-    val highlight: Color,
-    val highlightBorder: Color,
     val miniBackground: Color,
     val hintBackground: Color,
     val cardSurface: Color,
@@ -104,28 +97,7 @@ data class MasroofExtendedColors(
     val cardBorder: Color,
 )
 
-val LocalMasroofExtendedColors = staticCompositionLocalOf {
-    MasroofExtendedColors(
-        account = MasroofPalette.Account,
-        accountSoft = MasroofPalette.AccountSoft,
-        card = MasroofPalette.Card,
-        cardSoft = MasroofPalette.CardSoft,
-        liability = MasroofPalette.Liability,
-        liabilitySoft = MasroofPalette.LiabilitySoft,
-        inflow = MasroofPalette.Inflow,
-        inflowSoft = MasroofPalette.InflowSoft,
-        outflow = MasroofPalette.Outflow,
-        outflowSoft = MasroofPalette.OutflowSoft,
-        highlight = MasroofPalette.Highlight,
-        highlightBorder = MasroofPalette.HighlightBorder,
-        miniBackground = Color(0xFFF8FAFC),
-        hintBackground = MasroofPalette.HintBackground,
-        cardSurface = MasroofLightColors.Surface,
-        navCardSurface = MasroofLightColors.Surface,
-        navCardBorder = Color(0xFFE5E7EB),
-        cardBorder = Color(0xFFE5E7EB),
-    )
-}
+val LocalMasroofExtendedColors = staticCompositionLocalOf { lightExtendedColors() }
 
 fun lightExtendedColors() = MasroofExtendedColors(
     account = MasroofPalette.Account,
@@ -138,8 +110,6 @@ fun lightExtendedColors() = MasroofExtendedColors(
     inflowSoft = Color(0xFFF0FDF4),
     outflow = MasroofPalette.Outflow,
     outflowSoft = Color(0xFFFEF2F2),
-    highlight = MasroofPalette.Highlight,
-    highlightBorder = MasroofPalette.HighlightBorder,
     miniBackground = Color(0xFFF8FAFC),
     hintBackground = Color(0xFFF8FAFC),
     cardSurface = MasroofLightColors.Surface,
@@ -159,8 +129,6 @@ fun darkExtendedColors() = MasroofExtendedColors(
     inflowSoft = Color(0xFF0F3D2E),
     outflow = Color(0xFFFCA5A5),
     outflowSoft = Color(0xFF4A1515),
-    highlight = Color(0xFF7C2D12),
-    highlightBorder = Color(0xFFEA580C),
     miniBackground = MasroofDarkColors.SurfaceContainerLow,
     hintBackground = MasroofDarkColors.SurfaceContainerLow,
     cardSurface = MasroofDarkColors.SurfaceContainer,

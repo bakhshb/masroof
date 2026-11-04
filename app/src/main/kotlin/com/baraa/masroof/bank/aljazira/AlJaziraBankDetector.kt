@@ -52,9 +52,8 @@ class AlJaziraBankDetector : BankDetector {
         private val NON_ALPHANUMERIC = Regex("[^a-z0-9]")
         private val SENDER_SEPARATORS = Regex("[\\s\\-_.]+")
 
-        /** Arabic sender labels (after normalization). */
+        /** Arabic sender labels after [normalizeArabicSender], which folds ة to ه. */
         val ARABIC_SENDERS = setOf(
-            "بنكالجزيرة",
             "بنكالجزيره",
         )
 
@@ -84,7 +83,7 @@ class AlJaziraBankDetector : BankDetector {
         private fun isPlausibleSender(rawSender: String, normalizedSender: String): Boolean {
             if (normalizedSender.contains("aljazira")) return true
             val arabic = normalizeArabicSender(rawSender)
-            return arabic.contains("بنكالجزيرة") || arabic.contains("بنكالجزيره")
+            return arabic.contains("بنكالجزيره")
         }
 
         private fun bodySuggestsAlJazira(body: String): Boolean {

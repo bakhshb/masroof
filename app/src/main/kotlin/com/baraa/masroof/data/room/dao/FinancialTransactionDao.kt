@@ -210,14 +210,15 @@ interface FinancialTransactionDao {
     @Transaction
     suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean {
         val link = findLinkByRawSmsId(rawSmsId) ?: return false
-        val linkedRawSmsIds = listRawSmsIdsForTransaction(link.transactionId)
-        if (linkedRawSmsIds.size != 1 || linkedRawSmsIds.single() != rawSmsId) {
-            return false
-        }
+        if (!isOnlyLink(link.transactionId, rawSmsId)) return false
         deleteLinkByRawSmsId(rawSmsId)
         deleteTransactionById(link.transactionId)
         return true
     }
+
+    /** True when [rawSmsId] is the transaction's only evidence link. */
+    private suspend fun isOnlyLink(transactionId: String, rawSmsId: String): Boolean =
+        listRawSmsIdsForTransaction(transactionId) == listOf(rawSmsId)
 
     /** Removes one evidence link; deletes the transaction when it has no links left. */
     @Transaction
@@ -244,8 +245,7 @@ interface FinancialTransactionDao {
         for (rawSmsId in staleRawSmsIds.distinct()) {
             val link = findLinkByRawSmsId(rawSmsId) ?: continue
             if (link.transactionId == entity.id) continue
-            val linkedRawSmsIds = listRawSmsIdsForTransaction(link.transactionId)
-            if (linkedRawSmsIds.size != 1 || linkedRawSmsIds.single() != rawSmsId) {
+            if (!isOnlyLink(link.transactionId, rawSmsId)) {
                 return SaveAtomicOutcome.Conflict(rawSmsId, link.transactionId)
             }
             staleTransactionIds += link.transactionId

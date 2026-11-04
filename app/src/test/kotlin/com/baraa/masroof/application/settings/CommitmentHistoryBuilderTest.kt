@@ -1,11 +1,7 @@
 package com.baraa.masroof.application.settings
 
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
-import com.baraa.masroof.domain.model.Commitment
+import com.baraa.masroof.testsupport.sampleCommitment
 import com.baraa.masroof.domain.model.CommitmentPauseInterval
-import com.baraa.masroof.domain.model.CommitmentRecurrence
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -77,25 +73,5 @@ class CommitmentHistoryBuilderTest {
         val summaries = CommitmentHistoryBuilder.intervalSummaries(commitment, zone)
 
         assertTrue(summaries.isEmpty())
-    }
-
-    private fun sampleCommitment(
-        id: String = RegistryEntityIdFactory.newCommitmentId(),
-        active: Boolean = true,
-        updatedAt: Instant = Instant.parse("2026-08-01T00:00:00Z"),
-    ): Commitment {
-        val now = Instant.parse("2026-08-01T00:00:00Z")
-        return Commitment(
-            id = id,
-            name = "Netflix",
-            amount = Money.of("71.00", Currency.SAR),
-            transactionDate = LocalDate.parse("2026-08-01"),
-            recurrence = CommitmentRecurrence.MONTHLY,
-            dueDate = null,
-            active = active,
-            sourceTransactionId = "tx-$id",
-            createdAt = now,
-            updatedAt = updatedAt,
-        )
     }
 }

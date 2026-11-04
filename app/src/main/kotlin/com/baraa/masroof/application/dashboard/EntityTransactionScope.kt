@@ -20,9 +20,6 @@ object EntityTransactionScope {
         CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(listOf(maskedNumber)),
     )
 
-    /** Account whose stored id is [ownedContainerId], matching another container by the same last four digits. */
-    fun account(ownedContainerId: String, ownedLast4s: Set<String>): Account = Account(ownedContainerId, ownedLast4s)
-
     fun matchesAccount(containerId: String?, account: Account): Boolean {
         if (containerId == null) return false
         if (containerId == account.containerId) return true

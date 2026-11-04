@@ -25,7 +25,6 @@ class AccountFlowClassifierTest {
     private val cardId = "card:bank_aljazira:7271"
     private val scope = CurrentAccountTransactionScope(
         ownedContainerIds = setOf(accountId),
-        ownedAccountLast4s = setOf("3001"),
         mode = AccountFlowScopeMode.SingleAccount,
     )
 
@@ -33,7 +32,6 @@ class AccountFlowClassifierTest {
     fun income_onOwnedDestination_classifiedAsSalaryWhenHeuristicMatches() {
         val tx = tx("salary", FinancialTransactionType.INCOME, "15000", dest = accountId, linked = listOf("evt-1"))
         val context = AccountFlowClassifier.buildContext(
-            transactions = listOf(tx),
             parsedRecords = listOf(parsedRecord("evt-1", MessageFamily.TRANSFER_IN)),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
@@ -76,7 +74,6 @@ class AccountFlowClassifierTest {
             linked = listOf("evt-refund"),
         )
         val context = AccountFlowClassifier.buildContext(
-            transactions = listOf(tx),
             parsedRecords = listOf(
                 parsedRecord(
                     "evt-refund",
@@ -107,7 +104,6 @@ class AccountFlowClassifierTest {
             linked = listOf("evt-card-account"),
         )
         val context = AccountFlowClassifier.buildContext(
-            transactions = listOf(tx),
             parsedRecords = listOf(
                 parsedRecord(
                     "evt-card-account",
@@ -129,7 +125,6 @@ class AccountFlowClassifierTest {
     fun refund_toCreditCard_isExcludedFromAccountCash() {
         val tx = tx("card-refund", FinancialTransactionType.REFUND, "25", dest = cardId)
         val context = AccountFlowClassifier.buildContext(
-            transactions = listOf(tx),
             parsedRecords = listOf(
                 parsedRecord(
                     "evt-card-refund",
@@ -167,7 +162,6 @@ class AccountFlowClassifierTest {
         val debitCardId = "card:bank_aljazira:2210"
         val tx = tx("mada-refund", FinancialTransactionType.REFUND, "20", dest = debitCardId, linked = listOf("evt-mada"))
         val context = AccountFlowClassifier.buildContext(
-            transactions = listOf(tx),
             parsedRecords = listOf(
                 parsedRecord(
                     "evt-mada",
@@ -201,7 +195,6 @@ class AccountFlowClassifierTest {
         )
         val bothSidesScope = CurrentAccountTransactionScope(
             ownedContainerIds = setOf(accountId, "account:bank_aljazira:4002"),
-            ownedAccountLast4s = setOf("3001", "4002"),
             mode = AccountFlowScopeMode.Fleet,
         )
 
@@ -220,7 +213,6 @@ class AccountFlowClassifierTest {
     fun billPaymentExpense_usesBillPaymentCategory() {
         val tx = tx("bill", FinancialTransactionType.EXPENSE, "120", source = accountId, linked = listOf("evt-bill"))
         val context = AccountFlowClassifier.buildContext(
-            transactions = listOf(tx),
             parsedRecords = listOf(parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT)),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
@@ -243,7 +235,6 @@ class AccountFlowClassifierTest {
             transactions = listOf(refund),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountId),
-            ownedAccountLast4s = setOf("3001"),
         )
         assertEquals(Money.zero(Currency.SAR), summary.inflow.accountRefunds)
     }
@@ -288,13 +279,11 @@ class AccountFlowClassifierTest {
 
     private fun fleetScope() = CurrentAccountTransactionScope(
         ownedContainerIds = setOf(accountId),
-        ownedAccountLast4s = setOf("3001"),
         mode = AccountFlowScopeMode.Fleet,
     )
 
     private fun emptyContext() = AccountFlowClassificationContext(
         parsedRecordsById = emptyMap(),
-        billPaymentTxIds = emptySet(),
         primaryCurrency = Currency.SAR,
         sarEquivalents = emptyMap(),
     )

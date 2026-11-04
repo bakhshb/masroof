@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -159,14 +160,4 @@ class LiveCaptureFailureTest {
 
     private fun live(at: String = "2026-08-03T14:32:00Z"): RawSms =
         AndroidSmsMapper.toRawSms(ProviderSmsRecord(null, "AlJazira", PURCHASE_BODY, Instant.parse(at)))
-
-    private companion object {
-        val PURCHASE_BODY = """
-            شراء عبر الانترنت
-            بطاقة: 7271
-            لدى: Keeta
-            بمبلغ: 51.99 SAR
-            في: 14:32 03-08-2026
-        """.trimIndent()
-    }
 }

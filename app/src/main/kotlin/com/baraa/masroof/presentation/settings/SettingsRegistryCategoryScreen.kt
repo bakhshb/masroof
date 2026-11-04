@@ -13,7 +13,6 @@ import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
-import com.baraa.masroof.presentation.common.MasroofTextStyles
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

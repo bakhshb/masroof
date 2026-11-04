@@ -8,8 +8,8 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardType
+import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.ParseResult
@@ -41,70 +41,21 @@ class MadaGooglePayPosReproTest {
     """.trimIndent()
 
     @Test
-    fun googlePayMadaPos_parsesWithoutSourceAccount() {
-        val result = pipeline.parse(
-            SmsParseInput(
-                rawSmsId = "sms-google-pay",
-                sender = "AlJazira",
-                body = googlePayBody,
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-            ),
-        ) as ParseResult.Success
-
-        assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
-        assertEquals("8219", result.event.cardRef?.last4)
-        assertEquals("MALAYSIA FOODS RESTA", result.event.merchant)
-        assertEquals(Money.of("127.00", Currency.SAR), result.event.amount)
-        assertNull(result.event.sourceAccountRef)
-    }
-
-    @Test
     fun googlePayMadaPos_assemblesWithCardSourceOnly() {
-        val parsed = pipeline.parse(
-            SmsParseInput(
-                rawSmsId = "sms-google-pay",
-                sender = "AlJazira",
-                body = googlePayBody,
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-            ),
-        ) as ParseResult.Success
+        val (parsed, tx) = parseAndAssemble(googlePayBody)
 
-        val assembled = TransactionAssembler.assembleSingle(
-            event = parsed.event,
-            receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-            sourceOwnership = OwnershipStatus.UNKNOWN,
-            destinationOwnership = OwnershipStatus.UNKNOWN,
-            cardOwnership = OwnershipStatus.OWNED,
-        ) as TransactionAssembler.Outcome.Assembled
-
-        assertEquals(FinancialTransactionType.EXPENSE, assembled.transaction.type)
+        // Google Pay Mada carries no account line: no bank-only phantom source reference.
+        assertNull(parsed.event.sourceAccountRef)
+        assertEquals(FinancialTransactionType.EXPENSE, tx.type)
         assertEquals(
             FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "8219"),
-            assembled.transaction.sourceContainerId,
+            tx.sourceContainerId,
         )
     }
 
     @Test
     fun googlePayMadaPos_countsTowardLinkedDebitCardSpending() {
-        val parsed = pipeline.parse(
-            SmsParseInput(
-                rawSmsId = "sms-google-pay",
-                sender = "AlJazira",
-                body = googlePayBody,
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-            ),
-        ) as ParseResult.Success
-
-        val assembled = TransactionAssembler.assembleSingle(
-            event = parsed.event,
-            receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-            sourceOwnership = OwnershipStatus.UNKNOWN,
-            destinationOwnership = OwnershipStatus.UNKNOWN,
-            cardOwnership = OwnershipStatus.OWNED,
-        ) as TransactionAssembler.Outcome.Assembled
-
-        val tx = assembled.transaction.copy(occurredAt = Instant.parse("2026-08-03T10:24:00Z"))
-        val parsedRecord = ParsedEventRecord(event = parsed.event, details = parsed.details)
+        val (parsedRecord, tx) = parseAndAssemble(googlePayBody)
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",
@@ -125,7 +76,6 @@ class MadaGooglePayPosReproTest {
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             zoneId = zoneId,
         )
 
@@ -143,25 +93,7 @@ class MadaGooglePayPosReproTest {
 
     @Test
     fun googlePayMadaPos_countsTowardFleetCurrentAccountPosPurchases() {
-        val parsed = pipeline.parse(
-            SmsParseInput(
-                rawSmsId = "sms-google-pay",
-                sender = "AlJazira",
-                body = googlePayBody,
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-            ),
-        ) as ParseResult.Success
-
-        val assembled = TransactionAssembler.assembleSingle(
-            event = parsed.event,
-            receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-            sourceOwnership = OwnershipStatus.UNKNOWN,
-            destinationOwnership = OwnershipStatus.UNKNOWN,
-            cardOwnership = OwnershipStatus.OWNED,
-        ) as TransactionAssembler.Outcome.Assembled
-
-        val tx = assembled.transaction.copy(occurredAt = Instant.parse("2026-08-03T10:24:00Z"))
-        val parsedRecord = ParsedEventRecord(event = parsed.event, details = parsed.details)
+        val (parsedRecord, tx) = parseAndAssemble(googlePayBody)
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",
@@ -171,14 +103,12 @@ class MadaGooglePayPosReproTest {
             lastSeenRawSmsId = "sms",
         )
         val owned = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
-        val cardId = FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "8219")
         val debitCardScope = DebitCardScopeFactory.fromRegistry(listOf(debit))
 
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(tx),
             parsedRecords = listOf(parsedRecord),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             debitCardScope = debitCardScope,
         )
 
@@ -186,8 +116,6 @@ class MadaGooglePayPosReproTest {
             Money.of("127.00", Currency.SAR),
             summary.outflow.posPurchases,
         )
-        requireNotNull(cardId)
-        requireNotNull(owned)
     }
 
     @Test
@@ -201,25 +129,7 @@ class MadaGooglePayPosReproTest {
             إجمالي المبلغ المستحق:3921.11 SAR
         """.trimIndent()
 
-        val parsed = pipeline.parse(
-            SmsParseInput(
-                rawSmsId = "sms-credit-google-pay",
-                sender = "AlJazira",
-                body = creditGooglePayBody,
-                receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-            ),
-        ) as ParseResult.Success
-
-        val assembled = TransactionAssembler.assembleSingle(
-            event = parsed.event,
-            receivedAt = Instant.parse("2026-08-03T10:24:00Z"),
-            sourceOwnership = OwnershipStatus.UNKNOWN,
-            destinationOwnership = OwnershipStatus.UNKNOWN,
-            cardOwnership = OwnershipStatus.OWNED,
-        ) as TransactionAssembler.Outcome.Assembled
-
-        val tx = assembled.transaction.copy(occurredAt = Instant.parse("2026-08-03T10:24:00Z"))
-        val parsedRecord = ParsedEventRecord(event = parsed.event, details = parsed.details)
+        val (parsedRecord, tx) = parseAndAssemble(creditGooglePayBody, rawSmsId = "sms-credit-google-pay")
         val debit = CardRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,
             last4 = "8219",
@@ -241,7 +151,6 @@ class MadaGooglePayPosReproTest {
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             zoneId = zoneId,
         )
 
@@ -259,12 +168,31 @@ class MadaGooglePayPosReproTest {
             transactions = listOf(tx),
             parsedRecords = listOf(parsedRecord),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             debitCardScope = debitCardScope,
         )
         assertEquals(
             Money.zero(Currency.SAR),
             accountSummary.outflow.posPurchases,
         )
+    }
+
+    /** Parses [body] and assembles it with an owned card, as reconciliation would. */
+    private fun parseAndAssemble(
+        body: String,
+        rawSmsId: String = "sms-google-pay",
+    ): Pair<ParsedEventRecord, FinancialTransaction> {
+        val at = Instant.parse("2026-08-03T10:24:00Z")
+        val parsed = pipeline.parse(
+            SmsParseInput(rawSmsId = rawSmsId, sender = "AlJazira", body = body, receivedAt = at),
+        ) as ParseResult.Success
+        val assembled = TransactionAssembler.assembleSingle(
+            event = parsed.event,
+            receivedAt = at,
+            sourceOwnership = OwnershipStatus.UNKNOWN,
+            destinationOwnership = OwnershipStatus.UNKNOWN,
+            cardOwnership = OwnershipStatus.OWNED,
+        ) as TransactionAssembler.Outcome.Assembled
+        return ParsedEventRecord(event = parsed.event, details = parsed.details) to
+            assembled.transaction.copy(occurredAt = at)
     }
 }

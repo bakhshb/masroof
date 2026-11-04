@@ -138,8 +138,7 @@ object BankHierarchyBuilder {
                             id = loan.id,
                             bank = loan.bank,
                             loanType = loan.loanType,
-                            displayLabel = loan.displayName?.trim()?.takeIf { it.isNotEmpty() }
-                                ?: defaultLoanLabel(loan.loanType),
+                            displayLabel = RegistryDisplayLabels.loanLabel(loan),
                         )
                     },
             )
@@ -147,13 +146,6 @@ object BankHierarchyBuilder {
 
         return BankHierarchyOverview(banks = trees)
     }
-
-    private fun defaultLoanLabel(loanType: LoanType): String =
-        when (loanType) {
-            LoanType.PERSONAL -> "Personal loan"
-            LoanType.AUTO -> "Auto loan"
-            LoanType.MORTGAGE -> "Mortgage"
-        }
 }
 
 /** One rule for Home and Settings: a debit card sits under the current account its linked number names. */

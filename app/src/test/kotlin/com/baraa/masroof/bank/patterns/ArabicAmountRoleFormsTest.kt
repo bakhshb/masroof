@@ -1,7 +1,7 @@
 package com.baraa.masroof.bank.patterns
 
+import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
-import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.SmsParseInput
@@ -9,14 +9,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 import java.time.Instant
 
 /** Every bundled bank reads the common Arabic amount roles, with or without spaces and Arabic digits. */
 class ArabicAmountRoleFormsTest {
     private val banks = mapOf("BANK_ALJAZIRA" to "AlJazira", "BANK_SNB" to "SNB-AlAhli", "BANK_ALINMA" to "alinma",
         "BANK_SAB" to "SAB", "BANK_BARQ" to "barq app", "BANK_EMIRATES_NBD" to "EmiratesNBD")
-    private fun adapter(bank: String) = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/$bank.patterns.json").readText())
+    private fun adapter(bank: String) = bundledPatterns(bank)
         .let { MessagePatternSmsAdapter(it.banks.single(), PatternFactInterpreter(it)) }
     private fun parse(bank: String, body: String) =
         adapter(bank).parse(SmsParseInput("amount-form", banks.getValue(bank), body, Instant.parse("2026-10-15T10:00:00Z")))

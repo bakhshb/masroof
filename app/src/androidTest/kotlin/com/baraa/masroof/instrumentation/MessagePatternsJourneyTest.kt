@@ -8,7 +8,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.baraa.masroof.R
 import com.baraa.masroof.application.patterns.MessagePatternsWorkflow
 import com.baraa.masroof.data.patterns.MessagePatternStore
@@ -261,12 +260,7 @@ class MessagePatternsJourneyTest {
         if (runCatching { node.assertIsDisplayed() }.isFailure) node.performScrollTo()
         node.performClick(); compose.waitForIdle()
     }
-    private fun capture(name: String) {
-        compose.waitForIdle()
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        android.os.SystemClock.sleep(250)
-        ScreenshotArtifactWriter.publish(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot(), "pattern-journey", name)
-    }
+    private fun capture(name: String) = ScreenshotArtifactWriter.capture(compose, "pattern-journey", name)
 
     /** Read-only text either has no SetText action (Compose 1.8+) or ignores it; the text must stay. */
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertRejectsTextEdits(original: String) {

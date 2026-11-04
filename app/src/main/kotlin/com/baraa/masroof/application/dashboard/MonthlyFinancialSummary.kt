@@ -3,7 +3,6 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.period.FinancialPeriod
-import java.math.RoundingMode
 
 /**
  * Currency-scoped monthly dashboard projection derived from FinancialTransaction rows.
@@ -24,24 +23,6 @@ data class MonthlyFinancialSummary(
     val reviewRequiredCount: Int,
     val excludedOtherCurrencyCount: Int = 0,
 ) {
-    /** Salary/reward income plus external inbound transfers (separate buckets in UI). */
-    val combinedIncoming: Money
-        get() = income + externalTransfersIn
-
-    /**
-     * Period net cash change from external flows and spending (excludes self-transfers,
-     * card payments, and cash withdrawals which are neutral internal movements).
-     */
-    val netCashFlow: SignedMoneyAmount
-        get() {
-            val net = income.amount
-                .add(externalTransfersIn.amount)
-                .subtract(externalTransfersOut.amount)
-                .subtract(spendingNet.amount)
-                .setScale(Money.SCALE, RoundingMode.HALF_EVEN)
-            return SignedMoneyAmount(net, currency)
-        }
-
     init {
         require(spendingGross.currency == currency)
         require(refunds.currency == currency)

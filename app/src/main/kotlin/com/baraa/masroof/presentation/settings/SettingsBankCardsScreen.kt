@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
+import com.baraa.masroof.presentation.common.OwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
@@ -101,12 +101,7 @@ fun SettingsBankCardsScreen(
                 hint = stringResource(R.string.settings_cards_hint),
                 onOpenBank = onOpenBank,
             )
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.shortcutGap), verticalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.shortcutGap)) {
-                listOf("followed" to R.string.reference_followed, "unconfirmed" to R.string.reference_unconfirmed,
-                    "stopped" to R.string.reference_stopped).forEach { (key, label) ->
-                    com.baraa.masroof.presentation.common.MasroofChoice(stringResource(label), referenceTab == key, { referenceTab = key })
-                }
-            }
+            SettingsRegistryTabs(referenceTab) { referenceTab = it }
 
 
             if (followedCards.isEmpty() && unregisteredCards.isEmpty() && stoppedCards.isEmpty()) {
@@ -131,7 +126,9 @@ fun SettingsBankCardsScreen(
                             }
                         },
                         footer = {
-                            CardOwnershipInlinePrompt(
+                            OwnershipInlinePrompt(
+                                titleRes = R.string.ownership_prompt_needs_confirm,
+                                confirmRes = R.string.onboarding_is_mine_card,
                                 enabled = !state.updating,
                                 onConfirmOwned = { onConfirmOwned(card) },
                                 onMarkExternal = { onMarkExternal(card) },
@@ -173,13 +170,7 @@ fun SettingsBankCardsScreen(
                 }
             }
 
-            state.error?.let {
-                Text(
-                    stringResource(settingsErrorRes(it)),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
+            state.error?.let { SettingsUpdateFailedText(it) }
             onAddManual?.let { action -> com.baraa.masroof.presentation.common.MasroofOutlinedButton(action,
                 enabled = !state.updating, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.settings_add_card_manual))

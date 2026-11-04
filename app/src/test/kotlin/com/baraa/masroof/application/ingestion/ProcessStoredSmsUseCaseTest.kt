@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.ingestion
 
+import com.baraa.masroof.testsupport.LookalikeBankAdapter
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -7,7 +9,6 @@ import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
-import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.testsupport.EngineFixtureParser
 import com.baraa.masroof.testsupport.engineFixtureAdapter
@@ -21,7 +22,6 @@ import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
@@ -32,9 +32,6 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
-import com.baraa.masroof.parsing.model.BankDetectionResult
-import com.baraa.masroof.parsing.model.ParseResult
-import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
@@ -158,7 +155,7 @@ class ProcessStoredSmsUseCaseTest {
 
     @Test
     fun processById_ambiguousEvidence_leavesOneDurableReview_idempotently() = runBlocking {
-        val ambiguous = BankSmsRegistry(listOf(engineFixtureAdapter(pipeline = countingGateway()), LookalikeAdapter()))
+        val ambiguous = BankSmsRegistry(listOf(engineFixtureAdapter(pipeline = countingGateway()), LookalikeBankAdapter()))
         val svc = ProcessStoredSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
@@ -176,13 +173,6 @@ class ProcessStoredSmsUseCaseTest {
         assertEquals(listOf(IngestionReviewService.REASON_AMBIGUOUS_BANK_ROUTE), reviews.single().reasons)
         assertNull(parsedRepo.findByRawSmsId(raw.id))
         assertEquals(0, parseCalls.get())
-    }
-
-    private class LookalikeAdapter : BankSmsAdapter {
-        override val bank: Bank = Bank("LOOKALIKE_BANK")
-        override fun detect(sender: String, body: String): BankDetectionResult =
-            BankDetectionResult.Detected(bank = bank, confidence = Confidence(1.0), evidence = listOf("lookalike"))
-        override fun parse(input: SmsParseInput): ParseResult = ParseResult.Unsupported(reason = "lookalike")
     }
 
     @Test
@@ -319,14 +309,4 @@ class ProcessStoredSmsUseCaseTest {
 
     private fun sms(body: String, at: String = "2026-08-03T14:32:00Z"): RawSms =
         AndroidSmsMapper.toRawSms(ProviderSmsRecord(null, "AlJazira", body, Instant.parse(at)))
-
-    private companion object {
-        val PURCHASE_BODY = """
-            شراء عبر الانترنت
-            بطاقة: 7271
-            لدى: Keeta
-            بمبلغ: 51.99 SAR
-            في: 14:32 03-08-2026
-        """.trimIndent()
-    }
 }

@@ -33,11 +33,9 @@ class CaptureBankSmsUseCase(
         require(bankSmsRegistry.adapterFor(bank) != null) { "Bank scope is not registered" }
     }
 
-    suspend fun capture(rawSms: RawSms, logOutcome: Boolean = true, bankScope: Bank? = null,
+    suspend fun capture(rawSms: RawSms, logOutcome: Boolean = true,
         bankScopes: Set<Bank>? = null): BankSmsCaptureResult {
-        require(bankScope == null || bankScopes == null)
-        val scopes = bankScopes ?: bankScope?.let(::setOf)
-        scopes?.let { require(it.isNotEmpty()); it.forEach(::requireSupportedBank) }
+        bankScopes?.let { require(it.isNotEmpty()); it.forEach(::requireSupportedBank) }
         val route = try {
             bankSmsRegistry.route(rawSms.sender, rawSms.body)
         } catch (e: CancellationException) {
@@ -46,9 +44,9 @@ class CaptureBankSmsUseCase(
             return failed(rawSms, e, logOutcome)
         }
         // Scope filters evidence; it never selects an adapter or resolves a collision.
-        if (scopes != null && !when (route) {
-                is BankRoutingResult.Matched -> route.adapter.bank in scopes
-                is BankRoutingResult.Ambiguous -> route.banks.any { it in scopes }
+        if (bankScopes != null && !when (route) {
+                is BankRoutingResult.Matched -> route.adapter.bank in bankScopes
+                is BankRoutingResult.Ambiguous -> route.banks.any { it in bankScopes }
                 is BankRoutingResult.SuspectedBank, is BankRoutingResult.NotMatched -> false
             }) return BankSmsCaptureResult.NotRelevant(reason = "outside_bank_scope")
         if (route is BankRoutingResult.NotMatched) {

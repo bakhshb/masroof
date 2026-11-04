@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.dashboard
 
+import com.baraa.masroof.application.dashboard.EntityTransactionScope
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
@@ -23,8 +24,7 @@ class AccountTransactionPresentationTest {
 
         val direction = AccountTransactionPresentation.directionForAccount(
             tx = tx,
-            ownedContainerId = account3002,
-            ownedLast4s = setOf("3002"),
+            account = EntityTransactionScope.account(Bank.BANK_ALJAZIRA, "3002"),
         )
 
         assertEquals(TransactionDirectionUi.TRANSFER_IN, direction)
@@ -43,8 +43,7 @@ class AccountTransactionPresentationTest {
 
         val direction = AccountTransactionPresentation.directionForAccount(
             tx = tx,
-            ownedContainerId = account3002,
-            ownedLast4s = setOf("3002"),
+            account = EntityTransactionScope.account(Bank.BANK_ALJAZIRA, "3002"),
         )
 
         assertEquals(TransactionDirectionUi.OUTWARD, direction)

@@ -90,9 +90,9 @@ class DatabaseBackupEncryptionTest {
                 val bytes = destination.readBytes()
                 assertTrue(BackupEnvelope.looksLikeEnvelope(bytes, bytes.size))
                 assertFalse(bytes.copyOfRange(0, 4).contentEquals(ZIP_LOCAL))
-                assertFalse(contains(bytes, SMS_FIXTURE.toByteArray(Charsets.UTF_8)))
-                assertFalse(contains(bytes, "SQLite format 3".toByteArray(Charsets.US_ASCII)))
-                assertFalse(contains(bytes, passphrase.concatToString().toByteArray(Charsets.UTF_8)))
+                assertFalse(containsBytes(bytes, SMS_FIXTURE.toByteArray(Charsets.UTF_8)))
+                assertFalse(containsBytes(bytes, "SQLite format 3".toByteArray(Charsets.US_ASCII)))
+                assertFalse(containsBytes(bytes, passphrase.concatToString().toByteArray(Charsets.UTF_8)))
                 assertTrue(logs.readAll().none { it.message.contains(passphrase.concatToString()) })
                 assertEquals(TEST_KDF_ITERATIONS, readIterations(bytes))
             } finally {
@@ -305,23 +305,17 @@ class DatabaseBackupEncryptionTest {
                     assertEquals(BackupImportOutcome.InvalidPackage, outcome)
                     zip.delete()
                 }
-                val encryptedHostile = File(context.cacheDir, "encrypted-hostile.masroof")
-                FileOutputStream(encryptedHostile).use { output ->
-                    BackupEnvelope.encrypt(output, passphrase.copyOf(), TEST_KDF_ITERATIONS) { plain ->
-                        ZipOutputStream(plain).use { zip ->
-                            listOf(
-                                BackupPackageFormat.MANIFEST_ENTRY,
-                                BackupPackageFormat.DATABASE_ENTRY,
-                                BackupPackageFormat.PREFERENCES_ENTRY,
-                                "notes.txt",
-                            ).forEach { name ->
-                                zip.putNextEntry(ZipEntry(name))
-                                zip.write(byteArrayOf(1, 2, 3, 4))
-                                zip.closeEntry()
-                            }
-                        }
-                    }
-                }
+                val encryptedHostile = writeEncryptedPackage(
+                    File(context.cacheDir, "encrypted-hostile.masroof"),
+                    passphrase.copyOf(),
+                    TEST_KDF_ITERATIONS,
+                    listOf(
+                        BackupPackageFormat.MANIFEST_ENTRY,
+                        BackupPackageFormat.DATABASE_ENTRY,
+                        BackupPackageFormat.PREFERENCES_ENTRY,
+                        "notes.txt",
+                    ).map { it to byteArrayOf(1, 2, 3, 4) },
+                )
                 val encryptedOutcome = importer.importFrom(
                     Uri.fromFile(encryptedHostile),
                     passphrase.copyOf(),
@@ -404,16 +398,12 @@ class DatabaseBackupEncryptionTest {
                         maxTotalUncompressedBytes = 64 * 1024,
                     ),
                 )
-                val envelope = File(context.cacheDir, "encrypted-bomb.masroof")
-                FileOutputStream(envelope).use { output ->
-                    BackupEnvelope.encrypt(output, passphrase.copyOf(), TEST_KDF_ITERATIONS) { plain ->
-                        ZipOutputStream(plain).use { zip ->
-                            zip.putNextEntry(ZipEntry(BackupPackageFormat.MANIFEST_ENTRY))
-                            zip.write(ByteArray(8 * 1024))
-                            zip.closeEntry()
-                        }
-                    }
-                }
+                val envelope = writeEncryptedPackage(
+                    File(context.cacheDir, "encrypted-bomb.masroof"),
+                    passphrase.copyOf(),
+                    TEST_KDF_ITERATIONS,
+                    listOf(BackupPackageFormat.MANIFEST_ENTRY to ByteArray(8 * 1024)),
+                )
                 assertTrue(envelope.length() < 64 * 1024)
                 val outcome = importer.importFrom(Uri.fromFile(envelope), passphrase.copyOf())
                 assertEquals(BackupImportOutcome.InvalidPackage, outcome)
@@ -607,13 +597,7 @@ class DatabaseBackupEncryptionTest {
 
     private fun hostileZip(vararg entries: Pair<String, ByteArray>): File {
         val file = File(context.cacheDir, "hostile-${System.nanoTime()}.masroof")
-        ZipOutputStream(FileOutputStream(file)).use { zip ->
-            entries.forEach { (name, bytes) ->
-                zip.putNextEntry(ZipEntry(name))
-                zip.write(bytes)
-                zip.closeEntry()
-            }
-        }
+        FileOutputStream(file).use { writeZip(it, entries.toList()) }
         return file
     }
 
@@ -639,21 +623,6 @@ class DatabaseBackupEncryptionTest {
             ((envelope[11].toInt() and 0xff) shl 16) or
             ((envelope[12].toInt() and 0xff) shl 8) or
             (envelope[13].toInt() and 0xff)
-
-    private fun contains(haystack: ByteArray, needle: ByteArray): Boolean {
-        if (needle.isEmpty() || haystack.size < needle.size) return false
-        for (start in 0..haystack.size - needle.size) {
-            var matches = true
-            for (index in needle.indices) {
-                if (haystack[start + index] != needle[index]) {
-                    matches = false
-                    break
-                }
-            }
-            if (matches) return true
-        }
-        return false
-    }
 
     private fun assertNoBackupStaging() {
         val leftovers = context.cacheDir.listFiles().orEmpty().filter { it.name.startsWith("masroof-backup-") }

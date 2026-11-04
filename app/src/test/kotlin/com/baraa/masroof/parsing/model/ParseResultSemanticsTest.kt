@@ -6,11 +6,9 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
-import com.baraa.masroof.parsing.validator.ValidationFinding
-import com.baraa.masroof.parsing.validator.ValidationSeverity
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
@@ -28,27 +26,8 @@ class ParseResultSemanticsTest {
         ).toParsedEvent("evt-1")
 
     @Test
-    fun success_isDistinctFromReviewAndInvalid() {
-        val success: ParseResult = ParseResult.Success(event(ParseStatus.SUCCESS))
-        val review: ParseResult = ParseResult.ReviewRequired(
-            draft = null,
-            event = null,
-            findings = emptyList(),
-            reasons = listOf("unknown_format"),
-        )
-        val invalid: ParseResult = ParseResult.Invalid(
-            findings = listOf(
-                ValidationFinding("V-009", "missing amount", ValidationSeverity.ERROR),
-            ),
-        )
-        assertTrue(success is ParseResult.Success)
-        assertTrue(review is ParseResult.ReviewRequired)
-        assertTrue(invalid is ParseResult.Invalid)
-        assertFalse(success::class == review::class)
-    }
-
-    @Test
-    fun success_rejectsNonSuccessParseStatus() {
+    fun success_acceptsOnlySuccessParseStatus() {
+        assertEquals(ParseStatus.SUCCESS, ParseResult.Success(event(ParseStatus.SUCCESS)).event.parseStatus)
         assertThrows(IllegalArgumentException::class.java) {
             ParseResult.Success(event(ParseStatus.REVIEW_REQUIRED))
         }
@@ -70,6 +49,7 @@ class ParseResultSemanticsTest {
 
     @Test
     fun reviewRequired_rejectsNonReviewEventStatus() {
+        assertNull(ParseResult.ReviewRequired(draft = null, event = null, findings = emptyList(), reasons = listOf("x")).event)
         assertThrows(IllegalArgumentException::class.java) {
             ParseResult.ReviewRequired(
                 draft = null,
@@ -94,16 +74,9 @@ class ParseResultSemanticsTest {
     }
 
     @Test
-    fun draft_cannotCarryOccurredAtWithoutExplicitValue() {
-        val draft = ParsedEventDraft(
-            rawSmsId = "sms-2",
-            bank = Bank.BANK_ALJAZIRA,
-            messageFamily = MessageFamily.OTP,
-            parseStatus = ParseStatus.NON_FINANCIAL,
-            confidence = Confidence(1.0),
-            occurredAt = Instant.parse("2026-08-01T00:00:00Z"),
-        )
-        assertTrue(draft.amount == null)
-        assertTrue(draft.messageFamily == MessageFamily.OTP)
+    fun draft_carriesOccurredAtOnlyWhenGivenExplicitly() {
+        val at = Instant.parse("2026-08-01T00:00:00Z")
+        assertNull(ParsedEventDraft(rawSmsId = "sms-2").occurredAt)
+        assertEquals(at, ParsedEventDraft(rawSmsId = "sms-2", occurredAt = at).occurredAt)
     }
 }

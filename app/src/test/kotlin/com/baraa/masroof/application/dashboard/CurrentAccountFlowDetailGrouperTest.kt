@@ -110,7 +110,6 @@ class CurrentAccountFlowDetailGrouperTest {
             transactions = transactions,
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountA, accountB),
-            ownedAccountLast4s = setOf("3001", "3002"),
         )
 
         assertEquals(listOf("self"), grouping.selfTransfersOut.map { it.id })

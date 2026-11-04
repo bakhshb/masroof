@@ -1,12 +1,12 @@
 package com.baraa.masroof.integration.replica
 
+import com.baraa.masroof.testsupport.ScreenshotArtifactWriter
 import com.baraa.masroof.testsupport.*
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.test.platform.app.InstrumentationRegistry
@@ -38,7 +38,7 @@ class ReplicaSetupJourneyTest {
     private val host = InstrumentationRegistry.getInstrumentation().targetContext
     @Test fun setupProvidesFinishButtonThenDisplaysFinancialDataAndOriginalNavigation() {
         require(host.packageName=="com.baraa.masroof")
-        shell("rm -rf /sdcard/beta-dashboard-screenshots")
+        shell("rm -rf /sdcard/Download/replica-journey")
         runBlocking { TestRuntime.reset(host) }
         val container = AppContainer(TestStorageContext(host),smsDataSourceOverride = ReferenceHistory.source(host))
         container.appLocaleRepository.setLanguageTag("en")
@@ -307,23 +307,7 @@ class ReplicaSetupJourneyTest {
         node.assertIsDisplayed().assertIsEnabled().performClick()
         compose.waitForIdle()
     }
-    private fun screenshot(name: String) {
-        val file = File(host.getExternalFilesDir(null),"replica-journey/$name.png").apply { parentFile!!.mkdirs() }
-        compose.waitForIdle()
-        val instrument = InstrumentationRegistry.getInstrumentation()
-        instrument.waitForIdleSync()
-        android.os.SystemClock.sleep(200)
-        val bitmap = requireNotNull(instrument.uiAutomation.takeScreenshot())
-        file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
-        // connectedDebugAndroidTest uninstalls its test UID before the shell can collect evidence.
-        // Publish via the shell identity, as production's native screenshot tests do.
-        require(name.matches(Regex("[a-z0-9-]+")))
-        val target="/sdcard/beta-dashboard-screenshots/$name.png"
-        shell("mkdir -p /sdcard/beta-dashboard-screenshots")
-        shell("cp ${file.absolutePath} $target")
-        val listing=shell("ls -l $target")
-        assertTrue("Screenshot was not published as a regular file: $name",listing.trimStart().startsWith("-") && listing.contains("$name.png"))
-    }
+    private fun screenshot(name: String) = ScreenshotArtifactWriter.capture(compose, "replica-journey", name)
     private fun shell(command: String): String {
         val descriptor=InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
         return android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use {it.readText()}

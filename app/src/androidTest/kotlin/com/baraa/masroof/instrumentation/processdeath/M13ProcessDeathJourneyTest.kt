@@ -260,7 +260,9 @@ class M13ProcessDeathJourneyTest {
         ownAlJaziraCard()
         arm(DebugProcessHalt.PARSED)
         val raw = com.baraa.masroof.sms.mapper.AndroidSmsMapper.toRawSms(
-            "historical-process-death", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:32:00Z").toEpochMilli(),
+            com.baraa.masroof.sms.model.ProviderSmsRecord(
+                "historical-process-death", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:32:00Z"),
+            ),
         )
         app().container.applicationScope.launch {
             val batch = app().container.historicalSmsBatchProcessor.startBatch()

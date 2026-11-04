@@ -6,7 +6,6 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardRegistryEntry
-import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -258,7 +257,8 @@ class DashboardFixtureCharacterizationTest {
             bank = Bank.BANK_ALJAZIRA,
             last4 = "7271",
             ownership = OwnershipStatus.OWNED,
-            cardType = CardType.CREDIT,
+            // Untyped, so only the parsed SMS channel can keep it off the debit list.
+            cardType = null,
             firstSeenRawSmsId = record.event.rawSmsId,
             lastSeenRawSmsId = record.event.rawSmsId,
         )

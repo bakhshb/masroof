@@ -46,6 +46,8 @@ class DeviceProtocolTest(unittest.TestCase):
             self.assertIn('name: shared-test-apks', section)
             self.assertIn('-no-snapshot', section)
             self.assertIn('if: always()', section)
+            # No Gradle here, so no Java 21 toolchain; avdmanager still needs one JDK.
+            self.assertEqual(1, section.count('uses: actions/setup-java@'))
         gate = workflow.split('  emulator-smoke:', 1)[1]
         self.assertIn('unit-test, static-analysis, emulator-app, emulator-lifecycle', gate)
         self.assertIn('Require complete CI', gate)

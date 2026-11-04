@@ -23,7 +23,7 @@ object MasroofGuidanceStyle {
     val tourSpotlightRadius = 12.dp
     val backgroundColor: androidx.compose.ui.graphics.Color
         @androidx.compose.runtime.Composable get() =
-            if (androidx.compose.material3.MaterialTheme.colorScheme.background == MasroofDarkColors.Background) {
+            if (masroofIsDark()) {
                 MasroofDarkColors.SurfaceContainerHigh
             } else {
                 MasroofLightColors.Surface
@@ -49,10 +49,8 @@ object MasroofFontWeights {
 }
 
 object MasroofOpacity {
-    const val tint = 0.12f
     const val badge = 0.14f
     const val divider = 0.25f
     const val subtle = 0.35f
-    const val disabled = 0.38f
     const val muted = 0.45f
 }

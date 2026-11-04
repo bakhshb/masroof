@@ -7,6 +7,7 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.sms.time.InstantClock
+import kotlinx.coroutines.CancellationException
 
 /**
  * Persists the retry marker for evidence whose derived processing did not finish.
@@ -58,6 +59,22 @@ class ProcessingRecovery(
             ProcessingRetryMode.HISTORICAL_BATCH,
         )
         return true
+    }
+
+    /**
+     * Writes the historical retry set, then asks [schedule] to enqueue the batch worker.
+     * A failed write throws; a failed schedule is ignored because the set is durable
+     * and startup enqueues the one batch worker.
+     */
+    suspend fun markForHistoricalRetry(rawSmsIds: List<String>, schedule: (() -> Unit)?) {
+        if (!markExhaustedBatch(rawSmsIds)) return
+        try {
+            schedule?.invoke()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // The retry set is durable. Startup enqueues the one batch worker.
+        }
     }
 
     suspend fun clear(rawSmsId: String) {

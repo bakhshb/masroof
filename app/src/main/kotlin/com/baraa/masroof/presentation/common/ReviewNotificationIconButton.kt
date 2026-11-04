@@ -36,7 +36,7 @@ fun ReviewNotificationIconButton(reviewCount: Int, onClick: () -> Unit, modifier
         if (reviewCount > 0) Surface(modifier = Modifier.align(Alignment.TopEnd)
             .offset(x = MasroofReference.notificationOffsetX, y = MasroofReference.notificationOffsetY)
             .defaultMinSize(MasroofReference.notificationBadge, MasroofReference.notificationBadge), shape = MasroofShapes.extraLarge,
-            color = colors.liability, contentColor = if (MaterialTheme.colorScheme.background == com.baraa.masroof.ui.theme.MasroofDarkColors.Background)
+            color = colors.liability, contentColor = if (com.baraa.masroof.ui.theme.masroofIsDark())
                 colors.liabilitySoft else MaterialTheme.colorScheme.surface) {
             Box(contentAlignment = Alignment.Center) {
                 MasroofText(if (reviewCount > 99) "99+" else reviewCount.toString(), style = MasroofReference.notificationCount,

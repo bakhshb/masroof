@@ -41,7 +41,6 @@ class NotificationCenterViewModel(
                 excludedForeignCurrencyCount = external.excludedForeignCurrencyCount,
                 periodLabel = external.periodLabel,
                 periodKey = external.periodKey,
-                rescanStatusName = external.rescanStatusName,
                 updateAvailableVersion = external.updateAvailableVersion,
                 updateReadyVersion = external.updateReadyVersion,
             )

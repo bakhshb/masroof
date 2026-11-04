@@ -19,5 +19,4 @@ open class NoOpCommitmentRepository(
 
     override suspend fun listAll(): List<Commitment> = commitments
 
-    override suspend fun listActive(): List<Commitment> = commitments.filter { it.active }
 }

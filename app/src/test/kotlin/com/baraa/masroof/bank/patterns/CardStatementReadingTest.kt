@@ -1,7 +1,7 @@
 package com.baraa.masroof.bank.patterns
 
+import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
-import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.engine.bank.CardChannel
 import com.baraa.masroof.engine.bank.Interpretation
 import com.baraa.masroof.engine.bank.MessageFamily
@@ -17,7 +17,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 
@@ -53,7 +52,7 @@ class CardStatementReadingTest {
 
     @Test fun statementReachesTheCardDashboardAsAStatementWithItsDue() {
         for ((bank, sender, body) in listOf(Triple("BANK_SNB", "SNB-AlAhli", snb), Triple("BANK_SAB", "SAB", sab))) {
-            val bundled = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/$bank.patterns.json").readText())
+            val bundled = bundledPatterns(bank)
             val result = MessagePatternSmsAdapter(bundled.banks.single(), PatternFactInterpreter(bundled))
                 .parse(SmsParseInput("statement", sender, body, Instant.parse("2026-10-20T12:00:00Z")))
             assertTrue(result.toString(), result is ParseResult.NonFinancial)
@@ -77,7 +76,7 @@ class CardStatementReadingTest {
     }
 
     private fun parse(bank: String, sender: String, body: String): Interpretation {
-        val definitions = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/$bank.patterns.json").readText())
+        val definitions = bundledPatterns(bank)
         return PatternFactInterpreter(definitions).interpretRouted(MessageInput("fictional-statement", sender, body,
             Instant.parse("2026-10-20T12:00:00Z"), true), BankId(bank))
     }

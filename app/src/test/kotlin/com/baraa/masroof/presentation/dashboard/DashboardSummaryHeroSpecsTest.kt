@@ -12,7 +12,6 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 class DashboardSummaryHeroSpecsTest {

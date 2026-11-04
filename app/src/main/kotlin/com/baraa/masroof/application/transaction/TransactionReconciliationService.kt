@@ -5,6 +5,8 @@ import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.assembly.TransactionTiming
 import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
+import com.baraa.masroof.domain.model.AccountReference
+import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -199,52 +201,24 @@ class TransactionReconciliationService(
             val zone = TransactionTiming.zoneFor(record.event.bank, persistedZone, zoneId)
             localAnchors += LocalDateTime.ofInstant(effective, zone)
         }
+        val span = TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(2)
         return CandidateWindows(
-            receipt = mergedWindows(instantAnchors),
-            local = mergedLocalWindows(localAnchors),
+            receipt = mergedRanges(instantAnchors.map { it.minus(span) to it.plus(span).plusMillis(1) })
+                .map { (start, end) -> TimeRange(start, end) },
+            local = mergedRanges(localAnchors.map { it.minus(span) to it.plus(span).plusSeconds(1) })
+                .map { (start, end) -> LocalWindow(start, end) },
         )
     }
 
-    private fun mergedWindows(anchors: List<Instant>): List<TimeRange> {
-        if (anchors.isEmpty()) return emptyList()
-        val span = TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(2)
-        val sorted = anchors.map { anchor ->
-            TimeRange(
-                startInclusive = anchor.minus(span),
-                endExclusive = anchor.plus(span).plusMillis(1),
-            )
-        }.sortedBy { it.startInclusive }
-        val merged = mutableListOf<TimeRange>()
-        for (range in sorted) {
+    /** Sorts ranges by start and joins each one that starts at or before the previous end. */
+    private fun <T : Comparable<T>> mergedRanges(ranges: List<Pair<T, T>>): List<Pair<T, T>> {
+        val merged = mutableListOf<Pair<T, T>>()
+        for (range in ranges.sortedBy { it.first }) {
             val last = merged.lastOrNull()
-            if (last == null || range.startInclusive.isAfter(last.endExclusive)) {
+            if (last == null || range.first > last.second) {
                 merged += range
-            } else {
-                val endExclusive = maxOf(last.endExclusive, range.endExclusive)
-                if (endExclusive != last.endExclusive) {
-                    merged[merged.lastIndex] = last.copy(endExclusive = endExclusive)
-                }
-            }
-        }
-        return merged
-    }
-
-    private fun mergedLocalWindows(anchors: List<LocalDateTime>): List<LocalWindow> {
-        if (anchors.isEmpty()) return emptyList()
-        val span = TransactionMatcher.TRANSFER_MATCH_WINDOW.multipliedBy(2)
-        val sorted = anchors.map { anchor ->
-            LocalWindow(
-                startInclusive = anchor.minus(span),
-                endExclusive = anchor.plus(span).plusSeconds(1),
-            )
-        }.sortedBy { it.startInclusive }
-        val merged = mutableListOf<LocalWindow>()
-        for (range in sorted) {
-            val last = merged.lastOrNull()
-            if (last == null || range.startInclusive.isAfter(last.endExclusive)) {
-                merged += range
-            } else if (range.endExclusive.isAfter(last.endExclusive)) {
-                merged[merged.lastIndex] = last.copy(endExclusive = range.endExclusive)
+            } else if (range.second > last.second) {
+                merged[merged.lastIndex] = last.first to range.second
             }
         }
         return merged
@@ -360,11 +334,12 @@ class TransactionReconciliationService(
             if (linkedBefore != null) {
                 if (
                     !preservesExplicitUserDecision(review) &&
-                    eventShouldNotProduceTransaction(event) &&
+                    InformationalMessagePolicy.shouldAutoIgnore(event) &&
                     financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
                 ) {
                     // Stale transaction from a prior misclassification (e.g. OTP stored as a purchase).
-                    // Family comes from the parsed event; the raw body is not reclassified.
+                    // Family comes from the parsed event; the raw body is not reclassified, and
+                    // financial and UNKNOWN families are never dropped because of SMS wording.
                 } else if (shouldReleaseStaleSelfTransferLink(record, review, linkedBefore, receivedAtBefore)) {
                     financialTransactionRepository.unlinkRawSms(event.rawSmsId)
                     touchedTransactionIds += linkedBefore.id
@@ -391,142 +366,81 @@ class TransactionReconciliationService(
                 persistedZoneId = persistedZone,
             )
 
-            val sourceOwn = event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
-                ?: OwnershipStatus.UNKNOWN
-            val destOwn = event.destinationAccountRef?.let { ownershipResolver.resolveAccount(it) }
-                ?: OwnershipStatus.UNKNOWN
-            val cardOwn = event.cardRef?.let { ownershipResolver.resolveCard(it) }
-                ?: OwnershipStatus.UNKNOWN
+            val sourceOwn = accountOwnership(event.sourceAccountRef)
+            val destOwn = accountOwnership(event.destinationAccountRef)
+            val cardOwn = cardOwnership(event.cardRef)
             maybeAutoConfirmLoanOwnership(event, sourceOwn, record.details.loanType, userConfirmed)
             val loanType = record.details.loanType
             val loanOwn = loanType?.let {
                 ownershipResolver.resolveLoan(LoanReference(event.bank, it))
             } ?: OwnershipStatus.UNKNOWN
 
-            when (event.messageFamily) {
-                MessageFamily.TRANSFER_IN,
-                MessageFamily.TRANSFER_OUT,
-                -> {
-                    val single = TransactionAssembler.assembleSingle(
-                        event = event,
-                        receivedAt = receivedAt,
-                        sourceOwnership = sourceOwn,
-                        destinationOwnership = destOwn,
-                        cardOwnership = cardOwn,
-                        loanOwnership = loanOwn,
-                        loanType = loanType,
-                        transactionOccurredAt = transactionOccurredAt,
-                        userConfirmed = userConfirmed,
-                        occurredAtZone = zone,
-                    )
-                    when (single) {
-                        is TransactionAssembler.Outcome.Assembled -> {
-                            when (
-                                persist(single.transaction, single.rawSmsIds, evidence)
-                            ) {
-                                PersistOutcome.Saved -> {
-                                    assembledSingle++
-                                    settledRawSmsIds += event.rawSmsId
-                                }
-
-                                PersistOutcome.Already -> {
-                                    alreadyLinked++
-                                    settledRawSmsIds += event.rawSmsId
-                                }
-
-                                PersistOutcome.Failed -> {
-                                    failed++
-                                    failedRawSmsIds += event.rawSmsId
-                                }
-                            }
-                        }
-
-                        TransactionAssembler.Outcome.PendingMatch -> {
-                            unresolvedTransfers += TransferMatchCandidate(
-                                event = event,
-                                transactionReference = record.details.transactionReference,
-                                occurredAtLocal = record.details.occurredAtLocal,
-                                receivedAt = receivedAt,
-                                sourceOwnership = sourceOwn,
-                                destinationOwnership = destOwn,
-                                effectiveOccurredAt = transactionOccurredAt,
-                            )
-                            pendingMatch++
-                        }
-
-                        is TransactionAssembler.Outcome.NeedsReview -> {
-                            needsReview++
-                            reviewCandidates += ReconciliationReviewCandidate(
-                                rawSmsId = event.rawSmsId,
-                                kind = ReviewKind.NEEDS_REVIEW,
-                                reasons = single.reasons.ifEmpty { listOf("needs_review") },
-                            )
-                        }
-
-                        TransactionAssembler.Outcome.Ignored -> {
-                            ignored++
+            when (
+                val outcome = TransactionAssembler.assembleSingle(
+                    event = event,
+                    receivedAt = receivedAt,
+                    sourceOwnership = sourceOwn,
+                    destinationOwnership = destOwn,
+                    cardOwnership = cardOwn,
+                    loanOwnership = loanOwn,
+                    loanType = loanType,
+                    transactionOccurredAt = transactionOccurredAt,
+                    userConfirmed = userConfirmed,
+                    occurredAtZone = zone,
+                )
+            ) {
+                is TransactionAssembler.Outcome.Assembled -> {
+                    when (persist(outcome.transaction, outcome.rawSmsIds, evidence)) {
+                        PersistOutcome.Saved -> {
+                            assembledSingle++
                             settledRawSmsIds += event.rawSmsId
+                        }
+
+                        PersistOutcome.Already -> {
+                            alreadyLinked++
+                            settledRawSmsIds += event.rawSmsId
+                        }
+
+                        PersistOutcome.Failed -> {
+                            failed++
+                            failedRawSmsIds += event.rawSmsId
                         }
                     }
                 }
 
-                else -> {
-                    when (
-                        val outcome = TransactionAssembler.assembleSingle(
+                TransactionAssembler.Outcome.PendingMatch -> {
+                    pendingMatch++
+                    if (event.messageFamily.isTransferFamily()) {
+                        unresolvedTransfers += TransferMatchCandidate(
                             event = event,
+                            transactionReference = record.details.transactionReference,
+                            occurredAtLocal = record.details.occurredAtLocal,
                             receivedAt = receivedAt,
                             sourceOwnership = sourceOwn,
                             destinationOwnership = destOwn,
-                            cardOwnership = cardOwn,
-                            loanOwnership = loanOwn,
-                            loanType = loanType,
-                            transactionOccurredAt = transactionOccurredAt,
-                            userConfirmed = userConfirmed,
-                            occurredAtZone = zone,
+                            effectiveOccurredAt = transactionOccurredAt,
                         )
-                    ) {
-                        is TransactionAssembler.Outcome.Assembled -> {
-                            when (persist(outcome.transaction, outcome.rawSmsIds, evidence)) {
-                                PersistOutcome.Saved -> {
-                                    assembledSingle++
-                                    settledRawSmsIds += event.rawSmsId
-                                }
-
-                                PersistOutcome.Already -> {
-                                    alreadyLinked++
-                                    settledRawSmsIds += event.rawSmsId
-                                }
-
-                                PersistOutcome.Failed -> {
-                                    failed++
-                                    failedRawSmsIds += event.rawSmsId
-                                }
-                            }
-                        }
-
-                        TransactionAssembler.Outcome.PendingMatch -> {
-                            pendingMatch++
-                            reviewCandidates += ReconciliationReviewCandidate(
-                                rawSmsId = event.rawSmsId,
-                                kind = ReviewKind.PENDING_MATCH,
-                                reasons = listOf("transfer_pending_match"),
-                            )
-                        }
-
-                        is TransactionAssembler.Outcome.NeedsReview -> {
-                            needsReview++
-                            reviewCandidates += ReconciliationReviewCandidate(
-                                rawSmsId = event.rawSmsId,
-                                kind = ReviewKind.NEEDS_REVIEW,
-                                reasons = outcome.reasons.ifEmpty { listOf("needs_review") },
-                            )
-                        }
-
-                        TransactionAssembler.Outcome.Ignored -> {
-                            ignored++
-                            settledRawSmsIds += event.rawSmsId
-                        }
+                    } else {
+                        reviewCandidates += ReconciliationReviewCandidate(
+                            rawSmsId = event.rawSmsId,
+                            kind = ReviewKind.PENDING_MATCH,
+                            reasons = listOf("transfer_pending_match"),
+                        )
                     }
+                }
+
+                is TransactionAssembler.Outcome.NeedsReview -> {
+                    needsReview++
+                    reviewCandidates += ReconciliationReviewCandidate(
+                        rawSmsId = event.rawSmsId,
+                        kind = ReviewKind.NEEDS_REVIEW,
+                        reasons = outcome.reasons.ifEmpty { listOf("needs_review") },
+                    )
+                }
+
+                TransactionAssembler.Outcome.Ignored -> {
+                    ignored++
+                    settledRawSmsIds += event.rawSmsId
                 }
             }
         }
@@ -812,10 +726,8 @@ class TransactionReconciliationService(
                 val receivedAt = rawSmsRepository.getById(leg.event.rawSmsId)?.receivedAt
                     ?: leg.transaction?.occurredAt
                     ?: continue
-                val sourceOwn = leg.event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
-                    ?: OwnershipStatus.UNKNOWN
-                val destOwn = leg.event.destinationAccountRef?.let { ownershipResolver.resolveAccount(it) }
-                    ?: OwnershipStatus.UNKNOWN
+                val sourceOwn = accountOwnership(leg.event.sourceAccountRef)
+                val destOwn = accountOwnership(leg.event.destinationAccountRef)
                 add(
                     TransferMatchCandidate(
                         event = leg.event,
@@ -888,18 +800,18 @@ class TransactionReconciliationService(
                         .distinct()
                         .sorted()
                     when (upgradePersist(outcome.transaction, outcome.rawSmsIds, rawSmsIds, evidence)) {
-                        UpgradePersistOutcome.Saved -> {
+                        PersistOutcome.Saved -> {
                             matchedPairs++
                             assembledSingle++
                             settledRawSmsIds += rawSmsIds
                         }
 
-                        UpgradePersistOutcome.Already -> {
+                        PersistOutcome.Already -> {
                             alreadyLinked += 2
                             settledRawSmsIds += rawSmsIds
                         }
 
-                        UpgradePersistOutcome.Failed -> {
+                        PersistOutcome.Failed -> {
                             failed++
                             failedRawSmsIds += rawSmsIds
                         }
@@ -970,12 +882,9 @@ class TransactionReconciliationService(
             }
             if (!TransactionAssembler.isAutomationEligible(event, record.automationConfirmed)) continue
             val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: existing.occurredAt
-            val sourceOwn = event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
-                ?: OwnershipStatus.UNKNOWN
-            val destOwn = event.destinationAccountRef?.let { ownershipResolver.resolveAccount(it) }
-                ?: OwnershipStatus.UNKNOWN
-            val cardOwn = event.cardRef?.let { ownershipResolver.resolveCard(it) }
-                ?: OwnershipStatus.UNKNOWN
+            val sourceOwn = accountOwnership(event.sourceAccountRef)
+            val destOwn = accountOwnership(event.destinationAccountRef)
+            val cardOwn = cardOwnership(event.cardRef)
             maybeAutoConfirmLoanOwnership(event, sourceOwn, record.details.loanType, record.automationConfirmed)
             val loanType = record.details.loanType
             val loanOwn = loanType?.let {
@@ -1037,19 +946,14 @@ class TransactionReconciliationService(
         )
     }
 
-    private enum class UpgradePersistOutcome { Saved, Already, Failed }
-
     private suspend fun upgradePersist(
         transaction: FinancialTransaction,
         rawSmsIds: List<String>,
         staleRawSmsIds: List<String>,
         evidence: Map<String,ParsedEventRecord>,
-    ): UpgradePersistOutcome {
-        when (persist(transaction, rawSmsIds, evidence)) {
-            PersistOutcome.Saved -> return UpgradePersistOutcome.Saved
-            PersistOutcome.Already -> return UpgradePersistOutcome.Already
-            PersistOutcome.Failed -> Unit
-        }
+    ): PersistOutcome {
+        val first = persist(transaction, rawSmsIds, evidence)
+        if (first != PersistOutcome.Failed) return first
 
         return when (
             guardedWrite(rawSmsIds, evidence) { financialTransactionRepository.replaceExclusiveStaleLinks(
@@ -1058,9 +962,9 @@ class TransactionReconciliationService(
                 staleRawSmsIds = staleRawSmsIds,
             ) }
         ) {
-            FinancialTransactionSaveResult.Saved -> UpgradePersistOutcome.Saved
-            FinancialTransactionSaveResult.AlreadyExists -> UpgradePersistOutcome.Already
-            is FinancialTransactionSaveResult.Conflict -> UpgradePersistOutcome.Failed
+            FinancialTransactionSaveResult.Saved -> PersistOutcome.Saved
+            FinancialTransactionSaveResult.AlreadyExists -> PersistOutcome.Already
+            is FinancialTransactionSaveResult.Conflict -> PersistOutcome.Failed
         }
     }
 
@@ -1093,8 +997,6 @@ class TransactionReconciliationService(
     }
 
     private data class LegacyReleaseResult(
-        val releasedRawSmsIds: Set<String> = emptySet(),
-        val skippedRawSmsIds: Set<String> = emptySet(),
         val failedCount: Int = 0,
         val failedRawSmsIds: Set<String> = emptySet(),
     )
@@ -1113,7 +1015,6 @@ class TransactionReconciliationService(
         records: List<ParsedEventRecord>,
     ): LegacyReleaseResult {
         val postedSingleLeg = mutableListOf<ParsedEventRecord>()
-        val skipped = linkedSetOf<String>()
         val postedZones = mutableMapOf<String, String?>()
         for (record in records) {
             val event = record.event
@@ -1122,23 +1023,17 @@ class TransactionReconciliationService(
             postedZones[event.rawSmsId] = linked.occurredAtZone
             if (linked.type != FinancialTransactionType.SELF_TRANSFER) continue
             if (linked.linkedParsedEventIds.size != 1) continue
-            if (shouldProtectFromAutomaticUnlink(event.rawSmsId)) {
-                skipped += event.rawSmsId
-                continue
-            }
+            if (preservesExplicitUserDecision(event.rawSmsId)) continue
             postedSingleLeg += record
         }
-        if (postedSingleLeg.isEmpty()) {
-            return LegacyReleaseResult(skippedRawSmsIds = skipped)
-        }
+        if (postedSingleLeg.isEmpty()) return LegacyReleaseResult()
 
         val candidates = records.mapNotNull { transferCandidateFor(it, postedZones[it.event.rawSmsId]) }
-        if (candidates.isEmpty()) return LegacyReleaseResult(skippedRawSmsIds = skipped)
+        if (candidates.isEmpty()) return LegacyReleaseResult()
         val uniquelyPairedEventIds = TransactionMatcher.findMutuallyUniquePairs(candidates)
             .flatMap { pair -> listOf(pair.outgoing.event.id, pair.incoming.event.id) }
             .toSet()
 
-        val released = linkedSetOf<String>()
         val failedRawSmsIds = linkedSetOf<String>()
         var failed = 0
         for (record in postedSingleLeg) {
@@ -1155,18 +1050,12 @@ class TransactionReconciliationService(
                 failedRawSmsIds += event.rawSmsId
                 continue
             }
-            if (deleted) {
-                released += event.rawSmsId
-            } else if (ambiguousReleaseStillRequired(event.rawSmsId)) {
+            if (!deleted && ambiguousReleaseStillRequired(event.rawSmsId)) {
                 failed++
                 failedRawSmsIds += event.rawSmsId
-            } else {
-                skipped += event.rawSmsId
             }
         }
         return LegacyReleaseResult(
-            releasedRawSmsIds = released,
-            skippedRawSmsIds = skipped,
             failedCount = failed,
             failedRawSmsIds = failedRawSmsIds,
         )
@@ -1177,7 +1066,7 @@ class TransactionReconciliationService(
      * delete that returned false. Shared links and rows that already moved are skips.
      */
     private suspend fun ambiguousReleaseStillRequired(rawSmsId: String): Boolean {
-        if (shouldProtectFromAutomaticUnlink(rawSmsId)) return false
+        if (preservesExplicitUserDecision(rawSmsId)) return false
         val linked = financialTransactionRepository.findByRawSmsId(rawSmsId) ?: return false
         if (linked.type != FinancialTransactionType.SELF_TRANSFER) return false
         if (linked.linkedParsedEventIds.size != 1) return false
@@ -1204,9 +1093,6 @@ class TransactionReconciliationService(
         }
     }
 
-    private suspend fun shouldProtectFromAutomaticUnlink(rawSmsId: String): Boolean =
-        preservesExplicitUserDecision(rawSmsId)
-
     private suspend fun observeUnlinkedTransfer(record: ParsedEventRecord): TransferMatchCandidate? {
         if (financialTransactionRepository.isRawSmsLinked(record.event.rawSmsId)) return null
         return transferCandidateFor(record)
@@ -1232,10 +1118,8 @@ class TransactionReconciliationService(
         }
         if (!TransactionAssembler.isAutomationEligible(event, userConfirmed)) return null
         val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: return null
-        val sourceOwn = event.sourceAccountRef?.let { ownershipResolver.resolveAccount(it) }
-            ?: OwnershipStatus.UNKNOWN
-        val destOwn = event.destinationAccountRef?.let { ownershipResolver.resolveAccount(it) }
-            ?: OwnershipStatus.UNKNOWN
+        val sourceOwn = accountOwnership(event.sourceAccountRef)
+        val destOwn = accountOwnership(event.destinationAccountRef)
         return TransferMatchCandidate(
             event = event,
             transactionReference = record.details.transactionReference,
@@ -1260,11 +1144,7 @@ class TransactionReconciliationService(
         receivedAt: Instant?,
     ): Boolean {
         val event = record.event
-        if (event.messageFamily != MessageFamily.TRANSFER_IN &&
-            event.messageFamily != MessageFamily.TRANSFER_OUT
-        ) {
-            return false
-        }
+        if (!event.messageFamily.isTransferFamily()) return false
         if (preservesExplicitUserDecision(review)) return false
         if (linked.type != FinancialTransactionType.SELF_TRANSFER) return false
         if (receivedAt == null) return false
@@ -1279,14 +1159,6 @@ class TransactionReconciliationService(
         if (linked.linkedParsedEventIds.size != 2) return linked.occurredAt != expectedAt
         return java.time.Duration.between(linked.occurredAt, expectedAt).abs() > TransactionMatcher.TRANSFER_MATCH_WINDOW
     }
-
-    /**
-     * Legacy cleanup only: a transaction linked to a message the parser now
-     * calls informational is removed. Financial and [MessageFamily.UNKNOWN]
-     * families are never dropped because of SMS wording.
-     */
-    private fun eventShouldNotProduceTransaction(event: ParsedEvent): Boolean =
-        InformationalMessagePolicy.shouldAutoIgnore(event)
 
     private suspend fun maybeAutoConfirmLoanOwnership(
         event: ParsedEvent,
@@ -1303,6 +1175,12 @@ class TransactionReconciliationService(
         if (ownershipResolver.resolveLoan(reference) != OwnershipStatus.UNKNOWN) return
         ownershipConfirmationService?.confirmLoanOwned(reference)
     }
+
+    private suspend fun accountOwnership(reference: AccountReference?): OwnershipStatus =
+        reference?.let { ownershipResolver.resolveAccount(it) } ?: OwnershipStatus.UNKNOWN
+
+    private suspend fun cardOwnership(reference: CardReference?): OwnershipStatus =
+        reference?.let { ownershipResolver.resolveCard(it) } ?: OwnershipStatus.UNKNOWN
 
     private enum class PersistOutcome { Saved, Already, Failed }
 

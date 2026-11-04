@@ -15,13 +15,6 @@ class SharedPrefsNotificationPreferencesRepository(
         prefs.edit().putStringSet(KEY_READ_IDS, updated).apply()
     }
 
-    override fun clearRead(id: String) {
-        val updated = getReadIds().toMutableSet()
-        if (updated.remove(id)) {
-            prefs.edit().putStringSet(KEY_READ_IDS, updated).apply()
-        }
-    }
-
     override fun setReadIds(ids: Set<String>) {
         prefs.edit().putStringSet(KEY_READ_IDS, ids.toSet()).apply()
     }

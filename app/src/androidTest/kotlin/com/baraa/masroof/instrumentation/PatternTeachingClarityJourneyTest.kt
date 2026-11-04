@@ -34,11 +34,8 @@ class PatternTeachingClarityJourneyTest {
     private fun ar(id: Int) = AppLocaleContext.wrap(compose.activity, "ar").getString(id)
     private fun click(id: Int) = compose.onNodeWithText(ar(id)).performClick()
     private fun capture(name: String) {
-        compose.waitForIdle()
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
         val size = InstrumentationRegistry.getArguments().getString("previewSize", "phone")
-        val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
-        try { ScreenshotArtifactWriter.publish(bitmap, "pattern-teaching", "$size-$name") } finally { bitmap.recycle() }
+        ScreenshotArtifactWriter.capture(compose, "pattern-teaching", "$size-$name")
     }
     private fun select(value: String) {
         val start = body.indexOf(value)

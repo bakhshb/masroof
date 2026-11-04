@@ -42,14 +42,6 @@ sys.exit(int(os.environ.get('FAIL_STATUS', '0')))
     def calls(self):
         return [json.loads(s) for s in (self.work / 'calls.jsonl').read_text().splitlines()]
 
-    def test_builds_only_the_selected_suite(self):
-        expected = {
-            'production': [':app:assembleDebug', ':app:assembleDebugAndroidTest'],
-        }
-        for suite, tasks in expected.items():
-            self.assertEqual(0, self.run_suite(suite, 'build').returncode)
-            self.assertEqual(['gradlew', *tasks, '--stacktrace'], self.calls()[-1])
-
     def test_each_test_job_runs_only_its_own_journeys(self):
         for suite, script, count in [('production', 'm13-process-death.sh', 3)]:
             before = len(self.calls()) if (self.work / 'calls.jsonl').exists() else 0
@@ -65,16 +57,15 @@ sys.exit(int(os.environ.get('FAIL_STATUS', '0')))
         self.assertEqual(2, self.run_suite('upgrade', 'test').returncode)
 
     def test_failure_stops_the_suite_and_is_preserved(self):
-        for phase in ('build', 'test'):
-            result = self.run_suite('production', phase, FAIL_STATUS='17')
-            self.assertEqual(17, result.returncode)
-        self.assertEqual(2, len(self.calls()))
+        result = self.run_suite('production', 'test', FAIL_STATUS='17')
+        self.assertEqual(17, result.returncode)
+        self.assertEqual(1, len(self.calls()))
         log = self.work / "app/build/reports/device-ci/lifecycle.log"
         self.assertIn("Install production APK", log.read_text())
         self.assertIn("(exit 17)", log.read_text())
 
     def test_invalid_input_cannot_start_tools(self):
-        for args in [('other', 'build'), ('beta', 'other'), ('beta',), ('beta', 'test', 'extra')]:
+        for args in [('production', 'build'), ('other', 'test'), ('beta', 'other'), ('beta',), ('beta', 'test', 'extra')]:
             self.assertNotEqual(0, self.run_suite(*args).returncode)
         self.assertFalse((self.work / 'calls.jsonl').exists())
 

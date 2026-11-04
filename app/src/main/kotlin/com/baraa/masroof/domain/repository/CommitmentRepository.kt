@@ -18,8 +18,6 @@ interface CommitmentRepository {
 
     suspend fun listAll(): List<Commitment>
 
-    suspend fun listActive(): List<Commitment>
-
     data class CommitmentDraft(
         val name: String,
         val amount: Money,

@@ -1,9 +1,6 @@
 package com.baraa.masroof.presentation.settings
 
-import com.baraa.masroof.ui.theme.MasroofOpacity
-import com.baraa.masroof.ui.theme.MasroofSizes
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,13 +63,7 @@ fun SettingsRegistryItemCard(
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.rowGap)) {
-            androidx.compose.material3.Surface(shape = com.baraa.masroof.ui.theme.MasroofShapes.small,
-                color = background) {
-                Box(Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.iconBox), contentAlignment = Alignment.Center) {
-                    Icon(icon, null, tint = foreground,
-                        modifier = Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.icon))
-                }
-            }
+            com.baraa.masroof.presentation.common.MasroofIconTile(icon, background, foreground)
             Column(Modifier.weight(1f)) {
                 Text(title, modifier = if (onTitleClick != null) Modifier.clickable(onClick = onTitleClick) else Modifier, style = MasroofTextStyles.cardTitle)
                 if (showBankLabel) Text(settingsBankLabel(bank), style = MaterialTheme.typography.bodySmall,
@@ -122,6 +113,26 @@ internal fun SettingsDeleteOnlyMenu(title: String, enabled: Boolean, onDelete: (
     SettingsRegistryMoreMenu(stringResource(R.string.settings_item_more_actions, title), enabled, listOf(
         SettingsRowAction(stringResource(R.string.registry_delete), "registry-delete-action", danger = true, onClick = onDelete),
     ))
+}
+
+/** Followed / Unconfirmed / Stopped tabs shared by the accounts, cards and loans screens. */
+@Composable
+internal fun SettingsRegistryTabs(selected: String, onSelect: (String) -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.shortcutGap), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.shortcutGap)) {
+        listOf("followed" to R.string.reference_followed, "unconfirmed" to R.string.reference_unconfirmed,
+            "stopped" to R.string.reference_stopped).forEach { (key, label) ->
+            com.baraa.masroof.presentation.common.MasroofChoice(stringResource(label), selected == key, { onSelect(key) })
+        }
+    }
+}
+
+@Composable
+internal fun SettingsUpdateFailedText(error: SettingsError? = null) {
+    Text(
+        stringResource(settingsErrorRes(error)),
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodyMedium,
+    )
 }
 
 @Composable

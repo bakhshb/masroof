@@ -27,6 +27,3 @@ tasks.register<JavaExec>("trainRecurringSeed") {
         providers.gradleProperty("recurringReport").getOrElse("$projectDir/RECURRING_EVALUATION.json"))
     if (providers.gradleProperty("recurringCheck").orNull == "true") args("--check")
 }
-
-// The pure modules use Jupiter; Android and Robolectric retain their native runner.
-tasks.test { useJUnitPlatform() }

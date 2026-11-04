@@ -11,23 +11,14 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import org.junit.Assert.*
 import org.junit.Test
-import org.junit.After
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class) @Config(sdk = [28])
 class AnalyticsPersistenceTest {
-    private val directories = mutableListOf<java.io.File>()
-    // sqlite4java's Windows build cannot open the long nested integrity-check
-    // path in Robolectric's default application directory. Use real short files.
-    private fun context(): TestStorageContext {
-        val directory = java.nio.file.Files.createTempDirectory("ma").toFile().also { directories += it }
-        return TestStorageContext(object : android.content.ContextWrapper(ApplicationProvider.getApplicationContext<Context>()) {
-            override fun getDatabasePath(name: String) = java.io.File(name).takeIf { it.isAbsolute } ?: java.io.File(directory, name)
-        })
-    }
-    @After fun cleanup() { directories.forEach { it.deleteRecursively() } }
+    // TestStorageContext resolves its own database path; a wrapper path override would never be read.
+    private fun context() = TestStorageContext(ApplicationProvider.getApplicationContext<Context>())
     @Test fun pruningKeepsOnlyTheNewestSnapshotsAndModelsOfEachKind() = runBlocking {
         val c = context(); c.deleteDatabase(AnalyticsDatabase.NAME)
         val db = AnalyticsDatabase.open(c)

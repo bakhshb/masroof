@@ -22,8 +22,6 @@ import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.CreditCardDashboardRow
 import com.baraa.masroof.application.dashboard.DebitCardOverview
 import com.baraa.masroof.application.dashboard.aggregateDebitSalaryPeriodSpending
-import java.time.ZoneId
-import androidx.compose.foundation.layout.Row
 import com.baraa.masroof.application.dashboard.aggregateCreditSalaryPeriodSpending
 import com.baraa.masroof.application.dashboard.aggregateCreditStatementSpending
 
@@ -177,8 +175,6 @@ fun CardsSummaryScreen(
             if (creditSelected) followedFacilities.facilities.forEach { facility ->
                 CreditFacilityCard(
                     facility = facility,
-                    cardNetworksByLast4 = cardNetworksByLast4,
-                    zoneId = ZoneId.systemDefault(),
                     ownedCards = state.ownedCards,
                     modifier = Modifier.fillMaxWidth(),
                     onOpenCard = onOpenCard,

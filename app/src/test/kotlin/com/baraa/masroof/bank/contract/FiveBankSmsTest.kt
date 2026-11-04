@@ -1,10 +1,10 @@
 package com.baraa.masroof.bank.contract
 
+import com.baraa.masroof.testsupport.bundledPatterns
 import org.junit.Assume.assumeTrue
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.bank.BankRoutingResult
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
-import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
 import com.baraa.masroof.engine.bank.MessageInput
 import com.baraa.masroof.finance.value.BankId
@@ -80,7 +80,7 @@ class FiveBankSmsTest {
         val counts = linkedMapOf<String, Int>()
         val findings = linkedMapOf<String, Int>()
         val engines = senders.values.distinct().associateWith { bank ->
-            PatternFactInterpreter(MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/$bank.patterns.json").readText()))
+            PatternFactInterpreter(bundledPatterns(bank))
         }
         val diagnosticRows = mutableListOf<JsonElement>()
         Json.parseToJsonElement(File(path!!).readText(Charsets.UTF_8).removePrefix("\uFEFF")).jsonArray.forEachIndexed { index, element ->
@@ -107,7 +107,7 @@ class FiveBankSmsTest {
     companion object {
         val rows: List<JsonObject> = Json.parseToJsonElement(File("src/test/resources/testdata/multibank/messages.json").readText()).jsonArray.map { it.jsonObject }
         val adapters = rows.map { it.text("bankId") }.distinct().associateWith { bank ->
-            val config = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/$bank.patterns.json").readText())
+            val config = bundledPatterns(bank)
             MessagePatternSmsAdapter(config.banks.single(), PatternFactInterpreter(config))
         }
         fun cases(): List<BankSmsAdapterContractCase> = adapters.map { (bank, adapter) ->

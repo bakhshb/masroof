@@ -57,7 +57,6 @@ data class Facts(
     val loanType: LoanType? = null,
     val salaryIncomeWording: Boolean? = null,
     val executionState: String? = null,
-    val network: String? = null,
 )
 
 /** Half-open offsets into the ORIGINAL input body, never folded comparison text. */
@@ -66,7 +65,7 @@ data class Evidence(val ruleId: String, val field: String, val start: Int, val e
     fun slice(input: MessageInput): String = input.body.substring(start, end)
 }
 
-enum class Blocker { UNKNOWN_BANK, AMBIGUOUS_BANK, UNKNOWN_FAMILY, CONFLICTING_FACTS, VALIDATION_ERROR, UNSUPPORTED_RULE_SCHEMA, EVIDENCE_MAPPING_ERROR }
+enum class Blocker { UNKNOWN_BANK, AMBIGUOUS_BANK, UNKNOWN_FAMILY, CONFLICTING_FACTS, VALIDATION_ERROR, UNSUPPORTED_RULE_SCHEMA }
 
 enum class DiagnosticSeverity { INFO, WARNING, ERROR }
 data class InterpretationDiagnostic(val code: String, val message: String, val severity: DiagnosticSeverity)
@@ -96,23 +95,4 @@ data class Interpretation(
         require(bank != null || blockers.any { it == Blocker.UNKNOWN_BANK || it == Blocker.AMBIGUOUS_BANK })
         require(facts.family != MessageFamily.UNKNOWN || Blocker.UNKNOWN_FAMILY in blockers)
     }
-}
-
-/** Catalog governs detection; selected banks govern import scope in Beta, never routing truth. */
-data class BankDefinition(val id: BankId, val exactSenders: Set<String>) {
-    init { require(exactSenders.isNotEmpty() && exactSenders.none(String::isBlank)) }
-}
-
-class BankCatalog(definitions: List<BankDefinition>) {
-    private val banks = definitions.map { it.copy(exactSenders = it.exactSenders.toSet()) }
-    init { require(banks.map { it.id }.distinct().size == banks.size) }
-
-    /** Returns every matching bank; caller must preserve ambiguity, not pick list order. */
-    fun candidates(sender: String): Set<BankId> =
-        banks.filter { sender in it.exactSenders }.mapTo(linkedSetOf()) { it.id }
-}
-
-/** Implemented by a pure rule engine or a shadow adapter. No persistence side effects. */
-fun interface BankInterpreter {
-    fun interpret(input: MessageInput, catalog: BankCatalog): Interpretation
 }

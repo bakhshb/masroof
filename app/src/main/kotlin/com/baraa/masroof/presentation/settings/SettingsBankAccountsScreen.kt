@@ -4,7 +4,6 @@ package com.baraa.masroof.presentation.settings
 import com.baraa.masroof.ui.theme.MasroofSpacing
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
@@ -12,7 +11,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofText as Text
-import com.baraa.masroof.presentation.common.MasroofTextButton as TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -24,7 +22,7 @@ import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.presentation.common.AccountOwnershipInlinePrompt
+import com.baraa.masroof.presentation.common.OwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 
@@ -100,12 +98,7 @@ fun SettingsBankAccountsScreen(
                 hint = stringResource(R.string.settings_accounts_hint),
                 onOpenBank = onOpenBank,
             )
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.shortcutGap), verticalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.shortcutGap)) {
-                listOf("followed" to R.string.reference_followed, "unconfirmed" to R.string.reference_unconfirmed,
-                    "stopped" to R.string.reference_stopped).forEach { (key, label) ->
-                    com.baraa.masroof.presentation.common.MasroofChoice(stringResource(label), referenceTab == key, { referenceTab = key })
-                }
-            }
+            SettingsRegistryTabs(referenceTab) { referenceTab = it }
 
 
             if (followedAccounts.isEmpty() && unregisteredAccounts.isEmpty() && stoppedAccounts.isEmpty()) {
@@ -130,7 +123,9 @@ fun SettingsBankAccountsScreen(
                             }
                         },
                         footer = {
-                            AccountOwnershipInlinePrompt(
+                            OwnershipInlinePrompt(
+                                titleRes = R.string.settings_accounts_unregistered,
+                                confirmRes = R.string.onboarding_is_mine_account,
                                 enabled = !state.updating,
                                 onConfirmOwned = { onConfirmOwned(account) },
                                 onMarkExternal = { onMarkExternal(account) },
@@ -142,49 +137,20 @@ fun SettingsBankAccountsScreen(
 
             if (referenceTab == "followed" && followedAccounts.isNotEmpty()) {
 
-                if (bankTree != null) {
-                    bankTree.currentAccountNodes.forEach { node ->
-                        SettingsRegistryAccountRow(
-                            account = node.account,
-                            debitCards = node.debitCards,
-                            updating = state.updating,
-                            onRequestStopTracking = onRequestStopTracking,
-                            onRenameAccount = onRenameAccount,
-                            onPickAccountType = onPickAccountType,
-                            onRequestDelete = { deleteActions.onRequest(StopTrackingTarget.Account(it)) },
-                        )
-                    }
-                    bankTree.savingsAccounts.forEach { account ->
-                        SettingsRegistryAccountRow(
-                            account = account,
-                            updating = state.updating,
-                            onRequestStopTracking = onRequestStopTracking,
-                            onRenameAccount = onRenameAccount,
-                            onPickAccountType = onPickAccountType,
-                            onRequestDelete = { deleteActions.onRequest(StopTrackingTarget.Account(it)) },
-                        )
-                    }
-                    bankTree.walletAccounts.forEach { account ->
-                        SettingsRegistryAccountRow(
-                            account = account,
-                            updating = state.updating,
-                            onRequestStopTracking = onRequestStopTracking,
-                            onRenameAccount = onRenameAccount,
-                            onPickAccountType = onPickAccountType,
-                            onRequestDelete = { deleteActions.onRequest(StopTrackingTarget.Account(it)) },
-                        )
-                    }
-                } else {
-                    followedAccounts.forEach { account ->
-                        SettingsRegistryAccountRow(
-                            account = account,
-                            updating = state.updating,
-                            onRequestStopTracking = onRequestStopTracking,
-                            onRenameAccount = onRenameAccount,
-                            onPickAccountType = onPickAccountType,
-                            onRequestDelete = { deleteActions.onRequest(StopTrackingTarget.Account(it)) },
-                        )
-                    }
+                val rows = bankTree?.let { tree ->
+                    tree.currentAccountNodes.map { it.account to it.debitCards } +
+                        (tree.savingsAccounts + tree.walletAccounts).map { it to emptyList() }
+                } ?: followedAccounts.map { it to emptyList() }
+                rows.forEach { (account, debitCards) ->
+                    SettingsRegistryAccountRow(
+                        account = account,
+                        debitCards = debitCards,
+                        updating = state.updating,
+                        onRequestStopTracking = onRequestStopTracking,
+                        onRenameAccount = onRenameAccount,
+                        onPickAccountType = onPickAccountType,
+                        onRequestDelete = { deleteActions.onRequest(StopTrackingTarget.Account(it)) },
+                    )
                 }
             }
 
@@ -203,13 +169,7 @@ fun SettingsBankAccountsScreen(
                 }
             }
 
-            state.error?.let {
-                Text(
-                    stringResource(settingsErrorRes(it)),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
+            state.error?.let { SettingsUpdateFailedText(it) }
         }
     }
 }

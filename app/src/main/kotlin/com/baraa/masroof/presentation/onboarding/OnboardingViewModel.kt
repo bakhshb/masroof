@@ -390,72 +390,68 @@ class OnboardingViewModel(
         if (!permissionStateProvider()) { _uiState.update { it.copy(step = OnboardingStep.PERMISSION, permissionGranted = false, error = OnboardingError.PERMISSION_DENIED) }; return }
         persistDraft()
 
-        importJob = viewModelScope.launch {
-            try {
-                val selectedDate = from
-                val startInstant = ImportDatePolicy.toStartOfDayInstant(selectedDate, zoneId)
+        importJob = launchLogged(appLogService, AppLogCategories.SCAN, "Onboarding startImport", onError = {
+            _uiState.update {
+                it.copy(
+                    importState = ImportState.ProviderError(
+                        HistoricalImportResult(failure = HistoricalImportFailure.ProviderError("scan_failed")),
+                    ),
+                    error = OnboardingError.IMPORT_FAILED,
+                )
+            }
+        }) {
+            val selectedDate = from
+            val startInstant = ImportDatePolicy.toStartOfDayInstant(selectedDate, zoneId)
 
-                onboardingPrefs.setHistoricalImportStartEpochMillis(startInstant.toEpochMilli())
-                onboardingPrefs.setHistoricalImportCompleted(false)
-                _uiState.update { it.copy(step = OnboardingStep.IMPORTING, importState = ImportState.Scanning, importScanned = 0, error = null) }
+            onboardingPrefs.setHistoricalImportStartEpochMillis(startInstant.toEpochMilli())
+            onboardingPrefs.setHistoricalImportCompleted(false)
+            _uiState.update { it.copy(step = OnboardingStep.IMPORTING, importState = ImportState.Scanning, importScanned = 0, error = null) }
 
-                val result = historicalImportGateway.scan(com.baraa.masroof.application.onboarding.OnboardingImportRequest(selection.selectedBankIds, from, through,
-                    onProgress = { scanned -> _uiState.update { it.copy(importScanned = scanned) } }))
-                val state = result.toImportState()
-                _uiState.update { it.copy(importState = state) }
+            val result = historicalImportGateway.scan(com.baraa.masroof.application.onboarding.OnboardingImportRequest(selection.selectedBankIds, from, through,
+                onProgress = { scanned -> _uiState.update { it.copy(importScanned = scanned) } }))
+            val state = result.toImportState()
+            _uiState.update { it.copy(importState = state) }
 
-                when (state) {
-                    is ImportState.Completed -> {
-                        try {
-                            // The shared importer already completed discovery/reconciliation for this batch.
-                            loadCandidatesAndCounts()
-                            onboardingPrefs.setHistoricalImportCompleted(true)
-                            _uiState.update { it.copy(step = OnboardingStep.OWNERSHIP) }
-                        } catch (ce: CancellationException) {
-                            throw ce
-                        } catch (caught: Exception) { appLogService?.failure(com.baraa.masroof.application.logging.AppLogCategories.SCAN, "Onboarding startImport", caught);
-                            onboardingPrefs.setHistoricalImportCompleted(false)
-                            _uiState.update {
-                                it.copy(
-                                    importState = ImportState.ProviderError(
-                                        HistoricalImportResult(failure = HistoricalImportFailure.ProviderError("post_scan_setup_failed")),
-                                    ),
-                                    error = OnboardingError.IMPORT_FAILED,
-                                )
-                            }
-                        }
-                    }
-                    is ImportState.PermissionError -> {
+            when (state) {
+                is ImportState.Completed -> {
+                    try {
+                        // The shared importer already completed discovery/reconciliation for this batch.
+                        loadCandidatesAndCounts()
+                        onboardingPrefs.setHistoricalImportCompleted(true)
+                        _uiState.update { it.copy(step = OnboardingStep.OWNERSHIP) }
+                    } catch (ce: CancellationException) {
+                        throw ce
+                    } catch (caught: Exception) { appLogService?.failure(com.baraa.masroof.application.logging.AppLogCategories.SCAN, "Onboarding startImport", caught);
+                        onboardingPrefs.setHistoricalImportCompleted(false)
                         _uiState.update {
                             it.copy(
-                                step = OnboardingStep.PERMISSION,
-                                error = OnboardingError.PERMISSION_DENIED,
+                                importState = ImportState.ProviderError(
+                                    HistoricalImportResult(failure = HistoricalImportFailure.ProviderError("post_scan_setup_failed")),
+                                ),
+                                error = OnboardingError.IMPORT_FAILED,
                             )
                         }
                     }
-                    is ImportState.ProviderError -> {
-                        _uiState.update {
-                            it.copy(error = if (state.result.failure is HistoricalImportFailure.ProcessingIncomplete) {
-                                OnboardingError.IMPORT_FAILED
-                            } else {
-                                OnboardingError.SMS_PROVIDER_ERROR
-                            })
-                        }
-                    }
-                    else -> {
-                        _uiState.update { it.copy(error = OnboardingError.IMPORT_FAILED) }
+                }
+                is ImportState.PermissionError -> {
+                    _uiState.update {
+                        it.copy(
+                            step = OnboardingStep.PERMISSION,
+                            error = OnboardingError.PERMISSION_DENIED,
+                        )
                     }
                 }
-            } catch (ce: CancellationException) {
-                throw ce
-            } catch (caught: Exception) { appLogService?.failure(com.baraa.masroof.application.logging.AppLogCategories.SCAN, "Onboarding startImport", caught);
-                _uiState.update {
-                    it.copy(
-                                importState = ImportState.ProviderError(
-                                    HistoricalImportResult(failure = HistoricalImportFailure.ProviderError("scan_failed")),
-                                ),
-                        error = OnboardingError.IMPORT_FAILED,
-                    )
+                is ImportState.ProviderError -> {
+                    _uiState.update {
+                        it.copy(error = if (state.result.failure is HistoricalImportFailure.ProcessingIncomplete) {
+                            OnboardingError.IMPORT_FAILED
+                        } else {
+                            OnboardingError.SMS_PROVIDER_ERROR
+                        })
+                    }
+                }
+                else -> {
+                    _uiState.update { it.copy(error = OnboardingError.IMPORT_FAILED) }
                 }
             }
         }
@@ -500,27 +496,24 @@ class OnboardingViewModel(
     fun finalizeOnboarding() {
         if (isBusy()) return
         _uiState.update { it.copy(finalizing = true, error = null) }
-        viewModelScope.launch {
-            try {
-                val snapshot = onboardingOwnershipWorkflow.loadSnapshot(_uiState.value.selectedBankIds)
-                if (!_uiState.value.banksConfirmed || snapshot.hasUnknownCandidates || snapshot.cards.any { it.ownership == com.baraa.masroof.domain.model.OwnershipStatus.OWNED && it.cardType == null }) {
-                    _uiState.update { it.copy(error = OnboardingError.OWNERSHIP_UPDATE_FAILED) }
-                    return@launch
-                }
-                refreshReviewQueue()
-                loadCandidatesAndCounts()
-                onboardingPrefs.setOnboardingCompleted(true)
-                _uiState.update {
-                    it.copy(
-                        onboardingCompleted = true,
-                        finalizing = false,
-                        step = OnboardingStep.FINALIZE,
-                    )
-                }
-            } catch (error: CancellationException) { throw error }
-            catch (caught: Exception) { appLogService?.failure(com.baraa.masroof.application.logging.AppLogCategories.OWNERSHIP, "Onboarding finalizeOnboarding", caught);
-                _uiState.update { it.copy(finalizing = false, error = OnboardingError.FINALIZATION_FAILED) }
-            } finally { _uiState.update { it.copy(finalizing = false) } }
+        launchLogged(appLogService, AppLogCategories.OWNERSHIP, "Onboarding finalizeOnboarding", onError = {
+            _uiState.update { it.copy(finalizing = false, error = OnboardingError.FINALIZATION_FAILED) }
+        }, onFinally = { _uiState.update { it.copy(finalizing = false) } }) {
+            val snapshot = onboardingOwnershipWorkflow.loadSnapshot(_uiState.value.selectedBankIds)
+            if (!_uiState.value.banksConfirmed || snapshot.hasUnknownCandidates || snapshot.cards.any { it.ownership == com.baraa.masroof.domain.model.OwnershipStatus.OWNED && it.cardType == null }) {
+                _uiState.update { it.copy(error = OnboardingError.OWNERSHIP_UPDATE_FAILED) }
+                return@launchLogged
+            }
+            refreshReviewQueue()
+            loadCandidatesAndCounts()
+            onboardingPrefs.setOnboardingCompleted(true)
+            _uiState.update {
+                it.copy(
+                    onboardingCompleted = true,
+                    finalizing = false,
+                    step = OnboardingStep.FINALIZE,
+                )
+            }
         }
     }
 

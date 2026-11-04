@@ -17,7 +17,7 @@ internal object AccountDailySpendingTrendsBuilder {
     fun build(context: DashboardProjectionContext, involvement: Map<String, Set<String>>,
         creditKeys: Set<String>, cardInvolvement: Map<String, Set<String>> =
             CardTransactionInvolvementResolver.buildIndex(context.transactions, context.parsedRecords)): AccountDailySpendingTrends = with(context) {
-        val flowContext = AccountFlowClassifier.buildContext(transactions, parsedRecords, primaryCurrency, sarEquivalents)
+        val flowContext = AccountFlowClassifier.buildContext(parsedRecords, primaryCurrency, sarEquivalents)
         val aggregateAmounts = linkedMapOf<String, BigDecimal>()
         val allowed = setOf(ChartDataCategory.EXTERNAL_TRANSFERS, ChartDataCategory.CREDIT_SETTLEMENTS,
             ChartDataCategory.CASH_WITHDRAWALS, ChartDataCategory.BILLS, ChartDataCategory.ACCOUNT_PURCHASES,
@@ -27,9 +27,7 @@ internal object AccountDailySpendingTrendsBuilder {
             period, transactions, primaryCurrency, zoneId, today, amounts)
         val perAccount = ownedAccounts.associate { account ->
             val id = FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
-            val scope = CurrentAccountTransactionScope(setOf(id),
-                CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(listOf(account.maskedNumber)),
-                AccountFlowScopeMode.SingleAccount, debitCardScope.ownedDebitCardContainerIds,
+            val scope = CurrentAccountTransactionScope(setOf(id), AccountFlowScopeMode.SingleAccount, debitCardScope.ownedDebitCardContainerIds,
                 debitCardScope.debitCardLinkedAccountIds)
             val amounts = linkedMapOf<String, BigDecimal>()
             val categories = (allowed + ChartDataCategory.INTERNAL_TRANSFERS).associateWith { linkedMapOf<String, BigDecimal>() }

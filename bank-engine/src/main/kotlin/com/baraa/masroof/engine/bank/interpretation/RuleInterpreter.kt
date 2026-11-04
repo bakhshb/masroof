@@ -1,20 +1,12 @@
 package com.baraa.masroof.engine.bank.interpretation
 
 import com.baraa.masroof.engine.bank.*
+import com.baraa.masroof.engine.bank.patterns.frozen
 import java.security.MessageDigest
 
 /** Independent rules interpreter. Receipt fallback is explicit durable SMS metadata, never a device clock read. */
-class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAssist? = null) : BankInterpreter {
-    private val snapshot = schema.copy(rules = schema.rules.map { it.copy(
-        phrases = it.phrases.toList(), excludes = it.excludes.toList(),
-        labels = it.labels.mapValues { entry -> entry.value.toList() },
-        detailLabels = it.detailLabels.mapValues { entry -> entry.value.toList() },
-        observations = it.observations.mapValues { entry -> entry.value.toList() }) },
-        network = schema.network.copy(bankAliases = schema.network.bankAliases.mapValues { it.value.toList() },
-            sourceBankLabels = schema.network.sourceBankLabels.toList(),
-            destinationBankLabels = schema.network.destinationBankLabels.toList(),
-            networkLabels = schema.network.networkLabels.toList(),
-            unidentifiedExternalBankMarkers = schema.network.unidentifiedExternalBankMarkers.toList()))
+class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAssist? = null) {
+    private val snapshot = schema.frozen()
     // Content identity prevents changing literals under an unchanged declared revision.
     val version = InterpretationVersion(1, VERSION, "literal-v${snapshot.schema}-r${snapshot.revision}-" +
         MessageDigest.getInstance("SHA-256").digest(snapshot.toString().toByteArray(Charsets.UTF_8))
@@ -31,18 +23,15 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
             }
     }
 
-    override fun interpret(input: MessageInput, catalog: BankCatalog): Interpretation =
-        interpretWithBanks(input, catalog.candidates(input.sender))
-
     /** Router-selected bank: never re-detect a sender after an explicit/stored bank choice. */
     fun interpretRouted(input: MessageInput, bank: com.baraa.masroof.finance.value.BankId): Interpretation =
-        interpretWithBanks(input, setOf(bank))
+        interpretWithBank(input, bank)
 
     /** Same as [interpretRouted], with the assistance for this call, so one interpreter serves every caller. */
     fun interpretRouted(input: MessageInput, bank: com.baraa.masroof.finance.value.BankId, assist: FamilyAssist?): Interpretation =
-        interpretWithBanks(input, setOf(bank), assist)
+        interpretWithBank(input, bank, assist)
 
-    private fun interpretWithBanks(input: MessageInput, banks: Set<com.baraa.masroof.finance.value.BankId>,
+    private fun interpretWithBank(input: MessageInput, bank: com.baraa.masroof.finance.value.BankId,
         familyAssist: FamilyAssist? = this.familyAssist): Interpretation {
         val blockers = linkedSetOf<Blocker>()
         val diagnostics = mutableListOf<InterpretationDiagnostic>()
@@ -54,12 +43,8 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
         }
         fun result(facts: Facts = Facts(MessageFamily.UNKNOWN), status: ParseStatus = ParseStatus.REVIEW_REQUIRED): Interpretation {
             if (facts.family == MessageFamily.UNKNOWN) blockers += Blocker.UNKNOWN_FAMILY
-            return Interpretation(input.evidenceId, version, banks.singleOrNull(), facts, status,
+            return Interpretation(input.evidenceId, version, bank, facts, status,
                 inference?.let { Confidence(it.score,listOf("family_origin:${it.origin}","model:${it.modelVersion}")) }, evidence.toList(), blockers.toSet(), diagnostics.toList(), inference)
-        }
-        if (banks.size != 1) {
-            problem("SENDER_NOT_UNIQUE", if (banks.isEmpty()) Blocker.UNKNOWN_BANK else Blocker.AMBIGUOUS_BANK)
-            return result()
         }
         if (input.body.length > MAX_BODY) { problem("MESSAGE_TOO_LONG"); return result() }
         val source = SourceText(input.body)
@@ -226,7 +211,7 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
             problem("CONFLICTING_FOREIGN_PRINCIPAL", Blocker.CONFLICTING_FACTS)
         val observations = matching.flatMap { it.observations.entries }.groupBy({ it.key }, { it.value }).mapValues { it.value.flatten().distinct() }
         val network = TransferNetworkResolver(source, snapshot.network, observations, evidence, ::problem)
-            .resolve(family, banks.single(), familyPhrases, details.counterparty != null && (if (family == MessageFamily.TRANSFER_IN) destination != null else account != null))
+            .resolve(family, bank, familyPhrases, details.counterparty != null && (if (family == MessageFamily.TRANSFER_IN) destination != null else account != null))
         val observed = ObservationExtractor(source, observations, family, familyPhrases, evidence, ::problem).read()
         if (observed.card == CardChannel.STATEMENT && family !in INFORMATIONAL) problem("STATEMENT_CHANNEL_IN_MOVEMENT", Blocker.CONFLICTING_FACTS)
         if (observed.balanceMarker && balance == null) problem("MISSING_OBSERVED_BALANCE")
@@ -234,10 +219,10 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
         if (transfer && account == null && (family == MessageFamily.TRANSFER_OUT || details.counterparty == null)) problem("MISSING_TRANSFER_SOURCE")
         if (transfer && destination == null && (family == MessageFamily.TRANSFER_IN || details.counterparty == null)) problem("MISSING_TRANSFER_DESTINATION")
         val sourceBank = if (family == MessageFamily.TRANSFER_IN) {
-            if (network.kind == BankNetwork.INTRA_BANK) banks.single() else network.source
-        } else network.source ?: banks.single()
-        val destinationBank = if (family in setOf(MessageFamily.TRANSFER_IN, MessageFamily.REFUND)) network.destination ?: banks.single()
-            else if (network.kind == BankNetwork.INTRA_BANK) banks.single() else network.destination
+            if (network.kind == BankNetwork.INTRA_BANK) bank else network.source
+        } else network.source ?: bank
+        val destinationBank = if (family in setOf(MessageFamily.TRANSFER_IN, MessageFamily.REFUND)) network.destination ?: bank
+            else if (network.kind == BankNetwork.INTRA_BANK) bank else network.destination
         // One original source range cannot authorize two different field roles.
         val roleEvidence = evidence.filter { it.field != "family" && !it.field.startsWith("observation.") }
         if (roleEvidence.any { a -> roleEvidence.any { b -> a.field != b.field && a.start < b.end && b.start < a.end } })
@@ -246,7 +231,7 @@ class RuleInterpreter(schema: BankRuleSchema, private val familyAssist: FamilyAs
         val facts = Facts(if (familyCollision) MessageFamily.UNKNOWN else family, amount, if (family in INFORMATIONAL || family==MessageFamily.UNKNOWN) null else direction,
             sourceAccount = account?.let { AccountReference(sourceBank, it) },
             destinationAccount = destination?.let { AccountReference(destinationBank, it) },
-            card = card?.let { CardReference(banks.single(), it) }, merchant = merchant,
+            card = card?.let { CardReference(bank, it) }, merchant = merchant,
             availableBalance = balance, occurredAtLocal = times.singleOrNull(),
             occurredAt = input.receivedAt.takeIf {receiptTime && family !in INFORMATIONAL}, outstandingBalance = details.due,
             labeledForeignAmount = details.foreign ?: amount?.takeIf { it.currency != com.baraa.masroof.finance.value.Currency.SAR }, internationalFee = details.fee?.takeIf { family in setOf(MessageFamily.PURCHASE,MessageFamily.REFUND) }, exchangeRate = details.rate,

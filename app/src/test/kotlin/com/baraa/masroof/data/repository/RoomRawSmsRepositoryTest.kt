@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -56,14 +57,6 @@ class RoomRawSmsRepositoryTest {
     @Test
     fun listIdsByReceivedAt_isEmptyWithoutEvidence() = runBlocking {
         assertTrue(repo.listIdsByReceivedAt().isEmpty())
-    }
-
-    @Test
-    fun duplicateInsert_doesNotAddAnotherId() = runBlocking {
-        val row = raw("sms-a", "2026-08-01T10:00:00Z")
-        assertEquals(RawSmsInsertResult.Inserted, repo.insertIfAbsent(row))
-        assertEquals(RawSmsInsertResult.AlreadyExists, repo.insertIfAbsent(row))
-        assertEquals(listOf("sms-a"), repo.listIdsByReceivedAt())
     }
 
     @Test
@@ -218,14 +211,4 @@ class RoomRawSmsRepositoryTest {
         deviceMessageId = deviceMessageId,
         bodyHash = SmsBodyHasher.sha256Hex(body),
     )
-
-    private companion object {
-        val PURCHASE_BODY = """
-            شراء عبر الانترنت
-            بطاقة: 7271
-            لدى: Keeta
-            بمبلغ: 51.99 SAR
-            في: 14:32 03-08-2026
-        """.trimIndent()
-    }
 }

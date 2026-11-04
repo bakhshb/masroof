@@ -18,7 +18,6 @@ import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.formatCardLast4
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.ui.theme.MasroofThemeExtras
-import java.time.ZoneId
 
 @Composable
 fun DebitCardDetailSummaryCard(debit: DebitCardOverview, network: CardNetwork?, modifier: Modifier = Modifier,
@@ -63,9 +62,9 @@ fun DebitCardSummaryTile(debit: DebitCardOverview, network: CardNetwork?, modifi
 }
 
 @Composable
-fun CreditFacilityCard(facility: CreditFacilityOverview, cardNetworksByLast4: Map<String, CardNetwork?>,
-    zoneId: ZoneId, ownedCards: List<OwnedCardUi> = emptyList(), modifier: Modifier = Modifier,
-    allowInlineExpand: Boolean = true, onOpenCard: ((CreditCardDashboardRow) -> Unit)? = null,
+fun CreditFacilityCard(facility: CreditFacilityOverview,
+    ownedCards: List<OwnedCardUi> = emptyList(), modifier: Modifier = Modifier,
+    onOpenCard: ((CreditCardDashboardRow) -> Unit)? = null,
     trends: Map<String, com.baraa.masroof.application.dashboard.DailySpendingTrend> = emptyMap(),
 ) {
     // Facility due and available limit show once in the Cards hero, not on every card.

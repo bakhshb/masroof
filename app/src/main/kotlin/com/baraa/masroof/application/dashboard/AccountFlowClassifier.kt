@@ -5,7 +5,6 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.ids.FinancialContainerIdParser
 import com.baraa.masroof.parsing.model.isCreditCardSms
 import com.baraa.masroof.parsing.model.isDebitCardSms
@@ -28,7 +27,6 @@ sealed interface FlowAssignment {
 
 data class AccountFlowClassificationContext(
     val parsedRecordsById: Map<String, ParsedEventRecord>,
-    val billPaymentTxIds: Set<String>,
     val primaryCurrency: Currency,
     val sarEquivalents: Map<String, Money>,
 )
@@ -58,7 +56,6 @@ object AccountFlowClassifier {
         context: AccountFlowClassificationContext,
     ): List<FlowAssignment> {
         val parsedRecordsById = context.parsedRecordsById
-        val billPaymentTxIds = context.billPaymentTxIds
 
         return when (tx.type) {
             FinancialTransactionType.INCOME -> {
@@ -137,7 +134,7 @@ object AccountFlowClassifier {
                         scope.isCashWithdrawal(tx, parsedRecordsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.CASH_WITHDRAWAL)
 
-                        scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById) ->
+                        scope.isBillPayment(tx, parsedRecordsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.BILL_PAYMENT)
 
                         else -> FlowAssignment.Expense(FlowExpenseCategory.POS_PURCHASE)
@@ -157,7 +154,7 @@ object AccountFlowClassifier {
                         scope.isFinancingInstallment(tx, parsedRecordsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.LOAN_REPAYMENT)
 
-                        scope.isBillPayment(tx, billPaymentTxIds, parsedRecordsById) ->
+                        scope.isBillPayment(tx, parsedRecordsById) ->
                             FlowAssignment.Expense(FlowExpenseCategory.BILL_PAYMENT)
 
                         scope.isCashWithdrawal(tx, parsedRecordsById) ->
@@ -266,26 +263,13 @@ object AccountFlowClassifier {
 
     private fun isCardContainer(containerId: String): Boolean = FinancialContainerIdParser.isCardContainer(containerId)
 
-    fun resolveBillPaymentTransactionIds(
-        transactions: List<FinancialTransaction>,
-        parsedRecords: List<ParsedEventRecord>,
-    ): Set<String> {
-        val familyByEventId = parsedRecords.associate { it.event.id to it.event.messageFamily }
-        return transactions.mapNotNull { tx ->
-            val families = tx.linkedParsedEventIds.mapNotNull { familyByEventId[it] }
-            if (families.any { it == MessageFamily.BILL_PAYMENT }) tx.id else null
-        }.toSet()
-    }
-
     fun buildContext(
-        transactions: List<FinancialTransaction>,
         parsedRecords: List<ParsedEventRecord>,
         primaryCurrency: Currency,
         sarEquivalents: Map<String, Money>,
     ): AccountFlowClassificationContext =
         AccountFlowClassificationContext(
             parsedRecordsById = parsedRecords.associateBy { it.event.id },
-            billPaymentTxIds = resolveBillPaymentTransactionIds(transactions, parsedRecords),
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
         )

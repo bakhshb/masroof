@@ -2,7 +2,6 @@ package com.baraa.masroof.testsupport
 
 import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
 import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
-import com.baraa.masroof.application.notification.NotificationCenterMetricsWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
@@ -31,17 +30,6 @@ internal object PresentationWorkflowTestSupport {
         DashboardPeriodWorkflow(
             clock = InstantClock { now },
             zoneId = zoneId,
-        )
-
-    fun notificationCenterMetricsWorkflow(
-        reviewRepository: ReviewRepository,
-        cards: CardRegistryRepository = SettingsViewModelTestSupport.emptyCardRegistry(),
-        accounts: AccountRegistryRepository = SettingsViewModelTestSupport.emptyAccountRegistry(),
-    ): NotificationCenterMetricsWorkflow =
-        NotificationCenterMetricsWorkflow(
-            reviewRepository = reviewRepository,
-            cardRegistryRepository = cards,
-            accountRegistryRepository = accounts,
         )
 
     fun onboardingOwnershipWorkflow(

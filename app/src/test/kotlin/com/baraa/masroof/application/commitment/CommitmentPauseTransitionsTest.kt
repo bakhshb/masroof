@@ -1,9 +1,6 @@
 package com.baraa.masroof.application.commitment
 
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
-import com.baraa.masroof.domain.model.Commitment
+import com.baraa.masroof.testsupport.sampleCommitment
 import com.baraa.masroof.domain.model.CommitmentPauseInterval
 import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
@@ -119,26 +116,5 @@ class CommitmentPauseTransitionsTest {
 
         assertTrue(CommitmentPauseTransitions.isVisibleInSalaryPeriod(commitment, previousPeriod, zone))
         assertFalse(CommitmentPauseTransitions.isVisibleInSalaryPeriod(commitment, disabledPeriod, zone))
-    }
-
-    private fun sampleCommitment(
-        transactionDate: LocalDate = LocalDate.parse("2026-08-01"),
-        recurrence: CommitmentRecurrence? = CommitmentRecurrence.MONTHLY,
-        active: Boolean = true,
-        updatedAt: Instant = Instant.parse("2026-08-01T00:00:00Z"),
-    ): Commitment {
-        val now = Instant.parse("2026-08-01T00:00:00Z")
-        return Commitment(
-            id = RegistryEntityIdFactory.newCommitmentId(),
-            name = "Netflix",
-            amount = Money.of("71.00", Currency.SAR),
-            transactionDate = transactionDate,
-            recurrence = recurrence,
-            dueDate = null,
-            active = active,
-            sourceTransactionId = "tx-1",
-            createdAt = now,
-            updatedAt = updatedAt,
-        )
     }
 }

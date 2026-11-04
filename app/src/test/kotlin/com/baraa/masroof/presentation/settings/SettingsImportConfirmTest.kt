@@ -4,20 +4,10 @@ import android.net.Uri
 import com.baraa.masroof.application.backup.BackupImportOutcome
 import com.baraa.masroof.application.backup.BackupPackageKind
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
-import com.baraa.masroof.application.locale.AppLocale
-import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
-import com.baraa.masroof.domain.model.AccountReference
-import com.baraa.masroof.domain.model.AccountRegistryEntry
-import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.CardRegistryEntry
-import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
 import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
-import com.baraa.masroof.domain.repository.AccountRegistryRepository
-import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
-import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -146,24 +136,16 @@ class SettingsImportConfirmTest {
 
     private fun viewModel(backup: DatabaseBackupGateway): SettingsViewModel =
         SettingsViewModel(
-            settingsRegistryWorkflow = SettingsViewModelTestSupport.settingsRegistryWorkflow(
-                cards = EmptyCards(),
-                accounts = EmptyAccounts(),
-                loans = NoOpLoanRegistryRepository,
-            ),
+            settingsRegistryWorkflow = SettingsViewModelTestSupport.settingsRegistryWorkflow(),
             settingsCommitmentsWorkflow = SettingsCommitmentsWorkflow(
                 commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
             ),
-            appLocaleRepository = object : AppLocaleRepository {
-                override fun getLanguageTag() = AppLocale.DEFAULT_TAG
-                override fun setLanguageTag(languageTag: String) = Unit
-            },
+            appLocaleRepository = com.baraa.masroof.testsupport.FakeAppLocaleRepository(),
             themePreferencesRepository = object : ThemePreferencesRepository {
                 override fun getThemeMode() = ThemeMode.SYSTEM
                 override fun setThemeMode(mode: ThemeMode) = Unit
             },
             databaseBackupService = backup,
-            refreshReviewQueue = {},
             reparseStoredEvents = { com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(0, 0) },
             permissionStateProvider = { true },
             appVersion = SettingsViewModelTestFixtures.APP_VERSION,
@@ -198,17 +180,5 @@ class SettingsImportConfirmTest {
             importCalls++
             return BackupImportOutcome.InvalidPackage
         }
-    }
-
-    private class EmptyCards : NoOpCardRegistryRepository()
-
-    private class EmptyAccounts : AccountRegistryRepository {
-        override suspend fun observe(reference: AccountReference, rawSmsId: String) = Unit
-        override suspend fun setOwnership(reference: AccountReference, status: OwnershipStatus) = Unit
-        override suspend fun resolve(reference: AccountReference) = OwnershipStatus.UNKNOWN
-        override suspend fun get(reference: AccountReference): AccountRegistryEntry? = null
-        override suspend fun listAll(): List<AccountRegistryEntry> = emptyList()
-        override suspend fun updateDisplayName(reference: AccountReference, displayName: String?) = Unit
-            override suspend fun updateAccountType(reference: com.baraa.masroof.domain.model.AccountReference, accountType: com.baraa.masroof.domain.model.AccountType) = Unit
     }
 }

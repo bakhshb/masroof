@@ -20,9 +20,7 @@ import com.baraa.masroof.presentation.dashboard.DashboardUiState
 import com.baraa.masroof.presentation.dashboard.OwnedCardUi
 import com.baraa.masroof.presentation.dashboard.followedCreditFacilities
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.Instant
@@ -96,34 +94,6 @@ class MadaDebitCardsDashboardVisibilityTest {
         assertEquals(
             listOf("5555", "8219"),
             followed.debitCards.map { it.last4 }.sorted(),
-        )
-    }
-
-    @Test
-    fun debitCardRegistryInferrer_detectsMadaFromSmsWhenTypeMissing() {
-        val entry = ownedMadaWithoutMetadata("8219")
-        val parsedRecords = listOf(parsedMadaPurchase("evt-8219", "sms-8219", "8219"))
-
-        assertTrue(
-            CardRegistryDebitClassifier.isDebitRegistryEntry(
-                entry,
-                parsedRecords = parsedRecords,
-            ),
-        )
-    }
-
-    @Test
-    fun debitCardRegistryInferrer_ignoresCreditSmsAtRamadanMerchant() {
-        val entry = ownedMadaWithoutMetadata("7271")
-        val parsedRecords = listOf(
-            parsedMadaPurchase("evt-7271", "sms-7271", "7271", CardSmsChannel.CREDIT),
-        )
-
-        assertFalse(
-            CardRegistryDebitClassifier.isDebitRegistryEntry(
-                entry,
-                parsedRecords = parsedRecords,
-            ),
         )
     }
 

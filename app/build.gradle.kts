@@ -127,6 +127,9 @@ android {
     sourceSets {
         getByName("androidTest").assets.directories += "$projectDir/schemas"
         getByName("androidTest").assets.directories += "src/test/resources/testdata"
+        // Test helpers used by both JVM and device tests.
+        getByName("test").kotlin.directories += "src/sharedTest/kotlin"
+        getByName("androidTest").kotlin.directories += "src/sharedTest/kotlin"
     }
 }
 
@@ -169,9 +172,7 @@ dependencies {
     androidTestImplementation(testFixtures(project(":bank-engine")))
 
     testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.work.testing)

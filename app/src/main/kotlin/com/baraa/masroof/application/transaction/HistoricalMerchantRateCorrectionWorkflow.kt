@@ -1,7 +1,6 @@
 package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.application.dashboard.SarEquivalentResolution
-import com.baraa.masroof.application.dashboard.TransactionDisplayEnricher
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
@@ -80,14 +79,14 @@ class HistoricalMerchantRateCorrectionWorkflow(
         val manualFollowUp = mutableListOf<String>()
         val skipped = requested.filter { it !in candidateIds }.toMutableList()
         for (candidate in candidates) {
-            if (candidate.requiresManualFollowUp) {
+            val rate = candidate.correctedRate
+            val source = candidate.correctedSource
+            if (rate == null || source == null) {
                 manualFollowUp += candidate.transactionId
                 logCorrection(phase = "before", candidate = candidate, applied = null)
                 logCorrection(phase = "after", candidate = candidate, applied = false)
                 continue
             }
-            val rate = candidate.correctedRate ?: continue
-            val source = candidate.correctedSource ?: continue
             logCorrection(phase = "before", candidate = candidate, applied = null)
             val wrote = financialTransactionRepository.replaceConfirmedHistoricalMerchantRate(
                 id = candidate.transactionId,
@@ -137,24 +136,14 @@ class HistoricalMerchantRateCorrectionWorkflow(
 
     private suspend fun resolveIgnoringPersistedPairs(
         transactions: List<FinancialTransaction>,
-    ): Map<String, SarEquivalentResolution> {
-        val stripped = transactions.map { it.copy(appliedExchangeRate = null, exchangeRateSource = null) }
-        val linkedRawSmsIds = financialTransactionRepository.listRawSmsIdsForTransactions(stripped.map { it.id })
-        val parsedRecords = (
-            parsedEventRepository.listByRawSmsIds(linkedRawSmsIds) +
-                parsedEventRepository.listExchangeRateFacts()
-            )
-            .distinctBy { it.event.id }
-            .sortedBy { it.event.id }
-        val rawSmsById = rawSmsRepository.getByIds(parsedRecords.map { it.event.rawSmsId }.distinct())
-            .associateBy { it.id }
-        return sarEquivalentResolver.resolve(
-            transactions = TransactionDisplayEnricher.enrichMerchants(stripped, parsedRecords),
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-            primaryCurrency = primaryCurrency,
-        )
-    }
+    ): Map<String, SarEquivalentResolution> = resolveSarEquivalents(
+        transactions.map { it.copy(appliedExchangeRate = null, exchangeRateSource = null) },
+        financialTransactionRepository,
+        parsedEventRepository,
+        rawSmsRepository,
+        sarEquivalentResolver,
+        primaryCurrency,
+    )
 
     private fun logCorrection(
         phase: String,

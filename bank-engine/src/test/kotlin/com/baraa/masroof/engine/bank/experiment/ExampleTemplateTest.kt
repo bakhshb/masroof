@@ -13,7 +13,6 @@ class ExampleTemplateTest {
         assertEquals("USD 75.20", result.fields.getValue("amount").raw)
         assertEquals("ANOTHER SHOP", result.fields.getValue("merchant").raw)
         assertEquals("2026-10-07 11:15:30", result.fields.getValue("time").raw)
-        assertFalse(result.financialPostingAllowed)
     }
 
     @Test fun oneAnnotatedExampleExtractsNewValuesRatherThanCopyingTheTeacher() {
@@ -34,7 +33,6 @@ class ExampleTemplateTest {
         assertEquals("ANOTHER PERSON", result.fields.getValue("counterparty").raw)
         assertEquals("009", result.fields.getValue("account").raw)
         assertEquals("15/10/26 09:05", result.fields.getValue("time").raw)
-        assertFalse(result.financialPostingAllowed)
         result.fields.values.forEach { assertEquals(it.raw, changed.substring(it.start, it.end)) }
     }
 
@@ -46,7 +44,6 @@ class ExampleTemplateTest {
                 val result = requireNotNull(template.preview("STC Bank", body))
                 assertEquals(expected, result.fields.mapValues { it.value.raw })
                 assertEquals(example.label, result.label)
-                assertFalse(result.financialPostingAllowed)
                 result.fields.values.forEach { assertEquals(it.raw, body.substring(it.start, it.end)) }
             }
         }
@@ -111,9 +108,9 @@ class ExampleTemplateTest {
         val example = syntheticExamples().first()
         val incoming = example.learn()
         val conflicting = example.copy(label = "DIFFERENT_HUMAN_LABEL").learn()
-        assertNull(ExampleTemplate.previewUnique(listOf(incoming, conflicting), "STC Bank", example.body))
-        assertNull(ExampleTemplate.previewUnique(listOf(conflicting, incoming), "STC Bank", example.body))
-        assertNotNull(ExampleTemplate.previewUnique(listOf(incoming), "STC Bank", example.body))
+        assertNull(listOf(incoming, conflicting).unique("STC Bank", example.body))
+        assertNull(listOf(conflicting, incoming).unique("STC Bank", example.body))
+        assertNotNull(listOf(incoming).unique("STC Bank", example.body))
     }
 
     @Test fun overlappingOutOfBoundsOrTitleSelectionsAreRejected() {
@@ -152,6 +149,46 @@ class ExampleTemplateTest {
         assertEquals(4, requireNotNull(template.preview("STC Bank", example.body)).fields.size)
         assertNull(template.preview("STC Bank", example.body + " ".repeat(4096)))
     }
+
+    @Test fun frozenTemplatesEvaluateHeldOutMessagesWithoutLearningFromThem() {
+        val teachers = syntheticExamples()
+        val templates = teachers.map { it.learn() }
+        val (known, knownFields) = teachers.first().variant(1)
+        val unseen = "Previously unseen transfer\nAmount:17SR"
+        // Only original teachers reach learn(). Neither expected fields nor held-out text can alter a template.
+        assertTrue(listOf(known, unseen).none { body -> teachers.any { it.body == body } })
+        val preview = requireNotNull(templates.unique("STC Bank", known))
+        assertEquals(teachers.first().label, preview.label)
+        assertEquals(knownFields, preview.fields.mapValues { it.value.raw })
+        assertTrue(preview.fields.values.all { it.raw == known.substring(it.start, it.end) })
+        assertTrue(templates.none { it.preview("STC Bank", unseen) != null })
+    }
+
+    @Test fun oneAdditionalExampleHandlesAnUnseenLayoutWithoutLearningTheHoldout() {
+        val originalTeachers = syntheticExamples()
+        val originalTemplates = originalTeachers.map { it.learn() }
+        val teacher = markedExample("TRANSFER_IN",
+            "Previously unseen incoming transfer\n[[amount|MONEY|33.00 SAR]]\nReference:[[reference|TEXT|*AB12]]")
+        val (holdout, holdoutFields) = teacher.variant(1)
+        assertNull(originalTemplates.unique("STC Bank", teacher.body))
+        assertTrue((originalTeachers + teacher).none { it.body == holdout })
+        val extendedTemplates = originalTemplates + teacher.learn()
+        val reproduced = requireNotNull(extendedTemplates.unique("STC Bank", teacher.body))
+        assertEquals(teacher.selections.associate { it.field to teacher.body.substring(it.start, it.end) },
+            reproduced.fields.mapValues { it.value.raw })
+        assertNull(originalTemplates.unique("STC Bank", holdout))
+        val result = requireNotNull(extendedTemplates.unique("STC Bank", holdout))
+        assertEquals(teacher.label, result.label)
+        assertEquals(holdoutFields, result.fields.mapValues { it.value.raw })
+        assertTrue(result.fields.values.all { it.raw == holdout.substring(it.start, it.end) })
+        // Additional learning must retain all original templates and their meaning.
+        originalTeachers.forEach { original ->
+            assertEquals(original.learn().preview("STC Bank", original.body), extendedTemplates.unique("STC Bank", original.body))
+        }
+    }
+
+    private fun List<ExampleTemplate>.unique(sender: String, body: String): Preview? =
+        mapNotNull { it.preview(sender, body) }.singleOrNull()
 }
 
 /** Only synthetic, anonymized fixtures are checked in. Each marker simulates a human selection. */

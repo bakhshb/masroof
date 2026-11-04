@@ -14,12 +14,8 @@ private fun maskedName(custom: String?, fallback: String, number: String): Strin
 }
 
 @Composable
-internal fun registryLabel(account: ManagedAccountUi): String = maskedName(account.displayName,
-    stringResource(when (account.accountType) {
-        AccountType.CURRENT -> R.string.settings_account_type_current
-        AccountType.SAVINGS -> R.string.settings_account_type_savings
-        AccountType.WALLET -> R.string.settings_account_type_wallet
-    }), account.maskedNumber)
+internal fun registryLabel(account: ManagedAccountUi): String =
+    maskedName(account.displayName, accountTypeLabel(account.accountType), account.maskedNumber)
 
 @Composable
 internal fun registryLabel(card: ManagedCardUi): String = maskedName(card.displayName,
@@ -33,9 +29,9 @@ internal fun registryLabel(card: ManagedCardUi): String = maskedName(card.displa
     }), card.last4)
 
 @Composable
-internal fun accountTypeLabel(accountType: com.baraa.masroof.domain.model.AccountType): String =
+internal fun accountTypeLabel(accountType: AccountType): String =
     when (accountType) {
-        com.baraa.masroof.domain.model.AccountType.CURRENT -> stringResource(R.string.settings_account_type_current)
-        com.baraa.masroof.domain.model.AccountType.SAVINGS -> stringResource(R.string.settings_account_type_savings)
-        com.baraa.masroof.domain.model.AccountType.WALLET -> stringResource(R.string.settings_account_type_wallet)
+        AccountType.CURRENT -> stringResource(R.string.settings_account_type_current)
+        AccountType.SAVINGS -> stringResource(R.string.settings_account_type_savings)
+        AccountType.WALLET -> stringResource(R.string.settings_account_type_wallet)
     }

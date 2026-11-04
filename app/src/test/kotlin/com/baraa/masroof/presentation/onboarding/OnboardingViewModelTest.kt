@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.onboarding
 
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 import com.baraa.masroof.application.onboarding.ImportDatePolicy
 import com.baraa.masroof.application.backup.BackupImportOutcome
 import com.baraa.masroof.application.backup.BackupPackageKind
@@ -17,14 +18,9 @@ import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewStatus
-import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
-import com.baraa.masroof.domain.repository.ReviewRepository
 import kotlinx.coroutines.CompletableDeferred
-import com.baraa.masroof.application.sms.SmsScanFailure
-import com.baraa.masroof.application.sms.SmsScanResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -45,6 +41,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
 class OnboardingViewModelTest {
     private val dispatcher = StandardTestDispatcher()
 
@@ -235,17 +232,14 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun selectedDate_passesCorrectInstantBoundary() = runTest {
+    fun selectedDate_reachesTheImportRequest() = runTest {
         val fixture = Fixture(permissionGranted = true)
         advanceUntilIdle()
         fixture.vm.onStartClicked()
         fixture.vm.selectCustomDate(LocalDate.parse("2026-08-03"))
         fixture.vm.startImport()
         advanceUntilIdle()
-        assertEquals(
-            LocalDate.parse("2026-08-03").atStartOfDay(fixture.zone).toInstant(),
-            fixture.gateway.lastReceivedAfter,
-        )
+        assertEquals(LocalDate.parse("2026-08-03"), fixture.gateway.lastRequest?.from)
     }
 
     @Test
@@ -600,6 +594,16 @@ AccountRegistryEntry.forTest(
         assertTrue(fixture.vm.uiState.value.importState is ImportState.ProviderError)
     }
 
+    @Test
+    fun restoreBackup_invalidPackage_setsError() = runTest {
+        val fixture = Fixture(permissionGranted = false)
+        advanceUntilIdle()
+        fixture.vm.restoreBackup(android.net.Uri.parse("content://backup/invalid.masroof"))
+        advanceUntilIdle()
+        assertEquals(OnboardingError.BACKUP_RESTORE_INVALID, fixture.vm.uiState.value.error)
+        assertFalse(fixture.vm.uiState.value.restoringBackup)
+    }
+
     private class Fixture(
         now: Instant = Instant.parse("2026-08-11T08:00:00Z"),
         permissionGranted: Boolean = true,
@@ -648,8 +652,6 @@ AccountRegistryEntry.forTest(
     private class FakeDatabaseBackupGateway(
         var outcome: BackupImportOutcome = BackupImportOutcome.InvalidPackage,
     ) : DatabaseBackupGateway {
-        var lastImportUri: android.net.Uri? = null
-
         override suspend fun exportTo(destination: android.net.Uri, passphrase: CharArray): Result<Unit> =
             Result.success(Unit)
 
@@ -659,10 +661,7 @@ AccountRegistryEntry.forTest(
             source: android.net.Uri,
             passphrase: CharArray,
             confirmLegacyPlaintext: Boolean,
-        ): BackupImportOutcome {
-            lastImportUri = source
-            return outcome
-        }
+        ): BackupImportOutcome = outcome
     }
 
     private class FakeOnboardingPrefs : OnboardingPreferencesRepository {
@@ -700,13 +699,11 @@ AccountRegistryEntry.forTest(
     ) : HistoricalImportGateway {
         private var result: com.baraa.masroof.application.onboarding.HistoricalImportResult = initialResult
         private var blocked: CompletableDeferred<Unit>? = null
-        var lastReceivedAfter: Instant? = null
         var lastRequest: com.baraa.masroof.application.onboarding.OnboardingImportRequest? = null
         var calls: Int = 0
         override suspend fun scan(request: com.baraa.masroof.application.onboarding.OnboardingImportRequest): com.baraa.masroof.application.onboarding.HistoricalImportResult {
             calls++
             lastRequest = request
-            lastReceivedAfter = request.from.atStartOfDay(ZoneId.systemDefault()).toInstant()
             if (blockFirstCall && calls == 1) {
                 blocked = CompletableDeferred()
                 blocked?.await()
@@ -786,24 +783,9 @@ AccountRegistryEntry.forTest(
         override suspend fun updateCardNetwork(reference: CardReference, network: CardNetwork?) = Unit
 
         override suspend fun updateCardType(reference: CardReference, cardType: CardType?) = Unit
-
-        override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) = Unit
-
-        override suspend fun markAsDebit(reference: CardReference) = Unit
-
-        override suspend fun setPrimaryCard(reference: CardReference) = Unit
-
-        override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) = Unit
-
-        override suspend fun clearCardRole(reference: CardReference) = Unit
     }
 
-    private class FakeReviewRepo : ReviewRepository {
-        override suspend fun getById(id: String): ReviewItem? = null
-        override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? = null
-        override suspend fun listRequired(): List<ReviewItem> = emptyList()
-        override suspend fun listIgnored(): List<ReviewItem> = emptyList()
-        override suspend fun listAll(): List<ReviewItem> = emptyList()
+    private class FakeReviewRepo : EmptyReviewRepository() {
         override suspend fun upsertRequired(
             rawSmsId: String,
             kind: ReviewKind,
@@ -823,11 +805,5 @@ AccountRegistryEntry.forTest(
                 resolvedTransactionId = null,
             )
         }
-        override suspend fun markResolved(
-            id: String,
-            resolutionKind: com.baraa.masroof.domain.model.ReviewResolutionKind,
-            resolvedAt: Instant,
-            resolvedTransactionId: String?,
-        ): ReviewItem? = null
     }
 }

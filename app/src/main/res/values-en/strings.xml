@@ -270,7 +270,6 @@
     <string name="notification_center_unregistered_cards_title">Unregistered cards</string>
     <string name="notification_center_unregistered_accounts_title">Unregistered accounts</string>
     <string name="notification_center_unregistered_accounts_body">%1$d account(s) need ownership confirmation</string>
-    <string name="notification_center_rescan_title">SMS import result</string>
     <string name="dashboard_unregistered_cards_body">Unregistered card — confirm it in Settings.</string>
     <string name="dashboard_unregistered_cards_more">And %1$d more unregistered card(s) — confirm them in Settings.</string>
     <string name="dashboard_manage_cards_in_settings">Manage cards</string>
@@ -462,10 +461,8 @@
     <string name="dashboard_rescan_already_up_to_date">Messages are already imported — no new messages in this period</string>
     <string name="dashboard_rescan_needs_review">New messages found — review them in Review transactions</string>
     <string name="dashboard_rescan_no_messages">No messages in the selected period</string>
-    <string name="dashboard_rescan_no_bank_sms">No AlJazira Bank messages in the inbox</string>
     <string name="dashboard_rescan_no_transactions">New messages were found but not converted to transactions. You may need to confirm account/card ownership or review them later.</string>
     <string name="dashboard_rescan_failed">Could not import messages</string>
-    <string name="dashboard_rescan_permission_denied">Cannot import messages without SMS permission</string>
     <string name="dashboard_sms_permission_title">SMS permission is off</string>
     <string name="dashboard_sms_permission_body">To import bank transactions from your inbox, allow Masroof to read SMS. Pull-to-refresh only reloads saved data without this permission.</string>
     <string name="dashboard_sms_permission_grant">Allow SMS access</string>

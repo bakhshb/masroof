@@ -35,10 +35,6 @@ data class AccountsSummary(
     val totalOutflow: Money?
         get() = fleet.externalSummary()?.outflow
 
-    /** Fleet external movement (internal transfers excluded from totals). */
-    val externalRemaining: SignedMoneyAmount?
-        get() = fleet.externalSummary()?.remaining
-
     fun accountSummary(): AccountFlowSummary? = fleet.accountSummary()
 
     fun externalSummary(): AccountFlowSummary? = fleet.externalSummary()

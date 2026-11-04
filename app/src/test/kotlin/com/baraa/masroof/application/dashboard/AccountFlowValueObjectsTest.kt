@@ -83,30 +83,4 @@ class AccountFlowValueObjectsTest {
             aggregate.cashPosition().remaining,
         )
     }
-
-    @Test
-    fun cashPosition_and_externalMovement_differWhenSelfTransfersPresent() {
-        val summary = CurrentAccountSummary.of(
-            currency = Currency.SAR,
-            salary = Money.of("1000", Currency.SAR),
-            otherIncome = Money.zero(Currency.SAR),
-            externalTransfersIn = Money.zero(Currency.SAR),
-            selfTransfersIn = Money.zero(Currency.SAR),
-            creditCardPayments = Money.zero(Currency.SAR),
-            billPayments = Money.of("500", Currency.SAR),
-            externalTransfersOut = Money.zero(Currency.SAR),
-            cashWithdrawals = Money.zero(Currency.SAR),
-            posPurchases = Money.zero(Currency.SAR),
-            fees = Money.zero(Currency.SAR),
-            selfTransfersOut = Money.of("200", Currency.SAR),
-        )
-        assertEquals(
-            SignedMoneyAmount.of(Money.of("500.00", Currency.SAR)),
-            summary.externalMovement().remaining,
-        )
-        assertEquals(
-            SignedMoneyAmount.of(Money.of("300.00", Currency.SAR)),
-            summary.cashPosition().remaining,
-        )
-    }
 }

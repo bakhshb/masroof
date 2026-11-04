@@ -17,14 +17,13 @@ class NotificationCenterServiceTest {
             unregisteredAccountCount = 3,
             excludedForeignCurrencyCount = 4,
             periodLabel = "Aug 2026",
-            rescanStatusName = "OK",
             updateAvailableVersion = "0.3.0",
         )
 
         val result = service.build(snapshot)
 
-        assertEquals(7, result.items.size)
-        assertEquals(7, result.unreadCount)
+        assertEquals(6, result.items.size)
+        assertEquals(6, result.unreadCount)
         assertTrue(result.items.any { it.type == NotificationType.SMS_PERMISSION })
         assertTrue(result.items.any { it.type == NotificationType.REVIEW_REQUIRED })
         assertTrue(result.items.any { it.type == NotificationType.APP_UPDATE_AVAILABLE })
@@ -143,10 +142,6 @@ class NotificationCenterServiceTest {
 
         override fun markRead(id: String) {
             readIds = readIds + id
-        }
-
-        override fun clearRead(id: String) {
-            readIds = readIds - id
         }
 
         override fun setReadIds(ids: Set<String>) {

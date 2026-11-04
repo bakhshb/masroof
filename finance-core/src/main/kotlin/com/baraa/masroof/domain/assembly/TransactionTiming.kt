@@ -58,11 +58,7 @@ object TransactionTiming {
         occurredAtLocal: LocalDateTime,
         persistedZoneId: String? = null,
     ): Instant? {
-        val zone = BankTransactionTimePolicy.fixedZone(bank)
-            ?: persistedZoneId?.takeIf { it.isNotBlank() }?.let { id ->
-                runCatching { ZoneId.of(id) }.getOrNull()
-            }
-            ?: return null
+        val zone = BankTransactionTimePolicy.zoneOrNull(bank, persistedZoneId) ?: return null
         return occurredAtLocal.atZone(zone).toInstant()
     }
 }

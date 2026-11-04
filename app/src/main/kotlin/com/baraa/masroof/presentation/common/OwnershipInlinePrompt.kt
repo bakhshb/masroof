@@ -1,7 +1,6 @@
 
 package com.baraa.masroof.presentation.common
 
-import com.baraa.masroof.ui.theme.MasroofSpacing
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,39 +15,42 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
+import com.baraa.masroof.ui.theme.MasroofIconSizes
+import com.baraa.masroof.ui.theme.MasroofSpacing
 
 @Composable
-fun AccountOwnershipInlinePrompt(
+fun OwnershipInlinePrompt(
+    titleRes: Int,
+    confirmRes: Int,
     enabled: Boolean,
     onConfirmOwned: () -> Unit,
     onMarkExternal: () -> Unit,
     modifier: Modifier = Modifier,
-    titleRes: Int = R.string.settings_accounts_unregistered,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap),
+        verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = MasroofIcons.warning,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(MasroofSpacing.screenHorizontal),
+                modifier = Modifier.size(MasroofIconSizes.sm),
             )
-            Spacer(Modifier.size(MasroofSpacing.smallGap))
+            Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
             Text(
                 stringResource(titleRes),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.listItemGap)) {
             IconTextButton(
                 onClick = onConfirmOwned,
                 enabled = enabled,
                 icon = MasroofIcons.success,
-                text = stringResource(R.string.onboarding_is_mine_account),
+                text = stringResource(confirmRes),
             )
             IconTextButton(
                 onClick = onMarkExternal,

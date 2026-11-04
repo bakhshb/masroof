@@ -31,35 +31,9 @@ fun SettingsBankScreen(
     onStatement: () -> Unit = {},
     onEditBank: () -> Unit = {},
 ) {
-    val accountsSubtitle = formatRegistryCategorySubtitle(
-        state = resolveRegistryCategorySubtitle(
-            followed = summary.followedAccountCount,
-            unregistered = summary.unregisteredAccountCount,
-            stopped = summary.stoppedAccountCount,
-        ),
-        emptyLabel = stringResource(R.string.settings_accounts_empty),
-        followedUnregisteredRes = R.plurals.settings_hub_accounts_subtitle,
-        followedOnlyRes = R.plurals.settings_hub_accounts_subtitle_followed_only,
-        stoppedOnlyRes = R.plurals.settings_hub_accounts_subtitle_stopped_only,
-        followedStoppedRes = R.plurals.settings_hub_accounts_subtitle_followed_stopped,
-    )
-    val cardsSubtitle = formatRegistryCategorySubtitle(
-        state = resolveRegistryCategorySubtitle(
-            followed = summary.followedCardCount,
-            unregistered = summary.unregisteredCardCount,
-            stopped = summary.stoppedCardCount,
-        ),
-        emptyLabel = stringResource(R.string.settings_cards_empty),
-        followedUnregisteredRes = R.plurals.settings_hub_cards_subtitle,
-        followedOnlyRes = R.plurals.settings_hub_cards_subtitle_followed_only,
-        stoppedOnlyRes = R.plurals.settings_hub_cards_subtitle_stopped_only,
-        followedStoppedRes = R.plurals.settings_hub_cards_subtitle_followed_stopped,
-    )
-    val loansSubtitle = if (summary.loanCount > 0) {
-        pluralStringResource(R.plurals.settings_bank_summary_loans, summary.loanCount, summary.loanCount)
-    } else {
-        stringResource(R.string.settings_loans_empty)
-    }
+    val accountsSubtitle = SettingsRegistryCategory.Accounts.bankRowSubtitle(summary)
+    val cardsSubtitle = SettingsRegistryCategory.Cards.bankRowSubtitle(summary)
+    val loansSubtitle = SettingsRegistryCategory.Loans.bankRowSubtitle(summary)
 
     MasroofSecondaryScaffold(
         title = settingsBankLabel(bank),

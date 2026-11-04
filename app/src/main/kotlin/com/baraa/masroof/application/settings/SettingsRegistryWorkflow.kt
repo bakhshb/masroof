@@ -33,7 +33,7 @@ class SettingsRegistryWorkflow(
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
 ) {
     suspend fun addAccount(bankId: String, last4: String, name: String?): AccountReference {
-        val ref = AccountReference(Bank(bankId), canonicalSuffix(last4))
+        val ref = AccountReference(Bank(bankId), canonicalLast4(last4))
         require(ref.bank != Bank.UNKNOWN)
         inTransaction {
             require(accountRegistryRepository.get(ref) == null) { "Account already exists" }
@@ -44,7 +44,7 @@ class SettingsRegistryWorkflow(
     }
 
     suspend fun addCard(bankId: String, last4: String, name: String?, configuration: com.baraa.masroof.domain.model.CardConfiguration): CardReference {
-        val ref = CardReference(Bank(bankId), canonicalSuffix(last4))
+        val ref = CardReference(Bank(bankId), canonicalLast4(last4))
         require(ref.bank != Bank.UNKNOWN)
         configuration.validate(ref.bank, requireNotNull(ref.last4))
         inTransaction {
@@ -54,12 +54,6 @@ class SettingsRegistryWorkflow(
             cardRegistryRepository.updateDisplayName(ref, name?.trim()?.ifEmpty { null })
         }
         return ref
-    }
-
-    private fun canonicalSuffix(value: String): String {
-        val suffix = com.baraa.masroof.parsing.normalizer.MessageNormalizer().normalize(value).comparisonBody.trim()
-        require(suffix.matches(Regex("[0-9]{4}")))
-        return suffix
     }
 
     suspend fun configureCard(card: CardReference, configuration: com.baraa.masroof.domain.model.CardConfiguration) {
@@ -99,10 +93,6 @@ class SettingsRegistryWorkflow(
 
     suspend fun updateAccountDisplayName(account: AccountReference, displayName: String?) {
         accountRegistryRepository.updateDisplayName(account, displayName)
-    }
-
-    suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) {
-        cardRegistryRepository.linkDebitToAccount(card, account)
     }
 
     suspend fun updateAccountType(account: AccountReference, accountType: AccountType) {
@@ -208,4 +198,11 @@ data class DeletionPreview(
     val blocker: DeleteBlocker?,
 ) {
     companion object { const val SHOWN = 5 }
+}
+
+/** Normalized last four digits typed by the user; throws unless exactly four digits. */
+internal fun canonicalLast4(value: String): String {
+    val suffix = com.baraa.masroof.parsing.normalizer.MessageNormalizer().normalize(value).comparisonBody.trim()
+    require(suffix.matches(Regex("[0-9]{4}")))
+    return suffix
 }

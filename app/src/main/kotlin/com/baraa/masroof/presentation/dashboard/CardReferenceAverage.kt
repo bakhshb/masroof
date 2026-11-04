@@ -4,21 +4,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import com.baraa.masroof.ui.theme.MasroofReference
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.DailySpendingTrend
 import com.baraa.masroof.presentation.common.MasroofAverageBand
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
-import java.time.format.DateTimeFormatter
+import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 
 @Composable
 internal fun CardReferenceAverage(trend: DailySpendingTrend, inCard: Boolean = false) {
     if (trend.points.isEmpty()) return
-    val date = DateTimeFormatter.ofPattern("d MMM", LocalConfiguration.current.locales[0])
     val value = formatLocalizedMoney(trend.averageDailySpending)
-    val hint = stringResource(R.string.reference_period_average, date.format(trend.points.last().date), trend.points.size)
+    val hint = stringResource(R.string.reference_period_average, formatLocalizedTransactionDate(trend.points.last().date), trend.points.size)
     val guidance = stringResource(R.string.approved_average_basis, trend.points.size) + "\n" +
         stringResource(R.string.chart_full_card_average_hint)
     val spacing = Modifier.padding(top = MasroofReference.sectionGap)

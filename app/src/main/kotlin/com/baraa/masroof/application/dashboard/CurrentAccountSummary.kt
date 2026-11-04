@@ -2,7 +2,6 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
-import java.math.RoundingMode
 
 /**
  * Cash movement on owned current-account containers for a salary period.
@@ -18,14 +17,6 @@ data class CurrentAccountSummary(
 
     /** False when nothing moved in or out of the account this period. */
     val hasActivity: Boolean get() = inflow.total.amount.signum() != 0 || outflow.total.amount.signum() != 0
-
-    val netMovement: SignedMoneyAmount
-        get() {
-            val net = inflow.coreTotal.amount
-                .subtract(outflow.coreTotal.amount)
-                .setScale(Money.SCALE, RoundingMode.HALF_EVEN)
-            return SignedMoneyAmount(net, currency)
-        }
 
     init {
         require(inflow.currency == outflow.currency)
@@ -76,21 +67,12 @@ data class CurrentAccountSummary(
                 outflow = AccountOutflow.zero(currency),
             )
 
-        fun aggregate(summaries: Collection<CurrentAccountSummary>): CurrentAccountSummary =
-            AccountFlowAggregator.aggregate(summaries)
-    }
-}
-
-/**
- * Period spending: everything that left the current account in the period.
- */
-data class SpendingSplitSummary(
-    val currency: Currency,
-    val totalSpending: Money,
-    val creditCardPurchases: SignedMoneyAmount,
-) {
-    init {
-        require(totalSpending.currency == currency)
-        require(creditCardPurchases.currency == currency)
+        fun aggregate(summaries: Collection<CurrentAccountSummary>): CurrentAccountSummary {
+            if (summaries.isEmpty()) return zero(Currency.SAR)
+            return CurrentAccountSummary(
+                inflow = AccountInflow.sum(summaries.map { it.inflow }),
+                outflow = AccountOutflow.sum(summaries.map { it.outflow }),
+            )
+        }
     }
 }

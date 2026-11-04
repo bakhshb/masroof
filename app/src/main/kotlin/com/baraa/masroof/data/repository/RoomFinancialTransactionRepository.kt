@@ -204,13 +204,6 @@ class RoomFinancialTransactionRepository(
         dao.unlinkRawSms(rawSmsId)
     }
 
-    override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = accessGate.withAccess {
-        if (dao.findLinkByRawSmsId(rawSmsId) != null) return@withAccess false
-        return@withAccess dao.insertLinkIfAbsent(
-            FinancialTransactionRawSmsLinkEntity(rawSmsId = rawSmsId, transactionId = transactionId),
-        ) != -1L
-    }
-
     /**
      * One link query and one parsed-event query per bind-sized chunk, then each
      * entity is mapped with its sorted linked event ids. A missing parsed event

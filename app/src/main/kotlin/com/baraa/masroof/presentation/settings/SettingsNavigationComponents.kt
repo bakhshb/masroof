@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.settings
 
+import com.baraa.masroof.ui.theme.MasroofIconSizes
 import com.baraa.masroof.ui.theme.MasroofSpacing
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofText as Text
@@ -32,7 +32,6 @@ fun SettingsNavRow(
     subtitle: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    badgeCount: Int? = null,
     enabled: Boolean = true,
 ) {
     MasroofNavCard(
@@ -48,7 +47,7 @@ fun SettingsNavRow(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(MasroofSpacing.screenPaddingLarge),
+                modifier = Modifier.size(MasroofIconSizes.xl),
             )
             Spacer(Modifier.width(MasroofSpacing.sectionGap))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.hairlineGap)) {
@@ -67,20 +66,11 @@ fun SettingsNavRow(
                     textAlign = TextAlign.Start,
                 )
             }
-            if (badgeCount != null && badgeCount > 0) {
-                Badge {
-                    Text(
-                        if (badgeCount > 99) "99+" else badgeCount.toString(),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-                Spacer(Modifier.width(MasroofSpacing.cardInnerGap))
-            }
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(MasroofSpacing.largeGap),
+                modifier = Modifier.size(MasroofIconSizes.lg),
             )
         }
     }

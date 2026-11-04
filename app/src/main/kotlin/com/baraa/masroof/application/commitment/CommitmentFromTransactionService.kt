@@ -71,7 +71,7 @@ class CommitmentFromTransactionService(
                 type == FinancialTransactionType.BILL_PAYMENT
     }
 
-    internal fun buildDraft(transaction: FinancialTransaction): CommitmentDraft? {
+    private fun buildDraft(transaction: FinancialTransaction): CommitmentDraft? {
         if (!canMarkAsCommitment(transaction.type)) {
             return null
         }

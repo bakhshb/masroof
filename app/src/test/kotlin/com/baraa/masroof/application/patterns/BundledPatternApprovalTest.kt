@@ -1,12 +1,12 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.uniqueStorageContext
+import com.baraa.masroof.testsupport.withAppContainer
 import android.content.Context
-import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.domain.model.*
 import com.baraa.masroof.engine.bank.patterns.PatternAccountRole
 import com.baraa.masroof.sms.hash.SmsBodyHasher
-import com.baraa.masroof.testsupport.TestStorageContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -134,7 +134,7 @@ class BundledPatternApprovalTest {
         }
     }
 
-    private lateinit var context: Context
+    private lateinit var context: com.baraa.masroof.testsupport.TestStorageContext
     /** Leaving the patterns screen cancels its scope; an apply that started must still post what it reparsed. */
     @Test fun applyPendingFinishesWhenTheCallerIsCancelled() = runBlocking {
         fixture { c ->
@@ -154,9 +154,8 @@ class BundledPatternApprovalTest {
     }
 
     private suspend fun fixture(block: suspend (AppContainer) -> Unit) {
-        context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "bundled-${java.util.UUID.randomUUID()}")
-        val container = AppContainer(context)
-        try { kotlinx.coroutines.withTimeout(20_000) { block(container) } } finally { container.close(); context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
+        context = uniqueStorageContext("bundled")
+        withAppContainer(context, block = block)
     }
     private fun sms(id: String, body: String) = RawSms(id, "barq app", body, Instant.parse("2026-10-15T10:00:00Z"), id, SmsBodyHasher.sha256Hex(body))
 

@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.ingestion
 
+import com.baraa.masroof.testsupport.LookalikeBankAdapter
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -18,8 +20,6 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.model.BankDetectionResult
-import com.baraa.masroof.parsing.model.ParseResult
-import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
@@ -158,32 +158,6 @@ class CaptureBankSmsUseCaseTest {
     }
 
     @Test
-    fun crossSourceTwinBeyondSkewWindow_staysSeparate() = runBlocking {
-        val liveRow = live(PURCHASE_BODY, "2026-08-03T08:00:00.000Z")
-        val historical = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord("42", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T15:00:00.000Z")),
-        )
-        val useCase = capture()
-
-        assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
-        assertTrue(useCase.capture(historical) is BankSmsCaptureResult.Captured)
-        assertEquals(2, db.rawSmsDao().count())
-    }
-
-    @Test
-    fun repeatedIdenticalNotifications_staySeparateWhenHoursApart() = runBlocking {
-        val liveRow = live(PURCHASE_BODY, "2026-08-03T14:32:00.000Z")
-        val historical = AndroidSmsMapper.toRawSms(
-            ProviderSmsRecord("42", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T16:02:00.000Z")),
-        )
-        val useCase = capture()
-
-        assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
-        assertTrue(useCase.capture(historical) is BankSmsCaptureResult.Captured)
-        assertEquals(2, db.rawSmsDao().count())
-    }
-
-    @Test
     fun skewedTwin_isNotMergedWhenAnotherOppositeCopyExists() = runBlocking {
         val first = AndroidSmsMapper.toRawSms(
             ProviderSmsRecord("10", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:00:00.000Z")),
@@ -198,17 +172,6 @@ class CaptureBankSmsUseCaseTest {
         assertTrue(useCase.capture(second) is BankSmsCaptureResult.Captured)
         assertTrue(useCase.capture(liveRow) is BankSmsCaptureResult.Captured)
         assertEquals(3, db.rawSmsDao().count())
-    }
-
-    @Test
-    fun sameSourceRows_areNotMergedByBodyHash() = runBlocking {
-        val first = live(PURCHASE_BODY, "2026-08-03T14:32:00.000Z")
-        val second = live(PURCHASE_BODY, "2026-08-03T14:40:00.000Z")
-        val useCase = capture()
-
-        assertTrue(useCase.capture(first) is BankSmsCaptureResult.Captured)
-        assertTrue(useCase.capture(second) is BankSmsCaptureResult.Captured)
-        assertEquals(2, db.rawSmsDao().count())
     }
 
     @Test
@@ -492,7 +455,7 @@ class CaptureBankSmsUseCaseTest {
 
     @Test
     fun ambiguousRoute_isCapturedWithItsRoute_andLeftForProcessing() = runBlocking {
-        val registry = BankSmsRegistry(listOf(engineFixtureAdapter(), LookalikeAdapter()))
+        val registry = BankSmsRegistry(listOf(engineFixtureAdapter(), LookalikeBankAdapter()))
         val raw = live(PURCHASE_BODY, "2026-08-03T14:32:00Z")
 
         val result = CaptureBankSmsUseCase(rawRepo, registry).capture(raw)
@@ -561,22 +524,5 @@ class CaptureBankSmsUseCaseTest {
                 receivedAt = receivedAt,
             ),
         )
-    }
-
-    private class LookalikeAdapter : BankSmsAdapter {
-        override val bank: Bank = Bank("LOOKALIKE_BANK")
-        override fun detect(sender: String, body: String): BankDetectionResult =
-            BankDetectionResult.Detected(bank = bank, confidence = Confidence(1.0), evidence = listOf("lookalike"))
-        override fun parse(input: SmsParseInput): ParseResult = ParseResult.Unsupported(reason = "lookalike")
-    }
-
-    private companion object {
-        val PURCHASE_BODY = """
-            شراء عبر الانترنت
-            بطاقة: 7271
-            لدى: Keeta
-            بمبلغ: 51.99 SAR
-            في: 14:32 03-08-2026
-        """.trimIndent()
     }
 }

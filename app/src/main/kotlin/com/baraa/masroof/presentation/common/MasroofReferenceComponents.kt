@@ -56,6 +56,16 @@ fun MasroofAverageBand(value: String, periodHint: String, guidance: String?,
     }
 }
 
+/** Rounded tinted square holding one icon, at the start of a reference row. */
+@Composable
+fun MasroofIconTile(icon: ImageVector, background: Color, tint: Color, contentDescription: String? = null) {
+    Surface(shape = MasroofShapes.small, color = background) {
+        Box(Modifier.size(MasroofReference.iconBox), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription, Modifier.size(MasroofReference.icon), tint = tint)
+        }
+    }
+}
+
 @Composable
 fun MasroofReferenceNavigationRow(title: String, subtitle: String, icon: ImageVector,
     onClick: () -> Unit, modifier: Modifier = Modifier, divider: Boolean = true,
@@ -70,11 +80,7 @@ fun MasroofReferenceNavigationRow(title: String, subtitle: String, icon: ImageVe
             bottom = if (divider) MasroofReference.rowVertical else MasroofReference.lastRowBottom),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(MasroofReference.rowGap)) {
-            Surface(shape = MasroofShapes.small, color = MasroofThemeExtras.extendedColors.accountSoft) {
-                Box(Modifier.size(MasroofReference.iconBox), contentAlignment = Alignment.Center) {
-                    Icon(icon, iconDescription, Modifier.size(MasroofReference.icon), tint = MasroofThemeExtras.extendedColors.account)
-                }
-            }
+            MasroofIconTile(icon, MasroofThemeExtras.extendedColors.accountSoft, MasroofThemeExtras.extendedColors.account, iconDescription)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MasroofReference.metadataGap)) {
                 MasroofText(title, style = MasroofReference.pair.copy(fontWeight = MasroofFontWeights.semiBold))
                 MasroofText(subtitle, style = MaterialTheme.typography.labelSmall,

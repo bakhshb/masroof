@@ -76,9 +76,10 @@ object DailySpendingTrendBuilder {
         includeFinancialOutflows: Boolean = false,
     ): DailySpendingTrend {
         val parsedById = parsedRecords.associateBy { it.event.id }
-        val amounts = transactions.distinctBy { it.id }.associate { transaction ->
-            transaction.id to signedSpendingAmount(transaction, primaryCurrency, sarEquivalents, parsedById, includeFinancialOutflows)
-        }.mapNotNull { (id, amount) -> amount?.let { id to it } }.toMap()
+        val amounts = transactions.distinctBy { it.id }.mapNotNull { transaction ->
+            signedSpendingAmount(transaction, primaryCurrency, sarEquivalents, parsedById, includeFinancialOutflows)
+                ?.let { transaction.id to it }
+        }.toMap()
         return buildWithAmounts(period, transactions, primaryCurrency, zoneId, today, amounts)
     }
 

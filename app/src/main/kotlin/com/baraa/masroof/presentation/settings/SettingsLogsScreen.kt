@@ -18,8 +18,6 @@ import androidx.compose.material3.AlertDialog
 import com.baraa.masroof.presentation.common.MasroofButton as Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofOutlinedButton as OutlinedButton
 import androidx.compose.material3.SnackbarHost
@@ -43,7 +41,6 @@ import com.baraa.masroof.application.logging.AppLogEntry
 import com.baraa.masroof.application.logging.AppLogLevel
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.MasroofCard
-import com.baraa.masroof.presentation.common.MasroofCardAccent
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.MasroofTextStyles

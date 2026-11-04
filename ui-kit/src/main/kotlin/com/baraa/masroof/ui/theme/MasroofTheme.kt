@@ -129,6 +129,10 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
+/** True when the active Masroof theme is the dark one. */
+@Composable
+fun masroofIsDark(): Boolean = MaterialTheme.colorScheme.background == MasroofDarkColors.Background
+
 object MasroofThemeExtras {
     val extendedColors
         @Composable

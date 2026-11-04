@@ -1,17 +1,13 @@
 package com.baraa.masroof.presentation.dashboard
 
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import com.baraa.masroof.presentation.common.MasroofHeroCard
-import com.baraa.masroof.presentation.common.MasroofDetailRow
 import com.baraa.masroof.ui.theme.MasroofHeroRole
 import com.baraa.masroof.ui.theme.MasroofSpacing
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
 
 data class DashboardSummaryHeroSpec(

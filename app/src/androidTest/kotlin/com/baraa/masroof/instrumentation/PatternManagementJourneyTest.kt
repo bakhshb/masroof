@@ -52,8 +52,7 @@ class PatternManagementJourneyTest {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         device.findObject(By.res("com.android.systemui", "dismiss_button"))?.click()
         device.waitForIdle(1_500)
-        val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
-        try { ScreenshotArtifactWriter.publish(bitmap, "pattern-management", name) } finally { bitmap.recycle() }
+        ScreenshotArtifactWriter.capture(compose, "pattern-management", name)
     }
     private fun show(workflow: MessagePatternsWorkflow, openPattern: Boolean = true,
         setContent: (@Composable () -> Unit) -> Unit = { compose.setContent(it) }) {

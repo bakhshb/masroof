@@ -20,7 +20,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.locale.AppLocale
@@ -37,7 +36,6 @@ import com.baraa.masroof.presentation.navigation.popSettingsStack
 import com.baraa.masroof.presentation.navigation.pushSettingsDestination
 import com.baraa.masroof.presentation.navigation.replaceSettingsStack
 import com.baraa.masroof.presentation.navigation.replaceSettingsTop
-import com.baraa.masroof.presentation.navigation.resolvePendingDestination
 import com.baraa.masroof.presentation.statement.StatementReconciliationRoute
 import com.baraa.masroof.presentation.statement.StatementReconciliationViewModel
 
@@ -99,7 +97,7 @@ fun SettingsRoute(
     LaunchedEffect(pendingLaunch, state.loading, state.bankSummaries) {
         val launch = pendingLaunch ?: return@LaunchedEffect
         if (launch.destination.needsBankSummaries() && state.loading) return@LaunchedEffect
-        openAt(resolvePendingDestination(launch.destination))
+        openAt(launch.destination)
         onPendingLaunchConsumed()
     }
 
@@ -117,8 +115,6 @@ fun SettingsRoute(
         popOrExit()
     }
 
-    val logEntries by viewModel.logEntries.collectAsState()
-    val logErrorCount = logEntries.count { it.level == com.baraa.masroof.application.logging.AppLogLevel.ERROR }
 
     CompositionLocalProvider(LocalSettingsBankNames provides state.bankCatalog?.banks.orEmpty().mapNotNull { bank ->
         bank.displayName?.let { bank.bankId to it }
@@ -376,21 +372,11 @@ fun SettingsRoute(
             bankCatalog = state.bankCatalog,
             onOpenBanks = { navigateTo(SettingsDestination.Banks) },
             isNightlyBuild = state.isNightlyBuild,
-            updateChannel = state.updateChannel,
-            githubTokenConfigured = state.githubTokenConfigured,
-            updateState = state.updateState,
             updateMessage = state.updateMessage,
-            logErrorCount = logErrorCount,
             onBack = { popOrExit() },
             onOpenLogs = { navigateTo(SettingsDestination.Logs) },
             onOpenUpdates = { navigateTo(SettingsDestination.Updates) },
             onOpenDesignCatalog = { navigateTo(SettingsDestination.DesignCatalog) },
-            onSaveGithubToken = viewModel::saveGithubToken,
-            onClearGithubToken = viewModel::clearGithubToken,
-            onSelectUpdateChannel = viewModel::setUpdateChannel,
-            onCheckForUpdates = { viewModel.checkForUpdates(silent = false) },
-            onDownloadUpdate = viewModel::downloadUpdate,
-            onInstallUpdate = viewModel::installPendingUpdate,
             onClearUpdateMessage = viewModel::clearUpdateMessage,
         )
 

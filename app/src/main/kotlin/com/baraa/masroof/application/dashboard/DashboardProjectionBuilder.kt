@@ -73,7 +73,6 @@ class DashboardProjectionBuilder(
             isCurrentPeriod = period == FinancialPeriodPolicy.periodContaining(context.today),
             summary = analysis.summary,
             currentAccount = accounts.fleet,
-            spendingSplit = accounts.spendingSplit,
             accountsFleet = accounts.accountsFleet,
             ownedAccountPeriodSummaries = accounts.perAccount,
             creditFacilities = creditFacilities,
@@ -138,9 +137,6 @@ class DashboardProjectionBuilder(
             ownedAccountContainerIds = ownedAccounts
                 .map { FinancialContainerIdFactory.accountId(it.bank, it.maskedNumber) }
                 .toSet(),
-            ownedAccountLast4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
-                ownedAccounts.map { it.maskedNumber },
-            ),
             cardRegistry = cardRegistry,
             loans = loanRegistryRepository.listAll(),
             debitCardScope = DebitCardScopeFactory.fromRegistry(

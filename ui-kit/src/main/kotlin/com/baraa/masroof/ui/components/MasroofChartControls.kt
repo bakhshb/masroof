@@ -20,11 +20,7 @@ import com.baraa.masroof.ui.theme.*
 
 /** Equal columns and complete labels in both directions, with an explicit selected color pair. */
 @Composable
-fun MasroofChartScopeTabs(labels: List<String>, selected: Int, onSelected: (Int) -> Unit) =
-    MasroofChartScopeTabs(labels, selected, true, onSelected)
-
-@Composable
-fun MasroofChartScopeTabs(labels: List<String>, selected: Int, enabled: Boolean, onSelected: (Int) -> Unit) {
+fun MasroofChartScopeTabs(labels: List<String>, selected: Int, enabled: Boolean = true, onSelected: (Int) -> Unit) {
     Row(Modifier.fillMaxWidth().clip(MasroofShapes.small).background(MaterialTheme.colorScheme.background)
         .padding(MasroofReference.scopeTabInset).selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(MasroofReference.scopeTabInset)) {

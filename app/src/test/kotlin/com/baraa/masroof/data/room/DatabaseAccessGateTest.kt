@@ -146,10 +146,8 @@ class DatabaseAccessGateTest {
     @Test
     fun failedValidationBeforeRetirement_keepsRepositoryAccessAvailable() = runTest {
         val gate = DatabaseAccessGate()
-        try {
-            gate.withRestore { error("invalid import") }
-        } catch (_: IllegalStateException) {
-            assertEquals(4, gate.withAccess { 4 })
-        }
+        val failure = runCatching { gate.withRestore { error("invalid import") } }.exceptionOrNull()
+        assertTrue(failure is IllegalStateException)
+        assertEquals(4, gate.withAccess { 4 })
     }
 }

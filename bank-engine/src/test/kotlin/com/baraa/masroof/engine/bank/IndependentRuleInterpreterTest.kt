@@ -9,10 +9,9 @@ import java.time.Instant
 
 class IndependentRuleInterpreterTest {
     private val bank = BankId("TEST_BANK")
-    private val catalog = BankCatalog(listOf(BankDefinition(bank, setOf("SyntheticBank"))))
     private fun input(body: String, sender: String = "SyntheticBank") =
         MessageInput("fixture", sender, body, Instant.parse("2026-10-17T11:00:00Z"))
-    private fun parse(body: String) = RuleInterpreter(RuleLibrary.initial()).interpret(input(body), catalog)
+    private fun parse(body: String) = RuleInterpreter(RuleLibrary.initial()).interpretRouted(input(body), bank)
     private val purchase = "Purchase\nAmount: SAR 42.35\nCard: **1234\nMerchant: Synthetic Shop\n2026-10-17 13:00"
 
     @Test fun independentEngineExtractsOriginalEvidenceAndNeverGuessesOwnership() {
@@ -118,22 +117,13 @@ class IndependentRuleInterpreterTest {
         assertEquals(MessageFamily.UNKNOWN, parse("repurchase amount SAR 42.35").facts.family)
     }
 
-    @Test fun catalogAmbiguityCannotBeOverriddenByBodyOrRuleOrder() {
-        val engine = RuleInterpreter(RuleLibrary.initial())
-        val other = BankDefinition(BankId("OTHER"), setOf("SyntheticBank"))
-        val r = engine.interpret(input(purchase), BankCatalog(listOf(BankDefinition(bank, setOf("SyntheticBank")), other)))
-        assertEquals(setOf(Blocker.AMBIGUOUS_BANK, Blocker.UNKNOWN_FAMILY), r.blockers)
-        assertNull(r.bank); assertTrue(r.evidence.isEmpty())
-        assertTrue(Blocker.UNKNOWN_BANK in engine.interpret(input(purchase, "syntheticbank"), catalog).blockers)
-    }
-
     @Test fun ruleSnapshotsAreImmutableVersionedAndUnsupportedCapabilitiesFailClosed() {
         val phrases = mutableListOf("purchase")
         val rule = RuleLibrary.initial().rules.first().copy(phrases = phrases)
         val schema = BankRuleSchema(revision = 7, rules = listOf(rule))
         val engine = RuleInterpreter(schema)
         phrases.clear()
-        assertEquals(ParseStatus.SUCCESS, engine.interpret(input(purchase), catalog).status)
+        assertEquals(ParseStatus.SUCCESS, engine.interpretRouted(input(purchase), bank).status)
         val changed = RuleInterpreter(schema.copy(rules = listOf(rule.copy(phrases = listOf("buy")))))
         assertNotEquals(engine.version, changed.version)
         val configured = rule.copy(phrases = listOf("purchase"))
@@ -141,7 +131,7 @@ class IndependentRuleInterpreterTest {
         listOf(valid.copy(schema = 2), valid.copy(network = NetworkRules(bankAliases = mapOf("UNKNOWN" to listOf("bad")))),
             schema.copy(rules = listOf(configured.copy(observations = mapOf("ownership.mine" to listOf("credit"))))),
             schema.copy(rules = listOf(configured.copy(direction = MoneyDirection.INCOMING))))
-            .forEach { invalid -> assertEquals(ParseStatus.REVIEW_REQUIRED, RuleInterpreter(invalid).interpret(input(purchase), catalog).status) }
+            .forEach { invalid -> assertEquals(ParseStatus.REVIEW_REQUIRED, RuleInterpreter(invalid).interpretRouted(input(purchase), bank).status) }
         assertEquals(ParseStatus.REVIEW_REQUIRED, parse("x".repeat(16001)).status)
     }
 
@@ -153,11 +143,11 @@ class IndependentRuleInterpreterTest {
         invalidSchemas.forEach { schema ->
             val engine = RuleInterpreter(schema)
             repeat(2) {
-                val financial = engine.interpret(input(purchase), catalog)
+                val financial = engine.interpretRouted(input(purchase), bank)
                 assertEquals(ParseStatus.REVIEW_REQUIRED, financial.status)
                 assertTrue(Blocker.UNSUPPORTED_RULE_SCHEMA in financial.blockers)
                 assertTrue(financial.evidence.isEmpty())
-                val otp = engine.interpret(input("OTP 123456\n$purchase"), catalog)
+                val otp = engine.interpretRouted(input("OTP 123456\n$purchase"), bank)
                 assertEquals(ParseStatus.NON_FINANCIAL, otp.status)
                 assertEquals(MessageFamily.OTP, otp.facts.family)
                 assertTrue(otp.blockers.isEmpty())
@@ -168,7 +158,7 @@ class IndependentRuleInterpreterTest {
     @Test fun aSingleIdentifierCannotServeTwoAssetRoles() {
         val rule = RuleLibrary.initial().rules.first().copy(labels = RuleLibrary.initial().rules.first().labels +
             (ExtractionField.SOURCE_ACCOUNT to listOf("card")))
-        val r = RuleInterpreter(BankRuleSchema(revision = 1, rules = listOf(rule))).interpret(input(purchase), catalog)
+        val r = RuleInterpreter(BankRuleSchema(revision = 1, rules = listOf(rule))).interpretRouted(input(purchase), bank)
         assertEquals(ParseStatus.REVIEW_REQUIRED, r.status)
         assertTrue(Blocker.CONFLICTING_FACTS in r.blockers)
     }
@@ -183,11 +173,10 @@ class IndependentRuleInterpreterTest {
         assertEquals(ParseStatus.NON_FINANCIAL, parse("Balance notification\nAvailable balance: SAR 20").status)
         assertEquals(ParseStatus.NON_FINANCIAL, parse("Login notification").status)
         val otherBank = BankId("SECOND_BANK")
-        val r = RuleInterpreter(RuleLibrary.initial()).interpret(input(purchase, "OtherSender"),
-            BankCatalog(listOf(BankDefinition(otherBank, setOf("OtherSender")))))
+        val r = RuleInterpreter(RuleLibrary.initial()).interpretRouted(input(purchase, "OtherSender"), otherBank)
         assertEquals(ParseStatus.SUCCESS, r.status); assertEquals(otherBank, r.facts.card!!.bank)
         val transfer = RuleLibrary.initial().rules.first().copy(family = MessageFamily.TRANSFER_OUT)
-        val unsupported = RuleInterpreter(BankRuleSchema(revision = 1, rules = listOf(transfer))).interpret(input(purchase), catalog)
+        val unsupported = RuleInterpreter(BankRuleSchema(revision = 1, rules = listOf(transfer))).interpretRouted(input(purchase), bank)
         assertEquals(ParseStatus.REVIEW_REQUIRED, unsupported.status)
         assertTrue(Blocker.VALIDATION_ERROR in unsupported.blockers)
     }

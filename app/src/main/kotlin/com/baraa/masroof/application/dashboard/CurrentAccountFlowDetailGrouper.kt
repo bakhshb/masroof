@@ -29,23 +29,6 @@ data class CurrentAccountFlowDetailGrouping(
     val selfTransfersIn: List<FinancialTransaction> = emptyList(),
 ) {
     companion object {
-        val EXPENSE_DISPLAY_ORDER = listOf(
-            FlowExpenseCategory.EXTERNAL_TRANSFER_OUT,
-            FlowExpenseCategory.CREDIT_CARD_PAYMENT,
-            FlowExpenseCategory.CASH_WITHDRAWAL,
-            FlowExpenseCategory.BILL_PAYMENT,
-            FlowExpenseCategory.POS_PURCHASE,
-            FlowExpenseCategory.FEE,
-            FlowExpenseCategory.LOAN_REPAYMENT,
-        )
-
-        val INCOME_DISPLAY_ORDER = listOf(
-            FlowIncomeCategory.SALARY,
-            FlowIncomeCategory.EXTERNAL_TRANSFER_IN,
-            FlowIncomeCategory.ACCOUNT_REFUND,
-            FlowIncomeCategory.OTHER_INCOME,
-        )
-
         fun empty(): CurrentAccountFlowDetailGrouping = CurrentAccountFlowDetailGrouping(
             expense = FlowExpenseCategory.entries.associateWith { emptyList() },
             income = FlowIncomeCategory.entries.associateWith { emptyList() },
@@ -62,19 +45,16 @@ object CurrentAccountFlowDetailGrouper {
         primaryCurrency: Currency = Currency.SAR,
         sarEquivalents: Map<String, Money> = emptyMap(),
         ownedAccountContainerIds: Set<String> = emptySet(),
-        ownedAccountLast4s: Set<String> = emptySet(),
         scopeMode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
         debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): CurrentAccountFlowDetailGrouping {
         val context = AccountFlowClassifier.buildContext(
-            transactions = transactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
         )
         val scope = CurrentAccountTransactionScope(
             ownedContainerIds = ownedAccountContainerIds,
-            ownedAccountLast4s = ownedAccountLast4s,
             mode = scopeMode,
             ownedDebitCardContainerIds = debitCardScope.ownedDebitCardContainerIds,
             debitCardLinkedAccountIds = debitCardScope.debitCardLinkedAccountIds,

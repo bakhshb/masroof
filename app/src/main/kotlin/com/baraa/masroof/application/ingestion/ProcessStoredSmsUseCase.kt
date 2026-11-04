@@ -96,8 +96,17 @@ class ProcessStoredSmsUseCase(
         historicalBatch: Boolean = false,
     ): SmsIngestionResult = when (route) {
         is BankRoutingResult.Matched -> parseAndPersist(rawSms, route.adapter, logOutcome, deriveImmediately, historicalBatch)
-        is BankRoutingResult.Ambiguous -> holdAmbiguousRoute(rawSms, route, logOutcome)
-        is BankRoutingResult.SuspectedBank -> holdSuspectedRoute(rawSms, route, logOutcome)
+        // Ambiguous bank-like evidence is kept and reviewed, never parsed by a guessed adapter.
+        is BankRoutingResult.Ambiguous ->
+            holdRouteForReview(rawSms, route.reason, IngestionReviewService.REASON_AMBIGUOUS_BANK_ROUTE, logOutcome) {
+                "Ambiguous bank route for SMS from ${AppLogFormatting.maskSender(rawSms.sender)} " +
+                    "(${route.banks.joinToString { it.id }}); held for review"
+            }
+        // Suspected senders are kept for review. No adapter is allowed to parse them.
+        is BankRoutingResult.SuspectedBank ->
+            holdRouteForReview(rawSms, route.reason, IngestionReviewService.REASON_SUSPECTED_BANK, logOutcome) {
+                "Suspected bank sender from ${AppLogFormatting.maskSender(rawSms.sender)}; held for review"
+            }
         is BankRoutingResult.NotMatched -> SmsIngestionResult.NotRelevant(reason = route.reason)
     }
 
@@ -129,6 +138,7 @@ class ProcessStoredSmsUseCase(
     private suspend fun retainHistoricalRetry(rawSmsId: String) {
         val recovery = processingRecovery ?: return
         try {
+            // A failed schedule is logged here (the other callers ignore it), so keep the inline call.
             if (recovery.markExhaustedBatch(listOf(rawSmsId))) onHistoricalRetry?.invoke()
         } catch (e: CancellationException) {
             throw e
@@ -172,22 +182,10 @@ class ProcessStoredSmsUseCase(
         if (storedAdapter != null) {
             return parseAndPersist(rawSms, storedAdapter, logOutcome, deriveImmediately, historicalBatch)
         }
-        return when (val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)) {
-            is BankRoutingResult.Matched ->
-                parseAndPersist(rawSms, route.adapter, logOutcome, deriveImmediately, historicalBatch)
-            is BankRoutingResult.Ambiguous ->
-                holdAmbiguousRoute(rawSms, route, logOutcome)
-            is BankRoutingResult.SuspectedBank ->
-                holdSuspectedRoute(rawSms, route, logOutcome)
-            is BankRoutingResult.NotMatched -> {
-                val sole = bankSmsRegistry.singleAdapterOrNull()
-                if (sole != null) {
-                    parseAndPersist(rawSms, sole, logOutcome, deriveImmediately, historicalBatch)
-                } else {
-                    SmsIngestionResult.NotRelevant(reason = route.reason)
-                }
-            }
-        }
+        val route = bankSmsRegistry.route(rawSms.sender, rawSms.body)
+        val sole = if (route is BankRoutingResult.NotMatched) bankSmsRegistry.singleAdapterOrNull() else null
+        if (sole != null) return parseAndPersist(rawSms, sole, logOutcome, deriveImmediately, historicalBatch)
+        return processRouted(rawSms, route, logOutcome, deriveImmediately, historicalBatch)
     }
 
     /**
@@ -202,46 +200,20 @@ class ProcessStoredSmsUseCase(
         return bankSmsRegistry.adapterFor(Bank.fromId(bankId))
     }
 
-    /** Ambiguous bank-like evidence is kept and reviewed, never parsed by a guessed adapter. */
-    private suspend fun holdAmbiguousRoute(
+    private suspend fun holdRouteForReview(
         rawSms: RawSms,
-        route: BankRoutingResult.Ambiguous,
+        routeReason: String,
+        reviewReason: String,
         logOutcome: Boolean,
+        logMessage: () -> String,
     ): SmsIngestionResult {
-        if (logOutcome) {
-            appLogService?.warn(
-                AppLogCategories.INGEST,
-                "Ambiguous bank route for SMS from ${AppLogFormatting.maskSender(rawSms.sender)} " +
-                    "(${route.banks.joinToString { it.id }}); held for review",
-            )
-        }
-        reviewOrRetry(rawSms.id, IngestionReviewService.REASON_AMBIGUOUS_BANK_ROUTE)?.let { return it }
+        if (logOutcome) appLogService?.warn(AppLogCategories.INGEST, logMessage())
+        reviewOrRetry(rawSms.id, reviewReason)?.let { return it }
         return SmsIngestionResult.ReviewRequired(
             rawSmsId = rawSms.id,
             event = null,
             details = ParsedEventDetails(),
-            reasons = listOf(route.reason),
-        )
-    }
-
-    /** Suspected senders are kept for review. No adapter is allowed to parse them. */
-    private suspend fun holdSuspectedRoute(
-        rawSms: RawSms,
-        route: BankRoutingResult.SuspectedBank,
-        logOutcome: Boolean,
-    ): SmsIngestionResult {
-        if (logOutcome) {
-            appLogService?.warn(
-                AppLogCategories.INGEST,
-                "Suspected bank sender from ${AppLogFormatting.maskSender(rawSms.sender)}; held for review",
-            )
-        }
-        reviewOrRetry(rawSms.id, IngestionReviewService.REASON_SUSPECTED_BANK)?.let { return it }
-        return SmsIngestionResult.ReviewRequired(
-            rawSmsId = rawSms.id,
-            event = null,
-            details = ParsedEventDetails(),
-            reasons = listOf(route.reason),
+            reasons = listOf(routeReason),
         )
     }
 
@@ -257,14 +229,14 @@ class ProcessStoredSmsUseCase(
         val protection = patternProcessing ?: return processingFailure(rawSms, "pattern_protection_unavailable", null, logOutcome)
         val result = protection(rawSms.id, {
             if (parsedEventRepository.findByRawSmsId(rawSms.id)?.event?.parseStatus == com.baraa.masroof.domain.model.ParseStatus.SUCCESS) {
-                resumePatternEvidence(rawSms, logOutcome, deriveImmediately = false)
+                resumePatternEvidence(rawSms)
             } else {
                 val active = bankSmsRegistry.adapterFor(adapter.bank) as? com.baraa.masroof.bank.MessagePatternSmsAdapter
                 if (active?.configurationFingerprint != adapter.configurationFingerprint)
                     processingFailure(rawSms, "pattern_configuration_changed", null, logOutcome)
                 else parseAndStore(rawSms, adapter, logOutcome, deriveImmediately = false, historicalBatch, deferCompletion = true)
             }
-        }, { resumePatternEvidence(rawSms, logOutcome, deriveImmediately = false) })
+        }, { resumePatternEvidence(rawSms) })
         // Protection owns only the evidence check and parse/store transaction. Derived writes
         // and durable-stage probes must run after commit so process death cannot roll them back.
         val saved = when (result) {
@@ -319,13 +291,9 @@ class ProcessStoredSmsUseCase(
         }
     }
 
-    private suspend fun resumePatternEvidence(raw: RawSms, logOutcome: Boolean, deriveImmediately: Boolean): SmsIngestionResult {
+    private suspend fun resumePatternEvidence(raw: RawSms): SmsIngestionResult {
         val record = parsedEventRepository.findByRawSmsId(raw.id)
             ?: return SmsIngestionResult.Failed(raw.id, "pattern_saved_evidence_missing")
-        if (deriveImmediately) {
-            afterParsedEvent(record.event, record.details, logOutcome)?.let { return it }
-            processingRecovery?.clear(raw.id)
-        }
         return SmsIngestionResult.Parsed(raw.id, record.event, record.details)
     }
 
