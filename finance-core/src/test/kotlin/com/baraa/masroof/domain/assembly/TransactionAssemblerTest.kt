@@ -347,6 +347,33 @@ class TransactionAssemblerTest {
         assertEquals(local.atZone(riyadh).toInstant(), tx.occurredAt)
     }
 
+    /** OUT has only a wall clock, IN only a receipt instant: the pair keeps the earlier leg, not the later receipt. */
+    @Test
+    fun matchedPair_mixedTiming_takesEarliestEffectiveTime() {
+        val riyadh = java.time.ZoneId.of("Asia/Riyadh")
+        val outLocal = java.time.LocalDateTime.parse("2026-08-26T23:58:00")
+        val inReceived = java.time.LocalDateTime.parse("2026-08-27T00:04:00").atZone(riyadh).toInstant()
+        val snb = Bank("BANK_SNB")
+        val out = transferCandidate(
+            event(MessageFamily.TRANSFER_OUT, money("100.00"), source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(snb, "4001"), bankNetworkType = BankNetworkType.INTER_BANK).copy(occurredAt = null),
+            OwnershipStatus.OWNED, OwnershipStatus.OWNED,
+        ).copy(occurredAtLocal = outLocal)
+        val incoming = transferCandidate(
+            event(MessageFamily.TRANSFER_IN, money("100.00"), source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                destination = AccountReference(snb, "4001"), id = "pe-2", rawSmsId = "sms-2",
+                bankNetworkType = BankNetworkType.INTER_BANK).copy(occurredAt = inReceived, bank = snb),
+            OwnershipStatus.OWNED, OwnershipStatus.OWNED,
+        ).copy(receivedAt = inReceived)
+
+        val tx = (TransactionAssembler.assembleMatchedPair(
+            com.baraa.masroof.domain.matching.TransferMatchPair(out, incoming),
+            OwnershipStatus.OWNED, OwnershipStatus.OWNED, fallbackZone = riyadh,
+        ) as TransactionAssembler.Outcome.Assembled).transaction
+
+        assertEquals(outLocal.atZone(riyadh).toInstant(), tx.occurredAt)
+    }
+
     /** The reconciler builds candidates only from gate-passing evidence, such as a user's financial confirmation. */
     @Test
     fun unmatchedOwnedOwned_userConfirmedLegNotYetValidated_stillPosts() {
