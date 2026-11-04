@@ -127,6 +127,9 @@ android {
     sourceSets {
         getByName("androidTest").assets.directories += "$projectDir/schemas"
         getByName("androidTest").assets.directories += "src/test/resources/testdata"
+        // Test helpers used by both JVM and device tests.
+        getByName("test").kotlin.directories += "src/sharedTest/kotlin"
+        getByName("androidTest").kotlin.directories += "src/sharedTest/kotlin"
     }
 }
 
