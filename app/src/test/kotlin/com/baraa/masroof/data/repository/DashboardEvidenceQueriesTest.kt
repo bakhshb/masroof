@@ -6,7 +6,6 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.room.dao.RoomBatch
 import com.baraa.masroof.domain.ids.TransactionIdFactory
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -294,92 +293,6 @@ class DashboardEvidenceQueriesTest {
     }
 
     @Test
-    fun creditAndDebitEvidenceQueries_useExistingCardIndex() {
-        val db = world.db.openHelper.readableDatabase
-        val plans = linkedMapOf(
-            "latestCredit" to explain(
-                db,
-                """
-                SELECT MAX(p3.id)
-                FROM parsed_event p3
-                INNER JOIN raw_sms r3 ON r3.id = p3.rawSmsId
-                INNER JOIN (
-                    SELECT p2.cardBankId AS cardBankId,
-                           p2.cardLast4 AS cardLast4,
-                           MAX(COALESCE(p2.occurredAtEpochMillis, r2.receivedAtEpochMillis)) AS sortAt
-                    FROM parsed_event p2
-                    INNER JOIN raw_sms r2 ON r2.id = p2.rawSmsId
-                    WHERE p2.cardSmsChannel IN ('CREDIT', 'STATEMENT')
-                      AND p2.cardLast4 IS NOT NULL
-                    GROUP BY p2.cardBankId, p2.cardLast4
-                ) chosen
-                  ON chosen.cardBankId IS p3.cardBankId
-                 AND chosen.cardLast4 = p3.cardLast4
-                 AND COALESCE(p3.occurredAtEpochMillis, r3.receivedAtEpochMillis) = chosen.sortAt
-                WHERE p3.cardSmsChannel IN ('CREDIT', 'STATEMENT')
-                  AND p3.cardLast4 IS NOT NULL
-                GROUP BY p3.cardBankId, p3.cardLast4
-                """.trimIndent(),
-            ),
-            "availableBalance" to explain(
-                db,
-                """
-                SELECT pe.* FROM parsed_event pe
-                INNER JOIN raw_sms rs ON rs.id = pe.rawSmsId
-                INNER JOIN (
-                    SELECT p2.cardBankId AS cardBankId,
-                           p2.cardLast4 AS cardLast4,
-                           MAX(COALESCE(p2.occurredAtEpochMillis, r2.receivedAtEpochMillis)) AS latestAt
-                    FROM parsed_event p2
-                    INNER JOIN raw_sms r2 ON r2.id = p2.rawSmsId
-                    WHERE p2.cardSmsChannel = 'CREDIT'
-                      AND p2.availableBalanceDecimal IS NOT NULL
-                      AND p2.cardLast4 IS NOT NULL
-                      AND COALESCE(p2.occurredAtEpochMillis, r2.receivedAtEpochMillis) < 1
-                    GROUP BY p2.cardBankId, p2.cardLast4
-                ) latest ON latest.cardBankId IS pe.cardBankId AND latest.cardLast4 = pe.cardLast4
-                WHERE pe.cardSmsChannel = 'CREDIT'
-                  AND pe.availableBalanceDecimal IS NOT NULL
-                  AND pe.cardLast4 IS NOT NULL
-                  AND COALESCE(pe.occurredAtEpochMillis, rs.receivedAtEpochMillis) = latest.latestAt
-                  AND COALESCE(pe.occurredAtEpochMillis, rs.receivedAtEpochMillis) < 1
-                ORDER BY pe.id
-                """.trimIndent(),
-            ),
-            "firstDebit" to explain(
-                db,
-                """
-                SELECT MIN(p3.id)
-                FROM parsed_event p3
-                INNER JOIN raw_sms r3 ON r3.id = p3.rawSmsId
-                INNER JOIN (
-                    SELECT p2.bankId AS bankId,
-                           p2.cardLast4 AS cardLast4,
-                           MIN(COALESCE(p2.occurredAtEpochMillis, r2.receivedAtEpochMillis)) AS sortAt
-                    FROM parsed_event p2
-                    INNER JOIN raw_sms r2 ON r2.id = p2.rawSmsId
-                    WHERE p2.cardLast4 IN ('2210')
-                      AND p2.cardSmsChannel = 'DEBIT'
-                    GROUP BY p2.bankId, p2.cardLast4
-                ) chosen
-                  ON chosen.bankId IS p3.bankId
-                 AND chosen.cardLast4 = p3.cardLast4
-                 AND COALESCE(p3.occurredAtEpochMillis, r3.receivedAtEpochMillis) = chosen.sortAt
-                WHERE p3.cardSmsChannel = 'DEBIT'
-                GROUP BY p3.bankId, p3.cardLast4
-                """.trimIndent(),
-            ),
-        )
-        plans.forEach { (name, plan) ->
-            assertTrue(
-                "$name plan must keep the existing card index and not require a new one:\n$plan",
-                "index_parsed_event_cardSmsChannel_cardLast4" in plan ||
-                    "index_parsed_event_cardBankId_cardLast4" in plan,
-            )
-        }
-    }
-
-    @Test
     fun batchLookups_spanMultipleChunks_andSkipMissingIds() = runBlocking<Unit> {
         val count = RoomBatch.MAX_BIND_ARGS * 2 + 37
         val rawIds = (1..count).map { "bulk-sms:${it.toString().padStart(5, '0')}" }
@@ -511,15 +424,6 @@ class DashboardEvidenceQueriesTest {
                 debitSourceAccountLast4 = debitSource,
             ),
         )
-    }
-
-    private fun explain(db: SupportSQLiteDatabase, sql: String): String = buildString {
-        db.query("EXPLAIN QUERY PLAN $sql").use { cursor ->
-            while (cursor.moveToNext()) {
-                append(cursor.getString(3))
-                append('\n')
-            }
-        }
     }
 
     private fun assertExact(

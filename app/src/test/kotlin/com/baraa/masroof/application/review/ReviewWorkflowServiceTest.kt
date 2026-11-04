@@ -1085,7 +1085,7 @@ class ReviewWorkflowServiceTest {
     }
 
     @Test
-    fun refreshReviewQueue_autoIgnoresInformationalUnknown() = runBlocking {
+    fun refreshReviewQueue_keepsInformationalWordedUnknownReviewable() = runBlocking {
         persistEvent(
             smsId = "sms-info",
             event = event(

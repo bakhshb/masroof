@@ -60,6 +60,7 @@ class CoreEvidenceRepositoryContractTest {
 
             assertTrue("round $round", selection in reviews.findByRawSmsId(id)!!.reasons)
         }
+        assertEquals(20, reviews.countRequired())
     }
 
     @Test
@@ -72,6 +73,7 @@ class CoreEvidenceRepositoryContractTest {
             now = now,
         )
         assertEquals(listOf("missing_amount"), initial.reasons)
+        assertEquals(1, reviews.countRequired())
 
         val resolved = reviews.markResolved(
             id = initial.id,
@@ -89,6 +91,7 @@ class CoreEvidenceRepositoryContractTest {
         assertEquals(ReviewStatus.RESOLVED, resolved.status)
         assertEquals(resolved, afterRefresh)
         assertTrue(reviews.listRequired().isEmpty())
+        assertEquals(0, reviews.countRequired())
     }
 
     private fun rawSms(id: String, deviceMessageId: String) = RawSms(

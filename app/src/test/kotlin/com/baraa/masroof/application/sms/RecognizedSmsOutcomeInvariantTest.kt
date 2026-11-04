@@ -181,8 +181,9 @@ class RecognizedSmsOutcomeInvariantTest {
                 reasons: List<String>,
                 now: Instant,
             ) = harness.reviewRepo.upsertRequired(rawSmsId, kind, reasons, now).also {
+                // The first review row is written, then the review update fails.
                 reviewsWritten += 1
-                if (reviewsWritten >= 1) throw IOException("review update failed")
+                throw IOException("review update failed")
             }
         }
         val liveScheduled = mutableListOf<String>()

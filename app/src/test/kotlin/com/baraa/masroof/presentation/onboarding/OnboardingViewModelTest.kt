@@ -238,17 +238,14 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun selectedDate_passesCorrectInstantBoundary() = runTest {
+    fun selectedDate_reachesTheImportRequest() = runTest {
         val fixture = Fixture(permissionGranted = true)
         advanceUntilIdle()
         fixture.vm.onStartClicked()
         fixture.vm.selectCustomDate(LocalDate.parse("2026-08-03"))
         fixture.vm.startImport()
         advanceUntilIdle()
-        assertEquals(
-            LocalDate.parse("2026-08-03").atStartOfDay(fixture.zone).toInstant(),
-            fixture.gateway.lastReceivedAfter,
-        )
+        assertEquals(LocalDate.parse("2026-08-03"), fixture.gateway.lastRequest?.from)
     }
 
     @Test
@@ -708,13 +705,11 @@ AccountRegistryEntry.forTest(
     ) : HistoricalImportGateway {
         private var result: com.baraa.masroof.application.onboarding.HistoricalImportResult = initialResult
         private var blocked: CompletableDeferred<Unit>? = null
-        var lastReceivedAfter: Instant? = null
         var lastRequest: com.baraa.masroof.application.onboarding.OnboardingImportRequest? = null
         var calls: Int = 0
         override suspend fun scan(request: com.baraa.masroof.application.onboarding.OnboardingImportRequest): com.baraa.masroof.application.onboarding.HistoricalImportResult {
             calls++
             lastRequest = request
-            lastReceivedAfter = request.from.atStartOfDay(ZoneId.systemDefault()).toInstant()
             if (blockFirstCall && calls == 1) {
                 blocked = CompletableDeferred()
                 blocked?.await()

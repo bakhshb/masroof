@@ -258,7 +258,8 @@ class DashboardFixtureCharacterizationTest {
             bank = Bank.BANK_ALJAZIRA,
             last4 = "7271",
             ownership = OwnershipStatus.OWNED,
-            cardType = CardType.CREDIT,
+            // Untyped, so only the parsed SMS channel can keep it off the debit list.
+            cardType = null,
             firstSeenRawSmsId = record.event.rawSmsId,
             lastSeenRawSmsId = record.event.rawSmsId,
         )

@@ -242,13 +242,11 @@ class LiveSmsProcessingWorkerTest {
             ),
         )
 
-        assertEquals(
-            ListenableWorker.Result.retry(),
-            worker(raw.id, attempt = 0, processStored = processStored).doWork(),
-        )
+        val first = worker(raw.id, attempt = 0, processStored = processStored).doWork()
+        assertEquals(ListenableWorker.Result.retry(), first)
         assertTrue(harness.reviewRepo.listAll().isEmpty())
 
-        val results = listOf(ListenableWorker.Result.retry()) +
+        val results = listOf(first) +
             (1 until LiveSmsProcessingWorker.MAX_ATTEMPTS).map { attempt ->
                 worker(raw.id, attempt = attempt, processStored = processStored).doWork()
             }

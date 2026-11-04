@@ -41,18 +41,31 @@ class CommitmentFromTransactionServiceTest {
     }
 
     @Test
-    fun createFromTransaction_duplicateInsert_returnsAlreadyExists() = runBlocking {
+    fun createFromTransaction_insertRaceWithAStoredRow_returnsAlreadyExists() = runBlocking {
         val tx = transaction(id = "tx-netflix")
-        val repository = ThrowOnDuplicateCommitmentRepository()
-        val service = CommitmentFromTransactionService(
-            commitmentRepository = repository,
-            financialTransactionRepository = FakeFinancialTransactionRepository(listOf(tx)),
-            zoneId = zone,
-            clock = clock,
-        )
+        val stored = ThrowOnDuplicateCommitmentRepository()
+        // A concurrent writer stores the row between the pre-check and this insert.
+        val racing = object : CommitmentRepository by stored {
+            override suspend fun create(commitment: Commitment) {
+                stored.create(commitment)
+                throw IllegalStateException("duplicate sourceTransactionId")
+            }
+        }
+        val service = CommitmentFromTransactionService(racing, FakeFinancialTransactionRepository(listOf(tx)), zone, clock)
 
-        assertEquals(CommitmentCreationResult.Success, service.createFromTransaction(tx.id))
         assertEquals(CommitmentCreationResult.AlreadyExists, service.createFromTransaction(tx.id))
+        assertEquals(1, stored.created.size)
+    }
+
+    @Test
+    fun createFromTransaction_failedInsertWithoutARow_isRejected() = runBlocking {
+        val tx = transaction(id = "tx-netflix")
+        val failing = object : CommitmentRepository by ThrowOnDuplicateCommitmentRepository() {
+            override suspend fun create(commitment: Commitment): Unit = throw IllegalStateException("disk full")
+        }
+        val service = CommitmentFromTransactionService(failing, FakeFinancialTransactionRepository(listOf(tx)), zone, clock)
+
+        assertEquals(CommitmentCreationResult.Rejected("create_failed"), service.createFromTransaction(tx.id))
     }
 
     @Test
@@ -68,6 +81,7 @@ class CommitmentFromTransactionServiceTest {
 
         assertEquals(CommitmentCreationResult.Success, service.createFromTransaction(tx.id))
         assertEquals(CommitmentRecurrence.MONTHLY, repository.created.single().recurrence)
+        assertEquals(CommitmentCreationResult.AlreadyExists, service.createFromTransaction(tx.id))
     }
 
     @Test

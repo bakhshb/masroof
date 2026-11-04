@@ -39,7 +39,8 @@ class UpdateCheckCoordinatorTest {
     @Test
     fun shouldCheckNow_usesLastAttemptNotLastSuccess() {
         val now = 1_700_000_000_000L
-        preferencesRepository.setLastCheckEpochMs(now - 10_000L)
+        // The last success is outside the interval; only the recent attempt blocks a new check.
+        preferencesRepository.setLastCheckEpochMs(now - 120_000L)
         preferencesRepository.setLastAttemptEpochMs(now - 10_000L)
         val coordinator = coordinator(minIntervalMs = 60_000L, now = { now })
 

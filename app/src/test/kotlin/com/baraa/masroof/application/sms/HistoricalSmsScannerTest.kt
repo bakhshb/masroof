@@ -99,14 +99,12 @@ class HistoricalSmsScannerTest {
         assertEquals(1, result.parsed)
     }
 
-    @Test fun scanReportsProgressEveryTwentyFiveRowsAndRequiredReviewsAreCountedWithoutLoadingThem() = runBlocking {
+    @Test fun scanReportsProgressEveryTwentyFiveRows() = runBlocking {
         val at = Instant.parse("2026-08-01T10:00:00Z")
         val rows = (1..60).map { InboxRow.Valid(ProviderSmsRecord("p-$it", "OtherBank", purchaseBody(), at)) }
         val progress = mutableListOf<Int>()
         HistoricalSmsScanner(FakeSmsDataSource(rows), batchProcessor).scan(bankScopes = setOf(Bank.BANK_ALJAZIRA)) { progress += it }
         assertEquals(listOf(25, 50), progress)
-        val reviews = RoomReviewRepository(db.reviewItemDao())
-        assertEquals(reviews.listRequired().size, reviews.countRequired())
     }
 
     @Test fun invalidOrEmptyScopeIsRejectedBeforeInboxAccess() = runBlocking {
