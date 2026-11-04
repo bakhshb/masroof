@@ -1036,12 +1036,18 @@ class CommitmentsOverviewBuilderTest {
     fun weeklyCommitment_dueDateReplacesTheOccurrenceWhoseWeekHoldsIt() {
         val weekly = commitment(name = "Cleaner", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-clean",
             recurrence = CommitmentRecurrence.WEEKLY).copy(dueDate = LocalDate.parse("2026-08-17"))
-        val overview = build(
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
             commitments = listOf(weekly),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
         )
 
-        val dates = overview.rows.map { it.expectedDate }.sorted()
+        val dates = overview.rows.mapNotNull { it.expectedDate }.sorted()
         assertEquals(LocalDate.parse("2026-08-01"), dates[0])
         assertEquals(LocalDate.parse("2026-08-08"), dates[1])
         assertEquals(LocalDate.parse("2026-08-17"), dates[2])
