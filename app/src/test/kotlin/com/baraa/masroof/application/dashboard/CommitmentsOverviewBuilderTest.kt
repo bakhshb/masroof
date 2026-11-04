@@ -1012,6 +1012,27 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun weeklyCommitment_showsDueDateOnlyOnTheFirstUnpaidRow() {
+        val weekly = commitment(name = "Cleaner", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-clean",
+            recurrence = CommitmentRecurrence.WEEKLY).copy(dueDate = LocalDate.parse("2026-08-05"))
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(weekly),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        val dates = overview.rows.map { it.expectedDate }
+        assertTrue("rows: $dates", dates.size > 1)
+        assertEquals(LocalDate.parse("2026-08-05"), dates.first())
+        assertEquals(1, dates.count { it == LocalDate.parse("2026-08-05") })
+    }
+
+    @Test
     fun oneTimeCommitment_unpaidRowKeepsItsDueDate() {
         val oneTime = commitment(name = "Insurance", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-ins")
             .copy(dueDate = LocalDate.parse("2026-08-20"))

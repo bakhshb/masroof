@@ -59,6 +59,9 @@ class FinancialTransactionDaoTransactionTest {
         val select = snapshot.indexOfFirst { it.startsWith("SELECT") && "financial_transaction" in it }
         val update = snapshot.indexOfFirst { it.startsWith("UPDATE") && "financial_transaction" in it }
         assertTrue("statements: $snapshot", select >= 0 && update > select)
+        // The read itself must already run inside the transaction that later writes.
+        val begin = snapshot.indexOfFirst { it.startsWith("BEGIN") }
+        assertTrue("statements: $snapshot", begin in 0 until select)
         // A concurrent FX write between the read and the write must not be lost:
         // no transaction may end between them.
         val between = snapshot.subList(select + 1, update)
