@@ -563,17 +563,8 @@ private object ZipFixtures {
         maxTotalUncompressedBytes = total,
     )
 
-    fun zipBytes(vararg entries: Pair<String, ByteArray>): ByteArray {
-        val output = ByteArrayOutputStream()
-        ZipOutputStream(output).use { zip ->
-            entries.forEach { (name, data) ->
-                zip.putNextEntry(ZipEntry(name))
-                if (data.isNotEmpty()) zip.write(data)
-                zip.closeEntry()
-            }
-        }
-        return output.toByteArray()
-    }
+    fun zipBytes(vararg entries: Pair<String, ByteArray>): ByteArray =
+        ByteArrayOutputStream().also { writeZip(it, entries.toList()) }.toByteArray()
 
     fun storedZipBytes(name: String, data: ByteArray): ByteArray {
         val output = ByteArrayOutputStream()

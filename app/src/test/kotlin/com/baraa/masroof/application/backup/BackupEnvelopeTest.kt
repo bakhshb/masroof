@@ -20,8 +20,8 @@ class BackupEnvelopeTest {
         val envelope = encrypt(plaintext, passphrase.copyOf())
         assertFalse(envelope.copyOfRange(0, 4).contentEquals(ZIP_LOCAL))
         assertTrue(BackupEnvelope.looksLikeEnvelope(envelope, envelope.size))
-        assertFalse(contains(envelope, "SQLite format 3".toByteArray(Charsets.US_ASCII)))
-        assertFalse(contains(envelope, "MASROOF-SMS-FIXTURE-do-not-leak-9f3c2a".toByteArray(Charsets.UTF_8)))
+        assertFalse(containsBytes(envelope, "SQLite format 3".toByteArray(Charsets.US_ASCII)))
+        assertFalse(containsBytes(envelope, "MASROOF-SMS-FIXTURE-do-not-leak-9f3c2a".toByteArray(Charsets.UTF_8)))
 
         val restored = ByteArrayOutputStream()
         BackupEnvelope.decrypt(ByteArrayInputStream(envelope), restored, passphrase.copyOf())
@@ -74,21 +74,6 @@ class BackupEnvelopeTest {
             stream.write(bytes)
         }
         return output.toByteArray()
-    }
-
-    private fun contains(haystack: ByteArray, needle: ByteArray): Boolean {
-        if (needle.isEmpty() || haystack.size < needle.size) return false
-        for (start in 0..haystack.size - needle.size) {
-            var matches = true
-            for (index in needle.indices) {
-                if (haystack[start + index] != needle[index]) {
-                    matches = false
-                    break
-                }
-            }
-            if (matches) return true
-        }
-        return false
     }
 
     private companion object {

@@ -14,9 +14,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
-import java.io.FileOutputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /** Verify and import must agree that a malformed but correctly encrypted package is invalid. */
 @RunWith(RobolectricTestRunner::class)
@@ -64,21 +61,12 @@ class DatabaseBackupVerifyTest {
         } finally { if (live.isOpen) live.close() }
     }
 
-    private fun encryptedPackage(vararg entries: Pair<String, ByteArray>): File {
-        val file = File(context.cacheDir, "envelope-${System.nanoTime()}.masroof")
-        FileOutputStream(file).use { output ->
-            BackupEnvelope.encrypt(output, passphrase.copyOf(), TEST_KDF_ITERATIONS) { plain ->
-                ZipOutputStream(plain).use { zip ->
-                    entries.forEach { (name, bytes) ->
-                        zip.putNextEntry(ZipEntry(name))
-                        zip.write(bytes)
-                        zip.closeEntry()
-                    }
-                }
-            }
-        }
-        return file
-    }
+    private fun encryptedPackage(vararg entries: Pair<String, ByteArray>): File = writeEncryptedPackage(
+        File(context.cacheDir, "envelope-${System.nanoTime()}.masroof"),
+        passphrase.copyOf(),
+        TEST_KDF_ITERATIONS,
+        entries.toList(),
+    )
 
     private companion object {
         const val TEST_KDF_ITERATIONS = 4_096
