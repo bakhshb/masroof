@@ -81,7 +81,7 @@ fun transactionListShareText(
     fun money(amount: Money) = MoneyUiFormatter.format(amount, locale.toLanguageTag())
     fun typeLabel(type: FinancialTransactionType) = context.getString(type.toUiLabelRes())
     val typeLabels = filter.types.map(::typeLabel).sorted()
-    val cardLabels = filter.cardLast4s.map { last4 -> cardDisplayLabel(context, ownedCards, last4) }.sorted()
+    val cardLabels = filter.cardKeys.map { key -> cardKeyDisplayLabel(context, ownedCards, key) }.sorted()
     val accountLabels = filter.accountContainerIds.mapNotNull { containerId ->
         accountDisplayLabel(context, ownedAccounts, containerId)
     }.sorted()

@@ -66,7 +66,7 @@ class TransactionListFilterEngineTest {
             preview(type = FinancialTransactionType.EXPENSE, amount = "100", card = "7271"),
             preview(type = FinancialTransactionType.EXPENSE, amount = "50", card = "3478"),
         )
-        val result = TransactionListPresentationMapper.project(transactions = txs, filter = TransactionListFilterState(cardLast4s = setOf("7271"))).result
+        val result = TransactionListPresentationMapper.project(transactions = txs, filter = TransactionListFilterState(cardKeys = setOf("BANK_ALJAZIRA:7271"))).result
         assertEquals(1, result.transactions.size)
         assertEquals("7271", result.transactions.single().cardLast4)
     }
@@ -78,7 +78,7 @@ class TransactionListFilterEngineTest {
             preview(type = FinancialTransactionType.EXPENSE, amount = "50", card = "3478"),
             preview(type = FinancialTransactionType.EXPENSE, amount = "30", card = "8332"),
         )
-        val result = TransactionListPresentationMapper.project(transactions = txs, filter = TransactionListFilterState(cardLast4s = setOf("7271", "3478"))).result
+        val result = TransactionListPresentationMapper.project(transactions = txs, filter = TransactionListFilterState(cardKeys = setOf("BANK_ALJAZIRA:7271", "BANK_ALJAZIRA:3478"))).result
         assertEquals(2, result.transactions.size)
         assertEquals(Money.of("150.00", Currency.SAR), result.totalAmount)
     }
@@ -92,7 +92,7 @@ class TransactionListFilterEngineTest {
         )
         val result = TransactionListPresentationMapper.project(transactions = txs, filter = TransactionListFilterState(
                 types = setOf(FinancialTransactionType.EXPENSE),
-                cardLast4s = setOf("7271"),
+                cardKeys = setOf("BANK_ALJAZIRA:7271"),
             )).result
         assertEquals(1, result.transactions.size)
         assertEquals(Money.of("100.00", Currency.SAR), result.totalAmount)
@@ -109,7 +109,7 @@ class TransactionListFilterEngineTest {
         val result = TransactionListPresentationMapper.project(transactions = txs, filter = TransactionListFilterState(
                 searchQuery = "tamara",
                 types = setOf(FinancialTransactionType.EXPENSE, FinancialTransactionType.REFUND),
-                cardLast4s = setOf("7271"),
+                cardKeys = setOf("BANK_ALJAZIRA:7271"),
             )).result
         assertEquals(2, result.transactions.size)
         assertNull(result.totalAmount) // refunds and purchases do not share one total
@@ -198,7 +198,7 @@ class TransactionListFilterEngineTest {
     }
 
     @Test
-    fun availableCardLast4s_limitsToOwnedCards() {
+    fun availableCardKeys_limitsToOwnedCards() {
         val cardId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.cardId(
             com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
             "8219",
@@ -210,11 +210,30 @@ class TransactionListFilterEngineTest {
 
         val available = TransactionListPresentationMapper.project(transactions = txs, ownedCardKeys = setOf(CardOwnershipKey.of(com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA, "8219")), filter = TransactionListFilterState()).availableCards
 
-        assertEquals(listOf("8219"), available)
+        assertEquals(listOf("BANK_ALJAZIRA:8219"), available)
     }
 
     @Test
-    fun availableCardLast4s_returnsEmptyWhenNoOwnedCards() {
+    fun sameLast4AtTwoBanks_givesTwoOptionsThatFilterSeparately() {
+        val aljazira = com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA
+        val other = com.baraa.masroof.domain.model.Bank("BANK_OTHER")
+        val txs = listOf(
+            preview(id = "a", type = FinancialTransactionType.EXPENSE, amount = "10", card = "1234",
+                sourceAccountId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.cardId(aljazira, "1234")),
+            preview(id = "b", type = FinancialTransactionType.EXPENSE, amount = "20", card = "1234",
+                sourceAccountId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.cardId(other, "1234")),
+        )
+        val owned = setOf(CardOwnershipKey.of(aljazira, "1234"), CardOwnershipKey.of(other, "1234"))
+
+        val options = TransactionListPresentationMapper.project(transactions = txs, ownedCardKeys = owned, filter = TransactionListFilterState()).availableCards
+        assertEquals(listOf("BANK_ALJAZIRA:1234", "BANK_OTHER:1234"), options)
+        val onlyOther = TransactionListPresentationMapper.project(transactions = txs, ownedCardKeys = owned,
+            filter = TransactionListFilterState(cardKeys = setOf("BANK_OTHER:1234"))).result
+        assertEquals(listOf("b"), onlyOther.transactions.map { it.id })
+    }
+
+    @Test
+    fun availableCardKeys_returnsEmptyWhenNoOwnedCards() {
         val txs = listOf(
             preview(type = FinancialTransactionType.EXPENSE, amount = "10", card = "8219"),
         )

@@ -19,11 +19,11 @@ fun TransactionListFilterBottomSheet(visible: Boolean, onDismiss: () -> Unit,
     ownedAccounts: List<OwnedAccountUi> = emptyList(), onApply: (TransactionListFilterState) -> Unit) {
     if (!visible) return
     var types by rememberSaveable { mutableStateOf(filterState.types.map { it.name }) }
-    var cards by rememberSaveable { mutableStateOf(filterState.cardLast4s.toList()) }
+    var cards by rememberSaveable { mutableStateOf(filterState.cardKeys.toList()) }
     var accounts by rememberSaveable { mutableStateOf(filterState.accountContainerIds.toList()) }
     var resetAll by rememberSaveable { mutableStateOf(false) }
     val draft = filterState.copy(types = types.mapNotNull { runCatching { FinancialTransactionType.valueOf(it) }.getOrNull() }.toSet(),
-        cardLast4s = cards.toSet(), accountContainerIds = accounts.toSet(),
+        cardKeys = cards.toSet(), accountContainerIds = accounts.toSet(),
         searchQuery = if (resetAll) "" else filterState.searchQuery,
         transactionIds = if (resetAll) emptySet() else filterState.transactionIds)
     MasroofBottomSheet(stringResource(R.string.transaction_list_filter_sheet_title), onDismiss,
@@ -47,7 +47,7 @@ fun TransactionListFilterBottomSheet(visible: Boolean, onDismiss: () -> Unit,
         if (availableCards.isNotEmpty()) {
             MasroofText(stringResource(R.string.transaction_list_filter_card_section), style = MaterialTheme.typography.titleSmall)
             FilterChip(cards.isEmpty(), onClick = { cards = emptyList() }, label = { MasroofText(stringResource(R.string.transaction_list_filter_all_cards)) })
-            MasroofSheetChoices(availableCards, draft.cardLast4s, { cardDisplayLabel(ownedCards, it) },
+            MasroofSheetChoices(availableCards, draft.cardKeys, { cardKeyDisplayLabel(ownedCards, it) },
                 { value -> cards = if (value in cards) cards - value else cards + value }, { "filter-card-$it" })
         }
     }

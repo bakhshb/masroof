@@ -37,7 +37,7 @@ class TransactionListWorkflow {
     ): TransactionListProjection = TransactionListProjection(
         TransactionListProjectionCalculator.apply(rows, query, primaryCurrency, accountInvolvement),
         TransactionListProjectionCalculator.availableTypes(rows),
-        TransactionListProjectionCalculator.availableCardLast4s(rows, ownedCardKeys),
+        TransactionListProjectionCalculator.availableCardKeys(rows, ownedCardKeys),
         TransactionListProjectionCalculator.availableAccountContainerIds(rows, ownedAccountContainerIds, accountInvolvement),
     )
 }
@@ -45,14 +45,15 @@ class TransactionListWorkflow {
 data class TransactionListQuery(
     val searchQuery: String = "",
     val types: Set<FinancialTransactionType> = emptySet(),
-    val cardLast4s: Set<String> = emptySet(),
+    /** Bank-qualified `bankId:last4` card keys, so two banks' cards with one last4 stay apart. */
+    val cardKeys: Set<String> = emptySet(),
     val accountContainerIds: Set<String> = emptySet(),
     val transactionIds: Set<String> = emptySet(),
 ) {
     val isActive: Boolean
         get() = searchQuery.isNotBlank() ||
             types.isNotEmpty() ||
-            cardLast4s.isNotEmpty() ||
+            cardKeys.isNotEmpty() ||
             accountContainerIds.isNotEmpty() ||
             transactionIds.isNotEmpty()
 }
@@ -88,7 +89,7 @@ internal object TransactionListProjectionCalculator {
         val selected = transactions.withIndex().filter { (_, tx) ->
             matchesTransactionIds(tx, filter.transactionIds) &&
                 matchesTypes(tx, filter.types) &&
-                matchesCards(tx, filter.cardLast4s) &&
+                matchesCards(tx, filter.cardKeys) &&
                 matchesAccounts(tx, filter.accountContainerIds, accountInvolvementByTransactionId) &&
                 matchesSearch(tx, filter.searchQuery)
         }
@@ -103,26 +104,12 @@ internal object TransactionListProjectionCalculator {
         return TYPE_DISPLAY_ORDER.filter { it in present }
     }
 
-    fun availableCardLast4s(
+    fun availableCardKeys(
         transactions: List<TransactionListRow>,
         ownedCardKeys: Set<String> = emptySet(),
     ): List<String> {
         if (ownedCardKeys.isEmpty()) return emptyList()
-        val pool = mutableSetOf<String>()
-        transactions.forEach { tx ->
-            val keys = tx.cardOwnershipKeys()
-            if (keys.isNotEmpty()) {
-                keys.filter { it in ownedCardKeys }
-                    .mapTo(pool) { it.substringAfter(':') }
-            } else {
-                tx.cardLast4?.let { last4 ->
-                    if (ownedCardKeys.any { it.endsWith(":$last4") }) {
-                        pool.add(last4)
-                    }
-                }
-            }
-        }
-        return pool.sorted()
+        return transactions.flatMap { tx -> ownedCardKeys.filter { tx.matchesCardKey(it) } }.distinct().sorted()
     }
 
     fun availableAccountContainerIds(
@@ -151,8 +138,8 @@ internal object TransactionListProjectionCalculator {
         types: Set<FinancialTransactionType>,
     ): Boolean = types.isEmpty() || tx.typeLabelResHint in types
 
-    private fun matchesCards(tx: TransactionListRow, cardLast4s: Set<String>): Boolean =
-        cardLast4s.isEmpty() || tx.cardLast4 in cardLast4s
+    private fun matchesCards(tx: TransactionListRow, cardKeys: Set<String>): Boolean =
+        cardKeys.isEmpty() || cardKeys.any(tx::matchesCardKey)
 
     private fun matchesAccounts(
         tx: TransactionListRow,
@@ -211,3 +198,17 @@ private fun TransactionListRow.cardOwnershipKeys(): List<String> =
         val bankId = FinancialContainerIdParser.cardBankId(containerId) ?: return@mapNotNull null
         "${Bank(bankId).id}:$last4"
     }
+
+/**
+ * A card container decides the card. Without one, the row's last4 matches a key at the row's
+ * account bank; a row with no bank at all still matches every bank's card with that last4.
+ */
+private fun TransactionListRow.matchesCardKey(cardKey: String): Boolean {
+    val cardKeys = cardOwnershipKeys()
+    if (cardKeys.isNotEmpty()) return cardKey in cardKeys
+    val last4 = cardLast4 ?: return false
+    if (cardKey.substringAfterLast(':') != last4) return false
+    val banks = listOfNotNull(sourceContainerId, destinationContainerId)
+        .mapNotNull(FinancialContainerIdParser::accountBankId).map { Bank(it).id }.toSet()
+    return banks.isEmpty() || cardKey.substringBefore(':') in banks
+}
