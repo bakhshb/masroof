@@ -29,13 +29,6 @@ data class CurrentAccountFlowDetailGrouping(
     val selfTransfersIn: List<FinancialTransaction> = emptyList(),
 ) {
     companion object {
-        val INCOME_DISPLAY_ORDER = listOf(
-            FlowIncomeCategory.SALARY,
-            FlowIncomeCategory.EXTERNAL_TRANSFER_IN,
-            FlowIncomeCategory.ACCOUNT_REFUND,
-            FlowIncomeCategory.OTHER_INCOME,
-        )
-
         fun empty(): CurrentAccountFlowDetailGrouping = CurrentAccountFlowDetailGrouping(
             expense = FlowExpenseCategory.entries.associateWith { emptyList() },
             income = FlowIncomeCategory.entries.associateWith { emptyList() },
