@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
@@ -17,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -64,7 +66,9 @@ fun MasroofGuidanceButton(
         with(density) { MasroofGuidancePositionProvider(MasroofGuidanceStyle.anchorGap.roundToPx(), MasroofGuidanceStyle.windowMargin.roundToPx()) }
     }
     Box(modifier.size(MasroofGuidanceStyle.iconSize)) {
-        Box(modifier = Modifier.size(MasroofGuidanceStyle.iconSize).clickable(role = Role.Button) { open = !open }) {
+        // requiredSize overflows the icon slot evenly, so the touch target grows without moving the row.
+        Box(modifier = Modifier.requiredSize(MasroofSpacing.minimumTouchTarget).clickable(role = Role.Button) { open = !open },
+            contentAlignment = Alignment.Center) {
             Icon(MasroofOutlineIcons.Info, description,
                 tint = contentColor, modifier = Modifier.size(MasroofGuidanceStyle.iconSize))
         }
