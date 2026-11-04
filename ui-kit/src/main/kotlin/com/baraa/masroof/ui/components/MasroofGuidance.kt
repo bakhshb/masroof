@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -63,11 +64,10 @@ fun MasroofGuidanceButton(
     val position = remember(density) {
         with(density) { MasroofGuidancePositionProvider(MasroofGuidanceStyle.anchorGap.roundToPx(), MasroofGuidanceStyle.windowMargin.roundToPx()) }
     }
-    Box(modifier.size(MasroofGuidanceStyle.iconSize)) {
-        Box(modifier = Modifier.size(MasroofGuidanceStyle.iconSize).clickable(role = Role.Button) { open = !open }) {
-            Icon(MasroofOutlineIcons.Info, description,
-                tint = contentColor, modifier = Modifier.size(MasroofGuidanceStyle.iconSize))
-        }
+    // Laid out at icon size so rows keep their rhythm. Compose widens a touch to the platform minimum
+    // target around a small clickable when nothing else is hit, so the tap area needs no oversized box.
+    Box(modifier.size(MasroofGuidanceStyle.iconSize).clickable(role = Role.Button) { open = !open }) {
+        Icon(MasroofOutlineIcons.Info, description, tint = contentColor, modifier = Modifier.fillMaxSize())
         if (open) {
             Popup(popupPositionProvider = position, onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true)) {
