@@ -274,8 +274,10 @@ class BackupArchiveValidatorTest {
             "manifest.json\\",
             "manifest.json\u0000",
         )
-        aliases.forEach { entryName ->
+        aliases.forEach { alias ->
             withRoot { root, staging ->
+                // Aim the absolute alias at this test's own sandbox, never the real filesystem root.
+                val entryName = if (alias == "/manifest.json") File(root, "manifest.json").absolutePath else alias
                 val error = assertThrows(BackupArchiveException::class.java) {
                     BackupArchiveValidator(ZipFixtures.limits())
                         .extractInto(
@@ -296,7 +298,7 @@ class BackupArchiveValidatorTest {
                 assertFalse(entryName, File(staging, "manifest.json").exists())
                 assertFalse(entryName, File(staging, "masroof.db").exists())
                 assertFalse(entryName, File(staging, "foo").exists())
-                assertFalse(entryName, File("/manifest.json").exists())
+                assertFalse(entryName, File(root, "manifest.json").exists())
             }
         }
     }
@@ -364,7 +366,6 @@ class BackupArchiveValidatorTest {
             block(root, staging)
         } finally {
             root.deleteRecursively()
-            File("/manifest.json").delete()
         }
     }
 
