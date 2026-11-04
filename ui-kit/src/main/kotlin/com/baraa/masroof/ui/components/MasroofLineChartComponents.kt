@@ -56,17 +56,6 @@ object MasroofLineChart {
             get() = maximum.subtract(minimum)
     }
 
-    fun valueRange(values: List<BigDecimal>, reference: BigDecimal): ValueRange {
-        val allValues = values + reference + BigDecimal.ZERO
-        val minimum = allValues.minOrNull() ?: BigDecimal.ZERO
-        val maximum = allValues.maxOrNull() ?: BigDecimal.ZERO
-        return if (minimum == maximum) {
-            ValueRange(BigDecimal.ZERO, BigDecimal.ONE)
-        } else {
-            ValueRange(minimum, maximum)
-        }
-    }
-
     /** This is visual axis scaling only, matching the approved SVG headroom. */
     fun referenceRange(values: List<BigDecimal>): ValueRange {
         val min = (values + BigDecimal.ZERO).minOrNull() ?: BigDecimal.ZERO
@@ -149,16 +138,6 @@ internal object MasroofLineChartLayout {
         if (pointCount <= 0) return null
         return index?.takeIf { it in 0 until pointCount }
     }
-}
-
-@Composable
-fun MasroofLineChart(values: List<BigDecimal>, referenceValue: BigDecimal, labels: LineChartLabels,
-    modifier: Modifier = Modifier, selectedPointIndex: Int? = null,
-    onPointSelected: ((Int) -> Unit)? = null, pointLabel: (Int) -> String = { "" },
-    role: MasroofHeroRole = MasroofHeroRole.Brand,
-    axisLabel: (Int) -> String = { "" }, currencyLabel: String = "", showAverage: Boolean = false, displayText: (String) -> String = { it }) {
-    MasroofInteractiveLineChart(values, referenceValue, labels, modifier, selectedPointIndex,
-        onPointSelected, pointLabel, role, axisLabel, currencyLabel, showAverage, displayText)
 }
 
 @Composable

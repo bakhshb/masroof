@@ -34,18 +34,14 @@ import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.MasroofAmountRole
 import com.baraa.masroof.presentation.common.MasroofAmountText
 import com.baraa.masroof.presentation.common.MasroofBadge
-import com.baraa.masroof.presentation.common.MasroofBarChart
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.common.MasroofCardAccent
-import com.baraa.masroof.presentation.common.MasroofHorizontalBar
-import com.baraa.masroof.presentation.common.MasroofHorizontalBarStyle
+import com.baraa.masroof.ui.components.MasroofHorizontalBar
+import com.baraa.masroof.ui.components.MasroofHorizontalBarStyle
 import com.baraa.masroof.presentation.common.MasroofIcons
-import com.baraa.masroof.presentation.common.MasroofDonutChart
 import com.baraa.masroof.presentation.common.MasroofInteractiveLineChart
-import com.baraa.masroof.presentation.common.commitmentDonutPaidFraction
 import com.baraa.masroof.presentation.common.MasroofMoneyRow
 import com.baraa.masroof.presentation.common.MasroofMoneyRowStyle
-import com.baraa.masroof.presentation.common.MasroofRankedBarRow
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 import com.baraa.masroof.presentation.common.MasroofSectionHeader
 import com.baraa.masroof.presentation.settings.SettingsSpacing
@@ -287,16 +283,6 @@ private fun ComponentSection() {
                 progress = 0.45f,
                 style = MasroofHorizontalBarStyle.Outflow,
             )
-            MasroofRankedBarRow(
-                title = "Ranked bar row",
-                value = "1,250.00",
-                progress = MasroofBarChart.progress(
-                    java.math.BigDecimal("1250"),
-                    java.math.BigDecimal("2000"),
-                ),
-                subtitle = "5 purchase / payment transactions",
-                style = MasroofHorizontalBarStyle.Outflow,
-            )
             val previewValues = remember {
                 listOf(
                     java.math.BigDecimal("240"),
@@ -313,14 +299,6 @@ private fun ComponentSection() {
                 selectedPointIndex = selectedPointIndex,
                 onPointSelected = { selectedPointIndex = it },
                 pointLabel = { index -> "Day ${index + 1}: ${previewValues[index]}" },
-            )
-            MasroofDonutChart(
-                paidFraction = commitmentDonutPaidFraction(
-                    java.math.BigDecimal("1000"),
-                    java.math.BigDecimal("650"),
-                ),
-                centerTitle = "Total",
-                centerValue = "1,000.00",
             )
         }
     }

@@ -35,5 +35,4 @@ object MasroofSpacing {
     val compactCardLabelTop = 6.dp
     val inlineGap = 4.dp
     val chartHeight = MasroofReference.chartHeight
-    val donutChartSize = 96.dp
 }
