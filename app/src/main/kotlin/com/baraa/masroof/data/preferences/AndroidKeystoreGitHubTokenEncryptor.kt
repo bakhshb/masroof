@@ -50,6 +50,10 @@ class AndroidKeystoreGitHubTokenEncryptor(
             null
         } catch (_: javax.crypto.AEADBadTagException) {
             null
+        } catch (_: java.security.InvalidKeyException) {
+            null
+        } catch (_: java.security.UnrecoverableKeyException) {
+            null
         } catch (error: Exception) {
             // A transient keystore error (e.g. ProviderException) must not cost the stored token.
             throw GitHubTokenEncryptorException("GitHub token decryption failed", error)

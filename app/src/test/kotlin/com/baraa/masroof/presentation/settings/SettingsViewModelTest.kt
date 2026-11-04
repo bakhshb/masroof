@@ -799,6 +799,7 @@ class SettingsViewModelTest {
             reparse = { gate.await(); com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(0, 0) })
         vm.reparseStoredMessages(); runCurrent()
         vm.addManualAccount("BANK_ALJAZIRA", "3001", null) {}; runCurrent()
+        assertEquals(SettingsError.UPDATE_FAILED, vm.uiState.value.error)
         gate.complete(Unit); advanceUntilIdle()
 
         assertEquals(0, reconciles)

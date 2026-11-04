@@ -101,11 +101,16 @@ class NotificationCenterService(
     private fun pruneStaleReadIds(activeIds: Set<String>) {
         val readIds = preferencesRepository.getReadIds()
         // A foreign-currency notice belongs to one period; browsing another period must not forget it was read.
-        val pruned = readIds.filterTo(mutableSetOf()) { it in activeIds || it.startsWith(FOREIGN_CURRENCY_PREFIX) }
+        val pruned = readIds.filterTo(mutableSetOf()) { it in activeIds || isPeriodForeignCurrencyId(it) }
         if (pruned != readIds) {
             preferencesRepository.setReadIds(pruned)
         }
     }
+
+    // Old ids carried a translated period title; only the period-start form survives pruning.
+    private fun isPeriodForeignCurrencyId(id: String): Boolean =
+        id.startsWith(FOREIGN_CURRENCY_PREFIX) &&
+            runCatching { java.time.LocalDate.parse(id.removePrefix(FOREIGN_CURRENCY_PREFIX)) }.isSuccess
 
     companion object {
         const val ID_SMS_PERMISSION: String = "sms_permission"

@@ -98,6 +98,23 @@ class NotificationCenterServiceTest {
         assertTrue(back.items.single().isRead)
     }
 
+    @Test
+    fun `an old label-keyed foreign currency read id is pruned`() {
+        val prefs = FakeNotificationPreferencesRepository()
+        prefs.markRead("foreign_currency:Aug 2026")
+        NotificationCenterService(prefs).build(
+            NotificationCenterSnapshot(
+                smsPermissionGranted = true,
+                reviewRequiredCount = 0,
+                unregisteredCardCount = 0,
+                unregisteredAccountCount = 0,
+                excludedForeignCurrencyCount = 0,
+                periodLabel = "Aug 2026",
+            ),
+        )
+        assertTrue(prefs.getReadIds().isEmpty())
+    }
+
     private class FakeNotificationPreferencesRepository : NotificationPreferencesRepository {
         private var readIds: Set<String> = emptySet()
 

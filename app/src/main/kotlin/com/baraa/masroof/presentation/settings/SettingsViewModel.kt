@@ -502,7 +502,12 @@ class SettingsViewModel(
     fun exportBackup(uri: Uri) = backup.exportBackup(uri)
     fun importBackup(uri: Uri, passphrase: CharArray = CharArray(0), confirmLegacyPlaintext: Boolean = false) = backup.importBackup(uri, passphrase, confirmLegacyPlaintext)
     private fun updateRegistry(onUpdated: () -> Unit = {}, action: suspend () -> Unit) {
-        if (_uiState.value.updating || _uiState.value.reparsingStored || _uiState.value.importingSms) return
+        if (_uiState.value.updating) return
+        if (_uiState.value.reparsingStored || _uiState.value.importingSms) {
+            // Say the change was not saved instead of dropping the tap silently.
+            _uiState.update { it.copy(error = SettingsError.UPDATE_FAILED) }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(updating = true, error = null) }
             try {
