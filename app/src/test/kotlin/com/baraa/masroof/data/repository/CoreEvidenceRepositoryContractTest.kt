@@ -46,26 +46,6 @@ class CoreEvidenceRepositoryContractTest {
         database.close()
     }
 
-    @Test
-    fun rawSmsInsert_isIdempotentForTheSameEvidence() = runBlocking {
-        val evidence = rawSms(id = "sms-1", deviceMessageId = "device-1")
-
-        assertEquals(RawSmsInsertResult.Inserted, rawSms.insertIfAbsent(evidence))
-        assertEquals(RawSmsInsertResult.AlreadyExists, rawSms.insertIfAbsent(evidence))
-        assertEquals(evidence, rawSms.getById("sms-1"))
-    }
-
-    @Test
-    fun rawSmsInsert_rejectsSameDeviceMessageIdAcrossDifferentRows() = runBlocking {
-        assertEquals(RawSmsInsertResult.Inserted, rawSms.insertIfAbsent(rawSms("sms-1", "device-1")))
-
-        assertEquals(
-            RawSmsInsertResult.AlreadyExists,
-            rawSms.insertIfAbsent(rawSms("sms-2", "device-1")),
-        )
-        assertNull(rawSms.getById("sms-2"))
-    }
-
     /** A queue refresh racing a bank choice must never drop the user's selection. */
     @Test
     fun concurrentReviewUpserts_keepTheBankSelection() = runBlocking {

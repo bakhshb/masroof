@@ -137,53 +137,6 @@ class CurrentAccountSummaryCalculatorTest {
     }
 
     @Test
-    fun cashWithdrawalWithNullSourceContainer_ignoredWhenScopedToSingleAccount() {
-        val owned = "account:bank_aljazira:3478"
-        val cashWithdrawal = tx(
-            id = "cash-withdrawal",
-            type = FinancialTransactionType.CASH_WITHDRAWAL,
-            amount = "2200.00",
-            source = null,
-            linked = emptyList(),
-        )
-        val summary = CurrentAccountSummaryCalculator.summarize(
-            transactions = listOf(cashWithdrawal),
-            parsedRecords = emptyList(),
-            ownedAccountContainerIds = setOf(owned),
-            scopeMode = AccountFlowScopeMode.SingleAccount,
-        )
-        assertEquals(Money.zero(Currency.SAR), summary.outflow.cashWithdrawals)
-        assertEquals(Money.zero(Currency.SAR), summary.outflow.total)
-    }
-
-    @Test
-    fun orphanOutflow_notDuplicatedAcrossOwnedAccounts() {
-        val accountA = "account:bank_aljazira:3001"
-        val accountB = "account:bank_aljazira:3002"
-        val orphanWithdrawal = tx(
-            id = "orphan-cash",
-            type = FinancialTransactionType.CASH_WITHDRAWAL,
-            amount = "100.00",
-            source = null,
-            linked = emptyList(),
-        )
-        val summaryA = CurrentAccountSummaryCalculator.summarize(
-            transactions = listOf(orphanWithdrawal),
-            parsedRecords = emptyList(),
-            ownedAccountContainerIds = setOf(accountA),
-            scopeMode = AccountFlowScopeMode.SingleAccount,
-        )
-        val summaryB = CurrentAccountSummaryCalculator.summarize(
-            transactions = listOf(orphanWithdrawal),
-            parsedRecords = emptyList(),
-            ownedAccountContainerIds = setOf(accountB),
-            scopeMode = AccountFlowScopeMode.SingleAccount,
-        )
-        assertEquals(Money.zero(Currency.SAR), summaryA.outflow.cashWithdrawals)
-        assertEquals(Money.zero(Currency.SAR), summaryB.outflow.cashWithdrawals)
-    }
-
-    @Test
     fun accountRemaining_includesSelfTransfersInPerAccountCashPosition() {
         val accountA = "account:bank_aljazira:3001"
         val accountB = "account:bank_aljazira:3002"
@@ -387,6 +340,7 @@ class CurrentAccountSummaryCalculatorTest {
         )
         assertEquals(Money.of("2200.00", Currency.SAR), fleetSummary.outflow.cashWithdrawals)
         assertEquals(Money.zero(Currency.SAR), accountSummary.outflow.cashWithdrawals)
+        assertEquals(Money.zero(Currency.SAR), accountSummary.outflow.total)
     }
 
     @Test

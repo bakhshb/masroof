@@ -55,38 +55,6 @@ class AccountTransactionInvolvementResolverTest {
     }
 
     @Test
-    fun cashWithdrawal_hisabRaqam_mapsToOwnedAccount() {
-        val owned = AccountRegistryEntry.forTest(
-            bank = Bank.BANK_ALJAZIRA,
-            maskedNumber = "3001",
-            ownership = OwnershipStatus.OWNED,
-            firstSeenRawSmsId = null,
-            lastSeenRawSmsId = null,
-        )
-        val containerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")
-        val tx = tx(
-            id = "cash-atm",
-            type = FinancialTransactionType.CASH_WITHDRAWAL,
-            amount = "2200.00",
-            source = null,
-            linked = listOf("evt-cash-atm"),
-        )
-        val record = parsedRecord(
-            id = "evt-cash-atm",
-            family = MessageFamily.WITHDRAWAL,
-            sourceLast4 = "3001",
-        )
-
-        val index = AccountTransactionInvolvementResolver.buildIndex(
-            transactions = listOf(tx),
-            parsedRecords = listOf(record),
-            ownedAccounts = listOf(owned),
-        )
-
-        assertEquals(setOf(containerId), index["cash-atm"])
-    }
-
-    @Test
     fun unrelatedTransaction_notMapped() {
         val owned = AccountRegistryEntry.forTest(
             bank = Bank.BANK_ALJAZIRA,

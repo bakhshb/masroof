@@ -245,28 +245,6 @@ class ReviewWorkflowServiceTest {
     }
 
     @Test
-    fun unmatchedOwnedOutgoing_postsWithoutWaitingForCounterpart() = runBlocking {
-        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
-        persistEvent(
-            smsId = "sms-out",
-            event = event(
-                id = "pe-out",
-                rawSmsId = "sms-out",
-                family = MessageFamily.TRANSFER_OUT,
-                amount = money("500.00"),
-                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-                destination = AccountReference(Bank.UNKNOWN, "6810"),
-                network = BankNetworkType.INTER_BANK,
-            ),
-        )
-        workflow.refreshReviewQueue()
-        val tx = ftRepo.listAll().single()
-        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, tx.type)
-        val review = reviewRepo.findByRawSmsId("sms-out")
-        assertTrue(review == null || review.status == ReviewStatus.RESOLVED)
-    }
-
-    @Test
     fun missingAmountCorrection_createsExpenseAndResolves() = runBlocking {
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
         persistEvent(

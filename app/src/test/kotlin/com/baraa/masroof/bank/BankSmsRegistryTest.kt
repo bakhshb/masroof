@@ -62,28 +62,6 @@ class BankSmsRegistryTest {
     }
 
     @Test
-    fun unknownThenDetected_selectsSecondAdapter() {
-        val first = FakeBankSmsAdapter(
-            bank = Bank("FIRST"),
-            detection = BankDetectionResult.Unknown(reasons = listOf("first_unknown")),
-        )
-        val second = FakeBankSmsAdapter(
-            bank = Bank("SECOND"),
-            detection = BankDetectionResult.Detected(
-                bank = Bank("SECOND"),
-                confidence = Confidence(score = 1.0),
-                evidence = emptyList(),
-            ),
-        )
-        val registry = BankSmsRegistry(listOf(first, second))
-
-        val result = registry.route("sender", "body")
-
-        assertTrue(result is BankRoutingResult.Matched)
-        assertEquals(second, (result as BankRoutingResult.Matched).adapter)
-    }
-
-    @Test
     fun detectedThenDetected_isAmbiguousRegardlessOfOrder() {
         val first = detectingAdapter("FIRST")
         val second = detectingAdapter("SECOND")

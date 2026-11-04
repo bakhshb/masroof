@@ -78,6 +78,7 @@ class MasroofDatabasePersistenceTest {
         assertEquals(RawSmsInsertResult.AlreadyExists, rawSmsRepo.insertIfAbsent(sms))
         assertEquals(RawSmsInsertResult.AlreadyExists, rawSmsRepo.insertIfAbsent(sms.copy(id = "r2-other")))
         assertEquals(1, db.rawSmsDao().count())
+        assertEquals(sms, rawSmsRepo.getById("r2"))
     }
 
     @Test
@@ -107,6 +108,7 @@ class MasroofDatabasePersistenceTest {
         assertEquals(RawSmsInsertResult.Inserted, rawSmsRepo.insertIfAbsent(a))
         assertEquals(RawSmsInsertResult.AlreadyExists, rawSmsRepo.insertIfAbsent(b))
         assertEquals(a, rawSmsRepo.findByDeviceMessageId("device-9"))
+        assertNull(rawSmsRepo.getById("d2"))
     }
 
     @Test

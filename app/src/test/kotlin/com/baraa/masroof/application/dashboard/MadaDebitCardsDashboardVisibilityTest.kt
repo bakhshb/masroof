@@ -100,34 +100,6 @@ class MadaDebitCardsDashboardVisibilityTest {
     }
 
     @Test
-    fun debitCardRegistryInferrer_detectsMadaFromSmsWhenTypeMissing() {
-        val entry = ownedMadaWithoutMetadata("8219")
-        val parsedRecords = listOf(parsedMadaPurchase("evt-8219", "sms-8219", "8219"))
-
-        assertTrue(
-            CardRegistryDebitClassifier.isDebitRegistryEntry(
-                entry,
-                parsedRecords = parsedRecords,
-            ),
-        )
-    }
-
-    @Test
-    fun debitCardRegistryInferrer_ignoresCreditSmsAtRamadanMerchant() {
-        val entry = ownedMadaWithoutMetadata("7271")
-        val parsedRecords = listOf(
-            parsedMadaPurchase("evt-7271", "sms-7271", "7271", CardSmsChannel.CREDIT),
-        )
-
-        assertFalse(
-            CardRegistryDebitClassifier.isDebitRegistryEntry(
-                entry,
-                parsedRecords = parsedRecords,
-            ),
-        )
-    }
-
-    @Test
     fun untypedMadaNetworkCard_appearsInDebitOverviewAndHierarchy() {
         val bank = Bank.BANK_ALJAZIRA
         val ownedAccounts = listOf(

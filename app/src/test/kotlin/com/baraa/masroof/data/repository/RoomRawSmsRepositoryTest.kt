@@ -59,14 +59,6 @@ class RoomRawSmsRepositoryTest {
     }
 
     @Test
-    fun duplicateInsert_doesNotAddAnotherId() = runBlocking {
-        val row = raw("sms-a", "2026-08-01T10:00:00Z")
-        assertEquals(RawSmsInsertResult.Inserted, repo.insertIfAbsent(row))
-        assertEquals(RawSmsInsertResult.AlreadyExists, repo.insertIfAbsent(row))
-        assertEquals(listOf("sms-a"), repo.listIdsByReceivedAt())
-    }
-
-    @Test
     fun listIdsAwaitingProcessing_excludesRowsWithParsedEventOrReview() = runBlocking {
         val parsed = raw("sms-parsed", "2026-08-01T10:00:00Z", PURCHASE_BODY)
         val reviewed = raw("sms-reviewed", "2026-08-02T10:00:00Z")

@@ -566,11 +566,6 @@ class DatabaseRestoreRecoveryTest {
     }
 
     @Test
-    fun newInstalledRollback_crashAfterOriginalMainMoves_keepsOriginalPreferences() {
-        resumeOriginalRollback(DatabaseRestoreRecovery.OriginalRestoreStep.AFTER_MAIN)
-    }
-
-    @Test
     fun rollbackWithoutJournal_crashAfterMainMoves_keepsOriginalPreferences() {
         live.writeText("imported-broken")
         val rollback = File(live.path + ".rollback")

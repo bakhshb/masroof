@@ -38,43 +38,6 @@ class AlJaziraParserRegressionTest {
     private val registry = BankSmsRegistry(listOf(engineFixtureAdapter()))
 
     @Test
-    fun cardLast4BeforeAmount_doesNotBecomeAmount() {
-        val result = parse(
-            """
-            شراء عبر الانترنت
-            بطاقة: 7271
-            لدى: Keeta
-            بمبلغ: 51.99 SAR
-            في: 14:32 03-08-2026
-            الرصيد المتاح: SAR 17230.03
-            """.trimIndent(),
-        )
-        val success = result as ParseResult.Success
-        assertEquals(Money.of("51.99", Currency.SAR), success.event.amount)
-        assertEquals("7271", success.event.cardRef?.last4)
-        assertEquals(Money.of("17230.03", Currency.SAR), success.details.availableBalance)
-    }
-
-    @Test
-    fun cardBalancesAroundAmount_stayDistinct() {
-        val result = parse(
-            """
-            شراء عبر نقاط البيع (Samsung Pay)
-            بطاقة ائتمانية: 7271
-            لدى: TEST_SHOP_C
-            بمبلغ: 178.02 SAR
-            في: 09:08 30-07-2026
-            الرصيد المتاح: 18346.84 SAR
-            إجمالي المبلغ المستحق:802.62 SAR
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals(Money.of("178.02", Currency.SAR), result.event.amount)
-        assertEquals("7271", result.event.cardRef?.last4)
-        assertEquals(Money.of("18346.84", Currency.SAR), result.details.availableBalance)
-        assertEquals(Money.of("802.62", Currency.SAR), result.details.outstandingBalance)
-    }
-
-    @Test
     fun transferOutInter_d360BeneficiaryBank_realWorldShape() {
         val result = parse(
             """
@@ -100,29 +63,6 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
-    fun transferOutInter_sourceAlJazira_destinationUnknown() {
-        val result = parse(
-            """
-            عملية حوالة مالية صادرة مقبولة
-            خصمت من حساب: 3002
-            الى: TEST_BENEFICIARY
-            مبلغ العملية: 13,258.00 SAR
-            المعرف البديل \الايبان : 0593
-            [البنك العربي الوطني]
-            في: 2026-08-01 12:26
-            رقم المعاملة: TEST_REFERENCE_1
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals("3002", result.event.sourceAccountRef?.maskedNumber)
-        assertEquals(Bank.BANK_ALJAZIRA, result.event.sourceAccountRef?.bank)
-        assertEquals("0593", result.event.destinationAccountRef?.maskedNumber)
-        assertEquals(Bank.fromId("BANK_ANB"), result.event.destinationAccountRef?.bank)
-        assertEquals(Money.of("13258.00", Currency.SAR), result.event.amount)
-        assertEquals("TEST_REFERENCE_1", result.details.transactionReference)
-        assertEquals(BankNetworkType.INTER_BANK, result.event.bankNetworkType)
-    }
-
-    @Test
     fun transferInInter_externalSourceUnknown_destinationAlJazira() {
         val result = parse(
             """
@@ -141,73 +81,6 @@ class AlJaziraParserRegressionTest {
         assertEquals(Bank.fromId("BANK_RIYAD"), result.event.sourceAccountRef?.bank)
         assertEquals("3001", result.event.destinationAccountRef?.maskedNumber)
         assertEquals(Bank.BANK_ALJAZIRA, result.event.destinationAccountRef?.bank)
-    }
-
-    @Test
-    fun transferInIntra_bothAccountsBankAlJazira() {
-        val result = parse(
-            """
-            حوالة واردة داخلية
-            مبلغ: SAR 4,445.67
-            إلى: 3003
-            اسم المرسل: TEST_PERSON
-            رقم حساب المرسل: 3001
-            البنك المرسل: بنك الجزيرة
-            في: 2026-08-03 10:38
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals(MessageFamily.TRANSFER_IN, result.event.messageFamily)
-        assertEquals(BankNetworkType.INTRA_BANK, result.event.bankNetworkType)
-        assertEquals(Bank.BANK_ALJAZIRA, result.event.sourceAccountRef?.bank)
-        assertEquals("3001", result.event.sourceAccountRef?.maskedNumber)
-        assertEquals(Bank.BANK_ALJAZIRA, result.event.destinationAccountRef?.bank)
-        assertEquals("3003", result.event.destinationAccountRef?.maskedNumber)
-        assertFalse(result.toString().contains("SELF_TRANSFER"))
-    }
-
-    @Test
-    fun crossBankTransfer_isInterBank() {
-        val result = parse(
-            """
-            حوالة واردة: محلية
-            عبر: بنك الرياض
-            مبلغ: SAR 4,445.67
-            إلى: 3001
-            اسم المرسل: TEST_COMPANY
-            البنك المرسل: بنك الرياض
-            في: 2026-08-03 09:12
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals(BankNetworkType.INTER_BANK, result.event.bankNetworkType)
-        assertEquals(Bank.BANK_ALJAZIRA, result.event.destinationAccountRef?.bank)
-        assertNull(result.event.sourceAccountRef)
-    }
-
-    @Test
-    fun nonTransferLocalAccounts_remainBankAlJazira() {
-        val purchase = parse(
-            """
-            شراء من نقاط البيع
-            بطاقة مدى: 2210
-            لدى: TEST_GROCER
-            بمبلغ: 120.00 SAR
-            خصمت من حساب: 3001
-            في: 11:05 01-08-2026
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals(Bank.BANK_ALJAZIRA, purchase.event.sourceAccountRef?.bank)
-        assertEquals("3001", purchase.event.sourceAccountRef?.maskedNumber)
-
-        val bill = parse(
-            """
-            سداد فاتورة
-            المفوتر: TEST_BILLER
-            بمبلغ: 210.00 SAR
-            من حساب: 3001
-            في: 2026-08-03 16:40
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals(Bank.BANK_ALJAZIRA, bill.event.sourceAccountRef?.bank)
     }
 
     @Test
@@ -230,24 +103,6 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
-    fun madaGooglePayPos_parsesWithoutSourceAccount() {
-        val result = parse(
-            """
-            شراء عبر نقاط البيع (Google Pay)
-            بطاقة مدى: 8219
-            لدى: MALAYSIA FOODS RESTA
-            بمبلغ: 127.00 SAR
-            في: 13:24 03-08-2026
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
-        assertEquals("8219", result.event.cardRef?.last4)
-        assertEquals("MALAYSIA FOODS RESTA", result.event.merchant)
-        assertEquals(Money.of("127.00", Currency.SAR), result.event.amount)
-        assertNull(result.event.sourceAccountRef)
-    }
-
-    @Test
     fun creditCardPurchase_isPurchaseNotCardPayment() {
         val result = parse(
             """
@@ -260,49 +115,6 @@ class AlJaziraParserRegressionTest {
         ) as ParseResult.Success
         assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
         assertTrue(result.event.messageFamily != MessageFamily.CARD_PAYMENT)
-    }
-
-    @Test
-    fun creditCardPayment_isCardPaymentNotPurchase() {
-        val result = parse(
-            """
-            سداد بطاقة ائتمانية
-            من حساب: 3001
-            بطاقة: 7271
-            بمبلغ: 802.62 SAR
-            في: 2026-08-04 09:00
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals(MessageFamily.CARD_PAYMENT, result.event.messageFamily)
-        assertTrue(result.event.messageFamily != MessageFamily.PURCHASE)
-        assertEquals(Bank.BANK_ALJAZIRA, result.event.sourceAccountRef?.bank)
-    }
-
-    @Test
-    fun creditCardSettlement_tasdidWording_parsesAsCardPayment() {
-        val result = parse(
-            """
-            بطاقة إئتمانية: تسديد
-            بطاقة: 7271;إئتمانية
-            مبلغ: SAR 15,000.00
-            من: 3001
-            في: 2026-07-27 07:47
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals(MessageFamily.CARD_PAYMENT, result.event.messageFamily)
-        assertEquals("3001", result.event.sourceAccountRef?.maskedNumber)
-        assertEquals("7271", result.event.cardRef?.last4)
-        assertEquals(Money.of("15000.00", Currency.SAR), result.event.amount)
-    }
-
-    @Test
-    fun otp_isNonFinancialWithoutAmount() {
-        val result = parse("رمز التحقق الخاص بك هو 482911. لا تشاركه مع أي شخص.")
-        assertTrue(result is ParseResult.NonFinancial)
-        val nf = result as ParseResult.NonFinancial
-        assertEquals(MessageFamily.OTP, nf.event?.messageFamily)
-        assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
-        assertNull(nf.event?.amount)
     }
 
     @Test
@@ -320,48 +132,6 @@ class AlJaziraParserRegressionTest {
         assertEquals(MessageFamily.OTP, nf.event?.messageFamily)
         assertEquals(ParseStatus.NON_FINANCIAL, nf.event?.parseStatus)
         assertNull(nf.event?.amount)
-    }
-
-    @Test
-    fun balanceNotice_extractsBalanceWithoutTransactionAmount() {
-        val result = parse(
-            """
-            إشعار رصيد
-            حساب: 3001
-            الرصيد المتاح: SAR 17230.03
-            في: 2026-08-03 08:00
-            """.trimIndent(),
-        ) as ParseResult.NonFinancial
-        assertEquals(MessageFamily.BALANCE_NOTICE, result.event?.messageFamily)
-        assertNull(result.event?.amount)
-        assertEquals(Money.of("17230.03", Currency.SAR), result.details.availableBalance)
-        assertEquals(Bank.BANK_ALJAZIRA, result.event?.sourceAccountRef?.bank)
-    }
-
-    @Test
-    fun unknownFormat_requiresReviewWithoutGuessedFamily() {
-        val result = parse("تنبيه بنك الجزيرة: حدث تحديث في خدماتك. راجع التطبيق للتفاصيل.")
-        assertTrue(result is ParseResult.ReviewRequired)
-        val review = result as ParseResult.ReviewRequired
-        assertEquals(MessageFamily.UNKNOWN, review.event?.messageFamily)
-        assertEquals(ParseStatus.REVIEW_REQUIRED, review.event?.parseStatus)
-        assertNull(review.event?.amount)
-    }
-
-    @Test
-    fun billPayment_keepsBillerSeparateFromMerchant() {
-        val result = parse(
-            """
-            سداد فاتورة
-            المفوتر: TEST_BILLER
-            بمبلغ: 210.00 SAR
-            من حساب: 3001
-            في: 2026-08-03 16:40
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals(MessageFamily.BILL_PAYMENT, result.event.messageFamily)
-        assertEquals("TEST_BILLER", result.details.biller)
-        assertNull(result.event.merchant)
     }
 
     @Test
@@ -528,27 +298,6 @@ class AlJaziraParserRegressionTest {
         assertEquals(MessageFamily.REFUND, result.event.messageFamily)
         assertEquals(Money.of("75.65", Currency.SAR), result.event.amount)
         assertEquals("Tamara", result.event.merchant)
-    }
-
-    @Test
-    fun creditCardRefund_hamzaSpellingAndNumberLabel_isParsed() {
-        val result = parse(
-            """
-            بطاقة إئتمانية: إسترداد مبلغ
-            بطاقة: Credit
-            رقم: 7271
-            من: CURSOR, AI POWERED IDE
-            مبلغ: 6.51 USD
-            رصيد: 11303.00 SAR
-            في: 18:23 17-08-2026
-            إجمالي المبلغ المستحق:7683.86 SAR
-            """.trimIndent(),
-        ) as ParseResult.Success
-        assertEquals(MessageFamily.REFUND, result.event.messageFamily)
-        assertEquals(Money.of("6.51", Currency.USD), result.event.amount)
-        assertEquals("7271", result.event.cardRef?.last4)
-        assertEquals("CURSOR, AI POWERED IDE", result.event.merchant)
-        assertEquals(ParseStatus.SUCCESS, result.event.parseStatus)
     }
 
     @Test

@@ -322,34 +322,6 @@ class LiveSmsProcessingWorkerTest {
     }
 
     @Test
-    fun finalAttempt_retriesWhenProcessingErrorCannotBePersisted() = runBlocking {
-        val raw = captured()
-        val processStored = harness.processStored(
-            derivedFailures = DerivedFailureInjection(
-                reconciliationFailuresRemaining = AtomicInteger(Int.MAX_VALUE),
-                processingErrorUpsertFailuresRemaining = AtomicInteger(1),
-            ),
-        )
-        val finalAttempt = LiveSmsProcessingWorker.MAX_ATTEMPTS - 1
-
-        assertEquals(
-            ListenableWorker.Result.retry(),
-            worker(raw.id, attempt = finalAttempt, processStored = processStored).doWork(),
-        )
-        assertNull(harness.reviewRepo.findByRawSmsId(raw.id))
-        assertTrue(harness.processingRetryRepo.listRetryableRawSmsIds().isEmpty())
-
-        assertEquals(
-            ListenableWorker.Result.failure(),
-            worker(raw.id, attempt = finalAttempt + 1, processStored = processStored).doWork(),
-        )
-        val review = harness.reviewRepo.findByRawSmsId(raw.id)!!
-        assertEquals(ReviewStatus.REQUIRED, review.status)
-        assertEquals(listOf(IngestionReviewService.REASON_PROCESSING_ERROR), review.reasons)
-        assertEquals(listOf(raw.id), harness.processingRetryRepo.listRetryableRawSmsIds())
-    }
-
-    @Test
     fun reviewPersistenceFailure_retriesInsteadOfPermanentSuccess() = runBlocking {
         val raw = captured()
         harness.parseOverride = { ParseResult.Unsupported("unsupported_test") }

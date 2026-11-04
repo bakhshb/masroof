@@ -94,6 +94,13 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
         assertEquals(fixture.id, Bank.BANK_ALJAZIRA, e.bank)
         assertEquals(fixture.id, MessageFamily.valueOf(expected.messageFamily), e.messageFamily)
         assertEquals(fixture.id, ParseStatus.valueOf(expected.parseStatus), e.parseStatus)
+        val expectedResult = when (e.parseStatus) {
+            ParseStatus.SUCCESS -> ParseResult.Success::class.java
+            ParseStatus.NON_FINANCIAL -> ParseResult.NonFinancial::class.java
+            ParseStatus.REVIEW_REQUIRED -> ParseResult.ReviewRequired::class.java
+            else -> null
+        }
+        expectedResult?.let { assertTrue("${fixture.id}: $result", it.isInstance(result)) }
 
         assertEquals(fixture.id, expected.direction?.let { MoneyDirection.valueOf(it) }, e.direction)
         assertEquals(fixture.id, expected.purchaseChannel?.let { PurchaseChannel.valueOf(it) }, e.purchaseChannel)

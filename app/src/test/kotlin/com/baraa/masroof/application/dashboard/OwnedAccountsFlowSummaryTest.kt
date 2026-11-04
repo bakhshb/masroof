@@ -66,40 +66,7 @@ class OwnedAccountsFlowSummaryTest {
       SignedMoneyAmount.of(Money.of("3000.00", Currency.SAR)),
       fleet.externalSummary()?.remaining,
     )
-  }
-
-  @Test
-  fun fleetTotalRemaining_matchesSumOfPerAccountCashPositions() {
-    val account1 = "account:bank_aljazira:3001"
-    val account2 = "account:bank_aljazira:3002"
-    val account3 = "account:bank_aljazira:3003"
-    val transactions = listOf(
-      tx("a1-in", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "10000", dest = account1),
-      tx("a2-in", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "5000", dest = account2),
-      tx("a1-self", FinancialTransactionType.SELF_TRANSFER, "5000", source = account1, dest = account2),
-      tx("a2-self", FinancialTransactionType.SELF_TRANSFER, "1000", source = account2, dest = account3),
-      tx("a1-pos", FinancialTransactionType.EXPENSE, "5000", source = account1),
-      tx("a2-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "7000", source = account2),
-    )
-
-    val fleet = AccountsSummary.fromSummaries(
-      accounts = listOf(
-        Bank.BANK_ALJAZIRA to "3001",
-        Bank.BANK_ALJAZIRA to "3002",
-        Bank.BANK_ALJAZIRA to "3003",
-      ),
-      summaries = listOf(
-        summarizeAccount(account1, transactions),
-        summarizeAccount(account2, transactions),
-        summarizeAccount(account3, transactions),
-      ),
-    )
-
-    val sumOfCashPositions = fleet.accounts
-      .map { it.cashPosition }
-      .reduce { acc, position -> acc.plus(position) }
-
-    assertEquals(fleet.totalRemaining, sumOfCashPositions)
+    assertEquals(fleet.totalRemaining, fleet.accounts.map { it.cashPosition }.reduce { acc, position -> acc.plus(position) })
   }
 
   @Test

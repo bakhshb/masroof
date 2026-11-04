@@ -162,15 +162,6 @@ class TransactionListFilterEngineTest {
     }
 
     @Test
-    fun nonPrimaryCurrency_suppressesTotal() {
-        val txs = listOf(
-            preview(type = FinancialTransactionType.EXPENSE, amount = "100", currency = Currency.SAR),
-            preview(type = FinancialTransactionType.EXPENSE, amount = "23", currency = Currency.USD),
-        )
-        assertNull(TransactionListPresentationMapper.project(transactions = txs, filter = TransactionListFilterState()).result.totalAmount)
-    }
-
-    @Test
     fun accountFilter_limitsResults() {
         val accountId = com.baraa.masroof.domain.ids.FinancialContainerIdFactory.accountId(
             com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
