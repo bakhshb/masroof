@@ -170,7 +170,8 @@ class FoldModalWindowJourneyTest {
         } } catch (failure: Throwable) {
             println("WINDOW kind=$kind profile=$profile requested=$requestedWindow last=$lastMeasurement")
             lastFailure?.let { failure.addSuppressed(it); println("WINDOW last failure: $it") }
-            capture("$kind-$language-$appearance-$profile-failure")
+            // A failing screenshot must not hide the geometry failure itself.
+            runCatching { capture("$kind-$language-$appearance-$profile-failure") }.exceptionOrNull()?.let(failure::addSuppressed)
             throw failure
         }
         // All geometry assertions above use the same immutable measurement.

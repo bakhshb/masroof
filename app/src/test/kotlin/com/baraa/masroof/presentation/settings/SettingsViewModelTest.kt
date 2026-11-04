@@ -117,7 +117,7 @@ class SettingsViewModelTest {
     fun renamingOwnedEntitiesOnlyUpdatesTheirLabels() = runTest {
         val cards = FakeCardRegistry(CardRegistryEntry.forTest(Bank.BANK_ALJAZIRA, "1234"))
         val accounts = FakeAccountRegistry(AccountRegistryEntry.forTest(Bank.BANK_ALJAZIRA, "3001"))
-        val vm = viewModel(cards = cards, accounts = accounts)
+        val vm = viewModel(cards = cards, accounts = accounts, onReconcileOwnership = { error("no financial pass expected") })
         vm.refresh()
         advanceUntilIdle()
         vm.openRenameCard(vm.uiState.value.followedCards.single())
@@ -134,7 +134,7 @@ class SettingsViewModelTest {
 
     @Test
     fun completedReparseReloadsRegistriesWithoutAnotherFinancialPass() = runTest {
-        val vm = viewModel()
+        val vm = viewModel(onReconcileOwnership = { error("no financial pass expected") })
         vm.reparseStoredMessages()
         advanceUntilIdle()
         assertNull(vm.uiState.value.error)
@@ -146,6 +146,7 @@ class SettingsViewModelTest {
         var granted = false
         val vm = viewModel(
             permissionStateProvider = { granted },
+            onReconcileOwnership = { error("no financial pass expected") },
         )
         vm.refreshSmsPermissionState()
         assertFalse(vm.uiState.value.smsPermissionGranted)

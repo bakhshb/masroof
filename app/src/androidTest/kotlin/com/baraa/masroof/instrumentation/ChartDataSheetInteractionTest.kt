@@ -32,7 +32,7 @@ class ChartDataSheetInteractionTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private fun capture(name: String) {
         val profile = InstrumentationRegistry.getArguments().getString("profile") ?: "phone"
-        ScreenshotArtifactWriter.capture(compose, "chart-data-sheets/$profile", name)
+        ScreenshotArtifactWriter.capture(compose, "chart-data-sheets/$profile", name.lowercase())
     }
     private fun assertActionsFit() {
         val sheet = compose.onNodeWithTag("masroof-bottom-sheet").fetchSemanticsNode().boundsInRoot

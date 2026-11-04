@@ -145,6 +145,6 @@ class AccountCreditChartInteractionTest {
     }
 
     private fun capture(name: String) {
-        ScreenshotArtifactWriter.publish(compose.onRoot().captureToImage().asAndroidBitmap(), "account-credit-chart-review", name)
+        ScreenshotArtifactWriter.publish(compose.onRoot().captureToImage().asAndroidBitmap(), "account-credit-chart-review", name.lowercase())
     }
 }
