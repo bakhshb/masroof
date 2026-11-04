@@ -5,8 +5,6 @@ import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.parsing.model.isDebitCardSms
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /**
  * Shared rules for Mada salary-period spending: POS purchases, cash withdrawals, and refunds.
@@ -81,36 +79,11 @@ object DebitCardSpendClassifier {
         ) {
             return false
         }
-        if (isExcludedDebitSpend(tx, context)) return false
-        return linkedRecords(tx, context).any { record -> isDebitSpendRecord(record, context) }
-    }
-
-    private fun isDebitSpendRecord(
-        record: ParsedEventRecord,
-        context: AccountFlowClassificationContext,
-    ): Boolean {
-        if (!record.details.isDebitCardSms()) return false
-        return when (record.event.messageFamily) {
-            MessageFamily.PURCHASE,
-            MessageFamily.WITHDRAWAL,
-            -> true
-            else -> false
-        }
-    }
-
-    private fun isExcludedDebitSpend(
-        tx: FinancialTransaction,
-        context: AccountFlowClassificationContext,
-    ): Boolean {
-        if (tx.type == FinancialTransactionType.BILL_PAYMENT ||
-            tx.type == FinancialTransactionType.CREDIT_CARD_PAYMENT
-        ) {
-            return true
-        }
-        return linkedRecords(tx, context).any { record ->
+        val paymentLinked = linkedRecords(tx, context).any { record ->
             record.event.messageFamily == MessageFamily.BILL_PAYMENT ||
                 record.event.messageFamily == MessageFamily.CARD_PAYMENT
         }
+        return !paymentLinked &&
+            CurrentAccountTransactionScope.isDebitCardAttributedTransaction(tx, context.parsedRecordsById)
     }
-
 }
