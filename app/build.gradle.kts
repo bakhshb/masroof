@@ -172,9 +172,7 @@ dependencies {
     androidTestImplementation(testFixtures(project(":bank-engine")))
 
     testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.work.testing)
