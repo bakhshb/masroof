@@ -25,7 +25,6 @@ import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.SmsParseInput
-import com.baraa.masroof.parsing.finalize.ParseFinalizer
 import com.baraa.masroof.parsing.validator.AutomaticUsePolicy
 import com.baraa.masroof.parsing.validator.DefaultParsedEventValidator
 import org.junit.Assert.assertEquals

@@ -18,15 +18,9 @@ import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewStatus
-import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
-import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 import kotlinx.coroutines.CompletableDeferred
-import com.baraa.masroof.application.sms.SmsScanFailure
-import com.baraa.masroof.application.sms.SmsScanResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher

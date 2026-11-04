@@ -3,9 +3,6 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.testsupport.EmptyRawSmsRepository
 import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
 import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.domain.repository.FinancialTransactionRepository
-import com.baraa.masroof.domain.repository.RawSmsInsertResult
-import com.baraa.masroof.domain.repository.RawSmsRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

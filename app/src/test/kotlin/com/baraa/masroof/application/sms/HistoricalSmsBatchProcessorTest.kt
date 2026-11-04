@@ -33,7 +33,6 @@ import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
-import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver

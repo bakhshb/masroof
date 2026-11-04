@@ -5,7 +5,6 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardRole
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.OwnershipStatus

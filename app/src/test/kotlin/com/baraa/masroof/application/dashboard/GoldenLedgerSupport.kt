@@ -34,16 +34,11 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 
-/**
- * Independent expected numbers for the golden ledger. Pending scenarios keep a named
- * owner milestone and a pinned observation of the current defect. They are not JUnit
- * assumptions: when the ledger matches the oracle, the owner must turn the scenario ACTIVE.
- */
+/** Independent expected numbers for the golden ledger. */
 @Serializable
 data class GoldenLedgerScenario(
     val id: String,
     val status: String,
-    val ownerMilestone: String? = null,
     val periodAnchor: String,
     val description: String,
     val ownedAccounts: List<GoldenOwnedAccount> = emptyList(),
@@ -51,7 +46,6 @@ data class GoldenLedgerScenario(
     val messages: List<GoldenMessage> = emptyList(),
     val seedRows: List<GoldenSeedRow> = emptyList(),
     val expected: GoldenExpected,
-    val knownDefect: GoldenKnownDefect? = null,
 )
 
 @Serializable
@@ -136,12 +130,6 @@ data class GoldenAccountTotals(
     val salary: String = "0.00",
     val otherIncome: String = "0.00",
     val cashPosition: String,
-)
-
-@Serializable
-data class GoldenKnownDefect(
-    val ownerMilestone: String,
-    val signals: Map<String, String>,
 )
 
 data class GoldenLedgerSnapshot(
@@ -231,7 +219,6 @@ object GoldenLedgerCorpus {
 
 object GoldenLedgerRunner {
     private val zone: ZoneId = ZoneId.of("Asia/Riyadh")
-    private val accountMetricPattern = Regex("""account:([^:]+):([^:]+):([A-Za-z]+)""")
 
     suspend fun prepare(world: DashboardLedgerWorld, scenario: GoldenLedgerScenario) {
         for (account in scenario.ownedAccounts) {
@@ -380,36 +367,7 @@ object GoldenLedgerRunner {
         }
     }
 
-    fun expectedMetric(expected: GoldenExpected, key: String): String? = when (key) {
-        "rawSmsCount" -> expected.rawSmsCount.toString()
-        "parsedCount" -> expected.parsed.size.toString()
-        "transactionCount" -> expected.transactions.size.toString()
-        "displayedRowCount" -> expected.displayedRows.size.toString()
-        "accountsFleetInflow" -> expected.accountsFleetInflow
-        "accountsFleetOutflow" -> expected.accountsFleetOutflow
-        "accountsFleetRemaining" -> expected.accountsFleetRemaining
-        "spendingGross" -> expected.spendingGross
-        "excludedOtherCurrencyCount" -> expected.excludedOtherCurrencyCount?.toString()
-        else -> accountMetric(expected, key)
-    }
 
-    private fun accountMetric(expected: GoldenExpected, key: String): String? {
-        val match = accountMetricPattern.matchEntire(key) ?: return null
-        val account = expected.accounts.singleOrNull {
-            it.bank == match.groupValues[1] && it.masked == match.groupValues[2]
-        } ?: return null
-        return when (match.groupValues[3]) {
-            "selfTransfersIn" -> account.selfTransfersIn
-            "selfTransfersOut" -> account.selfTransfersOut
-            "posPurchases" -> account.posPurchases
-            "externalTransfersOut" -> account.externalTransfersOut
-            "externalTransfersIn" -> account.externalTransfersIn
-            "salary" -> account.salary
-            "otherIncome" -> account.otherIncome
-            "cashPosition" -> account.cashPosition
-            else -> null
-        }
-    }
 
     private suspend fun seed(world: DashboardLedgerWorld, row: GoldenSeedRow) {
         val raw = AndroidSmsMapper.toRawSms(toProviderRow(row))

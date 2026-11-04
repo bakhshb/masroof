@@ -4,9 +4,6 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.AccountType
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.CardRegistryEntry
-import com.baraa.masroof.domain.model.CardRole
-import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

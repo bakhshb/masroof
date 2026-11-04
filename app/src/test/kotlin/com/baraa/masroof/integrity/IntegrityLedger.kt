@@ -3,7 +3,6 @@ package com.baraa.masroof.integrity
 import com.baraa.masroof.application.dashboard.GoldenExpected
 import com.baraa.masroof.application.dashboard.GoldenLedgerRunner
 import com.baraa.masroof.application.dashboard.GoldenLedgerScenario
-import com.baraa.masroof.application.dashboard.GoldenLedgerSnapshot
 import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
@@ -59,7 +58,6 @@ import kotlin.random.Random
  */
 internal object IntegritySeeds {
     const val FORWARD = 20261009
-    const val REVERSE = 20261010
     const val LIVE_INBOX = 151515
     const val INSIDE_WINDOW = 180055
     const val AFTER_WINDOW = 200011
@@ -464,15 +462,12 @@ internal suspend fun assertFinancialInvariants(
     world: DashboardLedgerWorld,
     seed: Int,
     label: String,
-    retriesMustBeClear: Boolean = true,
 ) {
     val prefix = "seed=$seed $label"
     val retryIds = RoomProcessingRetryRepository(world.db.processingRetryDao())
         .listRetryableRawSmsIds()
         .toSet()
-    if (retriesMustBeClear) {
-        assertTrue("$prefix retry rows remain $retryIds", retryIds.isEmpty())
-    }
+    assertTrue("$prefix retry rows remain $retryIds", retryIds.isEmpty())
     val corrections = RoomUserCorrectionRepository(world.db.userCorrectionDao())
     val linkOwners = linkedMapOf<String, String>()
     for (transaction in world.ftRepo.listAll()) {

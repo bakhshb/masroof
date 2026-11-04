@@ -8,8 +8,6 @@ import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.repository.CommitmentRepository
-import com.baraa.masroof.domain.repository.FinancialTransactionRepository
-import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals

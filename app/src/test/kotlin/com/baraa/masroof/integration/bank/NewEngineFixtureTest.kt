@@ -1,6 +1,5 @@
 package com.baraa.masroof.integration.bank
 
-import com.baraa.masroof.engine.bank.MessageInput
 import com.baraa.masroof.engine.bank.interpretation.RuleInterpreter
 import com.baraa.masroof.engine.bank.rules.AlJaziraRuleProfile
 import com.baraa.masroof.finance.value.BankId

@@ -19,7 +19,6 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
-import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.PurchaseChannel

@@ -7,7 +7,6 @@ import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
 import com.baraa.masroof.finance.value.BankId
 import java.time.Instant
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

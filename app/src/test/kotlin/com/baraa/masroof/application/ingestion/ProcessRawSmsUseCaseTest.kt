@@ -11,7 +11,6 @@ import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.testsupport.EngineFixtureParser
-import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
@@ -42,7 +41,6 @@ import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.parser.SmsParseGateway
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper

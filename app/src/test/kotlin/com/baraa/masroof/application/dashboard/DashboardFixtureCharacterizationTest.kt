@@ -6,7 +6,6 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardRegistryEntry
-import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType

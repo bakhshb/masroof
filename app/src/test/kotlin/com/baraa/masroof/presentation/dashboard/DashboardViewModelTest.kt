@@ -28,7 +28,6 @@ import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.FinancialTransaction

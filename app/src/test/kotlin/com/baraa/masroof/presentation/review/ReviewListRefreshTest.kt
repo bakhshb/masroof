@@ -3,7 +3,6 @@ package com.baraa.masroof.presentation.review
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewDetailLoader
 import com.baraa.masroof.application.review.ReviewOwnershipWorkflow

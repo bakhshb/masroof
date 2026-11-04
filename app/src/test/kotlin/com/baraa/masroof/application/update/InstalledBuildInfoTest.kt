@@ -1,6 +1,5 @@
 package com.baraa.masroof.application.update
 
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

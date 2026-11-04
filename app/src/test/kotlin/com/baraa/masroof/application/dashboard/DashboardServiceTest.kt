@@ -17,7 +17,6 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
-import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
@@ -26,9 +25,7 @@ import com.baraa.masroof.testsupport.NoOpCommitmentRepository
 import com.baraa.masroof.testsupport.WriteRejectingFinancialTransactionRepository
 import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
-import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
-import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.domain.model.ParsedEvent
