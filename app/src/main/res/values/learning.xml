@@ -14,9 +14,6 @@
     <string name="learning_reason_pending">لم يكتمل تحميل الدليل أو القرار؛ سيُعاد التحقق.</string>
     <string name="learning_reason_cleaning">صياغة الرسالة غير مؤهلة لاستخراج خصائص تدريب آمنة.</string>
     <string name="learning_reason_ambiguous">النوع المالي المختار لا يكفي وحده لتحديد عائلة الرسالة.</string>
-    <string name="learning_counts">رسائل وصلت للمساعد: %1$d · اقتُرحت لها عائلة: %2$d · فهم محفوظ بمساعدته: %3$d · مرتبطة بحركة مسجلة: %4$d · في المراجعة: %5$d</string>
-    <string name="learning_feedback_counts">قرارات مستخدمة: %1$d · قوالب ممنوعة: %2$d · تعديلات مستبعدة: %3$d · اقتراحات لاحقة خالفت تصحيحًا مؤكدًا: %4$d · قرارات بانتظار الدليل: %5$d</string>
-    <string name="learning_exclusion_count">%1$s (%2$d)</string>
     <string name="learning_counts_hint">الأعداد من السجل المتاح، وليست نسبة دقة. غياب التصحيح لا يثبت صحة الاقتراح، وقد تكون بعض قرارات الماضي غير قابلة للإثبات.</string>
     <string name="learning_forecast_title">التوقع المنشور مقابل الفعلي</string>
     <string name="learning_forecast_periods">فترات مقارنة مكتملة ومؤهلة: %1$d</string>

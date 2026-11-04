@@ -24,7 +24,38 @@ import java.time.LocalDate
     MasroofCard(Modifier.clickable(onClick = onOpen).testTag("analysis-quality-entry")) {
         MasroofSectionHeader(stringResource(qualityStatusRes(snapshot)),
             onViewAll = onOpen, viewAllLabel = stringResource(R.string.analysis_quality_open))
-        Text(stringResource(R.string.lab_analysis_quality_coverage, snapshot.quality.coveredDays, snapshot.completedPeriods), style = MaterialTheme.typography.bodySmall)
+        PersonalReadinessRings(snapshot)
+    }
+}
+
+/** Progress toward the personal model's fixed history requirements, as rings. */
+@Composable internal fun PersonalReadinessRings(snapshot: AnalysisSnapshot) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        snapshot.quality.consecutiveCompleteDays?.let { count ->
+            com.baraa.masroof.ui.components.MasroofProgressRing(fraction(count.toLong(), PERSONAL_DAYS.toLong()),
+                AppDigits.display(stringResource(R.string.analysis_progress, count, PERSONAL_DAYS)), stringResource(R.string.analysis_personal_days))
+        }
+        com.baraa.masroof.ui.components.MasroofProgressRing(fraction(snapshot.completedPeriods.toLong(), PERSONAL_PERIODS.toLong()),
+            AppDigits.display(stringResource(R.string.analysis_progress, snapshot.completedPeriods, PERSONAL_PERIODS)),
+            stringResource(R.string.analysis_personal_periods), color = com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.card)
+    }
+}
+
+/** Requirements the forecaster applies before fitting a personal model (PurchaseForecaster). */
+internal const val PERSONAL_DAYS = 120
+internal const val PERSONAL_PERIODS = 4
+
+/** Average error per horizon as bars; the badge says whether estimates usually ran low or high. */
+@Composable internal fun ForecastErrorBars(evaluations: List<AnalysisEvaluation>) {
+    if (evaluations.isEmpty()) { Text(stringResource(R.string.lab_analysis_evaluation_missing), style = MaterialTheme.typography.bodySmall); return }
+    val maximum = evaluations.maxOf { it.mae }
+    evaluations.forEach { e ->
+        com.baraa.masroof.ui.components.MasroofValueBarRow(AppDigits.display(stringResource(R.string.analysis_error_horizon, e.horizon)),
+            AppDigits.display(stringResource(R.string.analysis_error_value, visualMoney(e.mae))), fraction(e.mae, maximum),
+            Modifier.testTag("forecast-error-${e.horizon}"),
+            subtitle = AppDigits.display(stringResource(if (e.bias > 0) R.string.analysis_error_low else R.string.analysis_error_high,
+                e.count, visualMoney(kotlin.math.abs(e.bias)))),
+            style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
     }
 }
 
@@ -42,6 +73,8 @@ import java.time.LocalDate
                     forecastHelp(s, state.updating || state.unavailable), Modifier.testTag("forecast-explanation-open"))
             }
             s.total?.let { Amount(stringResource(R.string.lab_analysis_expected_total), it, MasroofAmountRole.Hero) }
+            if (explanation.underestimates) MasroofBadge(stringResource(R.string.analysis_forecast_runs_low), MasroofCardAccent.Liability,
+                Modifier.testTag("forecast-runs-low"))
             s.remaining?.let { remaining -> MasroofForecastSplit(analysisAmount(s.actual).amount, analysisAmount(remaining).amount,
                 AppDigits.display("${stringResource(R.string.lab_analysis_actual)} ${visualMoney(s.actual)} · ${stringResource(R.string.lab_analysis_remaining)} ${visualMoney(remaining)}")) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
@@ -78,8 +111,7 @@ import java.time.LocalDate
     MasroofCard(Modifier.clickable(onClick = onPerformance).testTag("analysis-performance-entry")) {
         MasroofSectionHeader(stringResource(R.string.analysis_performance_open), icon = MasroofIcons.analysis,
             onViewAll = onPerformance, viewAllLabel = stringResource(R.string.lab_analysis_open))
-        Text(stringResource(R.string.analysis_performance_subtitle), style = MaterialTheme.typography.bodySmall)
-        Text(stringResource(R.string.lab_analysis_updated, timestamp(s.issuedAt)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ForecastErrorBars(explanation.evaluations)
     }
 }
 
@@ -87,11 +119,19 @@ import java.time.LocalDate
     val explanation = workflow.comparisonExplanation()
     MasroofCard {
         Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
-            MasroofSectionHeader(stringResource(R.string.learning_forecast_title))
+            MasroofGuidanceLabel(stringResource(R.string.learning_forecast_title), listOf(stringResource(R.string.learning_forecast_hint),
+                stringResource(R.string.lab_analysis_history_hint)).joinToString("\n\n"),
+                style = MaterialTheme.typography.titleMedium, contentColor = MaterialTheme.colorScheme.onSurface)
             if (explanation.status != ForecastComparisonStatus.READY) {
                 Text(stringResource(R.string.analysis_comparison_empty), style = MaterialTheme.typography.titleSmall)
-                explanation.anchorDay?.let { MasroofTimelineRow(stringResource(R.string.analysis_anchor_date, day(it)), stringResource(R.string.learning_forecast_hint), active = false) }
-                explanation.enabledDay?.let { MasroofTimelineRow(stringResource(R.string.analysis_enabled_date, day(it)), stringResource(R.string.lab_analysis_history_hint)) }
+                // Steps in time order: recording on, comparison window open, personal model ready.
+                explanation.enabledDay?.let { MasroofTimelineRow(AppDigits.display(stringResource(R.string.analysis_enabled_date, day(it))), "") }
+                explanation.anchorDay?.let { MasroofTimelineRow(AppDigits.display(stringResource(R.string.analysis_anchor_date, day(it))), "",
+                    active = explanation.status != ForecastComparisonStatus.WAITING_FOR_ANCHOR) }
+                state.snapshot?.let { s -> MasroofTimelineRow(stringResource(R.string.analysis_personal_readiness),
+                    AppDigits.display(listOfNotNull(s.quality.consecutiveCompleteDays?.let { stringResource(R.string.analysis_progress, it, PERSONAL_DAYS) },
+                        stringResource(R.string.analysis_progress, s.completedPeriods, PERSONAL_PERIODS)).joinToString(" · ")),
+                    active = s.method != "WEEKDAY_MEDIAN") }
                 val reason = when (explanation.status) {
                     ForecastComparisonStatus.AWAITING_ELIGIBLE_FORECAST -> R.string.analysis_wait_eligible
                     ForecastComparisonStatus.WAITING_FOR_ANCHOR -> R.string.analysis_wait_anchor
@@ -129,8 +169,10 @@ private fun forecastMethodResource(method: ForecastMethod): Int = when (method) 
 @Composable private fun ForecastEvaluationSummary(snapshot: AnalysisSnapshot) {
     val evaluations = remember(snapshot) { AnalysisPresentationBuilder.forecast(snapshot).evaluations }
     MasroofCard(Modifier.testTag("forecast-horizon-errors")) {
-        MasroofSectionHeader(stringResource(R.string.personal_forecast_errors))
-        if (evaluations.isEmpty()) Text(stringResource(R.string.lab_analysis_evaluation_missing))
-        evaluations.forEach { e -> Text(stringResource(R.string.personal_forecast_error_row, e.horizon, visualMoney(e.mae), e.count)) }
+        Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
+            MasroofGuidanceLabel(stringResource(R.string.personal_forecast_errors), stringResource(R.string.lab_analysis_evaluation_hint),
+                style = MaterialTheme.typography.titleMedium, contentColor = MaterialTheme.colorScheme.onSurface)
+            ForecastErrorBars(evaluations)
+        }
     }
 }

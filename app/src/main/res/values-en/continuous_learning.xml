@@ -2,7 +2,6 @@
     <string name="learning_distinct_origins">Statistical suggestions: %1$d · Templates from your corrections: %2$d</string>
     <string name="learning_personal_used">Your personal message model is in use after passing evaluation.</string>
     <string name="learning_personal_collecting">Learning from your corrections; personal generalization needs enough independent examples and evaluations.</string>
-    <string name="learning_personal_examples">Training templates: %1$d · Independent validation templates: %2$d</string>
     <string name="recurring_personal_used">Using your personal recurring model after passing evaluation.</string>
     <string name="recurring_seed_used">Using the pretrained recurring model and learning locally from your decisions.</string>
     <string name="recurring_rules_used">Using recurrence rules for now. The learned model needs sufficient data and evaluations.</string>

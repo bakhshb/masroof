@@ -29,7 +29,7 @@ fun MasroofTimelineRow(title: String, subtitle: String, modifier: Modifier = Mod
             .background(if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, MasroofBadgeShape))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (subtitle.isNotEmpty()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

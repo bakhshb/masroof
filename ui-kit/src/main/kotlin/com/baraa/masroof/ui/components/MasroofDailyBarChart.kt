@@ -22,11 +22,12 @@ data class MasroofDailyBar(val value: BigDecimal?, val expected: Boolean, val la
 
 @Composable
 fun MasroofDailyBarChart(points: List<MasroofDailyBar>, selectedIndex: Int, onSelected: (Int) -> Unit,
-    previousLabel: String, nextLabel: String, axisValue: (BigDecimal) -> String, modifier: Modifier = Modifier) {
+    previousLabel: String, nextLabel: String, axisValue: (BigDecimal) -> String, modifier: Modifier = Modifier,
+    average: BigDecimal? = null) {
     if (points.isEmpty()) return
     val axisIndices = androidx.compose.runtime.remember(points.size) { MasroofAnalyticsChartMath.axisIndices(points.size) }
     val selected = selectedIndex.coerceIn(points.indices)
-    val range = MasroofLineChart.referenceRange(points.mapNotNull { it.value })
+    val range = MasroofLineChart.referenceRange(points.mapNotNull { it.value } + listOfNotNull(average))
     val actualColor = MasroofThemeExtras.extendedColors.outflow
     val futureColor = MaterialTheme.colorScheme.primary
     val gridColor = MaterialTheme.colorScheme.outlineVariant
@@ -60,6 +61,11 @@ fun MasroofDailyBarChart(points: List<MasroofDailyBar>, selectedIndex: Int, onSe
             drawLine(gridColor, Offset(inset, yy), Offset(inset + width, yy), MasroofSpacing.borderWidth.toPx())
             val label = measurer.measure(axisValue(value), textStyle)
             drawText(label, topLeft = Offset((inset - label.size.width - MasroofSpacing.inlineGap.toPx()).coerceAtLeast(0f), yy - label.size.height / 2))
+        }
+        // Dashed like the Home average line; the caller states the average in text as well.
+        average?.let { value ->
+            drawLine(textColor, Offset(inset, y(value)), Offset(inset + width, y(value)), MasroofSpacing.borderWidth.toPx(),
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(MasroofSpacing.smallGap.toPx(), MasroofSpacing.inlineGap.toPx())))
         }
         points.forEachIndexed { index, point ->
             val x = inset + MasroofAnalyticsChartMath.barSlot(index, points.size, mirror) * cell + cell * (1 - MasroofAnalyticsTokens.barWidthFraction) / 2

@@ -22,7 +22,6 @@ import com.baraa.masroof.presentation.common.MasroofText as Text
 
 @Composable internal fun AnalysisSpendingExplanation(snapshot: AnalysisSnapshot, onOpenGroup: (String) -> Unit) {
     if (snapshot.insights == null) return
-    AnalysisComparisonCard(snapshot)
     MasroofCard(Modifier.testTag("analysis-spending-explanation")) {
         AnalysisComponentBars(snapshot, onOpenGroup)
     }
@@ -66,12 +65,7 @@ internal fun qualityStatusRes(snapshot: AnalysisSnapshot): Int = when {
                 if (snapshot.status == "READY") stringResource(forecastReasonResource(snapshot.modelReason)) else null).joinToString("\n\n")
             MasroofGuidanceLabel(stringResource(R.string.analysis_personal_readiness), readinessHelp,
                 style = MaterialTheme.typography.titleMedium, contentColor = MaterialTheme.colorScheme.onSurface)
-            quality.consecutiveCompleteDays?.let { count -> com.baraa.masroof.ui.components.MasroofValueBarRow(
-                stringResource(R.string.analysis_personal_days), com.baraa.masroof.application.locale.AppDigits.display(stringResource(R.string.analysis_progress, count, 120)), fraction(count.toLong(), 120),
-                style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default) }
-            com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.analysis_personal_periods),
-                com.baraa.masroof.application.locale.AppDigits.display(stringResource(R.string.analysis_progress, snapshot.completedPeriods, 4)), fraction(snapshot.completedPeriods.toLong(), 4),
-                style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
+            PersonalReadinessRings(snapshot)
         }
     }
     MasroofCard {
@@ -97,8 +91,19 @@ internal fun qualityStatusRes(snapshot: AnalysisSnapshot): Int = when {
             }
         }
 
-            Text(stringResource(R.string.analysis_used_count, quality.used), style = MaterialTheme.typography.titleSmall)
-            Text(stringResource(R.string.analysis_outside_count, quality.excluded["OUTSIDE_PURCHASE_SCOPE"].orEmpty().size), style = MaterialTheme.typography.bodySmall)
+            val outside = quality.excluded["OUTSIDE_PURCHASE_SCOPE"].orEmpty().size
+            com.baraa.masroof.ui.components.MasroofStackedBar(listOf(
+                com.baraa.masroof.ui.components.MasroofStackedPart(quality.used.toFloat(), MaterialTheme.colorScheme.primary),
+                com.baraa.masroof.ui.components.MasroofStackedPart(outside.toFloat(), MaterialTheme.colorScheme.outline)),
+                com.baraa.masroof.application.locale.AppDigits.display("${stringResource(R.string.analysis_used_count, quality.used)} · ${stringResource(R.string.analysis_outside_count, outside)}"))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(com.baraa.masroof.application.locale.AppDigits.display(stringResource(R.string.analysis_used_count, quality.used)),
+                    style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Text(com.baraa.masroof.application.locale.AppDigits.display(stringResource(R.string.analysis_outside_count, outside)),
+                    style = MaterialTheme.typography.bodySmall)
+            }
+            if (quality.unusual.isNotEmpty()) MasroofBadge(com.baraa.masroof.application.locale.AppDigits.display(
+                stringResource(R.string.analysis_unusual_kept, quality.unusual.size)), MasroofCardAccent.Liability)
             quality.excluded.filterKeys { it !in setOf("OUTSIDE_PURCHASE_SCOPE", "DUPLICATE_ID") }.forEach { (reason, ids) ->
                 EvidenceGroup(ids, stringResource(if (reason == "FUTURE_DATE") R.string.lab_analysis_excluded_future else R.string.lab_analysis_excluded_amount), workflow, snapshot.sourceHash, onOpenTransaction)
             }
@@ -110,8 +115,7 @@ internal fun qualityStatusRes(snapshot: AnalysisSnapshot): Int = when {
                 MasroofGuidanceLabel(stringResource(R.string.lab_analysis_quality_counts, quality.used, quality.coveredDays, snapshot.completedPeriods, quality.pendingReviews), stringResource(R.string.lab_analysis_quality_counts_hint), style = MaterialTheme.typography.bodySmall)
                 MasroofGuidanceLabel(stringResource(R.string.lab_analysis_scope_title), stringResource(R.string.lab_analysis_scope))
                 MasroofGuidanceLabel(stringResource(R.string.lab_analysis_evaluation), stringResource(R.string.lab_analysis_evaluation_hint))
-                if (snapshot.evaluations.isEmpty()) Text(stringResource(R.string.lab_analysis_evaluation_missing), style = MaterialTheme.typography.bodySmall)
-                snapshot.evaluations.forEach { e -> Text(stringResource(R.string.lab_analysis_evaluation_row, e.horizon, e.count, visualMoney(e.mae), visualMoney(e.bias)), style = MaterialTheme.typography.bodySmall) }
+                ForecastErrorBars(snapshot.evaluations.sortedBy { it.horizon })
             }
         }
     }
@@ -131,22 +135,64 @@ internal fun forecastReasonResource(reason: String?): Int = when (reason) {
 
 @Composable internal fun MessageLearningInsights(state: AnalysisUiState) {
     state.learning?.let { learning ->
+        val digits = com.baraa.masroof.application.locale.AppDigits::display
+        val bar = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default
         MasroofCard(Modifier.testTag("learning-insights")) {
-            MasroofGuidanceLabel(stringResource(R.string.learning_title), stringResource(R.string.learning_counts_hint),
-                style = MaterialTheme.typography.titleSmall)
-            if(learning.pending) Text(stringResource(R.string.learning_pending), style = MaterialTheme.typography.bodySmall)
-            else if(learning.statisticalFamilies == 0) Text(stringResource(R.string.learning_statistical_paused), style = MaterialTheme.typography.bodySmall)
-            else Text(stringResource(R.string.learning_statistical_active,learning.statisticalFamilies), style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(R.string.learning_distinct_origins, learning.statisticalSuggestions, learning.templateSuggestions), style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(if (learning.personalUsed) R.string.learning_personal_used else R.string.learning_personal_collecting), style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(R.string.learning_personal_examples, learning.trainingTemplates, learning.validationTemplates), style = MaterialTheme.typography.bodySmall)
-            Text(if (learning.personalReason == "NEEDS_EVALUATIONS") stringResource(R.string.learning_needs_examples_count,
-                learning.validationTemplates, learning.requiredValidationTemplates)
-                else stringResource(personalLearningReason(learning.personalReason)), style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(R.string.learning_counts, learning.attempted, learning.suggested, learning.understood, learning.posted, learning.awaitingReview), style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(R.string.learning_feedback_counts, learning.learned, learning.blocked, learning.excluded, learning.repeatedContradictions, learning.pendingDecisions), style = MaterialTheme.typography.bodySmall)
-            learning.exclusions.forEach { (reason,count) -> Text(stringResource(R.string.learning_exclusion_count,
-                stringResource(com.baraa.masroof.presentation.interpretation.learningReasonResource(reason)),count), style = MaterialTheme.typography.bodySmall) }
+            Column(verticalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofSpacing.sectionGap)) {
+                val status = stringResource(when {
+                    learning.pending -> R.string.learning_pending
+                    learning.statisticalFamilies == 0 -> R.string.learning_status_paused
+                    else -> R.string.learning_status_active
+                })
+                // Full wording of the state, the personal-model reason and the suggestion origins stays one tap away.
+                val help = listOf(stringResource(R.string.learning_counts_hint),
+                    if (learning.pending) null else if (learning.statisticalFamilies == 0) stringResource(R.string.learning_statistical_paused)
+                        else stringResource(R.string.learning_statistical_active, learning.statisticalFamilies),
+                    stringResource(R.string.learning_distinct_origins, learning.statisticalSuggestions, learning.templateSuggestions),
+                    stringResource(if (learning.personalUsed) R.string.learning_personal_used else R.string.learning_personal_collecting),
+                    if (learning.personalReason == "NEEDS_EVALUATIONS") stringResource(R.string.learning_needs_examples_count,
+                        learning.validationTemplates, learning.requiredValidationTemplates) else stringResource(personalLearningReason(learning.personalReason)))
+                    .filterNotNull().joinToString("\n\n")
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    MasroofGuidanceLabel(stringResource(R.string.learning_title), help, Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium, contentColor = MaterialTheme.colorScheme.onSurface)
+                    MasroofBadge(status, if (learning.statisticalFamilies == 0 && !learning.pending) MasroofCardAccent.Liability else MasroofCardAccent.Inflow)
+                }
+                MasroofSectionHeader(stringResource(R.string.learning_flow_title))
+                val reached = learning.attempted.toLong()
+                listOf(R.string.learning_flow_reached to learning.attempted, R.string.learning_flow_suggested to learning.suggested,
+                    R.string.learning_flow_understood to learning.understood, R.string.learning_flow_posted to learning.posted,
+                    R.string.learning_flow_review to learning.awaitingReview).forEach { (label, count) ->
+                    com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(label), digits(count.toString()),
+                        fraction(count.toLong(), reached), style = bar)
+                }
+                MasroofSectionHeader(stringResource(R.string.learning_corrections_title))
+                com.baraa.masroof.ui.components.MasroofStackedBar(listOf(
+                    com.baraa.masroof.ui.components.MasroofStackedPart(learning.learned.toFloat(), MaterialTheme.colorScheme.primary),
+                    com.baraa.masroof.ui.components.MasroofStackedPart(learning.excluded.toFloat(), MaterialTheme.colorScheme.outline)),
+                    digits(stringResource(R.string.learning_corrections_split, learning.learned, learning.excluded)))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(digits(stringResource(R.string.learning_corrections_used, learning.learned)), style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary)
+                    Text(digits(stringResource(R.string.learning_corrections_excluded, learning.excluded)), style = MaterialTheme.typography.titleSmall)
+                }
+                val excluded = learning.exclusions.values.sum().toLong()
+                learning.exclusions.forEach { (reason, count) ->
+                    com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(com.baraa.masroof.presentation.interpretation.learningReasonResource(reason)),
+                        digits(count.toString()), fraction(count.toLong(), excluded), previous = true, style = bar)
+                }
+                listOf(R.string.learning_blocked_badge to learning.blocked, R.string.learning_contradictions_badge to learning.repeatedContradictions,
+                    R.string.learning_pending_badge to learning.pendingDecisions).filter { it.second > 0 }.forEach { (label, count) ->
+                    MasroofBadge(digits(stringResource(label, count)), MasroofCardAccent.Liability)
+                }
+                MasroofSectionHeader(stringResource(R.string.learning_templates_title))
+                com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.learning_templates_training),
+                    digits(learning.trainingTemplates.toString()), if (learning.trainingTemplates > 0) 1f else 0f, style = bar)
+                com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.learning_templates_validation),
+                    digits(stringResource(R.string.analysis_progress, learning.validationTemplates, learning.requiredValidationTemplates)),
+                    fraction(learning.validationTemplates.toLong(), learning.requiredValidationTemplates.toLong()),
+                    style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Outflow)
+            }
         }
     }
 }

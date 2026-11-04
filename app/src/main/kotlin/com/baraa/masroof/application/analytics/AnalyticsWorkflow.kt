@@ -295,7 +295,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         val snapshot = AnalysisSnapshot(input.start, input.end, at, input.fingerprint, result.status, result.method,
             result.actual, result.remaining, result.total, result.lower, result.upper,
             input.clean.days.filter { it.day >= input.start }.map { AnalysisDay(it.day, it.net, null) } + futureDays,
-            quality, suggested, input.dues + estimates, input.completed,
+            quality, suggested, (input.dues + estimates).nearestFirst(), input.completed,
             trainingFrom = if (result.method == AnalyticsVersion.MODEL) result.model?.trainedFrom else result.baseline?.from,
             trainingThrough = if (result.method == AnalyticsVersion.MODEL) result.model?.trainedThrough else result.baseline?.through,
             insights = input.insights, evaluations = result.evaluations.map { AnalysisEvaluation(it.horizon, it.count, it.mae, it.bias) },
@@ -480,6 +480,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         }
     }
     fun comparisonExplanation() = AnalysisPresentationBuilder.comparison(state.value, LocalDate.now(clock).toEpochDay(), clock.zone)
+    fun commitmentsView(snapshot: AnalysisSnapshot) = AnalysisPresentationBuilder.commitments(snapshot, LocalDate.now(clock).toEpochDay())
 
     internal suspend fun replayForecasts(): List<ForecastReplayRow> = withContext(Dispatchers.Default) {
         mutex.withLock {

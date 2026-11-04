@@ -10,6 +10,9 @@ import kotlinx.serialization.Serializable
 @Serializable data class AnalysisDue(val id: String, val name: String, val amount: Long, val day: Long?, val confirmed: Boolean,
     val source: com.baraa.masroof.application.dashboard.CommitmentDashboardSource? = null,
     val loanTypeFallback: com.baraa.masroof.domain.model.LoanType? = null)
+
+/** Nearest due first, undated last; stable, so a confirmed due stays ahead of an estimate on the same day. */
+internal fun List<AnalysisDue>.nearestFirst() = sortedWith(compareBy<AnalysisDue> { it.day == null }.thenBy { it.day })
 @Serializable data class AnalysisCandidate(val key: String, val name: String, val amount: Long, val lower: Long,
     val upper: Long, val nextDay: Long, val cadence: String, val sourceIds: List<String>, val latestDay: Long,
     val latestAmount: Long, val referenceAmount: Long?, val increased: Boolean, val overdue: Boolean = false,

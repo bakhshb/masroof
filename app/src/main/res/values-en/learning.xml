@@ -14,9 +14,6 @@
     <string name="learning_reason_pending">Evidence or the decision is not fully available. The update will retry.</string>
     <string name="learning_reason_cleaning">The wording cannot produce eligible, privacy-preserving training features.</string>
     <string name="learning_reason_ambiguous">The selected financial type alone does not identify the message family.</string>
-    <string name="learning_counts">Messages reaching assistance: %1$d · Suggested: %2$d · Persisted assisted understanding: %3$d · Linked to a posted transaction: %4$d · In review: %5$d</string>
-    <string name="learning_feedback_counts">Decisions used: %1$d · Blocked templates: %2$d · Excluded edits: %3$d · Later suggestions contradicting a confirmed correction: %4$d · Decisions awaiting evidence: %5$d</string>
-    <string name="learning_exclusion_count">%1$s (%2$d)</string>
     <string name="learning_counts_hint">Counts reflect available records, not accuracy. No correction does not prove a suggestion correct. Some past decisions cannot be verified.</string>
     <string name="learning_forecast_title">Published forecast versus actual spending</string>
     <string name="learning_forecast_periods">Completed eligible comparison periods: %1$d</string>

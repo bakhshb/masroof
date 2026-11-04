@@ -176,6 +176,28 @@ Dashboard summary and detail pages emit into the `ColumnScope` supplied by
 loading/error gates and `MasroofSpacing.sectionGap`; pages add a nested layout
 only for sections with their own grouping or spacing.
 
+## Analysis screens: visual first (approved 2026-11-04)
+
+A human-approved amendment for Spending, Forecasts, Commitments, data quality, forecast
+accuracy and message-correction insights: each card leads with a chart, a large number or
+a badge; explanations live behind `MasroofGuidance`, never as permanent paragraphs.
+
+- Spending: one hero card holds the actual amount, a direction badge and the equal-length
+  comparison bars. Composition is one `MasroofStackedBar` with clickable rows. History uses
+  `MasroofDailyBarChart` per period with a dashed average line: missing periods keep an empty
+  slot and partly covered periods are striped; no per-period text rows.
+- Forecasts: a liability badge appears only when every qualified horizon's bias says the
+  estimate ran low. Personal-model readiness is two `MasroofProgressRing`s. Horizon errors
+  are bars with tests and direction in the subtitle.
+- Commitments: the confirmed total leads, followed by a stacked bar, a `MasroofDueTimeline`
+  from today to period end, and due rows nearest first with a countdown badge.
+- Message corrections: a status badge, bars for the assistance flow, one stacked bar for used
+  versus excluded corrections and a validation-template progress bar.
+
+Shares, totals and countdowns come from `AnalysisPresentationBuilder`; Compose only
+displays them. New geometry lives in `MasroofAnalyticsTokens`; previews are in the debug
+catalog's shared charts section.
+
 ## Text fitting and documentation captures
 
 `MasroofFitText` scales explicit money spans together with the base font. Shared tab labels also
