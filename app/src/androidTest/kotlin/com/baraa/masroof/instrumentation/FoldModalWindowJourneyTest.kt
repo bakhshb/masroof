@@ -1,7 +1,7 @@
 package com.baraa.masroof.instrumentation
 
+import com.baraa.masroof.testsupport.ScreenshotArtifactWriter
 import android.content.Context
-import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.semantics.SemanticsActions
@@ -15,8 +15,6 @@ import com.baraa.masroof.application.locale.AppLocalePreferences
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.presentation.locale.AppLocaleContext
 import com.baraa.masroof.ui.theme.MasroofSheetTokens
-import java.io.File
-import java.io.FileOutputStream
 import kotlin.math.abs
 import org.junit.Assert.*
 import org.junit.Rule
@@ -185,15 +183,7 @@ class FoldModalWindowJourneyTest {
         }
         capture("$kind-$language-$appearance-$profile")
     }
-    private fun capture(name: String) {
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        android.os.SystemClock.sleep(250)
-        val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "fold-modal-window")
-        dir.mkdirs()
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
-        FileOutputStream(File(dir, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
-    }
+    private fun capture(name: String) = ScreenshotArtifactWriter.capture(compose, "fold-modal-window", name)
     private fun journey(kind: String) {
         awaitShell()
         if (kind == "filter" || kind == "reclassify") {

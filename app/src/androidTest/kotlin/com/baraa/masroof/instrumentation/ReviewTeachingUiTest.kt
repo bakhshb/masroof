@@ -7,7 +7,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.test.platform.app.InstrumentationRegistry
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -66,11 +65,7 @@ class ReviewTeachingUiTest {
             compose.onNodeWithText(body).assertExists()
             compose.onNodeWithTag("review-teach-pattern").assertExists()
             compose.onNodeWithTag("review_resolve_EXPENSE").assertDoesNotExist()
-            compose.waitForIdle()
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-            android.os.SystemClock.sleep(250)
-            ScreenshotArtifactWriter.publish(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot(),
-                "teaching-review", "$locale-${if (isDark) "dark" else "light"}")
+            ScreenshotArtifactWriter.capture(compose, "teaching-review", "$locale-${if (isDark) "dark" else "light"}")
         }
         compose.onNodeWithTag("review-correct-type").performScrollTo().performClick()
         compose.onNodeWithTag("sheet-apply").assertIsNotEnabled()

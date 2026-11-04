@@ -1,6 +1,6 @@
 package com.baraa.masroof.instrumentation
 
-import android.graphics.Bitmap
+import com.baraa.masroof.testsupport.ScreenshotArtifactWriter
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,8 +23,6 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.presentation.dashboard.*
 import com.baraa.masroof.presentation.locale.AppLocaleContext
 import com.baraa.masroof.ui.theme.*
-import java.io.File
-import java.io.FileOutputStream
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -33,16 +31,8 @@ import org.junit.Test
 class ChartDataSheetInteractionTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private fun capture(name: String) {
-        compose.waitForIdle()
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        // Compose's virtual animation clock can finish before SurfaceFlinger presents a dialog frame.
-        android.os.SystemClock.sleep(250)
         val profile = InstrumentationRegistry.getArguments().getString("profile") ?: "phone"
-        val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "chart-data-sheets/$profile")
-        dir.mkdirs()
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
-        FileOutputStream(File(dir, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
+        ScreenshotArtifactWriter.capture(compose, "chart-data-sheets/$profile", name)
     }
     private fun assertActionsFit() {
         val sheet = compose.onNodeWithTag("masroof-bottom-sheet").fetchSemanticsNode().boundsInRoot

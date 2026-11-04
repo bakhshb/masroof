@@ -1,6 +1,6 @@
 package com.baraa.masroof.instrumentation
 
-import android.graphics.Bitmap
+import com.baraa.masroof.testsupport.ScreenshotArtifactWriter
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -15,14 +15,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.test.platform.app.InstrumentationRegistry
 import com.baraa.masroof.R
-import com.baraa.masroof.application.dashboard.DailySpendingTrend
 import com.baraa.masroof.presentation.dashboard.*
 import com.baraa.masroof.presentation.locale.AppLocaleContext
 import com.baraa.masroof.ui.theme.*
-import java.io.File
-import java.io.FileOutputStream
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -149,10 +145,6 @@ class AccountCreditChartInteractionTest {
     }
 
     private fun capture(name: String) {
-        val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "account-credit-chart-review")
-        dir.mkdirs()
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
-        FileOutputStream(File(dir, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
+        ScreenshotArtifactWriter.publish(compose.onRoot().captureToImage().asAndroidBitmap(), "account-credit-chart-review", name)
     }
 }

@@ -1,6 +1,5 @@
 package com.baraa.masroof.instrumentation
 
-import android.os.SystemClock
 import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
@@ -244,13 +243,7 @@ class ApprovedDesignScreenTest {
     private fun capture(name: String) {
         compose.waitForIdle()
         assertNoEasternDigits()
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.waitForIdleSync()
-        // Semantics can settle a frame before the compositor presents it.
-        SystemClock.sleep(250)
-        val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: error("Screenshot missing")
-        try { ScreenshotArtifactWriter.publish(bitmap, "masroof-design-screenshots", name) }
-        finally { bitmap.recycle() }
+        ScreenshotArtifactWriter.capture(compose, "masroof-design-screenshots", name)
     }
 
     private fun assertNoEasternDigits() {

@@ -1,5 +1,6 @@
 package com.baraa.masroof.integration.replica
 
+import com.baraa.masroof.testsupport.ScreenshotArtifactWriter
 import com.baraa.masroof.testsupport.*
 import android.content.res.Configuration
 import androidx.compose.runtime.*
@@ -35,7 +36,6 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
 import java.time.Instant
 import java.util.Locale
 
@@ -236,21 +236,5 @@ class ReportedMessagesJourneyTest {
         } finally {TestRuntime.reset(host)}
     }
 
-    private fun screenshot(name: String) {
-        compose.waitForIdle()
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.waitForIdleSync()
-        android.os.SystemClock.sleep(200)
-        val file=File(host.getExternalFilesDir(null),"reported-fixes/$name.png").apply {parentFile!!.mkdirs()}
-        val ui=instrumentation.uiAutomation
-        val bitmap = requireNotNull(ui.takeScreenshot())
-        file.outputStream().use {bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
-        fun shell(command: String): String {
-            val fd=ui.executeShellCommand(command)
-            return android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().use {it.readText()}
-        }
-        shell("mkdir -p /sdcard/lab-reported-fixes")
-        shell("cp ${file.absolutePath} /sdcard/lab-reported-fixes/$name.png")
-        assertTrue(shell("ls -l /sdcard/lab-reported-fixes/$name.png").trimStart().startsWith("-"))
-    }
+    private fun screenshot(name: String) = ScreenshotArtifactWriter.capture(compose, "reported-fixes", name)
 }
