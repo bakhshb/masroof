@@ -1,10 +1,12 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.application.dashboard.SarEquivalentResolution
 import com.baraa.masroof.application.dashboard.TransactionDisplayEnricher
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.core.money.Currency
+import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
@@ -51,20 +53,13 @@ class ExchangeRateEnrichmentWorkflow(
             .filter { it.amount.currency.convertsToSar() }
         if (pending.isEmpty()) return@withLock ExchangeRateEnrichmentResult(pending = 0, persisted = 0)
 
-        val linkedRawSmsIds = financialTransactionRepository.listRawSmsIdsForTransactions(pending.map { it.id })
-        val parsedRecords = (
-            parsedEventRepository.listByRawSmsIds(linkedRawSmsIds) +
-                parsedEventRepository.listExchangeRateFacts()
-            )
-            .distinctBy { it.event.id }
-            .sortedBy { it.event.id }
-        val rawSmsById = rawSmsRepository.getByIds(parsedRecords.map { it.event.rawSmsId }.distinct())
-            .associateBy { it.id }
-        val resolutions = sarEquivalentResolver.resolve(
-            transactions = TransactionDisplayEnricher.enrichMerchants(pending, parsedRecords),
-            parsedRecords = parsedRecords,
-            rawSmsById = rawSmsById,
-            primaryCurrency = primaryCurrency,
+        val resolutions = resolveSarEquivalents(
+            pending,
+            financialTransactionRepository,
+            parsedEventRepository,
+            rawSmsRepository,
+            sarEquivalentResolver,
+            primaryCurrency,
         )
 
         var persisted = 0
@@ -85,4 +80,30 @@ class ExchangeRateEnrichmentWorkflow(
         }
         ExchangeRateEnrichmentResult(pending = pending.size, persisted = persisted)
     }
+}
+
+/** Loads the linked and exchange-rate SMS evidence for [transactions] and resolves each one to SAR. */
+internal suspend fun resolveSarEquivalents(
+    transactions: List<FinancialTransaction>,
+    financialTransactionRepository: FinancialTransactionRepository,
+    parsedEventRepository: ParsedEventRepository,
+    rawSmsRepository: RawSmsRepository,
+    sarEquivalentResolver: TransactionSarEquivalentResolver,
+    primaryCurrency: Currency,
+): Map<String, SarEquivalentResolution> {
+    val linkedRawSmsIds = financialTransactionRepository.listRawSmsIdsForTransactions(transactions.map { it.id })
+    val parsedRecords = (
+        parsedEventRepository.listByRawSmsIds(linkedRawSmsIds) +
+            parsedEventRepository.listExchangeRateFacts()
+        )
+        .distinctBy { it.event.id }
+        .sortedBy { it.event.id }
+    val rawSmsById = rawSmsRepository.getByIds(parsedRecords.map { it.event.rawSmsId }.distinct())
+        .associateBy { it.id }
+    return sarEquivalentResolver.resolve(
+        transactions = TransactionDisplayEnricher.enrichMerchants(transactions, parsedRecords),
+        parsedRecords = parsedRecords,
+        rawSmsById = rawSmsById,
+        primaryCurrency = primaryCurrency,
+    )
 }
