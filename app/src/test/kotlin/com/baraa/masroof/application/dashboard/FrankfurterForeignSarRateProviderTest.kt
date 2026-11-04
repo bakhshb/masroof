@@ -23,6 +23,7 @@ class FrankfurterForeignSarRateProviderTest {
     private val date = LocalDate.parse("2026-08-03")
 
     private var calls = 0
+    private var now = 0L
 
     private fun provider(body: String, code: Int = 200, failure: IOException? = null) =
         FrankfurterForeignSarRateProvider(
@@ -32,6 +33,7 @@ class FrankfurterForeignSarRateProviderTest {
                 Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
                     .code(code).message("x").body(body.toResponseBody()).build()
             }.build(),
+            nanoTime = { now },
         )
 
     @Test
@@ -55,9 +57,22 @@ class FrankfurterForeignSarRateProviderTest {
     }
 
     @Test
-    fun networkFailure_isNullAndCachedAsMiss() = runBlocking {
+    fun networkFailure_isReusedBrieflyThenRetried() = runBlocking {
         val provider = provider("", failure = IOException("offline"))
         assertNull(provider.rateFor(Currency.USD, date))
+        now += FrankfurterForeignSarRateProvider.FAILURE_RETRY_NANOS - 1
+        assertNull(provider.rateFor(Currency.USD, date))
+        assertEquals(1, calls)
+        now += 1
+        assertNull(provider.rateFor(Currency.USD, date))
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun definitiveMiss_staysCachedPastTheRetryWindow() = runBlocking {
+        val provider = provider("""{"rate":0}""")
+        assertNull(provider.rateFor(Currency.USD, date))
+        now += FrankfurterForeignSarRateProvider.FAILURE_RETRY_NANOS * 10
         assertNull(provider.rateFor(Currency.USD, date))
         assertEquals(1, calls)
     }
