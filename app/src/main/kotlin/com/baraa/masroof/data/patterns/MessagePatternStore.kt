@@ -49,12 +49,7 @@ class MessagePatternStore(private val file: File, private val beforeReplace: () 
                 versions[key] = pattern
             }
         }
-        val updated = bank.copy(patterns = keepRecent(versions.values), deletedPatternIds = deletedIds)
-        val next = MessagePatternConfiguration(Math.addExact(current.generation, 1),
-            current.banks.filterNot { it.bankId == bank.bankId } + updated)
-        val raw = MessagePatternConfigurationCodec.encode(next)
-        replace(raw)
-        MessagePatternConfigurationCodec.decode(raw)
+        write(current, bank.copy(patterns = keepRecent(versions.values), deletedPatternIds = deletedIds))
     }
 
     fun deletePattern(expectedGeneration: Long, bankId: String, patternId: String): MessagePatternConfiguration = synchronized(lock) {

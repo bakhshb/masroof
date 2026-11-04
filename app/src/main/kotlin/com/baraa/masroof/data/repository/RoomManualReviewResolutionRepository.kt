@@ -32,40 +32,8 @@ class RoomManualReviewResolutionRepository(
         resolutionKind: ReviewResolutionKind,
         resolvedAt: Instant,
         validateBeforeWrite: suspend () -> Boolean,
-    ): ManualReviewResolutionResult = accessGate.withAccess {
-        try {
-            database.withTransaction {
-                if (!validateBeforeWrite()) throw ReviewResolutionRollback("transfer_evidence_changed")
-                when (
-                    val save = financialTransactionRepository.save(transaction, rawSmsIds)
-                ) {
-                    is FinancialTransactionSaveResult.Conflict ->
-                        ManualReviewResolutionResult.Conflict(
-                            reason = "link_conflict",
-                            rawSmsId = save.rawSmsId,
-                            existingTransactionId = save.existingTransactionId,
-                        )
-
-                    FinancialTransactionSaveResult.Saved,
-                    FinancialTransactionSaveResult.AlreadyExists,
-                    -> {
-                        val review = resolveRequiredOrRollback(
-                            reviewId = reviewId,
-                            resolutionKind = resolutionKind,
-                            resolvedAt = resolvedAt,
-                            transactionId = transaction.id,
-                        )
-                        ManualReviewResolutionResult.Success(
-                            transaction = transaction,
-                            reviews = listOf(review),
-                        )
-                    }
-                }
-            }
-        } catch (e: ReviewResolutionRollback) {
-            ManualReviewResolutionResult.Failed(e.reason)
-        }
-    }
+    ): ManualReviewResolutionResult =
+        persistResolution(transaction, rawSmsIds, listOf(reviewId), resolutionKind, resolvedAt, validateBeforeWrite)
 
     override suspend fun persistPairResolution(
         transaction: FinancialTransaction,
@@ -74,9 +42,23 @@ class RoomManualReviewResolutionRepository(
         secondReviewId: String,
         resolutionKind: ReviewResolutionKind,
         resolvedAt: Instant,
+    ): ManualReviewResolutionResult =
+        persistResolution(transaction, rawSmsIds, listOf(firstReviewId, secondReviewId), resolutionKind, resolvedAt)
+
+    /** Saves the transaction, then resolves [reviewIds] in order; any review failure rolls back all. */
+    private suspend fun persistResolution(
+        transaction: FinancialTransaction,
+        rawSmsIds: Collection<String>,
+        reviewIds: List<String>,
+        resolutionKind: ReviewResolutionKind,
+        resolvedAt: Instant,
+        validateBeforeWrite: (suspend () -> Boolean)? = null,
     ): ManualReviewResolutionResult = accessGate.withAccess {
         try {
             database.withTransaction {
+                if (validateBeforeWrite != null && !validateBeforeWrite()) {
+                    throw ReviewResolutionRollback("transfer_evidence_changed")
+                }
                 when (
                     val save = financialTransactionRepository.save(transaction, rawSmsIds)
                 ) {
@@ -89,24 +71,17 @@ class RoomManualReviewResolutionRepository(
 
                     FinancialTransactionSaveResult.Saved,
                     FinancialTransactionSaveResult.AlreadyExists,
-                    -> {
-                        val first = resolveRequiredOrRollback(
-                            reviewId = firstReviewId,
-                            resolutionKind = resolutionKind,
-                            resolvedAt = resolvedAt,
-                            transactionId = transaction.id,
-                        )
-                        val second = resolveRequiredOrRollback(
-                            reviewId = secondReviewId,
-                            resolutionKind = resolutionKind,
-                            resolvedAt = resolvedAt,
-                            transactionId = transaction.id,
-                        )
-                        ManualReviewResolutionResult.Success(
-                            transaction = transaction,
-                            reviews = listOf(first, second),
-                        )
-                    }
+                    -> ManualReviewResolutionResult.Success(
+                        transaction = transaction,
+                        reviews = reviewIds.map { reviewId ->
+                            resolveRequiredOrRollback(
+                                reviewId = reviewId,
+                                resolutionKind = resolutionKind,
+                                resolvedAt = resolvedAt,
+                                transactionId = transaction.id,
+                            )
+                        },
+                    )
                 }
             }
         } catch (e: ReviewResolutionRollback) {
