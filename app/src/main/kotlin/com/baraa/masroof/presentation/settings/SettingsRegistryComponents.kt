@@ -124,6 +124,26 @@ internal fun SettingsDeleteOnlyMenu(title: String, enabled: Boolean, onDelete: (
     ))
 }
 
+/** Followed / Unconfirmed / Stopped tabs shared by the accounts, cards and loans screens. */
+@Composable
+internal fun SettingsRegistryTabs(selected: String, onSelect: (String) -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.shortcutGap), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.shortcutGap)) {
+        listOf("followed" to R.string.reference_followed, "unconfirmed" to R.string.reference_unconfirmed,
+            "stopped" to R.string.reference_stopped).forEach { (key, label) ->
+            com.baraa.masroof.presentation.common.MasroofChoice(stringResource(label), selected == key, { onSelect(key) })
+        }
+    }
+}
+
+@Composable
+internal fun SettingsUpdateFailedText() {
+    Text(
+        stringResource(R.string.settings_update_failed),
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+}
+
 @Composable
 fun settingsBankLabel(bank: Bank): String =
     LocalSettingsBankNames.current[bank.id] ?: if (bank == Bank.BANK_ALJAZIRA) {

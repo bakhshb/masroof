@@ -42,7 +42,7 @@ import com.baraa.masroof.presentation.common.toUiLabelRes
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.presentation.common.formatCardLast4
-import com.baraa.masroof.presentation.common.CardOwnershipInlinePrompt
+import com.baraa.masroof.presentation.common.OwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.IconLabelRow
 import com.baraa.masroof.presentation.common.IconTextButton
 import com.baraa.masroof.presentation.common.MasroofCard
@@ -439,7 +439,9 @@ internal fun ReviewDetailScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                CardOwnershipInlinePrompt(
+                OwnershipInlinePrompt(
+                    titleRes = R.string.ownership_prompt_needs_confirm,
+                    confirmRes = R.string.onboarding_is_mine_card,
                     enabled = !resolving,
                     onConfirmOwned = onConfirmOwnershipCardOwned,
                     onMarkExternal = onMarkOwnershipCardExternal,

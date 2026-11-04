@@ -20,7 +20,7 @@ import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.presentation.common.AccountOwnershipInlinePrompt
+import com.baraa.masroof.presentation.common.OwnershipInlinePrompt
 import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofSecondaryScaffold
 
@@ -73,12 +73,7 @@ fun SettingsBankLoansScreen(
                 hint = stringResource(R.string.settings_loans_hint),
                 onOpenBank = onOpenBank,
             )
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.shortcutGap), verticalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.shortcutGap)) {
-                listOf("followed" to R.string.reference_followed, "unconfirmed" to R.string.reference_unconfirmed,
-                    "stopped" to R.string.reference_stopped).forEach { (key, label) ->
-                    com.baraa.masroof.presentation.common.MasroofChoice(stringResource(label), referenceTab == key, { referenceTab = key })
-                }
-            }
+            SettingsRegistryTabs(referenceTab) { referenceTab = it }
 
 
             if (bankLoans.isEmpty()) {
@@ -104,9 +99,10 @@ fun SettingsBankLoansScreen(
                             }
                         },
                         footer = {
-                            AccountOwnershipInlinePrompt(
+                            OwnershipInlinePrompt(
                                 enabled = !state.updating,
                                 titleRes = R.string.settings_loans_unregistered,
+                                confirmRes = R.string.onboarding_is_mine_account,
                                 onConfirmOwned = { onConfirmOwned(loan) },
                                 onMarkExternal = { onMarkExternal(loan) },
                             )
@@ -155,13 +151,7 @@ fun SettingsBankLoansScreen(
                 }
             }
 
-            state.error?.let {
-                Text(
-                    stringResource(R.string.settings_update_failed),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
+            state.error?.let { SettingsUpdateFailedText() }
         }
     }
 }
