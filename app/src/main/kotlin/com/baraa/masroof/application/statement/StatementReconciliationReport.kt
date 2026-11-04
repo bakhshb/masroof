@@ -84,11 +84,5 @@ data class StatementCurrencyTotal(
     val ledgerOnlyCount: Int,
     val ledgerOnlyDebit: BigDecimal,
     val ledgerOnlyCredit: BigDecimal,
-    val ambiguousStatementCount: Int,
-    val ambiguousStatementDebit: BigDecimal,
-    val ambiguousStatementCredit: BigDecimal,
-    val ambiguousLedgerCount: Int,
-    val ambiguousLedgerDebit: BigDecimal,
-    val ambiguousLedgerCredit: BigDecimal,
     val unsupportedCount: Int,
 )
