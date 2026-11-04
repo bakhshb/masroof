@@ -270,6 +270,46 @@ class DatabaseBackupEncryptionTest {
     }
 
     @Test
+    fun verifyAndImport_agreeThatAMalformedEnvelopeIsAnInvalidPackage() = runBlocking {
+        val live = openDatabase()
+        try {
+            insertProbe(live)
+            val service = service(live)
+            val missingPreferences = encryptedPackage(
+                BackupPackageFormat.MANIFEST_ENTRY to byteArrayOf(1),
+                BackupPackageFormat.DATABASE_ENTRY to byteArrayOf(2),
+            )
+            val badManifest = encryptedPackage(
+                BackupPackageFormat.MANIFEST_ENTRY to "not json".toByteArray(),
+                BackupPackageFormat.DATABASE_ENTRY to byteArrayOf(2),
+                BackupPackageFormat.PREFERENCES_ENTRY to byteArrayOf(3),
+            )
+            for (file in listOf(missingPreferences, badManifest)) {
+                assertEquals(BackupVerificationOutcome.INVALID_PACKAGE, service.verify(Uri.fromFile(file), passphrase.copyOf()))
+                assertEquals(BackupImportOutcome.InvalidPackage, service.importFrom(Uri.fromFile(file), passphrase.copyOf()))
+                file.delete()
+            }
+            assertTrue(live.isOpen)
+        } finally { if (live.isOpen) live.close() }
+    }
+
+    private fun encryptedPackage(vararg entries: Pair<String, ByteArray>): File {
+        val file = File(context.cacheDir, "envelope-${System.nanoTime()}.masroof")
+        FileOutputStream(file).use { output ->
+            BackupEnvelope.encrypt(output, passphrase.copyOf(), TEST_KDF_ITERATIONS) { plain ->
+                ZipOutputStream(plain).use { zip ->
+                    entries.forEach { (name, bytes) ->
+                        zip.putNextEntry(ZipEntry(name))
+                        zip.write(bytes)
+                        zip.closeEntry()
+                    }
+                }
+            }
+        }
+        return file
+    }
+
+    @Test
     fun hostileZip_doesNotModifyTheLiveDatabase() {
         runBlocking {
             val live = openDatabase()
