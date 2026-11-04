@@ -23,7 +23,7 @@ object MasroofGuidanceStyle {
     val tourSpotlightRadius = 12.dp
     val backgroundColor: androidx.compose.ui.graphics.Color
         @androidx.compose.runtime.Composable get() =
-            if (androidx.compose.material3.MaterialTheme.colorScheme.background == MasroofDarkColors.Background) {
+            if (masroofIsDark()) {
                 MasroofDarkColors.SurfaceContainerHigh
             } else {
                 MasroofLightColors.Surface

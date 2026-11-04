@@ -9,8 +9,7 @@ enum class MasroofHeroRole { Brand, Account, Card, Liability, Inflow, Outflow }
 /** Paired surfaces and content colors keep the approved heroes readable in both modes. */
 @Composable
 fun approvedHeroColors(role: MasroofHeroRole): Pair<Color, Color> {
-    val dark = MaterialTheme.colorScheme.background == MasroofDarkColors.Background
-    return heroColors(role, dark)
+    return heroColors(role, masroofIsDark())
 }
 
 internal fun heroColors(role: MasroofHeroRole, dark: Boolean): Pair<Color, Color> =

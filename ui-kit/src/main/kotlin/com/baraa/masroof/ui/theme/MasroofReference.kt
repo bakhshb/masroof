@@ -96,7 +96,7 @@ object MasroofReference {
 
     @Composable
     fun chartColor(role: MasroofHeroRole): Color {
-        val dark = MaterialTheme.colorScheme.background == MasroofDarkColors.Background
+        val dark = masroofIsDark()
         return when (role) {
             MasroofHeroRole.Account -> if (dark) accountChartDark else accountChartLight
             MasroofHeroRole.Card -> if (dark) creditChartDark else creditChartLight
@@ -106,5 +106,5 @@ object MasroofReference {
 
     @Composable
     fun selectedNavigationColor(): Color =
-        if (MaterialTheme.colorScheme.background == MasroofDarkColors.Background) navDark else navLight
+        if (masroofIsDark()) navDark else navLight
 }
