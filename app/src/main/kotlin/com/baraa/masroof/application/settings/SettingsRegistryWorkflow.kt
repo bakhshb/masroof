@@ -95,10 +95,6 @@ class SettingsRegistryWorkflow(
         accountRegistryRepository.updateDisplayName(account, displayName)
     }
 
-    suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) {
-        cardRegistryRepository.linkDebitToAccount(card, account)
-    }
-
     suspend fun updateAccountType(account: AccountReference, accountType: AccountType) {
         accountRegistryRepository.updateAccountType(account, accountType)
     }

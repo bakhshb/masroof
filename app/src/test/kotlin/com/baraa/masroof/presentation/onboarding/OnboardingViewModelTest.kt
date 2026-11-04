@@ -786,16 +786,6 @@ AccountRegistryEntry.forTest(
         override suspend fun updateCardNetwork(reference: CardReference, network: CardNetwork?) = Unit
 
         override suspend fun updateCardType(reference: CardReference, cardType: CardType?) = Unit
-
-        override suspend fun linkDebitToAccount(card: CardReference, account: AccountReference) = Unit
-
-        override suspend fun markAsDebit(reference: CardReference) = Unit
-
-        override suspend fun setPrimaryCard(reference: CardReference) = Unit
-
-        override suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String) = Unit
-
-        override suspend fun clearCardRole(reference: CardReference) = Unit
     }
 
     private class FakeReviewRepo : ReviewRepository {

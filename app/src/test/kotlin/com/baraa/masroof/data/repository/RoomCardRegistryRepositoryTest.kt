@@ -27,9 +27,9 @@ class RoomCardRegistryRepositoryTest {
         val bank = Bank.BANK_ALJAZIRA
         seedCard("1111", CardRole.PRIMARY)
         seedCard("2222", CardRole.STANDALONE)
-        repository.setSupplementaryCard(CardReference(bank, "2222"), "1111")
+        repository.configure(CardReference(bank, "2222"), com.baraa.masroof.domain.model.CardConfiguration(null, CardType.CREDIT, CardRole.SUPPLEMENTARY, "1111"))
         seedCard("3333", CardRole.STANDALONE)
-        repository.markAsDebit(CardReference(bank, "3333"))
+        markLegacyDebit("3333")
         database.cardRegistryDao().updateLinkedAccount(bank.id, "3333", bank.id, "3001")
         val others = repository.listAll().filter { it.last4 != "3333" }
         repository.configure(CardReference(bank, "3333"), com.baraa.masroof.domain.model.CardConfiguration(
@@ -47,7 +47,7 @@ class RoomCardRegistryRepositoryTest {
         val bank = Bank.BANK_ALJAZIRA
         seedCard("1111", CardRole.PRIMARY)
         seedCard("2222", CardRole.STANDALONE)
-        repository.setSupplementaryCard(CardReference(bank, "2222"), "1111")
+        repository.configure(CardReference(bank, "2222"), com.baraa.masroof.domain.model.CardConfiguration(null, CardType.CREDIT, CardRole.SUPPLEMENTARY, "1111"))
         database.cardRegistryDao().insertFacilityIfAbsent("preserved-facility", bank.id, "1111")
         database.cardRegistryDao().updateCreditFacilityId(bank.id, "1111", "preserved-facility")
         database.cardRegistryDao().updateCreditFacilityId(bank.id, "2222", "preserved-facility")
@@ -107,9 +107,9 @@ class RoomCardRegistryRepositoryTest {
         val bank = Bank.BANK_ALJAZIRA
         seedCard("1111", CardRole.PRIMARY)
         seedCard("2222", CardRole.STANDALONE)
-        repository.setSupplementaryCard(CardReference(bank, "2222"), "1111")
+        repository.configure(CardReference(bank, "2222"), com.baraa.masroof.domain.model.CardConfiguration(null, CardType.CREDIT, CardRole.SUPPLEMENTARY, "1111"))
         seedCard("3333", CardRole.STANDALONE)
-        repository.markAsDebit(CardReference(bank, "3333"))
+        markLegacyDebit("3333")
         database.cardRegistryDao().updateLinkedAccount(bank.id, "3333", bank.id, "3001")
         val others = repository.listAll().filter { it.last4 != "3333" }
         val tx = com.baraa.masroof.data.room.entity.FinancialTransactionEntity("preserved-tx", "EXPENSE", "42.00", "SAR", 1000,
@@ -147,7 +147,7 @@ class RoomCardRegistryRepositoryTest {
         val bank = Bank.BANK_ALJAZIRA
         seedCard("1111", CardRole.PRIMARY)
         seedCard("2222", CardRole.STANDALONE)
-        repository.setSupplementaryCard(CardReference(bank, "2222"), "1111")
+        repository.configure(CardReference(bank, "2222"), com.baraa.masroof.domain.model.CardConfiguration(null, CardType.CREDIT, CardRole.SUPPLEMENTARY, "1111"))
         val before = repository.listAll()
         assertThrows(IllegalArgumentException::class.java) { runBlocking {
             repository.configure(CardReference(bank, "1111"), com.baraa.masroof.domain.model.CardConfiguration(
@@ -166,6 +166,10 @@ class RoomCardRegistryRepositoryTest {
             com.baraa.masroof.domain.model.CardConfiguration(com.baraa.masroof.domain.model.CardNetwork.VISA, CardType.CREDIT,
                 CardRole.SUPPLEMENTARY, "missing"),
             com.baraa.masroof.domain.model.CardConfiguration(com.baraa.masroof.domain.model.CardNetwork.MADA, CardType.CREDIT, CardRole.PRIMARY),
+            com.baraa.masroof.domain.model.CardConfiguration(null, CardType.CREDIT, CardRole.SUPPLEMENTARY, "1111"),
+            com.baraa.masroof.domain.model.CardConfiguration(com.baraa.masroof.domain.model.CardNetwork.MADA, CardType.DEBIT,
+                linkedAccount = com.baraa.masroof.domain.model.AccountReference(Bank("D360"), "3001")),
+            com.baraa.masroof.domain.model.CardConfiguration(com.baraa.masroof.domain.model.CardNetwork.MADA, CardType.DEBIT, CardRole.PRIMARY),
         )
         invalid.forEach { draft ->
             assertThrows(IllegalArgumentException::class.java) { runBlocking { repository.configure(CardReference(bank, "1111"), draft) } }
@@ -206,169 +210,19 @@ class RoomCardRegistryRepositoryTest {
         database.close()
     }
 
-    @Test
-    fun setPrimaryCard_demotesExistingPrimary() = runBlocking {
-        seedCard("1111", CardRole.PRIMARY)
-        seedCard("2222", CardRole.STANDALONE)
-
-        repository.setPrimaryCard(CardReference(Bank.BANK_ALJAZIRA, "2222"))
-
-        val cards = repository.listAll().associateBy { it.last4 }
-        assertEquals(CardRole.STANDALONE, cards.getValue("1111").cardRole)
-        assertEquals(CardRole.PRIMARY, cards.getValue("2222").cardRole)
-    }
-
-    @Test
-    fun setSupplementaryCard_rejectsSelfParent() {
-        runBlocking {
-            seedCard("1111", CardRole.PRIMARY)
-
-            assertThrows(IllegalArgumentException::class.java) {
-                runBlocking {
-                    repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "1111"), "1111")
-                }
-            }
-        }
-    }
-
-    @Test
-    fun setSupplementaryCard_rejectsMissingPrimary() {
-        runBlocking {
-            seedCard("2222", CardRole.STANDALONE)
-
-            assertThrows(IllegalArgumentException::class.java) {
-                runBlocking {
-                    repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "2222"), "9999")
-                }
-            }
-        }
-    }
-
-    @Test
-    fun clearCardRole_onPrimary_detachesSupplementaries() = runBlocking {
-        seedCard("1111", CardRole.PRIMARY)
-        repository.observe(CardReference(Bank.BANK_ALJAZIRA, "2222"), "sms-2222")
-        repository.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "2222"), OwnershipStatus.OWNED)
-        repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "2222"), "1111")
-
-        repository.clearCardRole(CardReference(Bank.BANK_ALJAZIRA, "1111"))
-
-        val supplement = repository.get(CardReference(Bank.BANK_ALJAZIRA, "2222"))!!
-        assertEquals(CardRole.STANDALONE, supplement.cardRole)
-        assertEquals(null, supplement.parentCardLast4)
-    }
-
-    @Test
-    fun setPrimaryCard_demotesPrimaryAndDetachesSupplementaries() = runBlocking {
-        seedCard("1111", CardRole.PRIMARY)
-        repository.observe(CardReference(Bank.BANK_ALJAZIRA, "2222"), "sms-2222")
-        repository.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "2222"), OwnershipStatus.OWNED)
-        repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "2222"), "1111")
-        repository.observe(CardReference(Bank.BANK_ALJAZIRA, "3333"), "sms-3333")
-        repository.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "3333"), OwnershipStatus.OWNED)
-        repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "3333"), "1111")
-        seedCard("4444", CardRole.STANDALONE)
-
-        repository.setPrimaryCard(CardReference(Bank.BANK_ALJAZIRA, "4444"))
-
-        val cards = repository.listAll().associateBy { it.last4 }
-        assertEquals(CardRole.STANDALONE, cards.getValue("1111").cardRole)
-        assertEquals(CardRole.STANDALONE, cards.getValue("2222").cardRole)
-        assertEquals(null, cards.getValue("2222").parentCardLast4)
-        assertEquals(CardRole.STANDALONE, cards.getValue("3333").cardRole)
-        assertEquals(CardRole.PRIMARY, cards.getValue("4444").cardRole)
-    }
-
-    @Test
-    fun setSupplementaryCard_onPrimaryWithChildren_detachesChildren() = runBlocking {
-        seedCard("1111", CardRole.PRIMARY)
-        repository.observe(CardReference(Bank.BANK_ALJAZIRA, "2222"), "sms-2222")
-        repository.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "2222"), OwnershipStatus.OWNED)
-        repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "2222"), "1111")
-        seedCard("3333", CardRole.PRIMARY)
-
-        repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "1111"), "3333")
-
-        val cards = repository.listAll().associateBy { it.last4 }
-        assertEquals(CardRole.SUPPLEMENTARY, cards.getValue("1111").cardRole)
-        assertEquals("3333", cards.getValue("1111").parentCardLast4)
-        assertEquals(CardRole.STANDALONE, cards.getValue("2222").cardRole)
-        assertEquals(null, cards.getValue("2222").parentCardLast4)
-    }
-
-    @Test
-    fun linkDebitToAccount_rejectsCrossBank() {
-        runBlocking {
-            seedCard("1111", CardRole.STANDALONE)
-
-            assertThrows(IllegalArgumentException::class.java) {
-                runBlocking {
-                    repository.linkDebitToAccount(
-                        CardReference(Bank.BANK_ALJAZIRA, "1111"),
-                        com.baraa.masroof.domain.model.AccountReference(
-                            Bank("D360"),
-                            "3001",
-                        ),
-                    )
-                }
-            }
-        }
-    }
-
-    @Test
-    fun linkDebitToAccount_clearsPrimaryRoleAndChildren() = runBlocking {
-        seedCard("1111", CardRole.PRIMARY)
-        repository.observe(CardReference(Bank.BANK_ALJAZIRA, "2222"), "sms-2222")
-        repository.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "2222"), OwnershipStatus.OWNED)
-        repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "2222"), "1111")
-
-        repository.linkDebitToAccount(
-            CardReference(Bank.BANK_ALJAZIRA, "1111"),
-            com.baraa.masroof.domain.model.AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-        )
-
-        val cards = repository.listAll().associateBy { it.last4 }
-        assertEquals(CardType.DEBIT, cards.getValue("1111").cardType)
-        assertEquals(null, cards.getValue("1111").cardRole)
-        assertEquals(CardRole.STANDALONE, cards.getValue("2222").cardRole)
-    }
-
-    @Test
-    fun setPrimaryCard_rejectsDebitCard() {
-        runBlocking {
-            seedCard("1111", CardRole.STANDALONE)
-            repository.updateCardType(CardReference(Bank.BANK_ALJAZIRA, "1111"), CardType.DEBIT)
-
-            assertThrows(IllegalArgumentException::class.java) {
-                runBlocking {
-                    repository.setPrimaryCard(CardReference(Bank.BANK_ALJAZIRA, "1111"))
-                }
-            }
-        }
-    }
-
-    @Test
-    fun markAsDebit_clearsPrimaryRoleAndSetsDebitType() = runBlocking {
-        seedCard("1111", CardRole.PRIMARY)
-        repository.observe(CardReference(Bank.BANK_ALJAZIRA, "2222"), "sms-2222")
-        repository.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "2222"), OwnershipStatus.OWNED)
-        repository.setSupplementaryCard(CardReference(Bank.BANK_ALJAZIRA, "2222"), "1111")
-
-        repository.markAsDebit(CardReference(Bank.BANK_ALJAZIRA, "1111"))
-
-        val cards = repository.listAll().associateBy { it.last4 }
-        assertEquals(CardType.DEBIT, cards.getValue("1111").cardType)
-        assertEquals(null, cards.getValue("1111").cardRole)
-        assertEquals(CardRole.STANDALONE, cards.getValue("2222").cardRole)
-        assertEquals(com.baraa.masroof.domain.model.CardNetwork.MADA, cards.getValue("1111").cardNetwork)
+    /** A debit row written before card setup validated network and account together. */
+    private suspend fun markLegacyDebit(last4: String) {
+        database.cardRegistryDao().updateCardType(Bank.BANK_ALJAZIRA.id, last4, CardType.DEBIT.name)
+        database.cardRegistryDao().updateCardNetwork(Bank.BANK_ALJAZIRA.id, last4, "MADA")
     }
 
     private suspend fun seedCard(last4: String, role: CardRole) {
         repository.observe(CardReference(Bank.BANK_ALJAZIRA, last4), "sms-$last4")
         repository.setOwnership(CardReference(Bank.BANK_ALJAZIRA, last4), OwnershipStatus.OWNED)
         when (role) {
-            CardRole.PRIMARY -> repository.setPrimaryCard(CardReference(Bank.BANK_ALJAZIRA, last4))
-            CardRole.SUPPLEMENTARY -> error("use setSupplementaryCard")
+            CardRole.PRIMARY -> repository.configure(CardReference(Bank.BANK_ALJAZIRA, last4),
+                com.baraa.masroof.domain.model.CardConfiguration(null, CardType.CREDIT, CardRole.PRIMARY))
+            CardRole.SUPPLEMENTARY -> error("configure a supplementary card with its primary")
             CardRole.STANDALONE -> repository.updateCardType(
                 CardReference(Bank.BANK_ALJAZIRA, last4),
                 CardType.CREDIT,

@@ -1,6 +1,5 @@
 package com.baraa.masroof.domain.repository
 
-import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.CardNetwork
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
@@ -29,16 +28,6 @@ interface CardRegistryRepository {
     suspend fun updateCardNetwork(reference: CardReference, network: CardNetwork?)
 
     suspend fun updateCardType(reference: CardReference, cardType: CardType?)
-
-    suspend fun linkDebitToAccount(card: CardReference, account: AccountReference)
-
-    suspend fun markAsDebit(reference: CardReference)
-
-    suspend fun setPrimaryCard(reference: CardReference)
-
-    suspend fun setSupplementaryCard(reference: CardReference, primaryLast4: String)
-
-    suspend fun clearCardRole(reference: CardReference)
 
     /** Removes the registry row only; callers verify nothing still references the card. */
     suspend fun delete(reference: CardReference): Unit =
