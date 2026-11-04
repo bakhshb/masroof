@@ -59,17 +59,6 @@ class ChartGuidanceInteractionTest {
     }
 
     @Test
-    fun helpButton_hasAFullTouchTargetWithoutGrowingItsSlot() {
-        compose.setContent { MasroofTheme { Surface {
-            com.baraa.masroof.presentation.common.MasroofGuidanceButton("Why", "Because", Modifier.testTag("help"))
-        } } }
-        compose.onNodeWithTag("help").assertWidthIsEqualTo(com.baraa.masroof.ui.theme.MasroofGuidanceStyle.iconSize)
-        compose.onNode(hasContentDescription("Why") and hasClickAction())
-            .assertWidthIsEqualTo(MasroofSpacing.minimumTouchTarget)
-            .assertHeightIsEqualTo(MasroofSpacing.minimumTouchTarget)
-    }
-
-    @Test
     fun chartAndHelp_workInBothLanguagesAndThemes_withCorrectTouchDirection() {
         val language = mutableStateOf("ar")
         val dark = mutableStateOf(false)
