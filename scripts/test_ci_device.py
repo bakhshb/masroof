@@ -168,6 +168,31 @@ class DeviceProtocolTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             device.classify(cases | {'com.baraa.masroof.instrumentation.processdeath.NewTest#orphan'}, config)
 
+    def test_m13_script_runs_exactly_the_configured_process_death_pairs(self):
+        # The script and ci/device-suites.json each list the journeys; keep them equal.
+        config = json.loads(device.CONFIG.read_text())
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            (work / 'bin').mkdir()
+            adb = work / 'bin/adb'
+            adb.write_text('''#!/usr/bin/env python3
+import json, sys
+with open('calls.jsonl', 'a') as output:
+    output.write(json.dumps(sys.argv[1:]) + "\\n")
+if 'getprop' in sys.argv: print('36')
+if any('am instrument' in arg for arg in sys.argv): print('OK (1 test)')
+''')
+            adb.chmod(0o755)
+            env = {k: v for k, v in os.environ.items() if k != 'CI_DEVICE_BUNDLE'}
+            env['PATH'] = str(work / 'bin') + os.pathsep + env['PATH']
+            result = subprocess.run(['bash', str(device.ROOT / 'scripts/m13-process-death.sh')],
+                                    cwd=work, env=env, text=True, capture_output=True, timeout=30)
+            self.assertEqual(0, result.returncode, result.stderr)
+            cases = [call[-1].split("-e class '", 1)[1].split("'", 1)[0]
+                     for call in map(json.loads, (work / 'calls.jsonl').read_text().splitlines())
+                     if 'am instrument' in call[-1]]
+        self.assertEqual(config['processDeath'], [list(pair) for pair in zip(cases[::2], cases[1::2])])
+
     def test_default_new_tests_are_executed_not_omitted(self):
         import json
         config = json.loads(device.CONFIG.read_text())
