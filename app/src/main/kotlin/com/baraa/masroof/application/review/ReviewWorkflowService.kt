@@ -633,16 +633,7 @@ class ReviewWorkflowService(
             rawSmsIds = rawSmsIds,
             retryState = "historical_batch",
         )
-        val recovery = processingRecovery ?: return
-        if (!recovery.markExhaustedBatch(rawSmsIds.toList())) return
-        val schedule = onHistoricalRetry ?: return
-        try {
-            schedule()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // The retry set is durable. Startup enqueues the one batch worker.
-        }
+        processingRecovery?.markForHistoricalRetry(rawSmsIds.toList(), onHistoricalRetry)
     }
 
     private fun incomplete(

@@ -114,16 +114,7 @@ class TransactionRestoreService(
 
     private suspend fun retainRetry(rawSmsId: String, failureCount: Int, stage: String) {
         logIncomplete(rawSmsId, failureCount, retryState = "historical_batch", stage = stage)
-        val recovery = processingRecovery ?: return
-        if (!recovery.markExhaustedBatch(listOf(rawSmsId))) return
-        val schedule = onHistoricalRetry ?: return
-        try {
-            schedule()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // The retry row is durable. Startup enqueues the one batch worker.
-        }
+        processingRecovery?.markForHistoricalRetry(listOf(rawSmsId), onHistoricalRetry)
     }
 
     private fun logIncomplete(
