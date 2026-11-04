@@ -138,7 +138,8 @@ class ProcessStoredSmsUseCase(
     private suspend fun retainHistoricalRetry(rawSmsId: String) {
         val recovery = processingRecovery ?: return
         try {
-            recovery.markForHistoricalRetry(listOf(rawSmsId), onHistoricalRetry)
+            // A failed schedule is logged here (the other callers ignore it), so keep the inline call.
+            if (recovery.markExhaustedBatch(listOf(rawSmsId))) onHistoricalRetry?.invoke()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
