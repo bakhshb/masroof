@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.repository
 
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -210,14 +211,4 @@ class RoomRawSmsRepositoryTest {
         deviceMessageId = deviceMessageId,
         bodyHash = SmsBodyHasher.sha256Hex(body),
     )
-
-    private companion object {
-        val PURCHASE_BODY = """
-            شراء عبر الانترنت
-            بطاقة: 7271
-            لدى: Keeta
-            بمبلغ: 51.99 SAR
-            في: 14:32 03-08-2026
-        """.trimIndent()
-    }
 }

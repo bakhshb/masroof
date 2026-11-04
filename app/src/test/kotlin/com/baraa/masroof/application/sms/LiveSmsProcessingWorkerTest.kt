@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.TestSmsBodies.OTP_BODY
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.ListenableWorker
@@ -67,7 +68,7 @@ class LiveSmsProcessingWorkerTest {
 
     @Test
     fun nonFinancialEvidence_succeedsWithoutTransaction() = runBlocking {
-        val raw = captured(LiveSmsProcessingHarness.liveSms(body = LiveSmsProcessingHarness.OTP_BODY))
+        val raw = captured(LiveSmsProcessingHarness.liveSms(body = OTP_BODY))
 
         assertEquals(ListenableWorker.Result.success(), worker(raw.id).doWork())
         assertEquals(ParseStatus.NON_FINANCIAL, harness.parsedRepo.findByRawSmsId(raw.id)!!.event.parseStatus)

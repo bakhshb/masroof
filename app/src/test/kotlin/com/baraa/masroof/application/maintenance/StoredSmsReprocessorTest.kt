@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.maintenance
 
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -264,13 +265,7 @@ class StoredSmsReprocessorTest {
     )
 
     private fun purchase(id: String, at: Instant = Instant.parse("2026-08-03T14:32:00Z")): RawSms {
-        val body = """
-            شراء عبر الانترنت
-            بطاقة: 7271
-            لدى: Keeta
-            بمبلغ: 51.99 SAR
-            في: 14:32 03-08-2026
-        """.trimIndent()
+        val body = PURCHASE_BODY
         return RawSms(
             id = id,
             sender = "AlJazira",

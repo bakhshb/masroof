@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.TestSmsBodies.COLLIDING_TRANSFER_BODY
+import com.baraa.masroof.testsupport.TestSmsBodies.OTP_BODY
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -520,16 +522,6 @@ class HistoricalSmsBatchProcessorTest {
     }
 
     companion object {
-        private const val OTP_BODY =
-            "رمز التحقق لعملية شراء عبر الانترنت: 482913\nبمبلغ: 250.00 SAR\nلدى: TEST_STORE\nلا تشارك الرمز مع أحد"
-
-        private val COLLIDING_TRANSFER_BODY = """
-            حوالة واردة
-            حوالة صادرة
-            مبلغ: SAR 50.00
-            في: 2026-08-05 11:00
-        """.trimIndent()
-
         private val OUTGOING_TRANSFER = """
             حوالة صادرة الى حسابك الجاري
             من: 3001

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.ingestion
 
+import com.baraa.masroof.testsupport.LookalikeBankAdapter
 import com.baraa.masroof.testsupport.EmptyParsedEventRepository
 import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
 import com.baraa.masroof.testsupport.EmptyReviewRepository
@@ -645,7 +646,7 @@ class ProcessRawSmsUseCaseTest {
     fun ambiguousRoute_persistsRawSmsAndReviews_withoutParsingEitherAdapter() = runBlocking {
         val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
         val alJaziraParses = AtomicInteger(0)
-        val lookalike = CountingLookalikeAdapter()
+        val lookalike = LookalikeBankAdapter()
         val svc = ambiguousUseCase(ambiguousRegistry(alJaziraParses, lookalike), reviewRepo)
         val raw = aljaziraPurchase(id = "android-sms:ambiguous", deviceId = "ambiguous")
 
@@ -692,7 +693,7 @@ class ProcessRawSmsUseCaseTest {
     fun ambiguousRoute_reparseStoredWithoutParsedEvent_staysReviewed() = runBlocking {
         val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
         val alJaziraParses = AtomicInteger(0)
-        val lookalike = CountingLookalikeAdapter()
+        val lookalike = LookalikeBankAdapter()
         val raw = aljaziraPurchase(id = "android-sms:ambiguous-reparse", deviceId = "ambiguous-reparse")
         rawRepo.insertIfAbsent(raw)
 
@@ -709,7 +710,7 @@ class ProcessRawSmsUseCaseTest {
     fun explicitBankSelection_parsesOnlyTheChosenSms() = runBlocking {
         val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
         val alJaziraParses = AtomicInteger(0)
-        val lookalike = CountingLookalikeAdapter()
+        val lookalike = LookalikeBankAdapter()
         val harness = ambiguousHarness(alJaziraParses, lookalike, reviewRepo)
         val chosen = aljaziraPurchase(id = "android-sms:choose-aljazira", deviceId = "choose-aljazira")
         val otherBody = aljaziraPurchase(id = "android-sms:leave-ambiguous", deviceId = "leave-ambiguous")
@@ -759,7 +760,7 @@ class ProcessRawSmsUseCaseTest {
     fun explicitBankSelection_unknownBankDoesNotParse_failedChoiceStaysRetryable() = runBlocking {
         val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
         val alJaziraParses = AtomicInteger(0)
-        val lookalike = CountingLookalikeAdapter()
+        val lookalike = LookalikeBankAdapter()
         val harness = ambiguousHarness(alJaziraParses, lookalike, reviewRepo)
         val raw = aljaziraPurchase(id = "android-sms:choose-lookalike", deviceId = "choose-lookalike")
         harness.facade.ingest(raw)
@@ -920,7 +921,7 @@ class ProcessRawSmsUseCaseTest {
 
     private fun ambiguousRegistry(
         alJaziraParses: AtomicInteger,
-        lookalike: CountingLookalikeAdapter,
+        lookalike: LookalikeBankAdapter,
     ) = BankSmsRegistry(
         listOf(
             engineFixtureAdapter(
@@ -938,7 +939,7 @@ class ProcessRawSmsUseCaseTest {
         reviewRepo: com.baraa.masroof.data.repository.RoomReviewRepository,
     ) = ambiguousHarness(
         alJaziraParses = AtomicInteger(0),
-        lookalike = CountingLookalikeAdapter(),
+        lookalike = LookalikeBankAdapter(),
         reviewRepo = reviewRepo,
         registry = registry,
     ).facade
@@ -951,7 +952,7 @@ class ProcessRawSmsUseCaseTest {
 
     private fun ambiguousHarness(
         alJaziraParses: AtomicInteger,
-        lookalike: CountingLookalikeAdapter,
+        lookalike: LookalikeBankAdapter,
         reviewRepo: com.baraa.masroof.data.repository.RoomReviewRepository,
         registry: BankSmsRegistry = ambiguousRegistry(alJaziraParses, lookalike),
     ): AmbiguousHarness {
@@ -984,23 +985,6 @@ class ProcessRawSmsUseCaseTest {
         processStored = stored,
         clock = InstantClock { Instant.parse("2026-08-03T15:30:00Z") },
     )
-
-    private class CountingLookalikeAdapter : com.baraa.masroof.bank.BankSmsAdapter {
-        val parseCalls = AtomicInteger(0)
-        override val bank: Bank = Bank("LOOKALIKE_BANK")
-
-        override fun detect(sender: String, body: String): com.baraa.masroof.parsing.model.BankDetectionResult =
-            com.baraa.masroof.parsing.model.BankDetectionResult.Detected(
-                bank = bank,
-                confidence = Confidence(score = 1.0),
-                evidence = listOf("sender:$sender"),
-            )
-
-        override fun parse(input: com.baraa.masroof.parsing.model.SmsParseInput): com.baraa.masroof.parsing.model.ParseResult {
-            parseCalls.incrementAndGet()
-            return com.baraa.masroof.parsing.model.ParseResult.Unsupported("lookalike")
-        }
-    }
 
     private fun aljaziraPurchase(id: String, deviceId: String): RawSms {
         val body = """

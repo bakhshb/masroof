@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.ingestion
 
+import com.baraa.masroof.testsupport.LookalikeBankAdapter
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -18,8 +20,6 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.model.BankDetectionResult
-import com.baraa.masroof.parsing.model.ParseResult
-import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
@@ -455,7 +455,7 @@ class CaptureBankSmsUseCaseTest {
 
     @Test
     fun ambiguousRoute_isCapturedWithItsRoute_andLeftForProcessing() = runBlocking {
-        val registry = BankSmsRegistry(listOf(engineFixtureAdapter(), LookalikeAdapter()))
+        val registry = BankSmsRegistry(listOf(engineFixtureAdapter(), LookalikeBankAdapter()))
         val raw = live(PURCHASE_BODY, "2026-08-03T14:32:00Z")
 
         val result = CaptureBankSmsUseCase(rawRepo, registry).capture(raw)
@@ -524,22 +524,5 @@ class CaptureBankSmsUseCaseTest {
                 receivedAt = receivedAt,
             ),
         )
-    }
-
-    private class LookalikeAdapter : BankSmsAdapter {
-        override val bank: Bank = Bank("LOOKALIKE_BANK")
-        override fun detect(sender: String, body: String): BankDetectionResult =
-            BankDetectionResult.Detected(bank = bank, confidence = Confidence(1.0), evidence = listOf("lookalike"))
-        override fun parse(input: SmsParseInput): ParseResult = ParseResult.Unsupported(reason = "lookalike")
-    }
-
-    private companion object {
-        val PURCHASE_BODY = """
-            شراء عبر الانترنت
-            بطاقة: 7271
-            لدى: Keeta
-            بمبلغ: 51.99 SAR
-            في: 14:32 03-08-2026
-        """.trimIndent()
     }
 }

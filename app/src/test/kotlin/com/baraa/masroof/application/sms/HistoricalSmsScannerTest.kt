@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -68,10 +69,10 @@ class HistoricalSmsScannerTest {
         val from = Instant.parse("2026-08-01T00:00:00Z")
         val until = from.plusSeconds(86_400)
         val rows = listOf(
-            ProviderSmsRecord("before", "AlJazira", purchaseBody(), from.minusMillis(1)),
-            ProviderSmsRecord("included", "AlJazira", purchaseBody(), from),
-            ProviderSmsRecord("foreign", "OtherBank", purchaseBody(), from.plusSeconds(1)),
-            ProviderSmsRecord("after", "AlJazira", purchaseBody(), until),
+            ProviderSmsRecord("before", "AlJazira", PURCHASE_BODY, from.minusMillis(1)),
+            ProviderSmsRecord("included", "AlJazira", PURCHASE_BODY, from),
+            ProviderSmsRecord("foreign", "OtherBank", PURCHASE_BODY, from.plusSeconds(1)),
+            ProviderSmsRecord("after", "AlJazira", PURCHASE_BODY, until),
         ).map(InboxRow::Valid)
         var coverage = 0
         val scanner = HistoricalSmsScanner(FakeSmsDataSource(rows), batchProcessor,
@@ -92,7 +93,7 @@ class HistoricalSmsScannerTest {
         // The inbox is ordered by arrival; a row whose carrier time is past the range can come before in-range rows.
         val rows = listOf(
             ProviderSmsRecord("spam-ahead", "Promo", "offer", until.plusSeconds(5)),
-            ProviderSmsRecord("in-range", "AlJazira", purchaseBody(), until.minusSeconds(60)),
+            ProviderSmsRecord("in-range", "AlJazira", PURCHASE_BODY, until.minusSeconds(60)),
         ).map(InboxRow::Valid)
         val result = HistoricalSmsScanner(FakeSmsDataSource(rows), batchProcessor)
             .scan(receivedAfter = from, receivedBefore = until, bankScopes = setOf(Bank.BANK_ALJAZIRA))
@@ -101,7 +102,7 @@ class HistoricalSmsScannerTest {
 
     @Test fun scanReportsProgressEveryTwentyFiveRows() = runBlocking {
         val at = Instant.parse("2026-08-01T10:00:00Z")
-        val rows = (1..60).map { InboxRow.Valid(ProviderSmsRecord("p-$it", "OtherBank", purchaseBody(), at)) }
+        val rows = (1..60).map { InboxRow.Valid(ProviderSmsRecord("p-$it", "OtherBank", PURCHASE_BODY, at)) }
         val progress = mutableListOf<Int>()
         HistoricalSmsScanner(FakeSmsDataSource(rows), batchProcessor).scan(bankScopes = setOf(Bank.BANK_ALJAZIRA)) { progress += it }
         assertEquals(listOf(25, 50), progress)
@@ -147,7 +148,7 @@ class HistoricalSmsScannerTest {
         }
         val registry = BankSmsRegistry(listOf(base, other))
         val rows = listOf("AlJazira", "OtherBank").mapIndexed { index, sender ->
-            InboxRow.Valid(ProviderSmsRecord("scope-$index", sender, purchaseBody(), Instant.parse("2026-08-01T10:00:00Z")))
+            InboxRow.Valid(ProviderSmsRecord("scope-$index", sender, PURCHASE_BODY, Instant.parse("2026-08-01T10:00:00Z")))
         }
         var coverage = 0
         val scanner = HistoricalSmsScanner(FakeSmsDataSource(rows),
@@ -164,7 +165,7 @@ class HistoricalSmsScannerTest {
 
     @Test fun bankScopeImportsMatchedMessagesAndDoesNotReparseExistingEvidence() = runBlocking {
         val source = FakeSmsDataSource(listOf(InboxRow.Valid(ProviderSmsRecord(
-            "scoped-purchase", "AlJazira", purchaseBody(), Instant.parse("2026-08-01T10:00:00Z")))))
+            "scoped-purchase", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-01T10:00:00Z")))))
         val scanner = HistoricalSmsScanner(source, batchProcessor)
         assertEquals(1, scanner.scan(bankScopes = setOf(Bank.BANK_ALJAZIRA)).parsed)
         val repository = RoomParsedEventRepository(db.parsedEventDao())
@@ -206,7 +207,7 @@ class HistoricalSmsScannerTest {
     fun processesOldestToNewest_andCountsOutcomes() = runBlocking {
         val t1 = Instant.parse("2026-08-01T10:00:00Z")
         val t2 = Instant.parse("2026-08-02T10:00:00Z")
-        val purchase = purchaseBody()
+        val purchase = PURCHASE_BODY
         val otp = "رمز التحقق الخاص بك هو 482911. لا تشاركه مع أي شخص."
         val after = Instant.parse("2026-07-01T00:00:00Z")
         val order = mutableListOf<String>()
@@ -272,7 +273,7 @@ class HistoricalSmsScannerTest {
             ProviderSmsRecord(
                 "1",
                 "AlJazira",
-                purchaseBody(),
+                PURCHASE_BODY,
                 Instant.parse("2026-08-01T00:00:00Z"),
             ),
         )
@@ -293,7 +294,7 @@ class HistoricalSmsScannerTest {
     @Test
     fun malformedProviderRows_areCounted() = runBlocking {
         val good = InboxRow.Valid(
-            ProviderSmsRecord("1", "AlJazira", purchaseBody(), Instant.parse("2026-08-01T00:00:00Z")),
+            ProviderSmsRecord("1", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-01T00:00:00Z")),
         )
         val source = FakeSmsDataSource(listOf(good, InboxRow.Malformed, InboxRow.Malformed))
         val result = HistoricalSmsScanner(source, batchProcessor).scan()
@@ -328,7 +329,7 @@ class HistoricalSmsScannerTest {
                     ProviderSmsRecord(
                         "10",
                         "AlJazira",
-                        purchaseBody(),
+                        PURCHASE_BODY,
                         Instant.parse("2026-08-01T00:00:00Z"),
                     ),
                 ),
@@ -355,7 +356,7 @@ class HistoricalSmsScannerTest {
                     ProviderSmsRecord(
                         "11",
                         "AlJazira",
-                        purchaseBody(),
+                        PURCHASE_BODY,
                         Instant.parse("2026-08-01T00:00:00Z"),
                     ),
                 ),
@@ -382,13 +383,6 @@ class HistoricalSmsScannerTest {
         ),
     )
 
-    private fun purchaseBody() = """
-        شراء عبر الانترنت
-        بطاقة: 7271
-        لدى: Keeta
-        بمبلغ: 51.99 SAR
-        في: 14:32 03-08-2026
-    """.trimIndent()
 
     private class FakeSmsDataSource(
         private val rows: List<InboxRow>,
@@ -515,7 +509,7 @@ class HistoricalSmsScannerTest {
             ProviderSmsRecord(
                 providerMessageId = "p$index",
                 sender = "AlJazira",
-                body = purchaseBody().replace("51.99", amount).replace("14:32", time),
+                body = PURCHASE_BODY.replace("51.99", amount).replace("14:32", time),
                 receivedAt = Instant.parse("2026-08-03T${time}:00Z"),
             )
         }

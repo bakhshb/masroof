@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
 import com.baraa.masroof.application.dashboard.ForeignSarMarketRateProvider
@@ -257,17 +258,6 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         processingRetryRepository: ProcessingRetryRepository = processingRetryRepo,
         reviewRepository: ReviewRepository = reviewRepo,
     ): HistoricalSmsBatchProcessor {
-        val parsedForBatch = object : ParsedEventRepository by parsedRepo {
-            override suspend fun listAll(): List<ParsedEventRecord> {
-                reconciliationListAllCalls.incrementAndGet()
-                return parsedRepo.listAll()
-            }
-
-            override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
-                if (reconciliationFails) throw IOException("batch reconciliation unavailable")
-                return parsedRepo.listByRawSmsIds(rawSmsIds)
-            }
-        }
         val ingestionReview = IngestionReviewService(reviewRepo, clock)
         return HistoricalSmsBatchProcessor(
             capture = capture,
@@ -276,16 +266,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 parsedEventRepository = parsedRepo,
                 bankSmsRegistry = registry,
             ),
-            reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedForBatch,
-                rawSmsRepository = rawRepo,
-                financialTransactionRepository = ledgerUnderTest,
-                ownershipResolver = OwnershipResolver(
-                    RoomAccountRegistryRepository.from(db),
-                    cards,
-                    NoOpLoanRegistryRepository,
-                ),
-            ),
+            reconciliation = batchReconciliation(reconciliationFails),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepository, ftRepo, clock),
             processingRecovery = ProcessingRecovery(
                 processingRetryRepository = processingRetryRepository,
@@ -297,8 +278,8 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         )
     }
 
-    /** One batch derived pass over historical retry rows. Does not reparse SMS text. */
-    fun derivedRecovery(reconciliationFails: Boolean = false): HistoricalDerivedRecovery {
+    /** Counts full scans; [reconciliationFails] makes the batch lookup throw after parsing. */
+    private fun batchReconciliation(reconciliationFails: Boolean): TransactionReconciliationService {
         val parsedForBatch = object : ParsedEventRepository by parsedRepo {
             override suspend fun listAll(): List<ParsedEventRecord> {
                 reconciliationListAllCalls.incrementAndGet()
@@ -310,25 +291,35 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 return parsedRepo.listByRawSmsIds(rawSmsIds)
             }
         }
+        return TransactionReconciliationService(
+            parsedEventRepository = parsedForBatch,
+            rawSmsRepository = rawRepo,
+            financialTransactionRepository = ledgerUnderTest,
+            ownershipResolver = OwnershipResolver(
+                RoomAccountRegistryRepository.from(db),
+                cards,
+                NoOpLoanRegistryRepository,
+            ),
+        )
+    }
+
+    /** One batch derived pass over historical retry rows. Does not reparse SMS text. */
+    fun derivedRecovery(reconciliationFails: Boolean = false): HistoricalDerivedRecovery {
         return HistoricalDerivedRecovery(
             parsedEventRepository = parsedRepo,
             processingRetryRepository = processingRetryRepo,
-            reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedForBatch,
-                rawSmsRepository = rawRepo,
-                financialTransactionRepository = ledgerUnderTest,
-                ownershipResolver = OwnershipResolver(
-                    RoomAccountRegistryRepository.from(db),
-                    cards,
-                    NoOpLoanRegistryRepository,
-                ),
-            ),
+            reconciliation = batchReconciliation(reconciliationFails),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
             rawSmsRepository = rawRepo,
         )
     }
 
-    fun intake(scheduler: LiveSmsWorkScheduler): LiveSmsIntake =
+    fun intake(scheduler: LiveSmsWorkScheduler): LiveSmsIntake = intake(batchRecoveryScheduler = null, scheduler = scheduler)
+
+    fun intake(
+        batchRecoveryScheduler: HistoricalBatchRecoveryScheduler?,
+        scheduler: LiveSmsWorkScheduler,
+    ): LiveSmsIntake =
         LiveSmsIntake(
             captureBankSms = capture,
             scheduler = scheduler,
@@ -336,6 +327,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             reviewRepository = reviewRepo,
             processingRetryRepository = processingRetryRepo,
             appLogService = appLog,
+            batchRecoveryScheduler = batchRecoveryScheduler,
         )
 
     override fun close() {
@@ -343,19 +335,6 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
     }
 
     companion object {
-        const val OTP_CODE = "482913"
-
-        val PURCHASE_BODY = """
-            شراء عبر الانترنت
-            بطاقة: 7271
-            لدى: Keeta
-            بمبلغ: 51.99 SAR
-            في: 14:32 03-08-2026
-        """.trimIndent()
-
-        const val OTP_BODY =
-            "رمز التحقق لعملية شراء عبر الانترنت: $OTP_CODE\nبمبلغ: 250.00 SAR\nلدى: TEST_STORE\nلا تشارك الرمز مع أحد"
-
         fun liveSms(body: String = PURCHASE_BODY, at: String = "2026-08-03T14:32:00Z"): RawSms =
             AndroidSmsMapper.toRawSms(ProviderSmsRecord(null, "AlJazira", body, Instant.parse(at)))
     }

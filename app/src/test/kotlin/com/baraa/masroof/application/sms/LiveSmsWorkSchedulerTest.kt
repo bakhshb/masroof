@@ -1,5 +1,8 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.TestSmsBodies.OTP_CODE
+import com.baraa.masroof.testsupport.TestSmsBodies.OTP_BODY
+import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
@@ -57,7 +60,7 @@ class LiveSmsWorkSchedulerTest {
 
     @Test
     fun workInput_containsOnlyRawSmsId_neverBodyOrOtp() {
-        val raw = LiveSmsProcessingHarness.liveSms(body = LiveSmsProcessingHarness.OTP_BODY)
+        val raw = LiveSmsProcessingHarness.liveSms(body = OTP_BODY)
 
         val request = WorkManagerLiveSmsWorkScheduler.workRequest(raw.id)
         val input = request.workSpec.input
@@ -66,8 +69,8 @@ class LiveSmsWorkSchedulerTest {
         assertEquals(raw.id, input.getString(LiveSmsProcessingWorker.KEY_RAW_SMS_ID))
         val persisted = input.keyValueMap.values.joinToString() + request.tags.joinToString()
         assertFalse(persisted.contains(raw.body))
-        assertFalse(persisted.contains(LiveSmsProcessingHarness.OTP_CODE))
-        assertFalse(WorkManagerLiveSmsWorkScheduler.uniqueWorkName(raw.id).contains(LiveSmsProcessingHarness.OTP_CODE))
+        assertFalse(persisted.contains(OTP_CODE))
+        assertFalse(WorkManagerLiveSmsWorkScheduler.uniqueWorkName(raw.id).contains(OTP_CODE))
     }
 
     @Test
@@ -141,7 +144,7 @@ class LiveSmsWorkSchedulerTest {
     fun startupSweep_schedulesOnlyEvidenceAwaitingProcessing() = runBlocking {
         val processed = LiveSmsProcessingHarness.liveSms()
         val orphan = LiveSmsProcessingHarness.liveSms(
-            body = LiveSmsProcessingHarness.PURCHASE_BODY.replace("51.99", "12.00"),
+            body = PURCHASE_BODY.replace("51.99", "12.00"),
             at = "2026-08-03T15:00:00Z",
         )
         harness.intake(scheduler).ingest(processed)
