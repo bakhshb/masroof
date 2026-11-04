@@ -205,7 +205,7 @@ fun SettingsBankAccountsScreen(
 
             state.error?.let {
                 Text(
-                    stringResource(R.string.settings_update_failed),
+                    stringResource(settingsErrorRes(it)),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                 )

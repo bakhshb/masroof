@@ -59,7 +59,13 @@ class SharedPrefsGitHubTokenRepository(
         }
     }
 
-    override fun hasToken(): Boolean = getToken() != null
+    /**
+     * A permanent decrypt failure drops the ciphertext during the read, so ciphertext still stored
+     * after a null read means a transient keystore error: the token is configured, just unreadable now.
+     */
+    override fun hasToken(): Boolean = synchronized(lock) {
+        readTokenLocked() != null || !prefs.getString(KEY_TOKEN_CIPHERTEXT, null).isNullOrBlank()
+    }
 
     private fun readTokenLocked(): String? {
         val ciphertext = prefs.getString(KEY_TOKEN_CIPHERTEXT, null)

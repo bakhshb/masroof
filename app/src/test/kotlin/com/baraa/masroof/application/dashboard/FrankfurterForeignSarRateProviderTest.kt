@@ -90,12 +90,14 @@ class FrankfurterForeignSarRateProviderTest {
     }
 
     @Test
-    fun definitiveMiss_staysCachedPastTheRetryWindow() = runBlocking {
+    fun successWithoutUsableRate_isRetriedAfterTheWindow() = runBlocking {
         val provider = provider("""{"rate":0}""")
         assertNull(provider.rateFor(Currency.USD, date))
-        now += FrankfurterForeignSarRateProvider.FAILURE_RETRY_NANOS * 10
         assertNull(provider.rateFor(Currency.USD, date))
         assertEquals(1, calls)
+        now += FrankfurterForeignSarRateProvider.FAILURE_RETRY_NANOS
+        assertNull(provider.rateFor(Currency.USD, date))
+        assertEquals(2, calls)
     }
 
     @Test

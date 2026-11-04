@@ -235,6 +235,13 @@ class SharedPrefsGitHubTokenRepositoryTest {
     }
 
     @Test
+    fun transientDecryptError_stillReportsATokenAsConfigured() {
+        repository(ReversibleEncryptor()).setToken(TOKEN)
+
+        assertTrue(repository(FlakyEncryptor(failures = 1)).hasToken())
+    }
+
+    @Test
     fun setToken_decryptsOnceBeforeWriting() {
         val counting = FlakyEncryptor(failures = 0)
 

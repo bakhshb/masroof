@@ -81,6 +81,7 @@ fun SettingsBankCardsScreen(
         accounts = state.followedAccounts,
         busy = state.updating,
         failed = state.error != null,
+        failureRes = settingsErrorRes(state.error),
         onDismiss = onDismissCardNetwork,
         onSave = onSaveCardSetup,
     )
@@ -174,7 +175,7 @@ fun SettingsBankCardsScreen(
 
             state.error?.let {
                 Text(
-                    stringResource(R.string.settings_update_failed),
+                    stringResource(settingsErrorRes(it)),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                 )

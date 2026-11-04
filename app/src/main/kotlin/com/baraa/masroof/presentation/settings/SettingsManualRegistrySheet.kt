@@ -32,7 +32,7 @@ internal fun SettingsManualRegistrySheet(bankId: String, card: Boolean, state: S
     if (configuringCard) {
         SettingsCardSetupSheet(ManagedCardUi("", Bank(bankId), last4, OwnershipStatus.OWNED, name), null,
             state.followedCards, state.followedAccounts, state.updating, state.error != null, onDismiss,
-            { configuration -> onSaveCard(last4, name, configuration) })
+            { configuration -> onSaveCard(last4, name, configuration) }, settingsErrorRes(state.error))
         return
     }
     MasroofBottomSheet(stringResource(if (card) R.string.settings_add_card_manual else R.string.settings_add_account_manual),
@@ -51,7 +51,7 @@ internal fun SettingsManualRegistrySheet(bankId: String, card: Boolean, state: S
                 Checkbox(owned, null, enabled = !state.updating)
                 MasroofText(stringResource(if (card) R.string.settings_manual_card_owned else R.string.pattern_financial_account_owned))
             }
-            if (state.error != null) MasroofText(stringResource(R.string.settings_manual_registry_failed), color = MaterialTheme.colorScheme.error)
+            if (state.error != null) MasroofText(stringResource(settingsErrorRes(state.error, R.string.settings_manual_registry_failed)), color = MaterialTheme.colorScheme.error)
         }
     }
 }

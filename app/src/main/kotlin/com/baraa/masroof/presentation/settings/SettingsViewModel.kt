@@ -325,7 +325,7 @@ class SettingsViewModel(
                     loans = snapshot.loans,
                 )
                 appLogService.info(AppLogCategories.SETTINGS, "Manual reparse finished: $count events refreshed")
-                _uiState.update { it.copy(reparsingStored = false) }
+                _uiState.update { it.copy(reparsingStored = false, error = it.error.withoutBusyRefusal()) }
             } catch (ce: CancellationException) {
                 throw ce
             } catch (error: Exception) {
@@ -428,7 +428,7 @@ class SettingsViewModel(
             _uiState.update { it.copy(smsPermissionGranted = false, scopedSmsImportFailed = true) }
             return
         }
-        launchLogged(appLogService, AppLogCategories.SCAN, "Settings importSelectedBankSms", onError = { _uiState.update { it.copy(scopedSmsImportFailed = true) } }, onFinally = { _uiState.update { it.copy(importingSms = false) } }) {
+        launchLogged(appLogService, AppLogCategories.SCAN, "Settings importSelectedBankSms", onError = { _uiState.update { it.copy(scopedSmsImportFailed = true) } }, onFinally = { _uiState.update { it.copy(importingSms = false, error = it.error.withoutBusyRefusal()) } }) {
             _uiState.update { it.copy(importingSms = true, importScanned = 0, scopedSmsImportResult = null, scopedSmsImportFailed = false) }
             val result = workflow.import(bankIds, from, through) { scanned -> _uiState.update { it.copy(importScanned = scanned) } }
             _uiState.update { it.copy(scopedSmsImportResult = result) }
@@ -502,7 +502,12 @@ class SettingsViewModel(
     fun exportBackup(uri: Uri) = backup.exportBackup(uri)
     fun importBackup(uri: Uri, passphrase: CharArray = CharArray(0), confirmLegacyPlaintext: Boolean = false) = backup.importBackup(uri, passphrase, confirmLegacyPlaintext)
     private fun updateRegistry(onUpdated: () -> Unit = {}, action: suspend () -> Unit) {
-        if (_uiState.value.updating || _uiState.value.reparsingStored || _uiState.value.importingSms) return
+        if (_uiState.value.updating) return
+        // A registry write during a reparse or import would race its reconciliation: refuse it and say why.
+        if (_uiState.value.reparsingStored || _uiState.value.importingSms) {
+            _uiState.update { it.copy(error = SettingsError.REGISTRY_BUSY) }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(updating = true, error = null) }
             try {
@@ -524,6 +529,9 @@ class SettingsViewModel(
             }
         }
     }
+
+    /** A finished reparse or import retires its own busy refusal, never a real write failure. */
+    private fun SettingsError?.withoutBusyRefusal(): SettingsError? = takeUnless { it == SettingsError.REGISTRY_BUSY }
 
     /** A new sheet must not open showing an earlier action's failure. */
     fun clearError() = _uiState.update { it.copy(error = null) }
