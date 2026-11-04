@@ -43,11 +43,6 @@ internal object GsmSmsDeliverPdu {
         }
     }
 
-    fun hexList(sender: String, body: String): String =
-        encode(sender, body).joinToString(separator = ",") { pdu ->
-            pdu.joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xFF) }
-        }
-
     private fun segment(
         sender: String,
         body: String,

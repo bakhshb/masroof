@@ -71,16 +71,11 @@ internal object FidelityFixtures {
         val saving = summary(true)
         val ordinary = trend(transactions)
         val overall = trend(transactions, true)
-        val perCard = listOf("7271","8842","4421").associate { number ->
-            "${bank.id}:$number" to trend(transactions.filterIndexed { i, _ -> rows[i].card == number }, outflows = number == "4421") }
         val registryAccounts = listOf(AccountRegistryEntry.forTest(bank, "3001"), AccountRegistryEntry.forTest(bank, "5002"))
         val accountContext = DashboardProjectionContext(period, period.endDateExclusive.atStartOfDay(zone).toInstant(),
             LocalDate.parse("2026-10-10"), DashboardEvidence.EMPTY, transactions, emptyMap(), 0, registryAccounts,
             setOf(account("3001"), account("5002")), setOf("3001", "5002"), emptyList(), emptyList(),
             DebitCardScopeFacts(setOf(card("4421")), mapOf(card("4421") to account("3001"))), java.util.Locale.ENGLISH, zone, Currency.SAR)
-        val accountTrends = AccountDailySpendingTrendsBuilder.build(accountContext,
-            AccountTransactionInvolvementResolver.buildIndex(transactions, emptyList(), registryAccounts, accountContext.debitCardScope),
-            setOf("${bank.id}:7271", "${bank.id}:8842"))
         val snapshot = CreditCardBalanceSnapshot(money("5000"),money("2200"),LocalDate.parse("2026-10-15"),
             Instant.parse("2026-10-02T07:00:00Z"),Instant.parse("2026-10-02T07:00:00Z"))
         val primary = CreditCardDashboardRow(bank,"7271",signed("800"),signed("800"),"2 أكتوبر — 1 نوفمبر",snapshot)
