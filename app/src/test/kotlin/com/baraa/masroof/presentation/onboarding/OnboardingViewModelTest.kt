@@ -566,6 +566,27 @@ AccountRegistryEntry.forTest(
     }
 
     @Test
+    fun resumeWhileCatalogLoads_doesNotOverwriteAnImportStartedMeanwhile() = runTest {
+        val fixture = Fixture(permissionGranted = true, gateway = FakeImportGateway(blockFirstCall = true))
+        advanceUntilIdle()
+        fixture.vm.onStartClicked()
+        advanceUntilIdle()
+        val gate = CompletableDeferred<Unit>()
+        fixture.catalogGate = gate
+        fixture.vm.reloadFromCurrentState()
+        runCurrent()
+        fixture.vm.startImport()
+        runCurrent()
+        assertEquals(OnboardingStep.IMPORTING, fixture.vm.uiState.value.step)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(OnboardingStep.IMPORTING, fixture.vm.uiState.value.step)
+        assertEquals(ImportState.Scanning, fixture.vm.uiState.value.importState)
+        fixture.gateway.completeBlockedCall()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun partialParseFailures_doNotCompleteHistoricalOnboardingImport() = runTest {
         val fixture = Fixture(permissionGranted = true, gateway = FakeImportGateway(
             initialResult = com.baraa.masroof.application.onboarding.HistoricalImportResult(scanned = 2, parsed = 1, failed = 1),
@@ -597,6 +618,7 @@ AccountRegistryEntry.forTest(
         var permissionGranted: Boolean = permissionGranted
         var candidateLoadShouldFail: Boolean = candidateLoadShouldFail
         var refreshed: Boolean = false
+        var catalogGate: CompletableDeferred<Unit>? = null
 
         val vm: OnboardingViewModel = newViewModel(now)
 
@@ -615,7 +637,7 @@ AccountRegistryEntry.forTest(
                 permissionStateProvider = { permissionGranted },
                 zoneId = zone,
                 clock = Clock.fixed(now, zone),
-                loadBankCatalog = { com.baraa.masroof.application.patterns.PatternCatalog(0, listOf(
+                loadBankCatalog = { catalogGate?.await(); com.baraa.masroof.application.patterns.PatternCatalog(0, listOf(
                     com.baraa.masroof.application.patterns.PatternBankView(Bank.BANK_ALJAZIRA.id, "AlJazira", listOf("AlJazira"), emptyList()),
                     com.baraa.masroof.application.patterns.PatternBankView("stc_bank", "STC", listOf("STCBank"), emptyList()),
                 )) },
