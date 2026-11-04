@@ -451,15 +451,12 @@ object CommitmentsOverviewBuilder {
                 tx = sourceTx,
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
-            ) ?: sarEquivalents[sourceTransactionId] ?: return null
+            ) ?: return null
             if (sourceTx.amount.amount.signum() == 0) return null
-            val ratio = amount.amount.divide(
-                sourceTx.amount.amount,
-                Money.SCALE,
-                RoundingMode.HALF_EVEN,
-            )
+            // One rounding at the end; a rounded ratio skews the result (20/30 of 112.50 gave 75.38).
             return Money(
-                sourceSar.amount.multiply(ratio).setScale(Money.SCALE, RoundingMode.HALF_EVEN),
+                sourceSar.amount.multiply(amount.amount)
+                    .divide(sourceTx.amount.amount, Money.SCALE, RoundingMode.HALF_EVEN),
                 primaryCurrency,
             )
         }

@@ -954,6 +954,27 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun foreignCurrencyCommitment_scalesSourceSarWithoutRoundingTheRatio() {
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val sourceTx = transaction(id = "tx-usd", merchant = "Amazon", amount = "30", at = start.minusSeconds(3600))
+            .copy(amount = Money.of("30.00", Currency.USD))
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment(name = "Amazon", amount = Money.of("20.00", Currency.USD),
+                sourceTransactionId = sourceTx.id, recurrence = CommitmentRecurrence.MONTHLY)),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(sourceTx),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = mapOf(sourceTx.id to Money.of("112.50", Currency.SAR)),
+            zoneId = zone,
+        )
+
+        // 112.50 * 20 / 30 = 75.00; rounding the ratio to 0.67 first gave 75.38.
+        assertEquals(Money.of("75.00", Currency.SAR), overview.rows.single().amount)
+    }
+
+    @Test
     fun monthlyCommitment_countsEveryPaymentInSalaryPeriodWhenAmountIncreases() {
         val salaryPeriod = FinancialPeriod(
             startDate = LocalDate.parse("2026-09-27"),
