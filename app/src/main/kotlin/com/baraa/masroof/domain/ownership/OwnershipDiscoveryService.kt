@@ -45,7 +45,11 @@ class OwnershipDiscoveryService(
                 // source is not automatically the user's account
             }
 
-            MessageFamily.PURCHASE -> {
+            MessageFamily.PURCHASE,
+            MessageFamily.CARD_PAYMENT,
+            MessageFamily.WITHDRAWAL,
+            MessageFamily.FEE,
+            -> {
                 event.sourceAccountRef?.let(accounts::add)
                 event.cardRef?.let(cards::add)
             }
@@ -59,16 +63,6 @@ class OwnershipDiscoveryService(
                 loanType?.let { loans += LoanReference(event.bank, it) }
             }
 
-            MessageFamily.CARD_PAYMENT -> {
-                event.sourceAccountRef?.let(accounts::add)
-                event.cardRef?.let(cards::add)
-            }
-
-            MessageFamily.WITHDRAWAL -> {
-                event.sourceAccountRef?.let(accounts::add)
-                event.cardRef?.let(cards::add)
-            }
-
             MessageFamily.BALANCE_NOTICE -> {
                 event.sourceAccountRef?.let(accounts::add)
                     ?: event.destinationAccountRef?.let(accounts::add)
@@ -78,11 +72,6 @@ class OwnershipDiscoveryService(
                 // Only clearly identified user destination / card — never a
                 // generic source fallback when destination is absent.
                 event.destinationAccountRef?.let(accounts::add)
-                event.cardRef?.let(cards::add)
-            }
-
-            MessageFamily.FEE -> {
-                event.sourceAccountRef?.let(accounts::add)
                 event.cardRef?.let(cards::add)
             }
 
