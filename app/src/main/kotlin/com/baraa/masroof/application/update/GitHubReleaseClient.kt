@@ -144,7 +144,7 @@ class GitHubReleaseClient(
                 .get()
                 .build()
 
-        return executeBody(request, tokenWasProvided).map { it.string() }
+        return executeBody(request, tokenWasProvided).mapCatching { it.string() }
     }
 
     private fun downloadBinary(
@@ -214,7 +214,7 @@ class GitHubReleaseClient(
         }
         val body = response.body
         if (!response.isSuccessful) {
-            val errorSnippet = body.string().take(200)
+            val errorSnippet = runCatching { body.string().take(200) }.getOrDefault("")
             body.close()
             val code = response.code
             response.close()
