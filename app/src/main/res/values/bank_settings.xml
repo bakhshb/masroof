@@ -14,8 +14,14 @@
     <string name="settings_bank_needs_teaching">بانتظار تعليم الرسائل</string>
     <string name="settings_bank_bundled">جاهز</string>
     <string name="settings_bank_needs_approval">يحتاج مراجعة</string>
-    <string name="settings_bank_partly_approved">يحتاج مراجعة</string>
-    <string name="settings_bank_approved">جاهز · قد تحتاج بعض الرسائل للتعليم</string>
+    <plurals name="settings_bank_partly_approved">
+        <item quantity="zero">جاهز</item>
+        <item quantity="one">جاهز · نمط واحد بانتظار الموافقة</item>
+        <item quantity="two">جاهز · نمطان بانتظار الموافقة</item>
+        <item quantity="few">جاهز · %1$d أنماط بانتظار الموافقة</item>
+        <item quantity="many">جاهز · %1$d نمطًا بانتظار الموافقة</item>
+        <item quantity="other">جاهز · %1$d نمط بانتظار الموافقة</item>
+    </plurals>
     <string name="settings_bank_support_title">دعم رسائل البنوك</string>
     <string name="settings_bank_support_hint">يمكن إضافة بنك ومرسليه وتعليم صيغ رسائله. يقتصر الفهم على الأنماط المتاحة والمعتمدة.</string>
     <string name="settings_bank_manage">إدارة البنوك</string>

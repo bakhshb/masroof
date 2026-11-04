@@ -10,9 +10,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
-import com.baraa.masroof.application.patterns.PatternApprovalStatus
 import com.baraa.masroof.application.patterns.PatternBankView
 import com.baraa.masroof.presentation.common.*
 import com.baraa.masroof.ui.theme.MasroofSpacing
@@ -49,16 +49,26 @@ fun SettingsBanksScreen(state: SettingsUiState, onBack: () -> Unit, onOpenBank: 
 /** Short reading status of a bank and the semantic accent it is shown with. */
 @Composable
 internal fun bankSupportLabel(bank: PatternBankView): Pair<String, MasroofCardAccent> {
-    val active = bank.currentPatterns.filter { it.enabled }
-    val (label, accent) = when {
-        active.isEmpty() && bank.currentPatterns.isNotEmpty() -> R.string.settings_bank_patterns_disabled to MasroofCardAccent.None
-        active.isEmpty() -> R.string.settings_bank_needs_teaching to MasroofCardAccent.None
-        active.all { it.status == PatternApprovalStatus.BUNDLED } -> R.string.settings_bank_bundled to MasroofCardAccent.Inflow
-        active.none { it.canApply } -> R.string.settings_bank_needs_approval to MasroofCardAccent.Liability
-        active.any { !it.canApply } -> R.string.settings_bank_partly_approved to MasroofCardAccent.Liability
-        else -> R.string.settings_bank_approved to MasroofCardAccent.Inflow
+    val status = bankSupportStatus(bank)
+    val label = if (status.pending > 0)
+        pluralStringResource(status.label, status.pending, status.pending) else stringResource(status.label)
+    return label to status.accent
+}
+
+internal data class BankSupportStatus(val label: Int, val accent: MasroofCardAccent, val pending: Int = 0)
+
+internal fun bankSupportStatus(bank: PatternBankView): BankSupportStatus {
+    // Only movement patterns record money; an enabled notice pattern alone does not make a bank ready.
+    val movement = bank.currentPatterns.filter { it.canApprove }
+    val active = movement.filter { it.enabled }
+    val pending = active.count { !it.canApply }
+    return when {
+        movement.isEmpty() -> BankSupportStatus(R.string.settings_bank_needs_teaching, MasroofCardAccent.None)
+        active.isEmpty() -> BankSupportStatus(R.string.settings_bank_patterns_disabled, MasroofCardAccent.None)
+        pending == active.size -> BankSupportStatus(R.string.settings_bank_needs_approval, MasroofCardAccent.Liability)
+        pending > 0 -> BankSupportStatus(R.plurals.settings_bank_partly_approved, MasroofCardAccent.Liability, pending)
+        else -> BankSupportStatus(R.string.settings_bank_bundled, MasroofCardAccent.Inflow)
     }
-    return stringResource(label) to accent
 }
 
 @Composable
