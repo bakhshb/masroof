@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
+import kotlinx.coroutines.delay
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -65,11 +66,13 @@ fun LongPullToRefreshBox(
     val isRefreshingState = rememberUpdatedState(isRefreshing)
     val onRefreshState = rememberUpdatedState(onRefresh)
 
-    LaunchedEffect(pullDistance, thresholdPx) {
+    // The hold start whose full duration has passed; a timer, so holding still also shows "ready".
+    var holdCompletedFor by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(pullDistance, thresholdPx, holdDurationMs) {
         if (pullDistance >= thresholdPx) {
-            if (thresholdHeldSince == null) {
-                thresholdHeldSince = System.currentTimeMillis()
-            }
+            val since = thresholdHeldSince ?: System.currentTimeMillis().also { thresholdHeldSince = it }
+            delay((since + holdDurationMs - System.currentTimeMillis()).coerceAtLeast(0L))
+            holdCompletedFor = since
         } else {
             thresholdHeldSince = null
         }
@@ -181,8 +184,7 @@ fun LongPullToRefreshBox(
 
         if (pullDistance > 0f || isRefreshing) {
             val atThreshold = pullDistance >= thresholdPx
-            val heldMs = thresholdHeldSince?.let { System.currentTimeMillis() - it } ?: 0L
-            val holdComplete = atThreshold && heldMs >= holdDurationMs
+            val holdComplete = atThreshold && thresholdHeldSince != null && holdCompletedFor == thresholdHeldSince
             CircularProgressIndicator(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
