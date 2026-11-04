@@ -58,7 +58,6 @@ object DebitCardOverviewBuilder {
             parsedRecords = parsedRecords,
         )
         val context = AccountFlowClassifier.buildContext(
-            transactions = transactions,
             parsedRecords = parsedRecords,
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,

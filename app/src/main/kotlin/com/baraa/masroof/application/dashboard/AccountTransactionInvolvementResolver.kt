@@ -21,7 +21,7 @@ object AccountTransactionInvolvementResolver {
         if (transactions.isEmpty() || ownedAccounts.isEmpty()) return emptyMap()
 
         val parsedRecordsById = parsedRecords.associateBy { it.event.id }
-        val refundContext = AccountFlowClassificationContext(parsedRecordsById, emptySet(), Currency.SAR, emptyMap())
+        val refundContext = AccountFlowClassificationContext(parsedRecordsById, Currency.SAR, emptyMap())
         val scopesByContainer = ownedAccounts.map { account ->
             val containerId = FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
             containerId to CurrentAccountTransactionScope(

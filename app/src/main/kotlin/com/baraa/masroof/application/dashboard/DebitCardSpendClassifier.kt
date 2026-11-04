@@ -102,7 +102,6 @@ object DebitCardSpendClassifier {
         tx: FinancialTransaction,
         context: AccountFlowClassificationContext,
     ): Boolean {
-        if (tx.id in context.billPaymentTxIds) return true
         if (tx.type == FinancialTransactionType.BILL_PAYMENT ||
             tx.type == FinancialTransactionType.CREDIT_CARD_PAYMENT
         ) {

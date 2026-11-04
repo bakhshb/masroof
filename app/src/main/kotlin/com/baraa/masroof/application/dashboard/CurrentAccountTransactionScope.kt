@@ -111,11 +111,9 @@ data class CurrentAccountTransactionScope(
 
     fun isBillPayment(
         tx: FinancialTransaction,
-        billPaymentTxIds: Set<String>,
         parsedRecordsById: Map<String, ParsedEventRecord>,
     ): Boolean {
         if (tx.type == FinancialTransactionType.BILL_PAYMENT) return true
-        if (tx.id in billPaymentTxIds) return true
         return linkedRecords(tx, parsedRecordsById).any { record ->
             record.event.messageFamily == MessageFamily.BILL_PAYMENT
         }
