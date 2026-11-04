@@ -11,6 +11,7 @@ import com.baraa.masroof.application.statement.StatementImportResult
 import com.baraa.masroof.application.statement.StatementLineComparison
 import com.baraa.masroof.application.statement.StatementReconciliationWorkflow
 import com.baraa.masroof.domain.statement.StatementComparisonStatus
+import com.baraa.masroof.domain.statement.StatementDirection
 import com.baraa.masroof.domain.statement.StatementRejection
 import java.io.InputStream
 import java.math.BigDecimal
@@ -63,6 +64,7 @@ data class StatementLineUi(
     val title: String,
     val amountLabel: String,
     val detail: String,
+    val direction: StatementDirection,
 )
 
 fun statementReconciliationUiState(result: StatementImportResult): StatementReconciliationUiState =
@@ -178,14 +180,16 @@ private fun StatementLineComparison.toUi(): StatementLineUi =
     StatementLineUi(
         title = entry.description,
         amountLabel = plain(entry.amount.amount, entry.amount.currency.name),
-        detail = "${entry.bank.id} · ${entry.accountMasked} · ${entry.bookedDate} · ${entry.direction.name}",
+        detail = "${entry.bank.id} · ${entry.accountMasked} · ${entry.bookedDate}",
+        direction = entry.direction,
     )
 
 private fun LedgerLineComparison.toUi(): StatementLineUi =
     StatementLineUi(
         title = transactionId,
         amountLabel = plain(amount, currency.name),
-        detail = "${bank.id} · $accountMasked · $civilDate · ${direction.name}",
+        detail = "${bank.id} · $accountMasked · $civilDate",
+        direction = direction,
     )
 
 private fun plain(amount: BigDecimal, currencyCode: String): String =

@@ -127,6 +127,10 @@
     <string name="settings_statement_matched_credit">Matched credit</string>
     <string name="settings_statement_statement_only_debit">Statement-only debit</string>
     <string name="settings_statement_ledger_only_debit">Ledger-only debit</string>
+    <string name="settings_statement_statement_only_credit">Statement-only credit</string>
+    <string name="settings_statement_ledger_only_credit">Ledger-only credit</string>
+    <string name="settings_statement_direction_debit">Debit</string>
+    <string name="settings_statement_direction_credit">Credit</string>
     <string name="settings_statement_rejection_oversized">The file is larger than the allowed limit</string>
     <string name="settings_statement_rejection_truncated">The file is truncated</string>
     <string name="settings_statement_rejection_unrecognized">The file was not recognized</string>

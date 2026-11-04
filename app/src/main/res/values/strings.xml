@@ -132,6 +132,10 @@
     <string name="settings_statement_matched_credit">دائن مطابق</string>
     <string name="settings_statement_statement_only_debit">مدين في الكشف فقط</string>
     <string name="settings_statement_ledger_only_debit">مدين في السجل فقط</string>
+    <string name="settings_statement_statement_only_credit">دائن في الكشف فقط</string>
+    <string name="settings_statement_ledger_only_credit">دائن في السجل فقط</string>
+    <string name="settings_statement_direction_debit">مدين</string>
+    <string name="settings_statement_direction_credit">دائن</string>
     <string name="settings_statement_rejection_oversized">الملف أكبر من الحد المسموح</string>
     <string name="settings_statement_rejection_truncated">الملف مبتور</string>
     <string name="settings_statement_rejection_unrecognized">تعذّر التعرّف على الملف</string>
