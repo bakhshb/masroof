@@ -17,7 +17,7 @@ fun TransactionPreviewRow(
     val colors = MasroofThemeExtras.extendedColors
     val inward = row.direction.isInward
     val transfer = row.direction == TransactionDirectionUi.NEUTRAL
-    val (color, background) = when (row.type) {
+    val (color, background) = when (row.typeLabelResHint) {
         com.baraa.masroof.domain.model.FinancialTransactionType.LOAN_REPAYMENT -> colors.liability to colors.liabilitySoft
         com.baraa.masroof.domain.model.FinancialTransactionType.CREDIT_CARD_PAYMENT -> colors.card to colors.cardSoft
         else -> if (inward) colors.inflow to colors.inflowSoft else if (transfer) colors.account to colors.accountSoft else colors.outflow to colors.outflowSoft

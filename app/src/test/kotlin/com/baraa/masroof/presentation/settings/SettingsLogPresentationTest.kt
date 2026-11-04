@@ -41,7 +41,7 @@ class SettingsLogPresentationTest {
     @Test
     fun groupLogEntriesByDay_addsHeadersInDescendingDateOrder() {
         val zoneId = ZoneId.of("UTC")
-        val today = java.time.LocalDate.now(zoneId)
+        val today = java.time.LocalDate.parse("2026-11-04")
         val todayMs = today.atStartOfDay(zoneId).toInstant().toEpochMilli() + 3_600_000L
         val yesterdayMs = today.minusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() + 3_600_000L
         val entries = listOf(
@@ -55,6 +55,7 @@ class SettingsLogPresentationTest {
             todayLabel = "Today",
             yesterdayLabel = "Yesterday",
             dateFormatter = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy"),
+            today = today,
         )
 
         assertEquals(4, grouped.size)

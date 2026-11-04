@@ -13,7 +13,8 @@ import javax.crypto.spec.GCMParameterSpec
  * AES-GCM via the Android Keystore. The key is not user-auth bound so stable
  * and nightly update checks can read the token while the device is locked.
  * A lock-screen or biometric change that invalidates the key surfaces as a
- * decrypt failure; the repository then drops the payload and asks for re-entry.
+ * null decrypt; the repository then drops the payload and asks for re-entry.
+ * Other keystore errors are thrown so the payload is kept for a later read.
  */
 class AndroidKeystoreGitHubTokenEncryptor(
     private val keyAlias: String = DEFAULT_KEY_ALIAS,
@@ -45,10 +46,14 @@ class AndroidKeystoreGitHubTokenEncryptor(
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, payload.iv))
             String(cipher.doFinal(payload.ciphertext), Charsets.UTF_8).takeIf { it.isNotEmpty() }
-        } catch (error: Exception) {
-            // KeyPermanentlyInvalidatedException, AEAD failure, or a keystore
-            // ProviderException. Never throw into update checks.
+        } catch (_: android.security.keystore.KeyPermanentlyInvalidatedException) {
             null
+        } catch (_: javax.crypto.AEADBadTagException) {
+            null
+        } catch (error: Exception) {
+            // Keystore2 wraps transient failures as InvalidKeyException/UnrecoverableKeyException too:
+            // only the two cases above prove the token is gone, so anything else keeps it.
+            throw GitHubTokenEncryptorException("GitHub token decryption failed", error)
         }
     }
 

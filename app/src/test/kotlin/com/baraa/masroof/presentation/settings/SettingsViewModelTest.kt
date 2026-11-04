@@ -39,6 +39,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -767,6 +768,56 @@ class SettingsViewModelTest {
         assertNull(repo.get(commitment.id))
     }
 
+    @Test
+    fun commitmentWrites_ignoreASecondTapWhileTheFirstIsInFlight() = runTest {
+        val commitment = sampleCommitment()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var updates = 0
+        val inner = MutableCommitmentRepository(listOf(commitment))
+        val repo = object : CommitmentRepository by inner {
+            override suspend fun update(commitment: Commitment) { updates++; gate.await(); inner.update(commitment) }
+        }
+        val vm = viewModel(commitmentsWorkflow = commitmentsWorkflow(repo))
+        vm.refresh(); advanceUntilIdle()
+
+        vm.toggleCommitmentActive(commitment.id); runCurrent()
+        vm.toggleCommitmentActive(commitment.id)
+        vm.deleteCommitment(commitment.id); runCurrent()
+        gate.complete(Unit); advanceUntilIdle()
+
+        assertEquals(1, updates)
+        assertFalse(repo.get(commitment.id)!!.active)
+        assertFalse(vm.uiState.value.savingCommitment)
+    }
+
+    @Test
+    fun registryChangeIsRefusedWhileStoredMessagesReparse() = runTest {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val accounts = FakeAccountRegistry()
+        var reconciles = 0
+        val vm = viewModel(accounts = accounts, onReconcileOwnership = { reconciles++ },
+            reparse = { gate.await(); com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(0, 0) })
+        vm.reparseStoredMessages(); runCurrent()
+        vm.addManualAccount("BANK_ALJAZIRA", "3001", null) {}; runCurrent()
+        // The refusal says why; it is not reported as a failed write.
+        assertEquals(SettingsError.REGISTRY_BUSY, vm.uiState.value.error)
+        gate.complete(Unit); advanceUntilIdle()
+
+        assertEquals(0, reconciles)
+        assertTrue(vm.uiState.value.followedAccounts.isEmpty())
+        // A finished reparse retires its own refusal.
+        assertNull(vm.uiState.value.error)
+    }
+
+    @Test
+    fun clearError_dropsAnEarlierFailureBeforeTheManualSheetOpens() = runTest {
+        val vm = viewModel(onReconcileOwnership = { error("retry required") })
+        vm.addManualAccount("BANK_ALJAZIRA", "3001", null) {}; advanceUntilIdle()
+        assertEquals(SettingsError.UPDATE_FAILED, vm.uiState.value.error)
+        vm.clearError()
+        assertNull(vm.uiState.value.error)
+    }
+
     private fun sampleCommitment(
         id: String = "cmt_1",
         active: Boolean = true,
@@ -839,6 +890,7 @@ class SettingsViewModelTest {
         themeMode: ThemeMode = ThemeMode.SYSTEM,
         reparseResult: com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult =
             com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(0, 0),
+        reparse: suspend () -> com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult = { reparseResult },
         onRefreshReviewQueue: () -> Unit = {},
         onReconcileOwnership: (com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange) -> Unit = {},
         appUpdateService: com.baraa.masroof.application.update.AppUpdateService =
@@ -865,7 +917,7 @@ class SettingsViewModelTest {
             databaseBackupService = FakeDatabaseBackupGateway(),
             refreshReviewQueue = { onRefreshReviewQueue() },
             reconcileOwnershipChange = { onReconcileOwnership(it) },
-            reparseStoredEvents = { reparseResult },
+            reparseStoredEvents = reparse,
             permissionStateProvider = permissionStateProvider,
             appVersion = SettingsViewModelTestFixtures.APP_VERSION,
             appUpdateService = appUpdateService,

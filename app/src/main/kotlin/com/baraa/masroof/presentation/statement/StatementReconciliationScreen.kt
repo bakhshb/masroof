@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.domain.statement.StatementComparisonStatus
+import com.baraa.masroof.domain.statement.StatementDirection
 import com.baraa.masroof.domain.statement.StatementRejection
 import com.baraa.masroof.presentation.common.MasroofAmountRole
 import com.baraa.masroof.presentation.common.MasroofAmountText
@@ -202,7 +203,9 @@ private fun ReportBody(state: StatementReconciliationUiState) {
                 AmountRow(R.string.settings_statement_matched_debit, total.matchedDebit)
                 AmountRow(R.string.settings_statement_matched_credit, total.matchedCredit)
                 AmountRow(R.string.settings_statement_statement_only_debit, total.statementOnlyDebit)
+                AmountRow(R.string.settings_statement_statement_only_credit, total.statementOnlyCredit)
                 AmountRow(R.string.settings_statement_ledger_only_debit, total.ledgerOnlyDebit)
+                AmountRow(R.string.settings_statement_ledger_only_credit, total.ledgerOnlyCredit)
             }
         }
     }
@@ -241,7 +244,7 @@ private fun LineSection(
 ) {
     if (lines.isEmpty()) return
     MasroofSectionHeader(
-        title = stringResource(titleRes) + " " + status.name,
+        title = stringResource(titleRes),
         modifier = Modifier.testTag(statementSectionTag(status)),
     )
     lines.forEachIndexed { index, line ->
@@ -254,7 +257,12 @@ private fun LineSection(
                 )
                 MasroofAmountText(amount = line.amountLabel, role = MasroofAmountRole.List)
                 Text(
-                    text = line.detail,
+                    text = line.detail + " · " + stringResource(
+                        when (line.direction) {
+                            StatementDirection.DEBIT -> R.string.settings_statement_direction_debit
+                            StatementDirection.CREDIT -> R.string.settings_statement_direction_credit
+                        },
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -266,7 +274,7 @@ private fun LineSection(
 @Composable
 private fun CountRow(labelRes: Int, count: Int, status: StatementComparisonStatus? = null) {
     val label = stringResource(labelRes)
-    val value = if (status == null) "$label $count" else "$label ${status.name} $count"
+    val value = "$label $count"
     Text(
         text = value,
         style = MaterialTheme.typography.bodyMedium,

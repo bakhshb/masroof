@@ -522,7 +522,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     fun editorDraft(candidate: AnalysisCandidate) = SettingsCommitmentsWorkflow.CommitmentEditorDraft(
         candidate.name, money(candidate.amount), LocalDate.ofEpochDay(candidate.latestDay),
         com.baraa.masroof.domain.model.CommitmentRecurrence.valueOf(candidate.cadence), LocalDate.ofEpochDay(candidate.nextDay))
-    fun parseBudget(value: String): Long? = value.trim().takeIf { it.isNotEmpty() }?.let { BigDecimal(normalizeAnalysisNumber(it)).setScale(2, RoundingMode.UNNECESSARY).movePointRight(2).longValueExact().also { require(it > 0) } }
+    fun parseBudget(value: String): Long? = value.trim().takeIf { it.isNotEmpty() }?.let { requireNotNull(parseAnalysisAmount(it)).setScale(2, RoundingMode.UNNECESSARY).movePointRight(2).longValueExact().also { require(it > 0) } }
     override fun close() {
         if (closed) return
         closed = true

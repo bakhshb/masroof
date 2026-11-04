@@ -25,21 +25,13 @@ class SettingsInstallOnResumeTest {
     private var permissionRequests = 0
     private val installs = mutableListOf<java.io.File>()
 
-    // A recording installer: the real one reaches FileProvider, whose static root cache
-    // would pin this test's cache directory for later tests in the same sandbox.
-    private val installer = object : com.baraa.masroof.application.update.ApkInstaller(
-        androidx.test.core.app.ApplicationProvider.getApplicationContext(),
-    ) {
-        override fun install(apkFile: java.io.File): Result<Unit> = Result.success(Unit).also { installs += apkFile }
-    }
-
     private fun actions(service: AppUpdateService = SettingsViewModelTestFixtures.appUpdateService()) = SettingsUpdateActions(
         scope = TestScope(UnconfinedTestDispatcher()),
         settingsState = state,
         appUpdateService = service,
         updateCheckCoordinator = SettingsViewModelTestFixtures.updateCheckCoordinator(),
         appLogService = SettingsViewModelTestFixtures.appLogService(),
-        apkInstaller = installer,
+        apkInstaller = SettingsViewModelTestFixtures.apkInstaller(installs),
         canInstallPackages = { canInstall },
         onRequestInstallPermission = { permissionRequests++ },
     )

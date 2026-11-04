@@ -45,6 +45,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -257,6 +258,27 @@ class ReviewListRefreshTest {
     }
 
     @Test
+    fun selfTransferPair_locksActionsBeforeReadingTheDatabase() = runTest {
+        World().use { world ->
+            world.persistPurchase("pair-out", "pair-out-event", "20.00", null, family = MessageFamily.TRANSFER_OUT)
+            world.persistPurchase("pair-in", "pair-in-event", "20.00", null, family = MessageFamily.TRANSFER_IN)
+            val outId = world.requireReview("pair-out", "transfer_pending_match")
+            val inId = world.requireReview("pair-in", "transfer_pending_match")
+            world.viewModel.openDetail(outId)
+            advanceUntilIdle()
+
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            world.parsed.findGate = gate
+            world.viewModel.resolveSelfTransferPair(inId)
+            runCurrent()
+
+            assertTrue(world.viewModel.uiState.value.resolving)
+            gate.complete(Unit)
+            advanceUntilIdle()
+        }
+    }
+
+    @Test
     fun returnFromTeachingKeepsPendingDetailUntilProcessingActuallyResolvesIt() = runTest {
         World().use { world ->
             val id = world.requireReview("teaching-return", "unsupported_format")
@@ -430,6 +452,12 @@ class ReviewListRefreshTest {
         private val delegate: ParsedEventRepository,
     ) : ParsedEventRepository by delegate {
         var listAllCalls: Int = 0
+        var findGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+
+        override suspend fun findByRawSmsId(rawSmsId: String): ParsedEventRecord? {
+            findGate?.await()
+            return delegate.findByRawSmsId(rawSmsId)
+        }
 
         fun reset() {
             listAllCalls = 0

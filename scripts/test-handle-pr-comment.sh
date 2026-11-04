@@ -39,6 +39,23 @@ EXIT_CODE=$?
 set -e
 assert_eq "Invalid command exit code" "1" "$EXIT_CODE"
 
+# Test 1b: Invalid command reply has real line breaks, not a literal \n
+echo "Test 1b: Invalid command reply body is multi-line"
+cat > "$TEST_TMP/bin/gh" << EOF
+#!/usr/bin/env bash
+if [[ "\$1" == "pr" && "\$2" == "comment" ]]; then
+  printf '%s' "\$5" > "$TEST_TMP/invalid-body.txt"
+fi
+EOF
+chmod +x "$TEST_TMP/bin/gh"
+set +e
+COMMENT_BODY="/release unknown" PR_NUMBER="10" COMMENT_ID="123" COMMENT_AUTHOR="alice" COMMENT_AUTHOR_ASSOCIATION="OWNER" REPO="test/repo" "$SCRIPT" >/dev/null 2>&1
+set -e
+assert_eq "Invalid command reply line count" "5" "$(wc -l < "$TEST_TMP/invalid-body.txt" | tr -d ' ')"
+if grep -qF '\n' "$TEST_TMP/invalid-body.txt"; then
+  assert_eq "Invalid command reply has no literal backslash-n" "absent" "present"
+fi
+
 # Test 2: Unauthorized user rejected
 echo "Test 2: Unauthorized user rejected"
 cat > "$TEST_TMP/bin/gh" << 'EOF'

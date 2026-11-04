@@ -22,12 +22,14 @@ sealed interface InboxRow {
  */
 interface SmsDataSource {
     /**
+     * Opens the inbox, hands its rows to [block], and closes the inbox when [block] returns or throws,
+     * so a scan that stops early never leaks the provider cursor. The rows are valid only inside [block].
+     *
      * @param receivedAfter inclusive lower bound on DATE when non-null
-     * @return inbox rows ordered by DATE ASC (may include [InboxRow.Malformed])
      * @throws SmsPermissionException when READ_SMS is denied
      * @throws SmsProviderException on provider/cursor failures that abort the scan
      */
-    fun queryInbox(receivedAfter: Instant? = null): Sequence<InboxRow>
+    suspend fun <T> withInbox(receivedAfter: Instant? = null, block: suspend (rows: Sequence<InboxRow>) -> T): T
 }
 
 /** READ_SMS not granted. */

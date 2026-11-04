@@ -289,7 +289,6 @@ class BankInterpretationService(
     suspend fun learningLabels() = store.labels()
     suspend fun interpretations() = store.interpretations()
     private suspend fun schedulePendingRefresh() {
-        val prefs = context.getSharedPreferences("learning_runtime", Context.MODE_PRIVATE)
         val version = refreshVersion
         val required = reviews.listRequired()
         val records = parsed.listByRawSmsIds(required.map { it.rawSmsId })
@@ -312,7 +311,6 @@ class BankInterpretationService(
         val needs = refreshFilter()
         val pending = records.any { needs(it) && mayRefresh(it.event.rawSmsId) }
         if (pending) ModelRefreshWorker.enqueue(context, version)
-        check(prefs.edit().putString("scheduled_interpretation", version).commit())
     }
     fun needsRefresh(record: com.baraa.masroof.parsing.repository.ParsedEventRecord): Boolean = refreshFilter()(record)
     /**

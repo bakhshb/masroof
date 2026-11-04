@@ -132,6 +132,10 @@
     <string name="settings_statement_matched_credit">دائن مطابق</string>
     <string name="settings_statement_statement_only_debit">مدين في الكشف فقط</string>
     <string name="settings_statement_ledger_only_debit">مدين في السجل فقط</string>
+    <string name="settings_statement_statement_only_credit">دائن في الكشف فقط</string>
+    <string name="settings_statement_ledger_only_credit">دائن في السجل فقط</string>
+    <string name="settings_statement_direction_debit">مدين</string>
+    <string name="settings_statement_direction_credit">دائن</string>
     <string name="settings_statement_rejection_oversized">الملف أكبر من الحد المسموح</string>
     <string name="settings_statement_rejection_truncated">الملف مبتور</string>
     <string name="settings_statement_rejection_unrecognized">تعذّر التعرّف على الملف</string>
@@ -160,6 +164,7 @@
     <string name="settings_loan_type_mortgage">قرض عقاري</string>
     <string name="settings_reparse_title">إعادة تحليل الرسائل المحفوظة</string>
     <string name="settings_update_failed">تعذّر تحديث إعدادات البطاقة</string>
+    <string name="settings_registry_busy">انتظر حتى ينتهي تحديث الرسائل ثم حاول مرة أخرى</string>
     <string name="settings_reparse_stored_hint">يعيد تحليل رسائل البنك المحفوظة على الجهاز. مفيد بعد تحديث التطبيق أو إذا بدا مبلغ أو تصنيف غير صحيح — دون إعادة استيراد من الهاتف.</string>
     <string name="settings_reparse_stored_example">مثال: مشتريات بالدولار تُحوَّل للريال إذا ورد سعر الصرف في الرسالة.</string>
     <string name="settings_import_sms_title">استيراد رسائل البنك من الهاتف</string>

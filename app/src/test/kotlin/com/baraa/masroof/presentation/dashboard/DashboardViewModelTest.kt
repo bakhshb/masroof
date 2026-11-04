@@ -718,6 +718,30 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun customizeLayout_moveDown_skipsSectionsHiddenFromTheSheet() = runTest {
+        val vm = viewModel(FakeLoader(), layoutPreferencesRepository = FakeLayoutPreferencesRepository())
+        advanceUntilIdle()
+
+        vm.openCustomizeSheet()
+        // Default order: ... QUICK, CARDS, LOANS, MERCHANTS ...; CARDS and LOANS are not shown in the sheet.
+        vm.moveCustomizeSection(DashboardSectionId.QUICK, direction = 1)
+
+        val shown = vm.uiState.value.customizeDraft!!.sections.map { it.id }
+            .filter { it != DashboardSectionId.CARDS && it != DashboardSectionId.LOANS }
+        assertEquals(
+            listOf(
+                DashboardSectionId.HERO,
+                DashboardSectionId.ACCOUNTS,
+                DashboardSectionId.COMMITMENTS,
+                DashboardSectionId.MERCHANTS,
+                DashboardSectionId.QUICK,
+                DashboardSectionId.TRANSACTIONS,
+            ),
+            shown,
+        )
+    }
+
+    @Test
     fun customizeLayout_dismissWithoutSave_discardsDraft() = runTest {
         val layoutRepo = FakeLayoutPreferencesRepository()
         val vm = viewModel(FakeLoader(), layoutPreferencesRepository = layoutRepo)

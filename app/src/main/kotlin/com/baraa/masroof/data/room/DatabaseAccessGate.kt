@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 /** Drains repository operations before replacing files; a closed process instance is never reused. */
 class DatabaseAccessGate {
     private val state = Mutex()
+    private val exclusiveEdits = Mutex()
     private var active = 0
     private var restoring: CompletableDeferred<Unit>? = null
     private var drained: CompletableDeferred<Unit>? = null
@@ -73,9 +74,14 @@ class DatabaseAccessGate {
         }
     }
 
-    /** Exclusive configuration edits may read the still-open repositories without waiting on their own gate. */
-    suspend fun <T> withExclusiveAccess(block: suspend () -> T): T = withRestore {
-        withContext(Lease(this)) { block() }
+    /**
+     * Exclusive configuration edits may read the still-open repositories without waiting on their own gate.
+     * They queue behind each other; only a real [withRestore] fails fast while one runs.
+     */
+    suspend fun <T> withExclusiveAccess(block: suspend () -> T): T {
+        // Fail fast instead of waiting on a mutex this coroutine (or its access lease) already holds.
+        check(coroutineContext[Lease]?.gate !== this) { "Exclusive edit cannot run inside repository access" }
+        return exclusiveEdits.withLock { withRestore { withContext(Lease(this)) { block() } } }
     }
 
     /** Called under exclusive restore immediately before closing the live Room instance. */

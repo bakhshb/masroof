@@ -24,6 +24,31 @@ class DatabaseAccessGateTest {
     }
 
     @Test
+    fun exclusiveEditsQueue_whileARealRestoreStillFailsFast() = runTest {
+        val gate = DatabaseAccessGate()
+        val release = CompletableDeferred<Unit>()
+        val first = async { gate.withExclusiveAccess { release.await(); 1 } }
+        runCurrent()
+        val second = async { gate.withExclusiveAccess { 2 } }
+        runCurrent()
+        val restore = runCatching { gate.withRestore { 3 } }
+        assertTrue(restore.exceptionOrNull() is IllegalStateException)
+        release.complete(Unit)
+        assertEquals(1, first.await())
+        assertEquals(2, second.await())
+    }
+
+    @Test
+    fun nestedExclusiveEdit_failsFastInsteadOfWaitingOnItself() = runTest {
+        val gate = DatabaseAccessGate()
+        val inside = runCatching { gate.withExclusiveAccess { gate.withExclusiveAccess { 1 } } }
+        assertTrue(inside.exceptionOrNull() is IllegalStateException)
+        val fromAccess = runCatching { gate.withAccess { gate.withExclusiveAccess { 2 } } }
+        assertTrue(fromAccess.exceptionOrNull() is IllegalStateException)
+        assertEquals(3, gate.withExclusiveAccess { 3 })
+    }
+
+    @Test
     fun restoreDrainsExistingAccess_andRejectsQueuedOldProcessAccessAfterRetirement() = runTest {
         val gate = DatabaseAccessGate()
         val release = CompletableDeferred<Unit>()

@@ -540,7 +540,8 @@ class PatternProcessingMilestoneTest {
 
     @Test fun activatingANewBankImportsOnlyItsMessages() = runBlocking {
         val source = object : com.baraa.masroof.sms.datasource.SmsDataSource {
-            override fun queryInbox(receivedAfter: Instant?) = listOf("AlRajhiBank", "STC Bank", "barq app").mapIndexed { index, sender ->
+            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<com.baraa.masroof.sms.datasource.InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+            fun queryInbox(receivedAfter: Instant?) = listOf("AlRajhiBank", "STC Bank", "barq app").mapIndexed { index, sender ->
                 com.baraa.masroof.sms.datasource.InboxRow.Valid(com.baraa.masroof.sms.model.ProviderSmsRecord(
                     "new-bank-$index", sender, incoming, Instant.parse("2026-10-15T10:00:00Z")))
             }.asSequence()
@@ -569,7 +570,8 @@ class PatternProcessingMilestoneTest {
     @Test fun scopedImportUsesDynamicRoutingAndPreservesCollisionsWithoutClaimingOtherBanks() = runBlocking {
         var queries = 0
         val source = object : com.baraa.masroof.sms.datasource.SmsDataSource {
-            override fun queryInbox(receivedAfter: Instant?): Sequence<com.baraa.masroof.sms.datasource.InboxRow> {
+            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<com.baraa.masroof.sms.datasource.InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+            fun queryInbox(receivedAfter: Instant?): Sequence<com.baraa.masroof.sms.datasource.InboxRow> {
                 queries++
                 return listOf("STC Bank", "AlJazira", "PERSON").mapIndexed { index, sender ->
                     com.baraa.masroof.sms.datasource.InboxRow.Valid(com.baraa.masroof.sms.model.ProviderSmsRecord(

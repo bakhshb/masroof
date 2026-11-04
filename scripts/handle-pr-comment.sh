@@ -42,7 +42,7 @@ case "$FIRST_LINE" in
     echo "Unrecognized release command: '$FIRST_LINE'" >&2
     if [[ -n "${COMMENT_ID:-}" && -n "$REPO" ]] && command -v gh >/dev/null 2>&1; then
       gh api "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" -f content="-1" 2>/dev/null || true
-      gh pr comment "$PR_NUMBER" --body "❌ **Invalid command:** \`${FIRST_LINE}\`.\nSupported commands:\n- \`/nightly\`\n- \`/release\` (or \`/release patch\`)\n- \`/release minor\`\n- \`/release major\`" 2>/dev/null || true
+      gh pr comment "$PR_NUMBER" --body "❌ **Invalid command:** \`${FIRST_LINE}\`."$'\nSupported commands:\n- `/nightly`\n- `/release` (or `/release patch`)\n- `/release minor`\n- `/release major`' 2>/dev/null || true
     fi
     exit 1
     ;;

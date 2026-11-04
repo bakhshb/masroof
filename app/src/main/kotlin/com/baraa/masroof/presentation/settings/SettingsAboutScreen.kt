@@ -176,9 +176,8 @@ internal fun UpdateSectionCard(
     onInstallUpdate: () -> Unit,
     message: AppUpdateMessage? = null,
 ) {
-    val failed = message in setOf(AppUpdateMessage.AUTH_FAILED, AppUpdateMessage.CHECK_FAILED,
-        AppUpdateMessage.DOWNLOAD_FAILED, AppUpdateMessage.INSTALL_FAILED, AppUpdateMessage.TOKEN_REQUIRED)
-    var accessOpen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val failed = message in failedUpdateMessages
+    var accessOpen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     MasroofCard {
         com.baraa.masroof.presentation.common.MasroofGuidanceLabel(stringResource(R.string.settings_update_channel_title),
             stringResource(R.string.settings_update_channel_hint), style = MaterialTheme.typography.titleMedium)
@@ -272,6 +271,16 @@ private fun RowActions(
         }
     }
 }
+
+private val failedUpdateMessages = setOf(AppUpdateMessage.AUTH_FAILED, AppUpdateMessage.CHECK_FAILED,
+    AppUpdateMessage.DOWNLOAD_FAILED, AppUpdateMessage.INSTALL_FAILED, AppUpdateMessage.TOKEN_REQUIRED)
+
+/** The message the update card does not already show as its status; null when the card shows it. */
+internal fun updateMessageOutsideCard(state: AppUpdateUiState, message: AppUpdateMessage?): AppUpdateMessage? =
+    message?.takeUnless {
+        it == AppUpdateMessage.UP_TO_DATE || it == AppUpdateMessage.UPDATE_AVAILABLE ||
+            (state == AppUpdateUiState.Idle && it in failedUpdateMessages)
+    }
 
 @Composable
 internal fun resolveUpdateMessage(message: AppUpdateMessage): String =

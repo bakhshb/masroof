@@ -29,6 +29,9 @@ object MasroofAnalyticsChartMath {
 
     fun barAt(x: Float, width: Float, count: Int): Int? =
         if (width <= 0f || count <= 0) null else kotlin.math.floor(x / width * count).toInt().coerceIn(0, count - 1)
+
+    /** Maps a day index to its left-to-right slot and back; RTL puts the first day on the right. */
+    fun barSlot(index: Int, count: Int, mirror: Boolean): Int = if (mirror) count - 1 - index else index
 }
 
 /** Inline row for bars inside a shared card; labels wrap at large font sizes. */

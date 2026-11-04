@@ -101,31 +101,11 @@ class RoomAccountRegistryRepository(
         if (masked.isEmpty()) return null
 
         val exact = dao.get(reference.bank.id, masked)
-        val suffixMatch = findUniqueSuffixMatch(reference.bank.id, masked)
-        val ownedSuffixMatch = findUniqueOwnedSuffixMatch(reference.bank.id, masked)
-
-        if (exact != null) {
-            val exactStatus = OwnershipStatus.valueOf(exact.ownershipStatus)
-            if (exactStatus != OwnershipStatus.UNKNOWN) return exact
-            if (ownedSuffixMatch != null) return ownedSuffixMatch
-            return exact
-        }
-
-        return suffixMatch
+        if (exact != null && OwnershipStatus.valueOf(exact.ownershipStatus) != OwnershipStatus.UNKNOWN) return exact
+        val matches = suffixMatches(reference.bank.id, masked)
+        if (exact == null) return matches.singleOrNull()
+        return matches.singleOrNull { OwnershipStatus.valueOf(it.ownershipStatus) == OwnershipStatus.OWNED } ?: exact
     }
-
-    private suspend fun findUniqueSuffixMatch(
-        bankId: String,
-        masked: String,
-    ): AccountRegistryEntity? = suffixMatches(bankId, masked).singleOrNull()
-
-    private suspend fun findUniqueOwnedSuffixMatch(
-        bankId: String,
-        masked: String,
-    ): AccountRegistryEntity? =
-        suffixMatches(bankId, masked)
-            .filter { OwnershipStatus.valueOf(it.ownershipStatus) == OwnershipStatus.OWNED }
-            .singleOrNull()
 
     private suspend fun suffixMatches(
         bankId: String,

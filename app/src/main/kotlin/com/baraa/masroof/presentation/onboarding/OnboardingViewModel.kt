@@ -78,6 +78,11 @@ class OnboardingViewModel(
                     step = if (completed) OnboardingStep.HOME else it.step, onboardingCompleted = completed) }
                 return@launch
             }
+            // An import, finalize or restore may have started while the catalog was loading.
+            if (isBusy()) {
+                _uiState.update { it.copy(permissionGranted = permissionGranted) }
+                return@launch
+            }
             val started = onboardingPrefs.isOnboardingStarted()
             val completed = onboardingPrefs.isOnboardingCompleted()
             val savedEpoch = onboardingPrefs.getHistoricalImportStartEpochMillis()

@@ -274,7 +274,7 @@ fun SettingsRoute(
             state = state,
             onBack = { popOrExit() },
             onOpenBank = { navigateTo(SettingsDestination.BankHub(current.bankId)) },
-            onAddManual = { manualBankId = current.bankId; manualCard = false },
+            onAddManual = { viewModel.clearError(); manualBankId = current.bankId; manualCard = false },
             onConfirmOwned = viewModel::confirmAccountOwned,
             onMarkExternal = viewModel::markAccountExternal,
             onRequestStopTracking = viewModel::requestStopAccountTracking,
@@ -295,7 +295,7 @@ fun SettingsRoute(
             state = state,
             onBack = { popOrExit() },
             onOpenBank = { navigateTo(SettingsDestination.BankHub(current.bankId)) },
-            onAddManual = { manualBankId = current.bankId; manualCard = true },
+            onAddManual = { viewModel.clearError(); manualBankId = current.bankId; manualCard = true },
             onConfirmOwned = viewModel::confirmCardOwned,
             onMarkExternal = viewModel::markCardExternal,
             onRequestStopTracking = viewModel::requestStopTracking,
@@ -515,7 +515,7 @@ internal fun SettingsHubScreen(
                 com.baraa.masroof.presentation.common.MasroofReferenceNavigationRow(stringResource(R.string.settings_about_section),
                     stringResource(R.string.settings_about_subtitle, state.appVersion), MasroofIcons.periodHint, onOpenAbout, divider = false)
             }
-            state.error?.let { Text(stringResource(R.string.settings_update_failed), color = MaterialTheme.colorScheme.error) }
+            state.error?.let { Text(stringResource(settingsErrorRes(it)), color = MaterialTheme.colorScheme.error) }
         }
     }
 }

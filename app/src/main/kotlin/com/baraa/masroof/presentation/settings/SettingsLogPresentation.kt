@@ -50,9 +50,9 @@ internal fun groupLogEntriesByDay(
     todayLabel: String,
     yesterdayLabel: String,
     dateFormatter: DateTimeFormatter,
+    today: LocalDate = LocalDate.now(zoneId),
 ): List<SettingsLogListItem> {
     if (entries.isEmpty()) return emptyList()
-    val today = LocalDate.now(zoneId)
     val yesterday = today.minusDays(1)
     val grouped = entries
         .sortedByDescending { it.timestampEpochMs }

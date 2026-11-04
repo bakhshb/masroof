@@ -12,6 +12,7 @@ import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckPreferencesRepository
 import com.baraa.masroof.application.update.UpdateChecker
 import okhttp3.OkHttpClient
+import java.io.File
 
 internal object SettingsViewModelTestFixtures {
     const val APP_VERSION: String = "0.2.1"
@@ -80,6 +81,12 @@ internal object SettingsViewModelTestFixtures {
         )
     }
 
-    fun apkInstaller(): ApkInstaller =
-        ApkInstaller(ApplicationProvider.getApplicationContext())
+    /**
+     * A recording installer: the real one reaches FileProvider, whose static root cache
+     * would pin this test's cache directory for later tests in the same sandbox.
+     */
+    fun apkInstaller(installs: MutableList<File> = mutableListOf()): ApkInstaller =
+        object : ApkInstaller(ApplicationProvider.getApplicationContext()) {
+            override fun install(apkFile: File): Result<Unit> = Result.success(Unit).also { installs += apkFile }
+        }
 }

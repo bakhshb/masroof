@@ -289,7 +289,6 @@ class ReplicaMachineLearningTest {
             val before=c.financialTransactionRepository.listAll()
             val posted=requireNotNull(c.parsedEventRepository.findByRawSmsId("rule-posted"))
             TestRuntime.close()
-            TestStorageContext(host).getSharedPreferences("learning_runtime",0).edit().putString("scheduled_interpretation","previous").commit()
             c=TestRuntime.container(host)
             c.awaitPostStartupBackgroundWorkForTesting()
             requireNotNull(c.interpretationService).synchronizeFeedback()

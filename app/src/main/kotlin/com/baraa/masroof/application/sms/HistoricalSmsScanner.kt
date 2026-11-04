@@ -118,8 +118,7 @@ class HistoricalSmsScanner(
         }
 
         try {
-            val rows = dataSource.queryInbox(receivedAfter)
-            for (row in rows) {
+            dataSource.withInbox(receivedAfter) { rows -> for (row in rows) {
                 if (row is InboxRow.Valid) {
                     if (receivedAfter != null && row.record.receivedAt < receivedAfter) continue
                     // Rows are ordered by arrival time but receivedAt is the carrier time, so skip rather than stop.
@@ -178,7 +177,7 @@ class HistoricalSmsScanner(
                         }
                     }
                 }
-            }
+            } }
         } catch (_: SmsPermissionException) {
             return finishAfterFailure(SmsScanFailure.PermissionDenied)
         } catch (e: SmsProviderException) {

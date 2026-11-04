@@ -17,7 +17,9 @@ interface GitHubTokenEncryptor {
 
     /**
      * Returns the token, or null when the key was invalidated or the payload
-     * cannot be decrypted. Must not throw.
+     * cannot be decrypted (permanent failures).
+     *
+     * @throws GitHubTokenEncryptorException for a transient keystore error; the stored payload must be kept.
      */
     fun decrypt(ciphertext: String): String?
 }

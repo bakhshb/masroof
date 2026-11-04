@@ -217,7 +217,14 @@ enum class BackupMessage {
 
 enum class SettingsError {
     UPDATE_FAILED,
+
+    /** A registry change was refused because a stored reparse or SMS import is running. */
+    REGISTRY_BUSY,
 }
+
+/** The message for [error]; [fallback] for a write failure. */
+internal fun settingsErrorRes(error: SettingsError?, fallback: Int = com.baraa.masroof.R.string.settings_update_failed): Int =
+    if (error == SettingsError.REGISTRY_BUSY) com.baraa.masroof.R.string.settings_registry_busy else fallback
 
 enum class AppUpdateMessage {
     UP_TO_DATE,

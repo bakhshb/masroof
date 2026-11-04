@@ -8,6 +8,7 @@ import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.testsupport.TestStorageContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -35,6 +36,23 @@ class AnalyticsClockKeyTest {
 
             shadowOf(app).grantPermissions(Manifest.permission.READ_SMS)
             assertNotEquals(denied, workflow.clockKey())
+        } finally {
+            workflow.close()
+            container.close()
+        }
+    }
+
+    @Test
+    fun budgetAcceptsTheGroupedAmountsTheCommitmentEditorAccepts() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val context = TestStorageContext(app as Context, "analytics-budget-${UUID.randomUUID()}")
+        val container = AppContainer(context)
+        val workflow = AnalyticsWorkflow(container, context)
+        try {
+            assertEquals(500_000L, workflow.parseBudget("5,000"))
+            assertEquals(500_000L, workflow.parseBudget("٥٬٠٠٠"))
+            assertEquals(1_250L, workflow.parseBudget("١٢٫٥"))
+            assertTrue(runCatching { workflow.parseBudget("12,50") }.isFailure)
         } finally {
             workflow.close()
             container.close()

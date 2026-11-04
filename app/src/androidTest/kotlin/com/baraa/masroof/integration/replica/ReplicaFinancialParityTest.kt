@@ -154,7 +154,8 @@ internal object ReferenceHistory {
             ProviderSmsRecord("replica-history-$index",json.getValue("sender").jsonPrimitive.content,body,today.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().plusSeconds(index.toLong()))
         }
         return object : SmsDataSource {
-            override fun queryInbox(receivedAfter: Instant?) = records.asSequence().filter { receivedAfter == null || !it.receivedAt.isBefore(receivedAfter) }.map { InboxRow.Valid(it) }
+            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+            fun queryInbox(receivedAfter: Instant?) = records.asSequence().filter { receivedAfter == null || !it.receivedAt.isBefore(receivedAfter) }.map { InboxRow.Valid(it) }
         }
     }
 }

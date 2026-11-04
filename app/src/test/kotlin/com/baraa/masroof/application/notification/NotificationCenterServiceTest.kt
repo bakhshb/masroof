@@ -75,6 +75,67 @@ class NotificationCenterServiceTest {
         assertTrue(prefs.getReadIds().isEmpty())
     }
 
+    @Test
+    fun `foreign currency read state survives browsing another period and a language change`() {
+        val prefs = FakeNotificationPreferencesRepository()
+        val service = NotificationCenterService(prefs)
+        fun snapshot(count: Int, label: String, key: String) = NotificationCenterSnapshot(
+            smsPermissionGranted = true,
+            reviewRequiredCount = 0,
+            unregisteredCardCount = 0,
+            unregisteredAccountCount = 0,
+            excludedForeignCurrencyCount = count,
+            periodLabel = label,
+            periodKey = key,
+        )
+
+        val august = service.build(snapshot(2, "Aug 2026", "2026-08-01")).items.single()
+        service.markRead(august.id)
+        service.build(snapshot(0, "Jul 2026", "2026-07-01"))
+        val back = service.build(snapshot(2, "أغسطس 2026", "2026-08-01"))
+
+        assertEquals(0, back.unreadCount)
+        assertTrue(back.items.single().isRead)
+    }
+
+    @Test
+    fun `an old label-keyed foreign currency read id is pruned`() {
+        val prefs = FakeNotificationPreferencesRepository()
+        prefs.markRead("foreign_currency:Aug 2026")
+        NotificationCenterService(prefs).build(
+            NotificationCenterSnapshot(
+                smsPermissionGranted = true,
+                reviewRequiredCount = 0,
+                unregisteredCardCount = 0,
+                unregisteredAccountCount = 0,
+                excludedForeignCurrencyCount = 0,
+                periodLabel = "Aug 2026",
+            ),
+        )
+        assertTrue(prefs.getReadIds().isEmpty())
+    }
+
+    @Test
+    fun `only the newest foreign currency period read ids are kept`() {
+        val prefs = FakeNotificationPreferencesRepository()
+        val starts = (0 until NotificationCenterService.MAX_KEPT_FOREIGN_CURRENCY_PERIODS + 3)
+            .map { java.time.LocalDate.parse("2025-01-01").plusMonths(it.toLong()) }
+        starts.forEach { prefs.markRead(NotificationCenterService.foreignCurrencyId(it.toString())) }
+        NotificationCenterService(prefs).build(
+            NotificationCenterSnapshot(
+                smsPermissionGranted = true,
+                reviewRequiredCount = 0,
+                unregisteredCardCount = 0,
+                unregisteredAccountCount = 0,
+                excludedForeignCurrencyCount = 0,
+                periodLabel = "",
+            ),
+        )
+        val expected = starts.takeLast(NotificationCenterService.MAX_KEPT_FOREIGN_CURRENCY_PERIODS)
+            .map { NotificationCenterService.foreignCurrencyId(it.toString()) }.toSet()
+        assertEquals(expected, prefs.getReadIds())
+    }
+
     private class FakeNotificationPreferencesRepository : NotificationPreferencesRepository {
         private var readIds: Set<String> = emptySet()
 

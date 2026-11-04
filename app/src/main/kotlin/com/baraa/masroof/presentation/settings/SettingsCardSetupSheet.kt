@@ -17,6 +17,7 @@ import com.baraa.masroof.ui.theme.MasroofSpacing
 fun SettingsCardSetupSheet(
     target: ManagedCardUi?, suggestion: CardType?, cards: List<ManagedCardUi>, accounts: List<ManagedAccountUi>,
     busy: Boolean, failed: Boolean, onDismiss: () -> Unit, onSave: (CardConfiguration) -> Unit,
+    failureRes: Int = R.string.settings_update_failed,
 ) {
     target ?: return
     key(target.bank.id, target.last4) {
@@ -79,7 +80,7 @@ fun SettingsCardSetupSheet(
                     }, { account = it.ifEmpty { null } }, { "card-account-$it" })
                 }
                 if (blocksDependents) MasroofText(stringResource(R.string.settings_card_dependents_block), color = MaterialTheme.colorScheme.error)
-                if (failed) MasroofText(stringResource(R.string.settings_update_failed), color = MaterialTheme.colorScheme.error)
+                if (failed) MasroofText(stringResource(failureRes), color = MaterialTheme.colorScheme.error)
             }
         }
     }

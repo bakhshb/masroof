@@ -163,22 +163,32 @@ class DatabaseBackupService(
                         }
                     }
                     FileInputStream(plainZip).use { extractValidated(it, directory) }
-                    val manifest = BackupPackageCodec.decodeManifest(File(directory, BackupPackageFormat.MANIFEST_ENTRY).readText())
+                    // Same outcomes as importOnIo: an unreadable manifest or preferences file is an invalid package.
+                    val manifest = runCatching {
+                        BackupPackageCodec.decodeManifest(File(directory, BackupPackageFormat.MANIFEST_ENTRY).readText())
+                    }.getOrElse { return@withLock BackupVerificationOutcome.INVALID_PACKAGE }
                     if (!BackupPackageCodec.validateManifest(manifest, MasroofDatabase.VERSION, MasroofDatabase.IDENTITY_HASH)) {
                         return@withLock BackupVerificationOutcome.INVALID_PACKAGE
                     }
                     if (readIdentityHash(File(directory, BackupPackageFormat.DATABASE_ENTRY)) != MasroofDatabase.IDENTITY_HASH) {
                         return@withLock BackupVerificationOutcome.INVALID_PACKAGE
                     }
-                    BackupPackageCodec.decodePreferences(File(directory, BackupPackageFormat.PREFERENCES_ENTRY).readText())
+                    runCatching {
+                        BackupPackageCodec.decodePreferences(File(directory, BackupPackageFormat.PREFERENCES_ENTRY).readText())
+                    }.getOrElse { return@withLock BackupVerificationOutcome.INVALID_PACKAGE }
                     BackupVerificationOutcome.VERIFIED
                 }
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
+        } catch (_: BackupArchiveException) {
+            BackupVerificationOutcome.INVALID_PACKAGE
         } catch (failure: BackupFailureException) {
-            if (failure.category == BackupFailureCategory.AUTHENTICATION_FAILED) BackupVerificationOutcome.AUTHENTICATION_FAILED
-            else BackupVerificationOutcome.INVALID_PACKAGE
+            when (failure.category) {
+                BackupFailureCategory.AUTHENTICATION_FAILED -> BackupVerificationOutcome.AUTHENTICATION_FAILED
+                BackupFailureCategory.IMPORT_FAILED -> BackupVerificationOutcome.FAILED
+                else -> BackupVerificationOutcome.INVALID_PACKAGE
+            }
         } catch (error: Exception) {
             appLogService?.failure(AppLogCategories.BACKUP, "Backup verification", error)
             BackupVerificationOutcome.FAILED

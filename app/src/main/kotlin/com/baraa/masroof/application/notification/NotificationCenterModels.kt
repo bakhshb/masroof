@@ -40,6 +40,8 @@ data class NotificationCenterSnapshot(
     val unregisteredAccountCount: Int,
     val excludedForeignCurrencyCount: Int,
     val periodLabel: String,
+    /** Language-independent period identity (its start date) for the read state. */
+    val periodKey: String = "",
     val rescanStatusName: String? = null,
     val updateAvailableVersion: String? = null,
     val updateReadyVersion: String? = null,

@@ -40,6 +40,22 @@ class NotificationCenterStateMapperTest {
     }
 
     @Test
+    fun periodKeyIsTheUntranslatedPeriodStart() {
+        val state = notificationCenterExternalState(
+            dashboardState = DashboardUiState(
+                periodLabel = "أغسطس 2026",
+                period = com.baraa.masroof.domain.period.FinancialPeriod(
+                    java.time.LocalDate.parse("2026-08-01"),
+                    java.time.LocalDate.parse("2026-09-01"),
+                ),
+            ),
+            settingsState = SettingsUiState(),
+        )
+
+        assertEquals("2026-08-01", state.periodKey)
+    }
+
+    @Test
     fun idleUpdateStateOmitsUpdateNotifications() {
         val state = notificationCenterExternalState(
             dashboardState = DashboardUiState(periodLabel = "Aug 2026"),

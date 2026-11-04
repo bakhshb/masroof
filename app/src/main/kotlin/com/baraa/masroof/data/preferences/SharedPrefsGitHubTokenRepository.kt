@@ -12,7 +12,8 @@ import com.baraa.masroof.application.update.GitHubTokenRepository
  * repositories can be checked without credentials.
  *
  * When the keystore key cannot decrypt the stored payload, the ciphertext is
- * removed and [getToken] returns null. Update checks then run in no-token
+ * removed and [getToken] returns null. A thrown (transient) decrypt error keeps
+ * the ciphertext and returns null for that read only. Update checks then run in no-token
  * mode instead of throwing, and the user can enter the token again. This
  * preference file is not part of the database backup snapshot.
  */
@@ -35,10 +36,7 @@ class SharedPrefsGitHubTokenRepository(
             if (decryptOrNull(ciphertext) != trimmed) return@synchronized false
             val previous = prefs.getString(KEY_TOKEN_CIPHERTEXT, null)
             if (!prefs.edit().putString(KEY_TOKEN_CIPHERTEXT, ciphertext).commit()) {
-                return@synchronized false
-            }
-            val stored = prefs.getString(KEY_TOKEN_CIPHERTEXT, null)
-            if (stored != ciphertext || decryptOrNull(stored) != trimmed) {
+                // A failed commit may still have changed the in-memory value.
                 val rollback = prefs.edit()
                 if (previous == null) {
                     rollback.remove(KEY_TOKEN_CIPHERTEXT)
@@ -49,8 +47,6 @@ class SharedPrefsGitHubTokenRepository(
                 return@synchronized false
             }
             prefs.edit().remove(KEY_TOKEN).commit()
-            decryptOrNull(prefs.getString(KEY_TOKEN_CIPHERTEXT, null).orEmpty()) == trimmed &&
-                !prefs.contains(KEY_TOKEN)
         }
     }
 
@@ -63,12 +59,23 @@ class SharedPrefsGitHubTokenRepository(
         }
     }
 
-    override fun hasToken(): Boolean = getToken() != null
+    /**
+     * A permanent decrypt failure drops the ciphertext during the read, so ciphertext still stored
+     * after a null read means a transient keystore error: the token is configured, just unreadable now.
+     */
+    override fun hasToken(): Boolean = synchronized(lock) {
+        readTokenLocked() != null || !prefs.getString(KEY_TOKEN_CIPHERTEXT, null).isNullOrBlank()
+    }
 
     private fun readTokenLocked(): String? {
         val ciphertext = prefs.getString(KEY_TOKEN_CIPHERTEXT, null)
         if (!ciphertext.isNullOrBlank()) {
-            val decrypted = decryptOrNull(ciphertext)
+            val decrypted = try {
+                encryptor.decrypt(ciphertext)
+            } catch (error: Exception) {
+                // Transient keystore error: keep the stored token for the next read.
+                return null
+            }
             if (!decrypted.isNullOrBlank()) {
                 if (prefs.contains(KEY_TOKEN)) {
                     prefs.edit().remove(KEY_TOKEN).commit()

@@ -83,7 +83,7 @@ class ReportedMessagesJourneyTest {
                 val state by dashboard.uiState.collectAsState()
                 state.allTransactions.find {it.id==state.selectedTransactionId}?.let { selected ->
                     TransactionDetailScreen(selected,state.selectedTransactionSms,state.selectedTransactionSmsLoading,
-                        false,false,false,error=null,onBack={},onReclassify={},onIgnore={})
+                        false,false,false,onBack={},onReclassify={},onIgnore={})
                 }
             }}}
             compose.runOnUiThread {dashboard.refresh()}
@@ -227,7 +227,6 @@ class ReportedMessagesJourneyTest {
             }
             assertTrue(c.financialTransactionRepository.listAll().isEmpty())
             TestRuntime.close()
-            TestStorageContext(host).getSharedPreferences("learning_runtime",0).edit().putString("scheduled_interpretation","previous").commit()
             c=TestRuntime.container(host)
             c.awaitPostStartupBackgroundWorkForTesting()
             requireNotNull(c.interpretationService).synchronizeFeedback()

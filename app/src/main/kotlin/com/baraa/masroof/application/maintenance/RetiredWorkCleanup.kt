@@ -4,6 +4,7 @@ import android.content.Context
 import android.app.NotificationManager
 import androidx.work.WorkManager
 import androidx.work.await
+import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -31,7 +32,8 @@ object RetiredWorkCleanup {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                log.warn("MAINTENANCE", "Retired work cleanup stage=cancel failed=1 retry=pending (${e.javaClass.simpleName})")
+                // The retired jobs are SMS processing and recovery workers, so the failure belongs with the SMS pipeline.
+                log.warn(AppLogCategories.SMS, "Retired work cleanup stage=cancel failed=1 retry=pending (${e.javaClass.simpleName})")
             }
         }
     }

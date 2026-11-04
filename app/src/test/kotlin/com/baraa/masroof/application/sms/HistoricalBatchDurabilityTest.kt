@@ -65,7 +65,8 @@ class HistoricalBatchDurabilityTest {
         LiveSmsProcessingHarness(context()).use { harness ->
             val raw = LiveSmsProcessingHarness.liveSms()
             val source = object : SmsDataSource {
-                override fun queryInbox(receivedAfter: Instant?) = sequenceOf(
+                override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+                fun queryInbox(receivedAfter: Instant?) = sequenceOf(
                     InboxRow.Valid(ProviderSmsRecord("history-1", raw.sender, raw.body, raw.receivedAt)),
                 )
             }
@@ -83,7 +84,8 @@ class HistoricalBatchDurabilityTest {
             val queryThread = AtomicReference<Thread>()
             val iteratorThread = AtomicReference<Thread>()
             val source = object : SmsDataSource {
-                override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> {
+                override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+                fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> {
                     queryThread.set(Thread.currentThread())
                     return sequence { iteratorThread.set(Thread.currentThread()) }
                 }

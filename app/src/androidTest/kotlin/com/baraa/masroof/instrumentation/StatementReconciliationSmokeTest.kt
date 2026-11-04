@@ -389,7 +389,6 @@ class StatementReconciliationSmokeTest {
         try {
             composeRule.onNodeWithTag(tag)
                 .assertIsDisplayed()
-                .assertTextContains(status.name, substring = true)
                 .assertTextContains(count.toString(), substring = true)
         } catch (error: AssertionError) {
             throw AssertionError(
@@ -406,7 +405,6 @@ class StatementReconciliationSmokeTest {
         try {
             composeRule.onNodeWithTag(section)
                 .assertIsDisplayed()
-                .assertTextContains(status.name, substring = true)
         } catch (error: AssertionError) {
             throw AssertionError(emulatorMessage("${status.name} section was not shown"), error)
         }

@@ -62,7 +62,7 @@ class NotificationCenterService(
 
         if (snapshot.excludedForeignCurrencyCount > 0) {
             items += NotificationItem(
-                id = foreignCurrencyId(snapshot.periodLabel),
+                id = foreignCurrencyId(snapshot.periodKey),
                 type = NotificationType.FOREIGN_CURRENCY,
                 count = snapshot.excludedForeignCurrencyCount,
                 periodLabel = snapshot.periodLabel,
@@ -100,11 +100,24 @@ class NotificationCenterService(
 
     private fun pruneStaleReadIds(activeIds: Set<String>) {
         val readIds = preferencesRepository.getReadIds()
-        val pruned = readIds.intersect(activeIds)
+        // A foreign-currency notice belongs to one period; browsing another period must not forget it was read.
+        // Only the newest periods are kept, so the stored set stays bounded.
+        val keptPeriods = readIds.mapNotNull(::foreignCurrencyPeriodStart)
+            .sortedDescending()
+            .take(MAX_KEPT_FOREIGN_CURRENCY_PERIODS)
+            .toSet()
+        val pruned = readIds.filterTo(mutableSetOf()) { id ->
+            id in activeIds || foreignCurrencyPeriodStart(id)?.let { it in keptPeriods } == true
+        }
         if (pruned != readIds) {
             preferencesRepository.setReadIds(pruned)
         }
     }
+
+    // Old ids carried a translated period title; only the period-start form survives pruning.
+    private fun foreignCurrencyPeriodStart(id: String): java.time.LocalDate? =
+        if (!id.startsWith(FOREIGN_CURRENCY_PREFIX)) null
+        else runCatching { java.time.LocalDate.parse(id.removePrefix(FOREIGN_CURRENCY_PREFIX)) }.getOrNull()
 
     companion object {
         const val ID_SMS_PERMISSION: String = "sms_permission"
@@ -112,7 +125,12 @@ class NotificationCenterService(
         const val ID_UNREGISTERED_CARDS: String = "unregistered_cards"
         const val ID_UNREGISTERED_ACCOUNTS: String = "unregistered_accounts"
 
-        fun foreignCurrencyId(periodLabel: String): String = "foreign_currency:$periodLabel"
+        private const val FOREIGN_CURRENCY_PREFIX: String = "foreign_currency:"
+
+        /** Read foreign-currency notices kept for periods not currently shown (about a year of salary periods). */
+        internal const val MAX_KEPT_FOREIGN_CURRENCY_PERIODS: Int = 12
+
+        fun foreignCurrencyId(periodKey: String): String = "$FOREIGN_CURRENCY_PREFIX$periodKey"
 
         fun rescanId(statusName: String): String = "rescan:$statusName"
 

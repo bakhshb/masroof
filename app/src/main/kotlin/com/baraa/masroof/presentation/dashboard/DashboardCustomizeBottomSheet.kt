@@ -26,6 +26,9 @@ import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
 import com.baraa.masroof.application.dashboard.DashboardSectionId
 import com.baraa.masroof.presentation.common.MasroofIcons
 
+/** Sections the customize sheet does not list; Up/Down steps past them. */
+internal val CUSTOMIZE_SHEET_HIDDEN_SECTIONS = setOf(DashboardSectionId.CARDS, DashboardSectionId.LOANS)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardCustomizeBottomSheet(
@@ -40,9 +43,10 @@ fun DashboardCustomizeBottomSheet(
     com.baraa.masroof.presentation.common.MasroofBottomSheet(
         title = stringResource(R.string.dashboard_customize_sheet_title), onDismiss = onDismiss,
         onApply = onSave, applyLabel = stringResource(R.string.dashboard_customize_save)) {
-        draft.sections.filter { it.id != DashboardSectionId.CARDS && it.id != DashboardSectionId.LOANS }.forEach { entry ->
-            CustomizeSectionRow(entry, draft.sections.indexOf(entry) > 0,
-                draft.sections.indexOf(entry) < draft.sections.lastIndex, { onToggleSection(entry.id) },
+        val shown = draft.sections.filter { it.id !in CUSTOMIZE_SHEET_HIDDEN_SECTIONS }
+        shown.forEachIndexed { index, entry ->
+            CustomizeSectionRow(entry, index > 0,
+                index < shown.lastIndex, { onToggleSection(entry.id) },
                 { onMoveSection(entry.id, -1) }, { onMoveSection(entry.id, 1) },
                 if (entry.id == DashboardSectionId.QUICK) ({
                     QuickChildToggle(stringResource(R.string.dashboard_quick_total_expense), draft.quickExpenseVisible, onToggleQuickExpense)

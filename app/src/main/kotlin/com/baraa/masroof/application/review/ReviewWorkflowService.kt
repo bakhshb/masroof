@@ -108,7 +108,8 @@ class ReviewWorkflowService(
             val failedIds = report.failedRawSmsIds.ifEmpty {
                 report.reviewCandidates.mapTo(linkedSetOf()) { it.rawSmsId } + report.settledRawSmsIds
             }
-            retainHistoricalRetry(failedIds, failureCount = report.summary.failed.coerceAtLeast(1))
+            retainHistoricalRetry(failedIds, failureCount = report.summary.failed.coerceAtLeast(1),
+                ReconciliationCompletionPolicy.STAGE_REVIEW_UPDATE)
             throw incomplete(
                 failedIds,
                 report.summary.failed.coerceAtLeast(1),
@@ -155,7 +156,8 @@ class ReviewWorkflowService(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            retainHistoricalRetry(rawSmsIds, failureCount = report.summary.failed.coerceAtLeast(1))
+            retainHistoricalRetry(rawSmsIds, failureCount = report.summary.failed.coerceAtLeast(1),
+                ReconciliationCompletionPolicy.STAGE_REVIEW_UPDATE)
             return incomplete(
                 rawSmsIds,
                 report.summary.failed.coerceAtLeast(1),
@@ -620,9 +622,13 @@ class ReviewWorkflowService(
      * Keeps an already saved manual decision and records the failed RawSms ids for
      * one historical recovery pass. Does not reopen a non-financial resolution.
      */
-    private suspend fun retainHistoricalRetry(rawSmsIds: Collection<String>, failureCount: Int) {
+    private suspend fun retainHistoricalRetry(
+        rawSmsIds: Collection<String>,
+        failureCount: Int,
+        stage: String = ReconciliationCompletionPolicy.STAGE_RECONCILIATION,
+    ) {
         logIncomplete(
-            stage = ReconciliationCompletionPolicy.STAGE_RECONCILIATION,
+            stage = stage,
             failureCount = failureCount,
             rawSmsIds = rawSmsIds,
             retryState = "historical_batch",

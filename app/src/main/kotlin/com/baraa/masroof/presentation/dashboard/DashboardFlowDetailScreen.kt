@@ -85,6 +85,7 @@ fun DashboardFlowDetailScreen(
             DashboardSummaryTransactionsSection(
                 transactions = flowTransactions,
                 onOpenTransaction = onOpenTransaction,
+                ownedCards = state.ownedCards,
             )
         }
     }
