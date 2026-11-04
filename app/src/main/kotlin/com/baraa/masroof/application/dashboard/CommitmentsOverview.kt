@@ -194,7 +194,9 @@ object CommitmentsOverviewBuilder {
             val rowDate = if (isPaid && matchedPayment != null) {
                 matchedPayment.occurredAt.atZone(zoneId).toLocalDate()
             } else {
-                commitment.dueDate ?: occurrence
+                // dueDate is one fixed calendar date; a recurring row shows it only in the period that holds it.
+                commitment.dueDate?.takeIf { commitment.recurrence == null || isDateInPeriod(it, salaryPeriod) }
+                    ?: occurrence
             }
             CommitmentDashboardRow(
                 key = if (matchedPayment != null) {
