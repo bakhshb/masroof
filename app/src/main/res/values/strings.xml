@@ -294,7 +294,7 @@
     <string name="dashboard_account_remaining_calculated_hint">وارد − منصرف (تحويلات خارجية، سداد البطاقة الائتمانية، سحب نقدي، فواتير، أقساط تمويل، مدى، رسوم)</string>
     <string name="dashboard_accounts_remaining_total_title">صافي حركة الحسابات</string>
     <string name="dashboard_accounts_fleet_total_hint">مجموع كل الوارد − كل المنصرف لجميع حساباتك</string>
-    <string name="dashboard_account_linked_mada_label">مدى مربوط: %1$s</string>
+    <string name="dashboard_account_linked_mada_label">مربوط: %1$s</string>
     <string name="dashboard_summary_transactions_title">الحركات المالية (%1$d)</string>
     <string name="dashboard_summary_transactions_empty">لا توجد حركات في هذه الفترة</string>
     <string name="dashboard_summary_view_all_transactions">عرض كل الحركات ›</string>

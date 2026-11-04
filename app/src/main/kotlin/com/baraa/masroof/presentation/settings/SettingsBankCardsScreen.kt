@@ -265,7 +265,9 @@ private fun cardSubtitle(card: ManagedCardUi): String? {
         (card.cardRole == CardRole.PRIMARY || card.cardRole == CardRole.SUPPLEMENTARY)
     val parts = buildList {
         card.cardNetwork?.takeIf { !titleShowsNetwork }?.let { add(cardNetworkLabel(it)) }
-        card.cardRole?.takeIf { !titleShowsRole }?.let { add(cardRoleLabel(it)) }
+        // Primary/supplementary is a credit-card idea; a Mada or debit card has no role to show.
+        card.cardRole?.takeIf { !titleShowsRole && card.cardNetwork != CardNetwork.MADA && card.cardType != CardType.DEBIT }
+            ?.let { add(cardRoleLabel(it)) }
         card.linkedAccountMaskedNumber?.let {
             add(stringResource(R.string.settings_linked_account_suffix, it.takeLast(4)))
         }

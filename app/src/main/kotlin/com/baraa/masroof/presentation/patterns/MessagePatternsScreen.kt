@@ -279,8 +279,11 @@ fun MessagePatternsScreen(workflow: MessagePatternsWorkflow, initialBankId: Stri
                 }
                 else -> {
                     MasroofCard {
-                        Text(bank.displayName ?: bank.bankId, style = MaterialTheme.typography.titleMedium)
-                        Text(bank.senders.joinToString(), style = MaterialTheme.typography.bodySmall)
+                        val bankName = bank.displayName ?: bank.bankId
+                        Text(bankName, style = MaterialTheme.typography.titleMedium)
+                        // A sender spelled like the bank name would only repeat the title.
+                        bank.senders.filter { it != bankName }.takeIf { it.isNotEmpty() }
+                            ?.let { Text(it.joinToString(), style = MaterialTheme.typography.bodySmall) }
                     }
                     if (source != null && source.sender !in bank.senders) Text(stringResource(R.string.pattern_sender_mismatch), color = MaterialTheme.colorScheme.error)
                     MasroofButton(onClick = { teaching = true; editingPatternId = null; editingBody = ""; savedTeaching = false; savedBody = "" },

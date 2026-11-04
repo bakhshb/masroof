@@ -35,7 +35,7 @@
     <string name="reference_refunds">Refunds</string>
     <string name="reference_followed">Tracked</string>
     <string name="reference_unconfirmed">Unconfirmed</string>
-    <string name="reference_stopped">Paused</string>
+    <string name="reference_stopped">Stopped</string>
     <string name="reference_manage_accounts">My accounts · Manage</string>
     <string name="reference_manage_cards">Manage cards</string>
     <string name="reference_manage_loans">My loans · Manage</string>
