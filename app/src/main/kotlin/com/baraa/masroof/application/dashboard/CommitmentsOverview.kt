@@ -42,7 +42,10 @@ data class CommitmentDashboardRow(
     val paymentMatchIssue: CommitmentMatchIssue? = null,
     /** Set for a loan without a user name, so screens show its localized type instead of [displayName]. */
     val loanTypeFallback: LoanType? = null,
-)
+) {
+    /** Calendar days from [today] to the expected date: 0 today, 1 tomorrow, negative when late; null without a date. */
+    fun daysUntil(today: LocalDate): Long? = expectedDate?.let { java.time.temporal.ChronoUnit.DAYS.between(today, it) }
+}
 
 data class CommitmentsOverview(
     val rows: List<CommitmentDashboardRow>,
@@ -60,8 +63,7 @@ data class CommitmentsOverview(
 
     /** Unpaid rows, nearest due date first; rows without a date go last. Ties keep name order. */
     val upcomingUnpaid: List<CommitmentDashboardRow>
-        get() = rows.filter { it.status == CommitmentPaymentStatus.UNPAID }
-            .sortedWith(compareBy<CommitmentDashboardRow> { it.expectedDate == null }.thenBy { it.expectedDate })
+        get() = rows.filter { it.status == CommitmentPaymentStatus.UNPAID }.sortedWith(DISPLAY_ORDER)
 
     companion object {
         fun empty(currency: Currency = Currency.SAR): CommitmentsOverview {
@@ -76,6 +78,10 @@ data class CommitmentsOverview(
         }
     }
 }
+
+/** What is still to pay comes first, nearest date first; undated rows and paid rows follow. Ties keep name order. */
+internal val DISPLAY_ORDER = compareBy<CommitmentDashboardRow> { it.status == CommitmentPaymentStatus.PAID }
+    .thenBy { it.expectedDate == null }.thenBy { it.expectedDate }.thenBy { it.displayName.lowercase() }
 
 /** Key prefix of a credit facility's commitment row; due alerts carry it inside their id. */
 const val CREDIT_COMMITMENT_KEY_PREFIX = "credit:"
@@ -121,7 +127,7 @@ object CommitmentsOverviewBuilder {
                 ),
             )
             addAll(buildLoanRows(loansOverview))
-        }.sortedBy { it.displayName.lowercase() }
+        }.sortedWith(DISPLAY_ORDER)
 
         if (rows.isEmpty()) {
             return CommitmentsOverview.empty(primaryCurrency)

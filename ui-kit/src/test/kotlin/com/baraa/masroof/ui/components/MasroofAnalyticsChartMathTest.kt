@@ -19,6 +19,11 @@ class MasroofAnalyticsChartMathTest {
         assertEquals(setOf(0), MasroofAnalyticsChartMath.axisIndices(1))
         assertTrue(MasroofAnalyticsChartMath.axisIndices(0).isEmpty())
     }
+    @Test fun shortChartsLabelEveryBar() {
+        assertEquals((0 until 6).toSet(), MasroofAnalyticsChartMath.axisIndices(6)) // six salary periods: no month skipped
+        assertEquals((0 until 7).toSet(), MasroofAnalyticsChartMath.axisIndices(7))
+        assertEquals(5, MasroofAnalyticsChartMath.axisIndices(8).size)
+    }
     @Test fun dailySelectionUsesBarCellsAndHandlesEmptyCharts() {
         assertNull(MasroofAnalyticsChartMath.barAt(10f, 100f, 0))
         assertNull(MasroofAnalyticsChartMath.barAt(10f, 0f, 5))

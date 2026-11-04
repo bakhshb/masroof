@@ -87,7 +87,7 @@ fun MasroofDailyBarChart(points: List<MasroofDailyBar>, selectedIndex: Int, onSe
                 pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(MasroofSpacing.inlineGap.toPx(), MasroofSpacing.inlineGap.toPx())))
             if (index in axisIndices) {
                 val label = measurer.measure(point.axisLabel, textStyle)
-                drawText(label, topLeft = Offset((x - label.size.width / 2).coerceIn(inset, (size.width - label.size.width).coerceAtLeast(inset)), bottom + MasroofSpacing.inlineGap.toPx()))
+                drawText(label, topLeft = Offset((x + cell * MasroofAnalyticsTokens.barWidthFraction / 2 - label.size.width / 2).coerceIn(inset, (size.width - label.size.width).coerceAtLeast(inset)), bottom + MasroofSpacing.inlineGap.toPx()))
             }
         }
     }

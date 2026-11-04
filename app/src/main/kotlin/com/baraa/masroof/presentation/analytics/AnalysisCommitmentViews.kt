@@ -60,7 +60,7 @@ import com.baraa.masroof.ui.theme.MasroofThemeExtras
                     stringResource(R.string.analysis_commitments_total))
                 val horizon = view.daysToPeriodEnd.coerceAtLeast(1)
                 val marks = view.rows.filter { it.daysUntil != null && it.daysUntil in 0..view.daysToPeriodEnd }
-                    .groupBy { it.daysUntil!! }.map { (days, rows) -> MasroofTimelineMark(days.toFloat() / horizon, rows.size, days <= SOON_DAYS) }
+                    .groupBy { it.daysUntil!! }.map { (days, rows) -> MasroofTimelineMark(days.toFloat() / horizon, rows.size, days <= DUE_SOON_DAYS) }
                 if (marks.isNotEmpty()) MasroofDueTimeline(marks, stringResource(R.string.analysis_due_today),
                     AppDigits.display(day(snapshot.periodEnd - 1)),
                     AppDigits.display(stringResource(R.string.analysis_due_timeline, day(snapshot.periodEnd - 1))))
@@ -73,8 +73,6 @@ import com.baraa.masroof.ui.theme.MasroofThemeExtras
         }
     }
 }
-
-private const val SOON_DAYS = 2L
 
 @Composable private fun duePalette(): List<androidx.compose.ui.graphics.Color> {
     val extended = MasroofThemeExtras.extendedColors
@@ -94,7 +92,7 @@ private const val SOON_DAYS = 2L
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
                 MasroofAmountText(visualMoney(due.amount), MasroofAmountRole.Card)
-                dueBadge(row)?.let { (text, accent) -> MasroofBadge(AppDigits.display(text), accent) }
+                dueBadge(row)?.let { (text, accent) -> MasroofBadge(text, accent) }
             }
         }
     }
@@ -102,12 +100,5 @@ private const val SOON_DAYS = 2L
 
 @Composable private fun dueBadge(row: AnalysisDueRow): Pair<String, MasroofCardAccent>? {
     if (!row.due.confirmed) return stringResource(R.string.lab_analysis_estimated) to MasroofCardAccent.None
-    val days = row.daysUntil ?: return null
-    val accent = if (days <= SOON_DAYS) MasroofCardAccent.Liability else MasroofCardAccent.None
-    return when {
-        days < 0 -> stringResource(R.string.analysis_due_overdue, -days) to MasroofCardAccent.Outflow
-        days == 0L -> stringResource(R.string.analysis_due_today) to accent
-        days == 1L -> stringResource(R.string.analysis_due_tomorrow) to accent
-        else -> stringResource(R.string.analysis_due_in_days, days) to accent
-    }
+    return row.daysUntil?.let { dueCountdown(it) }
 }
