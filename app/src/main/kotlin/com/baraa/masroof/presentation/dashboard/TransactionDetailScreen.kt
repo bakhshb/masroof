@@ -60,7 +60,9 @@ fun TransactionDetailScreen(
     markingCommitment: Boolean = false,
     isCommitted: Boolean = false,
     markCommitmentSuccess: Boolean = false,
-    error: String?,
+    reclassifyError: String? = null,
+    ignoreError: String? = null,
+    markCommitmentError: String? = null,
     onBack: () -> Unit,
     onReclassify: (FinancialTransactionType) -> Unit,
     onIgnore: () -> Unit,
@@ -441,15 +443,14 @@ fun TransactionDetailScreen(
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
-            error?.let { reason ->
-                val isIgnoreError = reason in IGNORE_ERROR_REASONS
-                val isMarkCommitmentError = reason in MARK_COMMITMENT_ERROR_REASONS
+            (reclassifyError ?: ignoreError ?: markCommitmentError)?.let { reason ->
+                val isMarkCommitmentError = reclassifyError == null && ignoreError == null
                 Text(
                     stringResource(
                         when {
-                            isIgnoreError -> R.string.transaction_detail_ignore_failed
-                            isMarkCommitmentError -> R.string.transaction_detail_mark_commitment_failed
-                            else -> R.string.transaction_detail_reclassify_failed
+                            reclassifyError != null -> R.string.transaction_detail_reclassify_failed
+                            ignoreError != null -> R.string.transaction_detail_ignore_failed
+                            else -> R.string.transaction_detail_mark_commitment_failed
                         },
                     ),
                     color = MaterialTheme.colorScheme.error,
@@ -476,15 +477,3 @@ fun TransactionDetailScreen(
         }
     }
 }
-
-private val IGNORE_ERROR_REASONS = setOf(
-    "delete_failed",
-    "review_resolution_failed",
-)
-
-private val MARK_COMMITMENT_ERROR_REASONS = setOf(
-    "transaction_not_found",
-    "invalid_transaction",
-    "already_exists",
-    "create_failed",
-)

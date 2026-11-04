@@ -83,7 +83,7 @@ class ReportedMessagesJourneyTest {
                 val state by dashboard.uiState.collectAsState()
                 state.allTransactions.find {it.id==state.selectedTransactionId}?.let { selected ->
                     TransactionDetailScreen(selected,state.selectedTransactionSms,state.selectedTransactionSmsLoading,
-                        false,false,false,error=null,onBack={},onReclassify={},onIgnore={})
+                        false,false,false,onBack={},onReclassify={},onIgnore={})
                 }
             }}}
             compose.runOnUiThread {dashboard.refresh()}
