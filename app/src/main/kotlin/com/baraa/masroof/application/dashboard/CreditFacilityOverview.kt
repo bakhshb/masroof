@@ -115,21 +115,18 @@ object CreditFacilityOverviewBuilder {
             }
             .map { entry ->
                 val cardKey = CardTransactionInvolvementResolver.cardKey(entry.bank.id, entry.last4)
+                val linkedMasked = entry.linkedAccountMaskedNumber
+                    ?: DebitLinkedAccountInferrer.inferAccountLast4(
+                        bank = entry.bank,
+                        cardLast4 = entry.last4,
+                        parsedRecords = parsedRecords,
+                    )
                 DebitCardOverview(
                     bank = entry.bank,
                     last4 = entry.last4,
                     displayLabel = RegistryDisplayLabels.cardLabel(entry),
-                    linkedAccountLabel = resolveLinkedAccountLabel(
-                        entry = entry,
-                        registryAccounts = registryAccounts,
-                        parsedRecords = parsedRecords,
-                    ),
-                    linkedAccountMaskedNumber = entry.linkedAccountMaskedNumber
-                        ?: DebitLinkedAccountInferrer.inferAccountLast4(
-                            bank = entry.bank,
-                            cardLast4 = entry.last4,
-                            parsedRecords = parsedRecords,
-                        ),
+                    linkedAccountLabel = linkedMasked?.let { linkedAccountLabel(entry, it, registryAccounts) },
+                    linkedAccountMaskedNumber = linkedMasked,
                     network = entry.cardNetwork,
                     salaryPeriodSpendingNet = debitSpendingByCardKey[cardKey]
                         ?: SignedMoneyAmount.zero(overview.currency),
@@ -152,7 +149,7 @@ object CreditFacilityOverviewBuilder {
                     .filter {
                         it.bank == primaryEntry.bank && it.parentCardLast4 == primaryEntry.last4
                     }
-                    .mapNotNull {
+                    .map {
                         rowByBankAndLast4[it.bank to it.last4] ?: placeholderRow(it, overview)
                     }
                 add(buildFacility(overview, primaryRow, supplements))
@@ -175,14 +172,6 @@ object CreditFacilityOverviewBuilder {
                     ?: placeholderRow(orphan, overview)
                 add(buildFacility(overview, row, emptyList()))
             }
-        }
-
-        if (facilities.isEmpty() && debitCards.isEmpty()) {
-            return CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = overview.currency,
-            )
         }
 
         return CreditFacilitiesOverview(
@@ -233,28 +222,14 @@ object CreditFacilityOverviewBuilder {
     private fun com.baraa.masroof.domain.model.OwnershipStatus.isOwned(): Boolean =
         this == com.baraa.masroof.domain.model.OwnershipStatus.OWNED
 
-    private fun resolveLinkedAccountLabel(
+    private fun linkedAccountLabel(
         entry: CardRegistryEntry,
+        masked: String,
         registryAccounts: List<com.baraa.masroof.domain.model.AccountRegistryEntry>,
-        parsedRecords: List<ParsedEventRecord>,
-    ): String? {
-        val masked = entry.linkedAccountMaskedNumber
-            ?: DebitLinkedAccountInferrer.inferAccountLast4(
-                bank = entry.bank,
-                cardLast4 = entry.last4,
-                parsedRecords = parsedRecords,
-            )
-            ?: return null
-        val accountEntry = registryAccounts.find {
+    ): String =
+        registryAccounts.find {
             it.bank == entry.bank &&
                 (it.maskedNumber == masked || it.maskedNumber.endsWith(masked))
-        } ?: com.baraa.masroof.domain.model.AccountRegistryEntry.forTest(
-            bank = entry.bank,
-            maskedNumber = masked,
-            ownership = entry.ownership,
-            firstSeenRawSmsId = null,
-            lastSeenRawSmsId = null,
-        )
-        return RegistryDisplayLabels.accountLabel(accountEntry)
-    }
+        }?.let(RegistryDisplayLabels::accountLabel)
+            ?: RegistryDisplayLabels.defaultAccountLabel(masked)
 }
