@@ -202,8 +202,8 @@ object TransactionMatcher {
         outgoing: TransferMatchCandidate,
         incoming: TransferMatchCandidate,
     ): Boolean {
-        val outRef = outgoing.transactionReference?.trim().orEmpty()
-        val inRef = incoming.transactionReference?.trim().orEmpty()
+        val outRef = normalizedReference(outgoing.transactionReference)
+        val inRef = normalizedReference(incoming.transactionReference)
         if (outRef.isNotEmpty() && outRef == inRef) return true
 
         if (hasIntraBankAccountBridge(outgoing, incoming)) return true

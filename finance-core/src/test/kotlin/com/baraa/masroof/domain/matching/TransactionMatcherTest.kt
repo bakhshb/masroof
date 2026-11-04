@@ -47,6 +47,15 @@ class TransactionMatcherTest {
         }
     }
 
+    /** Only the reference bridges this cross-bank pair, and its case differs between the two banks. */
+    @Test
+    fun referenceBridgeIgnoresCase() {
+        val outgoing = outgoing(reference = "FT26ABC", destination = AccountReference(Bank.UNKNOWN, "9999"))
+        val incoming = incoming(reference = "ft26abc")
+
+        assertTrue(TransactionMatcher.compatiblePair(outgoing, incoming))
+    }
+
     @Test
     fun doesNotMatchAmbiguousCandidates() {
         val outgoing = outgoing(reference = "ref-1")
