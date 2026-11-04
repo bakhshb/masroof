@@ -14,7 +14,6 @@ import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.MainActivity
 import com.baraa.masroof.data.analytics.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 class AnalyticsWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
