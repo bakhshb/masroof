@@ -52,9 +52,9 @@ class LiveCaptureRecoveryWorker(
             }
             when (result.failure) {
                 // A capture that failed again stored nothing; rows already stored come back as duplicates.
-                null -> if (result.failed > 0) retryOrRequeue(after, "capture") else Result.success()
-                // The batch keeps retry rows for what it stored; a capture that failed again has none.
-                is SmsScanFailure.DerivedIncomplete -> if (result.failed > 0) retryOrRequeue(after, "capture") else Result.success()
+                // An incomplete batch keeps retry rows for what it stored; a capture that failed again has none.
+                null, is SmsScanFailure.DerivedIncomplete ->
+                    if (result.failed > 0) retryOrRequeue(after, "capture") else Result.success()
                 SmsScanFailure.PermissionDenied -> giveUp("permission")
                 is SmsScanFailure.ProviderError -> retryOrRequeue(after, "provider")
             }
