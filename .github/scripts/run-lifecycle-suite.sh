@@ -4,19 +4,10 @@ set -euo pipefail
 suite="${1:-}"
 phase="${2:-}"
 case "$suite:$phase" in
-  production:build|production:test) ;;
-  *) echo "Usage: $0 production build|test" >&2; exit 2 ;;
+  production:test) ;;
+  *) echo "Usage: $0 production test" >&2; exit 2 ;;
 esac
 test "$#" -eq 2
-SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-test -n "$SDK_DIR"
-printf 'sdk.dir=%s\n' "$SDK_DIR" > local.properties
-
-# Compile before boot; don't spend emulator CPU time compiling unrelated modules.
-if [ "$phase" = build ]; then
-  ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
-  exit
-fi
 
 # Timed log groups make install vs instrumentation costs visible in the job log.
 run_step() {
