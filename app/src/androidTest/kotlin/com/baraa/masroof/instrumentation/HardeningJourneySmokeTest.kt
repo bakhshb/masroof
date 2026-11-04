@@ -1,20 +1,16 @@
 package com.baraa.masroof.instrumentation
 
 import androidx.compose.ui.test.ComposeTimeoutException
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.baraa.masroof.MainActivity
 import com.baraa.masroof.MasroofApplication
@@ -128,8 +124,8 @@ class HardeningJourneySmokeTest {
 
     private fun awaitFinancialShell() {
         waitUntil("financial navigation is ready") {
-            contentDescriptionExists(text(R.string.dashboard_open_settings)) &&
-                contentDescriptionExists(text(R.string.approved_nav_home))
+            composeRule.contentDescriptionExists(text(R.string.dashboard_open_settings)) &&
+                composeRule.contentDescriptionExists(text(R.string.approved_nav_home))
         }
         assertBlockedScreenAbsent()
         composeRule.onNodeWithContentDescription(text(R.string.approved_nav_home))
@@ -165,35 +161,24 @@ class HardeningJourneySmokeTest {
 
     private fun awaitText(value: String, scroll: Boolean) {
         waitUntil("text '$value'") { textExists(value) }
-        if (scroll) scrollTo(textMatcher(value))
+        if (scroll) composeRule.scrollTo(textMatcher(value))
         composeRule.onAllNodes(textMatcher(value))[0].assertIsDisplayed()
     }
 
     private fun clickText(value: String, scroll: Boolean = false) {
         val matcher = textMatcher(value) and hasClickAction()
-        waitUntil("clickable text '$value'") { nodeExists(matcher) }
-        if (scroll) scrollTo(matcher)
+        waitUntil("clickable text '$value'") { composeRule.nodeExists(matcher) }
+        if (scroll) composeRule.scrollTo(matcher)
         clickableNode(value).performClick()
         composeRule.waitForIdle()
     }
 
     private fun clickTag(tag: String) {
         val matcher = hasTestTag(tag)
-        waitUntil("tag '$tag'") { nodeExists(matcher) }
-        scrollTo(matcher)
+        waitUntil("tag '$tag'") { composeRule.nodeExists(matcher) }
+        composeRule.scrollTo(matcher)
         composeRule.onNodeWithTag(tag).assertIsDisplayed().performClick()
         composeRule.waitForIdle()
-    }
-
-    private fun scrollTo(matcher: SemanticsMatcher) {
-        val scrollables = composeRule.onAllNodes(hasScrollAction())
-            .fetchSemanticsNodes(atLeastOneRootRequired = false)
-        for (index in scrollables.indices) {
-            val scrolled = runCatching {
-                composeRule.onAllNodes(hasScrollAction())[index].performScrollToNode(matcher)
-            }.isSuccess
-            if (scrolled) return
-        }
     }
 
     private fun waitUntil(description: String, condition: () -> Boolean) {
@@ -209,17 +194,7 @@ class HardeningJourneySmokeTest {
 
     private fun textMatcher(value: String) = hasText(value, substring = true)
 
-    private fun nodeExists(matcher: SemanticsMatcher): Boolean =
-        composeRule.onAllNodes(matcher)
-            .fetchSemanticsNodes(atLeastOneRootRequired = false)
-            .isNotEmpty()
-
-    private fun textExists(value: String): Boolean = nodeExists(textMatcher(value))
-
-    private fun contentDescriptionExists(value: String): Boolean =
-        composeRule.onAllNodesWithContentDescription(value)
-            .fetchSemanticsNodes(atLeastOneRootRequired = false)
-            .isNotEmpty()
+    private fun textExists(value: String): Boolean = composeRule.nodeExists(textMatcher(value))
 
     private fun assertBlockedScreenAbsent() {
         val blocked = text(R.string.startup_maintenance_blocked)

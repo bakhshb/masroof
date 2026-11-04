@@ -7,21 +7,17 @@ import android.os.Environment
 import android.os.SystemClock
 import android.provider.MediaStore
 import androidx.compose.ui.test.ComposeTimeoutException
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -254,7 +250,7 @@ class StatementReconciliationSmokeTest {
 
     private fun openStatementScreen() {
         val settings = text(R.string.dashboard_open_settings)
-        waitUntil("settings action") { contentDescriptionExists(settings) }
+        waitUntil("settings action") { composeRule.contentDescriptionExists(settings) }
         composeRule.onNodeWithContentDescription(settings).performClick()
         clickText(text(R.string.settings_banks_title))
         val bankName = runBlocking {
@@ -268,7 +264,7 @@ class StatementReconciliationSmokeTest {
 
     private fun launchSystemPicker() {
         awaitTag(STATEMENT_RECONCILIATION_PICK_TAG)
-        scrollTo(hasTestTag(STATEMENT_RECONCILIATION_PICK_TAG))
+        composeRule.scrollTo(hasTestTag(STATEMENT_RECONCILIATION_PICK_TAG))
         composeRule.onNodeWithTag(STATEMENT_RECONCILIATION_PICK_TAG).assertIsDisplayed()
         composeRule.waitForIdle()
         // Use the already verified Compose button for the in-app touch. Its text
@@ -385,7 +381,7 @@ class StatementReconciliationSmokeTest {
     private fun assertOutcome(status: StatementComparisonStatus, count: Int) {
         val tag = statementOutcomeTag(status)
         awaitTag(tag)
-        scrollTo(hasTestTag(tag))
+        composeRule.scrollTo(hasTestTag(tag))
         try {
             composeRule.onNodeWithTag(tag)
                 .assertIsDisplayed()
@@ -401,7 +397,7 @@ class StatementReconciliationSmokeTest {
     private fun assertLine(status: StatementComparisonStatus, title: String) {
         val section = statementSectionTag(status)
         awaitTag(section)
-        scrollTo(hasTestTag(section))
+        composeRule.scrollTo(hasTestTag(section))
         try {
             composeRule.onNodeWithTag(section)
                 .assertIsDisplayed()
@@ -409,24 +405,24 @@ class StatementReconciliationSmokeTest {
             throw AssertionError(emulatorMessage("${status.name} section was not shown"), error)
         }
         val matcher = hasText(title, substring = true)
-        waitUntil("line '$title'") { nodeExists(matcher) }
-        scrollTo(matcher)
+        waitUntil("line '$title'") { composeRule.nodeExists(matcher) }
+        composeRule.scrollTo(matcher)
         assertTrue(
             emulatorMessage("'$title' for ${status.name} was not displayed"),
-            nodeExists(matcher),
+            composeRule.nodeExists(matcher),
         )
         composeRule.onAllNodes(matcher)[0].assertIsDisplayed()
     }
 
     private fun scrollOutcome(status: StatementComparisonStatus) {
         awaitTag(statementOutcomeTag(status))
-        scrollTo(hasTestTag(statementOutcomeTag(status)))
+        composeRule.scrollTo(hasTestTag(statementOutcomeTag(status)))
         composeRule.waitForIdle()
     }
 
     private fun scrollSection(status: StatementComparisonStatus) {
         awaitTag(statementSectionTag(status))
-        scrollTo(hasTestTag(statementSectionTag(status)))
+        composeRule.scrollTo(hasTestTag(statementSectionTag(status)))
         composeRule.waitForIdle()
     }
 
@@ -542,37 +538,26 @@ class StatementReconciliationSmokeTest {
 
     private fun awaitFinancialShell() {
         waitUntil("financial navigation is ready") {
-            contentDescriptionExists(text(R.string.dashboard_open_settings)) &&
-                contentDescriptionExists(text(R.string.approved_nav_home))
+            composeRule.contentDescriptionExists(text(R.string.dashboard_open_settings)) &&
+                composeRule.contentDescriptionExists(text(R.string.approved_nav_home))
         }
         val blocked = text(R.string.startup_maintenance_blocked)
-        assertEquals(emulatorMessage("startup maintenance blocked the shell"), 0, nodeCount(textMatcher(blocked)))
+        assertEquals(emulatorMessage("startup maintenance blocked the shell"), 0, composeRule.nodeCount(textMatcher(blocked)))
         composeRule.onNodeWithContentDescription(text(R.string.approved_nav_home))
             .assertIsDisplayed().assertIsSelected()
         composeRule.onNodeWithContentDescription(text(R.string.dashboard_open_settings)).assertIsDisplayed()
     }
 
     private fun awaitTag(tag: String) {
-        waitUntil("tag '$tag'") { nodeExists(hasTestTag(tag)) }
+        waitUntil("tag '$tag'") { composeRule.nodeExists(hasTestTag(tag)) }
     }
 
     private fun clickText(value: String) {
         val matcher = textMatcher(value) and hasClickAction()
-        waitUntil("clickable text '$value'") { nodeExists(matcher) }
-        scrollTo(matcher)
+        waitUntil("clickable text '$value'") { composeRule.nodeExists(matcher) }
+        composeRule.scrollTo(matcher)
         composeRule.onNode(matcher).performClick()
         composeRule.waitForIdle()
-    }
-
-    private fun scrollTo(matcher: SemanticsMatcher) {
-        val scrollables = composeRule.onAllNodes(hasScrollAction())
-            .fetchSemanticsNodes(atLeastOneRootRequired = false)
-        for (index in scrollables.indices) {
-            val scrolled = runCatching {
-                composeRule.onAllNodes(hasScrollAction())[index].performScrollToNode(matcher)
-            }.isSuccess
-            if (scrolled) return
-        }
     }
 
     private fun waitUntil(description: String, condition: () -> Boolean) {
@@ -584,19 +569,6 @@ class StatementReconciliationSmokeTest {
     }
 
     private fun textMatcher(value: String) = hasText(value, substring = true)
-
-    private fun nodeExists(matcher: SemanticsMatcher): Boolean =
-        nodeCount(matcher) > 0
-
-    private fun nodeCount(matcher: SemanticsMatcher): Int =
-        composeRule.onAllNodes(matcher)
-            .fetchSemanticsNodes(atLeastOneRootRequired = false)
-            .size
-
-    private fun contentDescriptionExists(value: String): Boolean =
-        composeRule.onAllNodes(hasContentDescription(value))
-            .fetchSemanticsNodes(atLeastOneRootRequired = false)
-            .isNotEmpty()
 
     private fun text(id: Int): String = composeRule.activity.getString(id)
 
