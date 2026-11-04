@@ -56,7 +56,8 @@ data class PatternAccountBinding(val role: PatternAccountRole, val bank: BankId,
     }
 }
 
-private val PATTERN_REFERENCE_FIELDS = setOf("source_account", "destination_account", "account_reference", "funding_reference", "counterparty_bank")
+/** Fields that may name an account or bank; only these can be context references. */
+val PATTERN_REFERENCE_FIELDS: Set<String> = setOf("source_account", "destination_account", "account_reference", "funding_reference", "counterparty_bank")
 
 /** Values stay in Facts / original message spans; durable reasons contain only metadata and offsets. */
 data class PatternProvenance(val configurationFingerprint: String, val patternId: String, val revision: Int,

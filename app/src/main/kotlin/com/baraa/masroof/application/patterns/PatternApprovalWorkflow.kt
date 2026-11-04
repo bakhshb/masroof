@@ -50,8 +50,7 @@ class PatternApprovalWorkflow(private val store: MessagePatternStore, private va
     suspend fun confirmAccount(bankId: String, last4: String): PatternAccountOption = withContext(Dispatchers.IO) {
         gate.withAccess {
             require(store.load().banks.any { it.bankId == bankId })
-            val canonical = com.baraa.masroof.parsing.normalizer.MessageNormalizer().normalize(last4).comparisonBody.trim()
-            require(canonical.matches(Regex("[0-9]{4}")))
+            val canonical = com.baraa.masroof.application.settings.canonicalLast4(last4)
             ownership.confirmAccountOwned(AccountReference(Bank(bankId), canonical))
             val account = ownedAccounts(bankId).single { it.maskedNumber == canonical }
             PatternAccountOption(account.id, account.displayName, account.maskedNumber)
@@ -239,7 +238,7 @@ class PatternApprovalWorkflow(private val store: MessagePatternStore, private va
             accountBindings = listOf(PatternAccountBinding(if (incoming) PatternAccountRole.DESTINATION else PatternAccountRole.SOURCE,
                 BankId(bankId), last4)),
             // The remaining references (funding source, counterparty bank) name the other party; the linked account is the user's.
-            contextReferences = fields.filter { it in REFERENCE_FIELDS }.toSet())
+            contextReferences = fields.filter { it in PATTERN_REFERENCE_FIELDS }.toSet())
     }
 
     /** shortcut: one synthetic sample per pattern; a layout differing only in a field's width can be missed. */
@@ -254,7 +253,7 @@ class PatternApprovalWorkflow(private val store: MessagePatternStore, private va
             FieldKind.MONEY -> "100.00 SAR"
             FieldKind.DECIMAL -> "100.00"
             FieldKind.DIGITS -> "5".repeat(part.width.takeIf { it > 0 } ?: 4)
-            FieldKind.TEXT -> if (part.field in REFERENCE_FIELDS || part.field.endsWith("_account")) "**5555" else "TEST PERSON"
+            FieldKind.TEXT -> if (part.field in PATTERN_REFERENCE_FIELDS || part.field.endsWith("_account")) "**5555" else "TEST PERSON"
             FieldKind.DATE_DMY_SHORT -> "02/10/26 22:01"
             FieldKind.DATE_DMY_LONG -> "02-10-2026 22:01"
             FieldKind.DATE_YMD -> "2026-10-02 22:01"
@@ -268,7 +267,6 @@ class PatternApprovalWorkflow(private val store: MessagePatternStore, private va
     private companion object {
         val WALLET_BANKS = setOf("BANK_STC", "BANK_BARQ")
         val OWN_ACCOUNT_FIELDS = setOf("source_account", "destination_account", "account_reference")
-        val REFERENCE_FIELDS = setOf("source_account", "destination_account", "account_reference", "funding_reference", "counterparty_bank")
         val WALLET_ACCOUNT_FAMILIES = setOf(MessageFamily.TRANSFER_IN, MessageFamily.TRANSFER_OUT, MessageFamily.WITHDRAWAL,
             MessageFamily.BILL_PAYMENT, MessageFamily.FEE, MessageFamily.FINANCING_INSTALLMENT)
     }

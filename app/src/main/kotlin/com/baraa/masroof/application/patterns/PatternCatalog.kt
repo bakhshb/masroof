@@ -2,6 +2,7 @@ package com.baraa.masroof.application.patterns
 
 import com.baraa.masroof.engine.bank.patterns.FieldSlot
 import com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration
+import com.baraa.masroof.engine.bank.patterns.PATTERN_REFERENCE_FIELDS
 import com.baraa.masroof.engine.bank.patterns.PatternAccountRole
 import com.baraa.masroof.engine.bank.patterns.StaticText
 import com.baraa.masroof.core.money.Currency
@@ -25,9 +26,7 @@ data class PatternDefinitionView(val id: String, val bankId: String, val label: 
     /** Movements whose fields cover everything this template captures. */
     val operations: List<PatternOperation> get() = PatternOperation.entries.filter { operation -> fields.all { it in operation.fields } }
     val canApply: Boolean get() = enabled && status != PatternApprovalStatus.PREVIEW_ONLY
-    val referenceFields: List<String> get() = fields.filter {
-        it in setOf("source_account", "destination_account", "account_reference", "funding_reference", "counterparty_bank")
-    }
+    val referenceFields: List<String> get() = fields.filter { it in PATTERN_REFERENCE_FIELDS }
     fun accountReferenceFields(operation: PatternOperation?): List<String> {
         val ownRole = if (operation in setOf(PatternOperation.TRANSFER_IN, PatternOperation.REFUND)) "destination_account" else "source_account"
         return referenceFields.filter { it == "account_reference" || it == ownRole }
