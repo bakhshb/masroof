@@ -20,7 +20,7 @@ class AndroidSmsDataSource(
     private val contentResolver: ContentResolver,
 ) : SmsDataSource {
 
-    override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
+    override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (rows: Sequence<InboxRow>) -> T): T {
         val selection: String?
         val selectionArgs: Array<String>?
         if (receivedAfter != null) {
@@ -51,26 +51,33 @@ class AndroidSmsDataSource(
             throw SmsProviderException("SMS provider returned null cursor")
         }
 
-        try {
-            cursor.use { c ->
-                val idIdx = c.getColumnIndexOrThrow(Telephony.Sms._ID)
-                val addressIdx = c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
-                val bodyIdx = c.getColumnIndexOrThrow(Telephony.Sms.BODY)
-                val dateIdx = c.getColumnIndexOrThrow(Telephony.Sms.DATE)
-                val dateSentIdx = c.getColumnIndexOrThrow(Telephony.Sms.DATE_SENT)
-
-                while (c.moveToNext()) {
-                    yield(readRow(c, idIdx, addressIdx, bodyIdx, dateIdx, dateSentIdx))
-                }
+        return cursor.use { c ->
+            val indexes = providerCall {
+                intArrayOf(
+                    c.getColumnIndexOrThrow(Telephony.Sms._ID),
+                    c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS),
+                    c.getColumnIndexOrThrow(Telephony.Sms.BODY),
+                    c.getColumnIndexOrThrow(Telephony.Sms.DATE),
+                    c.getColumnIndexOrThrow(Telephony.Sms.DATE_SENT),
+                )
             }
-        } catch (e: SmsPermissionException) {
-            throw e
-        } catch (e: SmsProviderException) {
-            throw e
+            // Only cursor failures become provider errors; errors thrown by [block] pass through unchanged.
+            block(
+                sequence {
+                    while (providerCall { c.moveToNext() }) {
+                        yield(providerCall { readRow(c, indexes[0], indexes[1], indexes[2], indexes[3], indexes[4]) })
+                    }
+                },
+            )
+        }
+    }
+
+    private inline fun <R> providerCall(read: () -> R): R =
+        try {
+            read()
         } catch (e: Exception) {
             throw SmsProviderException("SMS provider cursor iteration failed", e)
         }
-    }
 
     private fun readRow(
         c: Cursor,

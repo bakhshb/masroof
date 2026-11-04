@@ -71,7 +71,8 @@ class SettingsBanksJourneyTest {
         var permissionGranted = false
         val queries = java.util.concurrent.atomic.AtomicInteger()
         val source = object : SmsDataSource {
-            override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> { queries.incrementAndGet(); return emptySequence() }
+            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+            fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> { queries.incrementAndGet(); return emptySequence() }
         }
         val container = AppContainer(context, smsDataSourceOverride = source)
         val store = ViewModelStore()

@@ -45,7 +45,8 @@ class StcSingleAccountJourneyTest {
             row("stc-out", outgoing, "2026-10-16T10:00:00Z"),
         )
         val source = object : SmsDataSource {
-            override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> =
+            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+            fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> =
                 rows.asSequence().map(InboxRow::Valid)
         }
         val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "stc-single-account-${UUID.randomUUID()}")

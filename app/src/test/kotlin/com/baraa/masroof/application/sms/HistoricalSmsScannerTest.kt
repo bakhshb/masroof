@@ -128,7 +128,8 @@ class HistoricalSmsScannerTest {
         assertEquals(listOf(after to started),receipts)
         receipts.clear()
         val denied=HistoricalSmsScanner(object : SmsDataSource {
-            override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = throw SmsPermissionException()
+            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+            fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = throw SmsPermissionException()
         },batchProcessor,coverageCompleted={ from,at -> receipts += from to at })
         assertTrue(denied.scan(after).failure is SmsScanFailure.PermissionDenied)
         assertTrue(receipts.isEmpty())
@@ -234,7 +235,8 @@ class HistoricalSmsScannerTest {
     @Test
     fun permissionDenied_isDistinctFailure() = runBlocking {
         val source = object : SmsDataSource {
-            override fun queryInbox(receivedAfter: Instant?) = throw SmsPermissionException()
+            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+            fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = throw SmsPermissionException()
         }
         val result = HistoricalSmsScanner(source, batchProcessor).scan()
         assertEquals(SmsScanFailure.PermissionDenied, result.failure)
@@ -244,7 +246,8 @@ class HistoricalSmsScannerTest {
     @Test
     fun providerError_isDistinctFailure() = runBlocking {
         val source = object : SmsDataSource {
-            override fun queryInbox(receivedAfter: Instant?) =
+            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+            fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> =
                 throw SmsProviderException("boom")
         }
         val result = HistoricalSmsScanner(source, batchProcessor).scan()
@@ -255,7 +258,8 @@ class HistoricalSmsScannerTest {
     @Test
     fun lazyPermissionException_duringIteration_isCaught() = runBlocking {
         val source = object : SmsDataSource {
-            override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
+            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+            fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
                 throw SmsPermissionException("lazy")
             }
         }
@@ -275,7 +279,8 @@ class HistoricalSmsScannerTest {
             ),
         )
         val source = object : SmsDataSource {
-            override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
+            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+            fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
                 yield(good)
                 throw SmsProviderException("cursor died")
             }
@@ -392,7 +397,8 @@ class HistoricalSmsScannerTest {
         private val rows: List<InboxRow>,
         private val onQuery: (Instant?) -> Unit = {},
     ) : SmsDataSource {
-        override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> {
+        override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+        fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> {
             onQuery(receivedAfter)
             return rows.asSequence()
         }
@@ -446,7 +452,8 @@ class HistoricalSmsScannerTest {
             val transactionsSeenWhileScanning = mutableListOf<Int>()
             val rows = purchaseInbox()
             val source = object : SmsDataSource {
-                override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
+                override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+                fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
                     for (row in rows) {
                         transactionsSeenWhileScanning += runBlocking { world.db.financialTransactionDao().count() }
                         yield(InboxRow.Valid(row))
@@ -468,7 +475,8 @@ class HistoricalSmsScannerTest {
         ImportWorld(context(), preOwned = true).use { world ->
             val rows = purchaseInbox()
             val source = object : SmsDataSource {
-                override fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
+                override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
+                fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = sequence {
                     yield(InboxRow.Valid(rows[0]))
                     yield(InboxRow.Valid(rows[1]))
                     throw SmsProviderException("cursor died")
