@@ -36,6 +36,7 @@ fun MasroofDailyBarChart(points: List<MasroofDailyBar>, selectedIndex: Int, onSe
     val density = androidx.compose.ui.platform.LocalDensity.current
     val inset = with(density) { MasroofAnalyticsTokens.chartInset.toPx() }
     val endInset = with(density) { MasroofAnalyticsTokens.chartEndInset.toPx() }
+    val mirror = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     Canvas(modifier.fillMaxWidth().height(MasroofSpacing.chartHeight)
         .semantics {
             contentDescription = points[selected].label
@@ -43,8 +44,9 @@ fun MasroofDailyBarChart(points: List<MasroofDailyBar>, selectedIndex: Int, onSe
                 CustomAccessibilityAction(previousLabel) { onSelected((selected - 1).coerceAtLeast(0)); true },
                 CustomAccessibilityAction(nextLabel) { onSelected((selected + 1).coerceAtMost(points.lastIndex)); true })
         }
-        .pointerInput(points) {
-            detectTapGestures { tap -> MasroofAnalyticsChartMath.barAt(tap.x - inset, size.width - inset - endInset, points.size)?.let(onSelected) }
+        .pointerInput(points, mirror) {
+            detectTapGestures { tap -> MasroofAnalyticsChartMath.barAt(tap.x - inset, size.width - inset - endInset, points.size)
+                ?.let { onSelected(MasroofAnalyticsChartMath.barSlot(it, points.size, mirror)) } }
         }) {
         val top = MasroofAnalyticsTokens.chartTopInset.toPx()
         val bottom = size.height - MasroofAnalyticsTokens.chartBottomInset.toPx()
@@ -60,7 +62,7 @@ fun MasroofDailyBarChart(points: List<MasroofDailyBar>, selectedIndex: Int, onSe
             drawText(label, topLeft = Offset((inset - label.size.width - MasroofSpacing.inlineGap.toPx()).coerceAtLeast(0f), yy - label.size.height / 2))
         }
         points.forEachIndexed { index, point ->
-            val x = inset + index * cell + cell * (1 - MasroofAnalyticsTokens.barWidthFraction) / 2
+            val x = inset + MasroofAnalyticsChartMath.barSlot(index, points.size, mirror) * cell + cell * (1 - MasroofAnalyticsTokens.barWidthFraction) / 2
             point.value?.let { value ->
                 val yy = y(value)
                 val rect = Size(cell * MasroofAnalyticsTokens.barWidthFraction, kotlin.math.abs(yy - zero).coerceAtLeast(MasroofSpacing.borderWidth.toPx()))

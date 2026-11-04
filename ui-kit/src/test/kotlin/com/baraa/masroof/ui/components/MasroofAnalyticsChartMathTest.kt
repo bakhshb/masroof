@@ -26,4 +26,13 @@ class MasroofAnalyticsChartMathTest {
         assertEquals(1, MasroofAnalyticsChartMath.barAt(39f, 100f, 5))
         assertEquals(4, MasroofAnalyticsChartMath.barAt(100f, 100f, 5))
     }
+    @Test fun rtlMirrorsBarSlotsAndTapsBackToTheSameDay() {
+        assertEquals(2, MasroofAnalyticsChartMath.barSlot(2, 5, mirror = false))
+        assertEquals(4, MasroofAnalyticsChartMath.barSlot(0, 5, mirror = true))
+        assertEquals(0, MasroofAnalyticsChartMath.barSlot(4, 5, mirror = true))
+        // A tap on the right-most cell selects the first day in RTL.
+        val slot = MasroofAnalyticsChartMath.barAt(99f, 100f, 5)!!
+        assertEquals(0, MasroofAnalyticsChartMath.barSlot(slot, 5, mirror = true))
+        (0 until 5).forEach { assertEquals(it, MasroofAnalyticsChartMath.barSlot(MasroofAnalyticsChartMath.barSlot(it, 5, true), 5, true)) }
+    }
 }
