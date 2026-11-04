@@ -19,6 +19,7 @@ interface FinancialTransactionDao {
     suspend fun updateTransaction(entity: FinancialTransactionEntity): Int
 
     /** Preserve a complete FX pair while refreshing the remaining stored fields. */
+    @Transaction
     suspend fun updatePreservingExchangeRate(entity: FinancialTransactionEntity): Int {
         val existing = getById(entity.id) ?: return 0
         val (rate, source) = ExchangeRatePairWrite.storedOrIncoming(
