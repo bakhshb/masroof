@@ -8,12 +8,7 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
-import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
-import com.baraa.masroof.application.theme.ThemeMode
-import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
-import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
-import com.baraa.masroof.data.preferences.SharedPrefsThemePreferencesRepository
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +16,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.BufferedInputStream
-import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -347,8 +341,12 @@ class DatabaseBackupService(
                     preservedRollback,
                 )
                 afterRestoreStage(DatabaseRestoreRecovery.Stage.NEW_INSTALLED)
-                restorePreferences(preferences)
-                resetMaintenanceMarkers()
+                // The incoming snapshot has no maintenance markers, so the next launch re-runs both repairs.
+                DatabaseRestoreRecovery.applyPreferences(
+                    appContext,
+                    DatabaseRestoreRecovery.incomingPreferences(preferences),
+                    maintenance = maintenancePrefs(),
+                )
                 DatabaseRestoreRecovery.writeJournal(
                     liveDb,
                     DatabaseRestoreRecovery.Stage.COMMITTED,
@@ -607,98 +605,19 @@ class DatabaseBackupService(
     }
 
     private fun capturePreferences(): BackupPreferencesSnapshot {
-        val onboarding = appContext.getSharedPreferences(
-            SharedPrefsOnboardingPreferencesRepository.PREFS_NAME,
-            Context.MODE_PRIVATE,
-        )
-        val locale = appContext.getSharedPreferences(
-            SharedPrefsAppLocaleRepository.PREFS_NAME,
-            Context.MODE_PRIVATE,
-        )
-        val theme = appContext.getSharedPreferences(
-            SharedPrefsThemePreferencesRepository.PREFS_NAME,
-            Context.MODE_PRIVATE,
-        )
-        val importStart = if (onboarding.contains(KEY_IMPORT_START_EPOCH_MILLIS)) {
-            onboarding.getLong(KEY_IMPORT_START_EPOCH_MILLIS, 0L)
-        } else {
-            null
-        }
+        val current = DatabaseRestoreRecovery.capturePreferences(appContext)
+        MessagePatternBackup.validate(current.messagePatterns)
         return BackupPreferencesSnapshot(
-            labAnalysis = com.baraa.masroof.application.analytics.AnalyticsBackup.capture(appContext),
-            messagePatterns = com.baraa.masroof.application.backup.MessagePatternBackup.capture(appContext),
-            onboardingStarted = onboarding.getBoolean(KEY_ONBOARDING_STARTED, false),
-            onboardingCompleted = onboarding.getBoolean(KEY_ONBOARDING_COMPLETED, false),
-            historicalImportStartEpochMillis = importStart,
-            historicalImportCompleted = onboarding.getBoolean(KEY_IMPORT_COMPLETED, false),
-            onboardingSetup = onboarding.getString(SharedPrefsOnboardingPreferencesRepository.KEY_SETUP_DRAFT, null),
-            languageTag = locale.getString(
-                SharedPrefsAppLocaleRepository.KEY_LANGUAGE_TAG,
-                AppLocale.DEFAULT_TAG,
-            ) ?: AppLocale.DEFAULT_TAG,
-            themeMode = theme.getString(
-                SharedPrefsThemePreferencesRepository.KEY_THEME_MODE,
-                ThemeMode.DEFAULT.name,
-            ) ?: ThemeMode.DEFAULT.name,
+            labAnalysis = current.labAnalysis,
+            messagePatterns = current.messagePatterns,
+            onboardingStarted = current.onboardingStarted,
+            onboardingCompleted = current.onboardingCompleted,
+            historicalImportStartEpochMillis = current.historicalImportStartEpochMillis,
+            historicalImportCompleted = current.historicalImportCompleted,
+            onboardingSetup = current.onboardingSetup,
+            languageTag = current.languageTag,
+            themeMode = current.themeMode,
         )
-    }
-
-    private fun restorePreferences(snapshot: BackupPreferencesSnapshot) {
-        com.baraa.masroof.application.backup.MessagePatternBackup.restore(appContext, snapshot.messagePatterns)
-        com.baraa.masroof.application.analytics.AnalyticsBackup.restore(appContext, snapshot.labAnalysis)
-        val onboarding = appContext.getSharedPreferences(
-            SharedPrefsOnboardingPreferencesRepository.PREFS_NAME,
-            Context.MODE_PRIVATE,
-        )
-        val locale = appContext.getSharedPreferences(
-            SharedPrefsAppLocaleRepository.PREFS_NAME,
-            Context.MODE_PRIVATE,
-        )
-        val theme = appContext.getSharedPreferences(
-            SharedPrefsThemePreferencesRepository.PREFS_NAME,
-            Context.MODE_PRIVATE,
-        )
-
-        val onboardingCommitted = onboarding.edit().apply {
-            putBoolean(KEY_ONBOARDING_STARTED, snapshot.onboardingStarted)
-            putBoolean(KEY_ONBOARDING_COMPLETED, snapshot.onboardingCompleted)
-            putBoolean(KEY_IMPORT_COMPLETED, snapshot.historicalImportCompleted)
-            putString(SharedPrefsOnboardingPreferencesRepository.KEY_SETUP_DRAFT, snapshot.onboardingSetup)
-            val start = snapshot.historicalImportStartEpochMillis
-            if (start == null) {
-                remove(KEY_IMPORT_START_EPOCH_MILLIS)
-            } else {
-                putLong(KEY_IMPORT_START_EPOCH_MILLIS, start)
-            }
-        }.commit()
-        check(onboardingCommitted) { "Cannot restore onboarding preferences" }
-
-        val localeCommitted = locale.edit().putString(
-            SharedPrefsAppLocaleRepository.KEY_LANGUAGE_TAG,
-            when (snapshot.languageTag) {
-                AppLocale.TAG_EN -> AppLocale.TAG_EN
-                else -> AppLocale.TAG_AR
-            },
-        ).commit()
-        check(localeCommitted) { "Cannot restore locale preferences" }
-
-        val themeCommitted = theme.edit().putString(
-            SharedPrefsThemePreferencesRepository.KEY_THEME_MODE,
-            ThemeMode.fromStorage(snapshot.themeMode).name,
-        ).commit()
-        check(themeCommitted) { "Cannot restore theme preferences" }
-    }
-
-    /**
-     * The restored database may predate the current parse-fact or transfer-integrity
-     * rules. Clearing these markers makes the next launch re-run both repairs.
-     */
-    private fun resetMaintenanceMarkers() {
-        val committed = maintenancePrefs().edit()
-            .remove(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION)
-            .remove(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION)
-            .commit()
-        check(committed) { "Cannot reset maintenance markers after backup restore" }
     }
 
     private fun maintenancePrefs(): SharedPreferences =
@@ -828,7 +747,7 @@ class DatabaseBackupService(
 
     /**
      * Checks a current-schema copy of the backup before the live file is replaced.
-     * The live database stays in place until [installValidatedDatabase].
+     * The live database stays in place until the validated copy is renamed over it.
      */
     private fun openAndValidate(dbFile: File) {
         val opened = Room.databaseBuilder(appContext, MasroofDatabase::class.java, dbFile.name)
@@ -893,11 +812,5 @@ class DatabaseBackupService(
         private const val SNAPSHOT_BUSY_TIMEOUT_MS: Int = 10_000
         private const val CHECKPOINT_ATTEMPTS: Int = 40
         private const val CHECKPOINT_RETRY_MS: Long = 25L
-
-        // Mirror SharedPrefsOnboardingPreferencesRepository private keys for backup I/O.
-        private const val KEY_ONBOARDING_STARTED = "onboarding_started"
-        private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
-        private const val KEY_IMPORT_START_EPOCH_MILLIS = "historical_import_start_epoch_millis"
-        private const val KEY_IMPORT_COMPLETED = "historical_import_completed"
     }
 }

@@ -523,13 +523,17 @@ object DatabaseRestoreRecovery {
         }
     }
 
-    private fun applyPreferences(context: Context, snapshot: PreferenceSnapshot, validatePatterns: Boolean = true) {
+    internal fun applyPreferences(
+        context: Context,
+        snapshot: PreferenceSnapshot,
+        validatePatterns: Boolean = true,
+        maintenance: android.content.SharedPreferences = prefs(context, MaintenancePreferences.PREFS_NAME),
+    ) {
         com.baraa.masroof.application.backup.MessagePatternBackup.restore(context, snapshot.messagePatterns, validatePatterns)
         com.baraa.masroof.application.analytics.AnalyticsBackup.restore(context, snapshot.labAnalysis)
         val onboarding = prefs(context, SharedPrefsOnboardingPreferencesRepository.PREFS_NAME)
         val locale = prefs(context, SharedPrefsAppLocaleRepository.PREFS_NAME)
         val theme = prefs(context, SharedPrefsThemePreferencesRepository.PREFS_NAME)
-        val maintenance = prefs(context, MaintenancePreferences.PREFS_NAME)
         val onboardingEditor = onboarding.edit()
         onboardingEditor.putBoolean(KEY_ONBOARDING_STARTED, snapshot.onboardingStarted)
         onboardingEditor.putBoolean(KEY_ONBOARDING_COMPLETED, snapshot.onboardingCompleted)
@@ -595,21 +599,25 @@ object DatabaseRestoreRecovery {
     }
 
     /** Header only. Does not open SQLite or scan pages. */
-    private fun looksLikeSqlite(file: File): Boolean {
-        if (!file.isFile || file.length() < SQLITE_HEADER.size) return false
+    private fun looksLikeSqlite(file: File): Boolean =
+        file.isFile && readHeader(file, SQLITE_HEADER.size)?.contentEquals(SQLITE_HEADER) == true
+
+    /** The first [size] bytes, or null when the file is shorter or cannot be read. */
+    private fun readHeader(file: File, size: Int): ByteArray? {
+        if (file.length() < size) return null
         return try {
             file.inputStream().use { input ->
-                val header = ByteArray(SQLITE_HEADER.size)
+                val header = ByteArray(size)
                 var offset = 0
                 while (offset < header.size) {
                     val read = input.read(header, offset, header.size - offset)
-                    if (read < 0) return false
+                    if (read < 0) return null
                     offset += read
                 }
-                header.contentEquals(SQLITE_HEADER)
+                header
             }
         } catch (_: Exception) {
-            false
+            null
         }
     }
 
@@ -643,23 +651,8 @@ object DatabaseRestoreRecovery {
     }
 
     /** Byte 18 of the SQLite header is 2 when the file uses a WAL. */
-    private fun usesWriteAheadLog(file: File): Boolean {
-        if (file.length() < WAL_FORMAT_OFFSET + 1) return false
-        return try {
-            file.inputStream().use { input ->
-                val header = ByteArray(WAL_FORMAT_OFFSET + 1)
-                var offset = 0
-                while (offset < header.size) {
-                    val read = input.read(header, offset, header.size - offset)
-                    if (read < 0) return false
-                    offset += read
-                }
-                header[WAL_FORMAT_OFFSET] == WAL_FORMAT_VERSION
-            }
-        } catch (_: Exception) {
-            false
-        }
-    }
+    private fun usesWriteAheadLog(file: File): Boolean =
+        readHeader(file, WAL_FORMAT_OFFSET + 1)?.get(WAL_FORMAT_OFFSET) == WAL_FORMAT_VERSION
 
     private fun readJournalState(live: File): JournalRead {
         val file = journalFile(live)
