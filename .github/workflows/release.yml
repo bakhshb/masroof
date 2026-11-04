@@ -100,7 +100,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          chmod +x scripts/verify-ci-status.sh
           python3 .release-control/scripts/verify_ci_status.py "$(git rev-parse HEAD)"
 
       - name: Resolve target version and versionCode
@@ -108,7 +107,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          chmod +x scripts/resolve-next-version.sh
           ./scripts/resolve-next-version.sh --type "${{ inputs.type || 'release' }}" --bump "${{ inputs.bump || 'patch' }}"
 
       - name: Install Java 21 toolchain
