@@ -51,8 +51,6 @@ import com.baraa.masroof.application.update.UpdateCheckCoordinator
 import com.baraa.masroof.application.update.UpdateCheckPreferencesRepository
 import com.baraa.masroof.application.update.UpdateChecker
 import com.baraa.masroof.BuildConfig
-import com.baraa.masroof.application.locale.AppLocaleBootstrap
-import com.baraa.masroof.application.locale.AppLocaleContextFactory
 import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
 import com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult
@@ -168,6 +166,14 @@ class AppContainer(
 
     val databaseAccessGate: DatabaseAccessGate = DatabaseAccessGate()
 
+    private fun enqueueHistoricalRecovery() {
+        HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
+    }
+
+    private suspend fun patternAccountBindings() =
+        databaseAccessGate.withAccess { messagePatternStore.load() }.banks.flatMap { bank -> bank.currentPatterns }
+            .flatMap { it.factContract?.accountBindings.orEmpty() }
+
     private val bundledPatternBanks = appContext.assets.list("bank-patterns").orEmpty().filter { it.endsWith(".patterns.json") }.sorted().flatMap { file ->
         com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec.decode(
             appContext.assets.open("bank-patterns/$file").bufferedReader(Charsets.UTF_8).use { it.readText() }).banks
@@ -239,12 +245,6 @@ class AppContainer(
         RoomUserCorrectionRepository(database.userCorrectionDao(), accessGate = databaseAccessGate)
 
     val applicationContext: Context get() = appContext
-
-    val localizedApplicationContext: Context
-        get() = AppLocaleContextFactory.wrap(
-            appContext,
-            AppLocaleBootstrap.readStoredLanguageTag(appContext),
-        )
 
     val onboardingPreferencesRepository: OnboardingPreferencesRepository =
         SharedPrefsOnboardingPreferencesRepository(
@@ -327,7 +327,7 @@ class AppContainer(
         com.baraa.masroof.application.interpretation.AutomaticInterpretationWriteGuard(
             effectiveParsedEventProvider,reviewRepository,financialTransactionRepository,
             inferenceCurrent = { interpretationService?.isInferenceCurrent(it) != false },
-            inTransaction = { mutation -> databaseAccessGate.withAccess { database.withTransaction { mutation() } } },
+            inTransaction = { mutation -> withDatabaseTransaction(mutation) },
             patternsCurrent = com.baraa.masroof.application.interpretation.PatternInterpretationWritePolicy(
                 messagePatternStore, accountRegistryRepository, cardRegistryRepository)::isCurrent)
     }
@@ -388,9 +388,7 @@ class AppContainer(
             clock = clock,
             appLogService = appLogService,
             processingRecovery = processingRecovery,
-            onHistoricalRetry = {
-                HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
-            },
+            onHistoricalRetry = ::enqueueHistoricalRecovery,
         )
 
     val reviewOwnershipWorkflow: ReviewOwnershipWorkflow =
@@ -409,15 +407,11 @@ class AppContainer(
             inTransaction = { block -> withDatabaseTransaction(block) },
             transactions = financialTransactionRepository,
             patternBoundAccounts = {
-                databaseAccessGate.withAccess { messagePatternStore.load() }.banks.flatMap { bank -> bank.currentPatterns }
-                    .flatMap { it.factContract?.accountBindings.orEmpty() }
-                    .filter { it.role != com.baraa.masroof.engine.bank.patterns.PatternAccountRole.CARD }
+                patternAccountBindings().filter { it.role != com.baraa.masroof.engine.bank.patterns.PatternAccountRole.CARD }
                     .map { com.baraa.masroof.domain.model.AccountReference(Bank(it.bank.value), it.last4) }.toSet()
             },
             patternBoundCards = {
-                databaseAccessGate.withAccess { messagePatternStore.load() }.banks.flatMap { bank -> bank.currentPatterns }
-                    .flatMap { it.factContract?.accountBindings.orEmpty() }
-                    .filter { it.role == com.baraa.masroof.engine.bank.patterns.PatternAccountRole.CARD }
+                patternAccountBindings().filter { it.role == com.baraa.masroof.engine.bank.patterns.PatternAccountRole.CARD }
                     .map { com.baraa.masroof.domain.model.CardReference(Bank(it.bank.value), it.last4) }.toSet()
             },
         )
@@ -542,9 +536,7 @@ class AppContainer(
             appLogService = appLogService,
             reviewQueueUpdater = reviewQueueUpdater,
             processingRecovery = processingRecovery,
-            onHistoricalRetry = {
-                HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
-            },
+            onHistoricalRetry = ::enqueueHistoricalRecovery,
         )
 
     val interpretationService = if (bankAdapterOverride==null)
@@ -618,7 +610,7 @@ class AppContainer(
             patternProcessing = com.baraa.masroof.application.ingestion.PatternEvidenceProtection(
                 reviewRepository, userCorrectionRepository, financialTransactionRepository, parsedEventRepository,
                 inTransaction = { work -> withDatabaseTransaction(work) })::run,
-            onHistoricalRetry = { HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext)) },
+            onHistoricalRetry = ::enqueueHistoricalRecovery,
         )
 
     val explicitBankSelectionWorkflow: ExplicitBankSelectionWorkflow =
@@ -657,7 +649,7 @@ class AppContainer(
             processingRetryRepository = processingRetryRepository,
             appLogService = appLogService,
             batchRecoveryScheduler = {
-                HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
+                enqueueHistoricalRecovery()
             },
             debugProcessHalt = debugProcessHaltProbe,
             missedSmsScheduler = { receivedAfter ->
@@ -722,7 +714,7 @@ class AppContainer(
         exchangeRateEnrichmentScheduler = exchangeRateEnrichmentScheduler,
         processingRecovery = processingRecovery,
         batchRecoveryScheduler = {
-            HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(appContext))
+            enqueueHistoricalRecovery()
         },
         appLogService = appLogService,
     )
