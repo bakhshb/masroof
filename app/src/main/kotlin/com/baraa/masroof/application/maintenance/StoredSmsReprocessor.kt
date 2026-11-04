@@ -47,7 +47,7 @@ class StoredSmsReprocessor(
             }
         }
         refreshDerivedState()
-        // The full pass covered every reparsed row; LIVE markers stay with their own retry path.
+        // The full pass covered every reparsed row; a reparsed LIVE marker became HISTORICAL_BATCH and is cleared here.
         val historical = processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).toSet()
         processingRetryRepository.clear(reparsed.filter { it in historical })
         appLogService?.info(

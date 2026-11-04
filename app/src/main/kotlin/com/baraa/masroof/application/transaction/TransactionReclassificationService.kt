@@ -138,8 +138,20 @@ class TransactionReclassificationService(
         if (!saved) {
             return ReclassificationResult.Rejected("update_failed")
         }
-        // Only a saved repayment may mark its loan owned.
-        loanToConfirm?.let { maybeConfirmLoanOwned(it) }
+        // Only a saved repayment may mark its loan owned. The repayment is already saved, so a failed
+        // confirmation leaves the loan for the user to confirm instead of reporting the save as failed.
+        loanToConfirm?.let { loan ->
+            try {
+                maybeConfirmLoanOwned(loan)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                appLogService?.warn(
+                    AppLogCategories.TRANSACTION,
+                    "Loan ownership confirmation failed after reclassify (${e::class.java.simpleName})",
+                )
+            }
+        }
         afterDecisionCommitted()
         appLogService?.info(
             AppLogCategories.TRANSACTION,
