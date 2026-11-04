@@ -83,24 +83,27 @@ data class ParsedEventDraft(
             parseStatus = status,
         )
     }
-
-    private val MessageFamily.isFinancialFamily: Boolean
-        get() = when (this) {
-            MessageFamily.PURCHASE,
-            MessageFamily.TRANSFER_IN,
-            MessageFamily.TRANSFER_OUT,
-            MessageFamily.CARD_PAYMENT,
-            MessageFamily.BILL_PAYMENT,
-            MessageFamily.FINANCING_INSTALLMENT,
-            MessageFamily.WITHDRAWAL,
-            MessageFamily.REFUND,
-            MessageFamily.FEE,
-            -> true
-
-            MessageFamily.BALANCE_NOTICE,
-            MessageFamily.OTP,
-            MessageFamily.NON_FINANCIAL,
-            MessageFamily.UNKNOWN,
-            -> false
-        }
 }
+
+private val OUTGOING = setOf(MoneyDirection.OUTGOING)
+private val INCOMING = setOf(MoneyDirection.INCOMING)
+
+/**
+ * Financial families and the directions their parse facts may carry. Direction is
+ * relative to the referenced account or card, so a card payment may be reported
+ * from either side.
+ */
+internal val FINANCIAL_FAMILY_DIRECTIONS: Map<MessageFamily, Set<MoneyDirection>> = mapOf(
+    MessageFamily.PURCHASE to OUTGOING,
+    MessageFamily.TRANSFER_IN to INCOMING,
+    MessageFamily.TRANSFER_OUT to OUTGOING,
+    MessageFamily.CARD_PAYMENT to setOf(MoneyDirection.OUTGOING, MoneyDirection.INCOMING),
+    MessageFamily.BILL_PAYMENT to OUTGOING,
+    MessageFamily.FINANCING_INSTALLMENT to OUTGOING,
+    MessageFamily.WITHDRAWAL to OUTGOING,
+    MessageFamily.REFUND to INCOMING,
+    MessageFamily.FEE to OUTGOING,
+)
+
+internal val MessageFamily.isFinancialFamily: Boolean
+    get() = this in FINANCIAL_FAMILY_DIRECTIONS

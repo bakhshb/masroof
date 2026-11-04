@@ -10,13 +10,9 @@ package com.baraa.masroof.domain.model
 object ExplicitBankSelection {
     const val REASON_PREFIX: String = "user_selected_bank:"
 
-    /** Persisted ingestion reason. Matches [com.baraa.masroof.bank.BankRoutingResult]. */
+    /** Persisted routing reasons; the single owner of these strings. */
     const val REASON_AMBIGUOUS_BANK_ROUTE: String = "ambiguous_bank_route"
 
-    /**
-     * Forward-compatible with suspected-bank quarantine. The reason is recognized
-     * here so a review created by that phase can offer the same action.
-     */
     const val REASON_SUSPECTED_BANK: String = "suspected_bank_sender"
 
     val ROUTE_REASONS_OFFERING_CHOICE: Set<String> = setOf(

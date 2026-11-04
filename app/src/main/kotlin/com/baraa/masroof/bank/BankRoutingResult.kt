@@ -1,6 +1,7 @@
 package com.baraa.masroof.bank
 
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.ExplicitBankSelection
 import com.baraa.masroof.parsing.model.BankDetectionResult
 
 /**
@@ -31,7 +32,7 @@ sealed interface BankRoutingResult {
 
         val banks: List<Bank> get() = candidates.map { it.adapter.bank }
 
-        val reason: String get() = REASON_AMBIGUOUS_BANK_ROUTE
+        val reason: String get() = ExplicitBankSelection.REASON_AMBIGUOUS_BANK_ROUTE
     }
 
     /**
@@ -41,11 +42,6 @@ sealed interface BankRoutingResult {
     data class SuspectedBank(
         val evidence: List<String>,
     ) : BankRoutingResult {
-        val reason: String get() = REASON_SUSPECTED_BANK
-    }
-
-    companion object {
-        const val REASON_AMBIGUOUS_BANK_ROUTE = "ambiguous_bank_route"
-        const val REASON_SUSPECTED_BANK = "suspected_bank_sender"
+        val reason: String get() = ExplicitBankSelection.REASON_SUSPECTED_BANK
     }
 }

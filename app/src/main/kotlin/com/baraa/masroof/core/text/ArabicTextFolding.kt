@@ -9,21 +9,11 @@ package com.baraa.masroof.core.text
  * - colon variants → `:`, Arabic decimal / thousands separators → `.` / `,`
  *
  * Never use folded text for display: it is a matching view only. Keywords and
- * regex patterns matched against folded text must be folded with [foldArabic] too.
+ * regex patterns matched against folded text must be folded with [foldForComparison] too.
  */
 object ArabicTextFolding {
-    /** Arabic-only folding (no case change); safe for regex pattern strings. */
-    fun foldArabic(text: String): String {
-        val out = StringBuilder(text.length)
-        for (c in text) {
-            if (isIgnorable(c)) continue
-            out.append(foldChar(c))
-        }
-        return out.toString()
-    }
-
     /**
-     * Full comparison form: [foldArabic] plus per-character lowercase.
+     * Comparison form: Arabic folding plus per-character lowercase.
      *
      * Per-character lowercasing keeps a one-to-one mapping between kept characters,
      * so [comparisonIndexMap] can map comparison offsets back to [text].
@@ -48,7 +38,7 @@ object ArabicTextFolding {
         return map.copyOf(size)
     }
 
-    fun isIgnorable(c: Char): Boolean =
+    private fun isIgnorable(c: Char): Boolean =
         c == TATWEEL ||
             c in ARABIC_DIACRITICS ||
             c == SUPERSCRIPT_ALEF ||

@@ -2,6 +2,7 @@ package com.baraa.masroof.parsing.model
 
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
+import com.baraa.masroof.domain.model.ExplicitBankSelection
 
 /**
  * Result of bank detection from sender/body evidence.
@@ -23,6 +24,6 @@ sealed interface BankDetectionResult {
      */
     data class Suspected(
         val evidence: List<String>,
-        val reasons: List<String> = listOf("suspected_bank_sender"),
+        val reasons: List<String> = listOf(ExplicitBankSelection.REASON_SUSPECTED_BANK),
     ) : BankDetectionResult
 }

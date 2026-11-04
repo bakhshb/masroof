@@ -52,15 +52,13 @@ class ParseFinalizer(
             }
 
             MessageFamily.UNKNOWN -> {
-                val finalized = draft.copy(parseStatus = ParseStatus.REVIEW_REQUIRED)
-                    .toParsedEvent(eventId)
+                val reviewDraft = draft.copy(parseStatus = ParseStatus.REVIEW_REQUIRED)
                 return ParseResult.ReviewRequired(
-                    draft = draft.copy(parseStatus = ParseStatus.REVIEW_REQUIRED),
-                    event = finalized,
+                    draft = reviewDraft,
+                    event = reviewDraft.toParsedEvent(eventId),
                     details = details,
                     findings = validation.findings,
-                    reasons = listOf("unknown_or_unsupported_format") +
-                        validation.errors.map { it.message },
+                    reasons = listOf("unknown_or_unsupported_format") + validation.reviewReasons,
                 )
             }
 
@@ -70,7 +68,8 @@ class ParseFinalizer(
                     val withStatus = draft.copy(parseStatus = ParseStatus.REVIEW_REQUIRED)
                     return ParseResult.ReviewRequired(
                         draft = withStatus,
-                        event = runCatching { withStatus.toParsedEvent(eventId) }.getOrNull(),
+                        // Bank, family and confidence were checked above, so this cannot throw.
+                        event = withStatus.toParsedEvent(eventId),
                         details = details,
                         findings = validation.findings,
                         reasons = validation.reviewReasons,
