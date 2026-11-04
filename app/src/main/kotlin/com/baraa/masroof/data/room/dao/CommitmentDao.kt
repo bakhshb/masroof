@@ -26,7 +26,4 @@ interface CommitmentDao {
 
     @Query("SELECT * FROM commitment ORDER BY name COLLATE NOCASE, id")
     suspend fun listAll(): List<CommitmentEntity>
-
-    @Query("SELECT * FROM commitment WHERE active = 1 ORDER BY name COLLATE NOCASE, id")
-    suspend fun listActive(): List<CommitmentEntity>
 }

@@ -170,7 +170,7 @@ class LiveSmsProcessingWorkerTest {
 
         val cancelled = runCatching { running.await() }.exceptionOrNull()
         assertTrue(cancelled is CancellationException)
-        assertTrue(harness.rawRepo.existsById(raw.id))
+        assertNotNull(harness.rawRepo.getById(raw.id))
         assertNull(harness.parsedRepo.findByRawSmsId(raw.id))
         assertTrue(harness.reviewRepo.listAll().isEmpty())
         assertEquals(listOf(raw.id), harness.rawRepo.listIdsAwaitingProcessing())

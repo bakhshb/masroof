@@ -346,7 +346,6 @@ class MasroofDatabasePersistenceTest {
         parsedEventRepo.deleteByRawSmsId(sms.id)
         assertNull(parsedEventRepo.findByRawSmsId(sms.id))
         assertEquals(sms, rawSmsRepo.getById(sms.id))
-        assertTrue(rawSmsRepo.existsById(sms.id))
     }
 
     @Test

@@ -386,8 +386,12 @@ class IntraBankSelfTransferReconciliationTest {
 
         persistParsed("sms-aug-out", outgoingBody)
         persistParsed("sms-aug-in", incomingBody)
-        ftRepo.linkRawSmsIfAbsent(julyTx.id, "sms-aug-out")
-        ftRepo.linkRawSmsIfAbsent(julyTx.id, "sms-aug-in")
+        // Stored links a previous release wrote onto the wrong (July) transaction.
+        listOf("sms-aug-out", "sms-aug-in").forEach { rawSmsId ->
+            db.financialTransactionDao().insertLinkIfAbsent(
+                com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity(rawSmsId = rawSmsId, transactionId = julyTx.id),
+            )
+        }
 
         reconciliation.reconcileStoredEvents()
 

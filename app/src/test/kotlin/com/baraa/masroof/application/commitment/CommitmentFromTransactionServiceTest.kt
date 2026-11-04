@@ -138,7 +138,6 @@ class CommitmentFromTransactionServiceTest {
 
         override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
 
-        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
     }
 
     private class ThrowOnDuplicateCommitmentRepository : CommitmentRepository {
@@ -163,6 +162,5 @@ class CommitmentFromTransactionServiceTest {
 
         override suspend fun listAll(): List<Commitment> = bySource.values.toList()
 
-        override suspend fun listActive(): List<Commitment> = bySource.values.filter { it.active }
     }
 }

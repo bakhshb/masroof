@@ -651,9 +651,6 @@ class WriteRejectingFinancialTransactionRepository(
 
     override suspend fun unlinkRawSms(rawSmsId: String): Boolean = rejected("unlinkRawSms")
 
-    override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean =
-        rejected("linkRawSmsIfAbsent")
-
     private fun rejected(operation: String): Nothing =
         throw AssertionError("FinancialTransactionRepository.$operation called during a read-only load")
 }

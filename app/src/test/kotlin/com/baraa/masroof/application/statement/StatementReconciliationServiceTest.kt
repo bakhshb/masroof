@@ -801,5 +801,4 @@ private class RecordingLedger(
 
     override suspend fun unlinkRawSms(rawSmsId: String): Boolean = mutate()
 
-    override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = mutate()
 }

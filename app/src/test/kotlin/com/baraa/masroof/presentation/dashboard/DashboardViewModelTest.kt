@@ -829,23 +829,21 @@ class DashboardViewModelTest {
                 override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
                 override suspend fun unlinkRawSms(rawSmsId: String) = false
 
-                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
             },
             rawSmsRepository = object : com.baraa.masroof.domain.repository.RawSmsRepository {
                 override suspend fun insertIfAbsent(rawSms: com.baraa.masroof.domain.model.RawSms) =
                     com.baraa.masroof.domain.repository.RawSmsInsertResult.Inserted
 
                 override suspend fun getById(id: String) = null
-                override suspend fun existsById(id: String) = false
                 override suspend fun findByDeviceMessageId(deviceMessageId: String) = null
                 override suspend fun listIdsByReceivedAt(): List<String> = emptyList()
-                override suspend fun findCrossSourceNearDuplicate(
+                override suspend fun listCrossSourceNearDuplicates(
                     sender: String,
                     bodyHash: String,
                     fromInclusive: java.time.Instant,
                     toInclusive: java.time.Instant,
                     lookingForLiveRow: Boolean,
-                ) = null
+                ): List<com.baraa.masroof.domain.model.RawSms> = emptyList()
             },
         ),
     ): DashboardViewModel =
@@ -886,7 +884,6 @@ class DashboardViewModelTest {
                     override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
                 override suspend fun unlinkRawSms(rawSmsId: String) = false
 
-                override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
                 },
                 effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
                     object : com.baraa.masroof.parsing.repository.ParsedEventRepository {
@@ -967,7 +964,6 @@ class DashboardViewModelTest {
                         ) = false
                         override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
                         override suspend fun unlinkRawSms(rawSmsId: String) = false
-                        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
                     },
                 ),
                 commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),

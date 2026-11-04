@@ -277,7 +277,6 @@ class TransactionRestoreServiceTest {
 
         override suspend fun unlinkRawSms(rawSmsId: String): Boolean = true
 
-        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
     }
 
     private class FailingDeleteFinancialTransactionRepository : FinancialTransactionRepository {
@@ -311,7 +310,6 @@ class TransactionRestoreServiceTest {
 
         override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
 
-        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
     }
 
     private class SingleTransactionRepository(
@@ -350,6 +348,5 @@ class TransactionRestoreServiceTest {
 
         override suspend fun unlinkRawSms(rawSmsId: String): Boolean = true
 
-        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
     }
 }

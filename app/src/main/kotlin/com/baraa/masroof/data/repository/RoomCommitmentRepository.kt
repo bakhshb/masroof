@@ -35,10 +35,6 @@ class RoomCommitmentRepository(
         dao.listAll().map(CommitmentMapper::toDomain)
     }
 
-    override suspend fun listActive(): List<Commitment> = accessGate.withAccess {
-        dao.listActive().map(CommitmentMapper::toDomain)
-    }
-
     companion object {
         fun from(database: MasroofDatabase, accessGate: DatabaseAccessGate = DatabaseAccessGate()): RoomCommitmentRepository =
             RoomCommitmentRepository(dao = database.commitmentDao(), accessGate = accessGate)

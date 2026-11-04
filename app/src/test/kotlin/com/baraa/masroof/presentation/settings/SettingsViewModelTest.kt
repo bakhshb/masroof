@@ -865,7 +865,6 @@ class SettingsViewModelTest {
 
         override suspend fun listAll(): List<Commitment> = items.values.sortedBy { it.name }
 
-        override suspend fun listActive(): List<Commitment> = listAll().filter { it.active }
     }
 
     @Test

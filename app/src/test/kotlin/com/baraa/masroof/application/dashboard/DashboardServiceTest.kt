@@ -307,16 +307,15 @@ class DashboardServiceTest {
     ) : RawSmsRepository {
         override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult = RawSmsInsertResult.Inserted
         override suspend fun getById(id: String): RawSms? = byId[id]
-        override suspend fun existsById(id: String): Boolean = byId.containsKey(id)
         override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? = null
         override suspend fun listIdsByReceivedAt(): List<String> = byId.keys.toList()
-        override suspend fun findCrossSourceNearDuplicate(
+        override suspend fun listCrossSourceNearDuplicates(
             sender: String,
             bodyHash: String,
             fromInclusive: Instant,
             toInclusive: Instant,
             lookingForLiveRow: Boolean,
-        ): RawSms? = null
+        ): List<com.baraa.masroof.domain.model.RawSms> = emptyList()
     }
 
     private fun tx(
@@ -369,7 +368,6 @@ class DashboardServiceTest {
         override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
         override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
 
-        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
     }
 
     private class FakeReviewRepo(

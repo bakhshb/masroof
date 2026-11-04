@@ -85,18 +85,17 @@ internal object SettingsViewModelTestSupport {
 
             override suspend fun getById(id: String): RawSms? = null
 
-            override suspend fun existsById(id: String): Boolean = false
 
             override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? = null
             override suspend fun listIdsByReceivedAt(): List<String> = emptyList()
 
-            override suspend fun findCrossSourceNearDuplicate(
+            override suspend fun listCrossSourceNearDuplicates(
                 sender: String,
                 bodyHash: String,
                 fromInclusive: java.time.Instant,
                 toInclusive: java.time.Instant,
                 lookingForLiveRow: Boolean,
-            ): RawSms? = null
+            ): List<com.baraa.masroof.domain.model.RawSms> = emptyList()
         }
 
     private fun emptyReviewRepository(): ReviewRepository =
@@ -143,7 +142,6 @@ internal object SettingsViewModelTestSupport {
                 exchangeRate: java.math.BigDecimal,
                 source: com.baraa.masroof.domain.model.ExchangeRateSource,
             ) = false
-            override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
         }
 
     internal fun emptyParsedEventRepository(): ParsedEventRepository =

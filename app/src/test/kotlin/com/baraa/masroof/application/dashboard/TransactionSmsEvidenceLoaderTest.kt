@@ -96,7 +96,6 @@ class TransactionSmsEvidenceLoaderTest {
         override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
         override suspend fun unlinkRawSms(rawSmsId: String) = false
 
-        override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String) = false
     }
 
     private class FakeRawSmsRepository(
@@ -104,15 +103,14 @@ class TransactionSmsEvidenceLoaderTest {
     ) : RawSmsRepository {
         override suspend fun insertIfAbsent(rawSms: RawSms) = RawSmsInsertResult.Inserted
         override suspend fun getById(id: String) = rows[id]
-        override suspend fun existsById(id: String) = rows.containsKey(id)
         override suspend fun findByDeviceMessageId(deviceMessageId: String) = null
         override suspend fun listIdsByReceivedAt(): List<String> = rows.keys.toList()
-        override suspend fun findCrossSourceNearDuplicate(
+        override suspend fun listCrossSourceNearDuplicates(
             sender: String,
             bodyHash: String,
             fromInclusive: Instant,
             toInclusive: Instant,
             lookingForLiveRow: Boolean,
-        ) = null
+        ): List<com.baraa.masroof.domain.model.RawSms> = emptyList()
     }
 }

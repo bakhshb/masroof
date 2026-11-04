@@ -398,7 +398,6 @@ class ProcessRawSmsUseCaseTest {
             override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
             override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
 
-            override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
         }
         val accounts = RoomAccountRegistryRepository.from(db)
         val cards = RoomCardRegistryRepository.from(db)
@@ -595,7 +594,6 @@ class ProcessRawSmsUseCaseTest {
             override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
             override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
 
-            override suspend fun linkRawSmsIfAbsent(transactionId: String, rawSmsId: String): Boolean = false
         }
         val accounts = RoomAccountRegistryRepository.from(db)
         val cards = RoomCardRegistryRepository.from(db)

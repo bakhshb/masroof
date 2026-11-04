@@ -53,7 +53,6 @@ class CoreEvidenceRepositoryContractTest {
         assertEquals(RawSmsInsertResult.Inserted, rawSms.insertIfAbsent(evidence))
         assertEquals(RawSmsInsertResult.AlreadyExists, rawSms.insertIfAbsent(evidence))
         assertEquals(evidence, rawSms.getById("sms-1"))
-        assertTrue(rawSms.existsById("sms-1"))
     }
 
     @Test

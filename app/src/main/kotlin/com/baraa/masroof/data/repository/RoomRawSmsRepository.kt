@@ -61,10 +61,6 @@ class RoomRawSmsRepository(
             .associate { it.id to java.time.Instant.ofEpochMilli(it.receivedAtEpochMillis) }
     }
 
-    override suspend fun existsById(id: String): Boolean = accessGate.withAccess {
-        dao.existsById(id)
-    }
-
     override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? = accessGate.withAccess {
         dao.findByDeviceMessageId(deviceMessageId)?.let(RawSmsMapper::toDomain)
     }
@@ -73,10 +69,6 @@ class RoomRawSmsRepository(
         findByDeviceMessageId(providerMessageId)?.let { return@withAccess it }
         val rawSmsId = dao.findRawSmsIdByProviderAlias(providerMessageId) ?: return@withAccess null
         return@withAccess getById(rawSmsId)
-    }
-
-    override suspend fun findProviderAliasRawSmsId(providerMessageId: String): String? = accessGate.withAccess {
-        dao.findRawSmsIdByProviderAlias(providerMessageId)
     }
 
     override suspend fun providerAliasRawSmsIds(rawSmsIds: Collection<String>): Set<String> = accessGate.withAccess {
@@ -103,22 +95,6 @@ class RoomRawSmsRepository(
 
     override suspend fun newestReceivedAt(notAfter: java.time.Instant): java.time.Instant? = accessGate.withAccess {
         dao.newestReceivedAtEpochMillis(notAfter.toEpochMilli())?.let(java.time.Instant::ofEpochMilli)
-    }
-
-    override suspend fun findCrossSourceNearDuplicate(
-        sender: String,
-        bodyHash: String,
-        fromInclusive: Instant,
-        toInclusive: Instant,
-        lookingForLiveRow: Boolean,
-    ): RawSms? = accessGate.withAccess {
-        dao.findCrossSourceNearDuplicate(
-            sender = sender,
-            bodyHash = bodyHash,
-            fromMillis = fromInclusive.toEpochMilli(),
-            toMillis = toInclusive.toEpochMilli(),
-            requireDeviceMessageIdNull = lookingForLiveRow,
-        )?.let(RawSmsMapper::toDomain)
     }
 
     override suspend fun listCrossSourceNearDuplicates(
