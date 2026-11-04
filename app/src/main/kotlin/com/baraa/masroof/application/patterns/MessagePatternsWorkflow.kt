@@ -67,13 +67,13 @@ class MessagePatternsWorkflow(
     suspend fun load() = withContext(ioDispatcher) {
         val existing = accessGate.withAccess { store.load() }
         if (bundledBanks.none { MessagePatternStore.installation(existing, it, requiredBundledBankIds) != null }) existing
-        else accessGate.withRestore {
+        else accessGate.withExclusiveAccess {
             store.installMissingBanks(bundledBanks, requiredBundledBankIds)
         }
     }
 
     suspend fun addBank(generation: Long, name: String, sender: String, bankId: String? = null) = withContext(ioDispatcher) {
-        accessGate.withRestore {
+        accessGate.withExclusiveAccess {
             val current = store.load()
             val id = bankId ?: "BANK_${java.util.UUID.randomUUID().toString().replace("-", "")}"
             require(current.banks.none { it.bankId == id }) { "Bank already configured" }
@@ -83,7 +83,7 @@ class MessagePatternsWorkflow(
     }
 
     suspend fun updateBank(generation: Long, bankId: String, name: String, senders: List<String>) = withContext(ioDispatcher) {
-        accessGate.withRestore {
+        accessGate.withExclusiveAccess {
             val current = store.load()
             val bank = current.banks.single { it.bankId == bankId }
             val addresses = senders.map(String::trim).distinct()
@@ -167,7 +167,7 @@ class MessagePatternsWorkflow(
 
     suspend fun saveTeaching(preview: PatternTeachingPreview): com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration {
         val (saved, prior) = withContext(ioDispatcher) {
-            accessGate.withRestore {
+            accessGate.withExclusiveAccess {
                 val current = store.load()
                 check(current.generation == preview.generation) { "Preview expired; review again" }
                 val bank = current.banks.single { it.bankId == preview.bankId }
@@ -185,7 +185,7 @@ class MessagePatternsWorkflow(
         revise(generation, bankId, patternId) { _, current -> current.copy(enabled = enabled) }
 
     suspend fun deletePattern(generation: Long, bankId: String, patternId: String) = withContext(ioDispatcher) {
-        accessGate.withRestore { store.deletePattern(generation, bankId, patternId).toCatalog() }
+        accessGate.withExclusiveAccess { store.deletePattern(generation, bankId, patternId).toCatalog() }
     }
 
     suspend fun restoreRevision(generation: Long, bankId: String, patternId: String, revision: Int) =
@@ -197,7 +197,7 @@ class MessagePatternsWorkflow(
 
     private suspend fun revise(generation: Long, bankId: String, patternId: String,
         definition: (BankMessagePatterns, SavedMessagePattern) -> SavedMessagePattern) = withContext(ioDispatcher) {
-        accessGate.withRestore {
+        accessGate.withExclusiveAccess {
             val snapshot = store.load()
             check(snapshot.generation == generation) { "Pattern configuration changed" }
             val bank = snapshot.banks.single { it.bankId == bankId }
@@ -209,6 +209,6 @@ class MessagePatternsWorkflow(
 
     suspend fun saveBank(expectedGeneration: Long, bank: BankMessagePatterns) = withContext(ioDispatcher) {
         // ponytail: reuse the existing exclusive gate for rare edits; no second financial/configuration lock hierarchy.
-        accessGate.withRestore { store.saveBank(expectedGeneration, bank) }
+        accessGate.withExclusiveAccess { store.saveBank(expectedGeneration, bank) }
     }
 }
