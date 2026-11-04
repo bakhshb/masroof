@@ -227,7 +227,6 @@ class ReportedMessagesJourneyTest {
             }
             assertTrue(c.financialTransactionRepository.listAll().isEmpty())
             TestRuntime.close()
-            TestStorageContext(host).getSharedPreferences("learning_runtime",0).edit().putString("scheduled_interpretation","previous").commit()
             c=TestRuntime.container(host)
             c.awaitPostStartupBackgroundWorkForTesting()
             requireNotNull(c.interpretationService).synchronizeFeedback()
