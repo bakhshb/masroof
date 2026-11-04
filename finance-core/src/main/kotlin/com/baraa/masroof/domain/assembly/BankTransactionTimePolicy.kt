@@ -26,11 +26,10 @@ object BankTransactionTimePolicy {
     fun fixedZone(bank: Bank): ZoneId? =
         if (bank == Bank.BANK_ALJAZIRA) ALJAZIRA else null
 
-    fun resolve(bank: Bank, persistedZoneId: String?, fallback: ZoneId): ZoneId {
-        fixedZone(bank)?.let { return it }
-        if (!persistedZoneId.isNullOrBlank()) {
-            runCatching { ZoneId.of(persistedZoneId) }.getOrNull()?.let { return it }
-        }
-        return fallback
-    }
+    fun resolve(bank: Bank, persistedZoneId: String?, fallback: ZoneId): ZoneId =
+        zoneOrNull(bank, persistedZoneId) ?: fallback
+
+    /** The fixed zone, else the valid stored zone, else null. Never the handset zone. */
+    fun zoneOrNull(bank: Bank, persistedZoneId: String?): ZoneId? =
+        fixedZone(bank) ?: persistedZoneId?.takeIf { it.isNotBlank() }?.let { runCatching { ZoneId.of(it) }.getOrNull() }
 }

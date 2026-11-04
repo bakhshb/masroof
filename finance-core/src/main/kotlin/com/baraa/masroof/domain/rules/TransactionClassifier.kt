@@ -97,25 +97,8 @@ object TransactionClassifier {
             )
         }
 
-        // Owned credit card purchase is an expense at purchase time (D-006)
-        // when CardType.CREDIT is a genuine known fact.
-        if (instrument != null &&
-            instrument.kind == ContainerKind.CARD &&
-            instrument.knownCardType == CardType.CREDIT &&
-            instrument.ownership == OwnershipStatus.OWNED
-        ) {
-            return classified(
-                type = FinancialTransactionType.EXPENSE,
-                transferOwnership = null,
-                reasons = listOf(
-                    "owned_credit_card_purchase",
-                    evidence.purchaseChannel?.let { "channel_$it" } ?: "channel_unspecified",
-                ),
-            )
-        }
-
         // Owned account/card funding reference is sufficient for expense
-        // without inventing debit/credit type.
+        // without inventing debit/credit type; an owned credit card is an expense at purchase time (D-006).
         if (instrument != null && instrument.ownership == OwnershipStatus.OWNED) {
             return classified(
                 type = FinancialTransactionType.EXPENSE,

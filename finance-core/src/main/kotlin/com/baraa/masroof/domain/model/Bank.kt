@@ -18,11 +18,7 @@ value class Bank(val id: String) {
         val BANK_ALJAZIRA: Bank = Bank("BANK_ALJAZIRA")
         val UNKNOWN: Bank = Bank("UNKNOWN")
 
-        fun fromId(id: String): Bank =
-            when (id) {
-                BANK_ALJAZIRA.id -> BANK_ALJAZIRA
-                UNKNOWN.id -> UNKNOWN
-                else -> Bank(id)
-            }
+        // Value-class equality is by id, so the known constants need no special case.
+        fun fromId(id: String): Bank = Bank(id)
     }
 }

@@ -219,10 +219,11 @@ object TransactionAssembler {
         if (TransactionMatcher.hasPendingIntraBankCounterpart(candidate, pendingCounterparts)) {
             return Outcome.PendingMatch
         }
+        val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, fallbackZone)
+        val zone = TransactionTiming.zoneFor(event.bank, fallback = fallbackZone)
         if (sourceOwnership == OwnershipStatus.OWNED &&
             destinationOwnership == OwnershipStatus.OWNED
         ) {
-            val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, fallbackZone)
             return assembleSingle(
                 event = event,
                 receivedAt = receivedAt,
@@ -230,14 +231,11 @@ object TransactionAssembler {
                 destinationOwnership = destinationOwnership,
                 cardOwnership = OwnershipStatus.UNKNOWN,
                 transactionOccurredAt = transactionOccurredAt,
-                occurredAtZone = TransactionTiming.zoneFor(event.bank, fallback = fallbackZone),
+                occurredAtZone = zone,
                 deferIntraBankPairing = false,
                 userConfirmed = true,
             )
         }
-
-        val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, fallbackZone)
-        val zone = TransactionTiming.zoneFor(event.bank, fallback = fallbackZone)
 
         val type = when (event.messageFamily) {
             MessageFamily.TRANSFER_OUT -> {
