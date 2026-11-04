@@ -136,20 +136,6 @@ class RegistryDeleteActions(
 )
 
 @Composable
-internal fun SettingsDeleteAction(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier) {
-    com.baraa.masroof.presentation.common.MasroofManagementAction(stringResource(R.string.registry_delete), onClick,
-        modifier.testTag("registry-delete-action"), enabled = enabled, danger = true)
-}
-
-/** Resume plus delete, for a stopped item's end action row. */
-@Composable
-internal fun SettingsStoppedItemActions(onResume: () -> Unit, onDelete: () -> Unit, enabled: Boolean) {
-    SettingsResumeTrackingButton(onClick = onResume, enabled = enabled)
-    Spacer(Modifier.width(MasroofSpacing.smallGap))
-    SettingsDeleteAction(onDelete, enabled)
-}
-
-@Composable
 internal fun SettingsDeleteDialogHost(state: SettingsUiState, actions: RegistryDeleteActions, name: @Composable (StopTrackingTarget) -> String?) {
     val request = state.deleteRequest ?: return
     val label = name(request.target) ?: return

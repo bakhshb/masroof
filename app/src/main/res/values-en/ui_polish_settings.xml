@@ -53,4 +53,5 @@
     <string name="notification_settings_row_subtitle">Choose what Masroof notifies you about</string>
     <string name="settings_card_more_actions">Actions for card %1$s</string>
     <string name="settings_account_more_actions">Actions for account %1$s</string>
+    <string name="settings_item_more_actions">Actions for %1$s</string>
 </resources>

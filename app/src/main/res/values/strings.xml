@@ -50,14 +50,12 @@
     <string name="settings_accounts_hint">الحسابات المتابَعة تُستخدم لتصنيف التحويلات (بين حساباتي / خارجي). المتوقفة لا تُعدّ من حساباتك.</string>
     <string name="settings_accounts_empty">لا توجد حسابات مسجّلة بعد.</string>
     <string name="settings_accounts_unregistered">غير مسجّلة</string>
-    <string name="settings_accounts_stopped">متوقفة</string>
     <string name="settings_action_resume_short">متابعة</string>
     <string name="settings_stop_account_confirm_title">إيقاف متابعة الحساب؟</string>
     <string name="settings_stop_account_confirm_body">لن يُعدّ حساب ···%1$s من حساباتك — قد تُصنَّف تحويلاته كتحويلات خارجية.</string>
     <string name="settings_cards_hint">البطاقات المتابَعة تظهر في الرئيسية. المتوقفة تختفي منها.</string>
     <string name="settings_cards_empty">لا توجد بطاقات مسجّلة بعد.</string>
     <string name="settings_cards_unregistered">غير مسجّلة</string>
-    <string name="settings_cards_stopped">متوقفة</string>
 <string name="settings_stop_confirm_title">إيقاف متابعة البطاقة؟</string>
     <string name="settings_stop_confirm_body">لن تظهر بطاقة ···%1$s في الرئيسية ولن تُحسب مشترياتها ضمن مصاريفك.</string>
     <string name="settings_stop_confirm_action">إيقاف المتابعة</string>
@@ -155,8 +153,6 @@
     <string name="settings_loans_empty">لا توجد قروض مسجّلة بعد.</string>
     <string name="settings_loans_unregistered">غير مسجّلة</string>
     <string name="settings_loans_followed">قروضي</string>
-    <string name="settings_loans_stopped">متوقفة</string>
-    <string name="settings_stop_loan_tracking">إيقاف متابعة القرض</string>
     <string name="settings_stop_loan_confirm_title">إيقاف متابعة القرض؟</string>
     <string name="settings_stop_loan_confirm_body">لن يُعدّ %1$s من قروضك — لن يظهر في ملخص القروض.</string>
     <string name="settings_loan_type_personal">قرض شخصي</string>

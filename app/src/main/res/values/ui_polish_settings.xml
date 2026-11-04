@@ -101,4 +101,5 @@
     <string name="notification_settings_row_subtitle">اختر ما ينبّهك إليه مصروف</string>
     <string name="settings_card_more_actions">إجراءات البطاقة %1$s</string>
     <string name="settings_account_more_actions">إجراءات الحساب %1$s</string>
+    <string name="settings_item_more_actions">إجراءات %1$s</string>
 </resources>

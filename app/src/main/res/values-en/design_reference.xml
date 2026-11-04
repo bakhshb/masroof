@@ -36,9 +36,9 @@
     <string name="reference_followed">Tracked</string>
     <string name="reference_unconfirmed">Unconfirmed</string>
     <string name="reference_stopped">Stopped</string>
-    <string name="reference_manage_accounts">My accounts · Manage</string>
+    <string name="reference_manage_accounts">Manage accounts</string>
     <string name="reference_manage_cards">Manage cards</string>
-    <string name="reference_manage_loans">My loans · Manage</string>
+    <string name="reference_manage_loans">Manage loans</string>
     <string name="reference_review_evidence">View evidence and options</string>
     <string name="reference_unread">New</string>
     <string name="reference_initial_setup">Initial setup</string>
