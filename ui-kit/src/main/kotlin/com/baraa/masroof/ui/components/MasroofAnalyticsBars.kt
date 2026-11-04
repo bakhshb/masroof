@@ -19,10 +19,13 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 
 object MasroofAnalyticsChartMath {
+    private const val ALL_LABELS_MAX = 7
+
     fun signedFraction(value: BigDecimal, maximum: BigDecimal): Float =
         if (maximum.signum() <= 0) 0f else value.divide(maximum, 4, RoundingMode.HALF_UP).toFloat().coerceIn(-1f, 1f)
 
-    fun axisIndices(count: Int): Set<Int> = if (count <= 0) emptySet() else
+    // A short chart (a week, or salary periods) labels every bar; a long one keeps evenly spaced labels.
+    fun axisIndices(count: Int): Set<Int> = if (count <= 0) emptySet() else if (count <= ALL_LABELS_MAX) (0 until count).toSet() else
         (0..MasroofAnalyticsTokens.gridIntervals).map { index ->
             kotlin.math.round(index.toDouble() * (count - 1) / MasroofAnalyticsTokens.gridIntervals).toInt()
         }.toSet()
@@ -145,7 +148,10 @@ fun MasroofProgressRing(progress: Float, value: String, caption: String, modifie
                 if (bounded > 0f) drawArc(color, -90f, 360f * bounded, false, inset, arc,
                     style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round))
             }
-            Text(value, style = MaterialTheme.typography.titleMedium.copy(textDirection = androidx.compose.ui.text.style.TextDirection.ContentOrLtr))
+            // Scales down to stay inside the ring: "100 / 120" is wider than the hole at titleMedium.
+            MasroofFitText(value, MaterialTheme.typography.titleMedium.copy(textDirection = androidx.compose.ui.text.style.TextDirection.ContentOrLtr),
+                Modifier.padding(horizontal = MasroofAnalyticsTokens.ringStroke + MasroofSpacing.inlineGap),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
         Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center)

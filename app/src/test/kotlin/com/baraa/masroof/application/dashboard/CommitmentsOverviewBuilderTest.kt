@@ -1018,4 +1018,18 @@ class CommitmentsOverviewBuilderTest {
 
         assertEquals(listOf("YouTube", "ChatGPT", "Gym"), overview.upcomingUnpaid.map { it.displayName })
     }
+
+    @Test
+    fun displayOrder_putsWhatIsLeftToPayFirstNearestDateFirst_andCountsDaysFromToday() {
+        fun row(name: String, date: String?, status: CommitmentPaymentStatus = CommitmentPaymentStatus.UNPAID) =
+            CommitmentDashboardRow(name, CommitmentDashboardSource.USER, name, Money.of("10.00", Currency.SAR),
+                date?.let(LocalDate::parse), status)
+        // The phone showed this name order: a card due 7 Nov first, electricity due tomorrow near the bottom.
+        val rows = listOf(row("7271", "2026-11-07", CommitmentPaymentStatus.PAID), row("ChatGPT", "2026-11-21"),
+            row("Personal loan", null), row("SEC", "2026-11-05"), row("YouTube", "2026-11-06"))
+        assertEquals(listOf("SEC", "YouTube", "ChatGPT", "Personal loan", "7271"), rows.sortedWith(DISPLAY_ORDER).map { it.displayName })
+        val today = LocalDate.parse("2026-11-04")
+        assertEquals(listOf(1L, 2L, 17L, null), listOf(rows[3], rows[4], rows[1], rows[2]).map { it.daysUntil(today) })
+        assertEquals(-3L, row("Late", "2026-11-01").daysUntil(today))
+    }
 }

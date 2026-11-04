@@ -24,6 +24,7 @@ import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.presentation.common.MasroofReferenceMoney
 import com.baraa.masroof.presentation.common.MasroofText
 import com.baraa.masroof.presentation.common.MasroofTextButton
+import com.baraa.masroof.presentation.common.dueCountdown
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
 import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.ui.theme.MasroofHeroRole
@@ -37,6 +38,7 @@ fun CommitmentsSummaryScreen(state: DashboardUiState, onBack: () -> Unit,
     androidx.activity.compose.BackHandler(onBack = onBack)
     val overview = state.commitmentsOverview
     val colors = MasroofThemeExtras.extendedColors
+    val today = java.time.LocalDate.now()
     DashboardSummaryScaffold(stringResource(R.string.approved_commitments), state, onBack) {
         MasroofHeroCard(stringResource(R.string.dashboard_commitments_remaining), formatLocalizedMoney(overview.remaining),
             stringResource(R.string.dashboard_commitments_total) + " " + formatLocalizedMoney(overview.total) + " · " +
@@ -54,7 +56,10 @@ fun CommitmentsSummaryScreen(state: DashboardUiState, onBack: () -> Unit,
                         MasroofText(commitmentRowName(row), style = MasroofReference.pair)
                         row.expectedDate?.let { MasroofText(formatLocalizedTransactionDate(it), style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        MasroofBadge(stringResource(if (paid) R.string.dashboard_commitments_status_paid else R.string.dashboard_commitments_status_unpaid),
+                        // Unpaid dated rows count down ("Tomorrow", "In 16 days"); paid and undated rows keep their status.
+                        val countdown = row.daysUntil(today)?.takeIf { !paid }?.let { dueCountdown(it) }
+                        if (countdown != null) MasroofBadge(countdown.first, countdown.second)
+                        else MasroofBadge(stringResource(if (paid) R.string.dashboard_commitments_status_paid else R.string.dashboard_commitments_status_unpaid),
                             if (paid) MasroofCardAccent.Inflow else MasroofCardAccent.Liability)
                         row.paymentMatchIssue?.let { issue ->
                             MasroofText(stringResource(when (issue) {

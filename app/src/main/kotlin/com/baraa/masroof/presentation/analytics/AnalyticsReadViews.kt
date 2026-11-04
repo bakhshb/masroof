@@ -54,7 +54,7 @@ import java.time.ZoneId
                 Text(labels[index], style = MaterialTheme.typography.bodySmall)
                 com.baraa.masroof.ui.components.MasroofDailyBarChart(periods.mapIndexed { i, period ->
                     com.baraa.masroof.ui.components.MasroofDailyBar(period.actual?.let { analysisAmount(it).amount }, period.actual != null && !period.complete,
-                        labels[i], com.baraa.masroof.application.locale.AppDigits.display(monthLabel(period.start)))
+                        labels[i], com.baraa.masroof.application.locale.AppDigits.display(monthLabel(period.end - 1)))
                 }, index, { selected = it }, stringResource(R.string.chart_previous_point), stringResource(R.string.chart_next_point),
                     { com.baraa.masroof.application.locale.AppDigits.display(it.stripTrailingZeros().toPlainString()) },
                     Modifier.testTag("analysis-history-bars"), average = history.average?.let { analysisAmount(it).amount })
@@ -72,6 +72,7 @@ import java.time.ZoneId
     }
 }
 
+/** A salary period is named by the month it ends in: 27 Sep – 26 Oct reads "Oct". */
 @Composable private fun monthLabel(epochDay: Long): String = java.time.format.DateTimeFormatter.ofPattern("MMM",
     androidx.compose.ui.platform.LocalConfiguration.current.locales[0]).format(java.time.LocalDate.ofEpochDay(epochDay))
 
