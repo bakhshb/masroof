@@ -463,9 +463,6 @@ class ReviewWorkflowService(
         }
     }
 
-    suspend fun resolveAsIgnored(reviewId: String): ReviewWorkflowResult =
-        resolveAsNonFinancial(reviewId)
-
     suspend fun resolveAsNonFinancial(reviewId: String): ReviewWorkflowResult {
         val review = reviewRepository.getById(reviewId)
             ?: return ReviewWorkflowResult.Rejected("review_not_found")
