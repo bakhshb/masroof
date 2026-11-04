@@ -63,6 +63,7 @@ class TransactionReclassificationService(
         val destAccountId = event.destinationAccountRef?.let(FinancialContainerIdFactory::accountId)
         val cardId = event.cardRef?.let(FinancialContainerIdFactory::cardId)
 
+        var loanToConfirm: LoanReference? = null
         val (sourceId, destId) = when (newType) {
             FinancialTransactionType.EXTERNAL_TRANSFER_IN -> {
                 val destRef = event.destinationAccountRef
@@ -114,8 +115,7 @@ class TransactionReclassificationService(
                 }
                 val loanType = record.details.loanType
                     ?: return ReclassificationResult.Rejected("loan_type_missing")
-                val loanRef = LoanReference(event.bank, loanType)
-                maybeConfirmLoanOwned(loanRef)
+                loanToConfirm = LoanReference(event.bank, loanType)
                 sourceAccountId to FinancialContainerIdFactory.loanId(event.bank, loanType)
             }
 
@@ -138,6 +138,8 @@ class TransactionReclassificationService(
         if (!saved) {
             return ReclassificationResult.Rejected("update_failed")
         }
+        // Only a saved repayment may mark its loan owned.
+        loanToConfirm?.let { maybeConfirmLoanOwned(it) }
         afterDecisionCommitted()
         appLogService?.info(
             AppLogCategories.TRANSACTION,
