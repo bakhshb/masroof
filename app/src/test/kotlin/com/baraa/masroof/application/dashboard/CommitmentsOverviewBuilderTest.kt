@@ -40,19 +40,9 @@ class CommitmentsOverviewBuilderTest {
             amount = Money.of("71.00", Currency.SAR),
             sourceTransactionId = tx.id,
         )
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(tx),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(Money.of("71.00", Currency.SAR), overview.total)
@@ -73,37 +63,16 @@ class CommitmentsOverviewBuilderTest {
             sourceTransactionId = "tx-netflix",
             transactionDate = LocalDate.parse("2026-07-01"),
         )
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertTrue(overview.rows.isEmpty())
         assertEquals(Money.zero(Currency.SAR), overview.total)
 
-        val inPreviousPeriod = CommitmentsOverviewBuilder.build(
+        val inPreviousPeriod = build(
             salaryPeriod = previousPeriod,
             commitments = listOf(commitment),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
         assertEquals(1, inPreviousPeriod.rows.size)
         assertEquals(CommitmentPaymentStatus.UNPAID, inPreviousPeriod.rows.single().status)
@@ -128,35 +97,16 @@ class CommitmentsOverviewBuilderTest {
             transactionDate = LocalDate.parse("2026-08-01"),
         )
 
-        val inSourcePeriod = CommitmentsOverviewBuilder.build(
+        val inSourcePeriod = build(
             salaryPeriod = previousPeriod,
             commitments = listOf(commitment),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(sourceTx),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
         assertTrue(inSourcePeriod.rows.isEmpty())
 
-        val inEditedPeriod = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val inEditedPeriod = build(
             commitments = listOf(commitment),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(sourceTx),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
         assertEquals(1, inEditedPeriod.rows.size)
         assertEquals(CommitmentPaymentStatus.UNPAID, inEditedPeriod.rows.single().status)
@@ -170,19 +120,8 @@ class CommitmentsOverviewBuilderTest {
             sourceTransactionId = "tx-old",
             recurrence = CommitmentRecurrence.MONTHLY,
         )
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(Money.of("173.00", Currency.SAR), overview.total)
@@ -201,15 +140,9 @@ class CommitmentsOverviewBuilderTest {
             transactionDate = LocalDate.parse("2026-01-15"),
         )
 
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertTrue(overview.rows.isEmpty())
@@ -231,15 +164,10 @@ class CommitmentsOverviewBuilderTest {
             at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
         )
 
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(payment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(5, overview.rows.size)
@@ -273,15 +201,10 @@ class CommitmentsOverviewBuilderTest {
                 .plusSeconds(60),
         )
 
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(laterPayment, earlierPayment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         val paidRows = overview.rows.filter { it.status == CommitmentPaymentStatus.PAID }
@@ -311,15 +234,10 @@ class CommitmentsOverviewBuilderTest {
             recurrence = CommitmentRecurrence.MONTHLY,
             transactionDate = LocalDate.parse("2026-08-01"),
         )
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(payment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
@@ -336,15 +254,9 @@ class CommitmentsOverviewBuilderTest {
             recurrence = CommitmentRecurrence.MONTHLY,
             transactionDate = LocalDate.parse("2026-08-01"),
         )
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(LocalDate.parse("2026-08-01"), overview.rows.single().expectedDate)
@@ -361,27 +273,16 @@ class CommitmentsOverviewBuilderTest {
         )
         val nextPeriod = FinancialPeriodPolicy.next(period)
 
-        val inMarkedPeriod = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val inMarkedPeriod = build(
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
         assertEquals(1, inMarkedPeriod.rows.size)
 
-        val inFollowingPeriod = CommitmentsOverviewBuilder.build(
+        val inFollowingPeriod = build(
             salaryPeriod = nextPeriod,
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
         assertEquals(1, inFollowingPeriod.rows.size)
         assertEquals(CommitmentPaymentStatus.UNPAID, inFollowingPeriod.rows.single().status)
@@ -401,27 +302,16 @@ class CommitmentsOverviewBuilderTest {
         )
         val previousPeriod = FinancialPeriodPolicy.previous(period)
 
-        val inPreviousPeriod = CommitmentsOverviewBuilder.build(
+        val inPreviousPeriod = build(
             salaryPeriod = previousPeriod,
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
         assertEquals(1, inPreviousPeriod.rows.size)
 
-        val inDisabledPeriod = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val inDisabledPeriod = build(
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
         assertTrue(inDisabledPeriod.rows.isEmpty())
     }
@@ -442,15 +332,10 @@ class CommitmentsOverviewBuilderTest {
             recurrence = CommitmentRecurrence.MONTHLY,
         )
 
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(refund),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(CommitmentPaymentStatus.UNPAID, overview.rows.single().status)
@@ -471,15 +356,10 @@ class CommitmentsOverviewBuilderTest {
             destinationContainerId = "card:${Bank.BANK_ALJAZIRA.id}:1234",
         )
 
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = emptyList(),
             creditFacilities = CreditFacilitiesOverview(listOf(facility), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(payment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
@@ -501,15 +381,10 @@ class CommitmentsOverviewBuilderTest {
         )
         val facilities = CreditFacilitiesOverview(listOf(paidFacility, unpaidFacility), emptyList(), Currency.SAR)
 
-        val commitments = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val commitments = build(
             commitments = emptyList(),
             creditFacilities = facilities,
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(payment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
         // The Cards screen reads the facilities after this same step in DashboardProjectionBuilder.
         val cards = facilities.withPaidDues(commitments.paidCreditFacilityKeys)
@@ -543,15 +418,11 @@ class CommitmentsOverviewBuilderTest {
             endDateExclusive = LocalDate.parse("2026-09-27"),
         )
 
-        val overview = CommitmentsOverviewBuilder.build(
+        val overview = build(
             salaryPeriod = laterPeriod,
             commitments = emptyList(),
             creditFacilities = CreditFacilitiesOverview(listOf(facility), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(payment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertTrue(overview.rows.isEmpty())
@@ -574,15 +445,10 @@ class CommitmentsOverviewBuilderTest {
             destinationContainerId = "card:${Bank.BANK_ALJAZIRA.id}:1234",
         )
 
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = emptyList(),
             creditFacilities = CreditFacilitiesOverview(listOf(facility), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(payment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
@@ -612,15 +478,10 @@ class CommitmentsOverviewBuilderTest {
             recurrence = CommitmentRecurrence.MONTHLY,
         )
 
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(first, second),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(payment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(2, overview.rows.size)
@@ -633,8 +494,7 @@ class CommitmentsOverviewBuilderTest {
 
     @Test
     fun inactiveCommitments_areExcluded() {
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(
                 commitment(
                     name = "School",
@@ -649,16 +509,6 @@ class CommitmentsOverviewBuilderTest {
                     ),
                 ),
             ),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertTrue(overview.rows.isEmpty())
@@ -667,14 +517,8 @@ class CommitmentsOverviewBuilderTest {
 
     @Test
     fun loanWithPeriodPayment_countsAsPaid() {
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = emptyList(),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
             loansOverview = LoansOverview(
                 loans = listOf(
                     LoanOverview(
@@ -690,10 +534,6 @@ class CommitmentsOverviewBuilderTest {
                 salaryPeriodLabel = "27 July",
                 currency = Currency.SAR,
             ),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
@@ -704,14 +544,8 @@ class CommitmentsOverviewBuilderTest {
 
     @Test
     fun loanWithoutPeriodPayment_usesInstallmentNotRemainingBalance() {
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = emptyList(),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
             loansOverview = LoansOverview(
                 loans = listOf(
                     LoanOverview(
@@ -729,10 +563,6 @@ class CommitmentsOverviewBuilderTest {
                 salaryPeriodLabel = "27 July",
                 currency = Currency.SAR,
             ),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(CommitmentPaymentStatus.UNPAID, overview.rows.single().status)
@@ -742,14 +572,8 @@ class CommitmentsOverviewBuilderTest {
 
     @Test
     fun paidOffLoanWithoutPeriodPayment_isOmitted() {
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = emptyList(),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
             loansOverview = LoansOverview(
                 loans = listOf(
                     LoanOverview(
@@ -767,10 +591,6 @@ class CommitmentsOverviewBuilderTest {
                 salaryPeriodLabel = "27 July",
                 currency = Currency.SAR,
             ),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertTrue(overview.rows.isEmpty())
@@ -792,19 +612,9 @@ class CommitmentsOverviewBuilderTest {
             sourceTransactionId = tx.id,
             recurrence = CommitmentRecurrence.MONTHLY,
         )
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(tx),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(Money.of("173.00", Currency.SAR), overview.rows.single().amount)
@@ -829,15 +639,10 @@ class CommitmentsOverviewBuilderTest {
             sourceTransactionId = "tx-stc-original",
             recurrence = CommitmentRecurrence.MONTHLY,
         )
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(payment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(Money.of("165.00", Currency.SAR), overview.rows.single().amount)
@@ -862,19 +667,9 @@ class CommitmentsOverviewBuilderTest {
             sourceTransactionId = tx.id,
             recurrence = CommitmentRecurrence.MONTHLY,
         )
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(tx),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
@@ -888,19 +683,9 @@ class CommitmentsOverviewBuilderTest {
             sourceTransactionId = "tx-usd",
             recurrence = CommitmentRecurrence.MONTHLY,
         )
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
             sarEquivalents = mapOf("tx-usd" to Money.of("93.75", Currency.SAR)),
-            zoneId = zone,
         )
 
         assertEquals(Money.of("93.75", Currency.SAR), overview.rows.single().amount)
@@ -934,19 +719,10 @@ class CommitmentsOverviewBuilderTest {
             sourceTransactionId = sourceTx.id,
             recurrence = CommitmentRecurrence.MONTHLY,
         )
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment),
-            creditFacilities = CreditFacilitiesOverview(
-                facilities = emptyList(),
-                debitCards = emptyList(),
-                currency = Currency.SAR,
-            ),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(sourceTx, paymentTx),
-            primaryCurrency = Currency.SAR,
             sarEquivalents = mapOf(sourceTx.id to Money.of("93.75", Currency.SAR)),
-            zoneId = zone,
         )
 
         assertEquals(CommitmentPaymentStatus.PAID, overview.rows.single().status)
@@ -958,16 +734,12 @@ class CommitmentsOverviewBuilderTest {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val sourceTx = transaction(id = "tx-usd", merchant = "Amazon", amount = "30", at = start.minusSeconds(3600))
             .copy(amount = Money.of("30.00", Currency.USD))
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(commitment(name = "Amazon", amount = Money.of("20.00", Currency.USD),
                 sourceTransactionId = sourceTx.id, recurrence = CommitmentRecurrence.MONTHLY)),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(sourceTx),
-            primaryCurrency = Currency.SAR,
             sarEquivalents = mapOf(sourceTx.id to Money.of("112.50", Currency.SAR)),
-            zoneId = zone,
         )
 
         // 112.50 * 20 / 30 = 75.00; rounding the ratio to 0.67 first gave 75.38.
@@ -979,15 +751,10 @@ class CommitmentsOverviewBuilderTest {
         val later = FinancialPeriod(LocalDate.parse("2026-09-27"), LocalDate.parse("2026-10-27"))
         val monthly = commitment(name = "Gym", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-gym",
             recurrence = CommitmentRecurrence.MONTHLY).copy(dueDate = LocalDate.parse("2026-08-05"))
-        val overview = CommitmentsOverviewBuilder.build(
+        val overview = build(
             salaryPeriod = later,
             commitments = listOf(monthly),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(listOf(LocalDate.parse("2026-10-01")), overview.rows.map { it.expectedDate })
@@ -997,15 +764,9 @@ class CommitmentsOverviewBuilderTest {
     fun recurringCommitment_unpaidRowShowsDueDateInThePeriodThatHoldsIt() {
         val monthly = commitment(name = "Gym", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-gym",
             recurrence = CommitmentRecurrence.MONTHLY).copy(dueDate = LocalDate.parse("2026-08-05"))
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(monthly),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(listOf(LocalDate.parse("2026-08-05")), overview.rows.map { it.expectedDate })
@@ -1015,15 +776,9 @@ class CommitmentsOverviewBuilderTest {
     fun weeklyCommitment_showsDueDateOnlyOnTheFirstUnpaidRow() {
         val weekly = commitment(name = "Cleaner", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-clean",
             recurrence = CommitmentRecurrence.WEEKLY).copy(dueDate = LocalDate.parse("2026-08-05"))
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(weekly),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         val dates = overview.rows.map { it.expectedDate }
@@ -1036,15 +791,9 @@ class CommitmentsOverviewBuilderTest {
     fun oneTimeCommitment_unpaidRowKeepsItsDueDate() {
         val oneTime = commitment(name = "Insurance", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-ins")
             .copy(dueDate = LocalDate.parse("2026-08-20"))
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(oneTime),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
-            transactions = emptyList(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(listOf(LocalDate.parse("2026-08-20")), overview.rows.map { it.expectedDate })
@@ -1076,7 +825,7 @@ class CommitmentsOverviewBuilderTest {
             id = "after-period",
             occurredAt = FinancialPeriodPolicy.toExclusiveEndInstant(salaryPeriod.endDateExclusive, zone),
         )
-        val overview = CommitmentsOverviewBuilder.build(
+        val overview = build(
             salaryPeriod = salaryPeriod,
             commitments = listOf(
                 commitment(
@@ -1088,11 +837,7 @@ class CommitmentsOverviewBuilderTest {
                 ),
             ),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(afterPeriod, octoberPayment, beforePeriod, septemberPayment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(listOf(septemberPayment.id, octoberPayment.id), overview.rows.map { it.paymentTransactionId })
@@ -1116,8 +861,7 @@ class CommitmentsOverviewBuilderTest {
             at = Instant.parse("2026-08-01T10:00:00Z"),
         )
         val secondPayment = firstPayment.copy(id = "second-payment", amount = Money.of("150", Currency.SAR))
-        val overview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             commitments = listOf(
                 commitment(
                     name = "Subscription",
@@ -1127,11 +871,7 @@ class CommitmentsOverviewBuilderTest {
                 ),
             ),
             creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
-            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
             transactions = listOf(firstPayment, secondPayment),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = zone,
         )
 
         assertEquals(2, overview.rows.size)
@@ -1139,6 +879,29 @@ class CommitmentsOverviewBuilderTest {
         assertEquals(Money.of("250", Currency.SAR), overview.paid)
         assertEquals(Money.zero(Currency.SAR), overview.remaining)
     }
+
+    private fun build(
+        salaryPeriod: FinancialPeriod = period,
+        commitments: List<Commitment> = emptyList(),
+        creditFacilities: CreditFacilitiesOverview = CreditFacilitiesOverview(
+            facilities = emptyList(),
+            debitCards = emptyList(),
+            currency = Currency.SAR,
+        ),
+        loansOverview: LoansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+        transactions: List<FinancialTransaction> = emptyList(),
+        primaryCurrency: Currency = Currency.SAR,
+        sarEquivalents: Map<String, Money> = emptyMap(),
+    ): CommitmentsOverview = CommitmentsOverviewBuilder.build(
+        salaryPeriod = salaryPeriod,
+        commitments = commitments,
+        creditFacilities = creditFacilities,
+        loansOverview = loansOverview,
+        transactions = transactions,
+        primaryCurrency = primaryCurrency,
+        sarEquivalents = sarEquivalents,
+        zoneId = zone,
+    )
 
     private fun commitment(
         name: String,

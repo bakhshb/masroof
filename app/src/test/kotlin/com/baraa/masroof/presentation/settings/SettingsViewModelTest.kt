@@ -808,24 +808,8 @@ class SettingsViewModelTest {
         assertNull(vm.uiState.value.error)
     }
 
-    private fun sampleCommitment(
-        id: String = "cmt_1",
-        active: Boolean = true,
-    ): Commitment {
-        val now = Instant.parse("2026-08-01T00:00:00Z")
-        return Commitment(
-            id = id,
-            name = "Netflix",
-            amount = Money.of("71.00", Currency.SAR),
-            transactionDate = LocalDate.parse("2026-08-01"),
-            recurrence = CommitmentRecurrence.MONTHLY,
-            dueDate = LocalDate.parse("2026-08-05"),
-            active = active,
-            sourceTransactionId = "tx-$id",
-            createdAt = now,
-            updatedAt = now,
-        )
-    }
+    private fun sampleCommitment(id: String = "cmt_1", active: Boolean = true): Commitment =
+        com.baraa.masroof.testsupport.sampleCommitment(id = id, active = active, dueDate = LocalDate.parse("2026-08-05"))
 
     private fun commitmentsWorkflow(
         repo: CommitmentRepository,

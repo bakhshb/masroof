@@ -115,7 +115,7 @@ class ManualDecisionReplayTest {
         DashboardLedgerWorld(context()).use { world ->
             val ledger = transferLedger(world)
             val batch = ledger.openBatch()
-            for (row in ambiguousTie()) {
+            for (row in ambiguousTie("manual")) {
                 assertTrue(batch.ingestProvider(row) is SmsIngestionResult.Parsed)
             }
             assertTrue("seed=$seed finish", batch.finish() is HistoricalBatchDerivedResult.Succeeded)
@@ -154,7 +154,7 @@ class ManualDecisionReplayTest {
             ownCard(world, "2210", com.baraa.masroof.domain.model.CardType.DEBIT)
             ownAccounts(world, listOf("3001"))
             val batch = ledger.openBatch()
-            for (row in ambiguousTie()) {
+            for (row in ambiguousTie("manual")) {
                 assertTrue(batch.ingestProvider(row) is SmsIngestionResult.Parsed)
             }
             assertTrue(batch.finish() is HistoricalBatchDerivedResult.Succeeded)
@@ -252,24 +252,6 @@ class ManualDecisionReplayTest {
             assertFinancialInvariants(world, seed, "correction")
         }
     }
-
-    private suspend fun purchaseLedger(world: DashboardLedgerWorld): IntegrityLedger {
-        ownAccounts(world, listOf("3001"))
-        ownCard(world, "2210", com.baraa.masroof.domain.model.CardType.DEBIT)
-        return IntegrityLedger(world)
-    }
-
-    private suspend fun transferLedger(world: DashboardLedgerWorld): IntegrityLedger {
-        ownAccounts(world, listOf("3001", "3002"))
-        return IntegrityLedger(world)
-    }
-
-    private fun ambiguousTie() = listOf(
-        providerRow("manual-tie-out-a", intraOut("2026-09-02 10:00"), "2026-09-02T07:00:00Z"),
-        providerRow("manual-tie-out-b", intraOut("2026-09-02 10:00"), "2026-09-02T07:00:01Z"),
-        providerRow("manual-tie-in-a", intraIn("2026-09-02 10:00"), "2026-09-02T07:00:02Z"),
-        providerRow("manual-tie-in-b", intraIn("2026-09-02 10:00"), "2026-09-02T07:00:03Z"),
-    )
 
     private suspend fun requireReview(world: DashboardLedgerWorld, rawSmsId: String): ReviewItem {
         world.reviewRepo.upsertRequired(

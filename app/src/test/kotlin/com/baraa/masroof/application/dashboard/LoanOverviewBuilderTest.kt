@@ -45,32 +45,9 @@ class LoanOverviewBuilderTest {
             lastSeenRawSmsId = "sms-loan",
         )
         val parsedRecords = listOf(
-            ParsedEventRecord(
-                event = ParsedEvent(
-                    id = "evt-loan",
-                    rawSmsId = "sms-loan",
-                    bank = Bank.BANK_ALJAZIRA,
-                    messageFamily = MessageFamily.FINANCING_INSTALLMENT,
-                    direction = MoneyDirection.OUTGOING,
-                    amount = Money.of("3036.11", Currency.SAR),
-                    purchaseChannel = null,
-                    cardRef = null,
-                    sourceAccountRef = com.baraa.masroof.domain.model.AccountReference(
-                        Bank.BANK_ALJAZIRA,
-                        "3001",
-                    ),
-                    destinationAccountRef = null,
-                    merchant = null,
-                    counterparty = "تمويل شخصي",
-                    occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
-                    bankNetworkType = null,
-                    confidence = Confidence(1.0),
-                    parseStatus = ParseStatus.SUCCESS,
-                ),
-                details = ParsedEventDetails(
-                    outstandingBalance = Money.of("33397.25", Currency.SAR),
-                    loanType = LoanType.PERSONAL,
-                ),
+            financingInstallmentRecord(
+                occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
+                outstandingBalance = Money.of("33397.25", Currency.SAR),
             ),
         )
         val loanContainerId = FinancialContainerIdFactory.loanId(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)
@@ -89,15 +66,11 @@ class LoanOverviewBuilderTest {
             ),
         )
 
-        val overview = LoanOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             loans = listOf(loan),
             transactions = transactions,
             parsedRecords = parsedRecords,
             rawSmsById = mapOf("sms-loan" to rawSms("sms-loan", Instant.parse("2026-08-27T01:10:00Z"))),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = ZoneId.of("Asia/Riyadh"),
         )
 
         assertEquals(1, overview.loans.size)
@@ -118,30 +91,7 @@ class LoanOverviewBuilderTest {
             lastSeenRawSmsId = "sms-loan",
         )
         val parsedRecords = listOf(
-            ParsedEventRecord(
-                event = ParsedEvent(
-                    id = "evt-loan",
-                    rawSmsId = "sms-loan",
-                    bank = Bank.BANK_ALJAZIRA,
-                    messageFamily = MessageFamily.FINANCING_INSTALLMENT,
-                    direction = MoneyDirection.OUTGOING,
-                    amount = Money.of("3036.11", Currency.SAR),
-                    purchaseChannel = null,
-                    cardRef = null,
-                    sourceAccountRef = com.baraa.masroof.domain.model.AccountReference(
-                        Bank.BANK_ALJAZIRA,
-                        "3001",
-                    ),
-                    destinationAccountRef = null,
-                    merchant = null,
-                    counterparty = "تمويل شخصي",
-                    occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
-                    bankNetworkType = null,
-                    confidence = Confidence(1.0),
-                    parseStatus = ParseStatus.SUCCESS,
-                ),
-                details = ParsedEventDetails(loanType = LoanType.PERSONAL),
-            ),
+            financingInstallmentRecord(occurredAt = Instant.parse("2026-08-27T01:10:00Z"), outstandingBalance = null),
         )
         val transactions = listOf(
             FinancialTransaction(
@@ -158,15 +108,11 @@ class LoanOverviewBuilderTest {
             ),
         )
 
-        val overview = LoanOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             loans = listOf(loan),
             transactions = transactions,
             parsedRecords = parsedRecords,
             rawSmsById = mapOf("sms-loan" to rawSms("sms-loan", Instant.parse("2026-08-27T01:10:00Z"))),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = ZoneId.of("Asia/Riyadh"),
         )
 
         assertEquals(BigDecimal("3036.11"), overview.loans.single().salaryPeriodPayment.amount)
@@ -186,44 +132,17 @@ class LoanOverviewBuilderTest {
             lastSeenRawSmsId = "sms-loan",
         )
         val parsedRecords = listOf(
-            ParsedEventRecord(
-                event = ParsedEvent(
-                    id = "evt-loan",
-                    rawSmsId = "sms-loan",
-                    bank = Bank.BANK_ALJAZIRA,
-                    messageFamily = MessageFamily.FINANCING_INSTALLMENT,
-                    direction = MoneyDirection.OUTGOING,
-                    amount = Money.of("3036.11", Currency.SAR),
-                    purchaseChannel = null,
-                    cardRef = null,
-                    sourceAccountRef = com.baraa.masroof.domain.model.AccountReference(
-                        Bank.BANK_ALJAZIRA,
-                        "3001",
-                    ),
-                    destinationAccountRef = null,
-                    merchant = null,
-                    counterparty = "تمويل شخصي",
-                    occurredAt = null,
-                    bankNetworkType = null,
-                    confidence = Confidence(1.0),
-                    parseStatus = ParseStatus.SUCCESS,
-                ),
-                details = ParsedEventDetails(
-                    outstandingBalance = Money.of("33397.25", Currency.SAR),
-                    occurredAtLocal = localTime,
-                    loanType = LoanType.PERSONAL,
-                ),
+            financingInstallmentRecord(
+                occurredAt = null,
+                outstandingBalance = Money.of("33397.25", Currency.SAR),
+                occurredAtLocal = localTime,
             ),
         )
 
-        val overview = LoanOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             loans = listOf(loan),
-            transactions = emptyList(),
             parsedRecords = parsedRecords,
             rawSmsById = mapOf("sms-loan" to rawSms("sms-loan", Instant.parse("2026-08-27T05:00:00Z"))),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
             zoneId = zoneId,
         )
 
@@ -266,25 +185,16 @@ class LoanOverviewBuilderTest {
             "sms-loan-current" to rawSms("sms-loan-current", Instant.parse("2026-08-28T01:10:00Z")),
         )
 
-        val previousOverview = LoanOverviewBuilder.build(
+        val previousOverview = build(
             salaryPeriod = previousPeriod,
             loans = listOf(loan),
-            transactions = emptyList(),
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = ZoneId.of("Asia/Riyadh"),
         )
-        val currentOverview = LoanOverviewBuilder.build(
-            salaryPeriod = period,
+        val currentOverview = build(
             loans = listOf(loan),
-            transactions = emptyList(),
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = ZoneId.of("Asia/Riyadh"),
         )
 
         assertEquals(Money.of("40000.00", Currency.SAR), previousOverview.loans.single().remainingBalance)
@@ -293,8 +203,7 @@ class LoanOverviewBuilderTest {
 
     @Test
     fun build_ignoresUnknownLoans() {
-        val overview = LoanOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             loans = listOf(
                 LoanRegistryEntry(
                     id = "loan-1",
@@ -306,12 +215,6 @@ class LoanOverviewBuilderTest {
                     lastSeenRawSmsId = "sms-loan",
                 ),
             ),
-            transactions = emptyList(),
-            parsedRecords = emptyList(),
-            rawSmsById = emptyMap(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = ZoneId.of("Asia/Riyadh"),
         )
 
         assertEquals(0, overview.loans.size)
@@ -324,25 +227,37 @@ class LoanOverviewBuilderTest {
             id = id, bank = Bank.BANK_ALJAZIRA, loanType = type, ownership = OwnershipStatus.OWNED,
             displayName = name, firstSeenRawSmsId = "sms-$id", lastSeenRawSmsId = "sms-$id",
         )
-        val overview = LoanOverviewBuilder.build(
-            salaryPeriod = period,
+        val overview = build(
             loans = listOf(owned("a", LoanType.PERSONAL, null), owned("b", LoanType.AUTO, "  Car  ")),
-            transactions = emptyList(),
-            parsedRecords = emptyList(),
-            rawSmsById = emptyMap(),
-            primaryCurrency = Currency.SAR,
-            sarEquivalents = emptyMap(),
-            zoneId = ZoneId.of("Asia/Riyadh"),
         )
 
         assertEquals(mapOf(LoanType.PERSONAL to null, LoanType.AUTO to "Car"), overview.loans.associate { it.loanType to it.customName })
     }
 
+    private fun build(
+        salaryPeriod: FinancialPeriod = period,
+        loans: List<LoanRegistryEntry>,
+        transactions: List<FinancialTransaction> = emptyList(),
+        parsedRecords: List<ParsedEventRecord> = emptyList(),
+        rawSmsById: Map<String, RawSms> = emptyMap(),
+        zoneId: ZoneId = ZoneId.of("Asia/Riyadh"),
+    ) = LoanOverviewBuilder.build(
+        salaryPeriod = salaryPeriod,
+        loans = loans,
+        transactions = transactions,
+        parsedRecords = parsedRecords,
+        rawSmsById = rawSmsById,
+        primaryCurrency = Currency.SAR,
+        sarEquivalents = emptyMap(),
+        zoneId = zoneId,
+    )
+
     private fun financingInstallmentRecord(
-        eventId: String,
-        rawSmsId: String,
-        occurredAt: Instant,
-        outstandingBalance: Money,
+        eventId: String = "evt-loan",
+        rawSmsId: String = "sms-loan",
+        occurredAt: Instant?,
+        outstandingBalance: Money?,
+        occurredAtLocal: LocalDateTime? = null,
     ) = ParsedEventRecord(
         event = ParsedEvent(
             id = eventId,
@@ -367,6 +282,7 @@ class LoanOverviewBuilderTest {
         ),
         details = ParsedEventDetails(
             outstandingBalance = outstandingBalance,
+            occurredAtLocal = occurredAtLocal,
             loanType = LoanType.PERSONAL,
         ),
     )
