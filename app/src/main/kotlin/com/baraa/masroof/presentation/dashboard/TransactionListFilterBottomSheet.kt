@@ -24,8 +24,7 @@ fun TransactionListFilterBottomSheet(visible: Boolean, onDismiss: () -> Unit,
     var resetAll by rememberSaveable { mutableStateOf(false) }
     val draft = filterState.copy(types = types.mapNotNull { runCatching { FinancialTransactionType.valueOf(it) }.getOrNull() }.toSet(),
         cardKeys = cards.toSet(), accountContainerIds = accounts.toSet(),
-        searchQuery = if (resetAll) "" else filterState.searchQuery,
-        transactionIds = if (resetAll) emptySet() else filterState.transactionIds)
+        searchQuery = if (resetAll) "" else filterState.searchQuery)
     MasroofBottomSheet(stringResource(R.string.transaction_list_filter_sheet_title), onDismiss,
         onApply = { onApply(draft); onDismiss() }, applyLabel = stringResource(R.string.transaction_list_filter_apply),
         resetLabel = stringResource(R.string.transaction_list_clear_filters),

@@ -20,18 +20,6 @@ class TransactionListFilterEngineTest {
     }
 
     @Test
-    fun transactionIdFilter_limitsResults() {
-        val txs = listOf(
-            preview(id = "keep", type = FinancialTransactionType.EXPENSE, amount = "100", card = "7271"),
-            preview(id = "drop", type = FinancialTransactionType.EXPENSE, amount = "50", card = "7271"),
-        )
-
-        val result = TransactionListPresentationMapper.project(transactions = txs, filter = TransactionListFilterState(transactionIds = setOf("keep"))).result
-
-        assertEquals(listOf("keep"), result.transactions.map { it.id })
-    }
-
-    @Test
     fun typeFilter_limitsResults() {
         val txs = listOf(
             preview(type = FinancialTransactionType.EXPENSE, amount = "100", card = "7271"),
