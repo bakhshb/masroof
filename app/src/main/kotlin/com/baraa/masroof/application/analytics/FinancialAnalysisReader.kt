@@ -64,8 +64,10 @@ internal object FinancialAnalysisReader {
                 object : CommitmentRepository by c.commitmentRepository { override suspend fun listAll() = commitments },
                 // Analytics never requests a new rate. Enrichment remains the financial authority.
                 TransactionSarEquivalentResolver(ForeignSarMarketRateProvider { _, _ -> null }), zoneId = zone, clock = clock, evidenceSource = detachedEvidence)
-            val retry = c.database.openHelper.readableDatabase.query("SELECT COUNT(*) FROM processing_retry").use { it.moveToFirst(); it.getInt(0) > 0 }
-            val incompleteIds = (reviews.map { it.rawSmsId } + c.processingRetryRepository.listRetryableRawSmsIds()).toSet()
+            // A non-financial resolution keeps its retry row but must not block analysis.
+            val retryIds = c.processingRetryRepository.listRetryableRawSmsIds()
+            val retry = retryIds.isNotEmpty()
+            val incompleteIds = (reviews.map { it.rawSmsId } + retryIds).toSet()
             val incompleteRaw = c.rawSmsRepository.getByIds(incompleteIds).associateBy { it.id }
             val incompleteEvents = c.parsedEventRepository.listByRawSmsIds(incompleteIds).associateBy { it.event.rawSmsId }
             val incompleteDays = incompleteIds.flatMap { id ->
