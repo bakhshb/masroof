@@ -49,11 +49,23 @@ class FrankfurterForeignSarRateProviderTest {
     }
 
     @Test
-    fun nonSuccessResponse_isNullAndCachedAsMiss() = runBlocking {
+    fun clientErrorResponse_isNullAndCachedAsMiss() = runBlocking {
+        val provider = provider("""{"rate":3.75}""", code = 404)
+        assertNull(provider.rateFor(Currency.USD, date))
+        now += FrankfurterForeignSarRateProvider.FAILURE_RETRY_NANOS * 10
+        assertNull(provider.rateFor(Currency.USD, date))
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun serverErrorResponse_isRetriedAfterTheWindow() = runBlocking {
         val provider = provider("""{"rate":3.75}""", code = 503)
         assertNull(provider.rateFor(Currency.USD, date))
         assertNull(provider.rateFor(Currency.USD, date))
         assertEquals(1, calls)
+        now += FrankfurterForeignSarRateProvider.FAILURE_RETRY_NANOS
+        assertNull(provider.rateFor(Currency.USD, date))
+        assertEquals(2, calls)
     }
 
     @Test

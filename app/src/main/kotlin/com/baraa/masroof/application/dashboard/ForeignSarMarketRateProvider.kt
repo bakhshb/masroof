@@ -18,8 +18,8 @@ fun interface ForeignSarMarketRateProvider {
 
 /**
  * Fetches foreign→SAR from Frankfurter v2 (no API key). Caches per currency and date in memory.
- * A definitive miss (non-2xx, missing or invalid rate) stays cached for this process. A network
- * failure is reused only for [FAILURE_RETRY_NANOS], so enrichment retries in the same process
+ * A definitive miss (4xx other than 429, missing or invalid rate) stays cached for this process. A
+ * network failure, server error or rate limit is reused only for [FAILURE_RETRY_NANOS], so enrichment retries in the same process
  * reach the network again after an outage.
  */
 class FrankfurterForeignSarRateProvider(
@@ -63,6 +63,8 @@ class FrankfurterForeignSarRateProvider(
                 .get()
                 .build()
             val body = httpClient.newCall(request).execute().use { response ->
+                // A server error or rate limit is temporary: retried like a network failure.
+                if (response.code == 429 || response.code >= 500) throw java.io.IOException("HTTP ${response.code}")
                 if (!response.isSuccessful) return@withContext null
                 response.body?.string()
             } ?: return@withContext null
