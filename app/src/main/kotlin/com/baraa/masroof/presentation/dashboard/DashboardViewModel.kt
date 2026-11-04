@@ -149,8 +149,10 @@ class DashboardViewModel(
             val sections = snapshot.sections.toMutableList()
             val index = sections.indexOfFirst { it.id == id }
             if (index < 0) return@mutateCustomizeDraft snapshot
-            val target = (index + direction).coerceIn(0, sections.lastIndex)
-            if (target == index) return@mutateCustomizeDraft snapshot
+            // Step past sections the sheet does not show, so Up/Down swaps with a visible row.
+            var target = index + direction
+            while (target in sections.indices && sections[target].id in CUSTOMIZE_SHEET_HIDDEN_SECTIONS) target += direction
+            if (target !in sections.indices) return@mutateCustomizeDraft snapshot
             val item = sections.removeAt(index)
             sections.add(target, item)
             snapshot.copy(sections = sections)
