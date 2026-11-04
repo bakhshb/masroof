@@ -68,18 +68,9 @@ class TransactionSarEquivalentResolver(
 
             val smsFacts = linkedRecord?.details
             if (smsFacts?.exchangeRate != null) {
-                ForeignPurchaseSarConverter.foreignToSar(
-                    foreignAmount = tx.amount,
-                    exchangeRate = smsFacts.exchangeRate,
-                    internationalFee = if (includeFee) smsFacts.internationalFee else null,
-                    targetCurrency = primaryCurrency,
-                )?.let { sar ->
-                    result[tx.id] = SarEquivalentResolution(
-                        sarAmount = sar,
-                        exchangeRate = smsFacts.exchangeRate,
-                        source = ExchangeRateSource.SMS,
-                    )
-                }
+                resolutionFromRate(
+                    tx, smsFacts.exchangeRate, ExchangeRateSource.SMS, primaryCurrency, smsFacts.internationalFee, includeFee,
+                )?.let { result[tx.id] = it }
                 continue
             }
 
@@ -87,35 +78,16 @@ class TransactionSarEquivalentResolver(
                 ?: tx.linkedParsedEventIds.firstNotNullOfOrNull { parsedByEventId[it]?.event?.merchant }
             val historicalRate = rateIndex.rateForMerchant(merchant, tx.amount.currency, tx.occurredAt)
             if (historicalRate != null) {
-                ForeignPurchaseSarConverter.foreignToSar(
-                    foreignAmount = tx.amount,
-                    exchangeRate = historicalRate,
-                    internationalFee = null,
-                    targetCurrency = primaryCurrency,
-                )?.let { sar ->
-                    result[tx.id] = SarEquivalentResolution(
-                        sarAmount = sar,
-                        exchangeRate = historicalRate,
-                        source = ExchangeRateSource.HISTORICAL_MERCHANT,
-                    )
-                }
+                resolutionFromRate(
+                    tx, historicalRate, ExchangeRateSource.HISTORICAL_MERCHANT, primaryCurrency, null, includeFee,
+                )?.let { result[tx.id] = it }
                 continue
             }
 
             val onDate = marketCivilDate(tx, linkedRecord) ?: continue
             val marketRate = marketRateProvider.rateFor(tx.amount.currency, onDate) ?: continue
-            ForeignPurchaseSarConverter.foreignToSar(
-                foreignAmount = tx.amount,
-                exchangeRate = marketRate,
-                internationalFee = null,
-                targetCurrency = primaryCurrency,
-            )?.let { sar ->
-                result[tx.id] = SarEquivalentResolution(
-                    sarAmount = sar,
-                    exchangeRate = marketRate,
-                    source = ExchangeRateSource.MARKET,
-                )
-            }
+            resolutionFromRate(tx, marketRate, ExchangeRateSource.MARKET, primaryCurrency, null, includeFee)
+                ?.let { result[tx.id] = it }
         }
         return result
     }
