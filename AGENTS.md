@@ -1,76 +1,68 @@
 # Masroof agent notes
 
-## Design system and theme
+Android app that turns Saudi bank SMS into a private ledger and dashboard. Arabic first (RTL), English second.
+Reference: `docs/ARCHITECTURE.md` (modules), `docs/DESIGN_SYSTEM.md` (UI), `docs/ANALYTICS.md` (analysis).
+This file wins when older records disagree.
 
-- All UI must follow the shared theme in `ui-kit/src/main/kotlin/com/baraa/masroof/ui/theme/` — do not introduce ad-hoc colors, typography, spacing, or icon sizes.
-- Use `MasroofTheme` / `MaterialTheme` for colors and typography; extended semantic colors live in `MasroofThemeExtras.extendedColors`.
-- Spacing and sizing tokens: `MasroofSpacing`, `MasroofIconSizes`, `MasroofElevation`, `MasroofShapes`.
-- Reuse shared components from `presentation/common/` (`MasroofCard`, `MasroofSectionHeader`, `MasroofAmountText`, `MasroofMoneyRow`, `MasroofSecondaryScaffold`, etc.) instead of one-off layouts.
-- All modal bottom sheets use `MasroofBottomSheet`; geometry and adaptive widths live in `MasroofSheetTokens`. Header/actions stay fixed and only the body scrolls. Multiple-choice rows use `MasroofSheetChoices`. Draft changes apply only on Save/Apply; Back, scrim, swipe, Close and Cancel discard them. Busy financial writes block dismissal.
-- Chart category projections and filtering live in application dashboard builders / `ChartDataWorkflow`. Chart choices never change entity balances, dues, or full-scope summary metrics. Persist keys with their bank-qualified entity identity, never translated names or only last4.
-- Do not add hardcoded `dp` values in feature screens when an existing token fits; add a new token in `ui-kit/src/main/kotlin/com/baraa/masroof/ui/theme/` only when the design truly needs a new size.
-- App navigation lives in `presentation/navigation/` (`MasroofRoot`, `HomeDestination`, `SettingsDestination`). Home screens sit on one back stack (`HomeBackStack.kt`): open a screen with `push`, return with `pop`; never assign a fixed return screen. Each visit keeps its own saved state, so screen-local navigation state (which sub-page is shown) must be `rememberSaveable`.
-- Debug builds expose a design catalog at **Settings → About → Design catalog** (`presentation/debug/DesignCatalogScreen.kt`) for previewing tokens and shared components.
+## Never break
+- Database `masroof.db` stays schema v18 with the same identity hash; reject other database/backup schemas, no destructive fallback, no migrations or backfills. A schema change needs an explicit design and device verification.
+- Keep the application id, preference names, Keystore alias, worker identities and historical persisted keys.
+- No Lab UI, replica app or parallel intake; no `lab`/`beta` source paths. Engine/model refreshes never reparse posted evidence or override human decisions.
+- Never log SMS bodies, account numbers or secrets. Logs carry stage, failure count, masked id and retry state.
+- PRs target `main`. Full tests run in PR/main CI only; never add `testDebugUnitTest` to `release.yml`.
 
-## Architecture (follow on every feature)
+## Layers
+- `presentation` → `application` → `domain` / `parsing` / `data` / `sms` / `bank`; dependencies point inward. `PackageDependencyRulesTest` enforces it: fix the import, never add an exception.
+- ViewModels call `application` workflows/services only. Presentation never imports `domain.ids|rules|repository|ownership|assembly|matching` or `domain.period`.
+- `finance-core` owns `core.money`, value models, period/time policies, identities, classification/impact, transfer and statement matching (packages kept as `com.baraa.masroof.core.money` / `domain.*`). It gets facts and returns decisions; repositories, ownership, reconciliation writes, CSV and dashboard aggregation stay in `app`. Do not copy these into `app`. Both Money contracts stay distinct.
+- `bank-engine` may import only `finance.value` contracts. Pure modules use `engine.bank`, `finance.value`, `ml`, `analytics`; app integration tests live under `integration`.
 
-**Layers:** `presentation` → `application` → `domain` / `parsing` / `data` / `sms` / `bank`. Dependencies point inward. Rules are enforced in `PackageDependencyRulesTest` — do not add exceptions; fix the import instead.
+## SMS pipeline
+- Live: `IncomingSmsReceiver` → `LiveSmsIntake` → `CaptureBankSmsUseCase` (durable `RawSms`) → `LiveSmsWorkScheduler` → `LiveSmsProcessingWorker` → `ProcessStoredSmsUseCase`. Work input is the rawSmsId only.
+- Live `receivedAt` = PDU service-center time when valid (`LiveReceiptTimestamp`, earliest part), else the injected clock.
+- Historical: `HistoricalSmsScanner` → `HistoricalSmsBatchProcessor`: parse each row, then one discovery/reconcile/review pass per batch, never per SMS.
+- `ProcessRawSmsUseCase` is only a capture-then-process facade. No orchestration under `sms/`.
 
-**Financial core:** `finance-core` owns production `core.money`, financial value models, period/time policies, container/transaction identities, financial classification/impact, transfer matching/assembly and statement matching. Their original `com.baraa.masroof.core.money` / `com.baraa.masroof.domain.*` packages are preserved. Do not recreate these implementations in `app`. Core receives facts and returns in-memory decisions; repository access, ownership discovery/confirmation, reconciliation writes/retries, CSV I/O and dashboard aggregation remain in `app`. `bank-engine` may import only the existing `finance.value` contracts, never the financial decision policies. Both current Money contracts remain distinct. Extraction adds no schema migration, backfill or reparse.
+## Bank routing and parsing
+- `BankSmsRegistry` evaluates every adapter. `Ambiguous`/`SuspectedBank` are stored and reviewed, never parsed by a guess; never resolve by registration order. Adapters never re-check the sender.
+- Reprocessing order: `user_selected_bank:<bankId>`, then the stored ParsedEvent bank, then a fresh route. `Matched` parses; only a genuine `NotMatched` may use the sole-adapter fallback. Queue refresh keeps the selection prefix.
+- Match on `NormalizedSms.comparisonBody` after `ArabicTextFolding`; display with `normalizedSlice(range)`, never `comparisonBody`.
+- Bank logic stays in `bank/*`; fill `ParsedEventDetails` at parse time (`cardSmsChannel`, balances, due dates). Dashboard code reads persisted facts only: never re-parses SMS or imports `bank.*`.
+- Interpretation lives in `bank-engine` (`PatternFactInterpreter`, `RuleInterpreter`, explicit evidence/blockers). Production definitions: `app/src/main/assets/bank-patterns/`; Kotlin rule profiles only in `bank-engine/src/testFixtures`. Ownership: approval `application/patterns`, protection `application/ingestion`, composition `application/interpretation`, storage `data/patterns`, backup `application/backup`; update `docs/ARCHITECTURE.md` before moving any. No parallel runtime.
+- Competing families stay UNKNOWN; OTP wins over quoted financial wording; refunds keep refund authority. Add regression tests for role/classification changes. The retired AlJazira parser/classifier/extractor never returns, test copies included.
+- Only `ParseFinalizer` emits `ParseResult.Success`, and only with no ERROR from `DefaultParsedEventValidator`. Tighten via validator rules / `AutomaticUsePolicy`; validators never resolve ownership or type.
+- `ml-assist` gives family hints only: never money, ownership or posting.
+- New bank: a `BankSmsAdapter`, fixtures under `testdata/`, and a `BankSmsAdapterContractCase` in `BankSmsAdapterContractTest` (financial + non-financial samples, positive/negative senders); no sample claimed by two adapters.
 
-**ViewModels:** Call `application` types only (workflows and services). No direct use of `domain.repository`, `domain.ownership`, or `domain.period` from ViewModels. No presentation file uses `domain.ids`, `domain.rules`, `domain.repository`, `domain.ownership`, `domain.assembly` or `domain.matching` (enforced in `PackageDependencyRulesTest`).
+## Financial rules
+- Posting gate (`TransactionAssembler.isAutomationEligible`): only `ParseStatus.SUCCESS`, an automation-confirming correction (family/amount) or `USER_FINANCIAL_TYPE`. Merchant/counterparty edits never lift it; reconciliation never bypasses it.
+- Auto-ignore and stale-link cleanup follow the parsed family (`OTP`, `NON_FINANCIAL`, `BALANCE_NOTICE`) via `InformationalMessagePolicy`; never re-read wording. `UNKNOWN` stays reviewable.
+- Time: `BankTransactionTimePolicy` is the only bank→zone map (AlJazira `Asia/Riyadh`; others keep the stored `occurredAtZone`). `resolveTransferAsExternal`/`resolveAsFinancialType` use `TransactionTiming.effectiveOccurredAt` and persist that zone. Dashboard code never branches on bank time zones.
+- FX: `ExchangeRateEnrichmentWorkflow` persists rates; dashboards apply them in memory. A complete `(appliedExchangeRate, exchangeRateSource)` pair is immutable; repair a half pair from one resolution.
 
-**SMS:** Live intake = `IncomingSmsReceiver` → `LiveSmsIntake` → `CaptureBankSmsUseCase` (durable `RawSms`) → `LiveSmsWorkScheduler` → `LiveSmsProcessingWorker` → `ProcessStoredSmsUseCase`. Live `receivedAt` is the PDU service-center timestamp when valid (`LiveReceiptTimestamp`, earliest part for multipart); otherwise the injected device clock. Work input is the rawSmsId only — never SMS body/OTP text. Historical scan = `application/sms/HistoricalSmsScanner` → `HistoricalSmsBatchProcessor` (parse each row, then one discovery/reconcile/review pass per batch — never reconcile per historical SMS). `ProcessRawSmsUseCase` is only a capture-then-process facade. Do not add orchestration under `sms/`.
+## Processing completion
+- `ReconciliationCompletionPolicy` is the only reading of a reconciliation report: `failed > 0` or a throw = incomplete, even if rows posted. Pending-match and intentional non-financial outcomes are not failures. A stored ParsedEvent is not a posted row.
+- Live failure → `DerivedIncomplete(RECONCILIATION)`, WorkManager retries; on exhaustion keep a `LIVE` retry row plus an error review; startup reschedules.
+- Historical batch with failures stays `Incomplete`, writes one atomic `HISTORICAL_BATCH` set and clears it only after a later pass with `failed == 0` and a successful review update.
+- Correction, restore and ownership changes keep the manual decision and record durable retries. A restore that wrote `USER_FINANCIAL_TYPE` stays financial on failure (never rewritten to `USER_NON_FINANCIAL`). Full `refreshReviewQueue` with failures throws and records the ids.
+- Startup waits for integrity repair (`StartupMaintenance`) and fails closed. Background work is idempotent, keeps failed rows retryable and emits `MaintenanceCompletionSignal`.
 
-**Processing completion:** `ReconciliationCompletionPolicy` is the one reading of a reconciliation report. `summary.failed == 0` means the required writes did not report a failure. `summary.failed > 0`, or a thrown exception, is incomplete reconciliation even when other rows posted. Pending-match and intentional non-financial dispositions are not failures. A stored ParsedEvent is not a posted ledger row. Live processing returns `DerivedIncomplete(RECONCILIATION)` and WorkManager retries; exhaustion keeps a `LIVE` processing-retry row and an explicit error review, and startup reschedules it. A historical batch with any failed count stays `Incomplete`, writes one atomic `HISTORICAL_BATCH` set, and does not clear that set. Recovery clears the set only after a later pass has `failed == 0` and the review update succeeds. Interactive correction, restore, and ownership changes keep the manual decision and record a durable retry for the failed RawSms ids. A restore that already wrote `USER_FINANCIAL_TYPE` stays financial when reconciliation fails; it is not rewritten to `USER_NON_FINANCIAL`. A full maintenance `refreshReviewQueue` with `summary.failed > 0` throws and records the failed RawSms ids; it does not return success. Logs carry stage, failure count, a masked id, and retry state — never SMS body, account numbers, or secrets.
+## Dashboard and analysis
+- Money totals live in `application/dashboard/*Builder|*Calculator` and `AnalysisPresentationBuilder`; Compose only displays. No summing, Mada/credit classification or aggregation in Composables.
+- Row facts and owned account ids come from `DashboardOverview.transactionFacts` / `ownedAccountContainerIds`; detail scoping is `EntityTransactionScope`. Presentation never builds container ids or converts currency.
+- Card type from `ParsedEventDetails.cardSmsChannel`, never SMS text. AlJazira credit = unlabeled `بطاقة`/`card` line plus available balance; a card line alone is null; debit markers win.
+- One due per credit facility (primary and supplementaries share it). Mada cards have salary-period spending only. Loan repayments (`LOAN_REPAYMENT`, or `FEE` + `FINANCING_INSTALLMENT`) via `LoanRepaymentAttribution`.
+- Use existing helpers: `CreditFacilitiesOverview.aggregateCreditSalaryPeriodSpending()`, `DebitCardOverview.salaryPeriodSpendingNet`, `AccountsSummary.totalInflow`.
+- Evidence only through `DashboardEvidenceSource` (`DashboardEvidenceScope`); never `ParsedEventRepository.listAll()` or per-row `RawSmsRepository.getById` on the load path. Unlinked history needs an explicit fact query (superset-safe, ordered by event id). Loads are read-only.
+- `DashboardProjectionBuilder` only composes; logic goes in the matching section projection (`AnalysisDashboardProjection`, `AccountsDashboardProjection`, `CardsDashboardProjection`, `CommitmentsDashboardProjection`) with inputs from `DashboardProjectionContext`.
+- Chart choices never change balances, dues or full-scope totals; persist bank-qualified keys, never names or last4 alone.
+- Tests: run `app/src/test/.../application/dashboard/`; keep `DashboardFixtureCharacterizationTest` green; cover registry-linked Mada and Google Pay SMS without `خصمت من حساب`.
 
-**Parsing vs dashboard:** Bank-specific logic stays in `bank/*` parsers. Populate `ParsedEventDetails` at parse time (`cardSmsChannel`, balances, due dates, etc.). Dashboard code in `application/dashboard/*` reads persisted facts only — never re-parse SMS text and never import `bank.*`.
-
-**Room changes:** The financial database supports schema v18 only. Keep its version and identity hash unchanged; reject other database/backup schemas without destructive fallback. Older-schema migrations and automatic schema-fact backfills are removed by user request. Preserve current-data integrity repair, restore rollback and retired worker identities. Any future schema change needs an explicit design, mapper/parser population and device verification.
-
-**Maintenance:** Startup waits for current-data integrity repair (`StartupMaintenance`) and fails closed if it is incomplete: never expose financial screens until a required retry succeeds. Work safe to run in the background must be idempotent, keep failed rows retryable, and emit `MaintenanceCompletionSignal` so screens refresh.
-
-**Parse-status gate:** Only `ParseStatus.SUCCESS`, an explicit automation-confirming correction (message family/amount), or an explicit `USER_FINANCIAL_TYPE` resolution may create/pair/post a `FinancialTransaction` (`TransactionAssembler.isAutomationEligible`). Merchant/counterparty-only edits never lift the gate. Never bypass it in reconciliation passes.
-
-**Informational authority:** Auto-ignore and stale-link cleanup follow the parsed message family (`OTP`, `NON_FINANCIAL`, `BALANCE_NOTICE`) via `InformationalMessagePolicy`. Reconciliation and review dismiss do not re-read SMS wording. `UNKNOWN` stays reviewable.
-
-**Transaction time:** Convert SMS wall clocks with `BankTransactionTimePolicy`, the only bank-to-zone map. AlJazira uses `Asia/Riyadh`. Other banks keep the zone stored on first assembly (`occurredAtZone`). Manual resolutions `resolveTransferAsExternal` and `resolveAsFinancialType` use `TransactionTiming.effectiveOccurredAt` and persist that zone. Stale transfer healing matches with the zone already stored on the transaction. Dashboard code does not branch on a bank timezone.
-
-**Bank routing:** `BankSmsRegistry` evaluates every adapter; `Ambiguous` and `SuspectedBank` are persisted and reviewed, never parsed by a guessed adapter. Never resolve collisions by registration order. The router owns detection: adapter parse pipelines must not re-check the sender. Stored reprocessing selects an explicit `user_selected_bank:<bankId>` choice, then the stored ParsedEvent bank, then a fresh route. `Matched` parses. `Ambiguous` and `SuspectedBank` stay in review. Only a genuine `NotMatched` route may use the sole-adapter fallback. Queue refresh preserves the selection prefix. Selecting a bank does not change detector rules.
-
-**SMS text matching:** Match on `NormalizedSms.comparisonBody`, folding any pattern or keyword with `ArabicTextFolding` first; never display `comparisonBody` — slice display values with `normalizedSlice(range)`.
-
-**Classification:** Bank interpretation lives in `bank-engine/`, using `PatternFactInterpreter` / the shared `RuleInterpreter` and explicit evidence/blockers. Production definitions live in `app/src/main/assets/bank-patterns/`; Kotlin rule profiles live only in `bank-engine/src/testFixtures` as interpreter/reference test vocabulary. Pattern approval stays in `application/patterns`, processing protection in `application/ingestion`, runtime adapter composition/write guards in `application/interpretation`, storage in `data/patterns`, and backup integration in `application/backup`. Pattern screens consume application display models, never engine definitions. Do not add a parallel pattern runtime or relocate packages without updating the ownership table in `docs/ARCHITECTURE.md`. Competing families stay UNKNOWN and reviewable. OTP security wins over quoted financial wording; refunds retain refund authority. Add regression coverage for role or classification changes. The retired AlJazira parser/classifier/extractor implementation must not return, including test-only copies. Local ML in `ml-assist/` supplies family assistance only, never money, ownership or posting authority.
-
-**Validation firewall:** Only `ParseFinalizer` may emit `ParseResult.Success`, and only when `DefaultParsedEventValidator` reports no ERROR findings. Tighten automatic use through validator rules / `AutomaticUsePolicy`, not by special-casing parsers; validators never resolve ownership or transaction type.
-
-**New bank:** Implement `BankSmsAdapter`, add fixture tests under `testdata/`, and register a `BankSmsAdapterContractCase` (real financial + non-financial fixtures, positive/negative senders) in `BankSmsAdapterContractTest`; no sample may be claimed by more than one adapter.
-
-**PRs:** Target `main` only.
-
-**Release CI:** Full tests run in PR/main **CI** only. Do not add `testDebugUnitTest` back to `release.yml`; release verifies green CI then builds the APK.
-
-**Reference:** `docs/ARCHITECTURE.md` describes the current production modules; `docs/ANALYTICS.md` describes advisory analysis. Follow this file when historical records disagree.
-
-**Production cutover:** Keep `masroof.db` schema v18, preference names, Keystore alias, worker identities and the original application id. No Lab UI, generated application replica or parallel intake may ship. Pure modules use production namespaces (`engine.bank`, `finance.value`, `ml`, `analytics`); application integration tests live under `integration`. Do not reintroduce `lab` or `beta` source paths. Historical persisted keys and retired-work identifiers stay compatible. Engine/model refreshes must not reparse posted evidence or override human decisions.
-
-## Dashboard calculations
-
-- All money totals live in `application/dashboard/*Builder` and `*Calculator`.
-- Compose screens in `presentation/dashboard` must display pre-computed values only.
-- Do not sum transactions, classify Mada vs credit, or aggregate spending inside Composables.
-- Row-level facts (card last4, effective type, SAR equivalent) and owned account container ids come from `DashboardOverview.transactionFacts` / `ownedAccountContainerIds`; presentation never builds or parses container ids or calls conversion helpers; detail-screen scoping lives in `application/dashboard/EntityTransactionScope` (enforced in `PackageDependencyRulesTest`).
-- Classify card type via `ParsedEventDetails.cardSmsChannel` — not SMS body text in dashboard code. AlJazira credit includes an unlabeled `بطاقة` / `card` line plus available balance. A card line alone stays null. Debit markers still win.
-- Use helpers such as `CreditFacilitiesOverview.aggregateCreditSalaryPeriodSpending()`, `DebitCardOverview.salaryPeriodSpendingNet`, and `AccountsSummary.totalInflow`.
-- Credit facility due is one value per facility (primary + supplementaries share the statement due).
-- Mada (debit) cards have salary-period spending only — no statement due.
-- Loan repayments are detected from `LOAN_REPAYMENT` or `FEE` + `FINANCING_INSTALLMENT` SMS via `LoanRepaymentAttribution`; all dashboard calculators must use it.
-- Dashboard evidence is scoped: read parsed/raw SMS only through `DashboardEvidenceSource` (`DashboardEvidenceScope`). Never call `ParsedEventRepository.listAll()` or per-row `RawSmsRepository.getById` on the dashboard load path; a rule needing unlinked history gets an explicit fact query (superset-safe, ordered by event id).
-- `DashboardProjectionBuilder` is composition only. Add dashboard logic to the matching section (`AnalysisDashboardProjection`, `AccountsDashboardProjection`, `CardsDashboardProjection`, `CommitmentsDashboardProjection`) via specialist builders/calculators; shared inputs come from `DashboardProjectionContext`, never a second repository read.
-- Dashboard loads are read-only: never write from `application/dashboard/*` projection code. Persisted FX enrichment belongs to `ExchangeRateEnrichmentWorkflow`; the dashboard applies resolved rates in memory only. A complete `(appliedExchangeRate, exchangeRateSource)` pair is immutable. A row with only one half is repaired by writing both columns from the same resolution, and a later market rate does not replace a complete pair.
-
-## Testing dashboard changes
-
-- Run targeted unit tests under `app/src/test/kotlin/com/baraa/masroof/application/dashboard/`.
-- Evidence-scope changes must keep `DashboardFixtureCharacterizationTest` scoped-vs-whole-history equality green.
-- For Mada linking, cover both registry-linked cards and Google Pay SMS without `خصمت من حساب`.
+## UI and design
+- Use `MasroofTheme`/`MaterialTheme` and `MasroofThemeExtras.extendedColors`; only theme tokens in `ui-kit/.../ui/theme/` (`MasroofSpacing`, `MasroofIconSizes`, `MasroofShapes`, `MasroofElevation`, `MasroofAnalyticsTokens`); no `dp`/`sp`/color literals in screens (`ApprovedDesignBoundaryTest`). Add a token only when nothing fits.
+- Reuse shared components (`MasroofCard`, `MasroofSectionHeader`, `MasroofAmountText`, `MasroofBadge`, `MasroofValueBarRow`, `MasroofStackedBar`, `MasroofSecondaryScaffold`, ...). New shared visuals go in `ui-kit` and the debug catalog (Settings → About → Design catalog).
+- Explanations only through `MasroofGuidance` (help popup), never paragraphs. Analysis screens are visual first: chart, big number or badge per card.
+- Every label in `values/` (Arabic) and `values-en/`; Western digits via `AppDigits`/`MasroofText`.
+- Sheets use `MasroofBottomSheet` (`MasroofSheetTokens`, fixed header, scrolling body, `MasroofSheetChoices`). Drafts apply only on Save/Apply; busy financial writes block dismissal.
+- Navigation in `presentation/navigation/` (`MasroofRoot`, `HomeDestination`, `SettingsDestination`); Home uses `HomeBackStack` `push`/`pop`, never a fixed return screen; screen-local state is `rememberSaveable`.
+- Chart category projections and filtering live in dashboard builders / `ChartDataWorkflow`.
