@@ -29,16 +29,6 @@ data class CurrentAccountFlowDetailGrouping(
     val selfTransfersIn: List<FinancialTransaction> = emptyList(),
 ) {
     companion object {
-        val EXPENSE_DISPLAY_ORDER = listOf(
-            FlowExpenseCategory.EXTERNAL_TRANSFER_OUT,
-            FlowExpenseCategory.CREDIT_CARD_PAYMENT,
-            FlowExpenseCategory.CASH_WITHDRAWAL,
-            FlowExpenseCategory.BILL_PAYMENT,
-            FlowExpenseCategory.POS_PURCHASE,
-            FlowExpenseCategory.FEE,
-            FlowExpenseCategory.LOAN_REPAYMENT,
-        )
-
         val INCOME_DISPLAY_ORDER = listOf(
             FlowIncomeCategory.SALARY,
             FlowIncomeCategory.EXTERNAL_TRANSFER_IN,

@@ -29,7 +29,6 @@ class OwnedAccountTest {
             pos = "90",
         )
         assertEquals(Money.of("15000.00", Currency.SAR), account.creditCardPayment)
-        assertEquals(Money.of("90.00", Currency.SAR), account.posPurchase)
         assertEquals(Money.of("15090.00", Currency.SAR), account.externalOut)
     }
 

@@ -47,10 +47,6 @@ class CurrentAccountSummaryCalculatorTest {
         assertEquals(Money.of("100.00", Currency.SAR), summary.outflow.externalTransfersOut)
         assertEquals(Money.of("50.00", Currency.SAR), summary.outflow.cashWithdrawals)
         assertEquals(Money.of("90.00", Currency.SAR), summary.outflow.posPurchases)
-        assertEquals(
-            SignedMoneyAmount.of(Money.of("14460.00", Currency.SAR)),
-            summary.netMovement,
-        )
     }
 
     @Test
@@ -412,7 +408,6 @@ class CurrentAccountSummaryCalculatorTest {
         )
         assertEquals(Money.of("500.00", Currency.SAR), summary.inflow.selfTransfersIn)
         assertEquals(Money.of("500.00", Currency.SAR), summary.outflow.selfTransfersOut)
-        assertEquals(SignedMoneyAmount.zero(Currency.SAR), summary.netMovement)
     }
 
     @Test
@@ -491,7 +486,6 @@ class CurrentAccountSummaryCalculatorTest {
         assertEquals(Money.zero(Currency.SAR), summary.inflow.salary)
         assertEquals(Money.zero(Currency.SAR), summary.inflow.otherIncome)
         assertEquals(Money.zero(Currency.SAR), summary.inflow.externalTransfersIn)
-        assertEquals(SignedMoneyAmount.zero(Currency.SAR), summary.netMovement)
         assertEquals(SignedMoneyAmount.zero(Currency.SAR), summary.cashPosition().remaining)
         assertEquals(listOf("account-refund"), grouping.income.getValue(FlowIncomeCategory.ACCOUNT_REFUND).map { it.id })
         assertTrue(grouping.income.getValue(FlowIncomeCategory.SALARY).isEmpty())

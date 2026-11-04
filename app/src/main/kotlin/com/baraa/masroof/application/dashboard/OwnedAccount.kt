@@ -36,9 +36,6 @@ data class OwnedAccount(
     /** سداد بطاقة ائتمانية — settlement from this account to a credit card. */
     val creditCardPayment: Money get() = flow.creditCardPayments
     val cashWithdrawal: Money get() = flow.cashWithdrawals
-    val billPayment: Money get() = flow.billPayments
-    /** POS / مدى debited from this account. */
-    val posPurchase: Money get() = flow.posPurchases
     val fees: Money get() = flow.fees
     val loan: Money get() = flow.loan
     val internalTransfersOut: Money get() = flow.internalTransfersOut
