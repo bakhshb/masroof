@@ -590,6 +590,40 @@ class ReviewWorkflowServiceTest {
     }
 
     @Test
+    fun transferResolutions_rejectAZeroAmount() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(Bank("D360"), "6810"))
+        persistEvent(
+            smsId = "sms-out",
+            event = event(
+                id = "pe-out", rawSmsId = "sms-out", family = MessageFamily.TRANSFER_OUT, amount = money("0.00"),
+                source = AccountReference(Bank.BANK_ALJAZIRA, "3001"), destination = AccountReference(Bank.UNKNOWN, "9999"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        persistEvent(
+            smsId = "sms-in",
+            event = event(
+                id = "pe-in", rawSmsId = "sms-in", bank = Bank("D360"), family = MessageFamily.TRANSFER_IN,
+                amount = money("0.00"), destination = AccountReference(Bank("D360"), "6810"),
+                network = BankNetworkType.INTER_BANK,
+            ),
+        )
+        listOf("sms-out", "sms-in").forEach {
+            reviewRepo.upsertRequired(rawSmsId = it, kind = ReviewKind.PENDING_MATCH,
+                reasons = listOf("transfer_pending_match"), now = clock.now())
+        }
+
+        assertEquals(ReviewWorkflowResult.Rejected("missing_amount"), workflow.resolveTransferAsExternal(
+            ReviewIdFactory.fromRawSmsId("sms-out"), ExternalTransferDirection.OUTGOING))
+        assertEquals(ReviewWorkflowResult.Rejected("missing_amount"), workflow.resolveSelfTransferPair(
+            outgoingReviewId = ReviewIdFactory.fromRawSmsId("sms-out"),
+            incomingReviewId = ReviewIdFactory.fromRawSmsId("sms-in"),
+        ))
+        assertTrue(ftRepo.listAll().isEmpty())
+    }
+
+    @Test
     fun resolveSelfTransferPair_rejectsWhenAlreadyLinked() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         confirmation.confirmAccountOwned(AccountReference(Bank("D360"), "6810"))

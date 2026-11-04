@@ -265,7 +265,7 @@ class ReviewWorkflowService(
         if (event.messageFamily != confirmedDirection.family) {
             return ReviewWorkflowResult.Rejected("transfer_evidence_changed")
         }
-        if (event.amount == null) return ReviewWorkflowResult.Rejected("missing_amount")
+        if ((event.amount?.amount?.signum() ?: 0) <= 0) return ReviewWorkflowResult.Rejected("missing_amount")
         val raw = rawSmsRepository.getById(review.rawSmsId)
             ?: return ReviewWorkflowResult.Rejected("raw_sms_missing")
 
@@ -389,6 +389,7 @@ class ReviewWorkflowService(
             ?: return ReviewWorkflowResult.Rejected("missing_amount")
         val inAmount = inEvent.amount
             ?: return ReviewWorkflowResult.Rejected("missing_amount")
+        if (outAmount.amount.signum() <= 0) return ReviewWorkflowResult.Rejected("missing_amount")
         if (outAmount != inAmount) {
             return ReviewWorkflowResult.Rejected("amount_mismatch")
         }
