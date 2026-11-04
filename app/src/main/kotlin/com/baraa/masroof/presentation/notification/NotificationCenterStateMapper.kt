@@ -21,6 +21,7 @@ fun notificationCenterExternalState(
 
     return NotificationCenterExternalState(
         periodLabel = dashboardState.periodLabel,
+        periodKey = dashboardState.period?.startDate?.toString().orEmpty(),
         excludedForeignCurrencyCount = dashboardState.summary?.excludedOtherCurrencyCount ?: 0,
         updateAvailableVersion = availableVersion,
         updateReadyVersion = readyVersion,

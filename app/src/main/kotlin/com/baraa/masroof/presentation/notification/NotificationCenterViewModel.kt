@@ -9,6 +9,7 @@ import com.baraa.masroof.application.notification.NotificationCenterService
 import com.baraa.masroof.application.notification.NotificationCenterSnapshot
 import com.baraa.masroof.application.notification.NotificationItem
 import com.baraa.masroof.presentation.common.launchLogged
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,10 +25,13 @@ class NotificationCenterViewModel(
     val uiState: StateFlow<NotificationCenterUiState> = _uiState.asStateFlow()
 
     private var lastExternalState: NotificationCenterExternalState = NotificationCenterExternalState()
+    private var refreshJob: Job? = null
 
     fun refresh(external: NotificationCenterExternalState = lastExternalState) {
         lastExternalState = external
-        launchLogged(appLogService, AppLogCategories.SETTINGS, "Notification center refresh", onError = { _uiState.update { it.copy(loading = false) } }) {
+        // Only the latest refresh may publish, so an older slow read cannot overwrite it.
+        refreshJob?.cancel()
+        refreshJob = launchLogged(appLogService, AppLogCategories.SETTINGS, "Notification center refresh", onError = { _uiState.update { it.copy(loading = false) } }) {
             _uiState.update { it.copy(loading = true) }
             val snapshot = NotificationCenterSnapshot(
                 smsPermissionGranted = permissionStateProvider(),
@@ -36,6 +40,7 @@ class NotificationCenterViewModel(
                 unregisteredAccountCount = notificationCenterMetricsWorkflow.unregisteredAccountCount(),
                 excludedForeignCurrencyCount = external.excludedForeignCurrencyCount,
                 periodLabel = external.periodLabel,
+                periodKey = external.periodKey,
                 rescanStatusName = external.rescanStatusName,
                 updateAvailableVersion = external.updateAvailableVersion,
                 updateReadyVersion = external.updateReadyVersion,

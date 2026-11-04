@@ -62,7 +62,7 @@ class NotificationCenterService(
 
         if (snapshot.excludedForeignCurrencyCount > 0) {
             items += NotificationItem(
-                id = foreignCurrencyId(snapshot.periodLabel),
+                id = foreignCurrencyId(snapshot.periodKey),
                 type = NotificationType.FOREIGN_CURRENCY,
                 count = snapshot.excludedForeignCurrencyCount,
                 periodLabel = snapshot.periodLabel,
@@ -100,7 +100,8 @@ class NotificationCenterService(
 
     private fun pruneStaleReadIds(activeIds: Set<String>) {
         val readIds = preferencesRepository.getReadIds()
-        val pruned = readIds.intersect(activeIds)
+        // A foreign-currency notice belongs to one period; browsing another period must not forget it was read.
+        val pruned = readIds.filterTo(mutableSetOf()) { it in activeIds || it.startsWith(FOREIGN_CURRENCY_PREFIX) }
         if (pruned != readIds) {
             preferencesRepository.setReadIds(pruned)
         }
@@ -112,7 +113,9 @@ class NotificationCenterService(
         const val ID_UNREGISTERED_CARDS: String = "unregistered_cards"
         const val ID_UNREGISTERED_ACCOUNTS: String = "unregistered_accounts"
 
-        fun foreignCurrencyId(periodLabel: String): String = "foreign_currency:$periodLabel"
+        private const val FOREIGN_CURRENCY_PREFIX: String = "foreign_currency:"
+
+        fun foreignCurrencyId(periodKey: String): String = "$FOREIGN_CURRENCY_PREFIX$periodKey"
 
         fun rescanId(statusName: String): String = "rescan:$statusName"
 
