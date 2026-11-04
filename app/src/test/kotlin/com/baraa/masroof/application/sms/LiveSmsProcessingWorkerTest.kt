@@ -119,6 +119,26 @@ class LiveSmsProcessingWorkerTest {
     }
 
     @Test
+    fun persistentUnexpectedFailure_finalAttemptRecordsLiveRetryAndProcessingError() = runBlocking {
+        val raw = captured()
+        val alwaysFailing = harness.processStored(FailingGetByIdRepository(harness.rawRepo, failures = Int.MAX_VALUE))
+
+        val results = (0 until LiveSmsProcessingWorker.MAX_ATTEMPTS).map { attempt ->
+            worker(raw.id, attempt = attempt, processStored = alwaysFailing).doWork()
+        }
+
+        assertEquals(
+            List(LiveSmsProcessingWorker.MAX_ATTEMPTS - 1) { ListenableWorker.Result.retry() } +
+                ListenableWorker.Result.failure(),
+            results,
+        )
+        assertEquals(listOf(raw.id), harness.processingRetryRepo.listRetryableRawSmsIds())
+        val review = harness.reviewRepo.findByRawSmsId(raw.id)!!
+        assertEquals(ReviewStatus.REQUIRED, review.status)
+        assertEquals(listOf(IngestionReviewService.REASON_PROCESSING_ERROR), review.reasons)
+    }
+
+    @Test
     fun persistentFailure_givesUpAtMaxAttempts_andKeepsReviewableEvidence() = runBlocking {
         val raw = captured()
         harness.parserFailuresRemaining.set(Int.MAX_VALUE)
