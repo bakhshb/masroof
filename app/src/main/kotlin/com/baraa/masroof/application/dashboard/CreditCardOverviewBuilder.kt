@@ -68,7 +68,6 @@ object CreditCardOverviewBuilder {
             ) {
                 snapshotCandidates += SnapshotCandidate(
                     cardId = cardId,
-                    cardRef = cardRef,
                     updatedAt = at,
                     details = details,
                     isStatement = isStatement,
@@ -99,13 +98,7 @@ object CreditCardOverviewBuilder {
             .groupBy { it.cardId }
             .mapValues { (_, candidates) -> candidates.maxBy { it.updatedAt } }
 
-        val cardIds = creditCardMeta.keys.toSet()
-
-        val rows = cardIds.map { cardId ->
-            val ref = creditCardMeta[cardId]
-                ?: latestStatementByCard[cardId]?.cardRef
-                ?: latestAvailableByCard[cardId]?.cardRef
-                ?: parseCardId(cardId)
+        val rows = creditCardMeta.map { (cardId, ref) ->
             val cardStatementStart = windows.start(ref.bank, latestStatementByCard[cardId]?.updatedAt)
             val statementLabel = dayMonth.format(cardStatementStart.atZone(zoneId).toLocalDate())
 
@@ -250,17 +243,8 @@ object CreditCardOverviewBuilder {
         )
     }
 
-    private fun parseCardId(cardId: String): CardReference {
-        val parts = cardId.split(":")
-        val last4 = parts.getOrNull(2).orEmpty()
-        val bankId = parts.getOrNull(1).orEmpty()
-        val bank = Bank.fromId(bankId)
-        return CardReference(bank = bank, last4 = last4)
-    }
-
     private data class SnapshotCandidate(
         val cardId: String,
-        val cardRef: CardReference,
         val updatedAt: Instant,
         val details: ParsedEventDetails,
         val isStatement: Boolean,
