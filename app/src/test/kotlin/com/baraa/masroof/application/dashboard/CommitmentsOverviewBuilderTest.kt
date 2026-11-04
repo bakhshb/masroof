@@ -1033,6 +1033,23 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun weeklyCommitment_dueDateReplacesTheOccurrenceWhoseWeekHoldsIt() {
+        val weekly = commitment(name = "Cleaner", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-clean",
+            recurrence = CommitmentRecurrence.WEEKLY).copy(dueDate = LocalDate.parse("2026-08-17"))
+        val overview = build(
+            commitments = listOf(weekly),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+        )
+
+        val dates = overview.rows.map { it.expectedDate }.sorted()
+        assertEquals(LocalDate.parse("2026-08-01"), dates[0])
+        assertEquals(LocalDate.parse("2026-08-08"), dates[1])
+        assertEquals(LocalDate.parse("2026-08-17"), dates[2])
+        assertTrue("rows: $dates", LocalDate.parse("2026-08-15") !in dates)
+        assertEquals("rows: $dates", dates.size, dates.toSet().size)
+    }
+
+    @Test
     fun oneTimeCommitment_unpaidRowKeepsItsDueDate() {
         val oneTime = commitment(name = "Insurance", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-ins")
             .copy(dueDate = LocalDate.parse("2026-08-20"))

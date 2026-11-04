@@ -109,7 +109,7 @@ internal object TransactionListProjectionCalculator {
         ownedCardKeys: Set<String> = emptySet(),
     ): List<String> {
         if (ownedCardKeys.isEmpty()) return emptyList()
-        return transactions.flatMap { tx -> ownedCardKeys.filter { tx.matchesCardKey(it) } }.distinct().sorted()
+        return transactions.flatMapTo(mutableSetOf()) { tx -> ownedCardKeys.filter(tx.cardKeyMatcher()) }.sorted()
     }
 
     fun availableAccountContainerIds(
@@ -139,7 +139,7 @@ internal object TransactionListProjectionCalculator {
     ): Boolean = types.isEmpty() || tx.typeLabelResHint in types
 
     private fun matchesCards(tx: TransactionListRow, cardKeys: Set<String>): Boolean =
-        cardKeys.isEmpty() || cardKeys.any(tx::matchesCardKey)
+        cardKeys.isEmpty() || cardKeys.any(tx.cardKeyMatcher())
 
     private fun matchesAccounts(
         tx: TransactionListRow,
@@ -202,13 +202,15 @@ private fun TransactionListRow.cardOwnershipKeys(): List<String> =
 /**
  * A card container decides the card. Without one, the row's last4 matches a key at the row's
  * account bank; a row with no bank at all still matches every bank's card with that last4.
+ * Container ids are parsed once per row, not once per tested key.
  */
-private fun TransactionListRow.matchesCardKey(cardKey: String): Boolean {
+private fun TransactionListRow.cardKeyMatcher(): (String) -> Boolean {
     val cardKeys = cardOwnershipKeys()
-    if (cardKeys.isNotEmpty()) return cardKey in cardKeys
-    val last4 = cardLast4 ?: return false
-    if (cardKey.substringAfterLast(':') != last4) return false
+    if (cardKeys.isNotEmpty()) return { it in cardKeys }
+    val last4 = cardLast4 ?: return { false }
     val banks = listOfNotNull(sourceContainerId, destinationContainerId)
         .mapNotNull(FinancialContainerIdParser::accountBankId).map { Bank(it).id }.toSet()
-    return banks.isEmpty() || cardKey.substringBefore(':') in banks
+    return { cardKey ->
+        cardKey.substringAfterLast(':') == last4 && (banks.isEmpty() || cardKey.substringBefore(':') in banks)
+    }
 }

@@ -37,17 +37,20 @@ class StoredSmsReprocessor(
         val reparsed = mutableListOf<String>()
         for (rawSmsId in rawSmsRepository.listIdsByReceivedAt()) {
             val raw = rawSmsRepository.getById(rawSmsId) ?: continue
-            reparsed += raw.id
             when (processRawSms.reparseAndStore(raw, historicalBatch = true)) {
                 is SmsIngestionResult.Duplicate,
                 is SmsIngestionResult.NotRelevant,
-                -> Unit
+                -> reparsed += raw.id
+                // A failed reparse did not refresh its evidence, so its retry marker stays for recovery.
                 is SmsIngestionResult.Failed -> failedCount++
-                else -> refreshedCount++
+                else -> {
+                    reparsed += raw.id
+                    refreshedCount++
+                }
             }
         }
         refreshDerivedState()
-        // The full pass covered every reparsed row; a reparsed LIVE marker became HISTORICAL_BATCH and is cleared here.
+        // The full pass covered every successfully reparsed row; a reparsed LIVE marker became HISTORICAL_BATCH and is cleared here.
         val historical = processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).toSet()
         processingRetryRepository.clear(reparsed.filter { it in historical })
         appLogService?.info(
