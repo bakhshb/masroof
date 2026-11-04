@@ -117,6 +117,18 @@ fun normalizeAnalysisNumber(value: String): String = value.trim().map { c ->
     when { c == '٫' -> '.'; c.isDigit() -> Character.digit(c, 10).toString().single(); else -> c }
 }.joinToString("")
 
+private val THOUSANDS_GROUPED = Regex("[0-9]{1,3}([,٬][0-9]{3})+(\\.[0-9]+)?")
+
+/**
+ * Accepts Arabic digits and decimal mark, and thousands separators only in a valid grouping:
+ * a comma typed as a decimal mark (`12,50`) stays unparsed instead of becoming 1250.
+ */
+fun parseAnalysisAmount(text: String): java.math.BigDecimal? {
+    val normalized = normalizeAnalysisNumber(text)
+    val plain = if (THOUSANDS_GROUPED.matches(normalized)) normalized.replace(",", "").replace("٬", "") else normalized
+    return plain.toBigDecimalOrNull()
+}
+
 data class AnalysisHistoryView(val periods: List<AnalysisPeriod>, val available: Int, val total: Long?, val chartPeriods: List<AnalysisPeriod>,
     val completeCount: Int, val average: Long?, val latestChange: Long?)
 fun AnalysisUiState.purchaseHistory(count: Int): AnalysisHistoryView {
