@@ -1,18 +1,16 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.testsupport.RoomReviewWiring
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.ingestion.ProcessingRecovery
-import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
-import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
-import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
@@ -44,7 +42,6 @@ import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.time.InstantClock
@@ -94,35 +91,31 @@ class ReviewWorkflowServiceTest {
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
         correctionRepo = RoomUserCorrectionRepository(db.userCorrectionDao())
         loans = RoomLoanRegistryRepository.from(db)
-        val accounts = RoomAccountRegistryRepository.from(db)
-        val cards = RoomCardRegistryRepository.from(db)
-        confirmation = OwnershipConfirmationService(accounts, cards, loans)
-        val ownershipResolver = OwnershipResolver(accounts, cards, loans)
-        val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
-        val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = ftRepo,
-            ownershipResolver = ownershipResolver,
-            effectiveParsedEventProvider = effective,
-        )
-        val updater = ReviewQueueUpdater(reviewRepo, ftRepo, clock)
-        val resolutionStore = RoomManualReviewResolutionRepository(db, ftRepo)
-        workflow = ReviewWorkflowService(
-            reviewRepository = reviewRepo,
-            userCorrectionRepository = correctionRepo,
-            financialTransactionRepository = ftRepo,
-            rawSmsRepository = rawRepo,
-            ownershipResolver = ownershipResolver,
-            ownershipConfirmationService = confirmation,
-            effectiveParsedEventProvider = effective,
-            parsedEventRepository = parsedRepo,
-            reconciliationService = reconciliation,
-            reviewQueueUpdater = updater,
-            manualReviewResolutionRepository = resolutionStore,
-            clock = clock,
-        )
+        val wiring = wiring(reconcileWithReviews = false)
+        confirmation = wiring.confirmation
+        workflow = wiring.workflow
     }
+
+    private fun wiring(
+        ledger: FinancialTransactionRepository = ftRepo,
+        reviewQueueReviews: com.baraa.masroof.domain.repository.ReviewRepository = reviewRepo,
+        reconcileWithReviews: Boolean = true,
+        zoneId: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+        processingRecovery: ProcessingRecovery? = null,
+    ) = RoomReviewWiring(
+        db = db,
+        clock = clock,
+        raw = rawRepo,
+        parsed = parsedRepo,
+        ledger = ledger,
+        reviews = reviewRepo,
+        corrections = correctionRepo,
+        loans = loans,
+        reviewQueueReviews = reviewQueueReviews,
+        reconcileWithReviews = reconcileWithReviews,
+        zoneId = zoneId,
+        processingRecovery = processingRecovery,
+    )
 
     @After
     fun tearDown() {
@@ -960,33 +953,9 @@ class ReviewWorkflowServiceTest {
 
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
-        val accounts = RoomAccountRegistryRepository.from(db)
-        val cards = RoomCardRegistryRepository.from(db)
-        val resolver = OwnershipResolver(accounts, cards, loans)
-        val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
-        val auto = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = ftRepo,
-            ownershipResolver = resolver,
-            effectiveParsedEventProvider = effective,
-            zoneId = newYork,
-        )
-        val manual = ReviewWorkflowService(
-            reviewRepository = reviewRepo,
-            userCorrectionRepository = correctionRepo,
-            financialTransactionRepository = ftRepo,
-            rawSmsRepository = rawRepo,
-            ownershipResolver = resolver,
-            ownershipConfirmationService = confirmation,
-            effectiveParsedEventProvider = effective,
-            parsedEventRepository = parsedRepo,
-            reconciliationService = auto,
-            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
-            manualReviewResolutionRepository = RoomManualReviewResolutionRepository(db, ftRepo),
-            clock = clock,
-            zoneId = newYork,
-        )
+        val newYorkWiring = wiring(reconcileWithReviews = false, zoneId = newYork)
+        val auto = newYorkWiring.reconciliation
+        val manual = newYorkWiring.workflow
 
         persistEvent(
             smsId = "sms-auto-purchase",
@@ -1130,42 +1099,7 @@ class ReviewWorkflowServiceTest {
             )
         }
         val retries = RoomProcessingRetryRepository(db.processingRetryDao())
-        val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
-        val conflicting = ReviewWorkflowService(
-            reviewRepository = reviewRepo,
-            userCorrectionRepository = correctionRepo,
-            financialTransactionRepository = conflictingLedger,
-            rawSmsRepository = rawRepo,
-            ownershipResolver = OwnershipResolver(
-                RoomAccountRegistryRepository.from(db),
-                RoomCardRegistryRepository.from(db),
-                loans,
-            ),
-            ownershipConfirmationService = confirmation,
-            effectiveParsedEventProvider = effective,
-            parsedEventRepository = parsedRepo,
-            reconciliationService = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
-                rawSmsRepository = rawRepo,
-                financialTransactionRepository = conflictingLedger,
-                ownershipResolver = OwnershipResolver(
-                    RoomAccountRegistryRepository.from(db),
-                    RoomCardRegistryRepository.from(db),
-                    loans,
-                ),
-                effectiveParsedEventProvider = effective,
-                reviewRepository = reviewRepo,
-            ),
-            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, conflictingLedger, clock),
-            manualReviewResolutionRepository = RoomManualReviewResolutionRepository(db, conflictingLedger),
-            clock = clock,
-            processingRecovery = ProcessingRecovery(
-                processingRetryRepository = retries,
-                reviewRepository = reviewRepo,
-                ingestionReviewService = IngestionReviewService(reviewRepo, clock),
-                clock = clock,
-            ),
-        )
+        val conflicting = wiring(ledger = conflictingLedger, processingRecovery = historicalRecovery(retries)).workflow
 
         val result = conflicting.applyCorrection(
             reviewId = ReviewIdFactory.fromRawSmsId("sms-conflict"),
@@ -1197,40 +1131,20 @@ class ReviewWorkflowServiceTest {
             override suspend fun upsertRequired(rawSmsId: String, kind: com.baraa.masroof.domain.model.ReviewKind,
                 reasons: List<String>, now: Instant) = throw java.io.IOException("review store unavailable")
         }
-        val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
-        val service = ReviewWorkflowService(
-            reviewRepository = reviewRepo,
-            userCorrectionRepository = correctionRepo,
-            financialTransactionRepository = ftRepo,
-            rawSmsRepository = rawRepo,
-            ownershipResolver = OwnershipResolver(RoomAccountRegistryRepository.from(db), RoomCardRegistryRepository.from(db), loans),
-            ownershipConfirmationService = confirmation,
-            effectiveParsedEventProvider = effective,
-            parsedEventRepository = parsedRepo,
-            reconciliationService = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
-                rawSmsRepository = rawRepo,
-                financialTransactionRepository = ftRepo,
-                ownershipResolver = OwnershipResolver(RoomAccountRegistryRepository.from(db), RoomCardRegistryRepository.from(db), loans),
-                effectiveParsedEventProvider = effective,
-                reviewRepository = reviewRepo,
-            ),
-            reviewQueueUpdater = ReviewQueueUpdater(failingReviews, ftRepo, clock),
-            manualReviewResolutionRepository = RoomManualReviewResolutionRepository(db, ftRepo),
-            clock = clock,
-            processingRecovery = ProcessingRecovery(
-                processingRetryRepository = retries,
-                reviewRepository = reviewRepo,
-                ingestionReviewService = IngestionReviewService(reviewRepo, clock),
-                clock = clock,
-            ),
-        )
+        val service = wiring(reviewQueueReviews = failingReviews, processingRecovery = historicalRecovery(retries)).workflow
 
         val thrown = runCatching { service.refreshReviewQueue() }.exceptionOrNull()
 
         assertTrue(thrown is com.baraa.masroof.application.transaction.ReconciliationIncompleteException)
         assertTrue("sms-needs" in retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH))
     }
+
+    private fun historicalRecovery(retries: RoomProcessingRetryRepository) = ProcessingRecovery(
+        processingRetryRepository = retries,
+        reviewRepository = reviewRepo,
+        ingestionReviewService = IngestionReviewService(reviewRepo, clock),
+        clock = clock,
+    )
 
     private suspend fun persistEvent(
         smsId: String,

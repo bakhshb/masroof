@@ -3,25 +3,18 @@ package com.baraa.masroof.presentation.review
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewDetailLoader
 import com.baraa.masroof.application.review.ReviewOwnershipWorkflow
-import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
-import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionRestoreService
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
-import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
-import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -33,8 +26,6 @@ import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
-import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
@@ -320,38 +311,23 @@ class ReviewListRefreshTest {
         private val financial = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         val transactions = financial
         val reviewRepo = RoomReviewRepository(db.reviewItemDao())
-        private val corrections = RoomUserCorrectionRepository(db.userCorrectionDao())
-        private val accounts = RoomAccountRegistryRepository.from(db)
-        private val cards = RoomCardRegistryRepository.from(db)
-        private val loans = RoomLoanRegistryRepository.from(db)
-        private val confirmation = OwnershipConfirmationService(accounts, cards, loans)
-        private val resolver = OwnershipResolver(accounts, cards, loans)
-        private val effective = EffectiveParsedEventProvider(parsed, corrections)
-        private val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsed,
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = financial,
-            ownershipResolver = resolver,
-            ownershipConfirmationService = confirmation,
-            effectiveParsedEventProvider = effective,
-            reviewRepository = reviewRepo,
-        )
-        private val updater = ReviewQueueUpdater(reviewRepo, financial, clock)
-        val workflow = ReviewWorkflowService(
-            reviewRepository = reviewRepo,
-            userCorrectionRepository = corrections,
-            financialTransactionRepository = financial,
-            rawSmsRepository = rawRepo,
-            ownershipResolver = resolver,
-            ownershipConfirmationService = confirmation,
-            effectiveParsedEventProvider = effective,
-            parsedEventRepository = parsed,
-            reconciliationService = reconciliation,
-            reviewQueueUpdater = updater,
-            manualReviewResolutionRepository = RoomManualReviewResolutionRepository(db, financial),
+        private val wiring = com.baraa.masroof.testsupport.RoomReviewWiring(
+            db = db,
             clock = clock,
+            raw = rawRepo,
+            parsed = parsed,
+            ledger = financial,
+            reviews = reviewRepo,
+            reconcileWithConfirmation = true,
             ioDispatcher = Dispatchers.Unconfined,
         )
+        private val cards = RoomCardRegistryRepository.from(db)
+        private val confirmation = wiring.confirmation
+        private val resolver = wiring.resolver
+        private val effective = wiring.effective
+        private val reconciliation = wiring.reconciliation
+        private val updater = wiring.updater
+        val workflow = wiring.workflow
         val loader = ReviewDetailLoader(workflow, rawRepo, effective)
         val viewModel = ReviewViewModel(
             reviewWorkflowService = workflow,
