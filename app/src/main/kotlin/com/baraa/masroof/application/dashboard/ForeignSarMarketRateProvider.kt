@@ -15,7 +15,8 @@ fun interface ForeignSarMarketRateProvider {
 }
 
 /**
- * Fetches foreign→SAR from Frankfurter v2 (no API key). Caches per currency and date in memory.
+ * Fetches foreign→SAR from Frankfurter v2 (no API key). Caches per currency and date in memory,
+ * misses included, so a dashboard load never repeats a failed request in this process.
  */
 class FrankfurterForeignSarRateProvider(
     private val httpClient: OkHttpClient,
@@ -26,10 +27,15 @@ class FrankfurterForeignSarRateProvider(
     override suspend fun rateFor(currency: Currency, date: LocalDate): BigDecimal? {
         if (!currency.convertsToSar()) return null
         val key = currency to date
-        cache[key]?.let { return it }
-        val fetched = fetchRate(currency, date) ?: return null
-        cache[key] = fetched
+        cache[key]?.let { return it.takeUnless { cached -> cached === MISS } }
+        val fetched = fetchRate(currency, date)
+        cache[key] = fetched ?: MISS
         return fetched
+    }
+
+    private companion object {
+        /** Identity sentinel for a cached miss; never returned to callers. */
+        val MISS = BigDecimal("-1")
     }
 
     private suspend fun fetchRate(currency: Currency, date: LocalDate): BigDecimal? =

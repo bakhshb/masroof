@@ -62,6 +62,7 @@ import com.baraa.masroof.application.maintenance.StoredSmsReprocessor
 import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
 import com.baraa.masroof.application.maintenance.TransferIntegrityRepairResult
 import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
@@ -488,7 +489,10 @@ class AppContainer(
 
     private val sarEquivalentResolver: TransactionSarEquivalentResolver =
         TransactionSarEquivalentResolver(
-            marketRateProvider = FrankfurterForeignSarRateProvider(updateHttpClient),
+            marketRateProvider = FrankfurterForeignSarRateProvider(
+                // The dashboard waits on this; fail fast instead of the update client's long timeouts.
+                updateHttpClient.newBuilder().callTimeout(10, TimeUnit.SECONDS).build(),
+            ),
         )
 
     private val exchangeRateEnrichmentScheduler = WorkManagerExchangeRateEnrichmentScheduler { WorkManager.getInstance(appContext) }

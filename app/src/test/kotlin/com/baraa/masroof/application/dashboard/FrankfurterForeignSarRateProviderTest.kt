@@ -12,6 +12,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.IOException
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -21,12 +22,17 @@ import java.time.LocalDate
 class FrankfurterForeignSarRateProviderTest {
     private val date = LocalDate.parse("2026-08-03")
 
-    private fun provider(body: String) = FrankfurterForeignSarRateProvider(
-        OkHttpClient.Builder().addInterceptor { chain ->
-            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
-                .code(200).message("OK").body(body.toResponseBody()).build()
-        }.build(),
-    )
+    private var calls = 0
+
+    private fun provider(body: String, code: Int = 200, failure: IOException? = null) =
+        FrankfurterForeignSarRateProvider(
+            OkHttpClient.Builder().addInterceptor { chain ->
+                calls++
+                failure?.let { throw it }
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                    .code(code).message("x").body(body.toResponseBody()).build()
+            }.build(),
+        )
 
     @Test
     fun positiveRate_isReturned() = runBlocking {
@@ -38,5 +44,30 @@ class FrankfurterForeignSarRateProviderTest {
         for (body in listOf("""{"rate":0}""", """{"rate":-1.2}""", """{"rate":"x"}""", """{"rate":null}""", """{}""")) {
             assertNull(body, provider(body).rateFor(Currency.USD, date))
         }
+    }
+
+    @Test
+    fun nonSuccessResponse_isNullAndCachedAsMiss() = runBlocking {
+        val provider = provider("""{"rate":3.75}""", code = 503)
+        assertNull(provider.rateFor(Currency.USD, date))
+        assertNull(provider.rateFor(Currency.USD, date))
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun networkFailure_isNullAndCachedAsMiss() = runBlocking {
+        val provider = provider("", failure = IOException("offline"))
+        assertNull(provider.rateFor(Currency.USD, date))
+        assertNull(provider.rateFor(Currency.USD, date))
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun hit_isCachedAndOtherDateStillFetches() = runBlocking {
+        val provider = provider("""{"rate":3.75}""")
+        provider.rateFor(Currency.USD, date)
+        provider.rateFor(Currency.USD, date)
+        provider.rateFor(Currency.USD, date.plusDays(1))
+        assertEquals(2, calls)
     }
 }
