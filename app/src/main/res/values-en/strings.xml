@@ -159,6 +159,7 @@
     <string name="settings_loan_type_mortgage">Mortgage</string>
     <string name="settings_reparse_title">Re-parse stored messages</string>
     <string name="settings_update_failed">Could not update card settings</string>
+    <string name="settings_registry_busy">Wait for the message refresh to finish, then try again</string>
     <string name="settings_reparse_stored_hint">Re-parses bank SMS stored on the device. Useful after an app update or if an amount or category looks wrong — without re-importing from the phone.</string>
     <string name="settings_reparse_stored_example">Example: USD purchases convert to SAR when the exchange rate is in the message.</string>
     <string name="settings_import_sms_title">Import bank SMS from phone</string>

@@ -32,7 +32,8 @@ object RetiredWorkCleanup {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                log.warn(AppLogCategories.UPDATE, "Retired work cleanup stage=cancel failed=1 retry=pending (${e.javaClass.simpleName})")
+                // The retired jobs are SMS processing and recovery workers, so the failure belongs with the SMS pipeline.
+                log.warn(AppLogCategories.SMS, "Retired work cleanup stage=cancel failed=1 retry=pending (${e.javaClass.simpleName})")
             }
         }
     }

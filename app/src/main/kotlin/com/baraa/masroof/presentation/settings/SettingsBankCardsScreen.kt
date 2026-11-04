@@ -81,6 +81,7 @@ fun SettingsBankCardsScreen(
         accounts = state.followedAccounts,
         busy = state.updating,
         failed = state.error != null,
+        failureRes = settingsErrorRes(state.error),
         onDismiss = onDismissCardNetwork,
         onSave = onSaveCardSetup,
     )
@@ -169,7 +170,7 @@ fun SettingsBankCardsScreen(
                 }
             }
 
-            state.error?.let { SettingsUpdateFailedText() }
+            state.error?.let { SettingsUpdateFailedText(it) }
             onAddManual?.let { action -> com.baraa.masroof.presentation.common.MasroofOutlinedButton(action,
                 enabled = !state.updating, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.settings_add_card_manual))

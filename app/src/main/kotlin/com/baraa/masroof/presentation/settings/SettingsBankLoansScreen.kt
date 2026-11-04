@@ -150,7 +150,7 @@ fun SettingsBankLoansScreen(
                 }
             }
 
-            state.error?.let { SettingsUpdateFailedText() }
+            state.error?.let { SettingsUpdateFailedText(it) }
         }
     }
 }

@@ -169,7 +169,7 @@ fun SettingsBankAccountsScreen(
                 }
             }
 
-            state.error?.let { SettingsUpdateFailedText() }
+            state.error?.let { SettingsUpdateFailedText(it) }
         }
     }
 }

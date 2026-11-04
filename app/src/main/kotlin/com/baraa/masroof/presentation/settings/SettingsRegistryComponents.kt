@@ -127,9 +127,9 @@ internal fun SettingsRegistryTabs(selected: String, onSelect: (String) -> Unit) 
 }
 
 @Composable
-internal fun SettingsUpdateFailedText() {
+internal fun SettingsUpdateFailedText(error: SettingsError? = null) {
     Text(
-        stringResource(R.string.settings_update_failed),
+        stringResource(settingsErrorRes(error)),
         color = MaterialTheme.colorScheme.error,
         style = MaterialTheme.typography.bodyMedium,
     )

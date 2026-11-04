@@ -793,10 +793,14 @@ class SettingsViewModelTest {
             reparse = { gate.await(); com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(0, 0) })
         vm.reparseStoredMessages(); runCurrent()
         vm.addManualAccount("BANK_ALJAZIRA", "3001", null) {}; runCurrent()
+        // The refusal says why; it is not reported as a failed write.
+        assertEquals(SettingsError.REGISTRY_BUSY, vm.uiState.value.error)
         gate.complete(Unit); advanceUntilIdle()
 
         assertEquals(0, reconciles)
         assertTrue(vm.uiState.value.followedAccounts.isEmpty())
+        // A finished reparse retires its own refusal.
+        assertNull(vm.uiState.value.error)
     }
 
     @Test
