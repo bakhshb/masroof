@@ -134,7 +134,7 @@ class BundledPatternApprovalTest {
         }
     }
 
-    private lateinit var context: Context
+    private lateinit var context: com.baraa.masroof.testsupport.TestStorageContext
     /** Leaving the patterns screen cancels its scope; an apply that started must still post what it reparsed. */
     @Test fun applyPendingFinishesWhenTheCallerIsCancelled() = runBlocking {
         fixture { c ->

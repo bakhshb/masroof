@@ -11,9 +11,12 @@ import java.util.UUID
 internal fun uniqueStorageContext(prefix: String): TestStorageContext =
     TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "$prefix-${UUID.randomUUID()}")
 
-/** Runs [block] on a real AppContainer, then closes it and deletes its database folder. */
+/**
+ * Runs [block] on a real AppContainer, then closes it and deletes its database folder.
+ * Takes a [TestStorageContext] so the folder it deletes is never the shared app database folder.
+ */
 internal suspend fun withAppContainer(
-    context: Context,
+    context: TestStorageContext,
     source: SmsDataSource? = null,
     block: suspend (AppContainer) -> Unit,
 ) {

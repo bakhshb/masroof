@@ -84,6 +84,24 @@ class AlJaziraParserRegressionTest {
     }
 
     @Test
+    fun transferInInter_withoutSenderAccountLine_hasNoSourceAccount() {
+        // Same body as fixture transfer_in_inter_ar_001: no bank-only phantom source reference.
+        val result = parse(
+            """
+            حوالة واردة: محلية
+            عبر: بنك الرياض
+            مبلغ: SAR 4,445.67
+            إلى: 3001
+            اسم المرسل: TEST_COMPANY
+            البنك المرسل: بنك الرياض
+            في: 2026-08-03 09:12
+            """.trimIndent(),
+        ) as ParseResult.Success
+        assertEquals(BankNetworkType.INTER_BANK, result.event.bankNetworkType)
+        assertNull(result.event.sourceAccountRef)
+    }
+
+    @Test
     fun internalAtmWithdrawal_hisabRaqam_extractsSourceAccount() {
         val result = parse(
             """

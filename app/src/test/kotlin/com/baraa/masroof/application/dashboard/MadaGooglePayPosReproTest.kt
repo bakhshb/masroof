@@ -16,6 +16,7 @@ import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.SmsParseInput
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
@@ -41,8 +42,10 @@ class MadaGooglePayPosReproTest {
 
     @Test
     fun googlePayMadaPos_assemblesWithCardSourceOnly() {
-        val (_, tx) = parseAndAssemble(googlePayBody)
+        val (parsed, tx) = parseAndAssemble(googlePayBody)
 
+        // Google Pay Mada carries no account line: no bank-only phantom source reference.
+        assertNull(parsed.event.sourceAccountRef)
         assertEquals(FinancialTransactionType.EXPENSE, tx.type)
         assertEquals(
             FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "8219"),
