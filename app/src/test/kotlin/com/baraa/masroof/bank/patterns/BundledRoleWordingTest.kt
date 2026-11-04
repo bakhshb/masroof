@@ -1,6 +1,6 @@
 package com.baraa.masroof.bank.patterns
 
-import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
+import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.engine.bank.Interpretation
 import com.baraa.masroof.engine.bank.MessageFamily
 import com.baraa.masroof.engine.bank.MessageInput
@@ -10,7 +10,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
-import java.io.File
 import java.time.Instant
 
 /** Bundled role wording; fictional values in production layouts. */
@@ -37,7 +36,7 @@ class BundledRoleWordingTest {
     }
 
     private fun parse(bank: String, sender: String, body: String): Interpretation {
-        val config = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/$bank.patterns.json").readText())
+        val config = bundledPatterns(bank)
         return PatternFactInterpreter(config).interpretRouted(
             MessageInput("wording", sender, body, Instant.parse("2026-10-20T12:00:00Z"), true), BankId(bank))
     }

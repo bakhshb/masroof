@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.engine.bank.MessageFamily
 import com.baraa.masroof.engine.bank.MoneyDirection
 import com.baraa.masroof.engine.bank.patterns.*
@@ -8,8 +9,7 @@ import org.junit.Test
 
 class PatternCatalogTest {
     @Test fun builtInRulesShowPhrasesAndFieldWordsAndApproveOnlyMovements() {
-        val catalog = com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec.decode(
-            java.io.File("src/main/assets/bank-patterns/BANK_BARQ.patterns.json").readText()).toCatalog()
+        val catalog = bundledPatterns("BANK_BARQ").toCatalog()
         val patterns = catalog.banks.single().currentPatterns.associateBy { it.id }
         val incoming = patterns.getValue("barq.transfer-in")
         assertTrue("حوالة داخلية واردة" in incoming.recognitionPhrases)

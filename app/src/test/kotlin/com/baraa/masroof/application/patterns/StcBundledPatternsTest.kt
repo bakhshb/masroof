@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.data.patterns.MessagePatternStore
 import com.baraa.masroof.data.room.DatabaseAccessGate
@@ -13,7 +14,7 @@ import java.nio.file.Files
 
 class StcBundledPatternsTest {
     @Test fun sarieTransferMatchesAnEmptyAccountLineWithoutInventingAnAccountReference() {
-        val bank = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/BANK_STC.patterns.json").readText()).banks.single()
+        val bank = bundledPatterns("BANK_STC").banks.single()
         val body = "Inward transfer (SARIE)\n100.00 SAR\nFrom TEST PERSON\nFrom BJAZ\nAccount \n02-09-2026 08:01\nRef. No. *8PJ7"
         for (accountLine in listOf("Account ", "Account", "Account   ")) {
             val text = body.replace("Account ", accountLine)

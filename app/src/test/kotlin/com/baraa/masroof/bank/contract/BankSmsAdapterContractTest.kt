@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.contract
 
+import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
@@ -9,7 +10,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
-import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
 import com.baraa.masroof.engine.bank.patterns.PatternFactContract
 import com.baraa.masroof.engine.bank.MoneyDirection
@@ -79,7 +79,7 @@ class BankSmsAdapterContractTest(
         ) + FiveBankSmsTest.cases()
 
         private fun stcPatternContractCase(): BankSmsAdapterContractCase {
-            val configuration = MessagePatternConfigurationCodec.decode(File("src/main/assets/bank-patterns/BANK_STC.patterns.json").readText())
+            val configuration = bundledPatterns("BANK_STC")
             val bank = configuration.banks.single()
             val approved = bank.copy(patterns = bank.patterns.map {
                 if (it.id == "stc-qattah") it.copy(factContract = PatternFactContract(com.baraa.masroof.engine.bank.MessageFamily.TRANSFER_OUT, MoneyDirection.OUTGOING)) else it

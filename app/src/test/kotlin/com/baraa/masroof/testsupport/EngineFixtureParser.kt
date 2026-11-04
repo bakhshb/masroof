@@ -3,7 +3,6 @@ package com.baraa.masroof.testsupport
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
 import com.baraa.masroof.bank.InterpretationDraftMapper
-import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.engine.bank.BankRuleSchema
 import com.baraa.masroof.engine.bank.interpretation.RuleInterpreter
@@ -11,8 +10,7 @@ import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
 import com.baraa.masroof.finance.value.BankId
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 
-private fun bundledConfiguration() = MessagePatternConfigurationCodec.decode(
-    java.io.File("src/main/assets/bank-patterns/BANK_ALJAZIRA.patterns.json").readText())
+private fun bundledConfiguration() = bundledPatterns("BANK_ALJAZIRA")
 
 /** Default integration setup follows production. Pass a profile only for an explicit reference test. */
 fun engineFixtureAdapter(

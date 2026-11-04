@@ -1,12 +1,11 @@
 package com.baraa.masroof.application.patterns
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.testsupport.uniqueStorageContext
+import com.baraa.masroof.testsupport.withAppContainer
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.domain.model.*
 import com.baraa.masroof.engine.bank.patterns.PatternAccountRole
 import com.baraa.masroof.sms.hash.SmsBodyHasher
-import com.baraa.masroof.testsupport.TestStorageContext
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -156,9 +155,6 @@ class WalletBuiltInLinksTest {
         destinationLast4?.let { assertEquals(it, event.destinationAccountRef?.maskedNumber) }
     }
 
-    private suspend fun fixture(block: suspend (AppContainer) -> Unit) {
-        val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "wallet-${java.util.UUID.randomUUID()}")
-        val container = AppContainer(context)
-        try { kotlinx.coroutines.withTimeout(20_000) { block(container) } } finally { container.close(); context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
-    }
+    private suspend fun fixture(block: suspend (AppContainer) -> Unit) =
+        withAppContainer(uniqueStorageContext("wallet"), block = block)
 }

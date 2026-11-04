@@ -1,15 +1,14 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.uniqueStorageContext
+import com.baraa.masroof.testsupport.withAppContainer
 import com.baraa.masroof.application.interpretation.ConfiguredPatternAdapters
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.domain.model.*
 import com.baraa.masroof.engine.bank.patterns.*
 import com.baraa.masroof.sms.hash.SmsBodyHasher
-import com.baraa.masroof.testsupport.TestStorageContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -350,11 +349,8 @@ class PatternProcessingMilestoneTest {
         }
     }
 
-    private suspend fun fixture(source: com.baraa.masroof.sms.datasource.SmsDataSource? = null, block: suspend (AppContainer) -> Unit) {
-        val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "pattern-${java.util.UUID.randomUUID()}")
-        val container = AppContainer(context, smsDataSourceOverride = source)
-        try { kotlinx.coroutines.withTimeout(20_000) { block(container) } } finally { container.close(); context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
-    }
+    private suspend fun fixture(source: com.baraa.masroof.sms.datasource.SmsDataSource? = null, block: suspend (AppContainer) -> Unit) =
+        withAppContainer(uniqueStorageContext("pattern"), source, block)
     private fun sms(id: String, body: String, sender: String = "STC Bank") = RawSms(id, sender, body,
         Instant.parse("2026-10-15T10:00:00Z"), id, SmsBodyHasher.sha256Hex(body))
     private val incoming = "Internal incoming transfer\nAmount:10SAR\nFrom:TEST PERSON\nAcc:321\nAt:15/10/26 12:30"
