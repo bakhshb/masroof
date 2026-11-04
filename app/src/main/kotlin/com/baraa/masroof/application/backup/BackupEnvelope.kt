@@ -84,6 +84,9 @@ object BackupEnvelope {
             } finally {
                 encrypted.close()
             }
+        } catch (_: OutOfMemoryError) {
+            // A very large backup can exhaust the heap inside the cipher; report a failed export, not a crash.
+            throw BackupFailureException(BackupFailureCategory.EXPORT_FAILED)
         } finally {
             password.fill('\u0000')
             encoded?.fill(0)
@@ -157,6 +160,9 @@ object BackupEnvelope {
             if (tail != null && tail.isNotEmpty()) {
                 writeBoundedPlaintext(output, tail, plaintextWritten, maxPlaintextBytes)
             }
+        } catch (_: OutOfMemoryError) {
+            // GCM decrypt may buffer the whole package before the tag check; report a failed import, not a crash.
+            throw BackupFailureException(BackupFailureCategory.IMPORT_FAILED)
         } finally {
             password.fill('\u0000')
             encoded?.fill(0)

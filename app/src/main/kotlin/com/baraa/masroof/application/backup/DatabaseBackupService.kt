@@ -184,8 +184,11 @@ class DatabaseBackupService(
         } catch (_: BackupArchiveException) {
             BackupVerificationOutcome.INVALID_PACKAGE
         } catch (failure: BackupFailureException) {
-            if (failure.category == BackupFailureCategory.AUTHENTICATION_FAILED) BackupVerificationOutcome.AUTHENTICATION_FAILED
-            else BackupVerificationOutcome.INVALID_PACKAGE
+            when (failure.category) {
+                BackupFailureCategory.AUTHENTICATION_FAILED -> BackupVerificationOutcome.AUTHENTICATION_FAILED
+                BackupFailureCategory.IMPORT_FAILED -> BackupVerificationOutcome.FAILED
+                else -> BackupVerificationOutcome.INVALID_PACKAGE
+            }
         } catch (error: Exception) {
             appLogService?.failure(AppLogCategories.BACKUP, "Backup verification", error)
             BackupVerificationOutcome.FAILED
