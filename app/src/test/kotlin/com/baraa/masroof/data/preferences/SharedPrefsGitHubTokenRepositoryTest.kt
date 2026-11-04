@@ -219,9 +219,29 @@ class SharedPrefsGitHubTokenRepositoryTest {
         assertTrue(checked.isSuccess)
         assertTrue(checked.getOrThrow().isSuccess)
         assertNull(repository.getToken())
-        assertFalse(prefs.contains(SharedPrefsGitHubTokenRepository.KEY_TOKEN_CIPHERTEXT))
+        // A thrown error is transient: the stored token survives for the next read.
+        assertEquals("sealed-payload", prefs.getString(SharedPrefsGitHubTokenRepository.KEY_TOKEN_CIPHERTEXT, null))
         captured.authorizationHeaders.forEach { header -> assertNull(header) }
         assertTrue(UpdateChecker(installedVersionCode = 1).evaluate(manifest()) is UpdateAvailability.Available)
+    }
+
+    @Test
+    fun transientDecryptError_keepsTheTokenForTheNextRead() {
+        repository(ReversibleEncryptor()).setToken(TOKEN)
+        val flaky = FlakyEncryptor(failures = 1)
+
+        assertNull(repository(flaky).getToken())
+        assertEquals(TOKEN, repository(flaky).getToken())
+    }
+
+    @Test
+    fun setToken_decryptsOnceBeforeWriting() {
+        val counting = FlakyEncryptor(failures = 0)
+
+        assertTrue(repository(counting).setToken(TOKEN))
+
+        assertEquals(1, counting.decrypts)
+        assertEquals(TOKEN, repository(ReversibleEncryptor()).getToken())
     }
 
     @Test
@@ -340,6 +360,19 @@ class SharedPrefsGitHubTokenRepositoryTest {
 
         override fun decrypt(ciphertext: String): String? {
             throw IllegalStateException("keystore key invalidated")
+        }
+    }
+
+    private class FlakyEncryptor(private var failures: Int) : GitHubTokenEncryptor {
+        private val delegate = ReversibleEncryptor()
+        var decrypts = 0
+
+        override fun encrypt(plaintext: String): String = delegate.encrypt(plaintext)
+
+        override fun decrypt(ciphertext: String): String? {
+            decrypts++
+            if (failures-- > 0) throw GitHubTokenEncryptorException("keystore busy")
+            return delegate.decrypt(ciphertext)
         }
     }
 
