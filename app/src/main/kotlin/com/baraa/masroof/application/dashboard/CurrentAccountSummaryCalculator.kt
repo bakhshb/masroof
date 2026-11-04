@@ -12,7 +12,6 @@ object CurrentAccountSummaryCalculator {
         primaryCurrency: Currency = Currency.SAR,
         sarEquivalents: Map<String, Money> = emptyMap(),
         ownedAccountContainerIds: Set<String> = emptySet(),
-        ownedAccountLast4s: Set<String> = emptySet(),
         scopeMode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
         debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): CurrentAccountSummary =
@@ -23,7 +22,6 @@ object CurrentAccountSummaryCalculator {
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
                 ownedAccountContainerIds = ownedAccountContainerIds,
-                ownedAccountLast4s = ownedAccountLast4s,
                 scopeMode = scopeMode,
                 debitCardScope = debitCardScope,
             ),

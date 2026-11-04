@@ -74,7 +74,7 @@ internal object FidelityFixtures {
         val registryAccounts = listOf(AccountRegistryEntry.forTest(bank, "3001"), AccountRegistryEntry.forTest(bank, "5002"))
         val accountContext = DashboardProjectionContext(period, period.endDateExclusive.atStartOfDay(zone).toInstant(),
             LocalDate.parse("2026-10-10"), DashboardEvidence.EMPTY, transactions, emptyMap(), 0, registryAccounts,
-            setOf(account("3001"), account("5002")), setOf("3001", "5002"), emptyList(), emptyList(),
+            setOf(account("3001"), account("5002")), emptyList(), emptyList(),
             DebitCardScopeFacts(setOf(card("4421")), mapOf(card("4421") to account("3001"))), java.util.Locale.ENGLISH, zone, Currency.SAR)
         val snapshot = CreditCardBalanceSnapshot(money("5000"),money("2200"),LocalDate.parse("2026-10-15"),
             Instant.parse("2026-10-02T07:00:00Z"),Instant.parse("2026-10-02T07:00:00Z"))
@@ -107,7 +107,7 @@ internal object FidelityFixtures {
         return DashboardUiState(loading=false, period=period,
             summary=MonthlyFinancialSummary(period,Currency.SAR,money("3850"),money("150"),signed("3700"),money("12000"),money("1000"),money("500"),money("2200"),money("400"),money("1000"),17,2),
             flowDetailGrouping=CurrentAccountFlowDetailGrouper.group(transactions,emptyList(),Currency.SAR,emptyMap(),
-                setOf(account("3001"),account("5002")),setOf("3001","5002")),
+                setOf(account("3001"),account("5002"))),
             currentAccount=CurrentAccountSummary.aggregate(listOf(current,saving)), accountsFleet=AccountsSummary.fromSummaries(listOf(bank to "3001",bank to "5002"),listOf(current,saving)),
             ownedAccounts=listOf(OwnedAccountUi(bank,"3001","الجاري •• 3001",current),OwnedAccountUi(bank,"5002","الادخار •• 5002",saving)),
             ownedCards=listOf(OwnedCardUi(bank,"7271","البطاقة الأساسية •• 7271",CardNetwork.VISA,CardRole.PRIMARY),OwnedCardUi(bank,"8842","البطاقة الفرعية •• 8842",CardNetwork.VISA,CardRole.SUPPLEMENTARY,"7271"),OwnedCardUi(bank,"4421","مدى •• 4421",CardNetwork.MADA)),

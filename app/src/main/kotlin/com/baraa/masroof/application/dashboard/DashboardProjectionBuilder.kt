@@ -137,9 +137,6 @@ class DashboardProjectionBuilder(
             ownedAccountContainerIds = ownedAccounts
                 .map { FinancialContainerIdFactory.accountId(it.bank, it.maskedNumber) }
                 .toSet(),
-            ownedAccountLast4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
-                ownedAccounts.map { it.maskedNumber },
-            ),
             cardRegistry = cardRegistry,
             loans = loanRegistryRepository.listAll(),
             debitCardScope = DebitCardScopeFactory.fromRegistry(

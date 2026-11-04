@@ -292,7 +292,7 @@ class DashboardSpendingTrendsTest {
         period, Instant.parse("2026-07-23T00:00:00Z"), date.plusDays(2), DashboardEvidence.EMPTY,
         transactions, emptyMap(), 0, accounts,
         accounts.map { FinancialContainerIdFactory.accountId(it.bank, it.maskedNumber) }.toSet(),
-        accounts.map { it.maskedNumber }.toSet(), emptyList(), emptyList(),
+        emptyList(), emptyList(),
         DebitCardScopeFacts(emptySet(), emptyMap()), Locale.ENGLISH, ZoneId.of("Asia/Riyadh"), Currency.SAR,
     )
 

@@ -125,7 +125,6 @@ class MadaGooglePayPosReproTest {
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             zoneId = zoneId,
         )
 
@@ -178,7 +177,6 @@ class MadaGooglePayPosReproTest {
             transactions = listOf(tx),
             parsedRecords = listOf(parsedRecord),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             debitCardScope = debitCardScope,
         )
 
@@ -241,7 +239,6 @@ class MadaGooglePayPosReproTest {
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             zoneId = zoneId,
         )
 
@@ -259,7 +256,6 @@ class MadaGooglePayPosReproTest {
             transactions = listOf(tx),
             parsedRecords = listOf(parsedRecord),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             debitCardScope = debitCardScope,
         )
         assertEquals(

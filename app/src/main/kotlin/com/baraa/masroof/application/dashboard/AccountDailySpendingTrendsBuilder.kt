@@ -27,9 +27,7 @@ internal object AccountDailySpendingTrendsBuilder {
             period, transactions, primaryCurrency, zoneId, today, amounts)
         val perAccount = ownedAccounts.associate { account ->
             val id = FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
-            val scope = CurrentAccountTransactionScope(setOf(id),
-                CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(listOf(account.maskedNumber)),
-                AccountFlowScopeMode.SingleAccount, debitCardScope.ownedDebitCardContainerIds,
+            val scope = CurrentAccountTransactionScope(setOf(id), AccountFlowScopeMode.SingleAccount, debitCardScope.ownedDebitCardContainerIds,
                 debitCardScope.debitCardLinkedAccountIds)
             val amounts = linkedMapOf<String, BigDecimal>()
             val categories = (allowed + ChartDataCategory.INTERNAL_TRANSFERS).associateWith { linkedMapOf<String, BigDecimal>() }

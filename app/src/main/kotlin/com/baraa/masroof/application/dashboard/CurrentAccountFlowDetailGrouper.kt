@@ -62,7 +62,6 @@ object CurrentAccountFlowDetailGrouper {
         primaryCurrency: Currency = Currency.SAR,
         sarEquivalents: Map<String, Money> = emptyMap(),
         ownedAccountContainerIds: Set<String> = emptySet(),
-        ownedAccountLast4s: Set<String> = emptySet(),
         scopeMode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
         debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
     ): CurrentAccountFlowDetailGrouping {
@@ -74,7 +73,6 @@ object CurrentAccountFlowDetailGrouper {
         )
         val scope = CurrentAccountTransactionScope(
             ownedContainerIds = ownedAccountContainerIds,
-            ownedAccountLast4s = ownedAccountLast4s,
             mode = scopeMode,
             ownedDebitCardContainerIds = debitCardScope.ownedDebitCardContainerIds,
             debitCardLinkedAccountIds = debitCardScope.debitCardLinkedAccountIds,

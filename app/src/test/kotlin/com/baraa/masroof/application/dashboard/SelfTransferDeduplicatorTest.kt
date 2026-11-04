@@ -78,7 +78,6 @@ class SelfTransferDeduplicatorTest {
       transactions = filtered,
       parsedRecords = emptyList(),
       ownedAccountContainerIds = setOf(account3),
-      ownedAccountLast4s = setOf("3003"),
       scopeMode = AccountFlowScopeMode.SingleAccount,
     )
 
@@ -115,7 +114,6 @@ class SelfTransferDeduplicatorTest {
       transactions = filtered,
       parsedRecords = emptyList(),
       ownedAccountContainerIds = setOf(account1),
-      ownedAccountLast4s = setOf("3001"),
       scopeMode = AccountFlowScopeMode.SingleAccount,
     )
     assertEquals(Money.of("4000.00", Currency.SAR), summary.outflow.selfTransfersOut)
@@ -152,7 +150,6 @@ class SelfTransferDeduplicatorTest {
       transactions = filtered,
       parsedRecords = emptyList(),
       ownedAccountContainerIds = setOf(account1),
-      ownedAccountLast4s = setOf("3001"),
       scopeMode = AccountFlowScopeMode.SingleAccount,
     )
     assertEquals(Money.of("2000.00", Currency.SAR), summary.outflow.externalTransfersOut)

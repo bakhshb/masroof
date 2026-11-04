@@ -94,7 +94,6 @@ class CurrentAccountSummaryCalculatorTest {
                 parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT),
             ),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
         )
         assertEquals(Money.of("210.00", Currency.SAR), summary.outflow.billPayments)
         assertEquals(Money.zero(Currency.SAR), summary.outflow.posPurchases)
@@ -122,7 +121,6 @@ class CurrentAccountSummaryCalculatorTest {
                 ),
             ),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
         )
         assertEquals(Money.of("120.00", Currency.SAR), summary.outflow.billPayments)
         assertEquals(Money.zero(Currency.SAR), summary.outflow.fees)
@@ -156,7 +154,6 @@ class CurrentAccountSummaryCalculatorTest {
             transactions = listOf(cashWithdrawal),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3478"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.zero(Currency.SAR), summary.outflow.cashWithdrawals)
@@ -178,14 +175,12 @@ class CurrentAccountSummaryCalculatorTest {
             transactions = listOf(orphanWithdrawal),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountA),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         val summaryB = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(orphanWithdrawal),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountB),
-            ownedAccountLast4s = setOf("3002"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.zero(Currency.SAR), summaryA.outflow.cashWithdrawals)
@@ -220,7 +215,6 @@ class CurrentAccountSummaryCalculatorTest {
             ),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountA),
-            ownedAccountLast4s = setOf("3001"),
         )
         assertEquals(Money.of("1000.00", Currency.SAR), summary.inflow.total)
         assertEquals(Money.of("700.00", Currency.SAR), summary.outflow.total)
@@ -258,7 +252,6 @@ class CurrentAccountSummaryCalculatorTest {
             ),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountId),
-            ownedAccountLast4s = setOf("3001"),
         )
         assertEquals(Money.of("100.00", Currency.SAR), summary.outflow.externalTransfersOut)
         assertEquals(Money.of("50.00", Currency.SAR), summary.outflow.creditCardPayments)
@@ -322,7 +315,6 @@ class CurrentAccountSummaryCalculatorTest {
             transactions = listOf(cardPay, cash, bill),
             parsedRecords = parsedRecords,
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
         )
         assertEquals(Money.of("802.62", Currency.SAR), summary.outflow.creditCardPayments)
         assertEquals(Money.of("500.00", Currency.SAR), summary.outflow.cashWithdrawals)
@@ -341,7 +333,6 @@ class CurrentAccountSummaryCalculatorTest {
             ),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.of("90.00", Currency.SAR), summary.outflow.posPurchases)
@@ -371,7 +362,6 @@ class CurrentAccountSummaryCalculatorTest {
             transactions = listOf(pos),
             parsedRecords = parsedRecords,
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.of("120.00", Currency.SAR), summary.outflow.posPurchases)
@@ -391,14 +381,12 @@ class CurrentAccountSummaryCalculatorTest {
             transactions = listOf(cashWithdrawal),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.Fleet,
         )
         val accountSummary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(cashWithdrawal),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.of("2200.00", Currency.SAR), fleetSummary.outflow.cashWithdrawals)
@@ -421,7 +409,6 @@ class CurrentAccountSummaryCalculatorTest {
             ),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(ownedA, ownedB),
-            ownedAccountLast4s = setOf("3001", "3002"),
         )
         assertEquals(Money.of("500.00", Currency.SAR), summary.inflow.selfTransfersIn)
         assertEquals(Money.of("500.00", Currency.SAR), summary.outflow.selfTransfersOut)
@@ -450,7 +437,6 @@ class CurrentAccountSummaryCalculatorTest {
                 ),
             ),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
         )
         assertEquals(Money.of("3036.11", Currency.SAR), summary.outflow.loanRepayments)
         assertEquals(Money.zero(Currency.SAR), summary.outflow.fees)
@@ -497,7 +483,6 @@ class CurrentAccountSummaryCalculatorTest {
             transactions = periodTransactions,
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountId),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
 
@@ -602,7 +587,6 @@ class CurrentAccountSummaryCalculatorTest {
             transactions = transactions,
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountA, accountB),
-            ownedAccountLast4s = setOf("3001", "3002"),
             scopeMode = AccountFlowScopeMode.Fleet,
         )
         val summaryA = summarizeOwned(transactions, accountA)
@@ -630,7 +614,6 @@ class CurrentAccountSummaryCalculatorTest {
             transactions = transactions,
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(aljazira, other),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.Fleet,
         )
         val aljaziraSummary = summarizeOwned(transactions, aljazira)
@@ -659,14 +642,12 @@ class CurrentAccountSummaryCalculatorTest {
             transactions = listOf(legacy),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(aljazira),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         val ambiguous = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(legacy),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(aljazira, other),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
 
@@ -695,7 +676,6 @@ class CurrentAccountSummaryCalculatorTest {
                 ),
             ),
             ownedAccountContainerIds = setOf(owned),
-            ownedAccountLast4s = setOf("3001"),
         )
         assertEquals(Money.of("3036.11", Currency.SAR), summary.outflow.loanRepayments)
         assertEquals(Money.of("3036.11", Currency.SAR), summary.outflow.coreTotal)
@@ -709,7 +689,6 @@ class CurrentAccountSummaryCalculatorTest {
             transactions = transactions,
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountId),
-            ownedAccountLast4s = setOf(accountId.substringAfterLast(':')),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
 

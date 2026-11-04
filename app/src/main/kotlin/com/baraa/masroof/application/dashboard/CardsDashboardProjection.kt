@@ -66,7 +66,6 @@ class CardsDashboardProjection(
             primaryCurrency = primaryCurrency,
             sarEquivalents = sarEquivalents,
             ownedAccountContainerIds = ownedAccountContainerIds,
-            ownedAccountLast4s = ownedAccountLast4s,
             zoneId = zoneId,
             displayLocale = displayLocale,
         )

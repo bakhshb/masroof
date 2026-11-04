@@ -822,7 +822,6 @@ class IntraBankSelfTransferReconciliationTest {
             transactions = displayed,
             parsedRecords = parsedRepo.listAll(),
             ownedAccountContainerIds = setOf(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         assertEquals(Money.of("2000.00", Currency.SAR), summary.outflow.selfTransfersOut)
@@ -966,7 +965,6 @@ class IntraBankSelfTransferReconciliationTest {
             transactions = displayed,
             parsedRecords = parsedRepo.listAll(),
             ownedAccountContainerIds = setOf(FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001")),
-            ownedAccountLast4s = setOf("3001"),
             scopeMode = AccountFlowScopeMode.SingleAccount,
         )
         return summary.outflow.selfTransfersOut

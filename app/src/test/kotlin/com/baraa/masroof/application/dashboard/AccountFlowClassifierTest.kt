@@ -25,7 +25,6 @@ class AccountFlowClassifierTest {
     private val cardId = "card:bank_aljazira:7271"
     private val scope = CurrentAccountTransactionScope(
         ownedContainerIds = setOf(accountId),
-        ownedAccountLast4s = setOf("3001"),
         mode = AccountFlowScopeMode.SingleAccount,
     )
 
@@ -201,7 +200,6 @@ class AccountFlowClassifierTest {
         )
         val bothSidesScope = CurrentAccountTransactionScope(
             ownedContainerIds = setOf(accountId, "account:bank_aljazira:4002"),
-            ownedAccountLast4s = setOf("3001", "4002"),
             mode = AccountFlowScopeMode.Fleet,
         )
 
@@ -243,7 +241,6 @@ class AccountFlowClassifierTest {
             transactions = listOf(refund),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(accountId),
-            ownedAccountLast4s = setOf("3001"),
         )
         assertEquals(Money.zero(Currency.SAR), summary.inflow.accountRefunds)
     }
@@ -288,7 +285,6 @@ class AccountFlowClassifierTest {
 
     private fun fleetScope() = CurrentAccountTransactionScope(
         ownedContainerIds = setOf(accountId),
-        ownedAccountLast4s = setOf("3001"),
         mode = AccountFlowScopeMode.Fleet,
     )
 

@@ -11,7 +11,6 @@ import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 data class CurrentAccountTransactionScope(
     val ownedContainerIds: Set<String>,
-    val ownedAccountLast4s: Set<String>,
     val mode: AccountFlowScopeMode = AccountFlowScopeMode.Fleet,
     val ownedDebitCardContainerIds: Set<String> = emptySet(),
     val debitCardLinkedAccountIds: Map<String, String> = emptyMap(),

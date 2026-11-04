@@ -30,7 +30,6 @@ data class DashboardProjectionContext(
     val reviewRequiredCount: Int,
     val ownedAccounts: List<AccountRegistryEntry>,
     val ownedAccountContainerIds: Set<String>,
-    val ownedAccountLast4s: Set<String>,
     val cardRegistry: List<CardRegistryEntry>,
     val loans: List<LoanRegistryEntry>,
     val debitCardScope: DebitCardScopeFacts,

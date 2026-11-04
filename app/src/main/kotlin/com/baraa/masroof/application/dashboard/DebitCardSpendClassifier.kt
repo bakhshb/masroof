@@ -20,25 +20,19 @@ object DebitCardSpendClassifier {
     fun scopeFor(
         entry: CardRegistryEntry,
         ownedAccountContainerIds: Set<String>,
-        ownedAccountLast4s: Set<String>,
     ): CurrentAccountTransactionScope {
         val linkedContainerId = entry.linkedAccount?.let { account ->
             FinancialContainerIdFactory.accountId(account)
         }
-        val linkedLast4s = entry.linkedAccountMaskedNumber?.let { masked ->
-            CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(listOf(masked))
-        }.orEmpty()
         return when {
             linkedContainerId != null ->
                 CurrentAccountTransactionScope(
                     ownedContainerIds = setOf(linkedContainerId),
-                    ownedAccountLast4s = linkedLast4s,
                     mode = AccountFlowScopeMode.SingleAccount,
                 )
             else ->
                 CurrentAccountTransactionScope(
                     ownedContainerIds = ownedAccountContainerIds,
-                    ownedAccountLast4s = ownedAccountLast4s,
                     mode = AccountFlowScopeMode.Fleet,
                 )
         }

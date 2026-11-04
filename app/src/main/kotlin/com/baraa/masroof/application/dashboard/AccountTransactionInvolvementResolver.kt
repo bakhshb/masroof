@@ -24,12 +24,8 @@ object AccountTransactionInvolvementResolver {
         val refundContext = AccountFlowClassificationContext(parsedRecordsById, emptySet(), Currency.SAR, emptyMap())
         val scopesByContainer = ownedAccounts.map { account ->
             val containerId = FinancialContainerIdFactory.accountId(account.bank, account.maskedNumber)
-            val last4s = CurrentAccountTransactionScope.ownedAccountLast4sFromMaskedNumbers(
-                listOf(account.maskedNumber),
-            )
             containerId to CurrentAccountTransactionScope(
                 ownedContainerIds = setOf(containerId),
-                ownedAccountLast4s = last4s,
                 mode = AccountFlowScopeMode.SingleAccount,
                 ownedDebitCardContainerIds = debitCardScope.ownedDebitCardContainerIds,
                 debitCardLinkedAccountIds = debitCardScope.debitCardLinkedAccountIds,

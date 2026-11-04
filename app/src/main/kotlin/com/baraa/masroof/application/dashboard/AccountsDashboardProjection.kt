@@ -26,7 +26,6 @@ object AccountsDashboardProjection {
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
                 ownedAccountContainerIds = ownedAccountContainerIds,
-                ownedAccountLast4s = ownedAccountLast4s,
                 debitCardScope = debitCardScope,
             )
             val fleet = CurrentAccountSummaryCalculator.summarize(flowDetail, primaryCurrency, sarEquivalents)

@@ -32,9 +32,9 @@ class OwnedAccountsFlowSummaryTest {
       tx("a2-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "7000", source = account2),
     )
 
-    val summary1 = summarizeAccount(account1, "3001", transactions)
-    val summary2 = summarizeAccount(account2, "3002", transactions)
-    val summary3 = summarizeAccount(account3, "3003", transactions)
+    val summary1 = summarizeAccount(account1, transactions)
+    val summary2 = summarizeAccount(account2, transactions)
+    val summary3 = summarizeAccount(account3, transactions)
 
     assertEquals(
       SignedMoneyAmount.zero(Currency.SAR),
@@ -89,9 +89,9 @@ class OwnedAccountsFlowSummaryTest {
         Bank.BANK_ALJAZIRA to "3003",
       ),
       summaries = listOf(
-        summarizeAccount(account1, "3001", transactions),
-        summarizeAccount(account2, "3002", transactions),
-        summarizeAccount(account3, "3003", transactions),
+        summarizeAccount(account1, transactions),
+        summarizeAccount(account2, transactions),
+        summarizeAccount(account3, transactions),
       ),
     )
 
@@ -117,8 +117,8 @@ class OwnedAccountsFlowSummaryTest {
         Bank.BANK_ALJAZIRA to "3002",
       ),
       summaries = listOf(
-        summarizeAccount(account1, "3001", transactions),
-        summarizeAccount(account2, "3002", transactions),
+        summarizeAccount(account1, transactions),
+        summarizeAccount(account2, transactions),
       ),
     )
 
@@ -186,14 +186,12 @@ class OwnedAccountsFlowSummaryTest {
 
   private fun summarizeAccount(
     containerId: String,
-    last4: String,
     transactions: List<FinancialTransaction>,
   ): CurrentAccountSummary =
     CurrentAccountSummaryCalculator.summarize(
       transactions = transactions,
       parsedRecords = emptyList(),
       ownedAccountContainerIds = setOf(containerId),
-      ownedAccountLast4s = setOf(last4),
     )
 
   private fun tx(
