@@ -540,7 +540,7 @@ class DashboardViewModel(
         val searchText = listOfNotNull(
             tx.merchant?.trim()?.takeIf { it.isNotEmpty() },
             tx.counterparty?.trim()?.takeIf { it.isNotEmpty() },
-        ).joinToString(" ").lowercase(Locale.getDefault())
+        ).joinToString(" ").lowercase(Locale.ROOT)
         val effectiveType = facts?.effectiveType ?: tx.type
         return TransactionPreviewUi(
             id = tx.id,
