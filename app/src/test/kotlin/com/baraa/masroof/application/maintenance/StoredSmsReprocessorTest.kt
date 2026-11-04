@@ -233,6 +233,24 @@ class StoredSmsReprocessorTest {
     }
 
     @Test
+    fun failedReparse_keepsItsHistoricalMarker() = runBlocking {
+        rawRepo.insertIfAbsent(purchase("android-sms:keep"))
+        runCatching { reprocessor(EngineFixtureParser()) { throw CancellationException("stopped") }.reprocessAll() }
+        assertEquals(
+            setOf("android-sms:keep"),
+            retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).toSet(),
+        )
+
+        val result = reprocessor(SmsParseGateway { throw IllegalStateException("boom") }).reprocessAll()
+
+        assertEquals(1, result.failedCount)
+        assertEquals(
+            setOf("android-sms:keep"),
+            retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).toSet(),
+        )
+    }
+
+    @Test
     fun parserFailure_countsAsFailed_andKeepsEvidence() = runBlocking {
         val raw = purchase("android-sms:still-broken")
         rawRepo.insertIfAbsent(raw)
