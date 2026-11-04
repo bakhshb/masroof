@@ -121,7 +121,11 @@ interface RawSmsDao {
             OR
             (:requireDeviceMessageIdNull = 0 AND deviceMessageId IS NOT NULL)
           )
-        ORDER BY receivedAtEpochMillis ASC
+          AND (
+            :requireDeviceMessageIdNull = 0
+            OR NOT EXISTS (SELECT 1 FROM raw_sms_provider_alias a WHERE a.rawSmsId = raw_sms.id)
+          )
+        ORDER BY receivedAtEpochMillis ASC, id ASC
         LIMIT 2
         """,
     )
