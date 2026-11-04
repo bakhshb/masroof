@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.contract
 
+import com.baraa.masroof.testsupport.eventOrNull
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.MessageFamily
@@ -91,16 +92,7 @@ object BankSmsAdapterContract {
             ),
         )
 
-    fun parsedEvent(result: ParseResult): ParsedEvent? =
-        when (result) {
-            is ParseResult.Success -> result.event
-            is ParseResult.Partial -> result.event
-            is ParseResult.ReviewRequired -> result.event
-            is ParseResult.NonFinancial -> result.event
-            is ParseResult.Unsupported,
-            is ParseResult.Invalid,
-            -> null
-        }
+    fun parsedEvent(result: ParseResult): ParsedEvent? = result.eventOrNull()
 
     private fun verifyFixtureCoverage(adapter: BankSmsAdapter, samples: BankSmsAdapterContractSamples) {
         val bank = adapter.bank.id

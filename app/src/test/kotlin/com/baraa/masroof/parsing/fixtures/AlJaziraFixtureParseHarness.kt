@@ -1,5 +1,7 @@
 package com.baraa.masroof.parsing.fixtures
 
+import com.baraa.masroof.testsupport.detailsOrNull
+import com.baraa.masroof.testsupport.eventOrNull
 import com.baraa.masroof.testsupport.EngineFixtureParser
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
@@ -45,16 +47,12 @@ object AlJaziraFixtureParseHarness {
 
     private fun unpack(fixture: AlJaziraFixture, result: ParseResult): Pair<ParsedEvent?, ParsedEventDetails?> =
         when (result) {
-            is ParseResult.Success -> result.event to result.details
-            is ParseResult.Partial -> result.event to result.details
-            is ParseResult.ReviewRequired -> result.event to result.details
-            is ParseResult.NonFinancial -> result.event to result.details
             is ParseResult.Invalid -> result.draft?.let {
                 runCatching {
                     it.copy(parseStatus = it.parseStatus ?: ParseStatus.INVALID)
                         .toParsedEvent("evt-${fixture.id}")
                 }.getOrNull()
             } to result.draft?.details
-            is ParseResult.Unsupported -> null to null
+            else -> result.eventOrNull() to result.detailsOrNull()
         }
 }
