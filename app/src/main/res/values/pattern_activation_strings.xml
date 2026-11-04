@@ -6,11 +6,11 @@
     <string name="pattern_financial_account_owned">أؤكد أن هذا الحساب ملكي</string>
     <string name="pattern_financial_confirm_account">تأكيد الحساب</string>
     <string name="pattern_financial_currency_from_message">العملة من الرسالة</string>
-    <string name="pattern_financial_blocked">تعذر اعتماد هذه الحقائق. تحقق من نوع الحركة والعملة وأدوار المراجع ومطابقة الرسالة. ما لم يُحسم يبقى للمراجعة.</string>
+    <string name="pattern_financial_blocked">تعذر اعتماد هذه الحقائق. تحقق من نوع الحركة والعملة وأدوار المراجع ومطابقة الرسالة. ما لم يحسم يبقى للمراجعة.</string>
     <string name="pattern_financial_approved_status">تفسير مالي معتمد؛ التسجيل مشروط بالتحقق والملكية</string>
     <string name="pattern_apply_pending">تطبيق المعتمد على المعلق</string>
-    <string name="pattern_apply_result">عولج: %1$d — سُجل ماليًا: %2$d — تعذر: %3$s</string>
+    <string name="pattern_apply_result">عولج: %1$d — سجل ماليا: %2$d — تعذر: %3$s</string>
     <string name="pattern_failure_count_unknown">العدد غير محدد</string>
-    <string name="pattern_financial_incomplete">لم تكتمل المعالجة المطلوبة. بقيت الأخطاء قابلة لإعادة المحاولة، ولم تُغلق المراجعة بسبب الحفظ وحده.</string>
+    <string name="pattern_financial_incomplete">لم تكتمل المعالجة المطلوبة. بقيت الأخطاء قابلة لإعادة المحاولة، ولم تغلق المراجعة بسبب الحفظ وحده.</string>
     <string name="pattern_import_bank">استيراد رسائل هذا البنك</string>
 </resources>

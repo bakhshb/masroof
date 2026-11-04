@@ -62,7 +62,7 @@ This file wins when older records disagree.
 - Use `MasroofTheme`/`MaterialTheme` and `MasroofThemeExtras.extendedColors`; only theme tokens in `ui-kit/.../ui/theme/` (`MasroofSpacing`, `MasroofIconSizes`, `MasroofShapes`, `MasroofElevation`, `MasroofAnalyticsTokens`); no `dp`/`sp`/color literals in screens (`ApprovedDesignBoundaryTest`). Add a token only when nothing fits.
 - Reuse shared components (`MasroofCard`, `MasroofSectionHeader`, `MasroofAmountText`, `MasroofBadge`, `MasroofValueBarRow`, `MasroofStackedBar`, `MasroofSecondaryScaffold`, ...). New shared visuals go in `ui-kit` and the debug catalog (Settings → About → Design catalog).
 - Explanations only through `MasroofGuidance` (help popup), never paragraphs. Analysis screens are visual first: chart, big number or badge per card.
-- Every label in `values/` (Arabic) and `values-en/`; Western digits via `AppDigits`/`MasroofText`.
+- Every label in `values/` (Arabic, no tashkeel) and `values-en/`; Western digits via `AppDigits`/`MasroofText`.
 - Sheets use `MasroofBottomSheet` (`MasroofSheetTokens`, fixed header, scrolling body, `MasroofSheetChoices`). Drafts apply only on Save/Apply; busy financial writes block dismissal.
 - Navigation in `presentation/navigation/` (`MasroofRoot`, `HomeDestination`, `SettingsDestination`); Home uses `HomeBackStack` `push`/`pop`, never a fixed return screen; screen-local state is `rememberSaveable`.
 - Chart category projections and filtering live in dashboard builders / `ChartDataWorkflow`.

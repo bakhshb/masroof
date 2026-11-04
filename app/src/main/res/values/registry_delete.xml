@@ -5,21 +5,21 @@
     <string name="registry_delete_card_title">حذف البطاقة؟</string>
     <string name="registry_delete_loan_title">حذف القرض؟</string>
     <string name="registry_delete_blocked_title">لا يمكن الحذف</string>
-    <string name="registry_delete_help">سيُحذف من قائمتك. قد يظهر مرة أخرى كغير مؤكد إذا وصلت رسائل جديدة تذكره.</string>
+    <string name="registry_delete_help">سيحذف من قائمتك. قد يظهر مرة أخرى كغير مؤكد إذا وصلت رسائل جديدة تذكره.</string>
     <string name="registry_delete_name">الاسم</string>
     <string name="registry_delete_copy">نسخ الاسم</string>
     <string name="registry_delete_confirmation">الصق الاسم للتأكيد</string>
     <plurals name="registry_delete_blocked_transactions">
-        <item quantity="zero">مرتبط بعمليات مسجّلة. أوقف المتابعة بدلًا من الحذف.</item>
-        <item quantity="one">مرتبط بعملية مسجّلة واحدة. أوقف المتابعة بدلًا من الحذف.</item>
-        <item quantity="two">مرتبط بعمليتين مسجّلتين. أوقف المتابعة بدلًا من الحذف.</item>
-        <item quantity="few">مرتبط بـ %d عمليات مسجّلة. أوقف المتابعة بدلًا من الحذف.</item>
-        <item quantity="many">مرتبط بـ %d عملية مسجّلة. أوقف المتابعة بدلًا من الحذف.</item>
-        <item quantity="other">مرتبط بـ %d عملية مسجّلة. أوقف المتابعة بدلًا من الحذف.</item>
+        <item quantity="zero">مرتبط بعمليات مسجلة. أوقف المتابعة بدلا من الحذف.</item>
+        <item quantity="one">مرتبط بعملية مسجلة واحدة. أوقف المتابعة بدلا من الحذف.</item>
+        <item quantity="two">مرتبط بعمليتين مسجلتين. أوقف المتابعة بدلا من الحذف.</item>
+        <item quantity="few">مرتبط بـ %d عمليات مسجلة. أوقف المتابعة بدلا من الحذف.</item>
+        <item quantity="many">مرتبط بـ %d عملية مسجلة. أوقف المتابعة بدلا من الحذف.</item>
+        <item quantity="other">مرتبط بـ %d عملية مسجلة. أوقف المتابعة بدلا من الحذف.</item>
     </plurals>
-    <string name="registry_delete_blocked_supplementary">لهذه البطاقة بطاقات إضافية. احذفها أو افصلها أولًا.</string>
-    <string name="registry_delete_blocked_linked_card">بطاقة مربوطة بهذا الحساب. افصلها من إعداد البطاقة أولًا.</string>
-    <string name="registry_delete_blocked_pattern">نمط رسائل يسجّل العمليات على هذا الحساب. احذف النمط أولًا.</string>
+    <string name="registry_delete_blocked_supplementary">لهذه البطاقة بطاقات إضافية. احذفها أو افصلها أولا.</string>
+    <string name="registry_delete_blocked_linked_card">بطاقة مربوطة بهذا الحساب. افصلها من إعداد البطاقة أولا.</string>
+    <string name="registry_delete_blocked_pattern">نمط رسائل يسجل العمليات على هذا الحساب. احذف النمط أولا.</string>
     <string name="registry_delete_more">و%d أخرى</string>
     <string name="registry_delete_close">إغلاق</string>
 </resources>

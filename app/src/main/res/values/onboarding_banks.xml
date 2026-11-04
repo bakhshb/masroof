@@ -4,9 +4,9 @@
     <string name="onboarding_select_banks">اختر بنوكك</string>
     <string name="onboarding_select_banks_hint">حدد البنوك التي تريد استيراد رسائلها الآن. يمكنك إضافة بنك ومرسل رسائله.</string>
     <string name="onboarding_configure_cards_hint">أكمل نوع كل بطاقة تخصك. ربط بطاقة الخصم بحساب اختياري.</string>
-    <string name="onboarding_add_manual">إضافة حساب أو بطاقة يدويًا</string>
+    <string name="onboarding_add_manual">إضافة حساب أو بطاقة يدويا</string>
     <string name="onboarding_discovered_entry">مكتشف من الرسائل</string>
-    <string name="onboarding_manual_entry">أُضيف يدويًا</string>
-    <string name="onboarding_no_candidates">لم تُكتشف حسابات أو بطاقات بعد. يمكنك إضافتها يدويًا أو إكمال إعداد رسائل البنك لاحقًا.</string>
+    <string name="onboarding_manual_entry">أضيف يدويا</string>
+    <string name="onboarding_no_candidates">لم تكتشف حسابات أو بطاقات بعد. يمكنك إضافتها يدويا أو إكمال إعداد رسائل البنك لاحقا.</string>
     <string name="onboarding_bank_teach_later">أكمل تعليم رسائل هذا البنك أو اعتمادها من الإعدادات ← البنوك بعد الدخول.</string>
 </resources>

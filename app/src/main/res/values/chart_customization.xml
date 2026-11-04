@@ -10,7 +10,7 @@
     <string name="chart_restore_defaults">استعادة الافتراضي</string>
     <string name="chart_custom_selection">مخصص · %1$d أنواع</string>
     <string name="chart_selected_data">الأنواع المحددة: %1$s</string>
-    <string name="chart_refunds_selection_hint">الاستردادات خيار مستقل يُخصم من المبلغ ضمن نطاق هذا الشارت؛ قد لا تحدد البيانات نوع العملية الأصلية. الاختيارات تخص الشارت وتفاصيل اليوم، ولا تغيّر ملخص الحساب أو البطاقة.</string>
+    <string name="chart_refunds_selection_hint">الاستردادات خيار مستقل يخصم من المبلغ ضمن نطاق هذا الشارت؛ قد لا تحدد البيانات نوع العملية الأصلية. الاختيارات تخص الشارت وتفاصيل اليوم، ولا تغير ملخص الحساب أو البطاقة.</string>
     <string name="chart_full_card_average_hint">هذا متوسط جميع المصاريف المؤهلة للبطاقة قبل تخصيص بيانات الشارت.</string>
     <string name="chart_category_credit">مشتريات البطاقات الائتمانية</string>
     <string name="chart_category_mada">مشتريات مدى</string>

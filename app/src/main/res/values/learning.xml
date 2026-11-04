@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="learning_title">أثر التعلّم من قراراتك</string>
-    <string name="learning_statistical_paused">المساعدة الإحصائية معلّقة حتى تكفي أدلة التقييم. تستمر القواعد والقوالب البشرية المتسقة.</string>
+    <string name="learning_title">أثر التعلم من قراراتك</string>
+    <string name="learning_statistical_paused">المساعدة الإحصائية معلقة حتى تكفي أدلة التقييم. تستمر القواعد والقوالب البشرية المتسقة.</string>
     <string name="learning_statistical_active">عائلات مؤهلة للمساعدة الإحصائية: %1$d</string>
-    <string name="learning_used">استُخدم قرارك لتعلّم عائلة الرسالة.</string>
-    <string name="learning_blocked">مُنع اقتراح القالب المتعارض تلقائيًا.</string>
-    <string name="learning_excluded">لم يُستخدم هذا التعديل لتدريب العائلة.</string>
-    <string name="learning_pending">تحديث التعلّم معلّق؛ تستمر القواعد أثناء إعادة المحاولة.</string>
+    <string name="learning_used">استخدم قرارك لتعلم عائلة الرسالة.</string>
+    <string name="learning_blocked">منع اقتراح القالب المتعارض تلقائيا.</string>
+    <string name="learning_excluded">لم يستخدم هذا التعديل لتدريب العائلة.</string>
+    <string name="learning_pending">تحديث التعلم معلق؛ تستمر القواعد أثناء إعادة المحاولة.</string>
     <string name="learning_reason_fields">تعديل المبلغ أو التاجر أو الطرف لا يحدد عائلة الرسالة.</string>
     <string name="learning_reason_context">قرار الملكية أو ربط التحويل لا يؤكد عائلة جديدة.</string>
-    <string name="learning_reason_bank">التعلّم الشخصي غير متاح لهذا البنك بعد.</string>
-    <string name="learning_reason_conflict">يوجد تعارض مع قرار بشري؛ يبقى هذا القالب دون مساعدة آلية حتى يُحسم.</string>
-    <string name="learning_reason_pending">لم يكتمل تحميل الدليل أو القرار؛ سيُعاد التحقق.</string>
+    <string name="learning_reason_bank">التعلم الشخصي غير متاح لهذا البنك بعد.</string>
+    <string name="learning_reason_conflict">يوجد تعارض مع قرار بشري؛ يبقى هذا القالب دون مساعدة آلية حتى يحسم.</string>
+    <string name="learning_reason_pending">لم يكتمل تحميل الدليل أو القرار؛ سيعاد التحقق.</string>
     <string name="learning_reason_cleaning">صياغة الرسالة غير مؤهلة لاستخراج خصائص تدريب آمنة.</string>
     <string name="learning_reason_ambiguous">النوع المالي المختار لا يكفي وحده لتحديد عائلة الرسالة.</string>
     <string name="learning_counts_hint">الأعداد من السجل المتاح، وليست نسبة دقة. غياب التصحيح لا يثبت صحة الاقتراح، وقد تكون بعض قرارات الماضي غير قابلة للإثبات.</string>
     <string name="learning_forecast_title">التوقع المنشور مقابل الفعلي</string>
     <string name="learning_forecast_periods">فترات مقارنة مكتملة ومؤهلة: %1$d</string>
-    <string name="learning_forecast_paused">يُستخدم خط الأساس بعد ثبوت تراجع الشخصي. يستمر تقييم الشخصي في الخلفية.</string>
+    <string name="learning_forecast_paused">يستخدم خط الأساس بعد ثبوت تراجع الشخصي. يستمر تقييم الشخصي في الخلفية.</string>
     <string name="learning_forecast_personal_error">متوسط خطأ الشخصي</string>
     <string name="learning_forecast_baseline_error">متوسط خطأ خط الأساس</string>
     <string name="learning_forecast_personal">الشخصي المحفوظ وقت التوقع</string>
     <string name="learning_forecast_baseline">خط الأساس المحفوظ وقت التوقع</string>
-    <string name="learning_forecast_hint">المقارنة لأول توقع صالح يصدر من اليوم الثامن من فترة الراتب فصاعدًا قبل نهاية الفترة، بعد اكتمال الفترة والتغطية. وقت الإصدار والأفق محفوظان لكل مقارنة؛ متوسط الخطأ لآخر ثلاث فترات مؤهلة. تبقى التوقعات ثابتة وتنعكس التصحيحات على الفعلي.</string>
-    <string name="learning_transfer_changed">تغيرت بيانات الرسالة منذ عرضها. راجع التفاصيل المحدثة ثم أكد اختيارك مجددًا.</string>
-    <string name="learning_forecast_origin">تاريخ المقارنة: %1$s؛ أفق التوقع عند الإصدار: %2$d يومًا.</string>
+    <string name="learning_forecast_hint">المقارنة لأول توقع صالح يصدر من اليوم الثامن من فترة الراتب فصاعدا قبل نهاية الفترة، بعد اكتمال الفترة والتغطية. وقت الإصدار والأفق محفوظان لكل مقارنة؛ متوسط الخطأ لآخر ثلاث فترات مؤهلة. تبقى التوقعات ثابتة وتنعكس التصحيحات على الفعلي.</string>
+    <string name="learning_transfer_changed">تغيرت بيانات الرسالة منذ عرضها. راجع التفاصيل المحدثة ثم أكد اختيارك مجددا.</string>
+    <string name="learning_forecast_origin">تاريخ المقارنة: %1$s؛ أفق التوقع عند الإصدار: %2$d يوما.</string>
 </resources>

@@ -20,4 +20,13 @@ class AppDigitsBoundaryTest {
             .filter { easternDigits.containsMatchIn(it.readText()) }.map { it.path }.toList()
         assertTrue("Display resources must use 0123456789: $violations", violations.isEmpty())
     }
+
+    @Test
+    fun arabicLabelsAreWrittenWithoutDiacritics() {
+        // The owner reads Arabic labels without tashkeel; SMS parsing tests keep diacritics on purpose.
+        val tashkeel = Regex("[\\u064B-\\u0652\\u0670]")
+        val violations = File("src/main/res").walkTopDown().filter { it.extension == "xml" }
+            .filter { tashkeel.containsMatchIn(it.readText()) }.map { it.path }.toList()
+        assertTrue("Write Arabic labels without tashkeel: $violations", violations.isEmpty())
+    }
 }
