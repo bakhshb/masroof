@@ -12,6 +12,6 @@
     <string name="entities_facility_available">المتاح %1$s</string>
     <string name="entities_idle_expand">عرض الحسابات</string>
     <string name="entities_idle_collapse">إخفاء الحسابات</string>
-    <string name="entities_state_expanded">موسّع</string>
+    <string name="entities_state_expanded">موسع</string>
     <string name="entities_state_collapsed">مطوي</string>
 </resources>

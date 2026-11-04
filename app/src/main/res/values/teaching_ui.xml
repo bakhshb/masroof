@@ -1,7 +1,7 @@
 <resources>
     <string name="teaching_title">تعليم مصروف</string>
-    <string name="teaching_catalog">ما علّمتني إياه</string>
-    <string name="teaching_pattern_disabled">معطّل</string>
+    <string name="teaching_catalog">ما علمتني إياه</string>
+    <string name="teaching_pattern_disabled">معطل</string>
     <string name="teaching_kind_title">ما نوع العملية؟</string>
     <string name="teaching_step_kind">الرسالة</string>
     <string name="teaching_step_fields">البيانات</string>
@@ -19,30 +19,30 @@
     <string name="teaching_skip_field">غير موجود</string>
     <string name="teaching_preview_title">هل البيانات صحيحة؟</string>
     <string name="teaching_try_another">تجربة رسالة أخرى</string>
-    <string name="teaching_saved_title">حُفظ النمط للمعاينة</string>
-    <string name="teaching_saved_scope">الحفظ وحده لا يسجّل أي عملية. اعتمد النمط ماليًا ليبدأ العمل، ثم طبّقه على الرسائل المطابقة.</string>
+    <string name="teaching_saved_title">حفظ النمط للمعاينة</string>
+    <string name="teaching_saved_scope">الحفظ وحده لا يسجل أي عملية. اعتمد النمط ماليا ليبدأ العمل، ثم طبقه على الرسائل المطابقة.</string>
     <string name="teaching_fixed_values">هذه القيم ستبقى ثابتة في النمط: %1$s. اضغط «تجاهل قيمة» عليها إذا كانت تتغير بين الرسائل.</string>
-    <string name="teaching_edit_resets_approval">بعد الحفظ نفحص النمط بإعدادات اعتماده السابقة. إن نجح الفحص يبقى معتمدًا، وإلا ستحتاج إلى اعتماده من جديد.</string>
+    <string name="teaching_edit_resets_approval">بعد الحفظ نفحص النمط بإعدادات اعتماده السابقة. إن نجح الفحص يبقى معتمدا، وإلا ستحتاج إلى اعتماده من جديد.</string>
     <string name="teaching_return_review">العودة إلى مراجعة الرسالة</string>
     <string name="teaching_saved_patterns">الأنماط</string>
     <string name="teaching_review_title">ساعدني أفهم الرسالة</string>
-    <string name="teaching_review_pending">صيغة غير معروفة؛ لم تُسجّل كعملية.</string>
-    <string name="teaching_review_action">علّم مصروف هذه الرسالة</string>
+    <string name="teaching_review_pending">صيغة غير معروفة؛ لم تسجل كعملية.</string>
+    <string name="teaching_review_action">علم مصروف هذه الرسالة</string>
     <string name="teaching_correct_type">تصحيح نوع الحركة</string>
-    <string name="teaching_correct_type_help">اختر نوع الحركة لهذه الرسالة فقط، ثم احفظ. يستخدم مصروف التفاصيل المتاحة؛ لا ينشئ هذا الإجراء نمط رسائل جديدًا ولا يكمل المبلغ أو الحساب الناقص بالتخمين.</string>
+    <string name="teaching_correct_type_help">اختر نوع الحركة لهذه الرسالة فقط، ثم احفظ. يستخدم مصروف التفاصيل المتاحة؛ لا ينشئ هذا الإجراء نمط رسائل جديدا ولا يكمل المبلغ أو الحساب الناقص بالتخمين.</string>
     <string name="teaching_review_why">لماذا تحتاج مراجعة؟</string>
     <string name="teaching_not_financial">ليست حركة مالية</string>
     <string name="teaching_apply_current">تطبيق على هذه الرسالة</string>
-    <string name="teaching_no_match">لم تُسجّل الرسالة. قد تكون غير مطابقة أو محمية بقرار سابق، أو ما زالت تفاصيلها تحتاج مراجعة.</string>
+    <string name="teaching_no_match">لم تسجل الرسالة. قد تكون غير مطابقة أو محمية بقرار سابق، أو ما زالت تفاصيلها تحتاج مراجعة.</string>
     <string name="teaching_apply_posted">اكتمل تسجيل الحركة</string>
-    <string name="teaching_pending_help">المعاينة للقراءة فقط. التطبيق إجراء منفصل، ولا يشمل العمليات المسجلة أو التصحيحات والقرارات اليدوية. تعارض الأنماط لا يُحسم بالتخمين.</string>
+    <string name="teaching_pending_help">المعاينة للقراءة فقط. التطبيق إجراء منفصل، ولا يشمل العمليات المسجلة أو التصحيحات والقرارات اليدوية. تعارض الأنماط لا يحسم بالتخمين.</string>
     <string name="teaching_choose_message_help">من الإعدادات: اختر البنك وألصق رسالة مثال. من المراجعة: تصل الرسالة والمرسل جاهزين ولا يتغير النص الأصلي.</string>
     <plurals name="teaching_patterns_count">
         <item quantity="zero">لا توجد أنماط</item>
         <item quantity="one">نمط واحد</item>
         <item quantity="two">نمطان</item>
         <item quantity="few">%1$d أنماط</item>
-        <item quantity="many">%1$d نمطًا</item>
+        <item quantity="many">%1$d نمطا</item>
         <item quantity="other">%1$d نمط</item>
     </plurals>
 </resources>

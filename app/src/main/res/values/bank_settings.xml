@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_banks_title">البنوك</string>
-    <string name="settings_banks_empty">أضف بنكًا ومرسل رسائله للبدء.</string>
+    <string name="settings_banks_empty">أضف بنكا ومرسل رسائله للبدء.</string>
     <string name="settings_add_bank">إضافة بنك</string>
     <string name="settings_banks_subtitle">الحسابات والبطاقات والقروض لكل بنك</string>
     <string name="settings_bank_details">بيانات البنك والمرسلون</string>
     <string name="settings_bank_senders">مرسلو رسائل البنك</string>
     <string name="settings_bank_extra_sender">مرسل إضافي · اختياري</string>
-    <string name="settings_bank_sender_hint">اكتب المرسل كما يظهر في تطبيق الرسائل. يُربط المرسل ببنك واحد.</string>
+    <string name="settings_bank_sender_hint">اكتب المرسل كما يظهر في تطبيق الرسائل. يربط المرسل ببنك واحد.</string>
     <string name="settings_bank_save_hint">حفظ البنك لا يبدأ الاستيراد ولا يعيد معالجة الرسائل السابقة.</string>
-    <string name="settings_bank_save_failed">تعذّر حفظ البنك. تحقق من البيانات ومن أن المرسل غير مرتبط ببنك آخر، ثم أعد المحاولة.</string>
-    <string name="settings_bank_registry_only">حسابات أو بطاقات مسجلة · لم تُضبط الرسائل بعد</string>
+    <string name="settings_bank_save_failed">تعذر حفظ البنك. تحقق من البيانات ومن أن المرسل غير مرتبط ببنك آخر، ثم أعد المحاولة.</string>
+    <string name="settings_bank_registry_only">حسابات أو بطاقات مسجلة · لم تضبط الرسائل بعد</string>
     <string name="settings_bank_needs_teaching">بانتظار تعليم الرسائل</string>
     <string name="settings_bank_bundled">جاهز</string>
     <string name="settings_bank_needs_approval">يحتاج مراجعة</string>
@@ -19,7 +19,7 @@
         <item quantity="one">جاهز · نمط واحد بانتظار الموافقة</item>
         <item quantity="two">جاهز · نمطان بانتظار الموافقة</item>
         <item quantity="few">جاهز · %1$d أنماط بانتظار الموافقة</item>
-        <item quantity="many">جاهز · %1$d نمطًا بانتظار الموافقة</item>
+        <item quantity="many">جاهز · %1$d نمطا بانتظار الموافقة</item>
         <item quantity="other">جاهز · %1$d نمط بانتظار الموافقة</item>
     </plurals>
     <string name="settings_bank_support_title">دعم رسائل البنوك</string>
@@ -31,26 +31,26 @@
     <string name="settings_import_period">فترة الاستيراد</string>
     <string name="settings_import_from">من</string>
     <string name="settings_import_through">إلى</string>
-    <string name="settings_import_period_hint">تُحتسب الفترة حسب تاريخ استلام الرسالة على الجهاز، وتشمل يوم البداية والنهاية.</string>
+    <string name="settings_import_period_hint">تحتسب الفترة حسب تاريخ استلام الرسالة على الجهاز، وتشمل يوم البداية والنهاية.</string>
     <string name="settings_import_invalid_period">اختر بداية لا تتجاوز النهاية، وتاريخ نهاية لا يتجاوز اليوم.</string>
-    <string name="settings_import_scope_hint">تُستورد رسائل البنوك المحددة فقط. الرسائل المستوردة سابقًا لن تتكرر.</string>
-    <string name="settings_import_result_counts">جديدة: %1$d · مكررة: %2$d · تحتاج مراجعة: %3$d · تعذّر معالجتها: %4$d</string>
+    <string name="settings_import_scope_hint">تستورد رسائل البنوك المحددة فقط. الرسائل المستوردة سابقا لن تتكرر.</string>
+    <string name="settings_import_result_counts">جديدة: %1$d · مكررة: %2$d · تحتاج مراجعة: %3$d · تعذر معالجتها: %4$d</string>
     <string name="settings_import_open_bank">عرض حسابات البنك وبطاقاته</string>
-    <string name="settings_import_no_selected_bank_sms">لم يُعثر على رسائل للبنوك المحددة ضمن هذه الفترة.</string>
+    <string name="settings_import_no_selected_bank_sms">لم يعثر على رسائل للبنوك المحددة ضمن هذه الفترة.</string>
     <string name="settings_data_tools_title">أدوات البيانات</string>
     <string name="settings_data_tools_hint">إعادة قراءة الرسائل المخزنة وتصحيح أسعار الصرف</string>
     <string name="settings_corrections_scope">هذه الصفحة تعرض أثر التصحيحات على مستوى التطبيق. تعليم حقول الرسالة واعتماد النمط متاحان داخل كل بنك.</string>
     <string name="settings_current_version">الإصدار الحالي: %1$s</string>
-    <string name="settings_statement_bank_scope_hint">يجب أن يطابق البنك في الملف البنك المحدد هنا. تُقارن الحسابات المملوكة والمسجلة فقط.</string>
-    <string name="settings_add_account_manual">إضافة حساب يدويًا</string>
-    <string name="settings_add_card_manual">إضافة بطاقة يدويًا</string>
+    <string name="settings_statement_bank_scope_hint">يجب أن يطابق البنك في الملف البنك المحدد هنا. تقارن الحسابات المملوكة والمسجلة فقط.</string>
+    <string name="settings_add_account_manual">إضافة حساب يدويا</string>
+    <string name="settings_add_card_manual">إضافة بطاقة يدويا</string>
     <string name="settings_manual_last4">آخر أربعة أرقام</string>
     <string name="settings_manual_name">الاسم · اختياري</string>
     <string name="settings_manual_card_owned">أؤكد أن هذه البطاقة تخصني</string>
-    <string name="settings_manual_registry_hint">الإضافة تحفظ تعريف الحساب أو البطاقة فقط. العمليات والأرصدة تُستمد من الرسائل المعتمدة.</string>
-    <string name="settings_manual_registry_failed">تعذّر الحفظ. قد يكون الرقم موجودًا أو بيانات الربط غير صحيحة. راجع القائمة والبيانات ثم أعد المحاولة.</string>
+    <string name="settings_manual_registry_hint">الإضافة تحفظ تعريف الحساب أو البطاقة فقط. العمليات والأرصدة تستمد من الرسائل المعتمدة.</string>
+    <string name="settings_manual_registry_failed">تعذر الحفظ. قد يكون الرقم موجودا أو بيانات الربط غير صحيحة. راجع القائمة والبيانات ثم أعد المحاولة.</string>
     <string name="settings_pattern_select_card">البطاقة المملوكة</string>
-    <string name="settings_pattern_add_card_hint">أضف البطاقة وأكّد نوعها وملكيتها من صفحة البنك أولًا.</string>
+    <string name="settings_pattern_add_card_hint">أضف البطاقة وأكد نوعها وملكيتها من صفحة البنك أولا.</string>
     <string name="settings_bank_setup_messages">تعريف رسائل هذا البنك</string>
     <string name="settings_bank_patterns_disabled">متوقف</string>
 </resources>

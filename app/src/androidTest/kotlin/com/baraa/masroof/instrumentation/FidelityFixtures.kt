@@ -144,5 +144,5 @@ internal object FidelityFixtures {
     fun logs()=listOf(
         AppLogEntry(1,Instant.parse("2026-10-10T07:20:00Z").toEpochMilli(),"sms",AppLogLevel.INFO,"اكتملت معالجة الرسائل المستوردة."),
         AppLogEntry(2,Instant.parse("2026-10-10T07:18:00Z").toEpochMilli(),"sms",AppLogLevel.WARN,"حوالة غير مؤكدة تحتاج مطابقة."),
-        AppLogEntry(3,Instant.parse("2026-10-10T06:55:00Z").toEpochMilli(),"sms",AppLogLevel.ERROR,"لم تكتمل معالجة إحدى الرسائل؛ حُفظت لإعادة المحاولة."))
+        AppLogEntry(3,Instant.parse("2026-10-10T06:55:00Z").toEpochMilli(),"sms",AppLogLevel.ERROR,"لم تكتمل معالجة إحدى الرسائل؛ حفظت لإعادة المحاولة."))
 }

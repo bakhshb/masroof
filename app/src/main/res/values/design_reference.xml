@@ -13,10 +13,10 @@
     <string name="reference_mada_tab">بطاقات مدى</string>
     <string name="reference_preferences_title">المظهر واللغة</string>
     <string name="reference_manage_title">إدارة حساباتك</string>
-    <string name="reference_period_average">حتى %1$s · %2$d يومًا</string>
+    <string name="reference_period_average">حتى %1$s · %2$d يوما</string>
     <string name="reference_accounts_scope">تشمل الحوالات الخارجية الصادرة والفواتير وأقساط القروض وسداد البطاقة الائتمانية والمشتريات غير الائتمانية والسحب النقدي والرسوم المرتبطة بحساباتك، بعد خصم استردادات الحساب. تستبعد الحوالات الداخلية ومشتريات الائتمان واسترداداته والعمليات الواردة.</string>
     <string name="reference_details">التفاصيل</string>
-    <string name="reference_export_title">إنشاء نسخة مشفّرة</string>
+    <string name="reference_export_title">إنشاء نسخة مشفرة</string>
     <string name="reference_restore_title">استعادة نسخة</string>
     <string name="reference_waiting_payment">%1$s بانتظار السداد</string>
     <string name="reference_no_commitments">لا توجد التزامات لهذه الفترة</string>
@@ -60,10 +60,10 @@
     <string name="reference_update_access">الوصول إلى التحديثات</string>
     <string name="reference_configure_access">إعداد الوصول</string>
     <string name="reference_update_idle">جاهز للفحص</string>
-    <string name="reference_update_checking">جارٍ التحقق</string>
-    <string name="reference_update_downloading">جارٍ التنزيل · %1$d%%</string>
+    <string name="reference_update_checking">جار التحقق</string>
+    <string name="reference_update_downloading">جار التنزيل · %1$d%%</string>
     <string name="reference_event_details">تفاصيل الحدث</string>
-    <string name="reference_event_id">معرّف الحدث</string>
+    <string name="reference_event_id">معرف الحدث</string>
     <string name="reference_event_time">وقت الحدث</string>
     <string name="reference_stop_tracking">إيقاف المتابعة</string>
     <string name="reference_edit">تعديل</string>
