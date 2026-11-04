@@ -69,8 +69,12 @@ class FrankfurterForeignSarRateProvider(
                 response.body?.string()
             } ?: return@withContext null
             // A stored rate is never replaced, so only a positive number may be returned.
-            runCatching {
-                JSONObject(body).optString("rate").toBigDecimalOrNull()?.takeIf { it.signum() > 0 }
-            }.getOrNull()
+            // A 200 that is not JSON (e.g. a captive portal page) is temporary, not a definitive miss.
+            val json = try {
+                JSONObject(body)
+            } catch (e: org.json.JSONException) {
+                throw java.io.IOException("Rate response is not JSON", e)
+            }
+            json.optString("rate").toBigDecimalOrNull()?.takeIf { it.signum() > 0 }
         }
 }

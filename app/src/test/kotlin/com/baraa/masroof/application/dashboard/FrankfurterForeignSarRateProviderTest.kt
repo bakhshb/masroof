@@ -81,6 +81,15 @@ class FrankfurterForeignSarRateProviderTest {
     }
 
     @Test
+    fun nonJsonSuccessBody_isRetriedAfterTheWindow() = runBlocking {
+        val provider = provider("<html>captive portal</html>")
+        assertNull(provider.rateFor(Currency.USD, date))
+        now += FrankfurterForeignSarRateProvider.FAILURE_RETRY_NANOS
+        assertNull(provider.rateFor(Currency.USD, date))
+        assertEquals(2, calls)
+    }
+
+    @Test
     fun definitiveMiss_staysCachedPastTheRetryWindow() = runBlocking {
         val provider = provider("""{"rate":0}""")
         assertNull(provider.rateFor(Currency.USD, date))

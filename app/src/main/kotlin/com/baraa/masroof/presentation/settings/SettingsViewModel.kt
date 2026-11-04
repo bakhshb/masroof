@@ -325,7 +325,7 @@ class SettingsViewModel(
                     loans = snapshot.loans,
                 )
                 appLogService.info(AppLogCategories.SETTINGS, "Manual reparse finished: $count events refreshed")
-                _uiState.update { it.copy(reparsingStored = false) }
+                _uiState.update { it.copy(reparsingStored = false, error = null) }
             } catch (ce: CancellationException) {
                 throw ce
             } catch (error: Exception) {

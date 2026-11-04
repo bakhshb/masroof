@@ -804,6 +804,8 @@ class SettingsViewModelTest {
 
         assertEquals(0, reconciles)
         assertTrue(vm.uiState.value.followedAccounts.isEmpty())
+        // A refusal while busy must not keep saying "failed" once the reparse finished well.
+        assertNull(vm.uiState.value.error)
     }
 
     @Test
