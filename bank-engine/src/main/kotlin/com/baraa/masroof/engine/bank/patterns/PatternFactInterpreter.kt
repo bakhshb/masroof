@@ -1,6 +1,7 @@
 package com.baraa.masroof.engine.bank.patterns
 
 import com.baraa.masroof.engine.bank.*
+import com.baraa.masroof.engine.bank.interpretation.MoneyGrammar
 import com.baraa.masroof.engine.bank.interpretation.SourceText
 import com.baraa.masroof.engine.bank.interpretation.otpEvidence
 import com.baraa.masroof.engine.bank.interpretation.hasUnprovenExecution
@@ -68,8 +69,7 @@ data class RoutedPreview(val interpretation: Interpretation, val matches: List<P
 
 /** Immutable configuration snapshot. Routing has already selected the bank; sender detection is not repeated. */
 class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
-    private val configuration get() = source
-    private val snapshot = configuration.copy(banks = configuration.banks.map {
+    private val snapshot = source.copy(banks = source.banks.map {
         it.copy(senders = it.senders.toList(), patterns = it.patterns.toList(), deletedPatternIds = it.deletedPatternIds.toSet())
     })
     val fingerprint: String = fingerprint(snapshot)
@@ -95,7 +95,8 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
             setOf(blocker, Blocker.UNKNOWN_FAMILY), listOf(diagnostic(code)))
         val definition = snapshot.banks.singleOrNull { it.bankId == bank.value }
             ?: return unresolved("PATTERN_BANK_MISSING", Blocker.UNKNOWN_BANK)
-        val security = otpEvidence(SourceText(input.body))
+        val bodyText = SourceText(input.body)
+        val security = otpEvidence(bodyText)
         if (security.isNotEmpty()) return Interpretation(input.evidenceId, version, bank, Facts(MessageFamily.OTP),
             ParseStatus.NON_FINANCIAL, null, security, emptySet())
         val taught = definition.currentPatterns.filter { it.roleProfile == null && it.sender in definition.senders }.mapNotNull { pattern ->
@@ -150,9 +151,9 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
         val diagnostics = mutableListOf<InterpretationDiagnostic>()
         val definitionFacts = mutableSetOf("FAMILY", "DIRECTION")
         fun block(code: String) { diagnostics += diagnostic(code) }
-        if (hasUnprovenExecution(SourceText(input.body))) block("PATTERN_EXECUTION_NOT_PROVEN")
-        if (hasNoticeContext(SourceText(input.body))) block("PATTERN_NOTICE_CONTEXT")
-        if (hasQuotedContext(SourceText(input.body))) block("PATTERN_QUOTED_MESSAGE_CONTEXT")
+        if (hasUnprovenExecution(bodyText)) block("PATTERN_EXECUTION_NOT_PROVEN")
+        if (hasNoticeContext(bodyText)) block("PATTERN_NOTICE_CONTEXT")
+        if (hasQuotedContext(bodyText)) block("PATTERN_QUOTED_MESSAGE_CONTEXT")
         fun value(field: String) = preview.fields[field]?.raw
         fun normalized(field: String) = value(field)?.let { SourceText(it).text.trim() }
         val boundFields = mutableSetOf<String>()
@@ -280,9 +281,9 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
         private val SOURCE_LINKED = setOf(MessageFamily.TRANSFER_OUT, MessageFamily.WITHDRAWAL, MessageFamily.CARD_PAYMENT,
             MessageFamily.BILL_PAYMENT, MessageFamily.FINANCING_INSTALLMENT, MessageFamily.FEE)
         val CARD_LINKED = setOf(MessageFamily.PURCHASE, MessageFamily.REFUND, MessageFamily.CARD_PAYMENT)
-        private val DECIMAL = Regex("(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\\.[0-9]{1,2})?")
-        private const val CURRENCY = "sar|sr|usd|eur|gbp|ريال سعودي|ريال|ر\\.س\\.?"
-        private val MONEY = Regex("(?:(${DECIMAL.pattern}) *($CURRENCY)|($CURRENCY) *(${DECIMAL.pattern}))")
+        private val DECIMAL = Regex(MoneyGrammar.NUMBER)
+        // Groups: 1 number, 2 currency | 3 currency, 4 number. CURRENCY is non-capturing, so numbering is unchanged.
+        private val MONEY = Regex("(?:(${MoneyGrammar.NUMBER}) *(${MoneyGrammar.CURRENCY})|(${MoneyGrammar.CURRENCY}) *(${MoneyGrammar.NUMBER}))")
         private val SUFFIX = Regex("[0-9]{4}")
         private val NEUTRAL_REFERENCES = setOf("account_reference", "funding_reference", "counterparty_bank")
         private val SUPPORTED_FIELDS = setOf("amount", "merchant", "counterparty", "biller", "biller_code", "reference",

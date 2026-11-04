@@ -6,8 +6,9 @@ import java.util.Locale
 
 /** One bounded grammar for principal and secondary money. Never rounds unsupported precision. */
 internal object MoneyGrammar {
-    private const val NUMBER = "(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\\.[0-9]{1,2})?"
-    private const val CURRENCY = "(?:sar|sr|usd|eur|gbp|ريال سعودي|ريال|ر\\.س\\.?)"
+    /** The one money number and currency shapes; taught templates and pattern facts reuse them. */
+    const val NUMBER = "(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\\.[0-9]{1,2})?"
+    const val CURRENCY = "(?:sar|sr|usd|eur|gbp|ريال سعودي|ريال|ر\\.س\\.?)"
     // The currency may touch the number (SAR100 / 100SAR); the lookahead still rejects 100SARX.
     const val VALUE = "(?:(?<c1>$CURRENCY)[ \\t]*(?<n1>$NUMBER)|(?<n2>$NUMBER)[ \\t]*(?<c2>$CURRENCY))(?![\\p{L}\\p{N}_.,+\\-−])"
     private val entire = CompiledPatterns.of(VALUE)

@@ -22,7 +22,6 @@ class StcBundledPatternsTest {
             assertEquals(mapOf("amount" to "100.00 SAR", "counterparty" to "TEST PERSON", "counterparty_bank" to "BJAZ",
                 "occurred_at" to "02-09-2026 08:01", "reference" to "*8PJ7"), match.second.fields.mapValues { it.value.raw })
             match.second.fields.values.forEach { assertEquals(it.raw, text.substring(it.start, it.end)) }
-            assertFalse(match.second.financialPostingAllowed)
         }
         for (invalid in listOf(body.replace("Account \n", ""), body.replace("100.00 SAR", ""),
             body.replace("TEST PERSON", ""), body.replace("BJAZ", ""), body.replace("02-09-2026 08:01", ""),
@@ -64,7 +63,6 @@ class StcBundledPatternsTest {
             assertEquals(row.text("id"), match.first.id)
             assertEquals(row.text("operation"), match.second.label)
             assertEquals(row.getValue("fields").jsonObject.mapValues { it.value.jsonPrimitive.content }, match.second.fields.mapValues { it.value.raw })
-            assertFalse(match.second.financialPostingAllowed)
             assertNull(SavedMessagePattern.unique(bank.currentPatterns, "BANK_ALJAZIRA", "STC Bank", row.text("body")))
             assertNull(SavedMessagePattern.unique(bank.currentPatterns, "BANK_STC", "Other Bank", row.text("body")))
             assertNull(SavedMessagePattern.unique(bank.currentPatterns, "BANK_STC", "STC Bank", row.text("body") + "\nCancelled"))

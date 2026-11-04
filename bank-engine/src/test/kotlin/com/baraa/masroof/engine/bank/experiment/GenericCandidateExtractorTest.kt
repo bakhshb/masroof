@@ -127,7 +127,6 @@ class GenericCandidateExtractorTest {
         val preview = requireNotNull(template.preview("User-selected sender", changed))
         assertEquals("98SAR", preview.fields.getValue("amount").raw)
         assertEquals("جهة مختلفة", preview.fields.getValue("counterparty").raw)
-        assertFalse(preview.financialPostingAllowed)
     }
 
     @Test fun suppliedRawValuesAreOfferedWithoutTeachingOrSemanticInputs() {

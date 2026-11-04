@@ -1,12 +1,13 @@
 package com.baraa.masroof.engine.bank.patterns
 
+import com.baraa.masroof.engine.bank.interpretation.MoneyGrammar
 import com.baraa.masroof.engine.bank.interpretation.SourceText
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
 
-private const val DECIMAL_PATTERN = "(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\\.[0-9]{1,2})?"
+private const val DECIMAL_PATTERN = MoneyGrammar.NUMBER
 
 /** Primitive shapes for raw text spans. No ownership, transaction time or financial authority. */
 enum class FieldKind(internal val dateFormat: String? = null, private val dateOnly: Boolean = false) {
@@ -16,10 +17,7 @@ enum class FieldKind(internal val dateFormat: String? = null, private val dateOn
     DATE_DMY_ONLY("dd/MM/uuuu", true), DATE_YMD_ONLY("uuuu-MM-dd", true);
 
     fun pattern(example: String): String = when (this) {
-        MONEY -> {
-            val currency = "(?:sar|sr|usd|eur|gbp|ريال سعودي|ريال|ر\\.س\\.?)"
-            "(?:$DECIMAL_PATTERN *$currency|$currency *$DECIMAL_PATTERN)"
-        }
+        MONEY -> "(?:$DECIMAL_PATTERN *${MoneyGrammar.CURRENCY}|${MoneyGrammar.CURRENCY} *$DECIMAL_PATTERN)"
         DECIMAL -> DECIMAL_PATTERN
         TEXT -> "[^\\n]{1,160}"
         DIGITS -> "[0-9]{${example.length}}"
@@ -46,9 +44,7 @@ enum class FieldKind(internal val dateFormat: String? = null, private val dateOn
     }
 }
 internal data class Selection(val field: String, val kind: FieldKind, val start: Int, val end: Int, val allowEmpty: Boolean = false)
-data class Preview(val label: String, val fields: Map<String, TextSpan>) {
-    val financialPostingAllowed: Boolean get() = false
-}
+data class Preview(val label: String, val fields: Map<String, TextSpan>)
 
 internal class ExampleTemplate private constructor(
     private val sender: String,
@@ -77,7 +73,7 @@ internal class ExampleTemplate private constructor(
             val ordered = selections.sortedBy { it.start }.toList()
             ordered.forEach { require(it.start in 0 until it.end && it.end <= body.length) }
             ordered.zipWithNext().forEach { (left, right) ->
-                require(left.end <= right.start && left.end in 0..body.length && right.start in 0..body.length)
+                require(left.end <= right.start)
                 val gap = body.substring(left.end, right.start)
                 require('\n' in gap || gap.isNotBlank()) { "Fields need literal separating evidence" }
             }
@@ -93,7 +89,6 @@ internal class ExampleTemplate private constructor(
                 ordered.forEach { selection ->
                     require(!selection.allowEmpty || selection.kind == FieldKind.TEXT)
                     require(selection.field.matches(Regex("[a-z][a-z0-9_]{0,47}")))
-                    require(selection.start in 0 until selection.end && selection.end <= body.length)
                     require(listOf(selection.start, selection.end).none { offset ->
                         offset in 1 until body.length && body[offset].isLowSurrogate() && body[offset - 1].isHighSurrogate()
                     }) { "Selection splits a Unicode character" }
@@ -116,9 +111,6 @@ internal class ExampleTemplate private constructor(
             }
             return ExampleTemplate(sender, label, ordered, Regex(expression))
         }
-
-        fun previewUnique(templates: List<ExampleTemplate>, sender: String, body: String): Preview? =
-            templates.mapNotNull { it.preview(sender, body) }.singleOrNull()
 
         private fun literal(value: String): String = buildString {
             var index = 0

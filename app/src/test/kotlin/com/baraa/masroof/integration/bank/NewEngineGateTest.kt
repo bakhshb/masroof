@@ -29,7 +29,5 @@ class NewEngineGateTest {
     @Test fun explicitStoredBankSelectionIsNotRedetected() {
         val routed = RuleInterpreter(AlJaziraRuleProfile.current()).interpretRouted(input.copy(sender="Unrecognized sender"),BankId("BANK_ALJAZIRA"))
         assertEquals(ParseStatus.SUCCESS,routed.status)
-        val fresh = RuleInterpreter(AlJaziraRuleProfile.current()).interpret(input.copy(sender="Unrecognized sender"),BankCatalog(listOf(BankDefinition(BankId("BANK_ALJAZIRA"),setOf("AlJazira")))))
-        assertTrue(Blocker.UNKNOWN_BANK in fresh.blockers)
     }
 }

@@ -6,13 +6,6 @@ import com.baraa.masroof.finance.value.BankId
 import java.time.Instant
 import java.util.Collections
 
-/** Keep the proven role vocabulary and flexible layouts; no fixture-sized template or adapter fallback. */
-fun BankRuleSchema.asMessagePatterns(bankId: String, senders: List<String>, displayName: String? = null) =
-    BankMessagePatterns(bankId, senders, displayName, rules.map { rule ->
-        SavedMessagePattern(rule.id, bankId, senders.first(), rule.family.name, parts = emptyList(),
-            factContract = PatternFactContract(rule.family, rule.direction), roleProfile = copy(rules = listOf(rule)))
-    })
-
 internal fun BankRuleSchema.frozen(): BankRuleSchema {
     fun terms(values: List<String>) = Collections.unmodifiableList(values.toList())
     fun <K> map(values: Map<K, List<String>>) = Collections.unmodifiableMap(values.mapValues { terms(it.value) })

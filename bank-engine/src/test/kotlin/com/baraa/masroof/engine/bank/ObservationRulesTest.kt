@@ -8,12 +8,11 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 
 class ObservationRulesTest {
-    private val catalog = BankCatalog(listOf(BankDefinition(BankId("LOCAL"), setOf("Synthetic"))))
     private val purchase = "Purchase\nAmount: SAR 50\nCard: 1234\n2026-10-18 13:00"
     private val loan = "Loan repayment\nAmount: SAR 50\nFrom account: 1234\nCounterparty: Synthetic Finance\n2026-10-18 13:00"
     private val incoming = "Incoming transfer\nAmount: SAR 50\nFrom account: 1234\nTo account: 5678\nNetwork: intra-bank\n2026-10-18 13:00"
     private fun input(body: String) = MessageInput("observation-fixture", "Synthetic", body, Instant.parse("2026-10-18T10:00:00Z"))
-    private fun parse(body: String, schema: BankRuleSchema = RuleLibrary.current()) = RuleInterpreter(schema).interpret(input(body), catalog)
+    private fun parse(body: String, schema: BankRuleSchema = RuleLibrary.current()) = RuleInterpreter(schema).interpretRouted(input(body), BankId("LOCAL"))
 
     @Test fun balanceEvidenceRetainsAllMatchesOfTheFirstConfiguredPhrase() {
         val body = "$purchase\nAvailable balance: SAR 500\nالرصيد المتاح: SAR 500\nAvailable balance: SAR 500"
