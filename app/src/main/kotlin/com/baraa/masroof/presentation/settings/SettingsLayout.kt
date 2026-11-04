@@ -39,15 +39,9 @@ fun SettingsScreenHeader(
     com.baraa.masroof.presentation.common.MasroofCard(modifier.then(if (onOpenBank != null) Modifier.clickable(onClick = onOpenBank) else Modifier)) {
         androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
-            androidx.compose.material3.Surface(shape = com.baraa.masroof.ui.theme.MasroofShapes.small,
-                color = com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.accountSoft) {
-                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.iconBox),
-                    contentAlignment = androidx.compose.ui.Alignment.Center) {
-                    androidx.compose.material3.Icon(com.baraa.masroof.presentation.common.MasroofIcons.moneyMovement, null,
-                        androidx.compose.ui.Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.icon),
-                        tint = com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.account)
-                }
-            }
+            com.baraa.masroof.presentation.common.MasroofIconTile(com.baraa.masroof.presentation.common.MasroofIcons.moneyMovement,
+                com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.accountSoft,
+                com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.account)
             com.baraa.masroof.presentation.common.MasroofGuidanceLabel(settingsBankLabel(bank), hint,
                 style = MasroofTextStyles.screenLabel, contentColor = MaterialTheme.colorScheme.onSurface)
         }

@@ -28,16 +28,11 @@ internal fun EntitySummaryCard(title: String, subtitle: String, icon: ImageVecto
         role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
-            androidx.compose.material3.Surface(shape = com.baraa.masroof.ui.theme.MasroofShapes.small,
-                color = when (accent) {
-                    com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.card -> com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.cardSoft
-                    com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.liability -> com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.liabilitySoft
-                    else -> com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.accountSoft
-                }) {
-                Box(Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.iconBox), contentAlignment = Alignment.Center) {
-                    Icon(icon, null, tint = accent, modifier = Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.icon))
-                }
-            }
+            com.baraa.masroof.presentation.common.MasroofIconTile(icon, when (accent) {
+                com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.card -> com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.cardSoft
+                com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.liability -> com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.liabilitySoft
+                else -> com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.accountSoft
+            }, accent)
             Column(Modifier.weight(1f)) {
                 com.baraa.masroof.presentation.common.MasroofGuidanceLabel(title, guidance,
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = com.baraa.masroof.ui.theme.MasroofFontWeights.semiBold), contentColor = MaterialTheme.colorScheme.onSurface)

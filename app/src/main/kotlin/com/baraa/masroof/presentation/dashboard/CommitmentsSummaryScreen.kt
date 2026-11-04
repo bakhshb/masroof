@@ -31,6 +31,7 @@ import com.baraa.masroof.presentation.common.MasroofReferenceMoney
 import com.baraa.masroof.presentation.common.MasroofText
 import com.baraa.masroof.presentation.common.MasroofTextButton
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.ui.theme.MasroofHeroRole
 import com.baraa.masroof.ui.theme.MasroofReference
 import com.baraa.masroof.ui.theme.MasroofShapes
@@ -43,7 +44,6 @@ fun CommitmentsSummaryScreen(state: DashboardUiState, onBack: () -> Unit,
     onOpenCommitment: (CommitmentDashboardRow) -> Unit, onOpenPayment: ((String) -> Unit)? = null) {
     androidx.activity.compose.BackHandler(onBack = onBack)
     val overview = state.commitmentsOverview
-    val date = DateTimeFormatter.ofPattern("d MMM", LocalConfiguration.current.locales[0])
     val colors = MasroofThemeExtras.extendedColors
     DashboardSummaryScaffold(stringResource(R.string.approved_commitments), state, onBack) {
         MasroofHeroCard(stringResource(R.string.dashboard_commitments_remaining), formatLocalizedMoney(overview.remaining),
@@ -56,15 +56,11 @@ fun CommitmentsSummaryScreen(state: DashboardUiState, onBack: () -> Unit,
                 Row(Modifier.fillMaxWidth().clickable { onOpenCommitment(row) }.padding(vertical = MasroofReference.rowVertical),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(MasroofReference.rowGap)) {
-                    Surface(shape = MasroofShapes.small, color = if (paid) colors.inflowSoft else colors.liabilitySoft) {
-                        Box(Modifier.size(MasroofReference.iconBox), contentAlignment = Alignment.Center) {
-                            Icon(if (paid) MasroofIcons.success else MasroofIcons.calendar, null,
-                                Modifier.size(MasroofReference.icon), tint = tint)
-                        }
-                    }
+                    com.baraa.masroof.presentation.common.MasroofIconTile(if (paid) MasroofIcons.success else MasroofIcons.calendar,
+                        if (paid) colors.inflowSoft else colors.liabilitySoft, tint)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
                         MasroofText(commitmentRowName(row), style = MasroofReference.pair)
-                        row.expectedDate?.let { MasroofText(date.format(it), style = MaterialTheme.typography.labelSmall,
+                        row.expectedDate?.let { MasroofText(formatLocalizedTransactionDate(it), style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         MasroofBadge(stringResource(if (paid) R.string.dashboard_commitments_status_paid else R.string.dashboard_commitments_status_unpaid),
                             if (paid) MasroofCardAccent.Inflow else MasroofCardAccent.Liability)

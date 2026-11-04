@@ -11,14 +11,14 @@ import com.baraa.masroof.application.dashboard.DailySpendingTrend
 import com.baraa.masroof.presentation.common.MasroofAverageBand
 import com.baraa.masroof.presentation.common.MasroofCard
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import java.time.format.DateTimeFormatter
 
 @Composable
 internal fun CardReferenceAverage(trend: DailySpendingTrend, inCard: Boolean = false) {
     if (trend.points.isEmpty()) return
-    val date = DateTimeFormatter.ofPattern("d MMM", LocalConfiguration.current.locales[0])
     val value = formatLocalizedMoney(trend.averageDailySpending)
-    val hint = stringResource(R.string.reference_period_average, date.format(trend.points.last().date), trend.points.size)
+    val hint = stringResource(R.string.reference_period_average, formatLocalizedTransactionDate(trend.points.last().date), trend.points.size)
     val guidance = stringResource(R.string.approved_average_basis, trend.points.size) + "\n" +
         stringResource(R.string.chart_full_card_average_hint)
     val spacing = Modifier.padding(top = MasroofReference.sectionGap)

@@ -16,6 +16,7 @@ import com.baraa.masroof.R
 import com.baraa.masroof.presentation.common.MasroofHeroCard
 import com.baraa.masroof.presentation.common.MasroofMetric
 import com.baraa.masroof.presentation.locale.formatLocalizedMoney
+import com.baraa.masroof.presentation.locale.formatLocalizedTransactionDate
 import com.baraa.masroof.ui.theme.MasroofReference
 import com.baraa.masroof.ui.theme.MasroofThemeExtras
 import java.time.format.DateTimeFormatter
@@ -38,7 +39,6 @@ fun DailyExpensesScreen(state: DashboardUiState, onBack: () -> Unit, onOpenTrans
     val chartKey = if (scope == "all") "home:overall" else "card:$scope"
     val trend = selectedChartTrend(source, chartKey)
     val point = trend.points.firstOrNull { it.date.toString() == day } ?: trend.points.last()
-    val date = DateTimeFormatter.ofPattern("d MMM", LocalConfiguration.current.locales[0])
     val names = state.ownedCards.associate { CardOwnershipKey.of(it.bank, it.last4) to
         (it.displayName ?: com.baraa.masroof.presentation.common.formatCardLast4(it.last4)) }
     val allLabel = stringResource(R.string.approved_all_expenses)
@@ -47,11 +47,11 @@ fun DailyExpensesScreen(state: DashboardUiState, onBack: () -> Unit, onOpenTrans
             val keys = listOf("all") + names.keys.toList()
             com.baraa.masroof.presentation.common.MasroofSelect(names[scope] ?: allLabel,
                 keys.map { names[it] ?: allLabel }, { scope = keys[it] }, Modifier.weight(1f), label = allLabel)
-            com.baraa.masroof.presentation.common.MasroofSelect(date.format(point.date),
-                trend.points.map { date.format(it.date) }, { day = trend.points[it].date.toString() }, Modifier.weight(1f),
+            com.baraa.masroof.presentation.common.MasroofSelect(formatLocalizedTransactionDate(point.date),
+                trend.points.map { formatLocalizedTransactionDate(it.date) }, { day = trend.points[it].date.toString() }, Modifier.weight(1f),
                 label = stringResource(R.string.reference_day_view))
         }
-        MasroofHeroCard(stringResource(R.string.reference_daily_net, date.format(point.date)), formatLocalizedMoney(point.spending))
+        MasroofHeroCard(stringResource(R.string.reference_daily_net, formatLocalizedTransactionDate(point.date)), formatLocalizedMoney(point.spending))
         SpendingTrendSection(trend, stringResource(R.string.reference_daily_title), selectedDate = point.date,
             onDaySelected = { day = it.toString() }, chartKey = chartKey,
             scopeLabel = names[scope] ?: allLabel,

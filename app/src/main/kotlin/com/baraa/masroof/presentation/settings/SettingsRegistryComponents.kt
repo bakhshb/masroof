@@ -66,13 +66,7 @@ fun SettingsRegistryItemCard(
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofReference.rowGap)) {
-            androidx.compose.material3.Surface(shape = com.baraa.masroof.ui.theme.MasroofShapes.small,
-                color = background) {
-                Box(Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.iconBox), contentAlignment = Alignment.Center) {
-                    Icon(icon, null, tint = foreground,
-                        modifier = Modifier.size(com.baraa.masroof.ui.theme.MasroofReference.icon))
-                }
-            }
+            com.baraa.masroof.presentation.common.MasroofIconTile(icon, background, foreground)
             Column(Modifier.weight(1f)) {
                 Text(title, modifier = if (onTitleClick != null) Modifier.clickable(onClick = onTitleClick) else Modifier, style = MasroofTextStyles.cardTitle)
                 if (showBankLabel) Text(settingsBankLabel(bank), style = MaterialTheme.typography.bodySmall,

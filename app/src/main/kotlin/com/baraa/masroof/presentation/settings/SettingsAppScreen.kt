@@ -70,11 +70,7 @@ fun SettingsAppScreen(languageTag: String, themeMode: ThemeMode, onBack: () -> U
                 legends.forEach { (label, icon, palette) ->
                     Row(Modifier.padding(top = MasroofSpacing.sectionGap), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {
-                        Surface(shape = com.baraa.masroof.ui.theme.MasroofShapes.small, color = palette.second) {
-                            androidx.compose.foundation.layout.Box(Modifier.size(MasroofReference.iconBox), contentAlignment = Alignment.Center) {
-                                Icon(icon, null, Modifier.size(MasroofReference.icon), tint = palette.first)
-                            }
-                        }
+                        com.baraa.masroof.presentation.common.MasroofIconTile(icon, palette.second, palette.first)
                         MasroofText(stringResource(label), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
