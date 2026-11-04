@@ -18,6 +18,7 @@ import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
+import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
@@ -27,6 +28,7 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
+import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
@@ -37,6 +39,7 @@ import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.time.InstantClock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -64,6 +67,7 @@ class StoredSmsReprocessorTest {
     private lateinit var reconciliation: TransactionReconciliationService
     private lateinit var reviewQueueUpdater: ReviewQueueUpdater
     private lateinit var ingestionReviews: IngestionReviewService
+    private lateinit var retries: RoomProcessingRetryRepository
     private val clock = InstantClock { Instant.parse("2026-08-11T12:00:00Z") }
 
     @Before
@@ -93,6 +97,7 @@ class StoredSmsReprocessorTest {
         )
         reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock)
         ingestionReviews = IngestionReviewService(reviewRepo, clock)
+        retries = RoomProcessingRetryRepository(db.processingRetryDao())
         Unit
     }
 
@@ -166,6 +171,7 @@ class StoredSmsReprocessorTest {
                 assertTrue(ftRepo.listAll().isEmpty())
                 reviewQueueUpdater.applyReport(reconciliation.reconcileStoredEventsDetailed())
             },
+            processingRetryRepository = retries,
         )
 
         val result = processor.reprocessAll()
@@ -206,6 +212,27 @@ class StoredSmsReprocessorTest {
     }
 
     @Test
+    fun interruptedDerivedPass_keepsHistoricalMarkers_andSuccessClearsThem() = runBlocking {
+        rawRepo.insertIfAbsent(purchase("android-sms:m-a"))
+        rawRepo.insertIfAbsent(purchase("android-sms:m-b", at = Instant.parse("2026-08-04T10:00:00Z")))
+
+        val interrupted = runCatching {
+            reprocessor(EngineFixtureParser()) { throw CancellationException("stopped") }.reprocessAll()
+        }
+
+        assertTrue(interrupted.exceptionOrNull() is CancellationException)
+        assertEquals(
+            setOf("android-sms:m-a", "android-sms:m-b"),
+            retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).toSet(),
+        )
+
+        reprocessor(EngineFixtureParser()).reprocessAll()
+
+        assertTrue(retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).isEmpty())
+        assertEquals(2, ftRepo.listAll().size)
+    }
+
+    @Test
     fun parserFailure_countsAsFailed_andKeepsEvidence() = runBlocking {
         val raw = purchase("android-sms:still-broken")
         rawRepo.insertIfAbsent(raw)
@@ -224,12 +251,16 @@ class StoredSmsReprocessorTest {
         ingestionReviewService = ingestionReviews,
     )
 
-    private fun reprocessor(pipeline: SmsParseGateway) = StoredSmsReprocessor(
-        rawSmsRepository = rawRepo,
-        processRawSms = useCase(pipeline),
-        refreshDerivedState = {
+    private fun reprocessor(
+        pipeline: SmsParseGateway,
+        refreshDerivedState: suspend () -> Unit = {
             reviewQueueUpdater.applyReport(reconciliation.reconcileStoredEventsDetailed())
         },
+    ) = StoredSmsReprocessor(
+        rawSmsRepository = rawRepo,
+        processRawSms = useCase(pipeline),
+        refreshDerivedState = refreshDerivedState,
+        processingRetryRepository = retries,
     )
 
     private fun purchase(id: String, at: Instant = Instant.parse("2026-08-03T14:32:00Z")): RawSms {

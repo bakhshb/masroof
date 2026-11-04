@@ -4,6 +4,8 @@ import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.domain.model.ProcessingRetryMode
+import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 
 /**
@@ -15,21 +17,28 @@ import com.baraa.masroof.domain.repository.RawSmsRepository
  * ParsedEvent keyed by rawSmsId without duplicating RawSms and deliberately skips
  * per-message derived processing. [refreshDerivedState] then runs ownership discovery,
  * reconciliation, review refresh, and enrichment once for the whole backlog.
+ * Each reparsed row commits a HISTORICAL_BATCH retry marker with its ParsedEvent, so
+ * a run stopped before the derived pass is finished by startup recovery. The markers
+ * are cleared only after [refreshDerivedState] returns; it must throw when its
+ * reconciliation report has failed > 0 or the review update fails.
  * Re-running is idempotent.
  */
 class StoredSmsReprocessor(
     private val rawSmsRepository: RawSmsRepository,
     private val processRawSms: ProcessRawSmsUseCase,
     private val refreshDerivedState: suspend () -> Unit,
+    private val processingRetryRepository: ProcessingRetryRepository,
     private val appLogService: AppLogService? = null,
 ) {
     suspend fun reprocessAll(): ReparseAllStoredEventsResult {
         appLogService?.info(AppLogCategories.PARSE, "Reparse started")
         var refreshedCount = 0
         var failedCount = 0
+        val reparsed = mutableListOf<String>()
         for (rawSmsId in rawSmsRepository.listIdsByReceivedAt()) {
             val raw = rawSmsRepository.getById(rawSmsId) ?: continue
-            when (processRawSms.reparseAndStore(raw)) {
+            reparsed += raw.id
+            when (processRawSms.reparseAndStore(raw, historicalBatch = true)) {
                 is SmsIngestionResult.Duplicate,
                 is SmsIngestionResult.NotRelevant,
                 -> Unit
@@ -38,6 +47,9 @@ class StoredSmsReprocessor(
             }
         }
         refreshDerivedState()
+        // The full pass covered every reparsed row; LIVE markers stay with their own retry path.
+        val historical = processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).toSet()
+        processingRetryRepository.clear(reparsed.filter { it in historical })
         appLogService?.info(
             AppLogCategories.PARSE,
             "Reparse finished: $refreshedCount refreshed, $failedCount failed",
