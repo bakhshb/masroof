@@ -339,6 +339,32 @@ class ProcessingCompletionFailureMatrixTest {
     }
 
     @Test
+    fun reviewUpdateFailure_isLoggedAsTheReviewUpdateStage() = runBlocking {
+        val raw = LiveSmsProcessingHarness.liveSms(at = "2026-08-16T10:00:00Z")
+        val captured = harness.capture.capture(raw) as BankSmsCaptureResult.Captured
+        assertTrue(harness.processStored().parseAndStore(captured.rawSms, captured.route) is SmsIngestionResult.Parsed)
+        val failingReviews = object : com.baraa.masroof.domain.repository.ReviewRepository by harness.reviewRepo {
+            override suspend fun findByRawSmsId(rawSmsId: String): com.baraa.masroof.domain.model.ReviewItem? = error("review store down")
+            override suspend fun upsertRequired(rawSmsId: String, kind: com.baraa.masroof.domain.model.ReviewKind,
+                reasons: List<String>, now: Instant): com.baraa.masroof.domain.model.ReviewItem = error("review store down")
+        }
+        val workflow = reviewWorkflow(
+            OwnershipConfirmationService(RoomAccountRegistryRepository.from(harness.db),
+                RoomCardRegistryRepository.from(harness.db), NoOpLoanRegistryRepository),
+            AtomicInteger(0),
+            reviewUpdateRepo = failingReviews,
+        )
+        harness.appLog.clear()
+
+        val failure = runCatching { workflow.refreshReviewQueue() }.exceptionOrNull()
+
+        assertTrue(failure is ReconciliationIncompleteException)
+        val logged = harness.appLog.readAll().joinToString("\n") { it.message }
+        assertTrue(logged, logged.contains("Derived review_update incomplete"))
+        assertFalse(logged, logged.contains("Derived reconciliation incomplete"))
+    }
+
+    @Test
     fun completingExistingFailedReportRetainsRetryWithoutPostingAgain() = runBlocking {
         val raw = LiveSmsProcessingHarness.liveSms(at = "2026-08-16T10:00:00Z")
         val captured = harness.capture.capture(raw) as BankSmsCaptureResult.Captured
@@ -436,6 +462,7 @@ class ProcessingCompletionFailureMatrixTest {
     private fun reviewWorkflow(
         confirmation: OwnershipConfirmationService,
         schedules: AtomicInteger,
+        reviewUpdateRepo: com.baraa.masroof.domain.repository.ReviewRepository = harness.reviewRepo,
     ): com.baraa.masroof.application.review.ReviewWorkflowService {
         val cards = RoomCardRegistryRepository.from(harness.db)
         val accounts = RoomAccountRegistryRepository.from(harness.db)
@@ -475,7 +502,7 @@ class ProcessingCompletionFailureMatrixTest {
                 reviewRepository = harness.reviewRepo,
             ),
             reviewQueueUpdater = com.baraa.masroof.application.review.ReviewQueueUpdater(
-                harness.reviewRepo,
+                reviewUpdateRepo,
                 harness.ftRepo,
                 clock,
             ),
@@ -491,6 +518,7 @@ class ProcessingCompletionFailureMatrixTest {
                 clock = clock,
             ),
             onHistoricalRetry = { schedules.incrementAndGet() },
+            appLogService = harness.appLog,
         )
     }
 }
