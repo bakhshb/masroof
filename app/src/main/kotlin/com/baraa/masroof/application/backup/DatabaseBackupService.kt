@@ -111,7 +111,11 @@ class DatabaseBackupService(
                     stage = "write"
                     writeEncryptedPackage(staging, destination, secret)
                 } finally {
-                    SensitiveFileCleanup.delete(staging)
+                    // A cleanup error must not fail a written backup (onFailure would delete it) or hide the real error.
+                    // The next staging sweep retries it.
+                    runCatching { SensitiveFileCleanup.delete(staging) }.onFailure {
+                        appLogService?.warn(AppLogCategories.BACKUP, "Export staging cleanup failed (${it.javaClass.simpleName})")
+                    }
                 }
             }.onSuccess {
                 appLogService?.info(AppLogCategories.BACKUP, "Database export succeeded")

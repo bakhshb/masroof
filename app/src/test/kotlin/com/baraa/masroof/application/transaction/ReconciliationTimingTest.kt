@@ -196,4 +196,56 @@ class ReconciliationTimingTest : ReconciliationTestFixture() {
         }
     }
 
+    @Test
+    fun postedSingleLegSelfTransfer_usesStoredZoneToHoldMixedClockCounterpart() = runBlocking {
+        val other = Bank("OTHER")
+        confirmation.confirmAccountOwned(AccountReference(other, "3001"))
+        confirmation.confirmAccountOwned(AccountReference(other, "3003"))
+        val local = LocalDateTime.parse("2026-08-01T12:00:00")
+        val tokyo = java.time.ZoneId.of("Asia/Tokyo")
+        val tokyoInstant = local.atZone(tokyo).toInstant()
+        persistEvent(
+            smsId = "sms-out-posted-leg",
+            at = tokyoInstant,
+            details = ParsedEventDetails(occurredAtLocal = local),
+            event = event(
+                id = "pe-out-posted-leg",
+                rawSmsId = "sms-out-posted-leg",
+                family = MessageFamily.TRANSFER_OUT,
+                amount = money("70.00"),
+                bank = other,
+                source = AccountReference(other, "3001"),
+                destination = AccountReference(other, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        serviceIn(tokyo).reconcileStoredEventsDetailed()
+        val posted = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, posted.type)
+        assertEquals(1, posted.linkedParsedEventIds.size)
+        assertEquals("Asia/Tokyo", posted.occurredAtZone)
+
+        // Counterpart has only a receipt time, so the matcher compares effective instants.
+        persistEvent(
+            smsId = "sms-in-posted-leg",
+            at = tokyoInstant.plusSeconds(5 * 60),
+            event = event(
+                id = "pe-in-posted-leg",
+                rawSmsId = "sms-in-posted-leg",
+                family = MessageFamily.TRANSFER_IN,
+                amount = money("70.00"),
+                bank = other,
+                source = AccountReference(other, "3001"),
+                destination = AccountReference(other, "3003"),
+                network = BankNetworkType.INTRA_BANK,
+            ),
+        )
+        val report = serviceIn(java.time.ZoneOffset.UTC).reconcileStoredEventsDetailed()
+
+        // Read in UTC the posted leg sits 9h away, so the counterpart was posted alone first (pendingMatch 0).
+        assertEquals(1, report.summary.pendingMatch)
+        val healed = ftRepo.listAll().single()
+        assertEquals(FinancialTransactionType.SELF_TRANSFER, healed.type)
+        assertEquals(setOf("pe-out-posted-leg", "pe-in-posted-leg"), healed.linkedParsedEventIds.toSet())
+    }
 }

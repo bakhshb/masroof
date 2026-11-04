@@ -38,20 +38,21 @@ interface ReviewItemDao {
     suspend fun listIgnored(): List<ReviewItemEntity>
 
     /**
-     * REQUIRED rows whose only reason is [reason], oldest RawSms receipt first.
-     * RESOLVED rows are excluded, including an explicit user resolution.
+     * REQUIRED rows whose encoded reasons contain [reason], oldest RawSms receipt first.
+     * RESOLVED rows are excluded, including an explicit user resolution. The caller
+     * decodes the reasons to decide the exact match.
      */
     @Query(
         """
-        SELECT v.rawSmsId FROM review_item v
+        SELECT v.rawSmsId AS rawSmsId, v.reasons AS reasons FROM review_item v
         INNER JOIN raw_sms r ON r.id = v.rawSmsId
         WHERE v.status = 'REQUIRED'
           AND v.resolutionKind IS NULL
-          AND v.reasons = :reason
+          AND instr(v.reasons, :reason) > 0
         ORDER BY r.receivedAtEpochMillis ASC, r.id ASC
         """,
     )
-    suspend fun listRawSmsIdsForRequiredReason(reason: String): List<String>
+    suspend fun listRequiredReasonsContaining(reason: String): List<ReviewRawSmsReasons>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfAbsent(entity: ReviewItemEntity): Long
@@ -211,3 +212,6 @@ interface ReviewItemDao {
         )
     }
 }
+
+/** Projection of a review row's RawSms id and its encoded reasons. */
+data class ReviewRawSmsReasons(val rawSmsId: String, val reasons: String)

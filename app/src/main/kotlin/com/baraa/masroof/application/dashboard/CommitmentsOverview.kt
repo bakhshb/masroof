@@ -182,6 +182,7 @@ object CommitmentsOverviewBuilder {
         } else {
             maxOf(occurrences.size, matchedPayments.size)
         }
+        val dueDateRowIndex = recurringDueDateRowIndex(commitment, occurrences, paidOccurrenceCount, salaryPeriod)
         return List(rowCount) { index ->
             val occurrence = occurrences.getOrNull(index)
             val isPaid = index < paidOccurrenceCount
@@ -194,7 +195,10 @@ object CommitmentsOverviewBuilder {
             val rowDate = if (isPaid && matchedPayment != null) {
                 matchedPayment.occurredAt.atZone(zoneId).toLocalDate()
             } else {
-                commitment.dueDate ?: occurrence
+                // dueDate is one fixed calendar date; a recurring commitment shows it once, on the unpaid
+                // occurrence whose cycle holds it.
+                commitment.dueDate?.takeIf { commitment.recurrence == null || index == dueDateRowIndex }
+                    ?: occurrence
             }
             CommitmentDashboardRow(
                 key = if (matchedPayment != null) {
@@ -313,6 +317,24 @@ object CommitmentsOverviewBuilder {
         salaryPeriod: FinancialPeriod,
         zoneId: ZoneId,
     ): Boolean = CommitmentPauseTransitions.isVisibleInSalaryPeriod(commitment, salaryPeriod, zoneId)
+
+    /**
+     * The unpaid row a recurring commitment's fixed [Commitment.dueDate] replaces: the latest unpaid
+     * occurrence on or before it, else the first unpaid occurrence. Null when the due date falls outside
+     * [salaryPeriod] or no unpaid occurrence is left.
+     */
+    private fun recurringDueDateRowIndex(
+        commitment: Commitment,
+        occurrences: List<LocalDate>,
+        paidOccurrenceCount: Int,
+        salaryPeriod: FinancialPeriod,
+    ): Int? {
+        val dueDate = commitment.dueDate ?: return null
+        if (commitment.recurrence == null || !isDateInPeriod(dueDate, salaryPeriod)) return null
+        val unpaid = occurrences.indices.filter { it >= paidOccurrenceCount }
+        if (unpaid.isEmpty()) return null
+        return unpaid.lastOrNull { !occurrences[it].isAfter(dueDate) } ?: unpaid.first()
+    }
 
     internal fun occurrencesInPeriod(
         commitment: Commitment,
@@ -451,15 +473,12 @@ object CommitmentsOverviewBuilder {
                 tx = sourceTx,
                 primaryCurrency = primaryCurrency,
                 sarEquivalents = sarEquivalents,
-            ) ?: sarEquivalents[sourceTransactionId] ?: return null
+            ) ?: return null
             if (sourceTx.amount.amount.signum() == 0) return null
-            val ratio = amount.amount.divide(
-                sourceTx.amount.amount,
-                Money.SCALE,
-                RoundingMode.HALF_EVEN,
-            )
+            // One rounding at the end; a rounded ratio skews the result (20/30 of 112.50 gave 75.38).
             return Money(
-                sourceSar.amount.multiply(ratio).setScale(Money.SCALE, RoundingMode.HALF_EVEN),
+                sourceSar.amount.multiply(amount.amount)
+                    .divide(sourceTx.amount.amount, Money.SCALE, RoundingMode.HALF_EVEN),
                 primaryCurrency,
             )
         }

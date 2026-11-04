@@ -102,6 +102,30 @@ class DatabaseBackupEncryptionTest {
     }
 
     @Test
+    fun export_stagingCleanupFailureKeepsTheWrittenBackup() {
+        runBlocking {
+            val live = openDatabase()
+            try {
+                insertProbe(live)
+                val destination = File(context.cacheDir, "cleanup-failure-export.masroof")
+                SensitiveFileCleanup.beforeUnlink = { file ->
+                    if (file.name.startsWith("masroof-backup-export-")) error("disk busy")
+                }
+                val exported = try {
+                    service(live).exportTo(Uri.fromFile(destination), passphrase.copyOf())
+                } finally {
+                    SensitiveFileCleanup.beforeUnlink = null
+                }
+                assertTrue(exported.exceptionOrNull()?.toString(), exported.isSuccess)
+                val bytes = destination.readBytes()
+                assertTrue(BackupEnvelope.looksLikeEnvelope(bytes, bytes.size))
+            } finally {
+                if (live.isOpen) live.close()
+            }
+        }
+    }
+
+    @Test
     fun encryptedExport_roundTripsThroughImport() {
         runBlocking {
             val live = openDatabase()

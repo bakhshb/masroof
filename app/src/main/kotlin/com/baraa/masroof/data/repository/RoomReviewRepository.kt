@@ -45,7 +45,13 @@ class RoomReviewRepository(
     }
 
     override suspend fun listRetryableProcessingErrorRawSmsIds(): List<String> = accessGate.withAccess {
-        dao.listRawSmsIdsForRequiredReason(RETRYABLE_PROCESSING_ERROR_REASON)
+        // The only reason, apart from a preserved explicit bank selection.
+        dao.listRequiredReasonsContaining(RETRYABLE_PROCESSING_ERROR_REASON)
+            .filter { row ->
+                ReviewItemMapper.decodeReasons(row.reasons).filterNot(ExplicitBankSelection::isSelection) ==
+                    listOf(RETRYABLE_PROCESSING_ERROR_REASON)
+            }
+            .map { it.rawSmsId }
     }
 
     override suspend fun upsertRequired(

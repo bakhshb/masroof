@@ -79,7 +79,8 @@ interface RawSmsRepository {
 
     /**
      * Same match as [findCrossSourceNearDuplicate], up to two rows so capture can
-     * tell a unique twin from an ambiguous pair. Ordered by receipt time.
+     * tell a unique twin from an ambiguous pair. Ordered by receipt time, then id.
+     * A live-row lookup skips rows that already carry a provider alias.
      */
     suspend fun listCrossSourceNearDuplicates(
         sender: String,

@@ -954,6 +954,126 @@ class CommitmentsOverviewBuilderTest {
     }
 
     @Test
+    fun foreignCurrencyCommitment_scalesSourceSarWithoutRoundingTheRatio() {
+        val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
+        val sourceTx = transaction(id = "tx-usd", merchant = "Amazon", amount = "30", at = start.minusSeconds(3600))
+            .copy(amount = Money.of("30.00", Currency.USD))
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(commitment(name = "Amazon", amount = Money.of("20.00", Currency.USD),
+                sourceTransactionId = sourceTx.id, recurrence = CommitmentRecurrence.MONTHLY)),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = listOf(sourceTx),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = mapOf(sourceTx.id to Money.of("112.50", Currency.SAR)),
+            zoneId = zone,
+        )
+
+        // 112.50 * 20 / 30 = 75.00; rounding the ratio to 0.67 first gave 75.38.
+        assertEquals(Money.of("75.00", Currency.SAR), overview.rows.single().amount)
+    }
+
+    @Test
+    fun recurringCommitment_unpaidRowUsesThisPeriodsOccurrenceNotTheFixedDueDate() {
+        val later = FinancialPeriod(LocalDate.parse("2026-09-27"), LocalDate.parse("2026-10-27"))
+        val monthly = commitment(name = "Gym", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-gym",
+            recurrence = CommitmentRecurrence.MONTHLY).copy(dueDate = LocalDate.parse("2026-08-05"))
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = later,
+            commitments = listOf(monthly),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(listOf(LocalDate.parse("2026-10-01")), overview.rows.map { it.expectedDate })
+    }
+
+    @Test
+    fun recurringCommitment_unpaidRowShowsDueDateInThePeriodThatHoldsIt() {
+        val monthly = commitment(name = "Gym", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-gym",
+            recurrence = CommitmentRecurrence.MONTHLY).copy(dueDate = LocalDate.parse("2026-08-05"))
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(monthly),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(listOf(LocalDate.parse("2026-08-05")), overview.rows.map { it.expectedDate })
+    }
+
+    @Test
+    fun weeklyCommitment_showsDueDateOnlyOnTheFirstUnpaidRow() {
+        val weekly = commitment(name = "Cleaner", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-clean",
+            recurrence = CommitmentRecurrence.WEEKLY).copy(dueDate = LocalDate.parse("2026-08-05"))
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(weekly),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        val dates = overview.rows.map { it.expectedDate }
+        assertTrue("rows: $dates", dates.size > 1)
+        assertEquals(LocalDate.parse("2026-08-05"), dates.first())
+        assertEquals(1, dates.count { it == LocalDate.parse("2026-08-05") })
+    }
+
+    @Test
+    fun weeklyCommitment_dueDateReplacesTheOccurrenceWhoseWeekHoldsIt() {
+        val weekly = commitment(name = "Cleaner", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-clean",
+            recurrence = CommitmentRecurrence.WEEKLY).copy(dueDate = LocalDate.parse("2026-08-17"))
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(weekly),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        val dates = overview.rows.mapNotNull { it.expectedDate }.sorted()
+        assertEquals(LocalDate.parse("2026-08-01"), dates[0])
+        assertEquals(LocalDate.parse("2026-08-08"), dates[1])
+        assertEquals(LocalDate.parse("2026-08-17"), dates[2])
+        assertTrue("rows: $dates", LocalDate.parse("2026-08-15") !in dates)
+        assertEquals("rows: $dates", dates.size, dates.toSet().size)
+    }
+
+    @Test
+    fun oneTimeCommitment_unpaidRowKeepsItsDueDate() {
+        val oneTime = commitment(name = "Insurance", amount = Money.of("100.00", Currency.SAR), sourceTransactionId = "tx-ins")
+            .copy(dueDate = LocalDate.parse("2026-08-20"))
+        val overview = CommitmentsOverviewBuilder.build(
+            salaryPeriod = period,
+            commitments = listOf(oneTime),
+            creditFacilities = CreditFacilitiesOverview(emptyList(), emptyList(), Currency.SAR),
+            loansOverview = LoansOverview(emptyList(), null, Currency.SAR),
+            transactions = emptyList(),
+            primaryCurrency = Currency.SAR,
+            sarEquivalents = emptyMap(),
+            zoneId = zone,
+        )
+
+        assertEquals(listOf(LocalDate.parse("2026-08-20")), overview.rows.map { it.expectedDate })
+    }
+
+    @Test
     fun monthlyCommitment_countsEveryPaymentInSalaryPeriodWhenAmountIncreases() {
         val salaryPeriod = FinancialPeriod(
             startDate = LocalDate.parse("2026-09-27"),

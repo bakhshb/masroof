@@ -118,6 +118,14 @@ fun cardDisplayLabel(
     last4: String,
 ): String = cardDisplayLabel(context, cards.find { it.last4 == last4 }, last4)
 
+/** Label for a [CardOwnershipKey] (`bankId:last4`), using the card registered at that bank. */
+@Composable
+fun cardKeyDisplayLabel(cards: List<OwnedCardUi>, cardKey: String): String =
+    cardKeyDisplayLabel(LocalContext.current, cards, cardKey)
+
+fun cardKeyDisplayLabel(context: Context, cards: List<OwnedCardUi>, cardKey: String): String =
+    cardDisplayLabel(context, cards.find { CardOwnershipKey.of(it) == cardKey }, cardKey.substringAfterLast(':'))
+
 /** A custom name wins; a registry Mada card says Mada; any other card stays "Card", since rows do not know credit vs debit. */
 private fun cardDisplayLabel(context: Context, match: OwnedCardUi?, last4: String): String {
     val custom = DashboardRegistryLabels.customName(match?.displayName)

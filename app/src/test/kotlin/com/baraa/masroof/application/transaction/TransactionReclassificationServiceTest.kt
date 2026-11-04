@@ -206,6 +206,20 @@ class TransactionReclassificationServiceTest {
         )
     }
 
+    @Test
+    fun loanRepaymentSaveFailure_leavesLoanOwnershipUnchanged() = runBlocking {
+        confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+        val loan = LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)
+        loans.observe(loan, "sms-loan-fail")
+        persistFinancingFee(smsId = "sms-loan-fail", amount = "3036.11")
+        val before = loans.resolve(loan)
+        db.openHelper.writableDatabase.execSQL("CREATE TRIGGER reject_decision BEFORE INSERT ON review_item BEGIN SELECT RAISE(ABORT,'injected'); END")
+        val result = service.reclassify(TransactionIdFactory.fromRawSmsIds(listOf("sms-loan-fail")), FinancialTransactionType.LOAN_REPAYMENT)
+        assertTrue(result is ReclassificationResult.Rejected)
+        assertEquals(OwnershipStatus.UNKNOWN, before)
+        assertEquals(before, loans.resolve(loan))
+    }
+
     private suspend fun persistFinancingFee(smsId: String, amount: String) {
         val body = "خصم: قسط تمويل\nمن: 3001\nالقسط: SAR $amount\nلـ: تمويل شخصي"
         rawRepo.insertIfAbsent(

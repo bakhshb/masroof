@@ -54,7 +54,8 @@ class LiveSmsProcessingWorker(
             throw e
         } catch (e: Exception) {
             logUnexpectedFailure(stage = "process", e)
-            return retryOrGiveUp()
+            // Earlier attempts wrote nothing, so the final one must leave a recovery marker.
+            return retryDerivedOrGiveUp(rawSmsId)
         }
 
         return when (outcome) {

@@ -118,6 +118,26 @@ class IngestionReviewServiceTest {
         )
     }
 
+    @Test
+    fun retryableProcessingErrors_includeRowsWithAPreservedBankSelection() = runBlocking {
+        insertRaw("sms-selected", "2026-08-10T10:00:00Z")
+        insertRaw("sms-mixed", "2026-08-11T10:00:00Z")
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-selected",
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf(IngestionReviewService.REASON_PROCESSING_ERROR, "user_selected_bank:aljazira"),
+            now = now.get(),
+        )
+        reviewRepo.upsertRequired(
+            rawSmsId = "sms-mixed",
+            kind = ReviewKind.NEEDS_REVIEW,
+            reasons = listOf(IngestionReviewService.REASON_PROCESSING_ERROR, IngestionReviewService.REASON_UNSUPPORTED_FORMAT),
+            now = now.get(),
+        )
+
+        assertEquals(listOf("sms-selected"), reviewRepo.listRetryableProcessingErrorRawSmsIds())
+    }
+
     private suspend fun insertRaw(id: String, at: String) {
         rawRepo.insertIfAbsent(
             RawSms(

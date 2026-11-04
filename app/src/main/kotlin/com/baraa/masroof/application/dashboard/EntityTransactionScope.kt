@@ -27,6 +27,9 @@ object EntityTransactionScope {
         if (containerId == null) return false
         if (containerId == account.containerId) return true
         if (!containerId.startsWith("account:")) return false
+        val bankId = FinancialContainerIdParser.accountBankId(containerId)
+        val ownedBankId = FinancialContainerIdParser.accountBankId(account.containerId)
+        if (bankId != null && ownedBankId != null && !bankId.equals(ownedBankId, ignoreCase = true)) return false
         return containerId.substringAfterLast(':') in account.last4s
     }
 

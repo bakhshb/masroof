@@ -269,6 +269,23 @@ class CaptureBankSmsUseCaseTest {
     }
 
     @Test
+    fun threeLiveTwins_thirdInboxCopyClaimsTheThirdLiveRow() = runBlocking {
+        val useCase = capture()
+        val times = listOf("2026-08-03T14:32:00Z", "2026-08-03T14:32:01Z", "2026-08-03T14:32:02Z")
+        val liveRows = times.map { live(PURCHASE_BODY, it) }
+        liveRows.forEach { assertTrue(useCase.capture(it) is BankSmsCaptureResult.Captured) }
+
+        times.forEachIndexed { index, at ->
+            assertEquals(BankSmsCaptureResult.Duplicate, useCase.capture(inbox("p$index", at)))
+        }
+
+        assertEquals(3, db.rawSmsDao().count())
+        times.indices.forEach { index ->
+            assertEquals(liveRows[index].id, rawRepo.findByProviderMessageId("p$index")?.id)
+        }
+    }
+
+    @Test
     fun inboxThenLive_exactProviderInstant_isOneRow() = runBlocking {
         val at = "2026-08-03T14:32:00.000Z"
         val historical = inbox("42", at)

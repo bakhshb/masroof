@@ -51,7 +51,7 @@ fun TransactionListScreen(
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedTypeNames by rememberSaveable { mutableStateOf(listOf<String>()) }
-    var selectedCardLast4s by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var selectedCardKeys by rememberSaveable { mutableStateOf(listOf<String>()) }
     var selectedAccountContainerIds by rememberSaveable { mutableStateOf(listOf<String>()) }
     var filtersSheetOpen by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -59,7 +59,7 @@ fun TransactionListScreen(
     val filterState = remember(
         searchQuery,
         selectedTypeNames,
-        selectedCardLast4s,
+        selectedCardKeys,
         selectedAccountContainerIds,
     ) {
         TransactionListFilterState(
@@ -67,7 +67,7 @@ fun TransactionListScreen(
             types = selectedTypeNames.mapNotNull { name ->
                 runCatching { FinancialTransactionType.valueOf(name) }.getOrNull()
             }.toSet(),
-            cardLast4s = selectedCardLast4s.toSet(),
+            cardKeys = selectedCardKeys.toSet(),
             accountContainerIds = selectedAccountContainerIds.toSet(),
         )
     }
@@ -85,7 +85,7 @@ fun TransactionListScreen(
     val clearFilters = {
         searchQuery = ""
         selectedTypeNames = emptyList()
-        selectedCardLast4s = emptyList()
+        selectedCardKeys = emptyList()
         selectedAccountContainerIds = emptyList()
         filtersSheetOpen = false
     }
@@ -155,12 +155,12 @@ fun TransactionListScreen(
                     selectedType = selectedTypeNames.singleOrNull(),
                     onSelectType = { name -> selectedTypeNames = if (name.isEmpty()) emptyList() else listOf(name) },
                     sourceChoices = availableAccounts.map { "account:$it" to (accountDisplayLabel(ownedAccounts, it) ?: it) } +
-                        availableCards.map { "card:$it" to cardDisplayLabel(ownedCards, it) },
+                        availableCards.map { "card:$it" to cardKeyDisplayLabel(ownedCards, it) },
                     selectedSource = selectedAccountContainerIds.singleOrNull()?.let { "account:$it" }
-                        ?: selectedCardLast4s.singleOrNull()?.let { "card:$it" },
+                        ?: selectedCardKeys.singleOrNull()?.let { "card:$it" },
                     onSelectSource = { key ->
                         selectedAccountContainerIds = if (key.startsWith("account:")) listOf(key.removePrefix("account:")) else emptyList()
-                        selectedCardLast4s = if (key.startsWith("card:")) listOf(key.removePrefix("card:")) else emptyList()
+                        selectedCardKeys = if (key.startsWith("card:")) listOf(key.removePrefix("card:")) else emptyList()
                     },
                 )
                 Spacer(Modifier.height(MasroofSpacing.cardInnerGap))
@@ -212,7 +212,7 @@ fun TransactionListScreen(
             ownedAccounts = ownedAccounts,
             onApply = { draft ->
                 selectedTypeNames = draft.types.map { it.name }
-                selectedCardLast4s = draft.cardLast4s.toList()
+                selectedCardKeys = draft.cardKeys.toList()
                 selectedAccountContainerIds = draft.accountContainerIds.toList()
                 searchQuery = draft.searchQuery
             },
