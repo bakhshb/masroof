@@ -80,8 +80,7 @@ object LoanOverviewBuilder {
             LoanOverview(
                 bank = loan.bank,
                 loanType = loan.loanType,
-                displayLabel = loan.displayName?.trim()?.takeIf { it.isNotEmpty() }
-                    ?: RegistryDisplayLabels.loanLabel(loan),
+                displayLabel = RegistryDisplayLabels.loanLabel(loan),
                 remainingBalance = remaining?.first,
                 remainingBalanceAsOf = remaining?.second,
                 latestInstallmentAmount = installment?.first,
