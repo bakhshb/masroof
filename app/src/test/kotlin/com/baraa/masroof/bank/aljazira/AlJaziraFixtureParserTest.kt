@@ -95,13 +95,7 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
         assertEquals(fixture.id, Bank.BANK_ALJAZIRA, e.bank)
         assertEquals(fixture.id, MessageFamily.valueOf(expected.messageFamily), e.messageFamily)
         assertEquals(fixture.id, ParseStatus.valueOf(expected.parseStatus), e.parseStatus)
-        val expectedResult = when (e.parseStatus) {
-            ParseStatus.SUCCESS -> ParseResult.Success::class.java
-            ParseStatus.NON_FINANCIAL -> ParseResult.NonFinancial::class.java
-            ParseStatus.REVIEW_REQUIRED -> ParseResult.ReviewRequired::class.java
-            else -> null
-        }
-        expectedResult?.let { assertTrue("${fixture.id}: $result", it.isInstance(result)) }
+        assertResultVariantMatchesStatus(result, e.parseStatus)
 
         assertEquals(fixture.id, expected.direction?.let { MoneyDirection.valueOf(it) }, e.direction)
         assertEquals(fixture.id, expected.purchaseChannel?.let { PurchaseChannel.valueOf(it) }, e.purchaseChannel)
@@ -171,6 +165,17 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
 
         assertFalse(result.toString().contains("SELF_TRANSFER"))
         assertFalse(result.toString().contains(TransferOwnershipType.SELF_TRANSFER.name))
+    }
+
+    /** The sealed ParseResult variant agrees with the event status. */
+    private fun assertResultVariantMatchesStatus(result: ParseResult, status: ParseStatus) {
+        val expected = when (status) {
+            ParseStatus.SUCCESS -> ParseResult.Success::class.java
+            ParseStatus.NON_FINANCIAL -> ParseResult.NonFinancial::class.java
+            ParseStatus.REVIEW_REQUIRED -> ParseResult.ReviewRequired::class.java
+            else -> return
+        }
+        assertTrue("${fixture.id}: $result", expected.isInstance(result))
     }
 
     /**
