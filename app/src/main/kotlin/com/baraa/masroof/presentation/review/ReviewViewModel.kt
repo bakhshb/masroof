@@ -337,17 +337,15 @@ class ReviewViewModel(
     }
 
     fun resolveSelfTransferPair(partnerReviewId: String) {
-        val currentId = _uiState.value.selectedDetail?.id ?: return
-        launchLogged(appLogService, AppLogCategories.REVIEW, "Review resolveSelfTransferPair", onError = { _uiState.update { it.copy(resolving = false, error = ReviewError.ACTION_FAILED) } }) {
-            val detail = detailLoader.loadDetail(currentId) ?: return@launchLogged
-            val (outgoingId, incomingId) = when (detail.messageFamily) {
-                MessageFamily.TRANSFER_OUT -> currentId to partnerReviewId
-                MessageFamily.TRANSFER_IN -> partnerReviewId to currentId
-                else -> return@launchLogged
-            }
-            runAction {
-                reviewWorkflowService.resolveSelfTransferPair(outgoingId, incomingId)
-            }
+        // Use the shown detail so the action locks the buttons at once; the service re-checks both families.
+        val detail = _uiState.value.selectedDetail ?: return
+        val (outgoingId, incomingId) = when (detail.messageFamily) {
+            MessageFamily.TRANSFER_OUT -> detail.id to partnerReviewId
+            MessageFamily.TRANSFER_IN -> partnerReviewId to detail.id
+            else -> return
+        }
+        runAction {
+            reviewWorkflowService.resolveSelfTransferPair(outgoingId, incomingId)
         }
     }
 
