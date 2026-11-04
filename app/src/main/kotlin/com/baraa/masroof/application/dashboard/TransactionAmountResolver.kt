@@ -13,7 +13,4 @@ object TransactionAmountResolver {
         if (tx.amount.currency == primaryCurrency) return tx.amount
         return sarEquivalents[tx.id]
     }
-
-    fun isCreditCardContainer(containerId: String?): Boolean =
-        com.baraa.masroof.domain.ids.FinancialContainerIdParser.isCardContainer(containerId)
 }

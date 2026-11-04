@@ -22,7 +22,6 @@ import com.baraa.masroof.application.dashboard.DashboardTransactionFacts
 import com.baraa.masroof.application.dashboard.DashboardTransactionFactsBuilder
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
-import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.application.dashboard.SignedMoneyAmount
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
@@ -513,7 +512,6 @@ class DashboardViewModelTest {
                 period = currentPeriod,
                 summary = MonthlyFinancialSummary.empty(currentPeriod, Currency.SAR),
                 currentAccount = emptyCurrentAccount(),
-                spendingSplit = emptySpendingSplit(),
                 transactions = listOf(tx),
                 creditFacilities = emptyCreditFacilities(),
                 ownedAccountPeriodSummaries = emptyList(),
@@ -608,7 +606,6 @@ class DashboardViewModelTest {
                 transactionCount = transactionCount,
             ),
             currentAccount = emptyCurrentAccount(),
-            spendingSplit = emptySpendingSplit(),
             transactions = emptyList(),
             creditFacilities = emptyCreditFacilities(),
             ownedAccountPeriodSummaries = emptyList(),
@@ -642,13 +639,6 @@ class DashboardViewModelTest {
     companion object {
         fun emptyCurrentAccount(currency: Currency = Currency.SAR): CurrentAccountSummary =
             CurrentAccountSummary.zero(currency)
-
-        fun emptySpendingSplit(currency: Currency = Currency.SAR): SpendingSplitSummary =
-            SpendingSplitSummary(
-                currency = currency,
-                totalSpending = Money.zero(currency),
-                creditCardPurchases = SignedMoneyAmount.zero(currency),
-            )
     }
 
     @Test
@@ -1015,7 +1005,6 @@ class DashboardViewModelTest {
                     period = period,
                     summary = MonthlyFinancialSummary.empty(period, Currency.SAR),
                     currentAccount = DashboardViewModelTest.emptyCurrentAccount(),
-                    spendingSplit = DashboardViewModelTest.emptySpendingSplit(),
                     transactions = emptyList(),
                     creditFacilities = CreditFacilitiesOverview(
                         facilities = emptyList(),

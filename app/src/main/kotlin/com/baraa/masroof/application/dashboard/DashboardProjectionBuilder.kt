@@ -73,7 +73,6 @@ class DashboardProjectionBuilder(
             isCurrentPeriod = period == FinancialPeriodPolicy.periodContaining(context.today),
             summary = analysis.summary,
             currentAccount = accounts.fleet,
-            spendingSplit = accounts.spendingSplit,
             accountsFleet = accounts.accountsFleet,
             ownedAccountPeriodSummaries = accounts.perAccount,
             creditFacilities = creditFacilities,

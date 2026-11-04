@@ -80,17 +80,3 @@ data class CurrentAccountSummary(
             AccountFlowAggregator.aggregate(summaries)
     }
 }
-
-/**
- * Period spending: everything that left the current account in the period.
- */
-data class SpendingSplitSummary(
-    val currency: Currency,
-    val totalSpending: Money,
-    val creditCardPurchases: SignedMoneyAmount,
-) {
-    init {
-        require(totalSpending.currency == currency)
-        require(creditCardPurchases.currency == currency)
-    }
-}

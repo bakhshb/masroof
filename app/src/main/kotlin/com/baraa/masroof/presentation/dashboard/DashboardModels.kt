@@ -13,7 +13,6 @@ import com.baraa.masroof.presentation.common.MasroofIcons
 import com.baraa.masroof.application.dashboard.CurrentAccountSummary
 import com.baraa.masroof.application.dashboard.MonthlyFinancialSummary
 import com.baraa.masroof.application.dashboard.MerchantSpendingOverview
-import com.baraa.masroof.application.dashboard.SpendingSplitSummary
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.ExchangeRateSource
@@ -94,7 +93,6 @@ data class DashboardUiState(
     val periodAdjustmentHint: String? = null,
     val summary: MonthlyFinancialSummary? = null,
     val currentAccount: CurrentAccountSummary? = null,
-    val spendingSplit: SpendingSplitSummary? = null,
     val creditFacilities: CreditFacilitiesOverview? = null,
     val loansOverview: LoansOverview? = null,
     val commitmentsOverview: CommitmentsOverview = CommitmentsOverview.empty(),

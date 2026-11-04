@@ -118,7 +118,6 @@ class ReplicaFinancialParityTest {
     private fun assertOverview(expected: DashboardOverview, actual: DashboardOverview) {
         assertEquals("Summary",expected.summary,actual.summary)
         assertEquals("Accounts",expected.currentAccount,actual.currentAccount)
-        assertEquals("Spending split",expected.spendingSplit,actual.spendingSplit)
         assertEquals("Cards",expected.creditFacilities,actual.creditFacilities)
         assertEquals("Loans",expected.loansOverview,actual.loansOverview)
         assertEquals("Commitments",expected.commitmentsOverview,actual.commitmentsOverview)

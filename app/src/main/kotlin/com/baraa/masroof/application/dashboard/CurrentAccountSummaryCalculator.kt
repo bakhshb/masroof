@@ -3,7 +3,6 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 object CurrentAccountSummaryCalculator {
@@ -56,58 +55,6 @@ object CurrentAccountSummaryCalculator {
             fees = total(grouping.expense.getValue(FlowExpenseCategory.FEE)),
             loanRepayments = total(grouping.expense.getValue(FlowExpenseCategory.LOAN_REPAYMENT)),
             selfTransfersOut = total(grouping.selfTransfersOut),
-        )
-    }
-
-    fun spendingSplit(
-        transactions: List<FinancialTransaction>,
-        currentAccount: CurrentAccountSummary,
-        sarEquivalents: Map<String, Money> = emptyMap(),
-        debitCardScope: DebitCardScopeFacts = DebitCardScopeFacts(emptySet(), emptyMap()),
-    ): SpendingSplitSummary {
-        val primaryCurrency = currentAccount.currency
-        var cardGross = Money.zero(primaryCurrency)
-        var cardRefunds = Money.zero(primaryCurrency)
-
-        for (tx in transactions) {
-            val amount = TransactionAmountResolver.effectiveAmount(tx, primaryCurrency, sarEquivalents)
-                ?: continue
-            when (tx.type) {
-                FinancialTransactionType.EXPENSE,
-                FinancialTransactionType.BILL_PAYMENT,
-                FinancialTransactionType.FEE,
-                -> {
-                    val sourceId = tx.sourceContainerId
-                    if (sourceId != null &&
-                        sourceId in debitCardScope.ownedDebitCardContainerIds
-                    ) {
-                        continue
-                    }
-                    if (TransactionAmountResolver.isCreditCardContainer(sourceId)) {
-                        cardGross += amount
-                    }
-                }
-
-                FinancialTransactionType.REFUND -> {
-                    val destinationId = tx.destinationContainerId
-                    if (destinationId != null &&
-                        destinationId in debitCardScope.ownedDebitCardContainerIds
-                    ) {
-                        continue
-                    }
-                    if (TransactionAmountResolver.isCreditCardContainer(destinationId)) {
-                        cardRefunds += amount
-                    }
-                }
-
-                else -> Unit
-            }
-        }
-
-        return SpendingSplitSummary(
-            currency = primaryCurrency,
-            totalSpending = currentAccount.outflow.coreTotal,
-            creditCardPurchases = SignedMoneyAmount.difference(cardGross, cardRefunds),
         )
     }
 }
