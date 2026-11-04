@@ -1,5 +1,7 @@
 package com.baraa.masroof.ui.theme
 
+import androidx.compose.ui.unit.dp
+
 /** Shared geometry for analytical bars, coverage, and forecast composition. */
 object MasroofAnalyticsTokens {
     val barHeight = MasroofSpacing.sectionHeaderGap
@@ -14,4 +16,9 @@ object MasroofAnalyticsTokens {
     val chartBottomInset = MasroofSpacing.screenPaddingLarge
     const val barWidthFraction = .6f
     const val previousOpacity = .3f
+    val stackedHeight = MasroofSpacing.screenPaddingLarge
+    val stackedGap = MasroofSpacing.hairlineGap
+    val ringSize = 96.dp
+    val ringStroke = 10.dp
+    val markerSize = 26.dp
 }

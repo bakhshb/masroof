@@ -31,7 +31,16 @@ internal fun AnalyticsCatalogSection() {
                     MasroofDailyBar(null, false, "Coverage missing", "2"),
                     MasroofDailyBar(BigDecimal("-30"), false, "Refund −30", "3"),
                     MasroofDailyBar(BigDecimal("80"), true, "Expected 80", "4")), selected, { selected = it },
-                    "Previous", "Next", { it.toPlainString() })
+                    "Previous", "Next", { it.toPlainString() }, average = BigDecimal("60"))
+                val extended = com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors
+                MasroofStackedBar(listOf(MasroofStackedPart(.5f, extended.account), MasroofStackedPart(.3f, extended.card),
+                    MasroofStackedPart(.2f, extended.liability)), "Transfers 50%, purchases 30%, cash 20%")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    MasroofProgressRing(.83f, "100 / 120", "Consecutive complete days")
+                    MasroofProgressRing(.75f, "3 / 4", "Complete salary periods", color = extended.card)
+                }
+                MasroofDueTimeline(listOf(MasroofTimelineMark(.05f, 2, true), MasroofTimelineMark(.8f, 1, false)),
+                    "Today", "25 Nov", "Two due tomorrow, one in 17 days")
             }
         }
     }

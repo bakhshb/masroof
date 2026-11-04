@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.drawText
 import com.baraa.masroof.ui.theme.*
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -106,6 +107,82 @@ fun MasroofForecastSplit(actual: BigDecimal, remaining: BigDecimal, description:
         while (x < through) {
             drawLine(expectedColor, Offset(x, size.height), Offset((x + size.height).coerceAtMost(through), 0f), stroke)
             x += MasroofSpacing.smallGap.toPx()
+        }
+    }
+}
+
+/** One share of a whole. [weight] is precomputed by the caller's application layer; non-positive parts are not drawn. */
+data class MasroofStackedPart(val weight: Float, val color: androidx.compose.ui.graphics.Color)
+
+/** Parts of one whole in one row; follows layout direction. [selected] dims the other parts. */
+@Composable
+fun MasroofStackedBar(parts: List<MasroofStackedPart>, description: String, modifier: Modifier = Modifier, selected: Int? = null) {
+    if (parts.none { it.weight > 0f && it.weight.isFinite() }) return
+    Row(modifier.fillMaxWidth().height(MasroofAnalyticsTokens.stackedHeight).semantics { contentDescription = description },
+        horizontalArrangement = Arrangement.spacedBy(MasroofAnalyticsTokens.stackedGap)) {
+        parts.forEachIndexed { index, part ->
+            if (part.weight > 0f && part.weight.isFinite()) Box(Modifier.weight(part.weight).fillMaxHeight().background(
+                if (selected == null || selected == index) part.color else part.color.copy(alpha = MasroofAnalyticsTokens.previousOpacity),
+                MasroofComponentShapes.tokenSwatch))
+        }
+    }
+}
+
+/** Progress toward a fixed target, with the value inside and a caption below. */
+@Composable
+fun MasroofProgressRing(progress: Float, value: String, caption: String, modifier: Modifier = Modifier,
+    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary) {
+    val track = MaterialTheme.colorScheme.surfaceVariant
+    val bounded = progress.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
+    Column(modifier.semantics(mergeDescendants = true) {}, horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
+        Box(Modifier.size(MasroofAnalyticsTokens.ringSize), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.matchParentSize()) {
+                val stroke = MasroofAnalyticsTokens.ringStroke.toPx()
+                val inset = Offset(stroke / 2, stroke / 2)
+                val arc = Size(size.width - stroke, size.height - stroke)
+                drawArc(track, -90f, 360f, false, inset, arc, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+                if (bounded > 0f) drawArc(color, -90f, 360f * bounded, false, inset, arc,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+            }
+            Text(value, style = MaterialTheme.typography.titleMedium.copy(textDirection = androidx.compose.ui.text.style.TextDirection.ContentOrLtr))
+        }
+        Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
+}
+
+/** A due date placed between today (0) and the period end (1); [count] items share that day. */
+data class MasroofTimelineMark(val fraction: Float, val count: Int, val soon: Boolean)
+
+/** Due dates on one line from today to period end; mirrors in RTL. Counts are drawn, never color alone. */
+@Composable
+fun MasroofDueTimeline(marks: List<MasroofTimelineMark>, startLabel: String, endLabel: String, description: String,
+    modifier: Modifier = Modifier) {
+    val extended = MasroofThemeExtras.extendedColors
+    val line = MaterialTheme.colorScheme.outlineVariant
+    val today = MaterialTheme.colorScheme.primary
+    val onMark = MaterialTheme.colorScheme.surface
+    val style = MaterialTheme.typography.labelSmall
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    Column(modifier.fillMaxWidth().semantics { contentDescription = description }, verticalArrangement = Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
+        Canvas(Modifier.fillMaxWidth().height(MasroofAnalyticsTokens.markerSize)) {
+            val rtl = layoutDirection == androidx.compose.ui.unit.LayoutDirection.Rtl
+            val radius = MasroofAnalyticsTokens.markerSize.toPx() / 2
+            val stroke = MasroofSpacing.borderWidth.toPx() * 2
+            fun x(fraction: Float) = radius + (size.width - 2 * radius) * (if (rtl) 1f - fraction else fraction).coerceIn(0f, 1f)
+            drawLine(line, Offset(0f, radius), Offset(size.width, radius), stroke)
+            drawLine(today, Offset(x(0f), radius / 2), Offset(x(0f), radius * 1.5f), stroke * 1.5f)
+            marks.forEach { mark ->
+                val center = Offset(x(mark.fraction), radius)
+                drawCircle(if (mark.soon) extended.liability else extended.card, radius, center)
+                val label = measurer.measure(mark.count.toString(), style.copy(color = onMark))
+                drawText(label, topLeft = Offset(center.x - label.size.width / 2, center.y - label.size.height / 2))
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(startLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(endLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

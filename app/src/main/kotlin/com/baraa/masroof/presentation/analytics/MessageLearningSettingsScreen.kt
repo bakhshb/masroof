@@ -48,13 +48,11 @@ fun MessageLearningSettingsScreen(onOpenPatterns: () -> Unit = {}, onOpenExample
     }
     MasroofSecondaryScaffold(stringResource(R.string.analysis_learning_settings), onBack, stringResource(R.string.settings_back)) { modifier ->
         Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
-            MasroofGuidanceLabel(
-                label = stringResource(R.string.analysis_learning_settings),
-                message = stringResource(R.string.settings_corrections_scope),
-                style = MaterialTheme.typography.bodyMedium,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            )
-            MasroofOutlinedButton(onClick = onOpenPatterns, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pattern_title)) }
+            // The screen title already names the page; only its scope explanation sits beside the patterns entry.
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                MasroofOutlinedButton(onClick = onOpenPatterns, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.pattern_title)) }
+                MasroofGuidanceButton(stringResource(R.string.analysis_learning_settings), stringResource(R.string.settings_corrections_scope))
+            }
             MessageLearningInsights(state)
             MasroofCard {
                 MasroofSectionHeader(stringResource(R.string.personal_review_title))

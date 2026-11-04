@@ -8,7 +8,6 @@
     <string name="personal_forecast_model_hint">The model learns locally from weekdays, the day within your salary period, and previous spending.</string>
     <string name="personal_forecast_qualification">The personal model must pass independent checks and beat the initial estimate; history alone does not activate it.</string>
     <string name="personal_forecast_errors">Forecast error by horizon</string>
-    <string name="personal_forecast_error_row">%1$d-day forecast: average error %2$s across %3$d checks.</string>
     <string name="personal_spending_attention">Higher payments than usual</string>
     <string name="personal_spending_hint">We compare this payment with the median of your earlier payments to the same merchant using the same payment source. This is a statistical observation; a larger payment is not necessarily incorrect and stays in your totals.</string>
     <string name="personal_spending_reference">Compared with %1$d previous payments from the same payment source, from %2$s to %3$s.</string>

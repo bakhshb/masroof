@@ -241,33 +241,7 @@ private fun statusRes(state: AnalysisUiState): Pair<Int, Int?> {
                     0 -> SpendingTab(state, purchaseRange, { purchaseRange = it }, { detail = "merchants" }, { evidenceKey = it })
                     1 -> ForecastTab(state, workflow, { detail = "quality" }, { detail = "performance" })
                     2 -> {
-                        if (state.snapshot?.dues?.isEmpty() == true) MasroofCard {
-                            com.baraa.masroof.ui.components.MasroofAnalysisEmptyState(stringResource(R.string.analysis_no_due),
-                                stringResource(R.string.analysis_no_due_hint), MasroofIcons.calendar)
-                        }
-                        MasroofGuidanceLabel(stringResource(R.string.lab_analysis_commitments), stringResource(R.string.lab_analysis_commitments_hint))
-                        state.snapshot?.recurringLearning?.let { learning ->
-                            MasroofCard {
-                                Text(stringResource(when (learning.method) {
-                                    "PERSONAL_MODEL" -> R.string.recurring_personal_used
-                                    "SEED_MODEL" -> R.string.recurring_seed_used
-                                    else -> R.string.recurring_rules_used
-                                }), style = MaterialTheme.typography.bodySmall)
-                                Text(stringResource(R.string.recurring_learning_examples, learning.trainingSeries, learning.validationSeries), style = MaterialTheme.typography.bodySmall)
-                                Text(stringResource(personalLearningReason(learning.reason)), style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                        state.snapshot?.dues?.forEach { due ->
-                            FocusAnalysisItem(focusedAlert == due.alertId, { focusedAlert = null }) {
-                            MasroofCard {
-                                com.baraa.masroof.ui.components.MasroofTimelineRow(
-                                    com.baraa.masroof.application.locale.AppDigits.display(
-                                        com.baraa.masroof.application.analytics.CommitmentNames.name(androidx.compose.ui.platform.LocalContext.current, due.source, due.name, due.loanTypeFallback)),
-                                    com.baraa.masroof.application.locale.AppDigits.display(due.day?.let { day(it) }.orEmpty()), active = due.confirmed)
-                                Amount(stringResource(if (due.confirmed) R.string.lab_analysis_confirmed else R.string.lab_analysis_estimated), due.amount)
-                            }
-                            }
-                        }
+                        state.snapshot?.let { s -> CommitmentsOverview(s, workflow, focusedAlert) { focusedAlert = null } }
                         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                             MasroofSectionHeader(stringResource(R.string.lab_analysis_candidates), Modifier.weight(1f), icon = MasroofIcons.analysis)
                             if (state.snapshot?.candidates?.isNotEmpty() == true) MasroofGuidanceButton(
@@ -317,7 +291,7 @@ private fun statusRes(state: AnalysisUiState): Pair<Int, Int?> {
 }
 
 @OptIn(ExperimentalFoundationApi::class)
-@Composable private fun FocusAnalysisItem(active: Boolean, onConsumed: () -> Unit, content: @Composable () -> Unit) {
+@Composable internal fun FocusAnalysisItem(active: Boolean, onConsumed: () -> Unit, content: @Composable () -> Unit) {
     val requester = remember { BringIntoViewRequester() }
     LaunchedEffect(active) { if (active) { delay(100); requester.bringIntoView(); onConsumed() } }
     Column(Modifier.fillMaxWidth().bringIntoViewRequester(requester)) { content() }
@@ -339,10 +313,7 @@ private fun statusRes(state: AnalysisUiState): Pair<Int, Int?> {
     if (range > 0) HistoricalPurchases(state, range)
     state.snapshot?.let { s ->
         if (range == 0) {
-            MasroofCard {
-                MasroofGuidanceLabel(stringResource(R.string.lab_analysis_actual), stringResource(R.string.lab_analysis_scope_short))
-                Amount("", s.actual, MasroofAmountRole.Hero)
-            }
+            AnalysisSpendingHero(s)
             AnalysisSpendingExplanation(s, onOpenGroup)
             AnalysisMerchantCard(s, onOpenGroup, onViewAll = onMerchants)
             AnalysisChangeCard(s, onOpenGroup)

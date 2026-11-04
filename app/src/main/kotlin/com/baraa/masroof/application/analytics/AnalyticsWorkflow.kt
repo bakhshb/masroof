@@ -480,6 +480,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         }
     }
     fun comparisonExplanation() = AnalysisPresentationBuilder.comparison(state.value, LocalDate.now(clock).toEpochDay(), clock.zone)
+    fun commitmentsView(snapshot: AnalysisSnapshot) = AnalysisPresentationBuilder.commitments(snapshot, LocalDate.now(clock).toEpochDay())
 
     internal suspend fun replayForecasts(): List<ForecastReplayRow> = withContext(Dispatchers.Default) {
         mutex.withLock {

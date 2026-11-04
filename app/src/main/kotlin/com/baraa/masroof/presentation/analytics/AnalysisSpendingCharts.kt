@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.analytics
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
@@ -53,37 +54,67 @@ internal fun fraction(value: Long, maximum: Long) = com.baraa.masroof.ui.compone
         subtitle = AppDigits.display(stringResource(R.string.personal_spending_sample, observation.referenceIds.size)))
 }
 
-@Composable internal fun AnalysisComparisonCard(snapshot: AnalysisSnapshot) {
+/** Actual spending so far, with the equal-length comparison drawn as two bars and a direction badge. */
+@Composable internal fun AnalysisSpendingHero(snapshot: AnalysisSnapshot) {
     val comparison = snapshot.insights?.comparison
-    MasroofCard {
+    MasroofCard(Modifier.testTag("analysis-spending-hero")) {
         Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
-            MasroofGuidanceLabel(stringResource(R.string.lab_analysis_insights), comparison?.let {
-                stringResource(R.string.lab_analysis_comparison_dates, day(it.from), day(it.through), day(it.previousFrom), day(it.previousThrough))
-            }, style = MaterialTheme.typography.titleMedium)
+            MasroofGuidanceLabel(stringResource(R.string.lab_analysis_actual), listOfNotNull(stringResource(R.string.lab_analysis_scope_short),
+                comparison?.let { stringResource(R.string.lab_analysis_comparison_dates, day(it.from), day(it.through), day(it.previousFrom), day(it.previousThrough)) }
+            ).joinToString("\n\n"))
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
+                MasroofAmountText(visualMoney(snapshot.actual), MasroofAmountRole.Hero, Modifier.weight(1f))
+                comparison?.percent?.let { percent ->
+                    val down = comparison.delta < 0
+                    MasroofBadge(AppDigits.display(stringResource(if (down) R.string.analysis_change_down else R.string.analysis_change_up, percent.removePrefix("-"))),
+                        if (down) MasroofCardAccent.Inflow else MasroofCardAccent.Outflow)
+                }
+            }
             if (comparison == null) Text(stringResource(R.string.lab_analysis_comparison_missing), style = MaterialTheme.typography.bodySmall)
             else {
-                Amount(stringResource(if (comparison.delta < 0) R.string.analysis_decrease else R.string.analysis_increase, ""), comparison.delta)
-                comparison.percent?.let { Text(stringResource(R.string.lab_analysis_comparison_percent, it), style = MaterialTheme.typography.labelMedium) }
                 val maximum = maxOf(comparison.current, comparison.previous, 0)
-                MasroofValueBarRow(stringResource(R.string.lab_analysis_comparison_current), visualMoney(comparison.current), fraction(comparison.current, maximum))
-                MasroofValueBarRow(stringResource(R.string.lab_analysis_comparison_previous), visualMoney(comparison.previous), fraction(comparison.previous, maximum), previous = true)
+                MasroofValueBarRow(stringResource(R.string.lab_analysis_comparison_current), visualMoney(comparison.current),
+                    fraction(comparison.current, maximum), style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
+                MasroofValueBarRow(stringResource(R.string.lab_analysis_comparison_previous), visualMoney(comparison.previous),
+                    fraction(comparison.previous, maximum), previous = true, style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
             }
         }
     }
 }
 
+/** One stacked bar for the parts of spending; each row opens that part's transactions. */
 @Composable internal fun AnalysisComponentBars(snapshot: AnalysisSnapshot, onOpenGroup: (String) -> Unit) {
     val groups = snapshot.insights?.components.orEmpty()
-    val maximum = groups.maxOfOrNull { it.amount } ?: 0
+    val parts = remember(snapshot) { AnalysisPresentationBuilder.composition(snapshot) }
+    val colors = compositionColors()
     Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
         MasroofSectionHeader(stringResource(R.string.analysis_composition))
-        groups.forEach { group ->
-            MasroofValueBarRow(spendingGroupName(group), visualMoney(group.amount), fraction(if (group.amount < 0) 0 else group.amount, maximum),
-                modifier = Modifier.testTag("analysis-component-${group.key}"),
-                style = if (group.amount < 0) com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Inflow else com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Outflow,
-                onClick = { onOpenGroup(group.key) })
+        val description = parts.map { "${spendingGroupName(it.group)} ${stringResource(R.string.analysis_share_percent, it.percent)}" }.joinToString(" · ")
+        com.baraa.masroof.ui.components.MasroofStackedBar(parts.map { com.baraa.masroof.ui.components.MasroofStackedPart(it.share, colors.getValue(it.group.key)) },
+            AppDigits.display(description))
+        Column {
+            groups.forEach { group ->
+                val part = parts.firstOrNull { it.group.key == group.key }
+                Row(Modifier.fillMaxWidth().heightIn(min = MasroofSpacing.minimumTouchTarget)
+                    .clickable(role = Role.Button, onClick = { onOpenGroup(group.key) }).testTag("analysis-component-${group.key}"),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
+                    Box(Modifier.size(MasroofSpacing.sectionGap).background(if (part != null) colors.getValue(group.key) else
+                        MaterialTheme.colorScheme.surfaceVariant, com.baraa.masroof.ui.theme.MasroofComponentShapes.tokenSwatch))
+                    Text(spendingGroupName(group), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    part?.let { Text(AppDigits.display(stringResource(R.string.analysis_share_percent, it.percent)),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    Text(visualMoney(group.amount), style = MaterialTheme.typography.titleSmall,
+                        color = if (group.amount < 0) com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.inflow else MaterialTheme.colorScheme.onSurface)
+                }
+            }
         }
     }
+}
+
+@Composable private fun compositionColors(): Map<String, androidx.compose.ui.graphics.Color> {
+    val extended = com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors
+    return mapOf("PURCHASES" to extended.card, "CASH" to extended.liability, "TRANSFERS" to extended.account, "REFUNDS" to extended.inflow)
 }
 
 @Composable internal fun AnalysisChangeCard(snapshot: AnalysisSnapshot, onOpenGroup: (String) -> Unit) {
@@ -124,7 +155,8 @@ internal fun fraction(value: Long, maximum: Long) = com.baraa.masroof.ui.compone
             (if (showAll) merchants else merchants.take(5)).forEach { group ->
                 MasroofValueBarRow(AppDigits.display(group.name.orEmpty()), visualMoney(group.amount), fraction(group.amount, merchants.first().amount),
                     modifier = Modifier.testTag("analysis-merchant-${group.key}"),
-                    subtitle = AppDigits.display(stringResource(R.string.analysis_transaction_count, group.ids.size)), onClick = { onOpenGroup(group.key) })
+                    subtitle = AppDigits.display(stringResource(R.string.analysis_merchant_count, group.ids.size)), onClick = { onOpenGroup(group.key) },
+                    style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
             }
         }
     }

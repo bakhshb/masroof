@@ -31,41 +31,49 @@ import java.time.ZoneId
 @Composable internal fun HistoricalPurchases(state: AnalysisUiState, count: Int) {
     val history = remember(state.purchasePeriods, count) { state.purchaseHistory(count) }
     val periods = history.periods
-    MasroofCard {
-        MasroofGuidanceLabel(stringResource(R.string.lab_analysis_history_purchases), stringResource(R.string.lab_analysis_history_purchases_hint), style = MaterialTheme.typography.titleSmall)
-        Text(stringResource(R.string.lab_analysis_available_periods, history.available, count), style = MaterialTheme.typography.bodySmall)
-        if (history.total != null) {
-            val total = history.total
-            Text(stringResource(R.string.lab_analysis_history_total))
-            MasroofAmountText(formatLocalizedMoney(analysisAmount(total)), MasroofAmountRole.Card)
-            history.average?.let { Text(stringResource(R.string.lab_analysis_history_average, history.completeCount, formatLocalizedMoney(analysisAmount(it)))) }
-            history.latestChange?.let { Text(stringResource(R.string.lab_analysis_history_change, formatLocalizedMoney(analysisAmount(it)))) }
-            if (periods.any { it.actual != null && !it.complete }) Text(stringResource(R.string.lab_analysis_partial), style = MaterialTheme.typography.bodySmall)
-            // Never connect a line across a missing or partially covered period.
-            if (history.chartPeriods.isNotEmpty()) {
-                val chartPeriods = history.chartPeriods
-                var selected by rememberSaveable(count) { mutableIntStateOf(0) }
-                val index = selected.coerceIn(chartPeriods.indices)
-                val labels = chartPeriods.map { "${day(it.start)} — ${day(it.end - 1)} · ${formatLocalizedMoney(analysisAmount(requireNotNull(it.actual)))}" }
-                val axes = chartPeriods.map { day(it.start) }
-                Text(labels[index], style = MaterialTheme.typography.bodySmall)
-                com.baraa.masroof.ui.components.MasroofInteractiveLineChart(chartPeriods.map { analysisAmount(requireNotNull(it.actual)).amount }, java.math.BigDecimal.ZERO,
-                    labels = com.baraa.masroof.ui.components.LineChartLabels(stringResource(R.string.lab_analysis_period_axis),
-                        stringResource(R.string.chart_previous_point), stringResource(R.string.chart_next_point), ""),
-                    displayText = com.baraa.masroof.application.locale.AppDigits::display,
-                    selectedPointIndex = index, onPointSelected = { selected = it }, pointLabel = { labels[it] },
-                    axisLabel = { axes[it] }, currencyLabel = stringResource(R.string.lab_analysis_sar))
+    MasroofCard(Modifier.testTag("analysis-history")) {
+        Column(verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
+            MasroofGuidanceLabel(stringResource(R.string.lab_analysis_history_purchases), listOf(stringResource(R.string.lab_analysis_history_purchases_hint),
+                stringResource(R.string.lab_analysis_partial)).joinToString("\n\n"), style = MaterialTheme.typography.titleSmall,
+                contentColor = MaterialTheme.colorScheme.onSurface)
+            Row(verticalAlignment = androidx.compose.ui.Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.analysis_history_average_label), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    history.average?.let { MasroofAmountText(formatLocalizedMoney(analysisAmount(it)), MasroofAmountRole.Hero) }
+                }
+                Text(com.baraa.masroof.application.locale.AppDigits.display(stringResource(R.string.lab_analysis_available_periods, history.available, count)),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        }
-        periods.forEach { period ->
-            Text("${day(period.start)} — ${day(period.end - 1)}", style = MaterialTheme.typography.bodySmall)
-            if (period.actual == null) Text(stringResource(R.string.lab_analysis_period_unavailable)) else {
-                MasroofAmountText(formatLocalizedMoney(analysisAmount(period.actual)), MasroofAmountRole.Card)
-                if (!period.complete) Text(stringResource(R.string.lab_analysis_partial))
+            // Missing periods keep their empty slot and partly covered ones are striped; the chart never bridges a gap.
+            if (periods.any { it.actual != null }) {
+                var selected by rememberSaveable(count) { mutableIntStateOf(periods.indexOfLast { it.actual != null }) }
+                val index = selected.coerceIn(periods.indices)
+                val labels = periods.map { period -> com.baraa.masroof.application.locale.AppDigits.display("${day(period.start)} — ${day(period.end - 1)} · " +
+                    (period.actual?.let { formatLocalizedMoney(analysisAmount(it)) } ?: stringResource(R.string.lab_analysis_period_unavailable))) }
+                Text(labels[index], style = MaterialTheme.typography.bodySmall)
+                com.baraa.masroof.ui.components.MasroofDailyBarChart(periods.mapIndexed { i, period ->
+                    com.baraa.masroof.ui.components.MasroofDailyBar(period.actual?.let { analysisAmount(it).amount }, period.actual != null && !period.complete,
+                        labels[i], com.baraa.masroof.application.locale.AppDigits.display(monthLabel(period.start)))
+                }, index, { selected = it }, stringResource(R.string.chart_previous_point), stringResource(R.string.chart_next_point),
+                    { com.baraa.masroof.application.locale.AppDigits.display(it.stripTrailingZeros().toPlainString()) },
+                    Modifier.testTag("analysis-history-bars"), average = history.average?.let { analysisAmount(it).amount })
+            }
+            history.latestChange?.let { change ->
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
+                    Text(stringResource(R.string.analysis_history_latest_change), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                    MasroofBadge(com.baraa.masroof.application.locale.AppDigits.display(stringResource(
+                        if (change < 0) R.string.analysis_amount_down else R.string.analysis_amount_up,
+                        formatLocalizedMoney(analysisAmount(kotlin.math.abs(change))))),
+                        if (change < 0) MasroofCardAccent.Inflow else MasroofCardAccent.Outflow)
+                }
             }
         }
     }
 }
+
+@Composable private fun monthLabel(epochDay: Long): String = java.time.format.DateTimeFormatter.ofPattern("MMM",
+    androidx.compose.ui.platform.LocalConfiguration.current.locales[0]).format(java.time.LocalDate.ofEpochDay(epochDay))
 
 @Composable internal fun EvidenceGroup(ids: List<String>, reason: String, workflow: AnalyticsWorkflow,
     source: String, onOpenTransaction: (String) -> Unit, collapsible: Boolean = true) {

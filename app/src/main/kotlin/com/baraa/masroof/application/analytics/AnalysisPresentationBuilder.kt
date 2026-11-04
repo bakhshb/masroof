@@ -9,7 +9,15 @@ enum class ForecastComparisonStatus { UNAVAILABLE, AWAITING_ELIGIBLE_FORECAST, W
 data class ForecastComparisonExplanation(val status: ForecastComparisonStatus, val anchorDay: Long? = null, val enabledDay: Long? = null)
 data class AnalysisDailyBar(val day: Long, val amount: Long?, val expected: Boolean)
 enum class ForecastMethod { UNAVAILABLE, INITIAL, PERSONAL }
-data class ForecastExplanation(val method: ForecastMethod, val evaluations: List<AnalysisEvaluation>)
+data class ForecastExplanation(val method: ForecastMethod, val evaluations: List<AnalysisEvaluation>) {
+    /** Every qualified horizon came out below actual spending (positive bias = estimate lower than actual). */
+    val underestimates: Boolean get() = evaluations.isNotEmpty() && evaluations.all { it.bias > 0 }
+}
+/** [daysUntil] is null for an undated due; [share] is its part of the confirmed total, 0 for estimates. */
+data class AnalysisDueRow(val due: AnalysisDue, val daysUntil: Long?, val share: Float)
+data class AnalysisCommitmentsView(val confirmedTotal: Long, val confirmedCount: Int, val rows: List<AnalysisDueRow>,
+    val daysToPeriodEnd: Long)
+data class AnalysisCompositionPart(val group: com.baraa.masroof.application.dashboard.AnalysisSpendingGroup, val percent: Int, val share: Float)
 
 object AnalysisPresentationBuilder {
     fun forecast(snapshot: AnalysisSnapshot): ForecastExplanation {
@@ -48,6 +56,28 @@ object AnalysisPresentationBuilder {
         val expected = forecast != null && (actual == null || forecast > actual)
         val gap = snapshot.quality.coverageDays.firstOrNull { it.day == day }?.covered == false
         AnalysisDailyBar(day, if (gap && !expected) null else if (expected) forecast else actual ?: 0, expected)
+    }
+
+    /** Dues keep the snapshot's nearest-first order; only confirmed dues make up the total. */
+    fun commitments(snapshot: AnalysisSnapshot, today: Long): AnalysisCommitmentsView {
+        val confirmed = snapshot.dues.filter { it.confirmed }
+        val total = confirmed.fold(0L) { sum, due -> Math.addExact(sum, due.amount) }
+        return AnalysisCommitmentsView(total, confirmed.size, snapshot.dues.map { due ->
+            AnalysisDueRow(due, due.day?.let { it - today },
+                if (due.confirmed && total > 0 && due.amount > 0) (due.amount.toDouble() / total).toFloat() else 0f)
+        }, (snapshot.periodEnd - 1 - today).coerceAtLeast(0))
+    }
+
+    /** Positive spending components as shares of their sum; refunds stay a separate, subtracted line. */
+    fun composition(snapshot: AnalysisSnapshot): List<AnalysisCompositionPart> {
+        val parts = snapshot.insights?.components.orEmpty().filter { it.amount > 0 }
+        val total = parts.fold(0L) { sum, part -> Math.addExact(sum, part.amount) }
+        if (total <= 0) return emptyList()
+        return parts.map { part ->
+            AnalysisCompositionPart(part, java.math.BigDecimal.valueOf(part.amount).multiply(java.math.BigDecimal(100))
+                .divide(java.math.BigDecimal.valueOf(total), 0, java.math.RoundingMode.HALF_EVEN).toInt(),
+                (part.amount.toDouble() / total).toFloat())
+        }
     }
 
     fun coverage(data: CleanData, today: Long): List<AnalysisCoverageDay> {

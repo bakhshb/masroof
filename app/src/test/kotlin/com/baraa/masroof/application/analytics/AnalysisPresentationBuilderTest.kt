@@ -74,4 +74,34 @@ class AnalysisPresentationBuilderTest {
         val withAdditionalToday = snapshot.copy(days = snapshot.days + AnalysisDay(start + 1, null, 200))
         assertTrue(AnalysisPresentationBuilder.dailyBars(withAdditionalToday)[1].expected)
     }
+    @Test fun commitmentsTotalOnlyConfirmedDuesAndCountDaysFromToday() {
+        val today = start + 8
+        val dues = listOf(AnalysisDue("electricity", "SEC", 43850, today + 1, true), AnalysisDue("stc", "STC", 17635, today + 1, true),
+            AnalysisDue("guess", "Gym", 9000, today + 3, false), AnalysisDue("late", "Loan", 1000, today - 2, true),
+            AnalysisDue("undated", "Other", 0, null, true))
+        val view = AnalysisPresentationBuilder.commitments(state(start).snapshot!!.copy(dues = dues), today)
+        assertEquals(62485L, view.confirmedTotal)
+        assertEquals(4, view.confirmedCount)
+        assertEquals(listOf(1L, 1L, 3L, -2L, null), view.rows.map { it.daysUntil })
+        assertEquals(0f, view.rows[2].share) // an estimate is never part of the confirmed total
+        assertEquals(43850f / 62485, view.rows[0].share, 1e-6f)
+        assertEquals(start + 29 - today, view.daysToPeriodEnd)
+    }
+    @Test fun compositionSharesPositivePartsOnlyAndRoundsHalfEven() {
+        val groups = listOf(com.baraa.masroof.application.dashboard.AnalysisSpendingGroup("PURCHASES", 332237, emptyList()),
+            com.baraa.masroof.application.dashboard.AnalysisSpendingGroup("CASH", 245000, emptyList()),
+            com.baraa.masroof.application.dashboard.AnalysisSpendingGroup("TRANSFERS", 643733, emptyList()),
+            com.baraa.masroof.application.dashboard.AnalysisSpendingGroup("REFUNDS", -5000, emptyList()))
+        val snapshot = state(start).snapshot!!.copy(insights = com.baraa.masroof.application.dashboard.AnalysisSpendingInsights(groups, emptyList(), null))
+        val parts = AnalysisPresentationBuilder.composition(snapshot)
+        assertEquals(listOf("PURCHASES", "CASH", "TRANSFERS"), parts.map { it.group.key })
+        assertEquals(listOf(27, 20, 53), parts.map { it.percent })
+        assertTrue(AnalysisPresentationBuilder.composition(snapshot.copy(insights = null)).isEmpty())
+    }
+    @Test fun underestimatesOnlyWhenEveryQualifiedHorizonRanLow() {
+        val low = listOf(AnalysisEvaluation(1, 13, 119778, 113357), AnalysisEvaluation(7, 11, 429500, 414815))
+        assertTrue(ForecastExplanation(ForecastMethod.INITIAL, low).underestimates)
+        assertFalse(ForecastExplanation(ForecastMethod.INITIAL, low + AnalysisEvaluation(14, 9, 100, -50)).underestimates)
+        assertFalse(ForecastExplanation(ForecastMethod.INITIAL, emptyList()).underestimates)
+    }
 }
