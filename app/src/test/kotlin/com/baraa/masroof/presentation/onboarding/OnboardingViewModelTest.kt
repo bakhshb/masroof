@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.onboarding
 
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 import com.baraa.masroof.application.onboarding.ImportDatePolicy
 import com.baraa.masroof.application.backup.BackupImportOutcome
 import com.baraa.masroof.application.backup.BackupPackageKind
@@ -22,6 +23,7 @@ import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 import kotlinx.coroutines.CompletableDeferred
 import com.baraa.masroof.application.sms.SmsScanFailure
 import com.baraa.masroof.application.sms.SmsScanResult
@@ -45,6 +47,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
 class OnboardingViewModelTest {
     private val dispatcher = StandardTestDispatcher()
 
@@ -600,6 +603,16 @@ AccountRegistryEntry.forTest(
         assertTrue(fixture.vm.uiState.value.importState is ImportState.ProviderError)
     }
 
+    @Test
+    fun restoreBackup_invalidPackage_setsError() = runTest {
+        val fixture = Fixture(permissionGranted = false)
+        advanceUntilIdle()
+        fixture.vm.restoreBackup(android.net.Uri.parse("content://backup/invalid.masroof"))
+        advanceUntilIdle()
+        assertEquals(OnboardingError.BACKUP_RESTORE_INVALID, fixture.vm.uiState.value.error)
+        assertFalse(fixture.vm.uiState.value.restoringBackup)
+    }
+
     private class Fixture(
         now: Instant = Instant.parse("2026-08-11T08:00:00Z"),
         permissionGranted: Boolean = true,
@@ -648,8 +661,6 @@ AccountRegistryEntry.forTest(
     private class FakeDatabaseBackupGateway(
         var outcome: BackupImportOutcome = BackupImportOutcome.InvalidPackage,
     ) : DatabaseBackupGateway {
-        var lastImportUri: android.net.Uri? = null
-
         override suspend fun exportTo(destination: android.net.Uri, passphrase: CharArray): Result<Unit> =
             Result.success(Unit)
 
@@ -659,10 +670,7 @@ AccountRegistryEntry.forTest(
             source: android.net.Uri,
             passphrase: CharArray,
             confirmLegacyPlaintext: Boolean,
-        ): BackupImportOutcome {
-            lastImportUri = source
-            return outcome
-        }
+        ): BackupImportOutcome = outcome
     }
 
     private class FakeOnboardingPrefs : OnboardingPreferencesRepository {
@@ -788,12 +796,7 @@ AccountRegistryEntry.forTest(
         override suspend fun updateCardType(reference: CardReference, cardType: CardType?) = Unit
     }
 
-    private class FakeReviewRepo : ReviewRepository {
-        override suspend fun getById(id: String): ReviewItem? = null
-        override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? = null
-        override suspend fun listRequired(): List<ReviewItem> = emptyList()
-        override suspend fun listIgnored(): List<ReviewItem> = emptyList()
-        override suspend fun listAll(): List<ReviewItem> = emptyList()
+    private class FakeReviewRepo : EmptyReviewRepository() {
         override suspend fun upsertRequired(
             rawSmsId: String,
             kind: ReviewKind,
@@ -813,11 +816,5 @@ AccountRegistryEntry.forTest(
                 resolvedTransactionId = null,
             )
         }
-        override suspend fun markResolved(
-            id: String,
-            resolutionKind: com.baraa.masroof.domain.model.ReviewResolutionKind,
-            resolvedAt: Instant,
-            resolvedTransactionId: String?,
-        ): ReviewItem? = null
     }
 }

@@ -1,5 +1,8 @@
 package com.baraa.masroof.application.ingestion
 
+import com.baraa.masroof.testsupport.EmptyParsedEventRepository
+import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -8,6 +11,7 @@ import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.testsupport.EngineFixtureParser
+import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
@@ -84,11 +88,7 @@ class ProcessRawSmsUseCaseTest {
             parseCalls.incrementAndGet()
             EngineFixtureParser().parse(input)
         }
-        useCase = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(pipeline = countingGateway),
-        )
+        useCase = newUseCase(pipeline = countingGateway)
     }
 
     @After
@@ -216,11 +216,7 @@ class ProcessRawSmsUseCaseTest {
     @Test
     fun reparseStored_doesNotReapplyIngestDetection() = runBlocking {
         val exploding = SmsParseGateway { throw IllegalStateException("reparse-boom") }
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(pipeline = exploding),
-        )
+        val svc = newUseCase(pipeline = exploding)
         val raw = RawSms(
             id = "android-sms:other-bank-stored",
             sender = "OtherBank",
@@ -259,11 +255,7 @@ class ProcessRawSmsUseCaseTest {
     @Test
     fun reparseStored_rawSmsWithoutParsedEvent_stillInvokesParser() = runBlocking {
         val exploding = SmsParseGateway { throw IllegalStateException("reparse-no-event-boom") }
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(pipeline = exploding),
-        )
+        val svc = newUseCase(pipeline = exploding)
         val raw = RawSms(
             id = "android-sms:unsupported-stored",
             sender = "OtherBank",
@@ -297,11 +289,7 @@ class ProcessRawSmsUseCaseTest {
     @Test
     fun parserFailure_keepsRawSmsAndReturnsFailed() = runBlocking {
         val exploding = SmsParseGateway { throw IllegalStateException("boom") }
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(pipeline = exploding),
-        )
+        val svc = newUseCase(pipeline = exploding)
         val raw = aljaziraPurchase(id = "android-sms:fail", deviceId = "fail")
         val result = svc.ingest(raw)
         assertTrue(result is SmsIngestionResult.Failed)
@@ -312,11 +300,7 @@ class ProcessRawSmsUseCaseTest {
     @Test
     fun parserCancellation_propagates() = runBlocking {
         val cancelling = SmsParseGateway { throw CancellationException("cancel") }
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(pipeline = cancelling),
-        )
+        val svc = newUseCase(pipeline = cancelling)
         val raw = aljaziraPurchase(id = "android-sms:cancel", deviceId = "cancel")
         try {
             svc.ingest(raw)
@@ -329,26 +313,12 @@ class ProcessRawSmsUseCaseTest {
 
     @Test
     fun parsedEventSaveFailure_returnsFailed_keepsRawSms() = runBlocking {
-        val failingParsedRepo = object : ParsedEventRepository {
+        val failingParsedRepo = object : EmptyParsedEventRepository() {
             override suspend fun save(event: ParsedEvent, details: ParsedEventDetails) {
                 throw IllegalStateException("save failed")
             }
-
-            override suspend fun getById(id: String): ParsedEventRecord? = null
-            override suspend fun findByRawSmsId(rawSmsId: String): ParsedEventRecord? = null
-            override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
-            override suspend fun listAll(): List<ParsedEventRecord> = emptyList()
-
-            override suspend fun listReceivedBetween(
-                startInclusive: java.time.Instant,
-                endExclusive: java.time.Instant,
-            ): List<ParsedEventRecord> = emptyList()
         }
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = failingParsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(),
-        )
+        val svc = newUseCase(parsed = failingParsedRepo)
         val raw = aljaziraPurchase(id = "android-sms:save-fail", deviceId = "save-fail")
         val result = svc.ingest(raw)
         assertTrue(result is SmsIngestionResult.Failed)
@@ -372,47 +342,15 @@ class ProcessRawSmsUseCaseTest {
 
     @Test
     fun p8DerivedSaveException_keepsEvidenceAndReportsReconciliationIncomplete() = runBlocking {
-        val throwingFtRepo = object : FinancialTransactionRepository {
+        val throwingFtRepo = object : EmptyFinancialTransactionRepository() {
             override suspend fun save(
                 transaction: FinancialTransaction,
                 rawSmsIds: Collection<String>,
             ): FinancialTransactionSaveResult {
                 throw IllegalStateException("p8-save-boom")
             }
-
-            override suspend fun getById(id: String): FinancialTransaction? = null
-            override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
-            override suspend fun listAll(): List<FinancialTransaction> = emptyList()
-            override suspend fun listOccurredBetween(
-                startInclusive: java.time.Instant,
-                endExclusive: java.time.Instant,
-            ): List<FinancialTransaction> = emptyList()
-            override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
-            override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
-            override suspend fun update(transaction: FinancialTransaction): Boolean = false
-            override suspend fun updateAppliedExchangeRate(
-                id: String,
-                exchangeRate: java.math.BigDecimal,
-                source: com.baraa.masroof.domain.model.ExchangeRateSource,
-            ): Boolean = false
-            override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
-            override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
-
         }
-        val accounts = RoomAccountRegistryRepository.from(db)
-        val cards = RoomCardRegistryRepository.from(db)
-        val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = throwingFtRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
-        )
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(),
-            reconciliation = reconciliation,
-        )
+        val svc = newUseCase(ledger = throwingFtRepo)
         val raw = aljaziraPurchase(id = "android-sms:p8-fail", deviceId = "p8-fail")
         val result = svc.ingest(raw)
         assertTrue(result is SmsIngestionResult.DerivedIncomplete)
@@ -427,20 +365,11 @@ class ProcessRawSmsUseCaseTest {
 
     @Test
     fun p9ReviewQueueException_keepsPostedTransactionAndReportsReviewIncomplete() = runBlocking {
-        val accounts = RoomAccountRegistryRepository.from(db)
-        val cards = RoomCardRegistryRepository.from(db)
         val ftRepo = RoomFinancialTransactionRepository(
             db.financialTransactionDao(),
             db.parsedEventDao(),
         )
-        val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = ftRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
-        )
-        val throwingReviews = object : ReviewRepository {
-            override suspend fun getById(id: String): ReviewItem? = null
+        val throwingReviews = object : EmptyReviewRepository() {
             override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? =
                 ReviewItem(
                     id = "review:$rawSmsId",
@@ -454,9 +383,7 @@ class ProcessRawSmsUseCaseTest {
                     resolutionKind = null,
                     resolvedTransactionId = null,
                 )
-            override suspend fun listRequired(): List<ReviewItem> = emptyList()
-            override suspend fun listIgnored(): List<ReviewItem> = emptyList()
-            override suspend fun listAll(): List<ReviewItem> = emptyList()
+
             override suspend fun upsertRequired(
                 rawSmsId: String,
                 kind: ReviewKind,
@@ -475,18 +402,7 @@ class ProcessRawSmsUseCaseTest {
                 throw IllegalStateException("p9-review-boom")
             }
         }
-        val updater = ReviewQueueUpdater(
-            reviewRepository = throwingReviews,
-            financialTransactionRepository = ftRepo,
-            clock = InstantClock.System,
-        )
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(),
-            reconciliation = reconciliation,
-            reviewQueueUpdater = updater,
-        )
+        val svc = newUseCase(ledger = ftRepo, reviews = throwingReviews)
         val raw = aljaziraBillPayment(id = "android-sms:p9-fail", deviceId = "p9-fail")
         val result = svc.ingest(raw)
         assertTrue(result is SmsIngestionResult.DerivedIncomplete)
@@ -502,24 +418,11 @@ class ProcessRawSmsUseCaseTest {
 
     @Test
     fun p9ReviewCancellation_propagatesOutOfIngestion() = runBlocking {
-        val accounts = RoomAccountRegistryRepository.from(db)
-        val cards = RoomCardRegistryRepository.from(db)
         val ftRepo = RoomFinancialTransactionRepository(
             db.financialTransactionDao(),
             db.parsedEventDao(),
         )
-        val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = ftRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
-        )
-        val cancellingReviews = object : ReviewRepository {
-            override suspend fun getById(id: String): ReviewItem? = null
-            override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? = null
-            override suspend fun listRequired(): List<ReviewItem> = emptyList()
-            override suspend fun listIgnored(): List<ReviewItem> = emptyList()
-            override suspend fun listAll(): List<ReviewItem> = emptyList()
+        val cancellingReviews = object : EmptyReviewRepository() {
             override suspend fun upsertRequired(
                 rawSmsId: String,
                 kind: ReviewKind,
@@ -528,26 +431,8 @@ class ProcessRawSmsUseCaseTest {
             ): ReviewItem {
                 throw CancellationException("p9-cancel")
             }
-
-            override suspend fun markResolved(
-                id: String,
-                resolutionKind: ReviewResolutionKind,
-                resolvedAt: Instant,
-                resolvedTransactionId: String?,
-            ): ReviewItem? = null
         }
-        val updater = ReviewQueueUpdater(
-            reviewRepository = cancellingReviews,
-            financialTransactionRepository = ftRepo,
-            clock = InstantClock.System,
-        )
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(),
-            reconciliation = reconciliation,
-            reviewQueueUpdater = updater,
-        )
+        val svc = newUseCase(ledger = ftRepo, reviews = cancellingReviews)
         val raw = RawSms(
             id = "android-sms:p9-cancel",
             sender = "AlJazira",
@@ -568,47 +453,15 @@ class ProcessRawSmsUseCaseTest {
 
     @Test
     fun p8DerivedCancellation_propagatesOutOfIngestion() = runBlocking {
-        val cancellingFtRepo = object : FinancialTransactionRepository {
+        val cancellingFtRepo = object : EmptyFinancialTransactionRepository() {
             override suspend fun save(
                 transaction: FinancialTransaction,
                 rawSmsIds: Collection<String>,
             ): FinancialTransactionSaveResult {
                 throw CancellationException("p8-cancel")
             }
-
-            override suspend fun getById(id: String): FinancialTransaction? = null
-            override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
-            override suspend fun listAll(): List<FinancialTransaction> = emptyList()
-            override suspend fun listOccurredBetween(
-                startInclusive: java.time.Instant,
-                endExclusive: java.time.Instant,
-            ): List<FinancialTransaction> = emptyList()
-            override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
-            override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
-            override suspend fun update(transaction: FinancialTransaction): Boolean = false
-            override suspend fun updateAppliedExchangeRate(
-                id: String,
-                exchangeRate: java.math.BigDecimal,
-                source: com.baraa.masroof.domain.model.ExchangeRateSource,
-            ): Boolean = false
-            override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
-            override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
-
         }
-        val accounts = RoomAccountRegistryRepository.from(db)
-        val cards = RoomCardRegistryRepository.from(db)
-        val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = cancellingFtRepo,
-            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
-        )
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(),
-            reconciliation = reconciliation,
-        )
+        val svc = newUseCase(ledger = cancellingFtRepo)
         val raw = aljaziraPurchase(id = "android-sms:p8-cancel", deviceId = "p8-cancel")
         try {
             svc.ingest(raw)
@@ -634,23 +487,10 @@ class ProcessRawSmsUseCaseTest {
                 details = parsed.details,
             )
         }
-        val accounts = RoomAccountRegistryRepository.from(db)
-        val cards = RoomCardRegistryRepository.from(db)
-        cards.setOwnership(com.baraa.masroof.domain.model.CardReference(Bank.BANK_ALJAZIRA, "7271"), com.baraa.masroof.domain.model.OwnershipStatus.OWNED)
+        RoomCardRegistryRepository.from(db).setOwnership(com.baraa.masroof.domain.model.CardReference(Bank.BANK_ALJAZIRA, "7271"), com.baraa.masroof.domain.model.OwnershipStatus.OWNED)
         val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(pipeline = reviewRequiredGateway),
-            reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
-                rawSmsRepository = rawRepo,
-                financialTransactionRepository = ftRepo,
-                ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
-            ),
-            reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, InstantClock.System),
-        )
+        val svc = newUseCase(pipeline = reviewRequiredGateway, ledger = ftRepo, reviews = reviewRepo)
         val raw = aljaziraPurchase(id = "android-sms:rr-amount", deviceId = "rr-amount")
         val result = svc.ingest(raw)
         assertTrue(result is SmsIngestionResult.ReviewRequired)
@@ -663,25 +503,38 @@ class ProcessRawSmsUseCaseTest {
 
     @Test
     fun successPurchase_stillAssemblesExpense() = runBlocking {
-        val accounts = RoomAccountRegistryRepository.from(db)
-        val cards = RoomCardRegistryRepository.from(db)
-        cards.setOwnership(com.baraa.masroof.domain.model.CardReference(Bank.BANK_ALJAZIRA, "7271"), com.baraa.masroof.domain.model.OwnershipStatus.OWNED)
+        RoomCardRegistryRepository.from(db).setOwnership(com.baraa.masroof.domain.model.CardReference(Bank.BANK_ALJAZIRA, "7271"), com.baraa.masroof.domain.model.OwnershipStatus.OWNED)
         val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(),
-            reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
-                rawSmsRepository = rawRepo,
-                financialTransactionRepository = ftRepo,
-                ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
-            ),
-        )
+        val svc = newUseCase(ledger = ftRepo)
         val raw = aljaziraPurchase(id = "android-sms:ok-amount", deviceId = "ok-amount")
         assertTrue(svc.ingest(raw) is SmsIngestionResult.Parsed)
         assertEquals(FinancialTransactionType.EXPENSE, ftRepo.findByRawSmsId(raw.id)!!.type)
     }
+
+    /** [ledger] adds reconciliation over Room registries; [reviews] adds the review-queue updater. */
+    private fun newUseCase(
+        pipeline: SmsParseGateway = EngineFixtureParser(),
+        parsed: ParsedEventRepository = parsedRepo,
+        ledger: FinancialTransactionRepository? = null,
+        reviews: ReviewRepository? = null,
+    ) = ProcessRawSmsUseCase(
+        rawSmsRepository = rawRepo,
+        parsedEventRepository = parsed,
+        bankSmsRegistry = alJaziraSmsRegistry(pipeline = pipeline),
+        reconciliation = ledger?.let {
+            TransactionReconciliationService(
+                parsedEventRepository = parsedRepo,
+                rawSmsRepository = rawRepo,
+                financialTransactionRepository = it,
+                ownershipResolver = OwnershipResolver(
+                    RoomAccountRegistryRepository.from(db),
+                    RoomCardRegistryRepository.from(db),
+                    NoOpLoanRegistryRepository,
+                ),
+            )
+        },
+        reviewQueueUpdater = reviews?.let { ReviewQueueUpdater(it, requireNotNull(ledger), InstantClock.System) },
+    )
 
     private fun reviewingUseCase(
         pipeline: SmsParseGateway,
@@ -1054,11 +907,7 @@ class ProcessRawSmsUseCaseTest {
 
     @Test
     fun reparseStored_notMatchedLegacySender_usesSoleAdapter() = runBlocking {
-        val svc = ProcessRawSmsUseCase(
-            rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
-            bankSmsRegistry = alJaziraSmsRegistry(),
-        )
+        val svc = newUseCase()
         val purchase = aljaziraPurchase(id = "android-sms:legacy-unmatched", deviceId = "legacy-unmatched")
         val raw = purchase.copy(sender = "LegacyInboxLabel")
         rawRepo.insertIfAbsent(raw)

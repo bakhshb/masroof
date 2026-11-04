@@ -1,5 +1,9 @@
 package com.baraa.masroof.application.dashboard
 
+import com.baraa.masroof.testsupport.EmptyRawSmsRepository
+import com.baraa.masroof.testsupport.EmptyParsedEventRepository
+import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 import com.baraa.masroof.testsupport.FakeAppLocaleRepository
 import com.baraa.masroof.testsupport.StubAccountRegistryRepository
 import com.baraa.masroof.core.money.Currency
@@ -260,7 +264,7 @@ class DashboardServiceTest {
         rawRepo: RawSmsRepository = FakeRawRepo(),
         accountRepo: AccountRegistryRepository = StubAccountRegistryRepository(),
         cardRepo: CardRegistryRepository = NoOpCardRegistryRepository(),
-        loanRepo: LoanRegistryRepository = FakeLoanRepo(),
+        loanRepo: LoanRegistryRepository = com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
         commitmentRepo: com.baraa.masroof.domain.repository.CommitmentRepository = NoOpCommitmentRepository(),
     ): DashboardService =
         DashboardService(
@@ -278,22 +282,10 @@ class DashboardServiceTest {
             clock = clock,
         )
 
-    private class FakeLoanRepo : LoanRegistryRepository {
-        override suspend fun observe(reference: com.baraa.masroof.domain.model.LoanReference, rawSmsId: String) = Unit
-        override suspend fun setOwnership(reference: com.baraa.masroof.domain.model.LoanReference, status: OwnershipStatus) = Unit
-        override suspend fun resolve(reference: com.baraa.masroof.domain.model.LoanReference): OwnershipStatus = OwnershipStatus.UNKNOWN
-        override suspend fun get(reference: com.baraa.masroof.domain.model.LoanReference): com.baraa.masroof.domain.model.LoanRegistryEntry? = null
-        override suspend fun listAll(): List<com.baraa.masroof.domain.model.LoanRegistryEntry> = emptyList()
-        override suspend fun updateDisplayName(reference: com.baraa.masroof.domain.model.LoanReference, displayName: String?) = Unit
-    }
 
     private class FakeParsedRepo(
         private val records: List<ParsedEventRecord> = emptyList(),
-    ) : ParsedEventRepository {
-        override suspend fun save(event: ParsedEvent, details: ParsedEventDetails) = Unit
-        override suspend fun getById(id: String): ParsedEventRecord? = null
-        override suspend fun findByRawSmsId(rawSmsId: String): ParsedEventRecord? = null
-        override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
+    ) : EmptyParsedEventRepository() {
         override suspend fun listAll(): List<ParsedEventRecord> = records
 
         override suspend fun listReceivedBetween(
@@ -304,18 +296,9 @@ class DashboardServiceTest {
 
     private class FakeRawRepo(
         private val byId: Map<String, RawSms> = emptyMap(),
-    ) : RawSmsRepository {
-        override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult = RawSmsInsertResult.Inserted
+    ) : EmptyRawSmsRepository() {
         override suspend fun getById(id: String): RawSms? = byId[id]
-        override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? = null
         override suspend fun listIdsByReceivedAt(): List<String> = byId.keys.toList()
-        override suspend fun listCrossSourceNearDuplicates(
-            sender: String,
-            bodyHash: String,
-            fromInclusive: Instant,
-            toInclusive: Instant,
-            lookingForLiveRow: Boolean,
-        ): List<com.baraa.masroof.domain.model.RawSms> = emptyList()
     }
 
     private fun tx(
@@ -341,14 +324,8 @@ class DashboardServiceTest {
 
     private class FakeFtRepo(
         private val all: List<FinancialTransaction>,
-    ) : FinancialTransactionRepository {
-        override suspend fun save(
-            transaction: FinancialTransaction,
-            rawSmsIds: Collection<String>,
-        ): FinancialTransactionSaveResult = FinancialTransactionSaveResult.Saved
-
+    ) : EmptyFinancialTransactionRepository() {
         override suspend fun getById(id: String): FinancialTransaction? = all.firstOrNull { it.id == id }
-        override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
         override suspend fun listAll(): List<FinancialTransaction> = all
         override suspend fun listOccurredBetween(
             startInclusive: Instant,
@@ -356,25 +333,11 @@ class DashboardServiceTest {
         ): List<FinancialTransaction> =
             all.filter { !it.occurredAt.isBefore(startInclusive) && it.occurredAt.isBefore(endExclusive) }
                 .sortedWith(compareByDescending<FinancialTransaction> { it.occurredAt }.thenByDescending { it.id })
-
-        override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
-        override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
-        override suspend fun update(transaction: FinancialTransaction): Boolean = false
-        override suspend fun updateAppliedExchangeRate(
-            id: String,
-            exchangeRate: java.math.BigDecimal,
-            source: com.baraa.masroof.domain.model.ExchangeRateSource,
-        ): Boolean = false
-        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
-        override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
-
     }
 
     private class FakeReviewRepo(
         private val requiredCount: Int = 0,
-    ) : ReviewRepository {
-        override suspend fun getById(id: String) = null
-        override suspend fun findByRawSmsId(rawSmsId: String) = null
+    ) : EmptyReviewRepository() {
         override suspend fun listRequired(): List<ReviewItem> =
             (1..requiredCount).map { idx ->
                 ReviewItem(
@@ -392,19 +355,5 @@ class DashboardServiceTest {
             }
 
         override suspend fun listAll(): List<ReviewItem> = listRequired()
-        override suspend fun listIgnored(): List<ReviewItem> = emptyList()
-        override suspend fun upsertRequired(
-            rawSmsId: String,
-            kind: ReviewKind,
-            reasons: List<String>,
-            now: Instant,
-        ): ReviewItem = error("unused")
-
-        override suspend fun markResolved(
-            id: String,
-            resolutionKind: com.baraa.masroof.domain.model.ReviewResolutionKind,
-            resolvedAt: Instant,
-            resolvedTransactionId: String?,
-        ): ReviewItem? = null
     }
 }

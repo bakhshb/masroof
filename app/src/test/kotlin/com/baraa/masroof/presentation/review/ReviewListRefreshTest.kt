@@ -371,10 +371,7 @@ class ReviewListRefreshTest {
                 reviewQueueUpdater = updater,
             ),
             reparseStoredSms = {},
-            appLocaleRepository = object : AppLocaleRepository {
-                override fun getLanguageTag(): String = "en"
-                override fun setLanguageTag(languageTag: String) = Unit
-            },
+            appLocaleRepository = com.baraa.masroof.testsupport.FakeAppLocaleRepository("en"),
         )
 
         suspend fun confirmCardOwned(last4: String) {

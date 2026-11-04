@@ -17,6 +17,7 @@ import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
@@ -41,150 +42,59 @@ internal object SettingsViewModelTestSupport {
             ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
         )
 
-    fun noOpRestoreService(): TransactionRestoreService =
-        TransactionRestoreService(
-            reviewRepository = emptyReviewRepository(),
-            financialTransactionRepository = emptyFinancialTransactionRepository(),
+    fun restoreService(
+        reviewRepository: ReviewRepository = emptyReviewRepository(),
+        financialTransactionRepository: FinancialTransactionRepository = emptyFinancialTransactionRepository(),
+        clock: InstantClock = InstantClock.System,
+    ): TransactionRestoreService {
+        val ownershipResolver = OwnershipResolver(
+            accountRegistry = emptyAccountRegistry(),
+            cardRegistry = emptyCardRegistry(),
+            loanRegistry = NoOpLoanRegistryRepository,
+        )
+        return TransactionRestoreService(
+            reviewRepository = reviewRepository,
+            financialTransactionRepository = financialTransactionRepository,
             reconciliation = TransactionReconciliationService(
                 parsedEventRepository = emptyParsedEventRepository(),
                 rawSmsRepository = emptyRawSmsRepository(),
-                financialTransactionRepository = emptyFinancialTransactionRepository(),
-                ownershipResolver = OwnershipResolver(
-                    accountRegistry = emptyAccountRegistry(),
-                    cardRegistry = emptyCardRegistry(),
-                    loanRegistry = NoOpLoanRegistryRepository,
-                ),
+                financialTransactionRepository = financialTransactionRepository,
+                ownershipResolver = ownershipResolver,
             ),
             reclassification = TransactionReclassificationService(
-                financialTransactionRepository = emptyFinancialTransactionRepository(),
+                financialTransactionRepository = financialTransactionRepository,
                 effectiveParsedEventProvider = EffectiveParsedEventProvider(
                     parsedEventRepository = emptyParsedEventRepository(),
-                    userCorrectionRepository = object : com.baraa.masroof.domain.repository.UserCorrectionRepository {
-                        override suspend fun save(correction: com.baraa.masroof.domain.model.UserCorrection) = Unit
-                        override suspend fun latestForRawSmsId(rawSmsId: String) = null
-                        override suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrection> =
-                            emptyList()
-                        override suspend fun listForRawSmsIds(rawSmsIds: Collection<String>): List<UserCorrection> =
-                            emptyList()
-                        override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.UserCorrection>()
-                    },
+                    userCorrectionRepository = emptyUserCorrectionRepository(),
                 ),
-                ownershipResolver = OwnershipResolver(
-                    accountRegistry = emptyAccountRegistry(),
-                    cardRegistry = emptyCardRegistry(),
-                    loanRegistry = NoOpLoanRegistryRepository,
-                ),
+                ownershipResolver = ownershipResolver,
             ),
-            clock = InstantClock.System,
+            clock = clock,
         )
+    }
 
-    fun emptyRawSmsRepository(): RawSmsRepository =
-        object : RawSmsRepository {
-            override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult =
-                RawSmsInsertResult.Inserted
-
-            override suspend fun getById(id: String): RawSms? = null
-
-
-            override suspend fun findByDeviceMessageId(deviceMessageId: String): RawSms? = null
-            override suspend fun listIdsByReceivedAt(): List<String> = emptyList()
-
-            override suspend fun listCrossSourceNearDuplicates(
-                sender: String,
-                bodyHash: String,
-                fromInclusive: java.time.Instant,
-                toInclusive: java.time.Instant,
-                lookingForLiveRow: Boolean,
-            ): List<com.baraa.masroof.domain.model.RawSms> = emptyList()
+    fun emptyUserCorrectionRepository(): UserCorrectionRepository =
+        object : UserCorrectionRepository {
+            override suspend fun save(correction: UserCorrection) = Unit
+            override suspend fun latestForRawSmsId(rawSmsId: String) = null
+            override suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrection> = emptyList()
+            override suspend fun listForRawSmsIds(rawSmsIds: Collection<String>): List<UserCorrection> = emptyList()
+            override suspend fun listAll(): List<UserCorrection> = emptyList()
         }
 
-    private fun emptyReviewRepository(): ReviewRepository =
-        object : ReviewRepository {
-            override suspend fun getById(id: String) = null
-            override suspend fun findByRawSmsId(rawSmsId: String) = null
-            override suspend fun listRequired() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
-            override suspend fun listIgnored() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
-            override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.ReviewItem>()
-            override suspend fun upsertRequired(
-                rawSmsId: String,
-                kind: com.baraa.masroof.domain.model.ReviewKind,
-                reasons: List<String>,
-                now: java.time.Instant,
-            ) = error("unused")
-            override suspend fun markResolved(
-                id: String,
-                resolutionKind: com.baraa.masroof.domain.model.ReviewResolutionKind,
-                resolvedAt: java.time.Instant,
-                resolvedTransactionId: String?,
-            ) = null
-        }
+    fun emptyRawSmsRepository(): RawSmsRepository = EmptyRawSmsRepository()
+
+
+    fun emptyReviewRepository(): ReviewRepository = EmptyReviewRepository()
+
 
     internal fun emptyFinancialTransactionRepository(): FinancialTransactionRepository =
-        object : FinancialTransactionRepository {
-            override suspend fun getById(id: String) = null
-            override suspend fun findByRawSmsId(rawSmsId: String) = null
-            override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.FinancialTransaction>()
-            override suspend fun listOccurredBetween(
-                startInclusive: java.time.Instant,
-                endExclusive: java.time.Instant,
-            ) = emptyList<com.baraa.masroof.domain.model.FinancialTransaction>()
-            override suspend fun save(
-                transaction: com.baraa.masroof.domain.model.FinancialTransaction,
-                rawSmsIds: Collection<String>,
-            ) = FinancialTransactionSaveResult.Saved
-            override suspend fun update(transaction: com.baraa.masroof.domain.model.FinancialTransaction) = false
-            override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
-            override suspend fun unlinkRawSms(rawSmsId: String) = false
-            override suspend fun listRawSmsIds(transactionId: String) = emptyList<String>()
-            override suspend fun isRawSmsLinked(rawSmsId: String) = false
-            override suspend fun updateAppliedExchangeRate(
-                id: String,
-                exchangeRate: java.math.BigDecimal,
-                source: com.baraa.masroof.domain.model.ExchangeRateSource,
-            ) = false
-        }
+        EmptyFinancialTransactionRepository()
 
-    internal fun emptyParsedEventRepository(): ParsedEventRepository =
-        object : ParsedEventRepository {
-            override suspend fun save(
-                event: com.baraa.masroof.domain.model.ParsedEvent,
-                details: ParsedEventDetails,
-            ) = Unit
-            override suspend fun getById(id: String) = null
-            override suspend fun findByRawSmsId(rawSmsId: String) = null
-            override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
-            override suspend fun listAll() =
-                emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
 
-            override suspend fun listReceivedBetween(
-                startInclusive: java.time.Instant,
-                endExclusive: java.time.Instant,
-            ) = emptyList<com.baraa.masroof.parsing.repository.ParsedEventRecord>()
-        }
+    internal fun emptyParsedEventRepository(): ParsedEventRepository = EmptyParsedEventRepository()
 
-    internal fun emptyAccountRegistry(): AccountRegistryRepository =
-        object : AccountRegistryRepository {
-            override suspend fun observe(
-                reference: com.baraa.masroof.domain.model.AccountReference,
-                rawSmsId: String,
-            ) = Unit
-            override suspend fun setOwnership(
-                reference: com.baraa.masroof.domain.model.AccountReference,
-                status: com.baraa.masroof.domain.model.OwnershipStatus,
-            ) = Unit
-            override suspend fun resolve(reference: com.baraa.masroof.domain.model.AccountReference) =
-                com.baraa.masroof.domain.model.OwnershipStatus.UNKNOWN
-            override suspend fun get(reference: com.baraa.masroof.domain.model.AccountReference) = null
-            override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.AccountRegistryEntry>()
-            override suspend fun updateDisplayName(
-                reference: com.baraa.masroof.domain.model.AccountReference,
-                displayName: String?,
-            ) = Unit
-            override suspend fun updateAccountType(
-                reference: com.baraa.masroof.domain.model.AccountReference,
-                accountType: com.baraa.masroof.domain.model.AccountType,
-            ) = Unit
-        }
+    internal fun emptyAccountRegistry(): AccountRegistryRepository = StubAccountRegistryRepository()
 
     internal fun emptyCardRegistry(): CardRegistryRepository = NoOpCardRegistryRepository()
 }

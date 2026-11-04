@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.dashboard
 
+import com.baraa.masroof.testsupport.EmptyRawSmsRepository
+import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
@@ -71,46 +73,14 @@ class TransactionSmsEvidenceLoaderTest {
 
     private class FakeFinancialTransactionRepository(
         private val links: Map<String, List<String>> = emptyMap(),
-    ) : FinancialTransactionRepository {
-        override suspend fun save(
-            transaction: com.baraa.masroof.domain.model.FinancialTransaction,
-            rawSmsIds: Collection<String>,
-        ) = com.baraa.masroof.domain.repository.FinancialTransactionSaveResult.Saved
-
-        override suspend fun getById(id: String) = null
-        override suspend fun findByRawSmsId(rawSmsId: String) = null
-        override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.FinancialTransaction>()
-        override suspend fun listOccurredBetween(
-            startInclusive: Instant,
-            endExclusive: Instant,
-        ) = emptyList<com.baraa.masroof.domain.model.FinancialTransaction>()
-
-        override suspend fun isRawSmsLinked(rawSmsId: String) = false
+    ) : EmptyFinancialTransactionRepository() {
         override suspend fun listRawSmsIds(transactionId: String) = links[transactionId].orEmpty()
-        override suspend fun update(transaction: com.baraa.masroof.domain.model.FinancialTransaction) = false
-        override suspend fun updateAppliedExchangeRate(
-            id: String,
-            exchangeRate: java.math.BigDecimal,
-            source: com.baraa.masroof.domain.model.ExchangeRateSource,
-        ) = false
-        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String) = false
-        override suspend fun unlinkRawSms(rawSmsId: String) = false
-
     }
 
     private class FakeRawSmsRepository(
         private val rows: Map<String, RawSms>,
-    ) : RawSmsRepository {
-        override suspend fun insertIfAbsent(rawSms: RawSms) = RawSmsInsertResult.Inserted
+    ) : EmptyRawSmsRepository() {
         override suspend fun getById(id: String) = rows[id]
-        override suspend fun findByDeviceMessageId(deviceMessageId: String) = null
         override suspend fun listIdsByReceivedAt(): List<String> = rows.keys.toList()
-        override suspend fun listCrossSourceNearDuplicates(
-            sender: String,
-            bodyHash: String,
-            fromInclusive: Instant,
-            toInclusive: Instant,
-            lookingForLiveRow: Boolean,
-        ): List<com.baraa.masroof.domain.model.RawSms> = emptyList()
     }
 }

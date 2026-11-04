@@ -106,10 +106,7 @@ class DashboardLedgerWorld(
     private val bank = Bank.BANK_ALJAZIRA
     private var sequence = 0
 
-    val localeRepository = object : AppLocaleRepository {
-        override fun getLanguageTag(): String = AppLocale.DEFAULT_TAG
-        override fun setLanguageTag(languageTag: String) = Unit
-    }
+    val localeRepository: AppLocaleRepository = FakeAppLocaleRepository()
 
     private val importClock = InstantClock { Instant.parse("2026-09-01T00:00:00Z") }
     private val registry = BankSmsRegistry(listOf(adapter))

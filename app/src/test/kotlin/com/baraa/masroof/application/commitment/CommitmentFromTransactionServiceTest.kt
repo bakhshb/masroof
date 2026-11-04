@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.commitment
 
+import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Commitment
@@ -104,15 +105,8 @@ class CommitmentFromTransactionServiceTest {
 
     private class FakeFinancialTransactionRepository(
         private val all: List<FinancialTransaction>,
-    ) : FinancialTransactionRepository {
-        override suspend fun save(
-            transaction: FinancialTransaction,
-            rawSmsIds: Collection<String>,
-        ): FinancialTransactionSaveResult = FinancialTransactionSaveResult.Saved
-
+    ) : EmptyFinancialTransactionRepository() {
         override suspend fun getById(id: String): FinancialTransaction? = all.firstOrNull { it.id == id }
-
-        override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
 
         override suspend fun listAll(): List<FinancialTransaction> = all
 
@@ -121,23 +115,6 @@ class CommitmentFromTransactionServiceTest {
             endExclusive: Instant,
         ): List<FinancialTransaction> =
             all.filter { !it.occurredAt.isBefore(startInclusive) && it.occurredAt.isBefore(endExclusive) }
-
-        override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
-
-        override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
-
-        override suspend fun update(transaction: FinancialTransaction): Boolean = false
-
-        override suspend fun updateAppliedExchangeRate(
-            id: String,
-            exchangeRate: java.math.BigDecimal,
-            source: com.baraa.masroof.domain.model.ExchangeRateSource,
-        ): Boolean = false
-
-        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
-
-        override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
-
     }
 
     private class ThrowOnDuplicateCommitmentRepository : CommitmentRepository {

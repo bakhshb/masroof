@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -21,7 +23,7 @@ import java.time.Instant
 
 class TransactionRestoreServiceTest {
     @Test
-    fun restore_rollsBackReviewWhenReconcileFails() = runBlocking {
+    fun restore_rollsBackReviewWhenReconcilePostsNothing() = runBlocking {
         val review = ignoredReview()
         val reviewRepo = TrackingReviewRepository(review)
         val service = service(
@@ -125,67 +127,23 @@ class TransactionRestoreServiceTest {
     private fun service(
         reviewRepository: ReviewRepository,
         financialTransactionRepository: FinancialTransactionRepository,
-    ): TransactionRestoreService =
-        TransactionRestoreService(
-            reviewRepository = reviewRepository,
-            financialTransactionRepository = financialTransactionRepository,
-            reconciliation = TransactionReconciliationService(
-                parsedEventRepository = SettingsViewModelTestSupport.emptyParsedEventRepository(),
-                rawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
-                financialTransactionRepository = financialTransactionRepository,
-                ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
-                    accountRegistry = SettingsViewModelTestSupport.emptyAccountRegistry(),
-                    cardRegistry = SettingsViewModelTestSupport.emptyCardRegistry(),
-                    loanRegistry = com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
-                ),
-            ),
-            reclassification = TransactionReclassificationService(
-                financialTransactionRepository = financialTransactionRepository,
-                effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
-                    parsedEventRepository = SettingsViewModelTestSupport.emptyParsedEventRepository(),
-                    userCorrectionRepository = object : com.baraa.masroof.domain.repository.UserCorrectionRepository {
-                        override suspend fun save(correction: com.baraa.masroof.domain.model.UserCorrection) = Unit
-                        override suspend fun latestForRawSmsId(rawSmsId: String) = null
-                        override suspend fun listForRawSmsId(rawSmsId: String): List<com.baraa.masroof.domain.model.UserCorrection> =
-                            emptyList()
-                        override suspend fun listForRawSmsIds(
-                            rawSmsIds: Collection<String>,
-                        ): List<com.baraa.masroof.domain.model.UserCorrection> = emptyList()
-                        override suspend fun listAll() = emptyList<com.baraa.masroof.domain.model.UserCorrection>()
-                    },
-                ),
-                ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
-                    accountRegistry = SettingsViewModelTestSupport.emptyAccountRegistry(),
-                    cardRegistry = SettingsViewModelTestSupport.emptyCardRegistry(),
-                    loanRegistry = com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
-                ),
-            ),
-            clock = InstantClock { Instant.parse("2026-08-02T00:00:00Z") },
-        )
+    ): TransactionRestoreService = SettingsViewModelTestSupport.restoreService(
+        reviewRepository = reviewRepository,
+        financialTransactionRepository = financialTransactionRepository,
+        clock = InstantClock { Instant.parse("2026-08-02T00:00:00Z") },
+    )
 
-    private class TrackingReviewRepository(
+    private open class TrackingReviewRepository(
         private var review: ReviewItem,
-    ) : ReviewRepository {
+    ) : EmptyReviewRepository() {
         var lastResolutionKind: ReviewResolutionKind? = review.resolutionKind
-        private var rollbackAttempts = 0
 
         override suspend fun getById(id: String): ReviewItem? = review.takeIf { it.id == id }
 
         override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? =
             review.takeIf { it.rawSmsId == rawSmsId }
 
-        override suspend fun listRequired(): List<ReviewItem> = emptyList()
-
-        override suspend fun listIgnored(): List<ReviewItem> = emptyList()
-
         override suspend fun listAll(): List<ReviewItem> = listOf(review)
-
-        override suspend fun upsertRequired(
-            rawSmsId: String,
-            kind: ReviewKind,
-            reasons: List<String>,
-            now: Instant,
-        ): ReviewItem = error("unused")
 
         override suspend fun markResolved(
             id: String,
@@ -199,33 +157,13 @@ class TransactionRestoreServiceTest {
                 resolvedAt = resolvedAt,
                 resolvedTransactionId = resolvedTransactionId,
             )
-            rollbackAttempts += 1
             return review
         }
     }
 
-    private class FailingRollbackReviewRepository(
-        private var review: ReviewItem,
-    ) : ReviewRepository {
+    /** The first write (clear to financial) succeeds; the rollback write fails. */
+    private class FailingRollbackReviewRepository(review: ReviewItem) : TrackingReviewRepository(review) {
         private var markResolvedCalls = 0
-
-        override suspend fun getById(id: String): ReviewItem? = review.takeIf { it.id == id }
-
-        override suspend fun findByRawSmsId(rawSmsId: String): ReviewItem? =
-            review.takeIf { it.rawSmsId == rawSmsId }
-
-        override suspend fun listRequired(): List<ReviewItem> = emptyList()
-
-        override suspend fun listIgnored(): List<ReviewItem> = emptyList()
-
-        override suspend fun listAll(): List<ReviewItem> = listOf(review)
-
-        override suspend fun upsertRequired(
-            rawSmsId: String,
-            kind: ReviewKind,
-            reasons: List<String>,
-            now: Instant,
-        ): ReviewItem = error("unused")
 
         override suspend fun markResolved(
             id: String,
@@ -234,82 +172,18 @@ class TransactionRestoreServiceTest {
             resolvedTransactionId: String?,
         ): ReviewItem? {
             markResolvedCalls += 1
-            if (markResolvedCalls == 1) {
-                review = review.copy(
-                    resolutionKind = resolutionKind,
-                    resolvedAt = resolvedAt,
-                    resolvedTransactionId = resolvedTransactionId,
-                )
-                return review
-            }
-            return null
+            return if (markResolvedCalls == 1) super.markResolved(id, resolutionKind, resolvedAt, resolvedTransactionId) else null
         }
     }
 
-    private class RollbackFriendlyEmptyFinancialTransactionRepository : FinancialTransactionRepository {
-        override suspend fun save(transaction: FinancialTransaction, rawSmsIds: Collection<String>) =
-            FinancialTransactionSaveResult.Saved
-
-        override suspend fun getById(id: String): FinancialTransaction? = null
-
-        override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
-
-        override suspend fun listAll(): List<FinancialTransaction> = emptyList()
-
-        override suspend fun listOccurredBetween(
-            startInclusive: Instant,
-            endExclusive: Instant,
-        ): List<FinancialTransaction> = emptyList()
-
-        override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = false
-
-        override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
-
-        override suspend fun update(transaction: FinancialTransaction): Boolean = false
-
-        override suspend fun updateAppliedExchangeRate(
-            id: String,
-            exchangeRate: java.math.BigDecimal,
-            source: com.baraa.masroof.domain.model.ExchangeRateSource,
-        ): Boolean = false
-
-        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
-
+    private class RollbackFriendlyEmptyFinancialTransactionRepository :
+        EmptyFinancialTransactionRepository() {
         override suspend fun unlinkRawSms(rawSmsId: String): Boolean = true
-
     }
 
-    private class FailingDeleteFinancialTransactionRepository : FinancialTransactionRepository {
-        override suspend fun save(transaction: FinancialTransaction, rawSmsIds: Collection<String>) =
-            FinancialTransactionSaveResult.Saved
-
-        override suspend fun getById(id: String): FinancialTransaction? = null
-
-        override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null
-
-        override suspend fun listAll(): List<FinancialTransaction> = emptyList()
-
-        override suspend fun listOccurredBetween(
-            startInclusive: Instant,
-            endExclusive: Instant,
-        ): List<FinancialTransaction> = emptyList()
-
+    private class FailingDeleteFinancialTransactionRepository :
+        EmptyFinancialTransactionRepository() {
         override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = true
-
-        override suspend fun listRawSmsIds(transactionId: String): List<String> = emptyList()
-
-        override suspend fun update(transaction: FinancialTransaction): Boolean = false
-
-        override suspend fun updateAppliedExchangeRate(
-            id: String,
-            exchangeRate: java.math.BigDecimal,
-            source: com.baraa.masroof.domain.model.ExchangeRateSource,
-        ): Boolean = false
-
-        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean = false
-
-        override suspend fun unlinkRawSms(rawSmsId: String): Boolean = false
-
     }
 
     private class SingleTransactionRepository(
