@@ -44,15 +44,6 @@ object MasroofTextStyles {
 
     val breakdownLabel: TextStyle
         @Composable get() = MaterialTheme.typography.labelMedium
-
-    val breakdownTotal: TextStyle
-        @Composable get() = MaterialTheme.typography.labelLarge.copy(fontWeight = MasroofFontWeights.bold)
-
-    val metricTileLabel: TextStyle
-        @Composable get() = MaterialTheme.typography.labelSmall
-
-    val metricTileAmount: TextStyle
-        @Composable get() = MaterialTheme.typography.labelLarge.copy(fontWeight = MasroofFontWeights.bold)
 }
 
 @Composable

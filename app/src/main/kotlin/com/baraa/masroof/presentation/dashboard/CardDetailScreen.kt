@@ -23,7 +23,6 @@ fun CardDetailScreen(
         cardInvolvementByTransactionId = state.transactionCardInvolvement,
     )
     val facility = state.followedCreditFacilities()?.facilities?.firstOrNull { it.allCards.any { card -> card.bank == row.bank && card.last4 == row.last4 } }
-    val title = row.displayLabel(state.ownedCards)
     val cardNetwork = state.ownedCards
         .find { it.bank == row.bank && it.last4 == row.last4 }
         ?.cardNetwork

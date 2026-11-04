@@ -85,15 +85,14 @@ class SettingsViewModelTest {
             cardNetwork = com.baraa.masroof.domain.model.CardNetwork.MADA,
             linkedAccountBankId = Bank.BANK_ALJAZIRA.id, linkedAccountMaskedNumber = "3001"))
         var reconciles = 0
-        var refreshes = 0
-        val vm = viewModel(cards = cards, onRefreshReviewQueue = { refreshes++ }, onReconcileOwnership = { reconciles++ })
+        val vm = viewModel(cards = cards, onReconcileOwnership = { reconciles++ })
         vm.refresh(); advanceUntilIdle()
         vm.openCardNetworkPicker(vm.uiState.value.followedCards.single()); advanceUntilIdle()
-        val baseline = refreshes to reconciles
+        val baseline = reconciles
         vm.saveCardSetup(com.baraa.masroof.domain.model.CardConfiguration(com.baraa.masroof.domain.model.CardNetwork.VISA,
             com.baraa.masroof.domain.model.CardType.CREDIT, com.baraa.masroof.domain.model.CardRole.PRIMARY))
         advanceUntilIdle()
-        assertEquals(baseline, refreshes to reconciles)
+        assertEquals(baseline, reconciles)
         assertNull(vm.uiState.value.cardNetworkTarget)
         assertEquals(com.baraa.masroof.domain.model.CardType.CREDIT, vm.uiState.value.followedCards.single().cardType)
         assertNull(vm.uiState.value.followedCards.single().linkedAccountMaskedNumber)
@@ -118,8 +117,7 @@ class SettingsViewModelTest {
     fun renamingOwnedEntitiesOnlyUpdatesTheirLabels() = runTest {
         val cards = FakeCardRegistry(CardRegistryEntry.forTest(Bank.BANK_ALJAZIRA, "1234"))
         val accounts = FakeAccountRegistry(AccountRegistryEntry.forTest(Bank.BANK_ALJAZIRA, "3001"))
-        val vm = viewModel(cards = cards, accounts = accounts,
-            onRefreshReviewQueue = { error("Renaming must not reconcile financial history") })
+        val vm = viewModel(cards = cards, accounts = accounts)
         vm.refresh()
         advanceUntilIdle()
         vm.openRenameCard(vm.uiState.value.followedCards.single())
@@ -136,7 +134,7 @@ class SettingsViewModelTest {
 
     @Test
     fun completedReparseReloadsRegistriesWithoutAnotherFinancialPass() = runTest {
-        val vm = viewModel(onRefreshReviewQueue = { error("Reparse already completed derived work") })
+        val vm = viewModel()
         vm.reparseStoredMessages()
         advanceUntilIdle()
         assertNull(vm.uiState.value.error)
@@ -148,7 +146,6 @@ class SettingsViewModelTest {
         var granted = false
         val vm = viewModel(
             permissionStateProvider = { granted },
-            onRefreshReviewQueue = { error("Permission changes must not reconcile") },
         )
         vm.refreshSmsPermissionState()
         assertFalse(vm.uiState.value.smsPermissionGranted)
@@ -270,11 +267,9 @@ class SettingsViewModelTest {
                 lastSeenRawSmsId = "3",
             ),
         )
-        var refreshCalls = 0
         val ownershipChanges = mutableListOf<com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange>()
         val vm = viewModel(
             cards = cards,
-            onRefreshReviewQueue = { refreshCalls++ },
             onReconcileOwnership = { ownershipChanges += it },
         )
         vm.refresh()
@@ -293,7 +288,6 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(OwnershipStatus.OWNED, cards.entries.single().ownership)
-        assertEquals(0, refreshCalls)
         assertEquals(
             listOf(
                 com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange.Card(
@@ -344,7 +338,6 @@ class SettingsViewModelTest {
         val ownershipChanges = mutableListOf<com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange>()
         val vm = viewModel(
             accounts = accounts,
-            onRefreshReviewQueue = { error("An account type must not reconcile the whole history") },
             onReconcileOwnership = { ownershipChanges += it },
         )
         vm.refresh()
@@ -886,7 +879,6 @@ class SettingsViewModelTest {
         reparseResult: com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult =
             com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(0, 0),
         reparse: suspend () -> com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult = { reparseResult },
-        onRefreshReviewQueue: () -> Unit = {},
         onReconcileOwnership: (com.baraa.masroof.application.review.ReviewWorkflowService.OwnershipChange) -> Unit = {},
         appUpdateService: com.baraa.masroof.application.update.AppUpdateService =
             SettingsViewModelTestFixtures.appUpdateService(),
@@ -910,7 +902,6 @@ class SettingsViewModelTest {
             appLocaleRepository = FakeAppLocaleRepository(),
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
             databaseBackupService = FakeDatabaseBackupGateway(),
-            refreshReviewQueue = { onRefreshReviewQueue() },
             reconcileOwnershipChange = { onReconcileOwnership(it) },
             reparseStoredEvents = reparse,
             permissionStateProvider = permissionStateProvider,

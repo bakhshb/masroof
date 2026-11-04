@@ -50,7 +50,7 @@ class ReviewTeachingUiTest {
         val body = "Payment\nAmount:85SAR\nMerchant:SHOP"
         val detail = ReviewDetailUi("review-ui", "sms-ui", ReviewKind.NEEDS_REVIEW,
             R.string.review_kind_needs_review, "TEST BANK", body, "26 Oct 2026",
-            null, MessageFamily.UNKNOWN, null, null, null, listOf("unsupported_bank_message_format"), emptyList(),
+            MessageFamily.UNKNOWN, null, null, null, listOf("unsupported_bank_message_format"), emptyList(),
             false, false, true, true)
         compose.setContent {
             val context = AppLocaleContext.wrap(LocalContext.current, language.value)

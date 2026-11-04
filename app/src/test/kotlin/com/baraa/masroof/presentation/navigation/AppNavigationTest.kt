@@ -63,14 +63,6 @@ class AppNavigationTest {
     }
 
     @Test
-    fun resolvePendingDestination_banksOpensTheUnifiedBankList() {
-        assertEquals(
-            SettingsDestination.Banks,
-            resolvePendingDestination(SettingsDestination.Banks),
-        )
-    }
-
-    @Test
     fun resolveNotificationSettingsLaunch_about_returnsAboutDestination() {
         val state = SettingsUiState(bankSummaries = listOf(summary(alJazira)))
 

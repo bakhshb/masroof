@@ -163,7 +163,6 @@ class SettingsImportConfirmTest {
                 override fun setThemeMode(mode: ThemeMode) = Unit
             },
             databaseBackupService = backup,
-            refreshReviewQueue = {},
             reparseStoredEvents = { com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(0, 0) },
             permissionStateProvider = { true },
             appVersion = SettingsViewModelTestFixtures.APP_VERSION,

@@ -43,9 +43,6 @@ internal fun ManageSettingsTarget.toRegistryCategory(): SettingsRegistryCategory
         ManageSettingsTarget.Loans -> SettingsRegistryCategory.Loans
     }
 
-internal fun resolvePendingDestination(pending: SettingsDestination): SettingsDestination =
-    pending
-
 internal fun resolveManageSettingsLaunch(
     state: SettingsUiState,
     target: ManageSettingsTarget,

@@ -251,13 +251,11 @@ private fun ComponentSection() {
                 label = "Inflow row",
                 value = "1,250.00",
                 style = MasroofMoneyRowStyle.Inflow,
-                leadingIcon = MasroofIcons.externalIn,
             )
             MasroofMoneyRow(
                 label = "Outflow row",
                 value = "320.50",
                 style = MasroofMoneyRowStyle.Outflow,
-                leadingIcon = MasroofIcons.externalOut,
             )
             MasroofAmountText(
                 amount = "4,500.00",

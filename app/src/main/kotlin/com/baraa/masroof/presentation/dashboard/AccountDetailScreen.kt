@@ -16,7 +16,6 @@ fun AccountDetailScreen(
         maskedNumber = account.maskedNumber,
         involvementByTransactionId = state.transactionAccountInvolvement,
     )
-    val title = account.displayLabel()
 
     DashboardSummaryScaffold(
         title = androidx.compose.ui.res.stringResource(com.baraa.masroof.R.string.reference_account_detail_title),

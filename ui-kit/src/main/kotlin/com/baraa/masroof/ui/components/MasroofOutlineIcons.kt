@@ -18,7 +18,6 @@ object MasroofOutlineIcons {
     val Info: ImageVector by lazy { outline("Info", listOf("M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0", "M12 16v-4", "M12 8h.01")) }
     val EllipsisVertical: ImageVector by lazy { outline("EllipsisVertical", listOf("M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M11 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M11 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0")) }
     val CircleAlert: ImageVector by lazy { outline("CircleAlert", listOf("M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0", "M12 8L12 12", "M12 16L12.01 16")) }
-    val TrendingDown: ImageVector by lazy { outline("TrendingDown", listOf("M16 17h6v-6", "m22 17-8.5-8.5-5 5L2 7")) }
     val TrendingUp: ImageVector by lazy { outline("TrendingUp", listOf("M16 7h6v6", "m22 7-8.5 8.5-5-5L2 17")) }
     val Undo2: ImageVector by lazy { outline("Undo2", listOf("M9 14 4 9l5-5", "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11")) }
     val ArrowRightLeft: ImageVector by lazy { outline("ArrowRightLeft", listOf("m16 3 4 4-4 4", "M20 7H4", "m8 21-4-4 4-4", "M4 17h16")) }
@@ -45,7 +44,6 @@ object MasroofOutlineIcons {
     val Settings: ImageVector by lazy { outline("Settings", listOf("M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915", "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0")) }
     val SlidersHorizontal: ImageVector by lazy { outline("SlidersHorizontal", listOf("M10 5H3", "M12 19H3", "M14 3v4", "M16 17v4", "M21 12h-9", "M21 19h-5", "M21 5h-7", "M8 10v4", "M8 12H3")) }
     val HandCoins: ImageVector by lazy { outline("HandCoins", listOf("M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17", "m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9", "m2 16 6 6", "M13.1 9a2.9 2.9 0 1 0 5.8 0a2.9 2.9 0 1 0 -5.8 0", "M3 5a3 3 0 1 0 6 0a3 3 0 1 0 -6 0")) }
-    val ShoppingCart: ImageVector by lazy { outline("ShoppingCart", listOf("M7 21a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M18 21a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12")) }
     val Upload: ImageVector by lazy { outline("Upload", listOf("M12 3v12", "m17 8-5-5-5 5", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4")) }
     val Download: ImageVector by lazy { outline("Download", listOf("M12 15V3", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "m7 10 5 5 5-5")) }
     val Moon: ImageVector by lazy { outline("Moon", listOf("M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401")) }
@@ -62,7 +60,6 @@ object MasroofOutlineIcons {
     val ShoppingBag: ImageVector by lazy { outline("ShoppingBag", listOf("M16 10a4 4 0 0 1-8 0", "M3.103 6.034h17.794", "M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z")) }
     val RotateCcw: ImageVector by lazy { outline("RotateCcw", listOf("M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5")) }
     val ArrowLeftRight: ImageVector by lazy { outline("ArrowLeftRight", listOf("M8 3 4 7l4 4", "M4 7h16", "m16 21 4-4-4-4", "M20 17H4")) }
-    val CalendarClock: ImageVector by lazy { outline("CalendarClock", listOf("M16 14v2.2l1.6 1", "M16 2v4", "M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5", "M3 10h5", "M8 2v4", "M10 16a6 6 0 1 0 12 0a6 6 0 1 0 -12 0")) }
     val Palette: ImageVector by lazy { outline("Palette", listOf("M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z", "M13 6.5a0.5 0.5 0 1 0 1 0a0.5 0.5 0 1 0 -1 0", "M17 10.5a0.5 0.5 0 1 0 1 0a0.5 0.5 0 1 0 -1 0", "M6 12.5a0.5 0.5 0 1 0 1 0a0.5 0.5 0 1 0 -1 0", "M8 7.5a0.5 0.5 0 1 0 1 0a0.5 0.5 0 1 0 -1 0")) }
 }
 

@@ -4,17 +4,13 @@ package com.baraa.masroof.presentation.settings
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import com.baraa.masroof.ui.theme.MasroofSpacing
-import com.baraa.masroof.ui.theme.MasroofSizes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import com.baraa.masroof.presentation.common.MasroofButton as Button
@@ -23,7 +19,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import com.baraa.masroof.presentation.common.MasroofOutlinedButton as OutlinedButton
 import com.baraa.masroof.presentation.common.MasroofFormField as OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import com.baraa.masroof.presentation.common.MasroofText as Text
@@ -33,7 +28,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -53,21 +47,11 @@ import com.baraa.masroof.presentation.common.MasroofLogo
 fun SettingsAboutScreen(
     appVersion: String,
     isNightlyBuild: Boolean,
-    updateChannel: UpdateChannel,
-    githubTokenConfigured: Boolean,
-    updateState: AppUpdateUiState,
     updateMessage: AppUpdateMessage?,
-    logErrorCount: Int = 0,
     onBack: () -> Unit,
     onOpenLogs: () -> Unit,
     onOpenUpdates: () -> Unit = {},
     onOpenDesignCatalog: () -> Unit = {},
-    onSaveGithubToken: (String) -> Unit,
-    onClearGithubToken: () -> Unit,
-    onSelectUpdateChannel: (UpdateChannel) -> Unit,
-    onCheckForUpdates: () -> Unit,
-    onDownloadUpdate: () -> Unit,
-    onInstallUpdate: () -> Unit,
     onClearUpdateMessage: () -> Unit,
     bankCatalog: com.baraa.masroof.application.patterns.PatternCatalog? = null,
     onOpenBanks: () -> Unit = {},

@@ -105,7 +105,6 @@ data class DashboardUiState(
     val allTransactions: List<TransactionPreviewUi> = emptyList(),
     val isCurrentPeriod: Boolean = true,
     val error: DashboardError? = null,
-    val reparsingStored: Boolean = false,
     val selectedTransactionId: String? = null,
     val labSelectedTransaction: TransactionPreviewUi? = null,
     val selectedTransactionSms: List<TransactionSmsEvidenceUi> = emptyList(),

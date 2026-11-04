@@ -508,7 +508,6 @@ class ReviewViewModel(
             provenance = detail.provenance,
             bankId = detail.bankId,
             dateLabel = dateLabel,
-            messageFamilyLabel = family?.name,
             messageFamily = family,
             amountLabel = detail.amount?.let { MoneyUiFormatter.format(it, languageTag) },
             merchant = detail.merchant,
@@ -528,7 +527,6 @@ class ReviewViewModel(
             ownershipCard = ownershipCard,
             showOwnershipActions = !ignored && ownershipCard != null,
             showRestoreActions = ignored,
-            readOnly = false,
             resolvedAtLabel = resolvedAtLabel,
             bankChoices = bankChoicesFor(review, ignored),
         )

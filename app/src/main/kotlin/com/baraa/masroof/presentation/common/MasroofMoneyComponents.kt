@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import com.baraa.masroof.ui.theme.MasroofIconSizes
 import com.baraa.masroof.ui.theme.MasroofRowShape
 import com.baraa.masroof.ui.theme.MasroofSpacing
@@ -31,7 +30,6 @@ fun MasroofMoneyRow(
     value: String,
     modifier: Modifier = Modifier,
     style: MasroofMoneyRowStyle = MasroofMoneyRowStyle.Neutral,
-    leadingIcon: ImageVector? = null,
 ) {
     val colors = MasroofThemeExtras.extendedColors
     val color = when (style) {

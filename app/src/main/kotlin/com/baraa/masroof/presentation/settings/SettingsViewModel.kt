@@ -52,7 +52,6 @@ class SettingsViewModel(
     private val appLocaleRepository: AppLocaleRepository,
     private val themePreferencesRepository: ThemePreferencesRepository,
     private val databaseBackupService: DatabaseBackupGateway,
-    private val refreshReviewQueue: suspend () -> Unit,
     private val reconcileOwnershipChange: suspend (ReviewWorkflowService.OwnershipChange) -> Unit = {},
     private val reparseStoredEvents: suspend () -> com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult,
     private val permissionStateProvider: () -> Boolean,
@@ -403,14 +402,7 @@ class SettingsViewModel(
         updatableCorrectionIds = report.candidates
             .filterNot { it.requiresManualFollowUp }
             .map { it.transactionId }
-        _uiState.update {
-            it.copy(
-                fxRateCorrectionUpdatable = updatableCorrectionIds.size,
-                fxRateCorrectionManualFollowUp = report.candidates.count { candidate ->
-                    candidate.requiresManualFollowUp
-                },
-            )
-        }
+        _uiState.update { it.copy(fxRateCorrectionUpdatable = updatableCorrectionIds.size) }
     }
 
     fun clearScopedSmsImportResult() {

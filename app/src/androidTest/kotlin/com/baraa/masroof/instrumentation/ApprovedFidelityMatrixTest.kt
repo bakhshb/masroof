@@ -249,18 +249,9 @@ class ApprovedFidelityMatrixTest {
             "about" -> SettingsAboutScreen(
                 appVersion = "1.0.0",
                 isNightlyBuild = false,
-                updateChannel = UpdateChannel.STABLE,
-                githubTokenConfigured = false,
-                updateState = updateState,
                 updateMessage = null,
                 onBack = {},
                 onOpenLogs = {},
-                onSaveGithubToken = {},
-                onClearGithubToken = {},
-                onSelectUpdateChannel = {},
-                onCheckForUpdates = {},
-                onDownloadUpdate = {},
-                onInstallUpdate = {},
                 onClearUpdateMessage = {}
             )
             "updates" -> SettingsUpdatesScreen(

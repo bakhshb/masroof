@@ -4,7 +4,6 @@ import com.baraa.masroof.ui.components.MasroofOutlineIcons
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.model.MessageFamily
 
 /**
  * Central icon mapping so dashboard, review, and onboarding stay visually consistent.
@@ -26,7 +25,6 @@ object MasroofIcons {
     val appLogo: ImageVector = MasroofOutlineIcons.Wallet
     val periodHint: ImageVector = MasroofOutlineIcons.Info
     val guidance: ImageVector = MasroofOutlineIcons.CircleAlert
-    val netSpending: ImageVector = MasroofOutlineIcons.TrendingDown
     val income: ImageVector = MasroofOutlineIcons.TrendingUp
     val refunds: ImageVector = MasroofOutlineIcons.Undo2
     val netCashFlow: ImageVector = MasroofOutlineIcons.ArrowRightLeft
@@ -43,7 +41,6 @@ object MasroofIcons {
     val externalIn: ImageVector = MasroofOutlineIcons.ArrowDownLeft
     val externalOut: ImageVector = MasroofOutlineIcons.ArrowUpRight
     val cardPayment: ImageVector = MasroofOutlineIcons.CreditCard
-    val cashWithdrawal: ImageVector = MasroofOutlineIcons.Banknote
     val selfTransfer: ImageVector = MasroofOutlineIcons.ArrowRightLeft
 
     val sms: ImageVector = MasroofOutlineIcons.MessageSquare
@@ -60,7 +57,6 @@ object MasroofIcons {
     val settings: ImageVector = MasroofOutlineIcons.Settings
     val customize: ImageVector = MasroofOutlineIcons.SlidersHorizontal
     val savings: ImageVector = MasroofOutlineIcons.HandCoins
-    val shopping: ImageVector = MasroofOutlineIcons.ShoppingCart
     val export: ImageVector = MasroofOutlineIcons.Upload
     val importBackup: ImageVector = MasroofOutlineIcons.Download
     val theme: ImageVector = MasroofOutlineIcons.Moon
@@ -82,19 +78,5 @@ object MasroofIcons {
             FinancialTransactionType.FEE -> MasroofOutlineIcons.Receipt
             FinancialTransactionType.ADJUSTMENT -> MasroofOutlineIcons.ArrowRightLeft
             FinancialTransactionType.UNKNOWN -> MasroofOutlineIcons.Info
-        }
-
-    fun messageFamily(family: MessageFamily?): ImageVector =
-        when (family) {
-            MessageFamily.PURCHASE -> MasroofOutlineIcons.ShoppingCart
-            MessageFamily.TRANSFER_IN -> MasroofOutlineIcons.ArrowDownLeft
-            MessageFamily.TRANSFER_OUT -> MasroofOutlineIcons.ArrowUpRight
-            MessageFamily.BILL_PAYMENT,
-            MessageFamily.CARD_PAYMENT,
-            -> MasroofOutlineIcons.CreditCard
-            MessageFamily.REFUND -> MasroofOutlineIcons.Undo2
-            MessageFamily.WITHDRAWAL -> MasroofOutlineIcons.Banknote
-            MessageFamily.FEE -> MasroofOutlineIcons.List
-            else -> MasroofOutlineIcons.Info
         }
 }
