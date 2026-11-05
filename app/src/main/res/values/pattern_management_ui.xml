@@ -17,8 +17,8 @@
     <string name="pattern_preview_done">تم</string>
     <string name="pattern_builtin_phrases">كلمات التعرف</string>
     <string name="pattern_builtin_phrases_help">يتعرف التطبيق على الرسالة إذا احتوت إحدى هذه العبارات. ترتيب الأسطر لا يهم.</string>
-    <string name="pattern_builtin_fields_help">يقرأ التطبيق كل قيمة من الكلمة التي تسبقها في الرسالة. لتغييرها اضغط «تعديل».</string>
+    <string name="pattern_builtin_fields_help">يقرأ التطبيق كل قيمة من الكلمة التي تسبقها في الرسالة. إذا لم يقرأ رسالة، اضغط «تعديل» لتضيف لها نمطا.</string>
     <string name="pattern_builtin_edit">تعديل</string>
-    <string name="pattern_builtin_edit_help">ينشئ نمطا جديدا من رسالة حقيقية ويوقف هذا النمط بعد الحفظ.</string>
+    <string name="pattern_builtin_edit_help">يضيف نمطا جديدا من رسالة حقيقية، ويبقى هذا النمط شغالا لبقية الرسائل.</string>
     <string name="pattern_copy">نسخ كنمط جديد</string>
 </resources>
