@@ -256,6 +256,8 @@ class MessagePatternsJourneyTest {
 
     private fun ar(id: Int) = AppLocaleContext.wrap(compose.activity, "ar").getString(id)
     private fun click(id: Int) {
+        // The screen loads in the background, outside Compose idling; wait for the node before acting on it.
+        compose.waitUntil(10_000) { compose.onAllNodesWithText(ar(id)).fetchSemanticsNodes().isNotEmpty() }
         val node = compose.onNodeWithText(ar(id))
         if (runCatching { node.assertIsDisplayed() }.isFailure) node.performScrollTo()
         node.performClick(); compose.waitForIdle()
