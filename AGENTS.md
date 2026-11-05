@@ -4,6 +4,14 @@ Android app that turns Saudi bank SMS into a private ledger and dashboard. Arabi
 Reference: `docs/ARCHITECTURE.md` (modules), `docs/DESIGN_SYSTEM.md` (UI), `docs/ANALYTICS.md` (analysis).
 This file wins when older records disagree.
 
+## Workflow
+Every change runs this loop; stop only when both reviews come back clean.
+1. Plan: what changes and how we know it is done (checks a person can run). A screen design first gets an interactive design artifact the owner confirms.
+2. Implement.
+3. Review for simplification (`/simplify`).
+4. Review for bugs (`/code-review`).
+5. Fix what both found, then repeat 3-5 until neither finds anything.
+
 ## Never break
 - Database `masroof.db` stays schema v18 with the same identity hash; reject other database/backup schemas, no destructive fallback, no migrations or backfills. A schema change needs an explicit design and device verification.
 - Keep the application id, preference names, Keystore alias, worker identities and historical persisted keys.
@@ -31,8 +39,8 @@ This file wins when older records disagree.
 - Interpretation lives in `bank-engine` (`PatternFactInterpreter`, `RuleInterpreter`, explicit evidence/blockers). Production definitions: `app/src/main/assets/bank-patterns/`; Kotlin rule profiles only in `bank-engine/src/testFixtures`. Ownership: approval `application/patterns`, protection `application/ingestion`, composition `application/interpretation`, storage `data/patterns`, backup `application/backup`; update `docs/ARCHITECTURE.md` before moving any. No parallel runtime.
 - Competing families stay UNKNOWN; OTP wins over quoted financial wording; refunds keep refund authority. Add regression tests for role/classification changes. The retired AlJazira parser/classifier/extractor never returns, test copies included.
 - Only `ParseFinalizer` emits `ParseResult.Success`, and only with no ERROR from `DefaultParsedEventValidator`. Tighten via validator rules / `AutomaticUsePolicy`; validators never resolve ownership or type.
-- `ml-assist` gives family hints only: never money, ownership or posting.
-- New bank: a `BankSmsAdapter`, fixtures under `testdata/`, and a `BankSmsAdapterContractCase` in `BankSmsAdapterContractTest` (financial + non-financial samples, positive/negative senders); no sample claimed by two adapters.
+- `ml-assist` gives family hints, forecasts and recurring detection only: never money, ownership or posting.
+- New bank: a role-rule pattern file in `app/src/main/assets/bank-patterns/` (served by `MessagePatternSmsAdapter`), fixtures under `testdata/`, and a `BankSmsAdapterContractCase` in `BankSmsAdapterContractTest` (financial + non-financial samples, positive/negative senders); no sample claimed by two adapters.
 
 ## Financial rules
 - Posting gate (`TransactionAssembler.isAutomationEligible`): only `ParseStatus.SUCCESS`, an automation-confirming correction (family/amount) or `USER_FINANCIAL_TYPE`. Merchant/counterparty edits never lift it; reconciliation never bypasses it.
