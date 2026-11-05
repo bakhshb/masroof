@@ -20,13 +20,11 @@ import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
-import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
@@ -38,6 +36,7 @@ import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
+import com.baraa.masroof.testsupport.event
 import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -799,36 +798,6 @@ class ScopedReconciliationTest {
         val globalUnlinkedCalls: Int,
         val listByTypesCalls: Int,
         val boundedLocalCalls: Int,
-    )
-
-    private fun event(
-        id: String,
-        rawSmsId: String,
-        family: MessageFamily,
-        amount: Money?,
-        source: AccountReference? = null,
-        destination: AccountReference? = null,
-        network: BankNetworkType? = null,
-        merchant: String? = null,
-        counterparty: String? = null,
-        status: ParseStatus = ParseStatus.SUCCESS,
-    ) = ParsedEvent(
-        id = id,
-        rawSmsId = rawSmsId,
-        bank = Bank.BANK_ALJAZIRA,
-        messageFamily = family,
-        direction = if (family == MessageFamily.TRANSFER_IN) MoneyDirection.INCOMING else MoneyDirection.OUTGOING,
-        amount = amount,
-        purchaseChannel = null,
-        sourceAccountRef = source,
-        destinationAccountRef = destination,
-        cardRef = null,
-        merchant = merchant,
-        counterparty = counterparty,
-        occurredAt = null,
-        bankNetworkType = network,
-        confidence = Confidence(1.0),
-        parseStatus = status,
     )
 
     private class CountingParsedEventRepository(

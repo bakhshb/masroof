@@ -4,6 +4,7 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.ExchangeRateSource
@@ -14,6 +15,7 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
@@ -94,4 +96,41 @@ internal fun parsedRecord(
             salaryIncomeWording = salaryIncomeWording,
             debitSourceAccountLast4 = debitSourceAccountLast4,
         ),
+    )
+
+/** Successful parsed event for reconciliation tests; transfer-in evidence is incoming, the rest outgoing. */
+internal fun event(
+    id: String,
+    rawSmsId: String,
+    family: MessageFamily,
+    amount: Money?,
+    bank: Bank = Bank.BANK_ALJAZIRA,
+    source: AccountReference? = null,
+    destination: AccountReference? = null,
+    card: CardReference? = null,
+    network: BankNetworkType? = null,
+    channel: PurchaseChannel? = null,
+    merchant: String? = null,
+    counterparty: String? = null,
+    status: ParseStatus = ParseStatus.SUCCESS,
+    direction: MoneyDirection =
+        if (family == MessageFamily.TRANSFER_IN) MoneyDirection.INCOMING else MoneyDirection.OUTGOING,
+): ParsedEvent =
+    ParsedEvent(
+        id = id,
+        rawSmsId = rawSmsId,
+        bank = bank,
+        messageFamily = family,
+        direction = direction,
+        amount = amount,
+        purchaseChannel = channel,
+        sourceAccountRef = source,
+        destinationAccountRef = destination,
+        cardRef = card,
+        merchant = merchant,
+        counterparty = counterparty,
+        occurredAt = null,
+        bankNetworkType = network,
+        confidence = Confidence(1.0),
+        parseStatus = status,
     )
