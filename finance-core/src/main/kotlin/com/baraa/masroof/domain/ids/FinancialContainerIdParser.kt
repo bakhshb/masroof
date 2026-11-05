@@ -41,8 +41,6 @@ object FinancialContainerIdParser {
         return bankId
     }
 
-    fun isBankQualifiedAccountId(containerId: String?): Boolean = accountBankId(containerId) != null
-
     fun isAccountContainer(containerId: String?): Boolean = containerId?.startsWith("account:") == true
 
     fun isCardContainer(containerId: String?): Boolean = containerId?.startsWith("card:") == true

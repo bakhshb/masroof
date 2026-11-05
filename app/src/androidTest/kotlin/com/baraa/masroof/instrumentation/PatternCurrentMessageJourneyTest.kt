@@ -17,6 +17,7 @@ import com.baraa.masroof.presentation.locale.AppLocaleContext
 import com.baraa.masroof.presentation.patterns.MessagePatternsScreen
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.testsupport.TestStorageContext
+import com.baraa.masroof.testsupport.ingest
 import com.baraa.masroof.ui.theme.MasroofTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*

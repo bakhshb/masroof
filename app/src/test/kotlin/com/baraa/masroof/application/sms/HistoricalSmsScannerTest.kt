@@ -49,6 +49,7 @@ import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.datasource.SmsPermissionException
 import com.baraa.masroof.sms.datasource.SmsProviderException
 import com.baraa.masroof.sms.model.ProviderSmsRecord
+import com.baraa.masroof.testsupport.ingest
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals

@@ -15,6 +15,7 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.testsupport.TestRuntime
+import com.baraa.masroof.testsupport.ingest
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter

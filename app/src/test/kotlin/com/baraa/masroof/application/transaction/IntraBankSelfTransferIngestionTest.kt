@@ -34,6 +34,7 @@ import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.sms.time.InstantClock
+import com.baraa.masroof.testsupport.ingest
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals

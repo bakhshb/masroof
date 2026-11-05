@@ -20,6 +20,7 @@ import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import com.baraa.masroof.testsupport.TestStorageContext
+import com.baraa.masroof.testsupport.ingest
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test

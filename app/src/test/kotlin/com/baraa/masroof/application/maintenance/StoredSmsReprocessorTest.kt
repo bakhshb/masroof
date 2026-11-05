@@ -40,6 +40,7 @@ import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.parser.SmsParseGateway
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.time.InstantClock
+import com.baraa.masroof.testsupport.ingest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.After

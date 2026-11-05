@@ -16,6 +16,7 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.testsupport.TestStorageContext
+import com.baraa.masroof.testsupport.ingest
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test

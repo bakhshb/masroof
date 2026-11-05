@@ -9,6 +9,7 @@ import com.baraa.masroof.application.review.ReviewWorkflowResult
 import com.baraa.masroof.application.sms.DebugProcessHalt
 import com.baraa.masroof.domain.model.*
 import com.baraa.masroof.sms.hash.SmsBodyHasher
+import com.baraa.masroof.testsupport.ingest
 import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Test
