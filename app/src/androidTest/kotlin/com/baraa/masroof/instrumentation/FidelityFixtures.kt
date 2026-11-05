@@ -104,7 +104,7 @@ internal object FidelityFixtures {
             MerchantSpendingRow("noon","NOON",signed("1400"),2,setOf("ref-10","ref-11")),
             MerchantSpendingRow("amazon","AMAZON",signed("1250"),2,setOf("ref-5","ref-6","ref-7")),
             MerchantSpendingRow("tamimi","TAMIMI",signed("400"),2,setOf("ref-8","ref-9"))))
-        return DashboardUiState(loading=false, period=period,
+        return DashboardUiState(loading=false, period=com.baraa.masroof.application.dashboard.DashboardSalaryPeriod(period.startDate, period.endDateExclusive),
             summary=MonthlyFinancialSummary(period,Currency.SAR,money("3850"),money("150"),signed("3700"),money("12000"),money("1000"),money("500"),money("2200"),money("400"),money("1000"),17,2),
             flowDetailGrouping=CurrentAccountFlowDetailGrouper.group(transactions,emptyList(),Currency.SAR,emptyMap(),
                 setOf(account("3001"),account("5002"))),

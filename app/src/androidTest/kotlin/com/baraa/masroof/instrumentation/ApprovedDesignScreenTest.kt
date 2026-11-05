@@ -234,7 +234,7 @@ class ApprovedDesignScreenTest {
         val secondary = primary.copy(last4 = "5678", snapshot = snapshot.copy(availableBalance = Money.of("3500", Currency.SAR)))
         val facility = CreditFacilityOverview(bank, primary, listOf(secondary),
             StatementDueSnapshot(Money.of("2400", Currency.SAR), snapshot.updatedAt, snapshot.dueDate), trend.totalSpending, trend.totalSpending, null, null, Currency.SAR)
-        return DashboardUiState(loading = false, period = period,
+        return DashboardUiState(loading = false, period = com.baraa.masroof.application.dashboard.DashboardSalaryPeriod(period.startDate, period.endDateExclusive),
             creditFacilities = CreditFacilitiesOverview(listOf(facility), emptyList(), Currency.SAR),
             ownedCards = listOf(OwnedCardUi(bank, "1234", "بطاقة السفر", CardNetwork.VISA), OwnedCardUi(bank, "5678", "بطاقة العائلة", CardNetwork.MASTERCARD)),
             spendingTrends = DashboardSpendingTrends(trend, trend, trend, emptyMap(), mapOf("${bank.id}:1234" to trend, "${bank.id}:5678" to trend), purchases = trend))
