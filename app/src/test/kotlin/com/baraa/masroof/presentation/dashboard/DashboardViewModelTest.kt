@@ -35,6 +35,8 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.application.dashboard.DashboardSalaryPeriod
+import com.baraa.masroof.application.dashboard.salaryPeriod
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -303,7 +305,7 @@ class DashboardViewModelTest {
         val state = vm.uiState.value
         assertFalse(state.loading)
         assertNull(state.error)
-        assertEquals(currentPeriod, state.period)
+        assertEquals(currentPeriod.ui(), state.period)
         assertNotNull(state.summary)
         assertEquals(currentPeriod, state.summary!!.period)
         assertEquals(Money.of("100.00", Currency.SAR), state.summary.spendingGross)
@@ -344,9 +346,9 @@ class DashboardViewModelTest {
         advanceUntilIdle()
 
         val loadingState = vm.uiState.value
-        assertEquals(previousPeriod, loadingState.period)
+        assertEquals(previousPeriod.ui(), loadingState.period)
         assertEquals(
-            FinancialPeriodUiFormatter.formatSalaryPeriodTitle(appContext, previousPeriod),
+            FinancialPeriodUiFormatter.formatSalaryPeriodTitle(appContext, previousPeriod.ui()),
             loadingState.periodLabel,
         )
         assertTrue(loadingState.loading)
@@ -372,9 +374,9 @@ class DashboardViewModelTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value
-        assertEquals(previousPeriod, state.period)
+        assertEquals(previousPeriod.ui(), state.period)
         assertEquals(
-            FinancialPeriodUiFormatter.formatSalaryPeriodTitle(appContext, previousPeriod),
+            FinancialPeriodUiFormatter.formatSalaryPeriodTitle(appContext, previousPeriod.ui()),
             state.periodLabel,
         )
         assertNull(state.summary)
@@ -400,7 +402,7 @@ class DashboardViewModelTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value
-        assertEquals(previousPeriod, state.period)
+        assertEquals(previousPeriod.ui(), state.period)
         assertNull(state.error)
         assertEquals(Money.of("55.00", Currency.SAR), state.summary!!.spendingGross)
         assertPeriodSummaryInvariant(state)
@@ -428,7 +430,7 @@ class DashboardViewModelTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value
-        assertEquals(previous2Period, state.period)
+        assertEquals(previous2Period.ui(), state.period)
         assertEquals(Money.of("30.00", Currency.SAR), state.summary!!.spendingGross)
         assertPeriodSummaryInvariant(state)
         assertNull(state.error)
@@ -454,7 +456,7 @@ class DashboardViewModelTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value
-        assertEquals(currentPeriod, state.period)
+        assertEquals(currentPeriod.ui(), state.period)
         assertEquals(Money.of("10.00", Currency.SAR), state.summary!!.spendingGross)
         assertTrue(state.isCurrentPeriod)
         assertPeriodSummaryInvariant(state)
@@ -481,7 +483,7 @@ class DashboardViewModelTest {
         advanceUntilIdle()
 
         val state = vm.uiState.value
-        assertEquals(previous2Period, state.period)
+        assertEquals(previous2Period.ui(), state.period)
         assertNull(state.error)
         assertNotNull(state.summary)
         assertPeriodSummaryInvariant(state)
@@ -599,10 +601,12 @@ class DashboardViewModelTest {
         assertEquals(1, vm.uiState.value.summary!!.transactionCount)
     }
 
+    private fun FinancialPeriod.ui() = DashboardSalaryPeriod(startDate, endDateExclusive)
+
     private fun assertPeriodSummaryInvariant(state: DashboardUiState) {
         val summary = state.summary
         if (summary != null) {
-            assertEquals(state.period, summary.period)
+            assertEquals(state.period, summary.salaryPeriod)
         }
     }
 
@@ -773,7 +777,7 @@ class DashboardViewModelTest {
         vm.refresh(); advanceUntilIdle()
         movingClock.now = next.startDate.atStartOfDay(zone).toInstant()
         vm.onAppResumed(); advanceUntilIdle()
-        assertEquals(next, vm.uiState.value.period)
+        assertEquals(next.ui(), vm.uiState.value.period)
     }
 
     @Test
@@ -787,9 +791,9 @@ class DashboardViewModelTest {
         vm.goToPreviousPeriod(); advanceUntilIdle()
         movingClock.now = next.startDate.atStartOfDay(zone).toInstant()
         vm.onAppResumed(); advanceUntilIdle()
-        assertEquals(previousPeriod, vm.uiState.value.period)
+        assertEquals(previousPeriod.ui(), vm.uiState.value.period)
         vm.goToCurrentPeriod(); advanceUntilIdle()
-        assertEquals(next, vm.uiState.value.period)
+        assertEquals(next.ui(), vm.uiState.value.period)
     }
 
     private class MovingClock(var now: Instant, private val zone: ZoneId) : Clock() {

@@ -44,7 +44,7 @@ class NotificationCenterStateMapperTest {
         val state = notificationCenterExternalState(
             dashboardState = DashboardUiState(
                 periodLabel = "أغسطس 2026",
-                period = com.baraa.masroof.domain.period.FinancialPeriod(
+                period = com.baraa.masroof.application.dashboard.DashboardSalaryPeriod(
                     java.time.LocalDate.parse("2026-08-01"),
                     java.time.LocalDate.parse("2026-09-01"),
                 ),

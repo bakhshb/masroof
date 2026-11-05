@@ -12,14 +12,14 @@ class DashboardPeriodWorkflow(
     private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) {
     fun currentPeriod(): DashboardSalaryPeriod =
-        FinancialPeriodPolicy.periodContaining(clock.now().atZone(zoneId).toLocalDate())
+        DashboardSalaryPeriod.of(FinancialPeriodPolicy.periodContaining(clock.now().atZone(zoneId).toLocalDate()))
 
     fun previous(period: DashboardSalaryPeriod): DashboardSalaryPeriod =
-        FinancialPeriodPolicy.previous(period)
+        DashboardSalaryPeriod.of(FinancialPeriodPolicy.previous(period.toFinancialPeriod()))
 
     fun next(period: DashboardSalaryPeriod): DashboardSalaryPeriod =
-        FinancialPeriodPolicy.next(period)
+        DashboardSalaryPeriod.of(FinancialPeriodPolicy.next(period.toFinancialPeriod()))
 
     fun salaryCycleStartAdjustment(period: DashboardSalaryPeriod): DashboardSalaryCycleAdjustment? =
-        FinancialPeriodPolicy.salaryCycleStartAdjustment(period.startDate)
+        FinancialPeriodPolicy.salaryCycleStartAdjustment(period.startDate)?.let(DashboardSalaryCycleAdjustment::of)
 }
