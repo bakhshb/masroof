@@ -31,11 +31,19 @@ object FamilyAssistBridge {
      * touches money or posting. A message with an amount stays reviewable even with the same wording.
      */
     fun rememberNonFinancial(result: Interpretation, suggestion: FamilySuggestion?): Interpretation =
-        if (suggestion?.family != MessageFamily.NON_FINANCIAL || result.facts.family != MessageFamily.UNKNOWN ||
-            result.facts.amount != null || result.bank == null) result
+        if (suggestion?.family != MessageFamily.NON_FINANCIAL || !mayRemember(result)) result
         // The draft mapper stamps family_origin/model reasons from [Interpretation.familyInference].
         else result.copy(facts = Facts(MessageFamily.NON_FINANCIAL), status = ParseStatus.NON_FINANCIAL,
             confidence = Confidence(suggestion.score, emptyList()), evidence = emptyList(), blockers = emptySet(), familyInference = suggestion)
+
+    /**
+     * Only an unidentified message whose amount the rules looked for and found none may be settled. These stops end
+     * the rules before they read an amount, or drop one they could not trust, so a missing amount proves nothing.
+     */
+    fun mayRemember(result: Interpretation): Boolean = result.bank != null && result.facts.family == MessageFamily.UNKNOWN &&
+        result.facts.amount == null && result.diagnostics.none { it.code in AMOUNT_NOT_READ }
+    private val AMOUNT_NOT_READ = setOf("MESSAGE_TOO_LONG", "UNSUPPORTED_RULE_CAPABILITY", "FAMILY_OR_DIRECTION_CONFLICT",
+        "INVALID_OR_CONFLICTING_PRINCIPAL_CURRENCY", "CONFLICTING_FOREIGN_PRINCIPAL")
 
     /** Messages a remembered "not financial" once settled that today's decisions no longer settle; they go back to review. */
     fun revokedMemories(records: List<ParsedEventRecord>, bodies: Map<String, String>,

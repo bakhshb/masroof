@@ -59,7 +59,7 @@ class DashboardProjectionBuilder(
         val analysis = AnalysisDashboardProjection.build(context)
         val accounts = AccountsDashboardProjection.build(context)
         val cards = cardsProjection.build(context)
-        val commitments = commitmentsProjection.build(context, cards.creditFacilities)
+        val commitments = commitmentsProjection.build(context, cards.creditFacilities, accounts.accountsFleet?.totalRemaining)
         val creditFacilities = cards.creditFacilities.withPaidDues(commitments.commitmentsOverview.paidCreditFacilityKeys)
         val bankHierarchy = BankHierarchyBuilder.build(
             ownedAccounts = context.ownedAccounts,
@@ -78,7 +78,7 @@ class DashboardProjectionBuilder(
             creditFacilities = creditFacilities,
             loansOverview = commitments.loansOverview,
             commitmentsOverview = commitments.commitmentsOverview,
-            dailyAllowance = DailyAllowanceCalculator.calculate(accounts.accountsFleet?.totalRemaining, commitments.commitmentsOverview, period, context.today),
+            dailyAllowance = commitments.dailyAllowance,
             merchantSpending = analysis.merchantSpending,
             dailySpendingTrend = analysis.dailySpendingTrend,
             spendingTrends = DashboardSpendingTrendsBuilder.build(context, accounts, cards),

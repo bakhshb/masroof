@@ -10,8 +10,8 @@ import kotlin.math.abs
 object AnalyticsVersion {
     const val CLEANING = "financial-clean-v2"
     const val FEATURES = "purchase-days-v2"
-    const val MODEL = "huber-l2-v2"
-    const val EVALUATION = "rolling-horizons-v2"
+    const val MODEL = "huber-l2-v3"
+    const val EVALUATION = "rolling-horizons-v3"
 }
 
 data class FinancialFact(val id: String, val day: Long, val amount: Long?, val refund: Boolean,

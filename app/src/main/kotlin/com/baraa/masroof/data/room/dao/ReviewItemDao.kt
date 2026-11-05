@@ -54,6 +54,16 @@ interface ReviewItemDao {
     )
     suspend fun listRequiredReasonsContaining(reason: String): List<ReviewRawSmsReasons>
 
+    /** Only an automatic settlement is reopened; a user's resolution never is. */
+    @Query(
+        """
+        UPDATE review_item SET status = 'REQUIRED', updatedAtEpochMillis = :updatedAtEpochMillis,
+          resolvedAtEpochMillis = NULL, resolutionKind = NULL, resolvedTransactionId = NULL
+        WHERE rawSmsId = :rawSmsId AND status = 'RESOLVED' AND resolutionKind = 'AUTO_NO_LONGER_REQUIRED'
+        """,
+    )
+    suspend fun reopenAutomatic(rawSmsId: String, updatedAtEpochMillis: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfAbsent(entity: ReviewItemEntity): Long
 

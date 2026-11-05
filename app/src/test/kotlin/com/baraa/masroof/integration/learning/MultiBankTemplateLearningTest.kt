@@ -82,6 +82,11 @@ class MultiBankTemplateLearningTest {
                 com.baraa.masroof.finance.value.Currency.SAR)))
             assertSame(bank, withAmount, FamilyAssistBridge.rememberNonFinancial(withAmount,
                 FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, body)))
+            // Conflicting wording stops the rules before an amount is read, so a missing amount proves nothing there.
+            val conflicted = ruled.copy(diagnostics = ruled.diagnostics + com.baraa.masroof.engine.bank.InterpretationDiagnostic(
+                "FAMILY_OR_DIRECTION_CONFLICT", "conflict", com.baraa.masroof.engine.bank.DiagnosticSeverity.ERROR))
+            assertSame(bank, conflicted, FamilyAssistBridge.rememberNonFinancial(conflicted,
+                FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, body)))
         }
     }
 

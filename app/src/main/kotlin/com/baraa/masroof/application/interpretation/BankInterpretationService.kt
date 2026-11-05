@@ -100,7 +100,7 @@ class BankInterpretationService(
         val ruled = try {
             snapshot.interpretRouted(input,BankId(bankId),familyAssist).also { ruled ->
                 // Banks without role rules never ask; an unidentified message without an amount asks once here.
-                if (!trace.requested && ruled.facts.family == MessageFamily.UNKNOWN && ruled.facts.amount == null)
+                if (!trace.requested && FamilyAssistBridge.mayRemember(ruled))
                     familyAssist.suggest(input, FamilyTextPreparation.prepare(input.body).title)
             }
         } finally { attempt.remove() }
@@ -148,6 +148,7 @@ class BankInterpretationService(
     fun invalidateFeedback() {
         classifiers = null
         synchronizedDecisions = null
+        revoked = emptySet()
         changes.trySend(Unit)
     }
 
@@ -289,6 +290,9 @@ class BankInterpretationService(
         val required = reviews.listRequired()
         val records = parsed.listByRawSmsIds(required.map { it.rawSmsId })
         val models = classifiers.orEmpty()
+        val configuration = patterns()
+        // Outside role rules only a remembered "not financial" can change a message, and only one without an amount.
+        val roled = configuration.banks.filter { bank -> bank.currentPatterns.any { it.roleProfile != null } }.map { it.bankId }.toSet()
         // Rules ask for a family only when they found none; a message already read with this model is never re-read,
         // otherwise a suggestion the rules cannot use would refresh the same message forever.
         val candidates = records.filter { record -> val bank = record.event.bank.id
@@ -298,12 +302,15 @@ class BankInterpretationService(
         val bodies = raw.getByIds(candidates.map { it.event.rawSmsId }.toSet()).associateBy { it.id }
         assistable = candidates.filter { record -> bodies[record.event.rawSmsId]?.body?.let { body ->
             FamilyAssistBridge.suggest(models[record.event.bank.id], record.event.bank.id, body)
-        } != null }.map { it.event.rawSmsId }.toSet()
+        }?.let { it.family == MessageFamily.NON_FINANCIAL && record.event.amount == null || record.event.bank.id in roled } == true }
+            .map { it.event.rawSmsId }.toSet()
         // Seed UNKNOWN messages already read with the current seed model are not read again (same guard as above).
         seedRead = records.filter { it.event.bank.id == SEED_BANK && it.event.messageFamily.name == "UNKNOWN" &&
             store.history(it.event.rawSmsId).lastOrNull()?.activeModelVersion == models[SEED_BANK]?.version }
             .map { it.event.rawSmsId }.toSet()
-        val remembered = parsed.listRememberedNonFinancial()
+        // A message read with its bank's current decisions is still settled by them; only older reads can be revoked.
+        val remembered = parsed.listRememberedNonFinancial().filter { record ->
+            "model:${models[record.event.bank.id]?.version}" !in record.event.confidence.reasons }
         revoked = FamilyAssistBridge.revokedMemories(remembered,
             raw.getByIds(remembered.map { it.event.rawSmsId }.toSet()).associate { it.id to it.body }, models)
         val needs = refreshFilter()
@@ -323,7 +330,8 @@ class BankInterpretationService(
     }
     private fun needsRefresh(record: com.baraa.masroof.parsing.repository.ParsedEventRecord, rules: Lazy<String>,
         read: Set<String>): Boolean {
-        if (record.event.rawSmsId in revoked) return true
+        // Only while it is still hidden: once read again it is an ordinary review message.
+        if (record.event.rawSmsId in revoked && record.event.messageFamily.name == "NON_FINANCIAL") return true
         // Successful facts resume derived work.
         if (record.event.parseStatus.name == "SUCCESS") return false
         val bank = record.event.bank.id
@@ -335,10 +343,10 @@ class BankInterpretationService(
         return record.event.messageFamily.name == "UNKNOWN" && record.event.rawSmsId !in read ||
             reasons.none { it == "rules:$fingerprint" || it.startsWith("rules:$fingerprint:") } || staleInference
     }
-    /** Do not re-interpret posted evidence or human decisions on engine/model upgrades. */
+    /** Do not re-interpret posted evidence or human decisions on engine/model upgrades; an automatic settlement is not one. */
     suspend fun mayRefresh(rawSmsId: String): Boolean =
         !transactions.isRawSmsLinked(rawSmsId) && corrections.latestForRawSmsId(rawSmsId) == null &&
-            reviews.findByRawSmsId(rawSmsId)?.resolutionKind == null
+            reviews.findByRawSmsId(rawSmsId)?.resolutionKind.let { it == null || it == ReviewResolutionKind.AUTO_NO_LONGER_REQUIRED }
 
     private data class Decision(val id: String,val rawId: String,val family: MessageFamily?,val at: Long,
         val provenance: String,val type: FinancialTransactionType? = null,val reason: String? = null)
@@ -353,6 +361,7 @@ class BankInterpretationService(
         stopSignal.complete(Unit)
         classifiers = null
         synchronizedDecisions = null
+        revoked = emptySet()
         tracker?.removeObserver(observer);tracker=null
         changes.close()
         // Do not cancel Room continuations while their connection callback is opening.

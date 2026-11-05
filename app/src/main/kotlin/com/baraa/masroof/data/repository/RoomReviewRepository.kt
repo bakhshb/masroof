@@ -100,6 +100,10 @@ class RoomReviewRepository(
         return@withAccess updated?.let(ReviewItemMapper::toDomain)
     }
 
+    override suspend fun reopenAutomatic(rawSmsId: String, now: Instant): Boolean = accessGate.withAccess {
+        dao.reopenAutomatic(rawSmsId, now.toEpochMilli()) > 0
+    }
+
     private companion object {
         /** Persisted ingestion reason code for exhausted processing. */
         const val RETRYABLE_PROCESSING_ERROR_REASON = "processing_error"

@@ -27,11 +27,10 @@ class DailyAllowanceCalculatorTest {
         assertEquals(1, DailyAllowanceCalculator.calculate(net("100"), dues(), period, LocalDate.of(2026, 11, 25))!!.days)
     }
 
-    @Test fun anOverdueUnpaidRowIsNotSubtractedAgain() {
-        // Paid on the 3rd but not matched: the payment already lowered the net flow.
+    @Test fun aLateUnpaidRowIsStillOwed() {
         val result = DailyAllowanceCalculator.calculate(net("1000"), dues(row("500", LocalDate.of(2026, 11, 3))), period, today)!!
-        assertEquals(Money.zero(Currency.SAR), result.unpaidCommitments)
-        assertEquals(BigDecimal("1000.00"), result.left.amount)
+        assertEquals(Money.of("500", Currency.SAR), result.unpaidCommitments)
+        assertEquals(BigDecimal("500.00"), result.left.amount)
     }
 
     @Test fun overspendingShowsZeroPerDayAndKeepsTheNegativeDifference() {

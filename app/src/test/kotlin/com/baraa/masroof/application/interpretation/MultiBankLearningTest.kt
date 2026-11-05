@@ -126,6 +126,24 @@ class MultiBankLearningTest {
             assertTrue("family_origin:HUMAN_TEMPLATE" in next.event.confidence.reasons)
             assertTrue(c.reviewRepository.listRequired().isEmpty())
             assertTrue(c.financialTransactionRepository.listAll().isEmpty())
+
+            // The user later says this wording is a purchase: both hidden copies go back to review, the
+            // automatically settled one included, and they are read once, not on every refresh.
+            c.userCorrectionRepository.save(com.baraa.masroof.domain.model.UserCorrection("promo-was-purchase", "promo-one",
+                com.baraa.masroof.domain.model.MessageFamily.PURCHASE, null, null, null, Instant.now()))
+            service.synchronizeFeedback()
+            assertEquals(setOf("promo-waiting", "promo-next"), service.revokedMemories())
+            suspend fun refresh() = ModelRefreshWorkflow(c.reviewRepository, c.parsedEventRepository, c.rawSmsRepository,
+                c.processingRetryRepository, c.processStoredSmsUseCase, service::mayRefresh, service.refreshFilter(readHistory = false),
+                { c.withDatabaseTransaction(it) }, { c.historicalDerivedRecovery.recoverPending() }, c.clock,
+                extra = { service.revokedMemories() }).refresh()
+            refresh()
+            listOf("promo-waiting", "promo-next").forEach { id ->
+                assertEquals(id, "UNKNOWN", c.parsedEventRepository.findByRawSmsId(id)!!.event.messageFamily.name)
+                assertFalse(id, service.needsRefresh(c.parsedEventRepository.findByRawSmsId(id)!!))
+            }
+            assertEquals(setOf("promo-waiting", "promo-next"), c.reviewRepository.listRequired().map { it.rawSmsId }.toSet())
+            assertTrue(c.financialTransactionRepository.listAll().isEmpty())
         } finally {
             c.close()
             WorkManagerTestInitHelper.closeWorkDatabase()

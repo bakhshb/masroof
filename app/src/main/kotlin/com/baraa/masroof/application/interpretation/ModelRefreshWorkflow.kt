@@ -27,7 +27,8 @@ class ModelRefreshWorkflow(
 ) {
     /** Returns false when a parse failed; thrown failures retain committed retry markers. */
     suspend fun refresh(): Boolean {
-        val ids = (reviews.listRequired().map { it.rawSmsId } + extra()).distinct()
+        val revoked = extra().toSet()
+        val ids = (reviews.listRequired().map { it.rawSmsId } + revoked).distinct()
         val records = parsed.listByRawSmsIds(ids).associateBy { it.event.rawSmsId }
         val pending = ids.filter { mayRefresh(it) && records[it]?.let(needsRefresh) == true }
         var complete = true
@@ -39,6 +40,8 @@ class ModelRefreshWorkflow(
                     val evidence = raw.getById(rawSmsId)
                     if (evidence != null) {
                         retries.markRequired(evidence.id, clock.now(), ProcessingRetryMode.HISTORICAL_BATCH)
+                        // Queue refresh never reopens a resolved review, so a revoked hidden message reopens here.
+                        if (rawSmsId in revoked) reviews.reopenAutomatic(rawSmsId, clock.now())
                         if (processor.reparseAndStore(evidence) is SmsIngestionResult.Failed) complete = false
                     }
                 }
