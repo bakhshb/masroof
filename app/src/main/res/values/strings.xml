@@ -286,16 +286,6 @@
     <string name="bank_aljazira">بنك الجزيرة</string>
     <string name="bank_unknown">بنك غير معروف</string>
 <string name="dashboard_remaining_title">صافي حركة الفترة</string>
-    <plurals name="home_daily_allowance">
-        <item quantity="zero">تقدر تصرف يوميا · %1$d يوم للراتب</item>
-        <item quantity="one">تقدر تصرف يوميا · يوم واحد للراتب</item>
-        <item quantity="two">تقدر تصرف يوميا · يومان للراتب</item>
-        <item quantity="few">تقدر تصرف يوميا · %1$d أيام للراتب</item>
-        <item quantity="many">تقدر تصرف يوميا · %1$d يوما للراتب</item>
-        <item quantity="other">تقدر تصرف يوميا · %1$d يوم للراتب</item>
-    </plurals>
-    <string name="home_daily_allowance_hint">باقي من هذه الفترة %1$s بعد الالتزامات غير المدفوعة من اليوم فصاعدا (%2$s)، مقسوم على الأيام الباقية حتى الراتب ومنها اليوم. الحساب من دخل وصرف حساباتك في هذه الفترة فقط، ولا يشمل مدخراتك السابقة.</string>
-    <string name="home_daily_allowance_over">صرفت أكثر من دخل هذه الفترة: الفرق %1$s بعد الالتزامات غير المدفوعة (%2$s). الحساب من دخل وصرف حساباتك في هذه الفترة فقط.</string>
     <string name="dashboard_hero_remaining_title">صافي حركة الحسابات</string>
     <string name="dashboard_quick_total_expense">إجمالي المصاريف</string>
     <string name="dashboard_quick_total_income">متوسط المصاريف اليومية</string>

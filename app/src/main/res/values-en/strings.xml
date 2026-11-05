@@ -280,12 +280,6 @@
     <string name="bank_aljazira">AlJazira Bank</string>
     <string name="bank_unknown">Unknown bank</string>
 <string name="dashboard_remaining_title">Net period movement</string>
-    <plurals name="home_daily_allowance">
-        <item quantity="one">Can spend per day · %1$d day to salary</item>
-        <item quantity="other">Can spend per day · %1$d days to salary</item>
-    </plurals>
-    <string name="home_daily_allowance_hint">%1$s is left this period after unpaid commitments due from today (%2$s), spread over the days until salary, today included. Based only on this period\'s money in and out of your accounts, not earlier savings.</string>
-    <string name="home_daily_allowance_over">You spent more than this period\'s income: %1$s after unpaid commitments (%2$s). Based only on this period\'s money in and out of your accounts.</string>
     <string name="dashboard_hero_remaining_title">Net account movement</string>
     <string name="dashboard_quick_total_expense">Total expenses</string>
     <string name="dashboard_quick_total_income">Average daily expenses</string>
