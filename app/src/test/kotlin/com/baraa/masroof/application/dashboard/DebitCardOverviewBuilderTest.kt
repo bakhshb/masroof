@@ -8,7 +8,6 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.Confidence
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
@@ -18,6 +17,7 @@ import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -106,7 +106,7 @@ class DebitCardOverviewBuilderTest {
             type = FinancialTransactionType.REFUND,
             amount = "20.00",
             source = null,
-            destination = cardId,
+            dest = cardId,
             linked = listOf("evt-refund"),
         )
         val parsedRecords = listOf(
@@ -248,27 +248,6 @@ class DebitCardOverviewBuilderTest {
         assertEquals(BigDecimal("0.00"), result.spendingByCardKey["BANK_ALJAZIRA:2210"]?.amount)
         assertTrue(result.transactionDebitSpendInvolvement.isEmpty())
     }
-
-    private fun tx(
-        id: String,
-        type: FinancialTransactionType,
-        amount: String,
-        source: String?,
-        linked: List<String>,
-        destination: String? = null,
-    ): FinancialTransaction =
-        FinancialTransaction(
-            id = id,
-            type = type,
-            amount = Money.of(amount, Currency.SAR),
-            occurredAt = Instant.parse("2026-08-05T11:05:00Z"),
-            sourceContainerId = source,
-            destinationContainerId = destination,
-            linkedParsedEventIds = linked,
-            merchant = null,
-            counterparty = null,
-            categoryId = null,
-        )
 
     private fun parsedRecord(
         id: String,

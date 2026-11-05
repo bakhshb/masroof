@@ -2,11 +2,10 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.time.Instant
 
 class SelfTransferDeduplicatorTest {
   @Test
@@ -249,25 +248,4 @@ class SelfTransferDeduplicatorTest {
 
     assertEquals(setOf("self", "external-out"), filtered.map { it.id }.toSet())
   }
-
-  private fun tx(
-    id: String,
-    type: FinancialTransactionType,
-    amount: String,
-    source: String?,
-    dest: String?,
-    linked: List<String>,
-  ): FinancialTransaction =
-    FinancialTransaction(
-      id = id,
-      type = type,
-      amount = Money.of(amount, Currency.SAR),
-      occurredAt = Instant.parse("2026-08-02T12:00:00Z"),
-      sourceContainerId = source,
-      destinationContainerId = dest,
-      merchant = null,
-      counterparty = null,
-      categoryId = null,
-      linkedParsedEventIds = linked,
-    )
 }

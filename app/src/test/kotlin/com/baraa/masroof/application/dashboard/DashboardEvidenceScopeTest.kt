@@ -1,12 +1,8 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.Confidence
-import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
@@ -17,6 +13,7 @@ import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
+import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -35,7 +32,7 @@ class DashboardEvidenceScopeTest {
             linked = mapOf("tx-1" to listOf(record("evt-b", "sms-b"), record("evt-a", "sms-a"))),
         )
 
-        val evidence = repos.scope().load(listOf(tx("tx-1", "evt-b", "evt-a")), listOf(card("2210"), card("2210")), periodEnd)
+        val evidence = repos.scope().load(listOf(tx("tx-1", linked = listOf("evt-b", "evt-a"), occurredAt = periodEndMinusDay)), listOf(card("2210"), card("2210")), periodEnd)
 
         assertEquals(listOf("evt-a", "evt-b", "evt-c"), evidence.parsedRecords.map { it.event.id })
         assertEquals(setOf("sms-a", "sms-b", "sms-c"), evidence.rawSmsById.keys)
@@ -50,7 +47,7 @@ class DashboardEvidenceScopeTest {
         val scope = repos.scope()
         val evidence = scope.load(emptyList(), emptyList(), periodEnd)
 
-        val extended = scope.extend(evidence, listOf(tx("tx-covered", "evt-a"), tx("tx-unlinked")))
+        val extended = scope.extend(evidence, listOf(tx("tx-covered", linked = listOf("evt-a"), occurredAt = periodEndMinusDay), tx("tx-unlinked", occurredAt = periodEndMinusDay)))
 
         assertSame(evidence, extended)
         assertTrue(repos.linkLookups.isEmpty())
@@ -65,7 +62,7 @@ class DashboardEvidenceScopeTest {
         val scope = repos.scope()
         val evidence = scope.load(emptyList(), emptyList(), periodEnd)
 
-        val extended = scope.extend(evidence, listOf(tx("tx-covered", "evt-a"), tx("tx-new", "evt-n")))
+        val extended = scope.extend(evidence, listOf(tx("tx-covered", linked = listOf("evt-a"), occurredAt = periodEndMinusDay), tx("tx-new", linked = listOf("evt-n"), occurredAt = periodEndMinusDay)))
 
         assertEquals(listOf(listOf("tx-new")), repos.linkLookups)
         assertEquals(listOf("evt-a", "evt-n"), extended.parsedRecords.map { it.event.id })
@@ -121,19 +118,6 @@ class DashboardEvidenceScopeTest {
                 error("unexpected call: ${method.name}")
             } as T
     }
-
-    private fun tx(id: String, vararg linkedEventIds: String) = FinancialTransaction(
-        id = id,
-        type = FinancialTransactionType.EXPENSE,
-        amount = Money.of("1.00", Currency.SAR),
-        occurredAt = periodEndMinusDay,
-        sourceContainerId = null,
-        destinationContainerId = null,
-        merchant = null,
-        counterparty = null,
-        categoryId = null,
-        linkedParsedEventIds = linkedEventIds.toList(),
-    )
 
     private fun card(last4: String) = CardRegistryEntry.forTest(
         bank = Bank.BANK_ALJAZIRA,

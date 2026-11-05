@@ -6,7 +6,6 @@ import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
@@ -15,6 +14,7 @@ import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -47,7 +47,7 @@ class AccountFlowClassifierTest {
 
     @Test
     fun expense_fromCreditCardWithoutOwnedAccount_isExcluded() {
-        val tx = tx("card-exp", FinancialTransactionType.EXPENSE, "75", source = cardId)
+        val tx = tx("card-exp", FinancialTransactionType.EXPENSE, "75", source = cardId, linked = listOf("evt-card-exp"))
         val result = AccountFlowClassifier.classify(tx, scope, emptyContext())
 
         assertTrue(result.isEmpty())
@@ -55,7 +55,7 @@ class AccountFlowClassifierTest {
 
     @Test
     fun expense_fromOwnedAccount_classifiedAsPosPurchase() {
-        val tx = tx("pos", FinancialTransactionType.EXPENSE, "90", source = accountId)
+        val tx = tx("pos", FinancialTransactionType.EXPENSE, "90", source = accountId, linked = listOf("evt-pos"))
         val result = AccountFlowClassifier.classify(tx, scope, emptyContext())
 
         assertEquals(
@@ -123,7 +123,7 @@ class AccountFlowClassifierTest {
 
     @Test
     fun refund_toCreditCard_isExcludedFromAccountCash() {
-        val tx = tx("card-refund", FinancialTransactionType.REFUND, "25", dest = cardId)
+        val tx = tx("card-refund", FinancialTransactionType.REFUND, "25", dest = cardId, linked = listOf("evt-card-refund"))
         val context = AccountFlowClassifier.buildContext(
             parsedRecords = listOf(
                 parsedRecord(
@@ -152,7 +152,7 @@ class AccountFlowClassifierTest {
     @Test
     fun refund_toAnotherOwnedAccount_isExcludedFromThisAccount() {
         val other = "account:bank_aljazira:3002"
-        val tx = tx("other-refund", FinancialTransactionType.REFUND, "15", dest = other)
+        val tx = tx("other-refund", FinancialTransactionType.REFUND, "15", dest = other, linked = listOf("evt-other-refund"))
 
         assertTrue(AccountFlowClassifier.classify(tx, scope, emptyContext()).isEmpty())
     }
@@ -192,6 +192,7 @@ class AccountFlowClassifierTest {
             "500",
             source = accountId,
             dest = "account:bank_aljazira:4002",
+            linked = listOf("evt-xfer"),
         )
         val bothSidesScope = CurrentAccountTransactionScope(
             ownedContainerIds = setOf(accountId, "account:bank_aljazira:4002"),
@@ -228,7 +229,7 @@ class AccountFlowClassifierTest {
 
     @Test
     fun refund_sameSuffixInDifferentBank_isExcludedFromSelectedAccountAndFleet() {
-        val refund = tx("foreign-refund", FinancialTransactionType.REFUND, "100", dest = "account:OTHER_BANK:3001")
+        val refund = tx("foreign-refund", FinancialTransactionType.REFUND, "100", dest = "account:OTHER_BANK:3001", linked = listOf("evt-foreign-refund"))
         assertTrue(AccountFlowClassifier.classify(refund, scope, emptyContext()).isEmpty())
         assertTrue(AccountFlowClassifier.classify(refund, fleetScope(), emptyContext()).isEmpty())
         val summary = CurrentAccountSummaryCalculator.summarize(
@@ -254,7 +255,7 @@ class AccountFlowClassifierTest {
     @Test
     fun refund_debitCardLinkedToForeignSameSuffix_doesNotCreditSelectedAccount() {
         val debitCard = "card:OTHER_BANK:2210"
-        val refund = tx("foreign-card", FinancialTransactionType.REFUND, "20", dest = debitCard)
+        val refund = tx("foreign-card", FinancialTransactionType.REFUND, "20", dest = debitCard, linked = listOf("evt-foreign-card"))
         val linkedScope = scope.copy(
             ownedDebitCardContainerIds = setOf(debitCard),
             debitCardLinkedAccountIds = mapOf(debitCard to "account:OTHER_BANK:3001"),
@@ -264,7 +265,7 @@ class AccountFlowClassifierTest {
 
     @Test
     fun refund_bankIdentityCaseDifference_isStillTheSameAccount() {
-        val refund = tx("same-bank", FinancialTransactionType.REFUND, "20", dest = "account:BANK_ALJAZIRA:3001")
+        val refund = tx("same-bank", FinancialTransactionType.REFUND, "20", dest = "account:BANK_ALJAZIRA:3001", linked = listOf("evt-same-bank"))
         assertEquals(
             listOf(FlowAssignment.Income(FlowIncomeCategory.ACCOUNT_REFUND)),
             AccountFlowClassifier.classify(refund, scope, emptyContext()),
@@ -273,7 +274,7 @@ class AccountFlowClassifierTest {
 
     @Test
     fun refund_unqualifiedDestination_cannotCertifyBankIdentity() {
-        val refund = tx("legacy", FinancialTransactionType.REFUND, "20", dest = "account:3001")
+        val refund = tx("legacy", FinancialTransactionType.REFUND, "20", dest = "account:3001", linked = listOf("evt-legacy"))
         assertTrue(AccountFlowClassifier.classify(refund, scope, emptyContext()).isEmpty())
     }
 
@@ -286,26 +287,6 @@ class AccountFlowClassifierTest {
         parsedRecordsById = emptyMap(),
         primaryCurrency = Currency.SAR,
         sarEquivalents = emptyMap(),
-    )
-
-    private fun tx(
-        id: String,
-        type: FinancialTransactionType,
-        amount: String,
-        source: String? = null,
-        dest: String? = null,
-        linked: List<String> = listOf("evt-$id"),
-    ) = FinancialTransaction(
-        id = id,
-        type = type,
-        amount = Money.of(amount, Currency.SAR),
-        occurredAt = Instant.parse("2026-08-01T12:00:00Z"),
-        sourceContainerId = source,
-        destinationContainerId = dest,
-        merchant = null,
-        counterparty = null,
-        categoryId = null,
-        linkedParsedEventIds = linked,
     )
 
     private fun parsedRecord(
@@ -336,5 +317,4 @@ class AccountFlowClassifierTest {
         ),
         details = ParsedEventDetails(cardSmsChannel = cardSmsChannel),
     )
-
 }

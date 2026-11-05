@@ -15,6 +15,7 @@ import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,13 +30,13 @@ class CurrentAccountSummaryCalculatorTest {
         val cardId = "card:bank_aljazira:7271"
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(
-                tx("income", FinancialTransactionType.INCOME, "15000", source = accountId),
-                tx("xfer-in", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "200", dest = accountId),
-                tx("card-pay", FinancialTransactionType.CREDIT_CARD_PAYMENT, "500", source = accountId, dest = cardId),
-                tx("xfer-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100", source = accountId),
-                tx("cash", FinancialTransactionType.CASH_WITHDRAWAL, "50", source = accountId),
-                tx("pos", FinancialTransactionType.EXPENSE, "90", source = accountId),
-                tx("card-exp", FinancialTransactionType.EXPENSE, "75", source = cardId),
+                tx("income", FinancialTransactionType.INCOME, "15000", source = accountId, linked = listOf("evt-income")),
+                tx("xfer-in", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "200", dest = accountId, linked = listOf("evt-xfer-in")),
+                tx("card-pay", FinancialTransactionType.CREDIT_CARD_PAYMENT, "500", source = accountId, dest = cardId, linked = listOf("evt-card-pay")),
+                tx("xfer-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100", source = accountId, linked = listOf("evt-xfer-out")),
+                tx("cash", FinancialTransactionType.CASH_WITHDRAWAL, "50", source = accountId, linked = listOf("evt-cash")),
+                tx("pos", FinancialTransactionType.EXPENSE, "90", source = accountId, linked = listOf("evt-pos")),
+                tx("card-exp", FinancialTransactionType.EXPENSE, "75", source = cardId, linked = listOf("evt-card-exp")),
             ),
             parsedRecords = emptyList(),
         )
@@ -147,12 +148,14 @@ class CurrentAccountSummaryCalculatorTest {
                     type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
                     amount = "1000",
                     dest = accountA,
+                    linked = listOf("evt-transfer-in"),
                 ),
                 tx(
                     id = "purchase",
                     type = FinancialTransactionType.EXPENSE,
                     amount = "500",
                     source = accountA,
+                    linked = listOf("evt-purchase"),
                 ),
                 tx(
                     id = "self-out",
@@ -160,6 +163,7 @@ class CurrentAccountSummaryCalculatorTest {
                     amount = "200",
                     source = accountA,
                     dest = accountB,
+                    linked = listOf("evt-self-out"),
                 ),
             ),
             parsedRecords = emptyList(),
@@ -185,18 +189,19 @@ class CurrentAccountSummaryCalculatorTest {
         val otherAccount = "account:bank_aljazira:3002"
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(
-                tx("xfer-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100", source = accountId),
-                tx("card-pay", FinancialTransactionType.CREDIT_CARD_PAYMENT, "50", source = accountId, dest = cardId),
-                tx("cash", FinancialTransactionType.CASH_WITHDRAWAL, "30", source = accountId),
-                tx("bill", FinancialTransactionType.BILL_PAYMENT, "40", source = accountId),
-                tx("pos", FinancialTransactionType.EXPENSE, "60", source = accountId),
-                tx("fee", FinancialTransactionType.FEE, "10", source = accountId),
+                tx("xfer-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100", source = accountId, linked = listOf("evt-xfer-out")),
+                tx("card-pay", FinancialTransactionType.CREDIT_CARD_PAYMENT, "50", source = accountId, dest = cardId, linked = listOf("evt-card-pay")),
+                tx("cash", FinancialTransactionType.CASH_WITHDRAWAL, "30", source = accountId, linked = listOf("evt-cash")),
+                tx("bill", FinancialTransactionType.BILL_PAYMENT, "40", source = accountId, linked = listOf("evt-bill")),
+                tx("pos", FinancialTransactionType.EXPENSE, "60", source = accountId, linked = listOf("evt-pos")),
+                tx("fee", FinancialTransactionType.FEE, "10", source = accountId, linked = listOf("evt-fee")),
                 tx(
                     id = "self",
                     type = FinancialTransactionType.SELF_TRANSFER,
                     amount = "200",
                     source = accountId,
                     dest = otherAccount,
+                    linked = listOf("evt-self"),
                 ),
             ),
             parsedRecords = emptyList(),
@@ -277,8 +282,8 @@ class CurrentAccountSummaryCalculatorTest {
         val other = "account:bank_aljazira:3002"
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(
-                tx("owned-pos", FinancialTransactionType.EXPENSE, "90", source = owned),
-                tx("other-pos", FinancialTransactionType.EXPENSE, "40", source = other),
+                tx("owned-pos", FinancialTransactionType.EXPENSE, "90", source = owned, linked = listOf("evt-owned-pos")),
+                tx("other-pos", FinancialTransactionType.EXPENSE, "40", source = other, linked = listOf("evt-other-pos")),
             ),
             parsedRecords = emptyList(),
             ownedAccountContainerIds = setOf(owned),
@@ -355,6 +360,7 @@ class CurrentAccountSummaryCalculatorTest {
                     amount = "500",
                     source = ownedA,
                     dest = ownedB,
+                    linked = listOf("evt-self"),
                 ),
             ),
             parsedRecords = emptyList(),
@@ -406,6 +412,7 @@ class CurrentAccountSummaryCalculatorTest {
             amount = "100.00",
             source = accountId,
             occurredAt = purchaseAt,
+            linked = listOf("evt-purchase"),
         )
         val accountRefund = tx(
             id = "account-refund",
@@ -413,6 +420,7 @@ class CurrentAccountSummaryCalculatorTest {
             amount = "100.00",
             dest = accountId,
             occurredAt = refundAt,
+            linked = listOf("evt-account-refund"),
         )
         val cardRefund = tx(
             id = "card-refund",
@@ -465,6 +473,7 @@ class CurrentAccountSummaryCalculatorTest {
             amount = "100.00",
             source = accountId,
             occurredAt = purchaseAt,
+            linked = listOf("evt-purchase"),
         )
         val refund = tx(
             id = "account-refund",
@@ -472,6 +481,7 @@ class CurrentAccountSummaryCalculatorTest {
             amount = "100.00",
             dest = accountId,
             occurredAt = refundAt,
+            linked = listOf("evt-account-refund"),
         )
         assertTrue(inSalaryPeriod(purchase.occurredAt, period, zone))
         assertTrue(!inSalaryPeriod(refund.occurredAt, period, zone))
@@ -506,8 +516,8 @@ class CurrentAccountSummaryCalculatorTest {
         val creditCardId = "card:BANK_ALJAZIRA:7271"
         val summary = summarizeOwned(
             transactions = listOf(
-                tx("pos", FinancialTransactionType.EXPENSE, "100.00", source = accountId),
-                tx("card-refund", FinancialTransactionType.REFUND, "25.00", dest = creditCardId),
+                tx("pos", FinancialTransactionType.EXPENSE, "100.00", source = accountId, linked = listOf("evt-pos")),
+                tx("card-refund", FinancialTransactionType.REFUND, "25.00", dest = creditCardId, linked = listOf("evt-card-refund")),
                 tx("unknown-refund", FinancialTransactionType.REFUND, "40.00", dest = null, linked = emptyList()),
             ),
             accountId = accountId,
@@ -528,8 +538,8 @@ class CurrentAccountSummaryCalculatorTest {
         val accountA = "account:BANK_ALJAZIRA:3001"
         val accountB = "account:BANK_ALJAZIRA:3002"
         val transactions = listOf(
-            tx("pos", FinancialTransactionType.EXPENSE, "100.00", source = accountA),
-            tx("refund", FinancialTransactionType.REFUND, "100.00", dest = accountA),
+            tx("pos", FinancialTransactionType.EXPENSE, "100.00", source = accountA, linked = listOf("evt-pos")),
+            tx("refund", FinancialTransactionType.REFUND, "100.00", dest = accountA, linked = listOf("evt-refund")),
         )
         val fleet = CurrentAccountSummaryCalculator.summarize(
             transactions = transactions,
@@ -555,8 +565,8 @@ class CurrentAccountSummaryCalculatorTest {
         val aljazira = "account:BANK_ALJAZIRA:3001"
         val other = "account:OTHER_BANK:3001"
         val transactions = listOf(
-            tx("alj", FinancialTransactionType.EXPENSE, "100.00", source = aljazira),
-            tx("other", FinancialTransactionType.EXPENSE, "250.00", source = other),
+            tx("alj", FinancialTransactionType.EXPENSE, "100.00", source = aljazira, linked = listOf("evt-alj")),
+            tx("other", FinancialTransactionType.EXPENSE, "250.00", source = other, linked = listOf("evt-other")),
         )
         val fleet = CurrentAccountSummaryCalculator.summarize(
             transactions = transactions,
@@ -585,6 +595,7 @@ class CurrentAccountSummaryCalculatorTest {
             FinancialTransactionType.EXPENSE,
             "40.00",
             source = "account:3001",
+            linked = listOf("evt-legacy"),
         )
         val unique = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(legacy),
@@ -649,28 +660,6 @@ class CurrentAccountSummaryCalculatorTest {
         val end = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zone)
         return !instant.isBefore(start) && instant.isBefore(end)
     }
-
-    private fun tx(
-        id: String,
-        type: FinancialTransactionType,
-        amount: String,
-        source: String? = null,
-        dest: String? = null,
-        linked: List<String> = listOf("evt-$id"),
-        occurredAt: Instant = Instant.parse("2026-08-10T12:00:00Z"),
-    ): FinancialTransaction =
-        FinancialTransaction(
-            id = id,
-            type = type,
-            amount = Money.of(amount, Currency.SAR),
-            occurredAt = occurredAt,
-            sourceContainerId = source,
-            destinationContainerId = dest,
-            merchant = null,
-            counterparty = null,
-            categoryId = null,
-            linkedParsedEventIds = linked,
-        )
 
     private fun parsedRecord(
         id: String,

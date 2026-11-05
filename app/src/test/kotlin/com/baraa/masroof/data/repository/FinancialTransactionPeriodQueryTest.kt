@@ -3,12 +3,10 @@ package com.baraa.masroof.data.repository
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -45,12 +43,12 @@ class FinancialTransactionPeriodQueryTest {
     fun listOccurredBetween_includesStartExcludesEndAndOrdersNewestFirst() = runBlocking {
         val start = Instant.parse("2026-07-27T00:00:00+03:00")
         val end = Instant.parse("2026-08-27T00:00:00+03:00")
-        save(tx("before", start.minusSeconds(1)))
-        save(tx("start", start))
-        save(tx("mid-b", start.plusSeconds(20)))
-        save(tx("mid-a", start.plusSeconds(10)))
-        save(tx("end", end))
-        save(tx("after", end.plusSeconds(1)))
+        save(tx("before", occurredAt = start.minusSeconds(1)))
+        save(tx("start", occurredAt = start))
+        save(tx("mid-b", occurredAt = start.plusSeconds(20)))
+        save(tx("mid-a", occurredAt = start.plusSeconds(10)))
+        save(tx("end", occurredAt = end))
+        save(tx("after", occurredAt = end.plusSeconds(1)))
 
         val result = repo.listOccurredBetween(start, end)
         assertEquals(listOf("mid-b", "mid-a", "start"), result.map { it.id })
@@ -70,18 +68,4 @@ class FinancialTransactionPeriodQueryTest {
         )
         repo.save(tx, listOf(rawId))
     }
-
-    private fun tx(id: String, at: Instant): FinancialTransaction =
-        FinancialTransaction(
-            id = id,
-            type = FinancialTransactionType.EXPENSE,
-            amount = Money.of("10.00", Currency.SAR),
-            occurredAt = at,
-            sourceContainerId = null,
-            destinationContainerId = null,
-            merchant = null,
-            counterparty = null,
-            categoryId = null,
-            linkedParsedEventIds = emptyList(),
-        )
 }

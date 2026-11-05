@@ -7,7 +7,6 @@ import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
@@ -16,6 +15,7 @@ import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -80,26 +80,6 @@ class AccountTransactionInvolvementResolverTest {
 
         assertTrue(index["other"].isNullOrEmpty())
     }
-
-    private fun tx(
-        id: String,
-        type: FinancialTransactionType,
-        amount: String,
-        source: String? = null,
-        linked: List<String> = listOf("evt-$id"),
-    ): FinancialTransaction =
-        FinancialTransaction(
-            id = id,
-            type = type,
-            amount = Money.of(amount, Currency.SAR),
-            occurredAt = Instant.parse("2026-08-10T12:00:00Z"),
-            sourceContainerId = source,
-            destinationContainerId = null,
-            merchant = null,
-            counterparty = null,
-            categoryId = null,
-            linkedParsedEventIds = linked,
-        )
 
     private fun parsedRecord(
         id: String,
