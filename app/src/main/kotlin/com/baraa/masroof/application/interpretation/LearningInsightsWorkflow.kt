@@ -8,7 +8,9 @@ data class LearningInsights(val pending: Boolean = false, val attempted: Int = 0
     val understood: Int = 0, val posted: Int = 0, val awaitingReview: Int = 0,
     val learned: Int = 0, val blocked: Int = 0, val excluded: Int = 0,
     val repeatedContradictions: Int = 0, val exclusions: Map<String,Int> = emptyMap(), val pendingDecisions: Int = 0,
-    val templateSuggestions: Int = 0, val suggesting: Boolean = false)
+    val templateSuggestions: Int = 0, val suggesting: Boolean = false) {
+    val exclusionTotal: Long get() = exclusions.values.sum().toLong()
+}
 
 /** Operational counts have denominators. No correction does not prove a prediction correct. */
 class LearningInsightsWorkflow(private val learning: BankInterpretationService?,

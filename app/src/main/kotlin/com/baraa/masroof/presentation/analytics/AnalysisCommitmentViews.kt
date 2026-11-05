@@ -44,8 +44,7 @@ import com.baraa.masroof.ui.theme.MasroofThemeExtras
                 MasroofStackedBar(view.rows.mapIndexed { index, row -> MasroofStackedPart(row.share, palette[index % palette.size]) },
                     stringResource(R.string.analysis_commitments_total))
                 val horizon = view.daysToPeriodEnd.coerceAtLeast(1)
-                val marks = view.rows.filter { it.daysUntil != null && it.daysUntil in 0..view.daysToPeriodEnd }
-                    .groupBy { it.daysUntil!! }.map { (days, rows) -> MasroofTimelineMark(days.toFloat() / horizon, rows.size, days <= DUE_SOON_DAYS) }
+                val marks = view.dueCountsByDay.map { (days, count) -> MasroofTimelineMark(days.toFloat() / horizon, count, days <= DUE_SOON_DAYS) }
                 if (marks.isNotEmpty()) MasroofDueTimeline(marks, stringResource(R.string.analysis_due_today),
                     AppDigits.display(day(snapshot.periodEnd - 1)),
                     AppDigits.display(stringResource(R.string.analysis_due_timeline, day(snapshot.periodEnd - 1))))

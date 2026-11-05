@@ -47,6 +47,14 @@ class AnalysisLifecyclePolicyTest {
         // Monetary differences are evaluated without overflowing Long arithmetic.
         assertFalse(ForecastPerformancePolicy.evaluate(huge).allowPersonal)
     }
+    @Test fun recentComparisonsShowTheFirstSupportedRowOfTheLastThreePeriodsIncludingOpenOnes() {
+        val rows = listOf(comparison(0),comparison(30),comparison(60),comparison(90,actual=null),
+            comparison(90).copy(id="late",issuedAt=200),comparison(120).copy(evaluationVersion="old"))
+        val recent = ForecastPerformancePolicy.evaluate(rows).recent
+        assertEquals(listOf(30L,60L,90L),recent.map { it.periodStart })
+        assertNull(recent.last().actual)
+        assertEquals(150L,recent.last().barScale)
+    }
     @Test fun firstValidOriginsIncludeLateDaysButExcludeEarlyAndCompletedPeriods() {
         assertFalse(ForecastPerformancePolicy.eligibleOrigin(100,130,106))
         assertTrue(ForecastPerformancePolicy.eligibleOrigin(100,130,107))

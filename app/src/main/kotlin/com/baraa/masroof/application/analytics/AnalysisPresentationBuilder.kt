@@ -16,7 +16,11 @@ data class ForecastExplanation(val method: ForecastMethod, val evaluations: List
 /** [daysUntil] is null for an undated due; [share] is its part of the confirmed total, 0 for estimates. */
 data class AnalysisDueRow(val due: AnalysisDue, val daysUntil: Long?, val share: Float)
 data class AnalysisCommitmentsView(val confirmedTotal: Long, val confirmedCount: Int, val rows: List<AnalysisDueRow>,
-    val daysToPeriodEnd: Long)
+    val daysToPeriodEnd: Long) {
+    /** Dated dues before the period ends, counted per day in row order. */
+    val dueCountsByDay: Map<Long, Int> get() = rows.mapNotNull { it.daysUntil }.filter { it in 0..daysToPeriodEnd }
+        .groupingBy { it }.eachCount()
+}
 data class AnalysisCompositionPart(val group: com.baraa.masroof.application.dashboard.AnalysisSpendingGroup, val percent: Int, val share: Float)
 
 object AnalysisPresentationBuilder {
