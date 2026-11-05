@@ -41,6 +41,18 @@ class SalaryIncomeHeuristicsTest {
         assertFalse(SalaryIncomeHeuristics.isSalaryIncome(tx, records))
     }
 
+    @Test
+    fun payrollCounterpartyWithoutSalaryFact_isNotSalary() {
+        val tx = transaction(
+            type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+            linked = listOf("evt-1"),
+        ).copy(counterparty = "Payroll Co", merchant = "راتب")
+        val records = mapOf(
+            "evt-1" to parsedRecord("evt-1", salaryIncomeWording = false),
+        )
+        assertFalse(SalaryIncomeHeuristics.isSalaryIncome(tx, records))
+    }
+
     private fun transaction(
         type: FinancialTransactionType,
         linked: List<String> = emptyList(),
