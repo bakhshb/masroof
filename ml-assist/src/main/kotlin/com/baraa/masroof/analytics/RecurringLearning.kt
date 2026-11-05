@@ -68,7 +68,8 @@ object RecurringLearning {
         val rows = latest(examples)
         val training = rows.filterNot { isValidation(it.seriesKey) }
         val heldOut = rows.filter { isValidation(it.seriesKey) }
-        val candidate = training.takeIf { it.isNotEmpty() }?.let { fit(it, seed) }
+        // 600 gradient passes are wasted when no eligible seed exists to compare against.
+        val candidate = training.takeIf { it.isNotEmpty() && seed?.accepted == true }?.let { fit(it, seed) }
         val baseline = seed?.takeIf { it.accepted }
         fun correct(model: RecurringModel?, rows: List<RecurringExample>) = rows.count { model?.predict(it.features)?.label == it.label }
         fun wrong(model: RecurringModel?, rows: List<RecurringExample>) = rows.count { row ->

@@ -58,7 +58,7 @@ calendar span alone. Archived snapshots are not independent accuracy samples.
 
 | Use | Method | Training | What the user sees |
 |---|---|---|---|
-| Initial forecast | Mean by weekday, rare huge days capped at the 98th percentile | Local covered spending history | “Initial estimate based on your history” |
+| Initial forecast | Mean by weekday; the single largest day capped at the second largest | Local covered spending history | “Initial estimate based on your history” |
 | Personal forecast | Huber regression with L2 (existing) | Local, eligible history only | “Personal estimate”; error in SAR over a named horizon |
 | Recurrence | Regularized three-class softmax / logistic classifier (existing in #329): NONE, WEEKLY, MONTHLY | Reviewed base corpus offline; explicit personal labels on-device | “Rules”, “Your confirmation”, or “Learned model” |
 | Message family | Exact human-template memory (Naive Bayes removed: it never qualified a family) | Explicit human decisions on-device | Source of interpretation and whether a correction was used |

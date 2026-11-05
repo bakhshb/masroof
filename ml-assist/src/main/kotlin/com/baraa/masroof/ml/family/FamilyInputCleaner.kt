@@ -14,7 +14,7 @@ class CleanFamilyFeatures private constructor(
     }
 }
 
-enum class CleaningRejection { EMPTY, TOO_LARGE, UNRECOGNIZED_TITLE }
+enum class CleaningRejection { EMPTY, TOO_LARGE }
 data class FamilyCleaningResult(val features: CleanFamilyFeatures?, val rejection: CleaningRejection?)
 
 /** Task-specific minimization, after the bank's normalization. Never remove negation/security words. */
@@ -27,8 +27,8 @@ object FamilyInputCleaner {
     private val identifiers = Regex("(?:https?://|www\\.)\\S+|\\S+@\\S+|(?i:sa[0-9]{6,}|btms[0-9]+)|[\\p{N}][\\p{N}.,:/+\\-]*")
     private val currencyCodes = Regex("\\b(?:sar|usd|eur|gbp|aed)\\b", RegexOption.IGNORE_CASE)
     private val characterTerm = Regex("c[3-5]:[\\p{L} ]+")
-    // Reviewed structural vocabulary, not user names/merchants. New wording requires a versioned review.
-    // Unknown words abstain rather than silently dropping a potentially important qualification.
+    // Reviewed structural vocabulary, not user names/merchants. Only these words are stored as terms;
+    // any other title word still shapes the template hash, so no qualification is ever dropped.
     private val titleWords = """
         internet online purchase apple pay pos contactless google samsung one time password for
         card credit debit refund payment transfer incoming outgoing local internal external accepted
@@ -64,20 +64,22 @@ object FamilyInputCleaner {
         val tokens = words.findAll(title).map { it.value }.toList()
         if (tokens.isEmpty()) return rejected(CleaningRejection.EMPTY)
         if (tokens.size > 64) return rejected(CleaningRejection.TOO_LARGE)
-        if (tokens.any { it !in titleWords }) return rejected(CleaningRejection.UNRECOGNIZED_TITLE)
+        // Every bank's wording learns: the full title is hashed, but unreviewed words never leave the hash.
         val cleanTitle = tokens.joinToString(" ")
+        val known = tokens.filter { it in titleWords }
+        val knownTitle = known.joinToString(" ")
         val fieldLabels = normalizedFieldLabels.map(::compact).filter { it in labels }.distinct().sorted()
         val features = mutableListOf<String>()
-        features += tokens.map { "w:$it" }
-        features += tokens.zipWithNext { a, b -> "b:$a $b" }
-        for (n in 3..5) if (cleanTitle.length >= n) features += cleanTitle.windowed(n).map { "c$n:$it" }
+        features += known.map { "w:$it" }
+        features += tokens.zipWithNext { a, b -> "b:$a $b" }.filter { it.substring(2).split(' ').all(titleWords::contains) }
+        if (known.size == tokens.size) for (n in 3..5) if (knownTitle.length >= n) features += knownTitle.windowed(n).map { "c$n:$it" }
         val terms = features.groupingBy { it }.eachCount().mapValues { it.value.coerceAtMost(5) }
         val template = sha256("$VERSION|$FEATURES_VERSION|$cleanTitle|${fieldLabels.joinToString("|")}")
         return FamilyCleaningResult(CleanFamilyFeatures.create(cleanTitle, terms, template), null)
     }
 
     /** Cache labels are data, not a bypass for the cleaner's vocabulary and feature bounds. */
-    fun validTerms(terms: Map<String, Int>): Boolean = terms.isNotEmpty() && terms.size <= 2048 && terms.all { (term, count) ->
+    fun validTerms(terms: Map<String, Int>): Boolean = terms.size <= 2048 && terms.all { (term, count) ->
         count in 1..5 && term.length <= 260 && when {
             term.startsWith("w:") -> term.substring(2) in titleWords
             term.startsWith("b:") -> term.substring(2).split(' ').let { it.size == 2 && it.all(titleWords::contains) }

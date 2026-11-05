@@ -115,4 +115,10 @@ class AnalyticsEngineTest {
         val model = PurchaseForecaster.forecast(data, from + 190, from + 220, from + 200, 6, { ((it - from) % 30).toInt() }).model!!
         assertEquals(0.0, model.weights[13])
     }
+    @Test fun oneOrTwoPurchasesAreNeverCappedAwayFromTheBaseline() {
+        val one = (0 until 84).map { PurchaseDay(start + it, if (it == 40) 300000 else 0, 0, 1, 0, true) }
+        assertTrue(PurchaseForecaster.weekdayBaseline(one).sum() > 0)
+        val two = (0 until 84).map { PurchaseDay(start + it, when (it) { 40 -> 300000; 50 -> 1000; else -> 0 }, 0, 1, 0, true) }
+        assertEquals(301000.0 / 12, PurchaseForecaster.weekdayBaseline(two).sum(), 1.0)
+    }
 }

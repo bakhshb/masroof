@@ -18,6 +18,16 @@ class FamilyClassifierTest {
         assertNotNull(FamilyClassifier("BANK_TEST", listOf(label()), listOf(block.copy(bankId = "OTHER_BANK"))).suggest("BANK_TEST", f))
     }
 
+    @Test fun canSuggestMatchesWhatSuggestReturns() {
+        assertFalse(FamilyClassifier("BANK_TEST").canSuggest)
+        assertTrue(FamilyClassifier("BANK_TEST", listOf(label())).canSuggest)
+        assertFalse(FamilyClassifier("BANK_TEST", listOf(label(family = SmsFamilyLabel.OTP))).canSuggest)
+        assertFalse(FamilyClassifier("BANK_TEST", listOf(label(family = SmsFamilyLabel.NON_FINANCIAL).copy(provenance = "USER_NON_FINANCIAL"))).canSuggest)
+        assertFalse(FamilyClassifier("BANK_TEST", listOf(label(), label("two", SmsFamilyLabel.FEE))).canSuggest)
+        assertFalse(FamilyClassifier("BANK_TEST", listOf(label()), listOf(HumanTemplateBlock("BANK_TEST", "x", "b", f.template, 2))).canSuggest)
+        assertTrue(FamilyClassifier("BANK_TEST", listOf(label()), listOf(HumanTemplateBlock("OTHER_BANK", "x", "b", f.template, 2))).canSuggest)
+    }
+
     @Test fun withoutHumanDecisionsNothingIsSuggested() {
         val empty = FamilyClassifier("BANK_TEST")
         assertNull(empty.suggest("BANK_TEST", f))

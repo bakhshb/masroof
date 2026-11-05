@@ -76,6 +76,8 @@ class BankInterpretationService(
         }
     }
     /** One stable version for all banks, so refresh work started for an older set of models is skipped. */
+    /** Whether any bank's template memory can propose a family right now. */
+    val suggesting: Boolean get() = classifiers?.values?.any { it.canSuggest } == true
     val modelVersion: String? get() = classifiers?.entries?.sortedBy { it.key }?.joinToString(",") { "${it.key}=${it.value.version}" }
     /** Banks whose bundled role rules can ask for a family; only these learn and receive suggestions. */
     fun assistedBanks(configuration: MessagePatternConfiguration = patterns()): Set<String> =

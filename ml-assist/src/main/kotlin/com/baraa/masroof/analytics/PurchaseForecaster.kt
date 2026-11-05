@@ -93,7 +93,10 @@ object PurchaseForecaster {
 
     internal enum class Season { NONE, RAMADAN, EID }
     /** Umm al-Qura calendar from java.time; dates outside its range carry no season. */
-    internal fun season(day: Long): Season = try {
+    private val seasons = java.util.concurrent.ConcurrentHashMap<Long, Season>()
+    // Every fit rebuilds features for the same days; the Hijri conversion is computed once per day.
+    internal fun season(day: Long): Season = seasons.computeIfAbsent(day, ::hijriSeason)
+    private fun hijriSeason(day: Long): Season = try {
         val hijri = HijrahDate.from(LocalDate.ofEpochDay(day))
         val month = hijri.get(ChronoField.MONTH_OF_YEAR); val date = hijri.get(ChronoField.DAY_OF_MONTH)
         when {
@@ -146,13 +149,14 @@ object PurchaseForecaster {
     }
     /**
      * A period total needs the expected (mean) day, not the typical one: medians of mostly-empty or
-     * skewed days forecast far too little. One rare huge day is capped at the 98th percentile instead.
+     * skewed days forecast far too little. The single largest day is capped at the second largest
+     * spending day, and only when there are at least three, so a sparse spender's few days stay whole.
      * The method is still stored as "WEEKDAY_MEDIAN" because that persisted key predates this estimator.
      */
     internal fun weekdayBaseline(history: List<PurchaseDay>): List<Double> {
         val recent = history.groupBy { weekday(it.day) }.mapValues { (_, rows) -> rows.takeLast(12).map { it.gross.toDouble() } }
-        val all = recent.values.flatten().sorted()
-        val cap = all.getOrNull((all.size * .98).toInt().coerceAtMost(all.size - 1)) ?: 0.0
+        val spending = recent.values.flatten().filter { it > 0 }.sorted()
+        val cap = if (spending.size >= 3) spending[spending.size - 2] else Double.MAX_VALUE
         return (0..6).map { dow -> recent[dow]?.map { minOf(it, cap) }?.average() ?: 0.0 }
     }
 

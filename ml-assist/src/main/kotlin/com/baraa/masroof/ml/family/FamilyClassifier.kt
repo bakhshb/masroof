@@ -22,6 +22,10 @@ class FamilyClassifier(val bankId: String, labels: List<HumanFamilyLabel> = empt
         latestLabels.joinToString("|") { "${it.rawId}:${it.decisionId}:${it.family}:${it.template}" } +
             latestBlocks.joinToString("|") { "block:${it.rawId}:${it.decisionId}:${it.template}" }).take(16)
 
+    /** True when at least one learned template can propose; the same rule as [suggest]. */
+    val canSuggest: Boolean = templates.any { (template, families) ->
+        template !in blockedTemplates && families.singleOrNull() in FINANCIAL }
+
     fun suggest(bankId: String, features: CleanFamilyFeatures): FamilyPrediction? {
         if (bankId != this.bankId || features.template in blockedTemplates) return null
         val family = templates[features.template]?.singleOrNull()?.takeIf { it in FINANCIAL } ?: return null
