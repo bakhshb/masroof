@@ -23,6 +23,9 @@ object ForecastPerformancePolicy {
     fun supports(row: ForecastComparisonRow): Boolean = row.modelVersion == AnalyticsVersion.MODEL &&
         row.evaluationVersion in setOf(VERSION, LEGACY_VERSION) &&
         originDay(row)?.let { eligibleOrigin(row.periodStart, row.periodEnd, it) } == true
+    /** The period's first supported comparison, the one every screen shows. */
+    fun firstSupported(rows: List<ForecastComparisonRow>, start: Long): ForecastComparisonRow? =
+        firstPerPeriod(rows.filter { it.periodStart == start && supports(it) }).firstOrNull()
     fun hasComparison(rows: List<ForecastComparisonRow>, start: Long) = rows.any { it.periodStart == start && supports(it) }
     fun evaluate(rows: List<ForecastComparisonRow>): ForecastPerformance {
         val usable = firstPerPeriod(rows.filter { it.actual != null && supports(it) })

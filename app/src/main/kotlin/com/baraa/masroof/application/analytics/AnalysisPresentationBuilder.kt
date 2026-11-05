@@ -53,7 +53,7 @@ object AnalysisPresentationBuilder {
         val snapshot = state.snapshot ?: return ForecastComparisonExplanation(ForecastComparisonStatus.UNAVAILABLE)
         val anchor = snapshot.periodStart + 7
         val enabled = state.preferences.enabledAt.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toEpochDay() }
-        val row = state.forecastComparisons.filter { it.periodStart == snapshot.periodStart && ForecastPerformancePolicy.supports(it) }.minByOrNull { it.issuedAt }
+        val row = ForecastPerformancePolicy.firstSupported(state.forecastComparisons, snapshot.periodStart)
         val status = when {
             row?.actual != null -> ForecastComparisonStatus.READY
             row != null && today < row.periodEnd -> ForecastComparisonStatus.WAITING_FOR_PERIOD

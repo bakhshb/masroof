@@ -54,9 +54,13 @@ internal fun NotificationCenterScreen(
     onBack: () -> Unit,
     onOpenNotification: (NotificationItem) -> Unit,
 ) {
-    val analysis = com.baraa.masroof.presentation.analytics.notificationAnalysisState()
+    val stored = com.baraa.masroof.presentation.analytics.notificationAnalysisState()
     val now = com.baraa.masroof.presentation.analytics.currentAnalysisTime()
-    val unreadAlerts = androidx.compose.runtime.remember(analysis, now) { com.baraa.masroof.application.analytics.unreadAnalysisAlertCount(analysis, now) }
+    // Filtered once here; the content below shows these alerts as they are.
+    val analysis = androidx.compose.runtime.remember(stored, now) {
+        stored.copy(alerts = com.baraa.masroof.application.analytics.visibleAnalysisAlerts(stored, now))
+    }
+    val unreadAlerts = analysis.alerts.count { !it.read }
     MasroofSecondaryScaffold(
         title = stringResource(R.string.notification_center_title),
         onBack = onBack,
@@ -67,7 +71,7 @@ internal fun NotificationCenterScreen(
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         },
     ) { contentModifier ->
-        com.baraa.masroof.presentation.analytics.AnalysisNotificationContent(state, analysis, now, contentModifier) { item, divider ->
+        com.baraa.masroof.presentation.analytics.AnalysisNotificationContent(state, analysis, contentModifier) { item, divider ->
             NotificationCenterRow(item, { onOpenNotification(item) }, divider)
         }
     }
