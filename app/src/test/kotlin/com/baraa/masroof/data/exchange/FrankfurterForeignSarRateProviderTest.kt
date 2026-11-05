@@ -1,4 +1,4 @@
-package com.baraa.masroof.application.dashboard
+package com.baraa.masroof.data.exchange
 
 import com.baraa.masroof.core.money.Currency
 import kotlinx.coroutines.runBlocking

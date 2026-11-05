@@ -15,7 +15,6 @@ import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
 import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
 import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
 import com.baraa.masroof.application.dashboard.ForeignSarMarketRateProvider
-import com.baraa.masroof.application.dashboard.FrankfurterForeignSarRateProvider
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ExplicitBankSelectionWorkflow
@@ -63,6 +62,7 @@ import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
+import com.baraa.masroof.data.exchange.FrankfurterForeignSarRateProvider
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.data.preferences.AndroidKeystoreGitHubTokenEncryptor
