@@ -31,5 +31,9 @@ object BankTransactionTimePolicy {
 
     /** The fixed zone, else the valid stored zone, else null. Never the handset zone. */
     fun zoneOrNull(bank: Bank, persistedZoneId: String?): ZoneId? =
-        fixedZone(bank) ?: persistedZoneId?.takeIf { it.isNotBlank() }?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+        fixedZone(bank) ?: storedZoneOrNull(persistedZoneId)
+
+    /** A transaction's valid stored zone, or null for a blank or invalid one. */
+    fun storedZoneOrNull(persistedZoneId: String?): ZoneId? =
+        persistedZoneId?.takeIf { it.isNotBlank() }?.let { runCatching { ZoneId.of(it) }.getOrNull() }
 }

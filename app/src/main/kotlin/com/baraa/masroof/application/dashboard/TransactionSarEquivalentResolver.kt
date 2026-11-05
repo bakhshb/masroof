@@ -113,9 +113,7 @@ class TransactionSarEquivalentResolver(
      * No handset-zone fallback.
      */
     private fun marketZone(tx: FinancialTransaction, linked: ParsedEventRecord?): ZoneId? {
-        tx.occurredAtZone?.takeIf { it.isNotBlank() }?.let { id ->
-            runCatching { ZoneId.of(id) }.getOrNull()?.let { return it }
-        }
+        TransactionLocalDate.storedZoneOrNull(tx)?.let { return it }
         val bank = linked?.event?.bank ?: return null
         return BankTransactionTimePolicy.fixedZone(bank)
     }

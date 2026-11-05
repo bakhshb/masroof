@@ -19,6 +19,7 @@ import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.DashboardSectionId
 import com.baraa.masroof.application.dashboard.DashboardTransactionFacts
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
+import com.baraa.masroof.application.dashboard.TransactionLocalDate
 import com.baraa.masroof.application.transaction.IgnoreResult
 import com.baraa.masroof.application.transaction.ReclassificationResult
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
@@ -532,9 +533,7 @@ class DashboardViewModel(
     ): TransactionPreviewUi {
         val title = tx.merchant?.takeIf { it.isNotBlank() }
             ?: tx.counterparty?.takeIf { it.isNotBlank() }
-        // The transaction's stored zone keeps it on its own day; the device zone only fills a missing one.
-        val zone = tx.occurredAtZone?.takeIf { it.isNotBlank() }?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: zoneId
-        val localDate = tx.occurredAt.atZone(zone).toLocalDate()
+        val localDate = TransactionLocalDate.of(tx, zoneId)
         val searchText = listOfNotNull(
             tx.merchant?.trim()?.takeIf { it.isNotEmpty() },
             tx.counterparty?.trim()?.takeIf { it.isNotEmpty() },
