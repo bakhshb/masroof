@@ -4,7 +4,7 @@
     <string name="personal_forecast_model">نموذجك الشخصي مستخدم</string>
     <string name="personal_forecast_unavailable">التقدير غير متاح حاليا</string>
     <string name="personal_forecast_refreshing">جار تحديث التقدير؛ التفاصيل المعروضة تخص آخر نتيجة محفوظة.</string>
-    <string name="personal_forecast_initial_hint">يعتمد التقدير على وسيط صرفك في أيام الأسبوع المشابهة.</string>
+    <string name="personal_forecast_initial_hint">يعتمد التقدير على متوسط صرفك في أيام الأسبوع المشابهة.</string>
     <string name="personal_forecast_model_hint">يتعلم النموذج محليا من يوم الأسبوع وموقع اليوم من فترة الراتب وصرف الأيام السابقة.</string>
     <string name="personal_forecast_qualification">استخدام النموذج الشخصي يتطلب اجتياز اختبارات مستقلة والتفوق على التقدير الأولي؛ اكتمال المدة وحده لا يفعله.</string>
     <string name="personal_forecast_errors">خطأ التوقع حسب المدة</string>

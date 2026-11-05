@@ -1,6 +1,5 @@
 package com.baraa.masroof.analytics
 
-import java.time.DateTimeException
 import java.time.LocalDate
 import java.time.chrono.HijrahDate
 import java.time.temporal.ChronoField
@@ -39,7 +38,8 @@ object PurchaseForecaster {
         var model: HuberModel? = null
         if (training.size >= MIN_PERSONAL_DAYS && completedPeriods >= MIN_PERSONAL_PERIODS && training.count { it.gross > 0 } >= 20) {
             val canReuse = previous != null && previous.featureVersion == AnalyticsVersion.FEATURES &&
-                today - previous.trainedThrough <= 7 && previous.trainingFingerprint == fingerprint(training.filter { it.day in previous.trainedFrom..previous.trainedThrough })
+                today - previous.trainedThrough <= 7 && // The uncapped history: the 365-day window's start moves daily, the previous fit's range does not.
+                previous.trainingFingerprint == fingerprint(history.filter { it.day in previous.trainedFrom..previous.trainedThrough })
             model = if (canReuse) previous else runCatching { evaluateAndFit(training, phase, completedPeriodsAt) }.getOrNull()
         }
         val chosen = model?.takeIf { it.accepted && allowPersonal }
@@ -101,10 +101,12 @@ object PurchaseForecaster {
             (month == 10 && date <= 3) || (month == 12 && date in 10..13) -> Season.EID
             else -> Season.NONE
         }
-    } catch (_: DateTimeException) { Season.NONE }
+    } catch (_: RuntimeException) { Season.NONE } // DateTimeException, or missing calendar data on a device
 
     private fun fit(history: List<PurchaseDay>): HuberModel {
         val rows = history.drop(28).map { features(it.day, it.phase, history.filter { row -> row.day < it.day }) }
+        // A season seen on only a few days would fit those days' spikes exactly; leave it unlearned (weight 0).
+        SEASON_COLUMNS.filter { j -> rows.count { it[j] > 0 } < MIN_SEASON_DAYS }.forEach { j -> rows.forEach { it[j] = 0.0 } }
         val targets = history.drop(28).map { it.gross.toDouble() / 100 }.toDoubleArray()
         val p = rows.first().size
         val means = DoubleArray(p) { j -> if (j == 0) 0.0 else rows.map { it[j] }.average() }
@@ -156,6 +158,8 @@ object PurchaseForecaster {
 
     private val CORE_HORIZONS = listOf(1, 7, 14, 28)
     private const val MAX_TRAINING_DAYS = 365
+    private val SEASON_COLUMNS = listOf(13, 14)
+    private const val MIN_SEASON_DAYS = 7
     /** History the personal model needs before it is even tried; the readiness rings show progress to these. */
     const val MIN_PERSONAL_DAYS = 120
     const val MIN_PERSONAL_PERIODS = 4

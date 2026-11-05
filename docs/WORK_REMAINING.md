@@ -7,8 +7,8 @@ unfinished qualification work is retained here without declaring it complete.
 
 - [ ] Qualify base artifacts when sufficient independent reviewed data exists.
   Keep validation and untouched final-test gates unchanged. Use the existing
-  [local learning tools](../ml-assist/tools/README.md) and reproducible family /
-  recurring training. Private inputs and reports stay outside git and CI.
+  [local learning tools](../ml-assist/tools/README.md) and reproducible recurring
+  training. Private inputs and reports stay outside git and CI.
 - [ ] Close the original personal-insights validation checkpoint against the
   relevant final commit: focused tests, lint/detekt, both APKs, upgrade/restore,
   process-death/device journeys and full PR/main CI. Check actual model readiness
@@ -16,11 +16,7 @@ unfinished qualification work is retained here without declaring it complete.
 
 ## Qualification gates
 
-Family seeds need at least eight accepted naturally eligible validation templates
-and eight final-test templates per enabled family, with no accepted wrong families.
-Personal fitting holds out 20% of templates, requires at least eight eligible
-held-out templates, improved correct coverage, no added errors and passing seed
-validation.
+Message families have no statistical model; learning is exact human-template memory.
 
 Recurring seeds need at least 95% precision, ten percentage points of recall
 improvement over rules and no increased false-positive rate. Validation and final

@@ -4,7 +4,7 @@
     <string name="personal_forecast_model">Your personal model is in use</string>
     <string name="personal_forecast_unavailable">Estimate currently unavailable</string>
     <string name="personal_forecast_refreshing">Updating the estimate; these details describe the last saved result.</string>
-    <string name="personal_forecast_initial_hint">The estimate uses your median spending on matching weekdays.</string>
+    <string name="personal_forecast_initial_hint">The estimate uses your average spending on matching weekdays.</string>
     <string name="personal_forecast_model_hint">The model learns locally from weekdays, the day within your salary period, and previous spending.</string>
     <string name="personal_forecast_qualification">The personal model must pass independent checks and beat the initial estimate; history alone does not activate it.</string>
     <string name="personal_forecast_errors">Forecast error by horizon</string>

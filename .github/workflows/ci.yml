@@ -78,11 +78,8 @@ jobs:
             finance-core/build/reports/tests/
             ml-assist/build/reports/tests/
           if-no-files-found: error
-      - name: Verify trained model reproducibility
+      - name: Verify recurring seed reproducibility
         run: |
-          python3 ml-assist/tools/test_train_family_model.py
-          python3 ml-assist/tools/train_family_model.py --check --skip-export
-          python3 ml-assist/tools/test_training.py
           ./gradlew :ml-assist:trainRecurringSeed -PrecurringCheck=true --console=plain
 
   static-analysis:

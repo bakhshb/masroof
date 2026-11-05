@@ -101,4 +101,18 @@ class AnalyticsEngineTest {
         assertEquals(PurchaseForecaster.Season.NONE, PurchaseForecaster.season(LocalDate.of(2026, 1, 15).toEpochDay()))
         assertEquals(PurchaseForecaster.Season.NONE, PurchaseForecaster.season(LocalDate.of(1800, 1, 1).toEpochDay()))
     }
+    @Test fun modelIsStillReusedAfterTheTrainingWindowStartsMoving() {
+        fun rows(n: Int) = (0 until n).map { FinancialFact("p$it", start + it, 1000 + (it % 9) * 300L, false, true) }
+        val first = PurchaseForecaster.forecast(clean(rows(400), 400), start + 390, start + 420, start + 400, 12, { 0 }).model!!
+        val next = PurchaseForecaster.forecast(clean(rows(401), 401), start + 390, start + 420, start + 401, 12, { 0 }, first).model!!
+        assertEquals(first, next)
+    }
+    @Test fun aSeasonSeenOnFewTrainingDaysIsNotLearned() {
+        // Training starts in mid-February 2026, so only the last few days of Ramadan 1447 are fitted rows.
+        val from = LocalDate.of(2026, 2, 15).toEpochDay()
+        val facts = (0 until 200).map { FinancialFact("p$it", from + it, 1000 + (it % 7) * 400L, false, true) }
+        val data = FinancialCleaner.clean(facts, from, from + 200, from) { ((it - from) % 30).toInt() }
+        val model = PurchaseForecaster.forecast(data, from + 190, from + 220, from + 200, 6, { ((it - from) % 30).toInt() }).model!!
+        assertEquals(0.0, model.weights[13])
+    }
 }

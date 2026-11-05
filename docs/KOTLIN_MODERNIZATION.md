@@ -27,7 +27,7 @@ application. There is no claim of adopting every Kotlin release feature.
   introduction/stabilization versions, Android toolchain and pre-stable exclusions.
 - [Code audit](#code-audit): per-opportunity current/recommended implementations, benefit,
   version, risks, tests and adopted/rejected decisions.
-- [Inventory](kotlin-modernization-inventory.csv): all **617 production Kotlin files / 58,481 baseline
+- [Inventory](kotlin-modernization-inventory.csv): all **614 production Kotlin files / 58,374 baseline
   lines** screened across five modules, with baseline hashes and dispositions.
   Candidate bodies/flows/tests were inspected semantically; this is not a claim
   of manual line-by-line review of every source expression.
@@ -245,9 +245,9 @@ Baseline: `05b7e045f894b6a5283022e822da99083a9e4375`.
 | app | 507 | 51,214 |
 | finance-core | 42 | 2,442 |
 | bank-engine | 21 | 1,781 |
-| ml-assist | 12 | 827 |
+| ml-assist | 9 | 720 |
 | ui-kit | 35 | 2,217 |
-| Total | 617 | 58,481 |
+| Total | 614 | 58,374 |
 
 `kotlin-modernization-inventory.csv` enumerates every tracked `src/main/**/*.kt` file, with its baseline
 SHA-256, line count, construct counts and disposition. There are no other tracked
@@ -256,7 +256,7 @@ DSL are outside the source-file count; build configuration was inspected separat
 
 This was full-scope automated source screening plus focused semantic review of
 candidate bodies, surrounding control flow, contracts and tests. It is not a claim
-of manual line-by-line inspection of every expression in all 58,481 lines. Screening
+of manual line-by-line inspection of every expression in all 58,374 lines. Screening
 looked for conditional/type dispatch, mutable/read-only pairs, casts/assertions,
 stdlib/encoding/identity code, adjacency checks, labeled returns, aliases,
 deprecation suppressions and escaped-dollar workarounds. Compilation and existing

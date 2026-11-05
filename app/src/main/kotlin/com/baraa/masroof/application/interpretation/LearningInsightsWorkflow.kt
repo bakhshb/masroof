@@ -8,7 +8,7 @@ data class LearningInsights(val pending: Boolean = false, val attempted: Int = 0
     val understood: Int = 0, val posted: Int = 0, val awaitingReview: Int = 0,
     val learned: Int = 0, val blocked: Int = 0, val excluded: Int = 0,
     val repeatedContradictions: Int = 0, val exclusions: Map<String,Int> = emptyMap(), val pendingDecisions: Int = 0,
-    val templateSuggestions: Int = 0)
+    val templateSuggestions: Int = 0, val suggesting: Boolean = false)
 
 /** Operational counts have denominators. No correction does not prove a prediction correct. */
 class LearningInsightsWorkflow(private val learning: BankInterpretationService?,
@@ -34,6 +34,8 @@ class LearningInsightsWorkflow(private val learning: BankInterpretationService?,
         return LearningInsights(service.modelVersion == null, audits.filter { it.assistRequested }.map { it.rawId }.distinct().size,
             ids.size,understood.size,posted,required,labels.filter { it.template !in blocked }.map { it.rawId }.distinct().size,blocked.size,
             excluded.size,repeat,excluded.groupingBy { it.reason ?: "AMBIGUOUS_FAMILY" }.eachCount(),effective.count { it.state == "PENDING" },
-            audits.filter { it.origin == "HUMAN_TEMPLATE" }.map { it.rawId }.distinct().size)
+            audits.filter { it.origin == "HUMAN_TEMPLATE" }.map { it.rawId }.distinct().size,
+            // Only financial templates propose; an ignored message teaches nothing to suggest.
+            labels.any { it.template !in blocked && it.family != "NON_FINANCIAL" })
     }
 }

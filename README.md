@@ -66,7 +66,7 @@ Install JDK 27 for Gradle, JDK 21 for compilation/Android unit tests, and Androi
 ./gradlew lintDebug detekt
 ```
 
-Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Android-compatible runner. Run focused tests locally. Full unit suites, model reproducibility, APK builds, device shards, and process-death recovery run in PR/main CI. Release publication checks successful CI for the exact commit before building the APK.
+Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Android-compatible runner. Run focused tests locally. Full unit suites, recurring seed reproducibility, APK builds, device shards, and process-death recovery run in PR/main CI. Release publication checks successful CI for the exact commit before building the APK.
 
 | Module | Responsibility |
 | --- | --- |

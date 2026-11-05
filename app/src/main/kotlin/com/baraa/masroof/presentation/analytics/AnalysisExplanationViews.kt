@@ -140,7 +140,7 @@ internal fun forecastReasonResource(reason: String?): Int = when (reason) {
         MasroofCard(Modifier.testTag("learning-insights")) {
             Column(verticalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofSpacing.sectionGap)) {
                 // Suggestions come only from templates you corrected, so they start with your first correction.
-                val active = learning.learned > 0
+                val active = learning.suggesting
                 val status = stringResource(when {
                     learning.pending -> R.string.learning_pending
                     active -> R.string.learning_status_active
