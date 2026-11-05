@@ -84,4 +84,21 @@ class AnalyticsEngineTest {
         assertEquals(first.model!!.weights, changed.model!!.weights)
         assertEquals(first.actual + 900000, changed.actual)
     }
+    @Test fun sparseSpendingBaselineForecastsTheExpectedTotalNotAZeroMedian() {
+        // Spending every third day: each weekday's median is 0, its mean is a third of the purchase.
+        val rows = (0 until 90 step 3).map { FinancialFact("p$it", start + it, 9000, false, true) }
+        val result = PurchaseForecaster.forecast(clean(rows, 90), start + 60, start + 91, start + 90, 2, { 0 })
+        assertEquals("WEEKDAY_MEDIAN", result.method)
+        assertEquals(3000.0, result.remaining!!.toDouble(), 600.0)
+    }
+    @Test fun oneHugeDayIsCappedInTheBaseline() {
+        val days = (0 until 84).map { PurchaseDay(start + it, if (it == 40) 10_000_000 else 1000, 0, 1, 0, true) }
+        assertTrue(PurchaseForecaster.weekdayBaseline(days).all { it < 2000 })
+    }
+    @Test fun hijriSeasonsFollowUmmAlQura() {
+        assertEquals(PurchaseForecaster.Season.RAMADAN, PurchaseForecaster.season(LocalDate.of(2026, 3, 1).toEpochDay()))
+        assertEquals(PurchaseForecaster.Season.EID, PurchaseForecaster.season(LocalDate.of(2026, 3, 20).toEpochDay()))
+        assertEquals(PurchaseForecaster.Season.NONE, PurchaseForecaster.season(LocalDate.of(2026, 1, 15).toEpochDay()))
+        assertEquals(PurchaseForecaster.Season.NONE, PurchaseForecaster.season(LocalDate.of(1800, 1, 1).toEpochDay()))
+    }
 }

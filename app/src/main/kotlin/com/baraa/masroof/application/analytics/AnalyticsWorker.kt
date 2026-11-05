@@ -125,7 +125,8 @@ object AnalyticsBackup {
                 return@forEach
             }
             val m = json.decodeFromString(StoredHuber.serializer(), row.payload)
-            require(m.weights.size == 12 && m.means.size == 12 && m.scales.size == 12)
+            // 12 = purchase-days-v1 archives, 15 = v2 (salary start, Ramadan, Eid).
+            require(m.weights.size in setOf(12, 15) && m.means.size == m.weights.size && m.scales.size == m.weights.size)
             require((m.weights + m.means + m.scales).all { it.isFinite() } && m.scales.all { it > 0 })
             require(m.baselineMae.isFinite() && m.modelMae.isFinite())
             require((m.signedErrors + m.wholeDayErrors).all { (h, values) -> h in 1..31 && values.all { it.isFinite() } })

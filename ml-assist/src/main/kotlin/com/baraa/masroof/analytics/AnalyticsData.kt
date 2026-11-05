@@ -9,7 +9,7 @@ import kotlin.math.abs
 /** Shared training/inference contract, isolated from SMS-family classification. */
 object AnalyticsVersion {
     const val CLEANING = "financial-clean-v2"
-    const val FEATURES = "purchase-days-v1"
+    const val FEATURES = "purchase-days-v2"
     const val MODEL = "huber-l2-v2"
     const val EVALUATION = "rolling-horizons-v2"
 }
