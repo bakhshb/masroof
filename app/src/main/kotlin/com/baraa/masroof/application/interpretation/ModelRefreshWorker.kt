@@ -38,6 +38,7 @@ class ModelRefreshWorker(context: Context, params: WorkerParameters) : Coroutine
                 inTransaction = { container.withDatabaseTransaction(it) },
                 recoverDerived = { container.historicalDerivedRecovery.recoverPending() },
                 clock = container.clock,
+                extra = { service.revokedMemories() },
             ).refresh() else {
                 // Committed derived work survives model changes or unavailable assistance.
                 container.historicalDerivedRecovery.recoverPending()

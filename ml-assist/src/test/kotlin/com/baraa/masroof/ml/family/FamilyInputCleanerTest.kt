@@ -42,11 +42,17 @@ class FamilyInputCleanerTest {
         assertFalse(clean("اسم المستفيد: Sarah Example").terms.keys.any {it.contains("Sarah", ignoreCase=true)})
     }
 
-    @Test fun unfamiliarOrOversizedTitleAbstainsRatherThanDroppingUnknownWords() {
-        assertEquals(CleaningRejection.UNRECOGNIZED_TITLE, FamilyInputCleaner.clean("شراء محمد", emptyList()).rejection)
+    @Test fun otherBanksWordingLearnsWithoutStoringOrDroppingUnknownWords() {
+        // Wording from SNB, Alinma and SAB titles that the reviewed list does not contain.
+        listOf("شراء انترنت", "شراء عبر نقاط بيع", "تاكيد السداد").forEach { title ->
+            val features = clean(title)
+            assertFalse(features.terms.keys.any { it.contains("انترنت") || it.contains("بيع") || it.contains("تاكيد") }, title)
+        }
+        // The unknown word still separates templates, so a qualifier can never be silently ignored.
+        assertNotEquals(clean("purchase").template, clean("purchase hypotheticalnegation").template)
+        assertEquals(clean("شراء انترنت").template, clean("شراء  انترنت").template)
         assertEquals(CleaningRejection.EMPTY, FamilyInputCleaner.clean("123456", emptyList()).rejection)
         assertEquals(CleaningRejection.TOO_LARGE, FamilyInputCleaner.clean("purchase ".repeat(100), emptyList()).rejection)
-        assertEquals(CleaningRejection.UNRECOGNIZED_TITLE, FamilyInputCleaner.clean("purchase hypotheticalnegation", emptyList()).rejection)
     }
     @Test fun reviewedReturnWordingKeepsSecurityAndRejectionQualifiers() {
         val returned = clean("عملية استرجاع", listOf("مبلغ", "بطاقة"))
@@ -56,6 +62,6 @@ class FamilyInputCleanerTest {
         assertNotEquals(returned.template, rejected.template)
         assertNotEquals(returned.template, security.template)
         assertTrue(security.terms.containsKey("w:التحقق"))
-        assertNull(FamilyInputCleaner.clean("عملية استرجاع محمد", emptyList()).features)
+        assertNotEquals(returned.template, clean("عملية استرجاع محمد").template)
     }
 }

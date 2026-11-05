@@ -313,7 +313,7 @@ private fun DashboardCustomizableSections(
                     DashboardHeroCard(
                         accountsFleet = accountsFleet,
                         onIncome = onOpenIncomeDetails,
-                        onOutflow = onOpenExpenseDetails,
+                        onOutflow = onOpenExpenseDetails, allowance = state.dailyAllowance, // Null outside the current period.
                         modifier = Modifier.coachMarkTarget(com.baraa.masroof.presentation.navigation.HomeTour.SUMMARY),
                     )
                 }

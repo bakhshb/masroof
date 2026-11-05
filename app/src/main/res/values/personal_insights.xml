@@ -4,8 +4,8 @@
     <string name="personal_forecast_model">نموذجك الشخصي مستخدم</string>
     <string name="personal_forecast_unavailable">التقدير غير متاح حاليا</string>
     <string name="personal_forecast_refreshing">جار تحديث التقدير؛ التفاصيل المعروضة تخص آخر نتيجة محفوظة.</string>
-    <string name="personal_forecast_initial_hint">يعتمد التقدير على وسيط صرفك في أيام الأسبوع المشابهة.</string>
-    <string name="personal_forecast_model_hint">يتعلم النموذج محليا من يوم الأسبوع وموقع اليوم من فترة الراتب وصرف الأيام السابقة.</string>
+    <string name="personal_forecast_initial_hint">يعتمد التقدير على متوسط صرفك في أيام الأسبوع المشابهة.</string>
+    <string name="personal_forecast_model_hint">يتعلم النموذج محليا من يوم الأسبوع وموقع اليوم من فترة الراتب وأيام ما بعد الراتب ورمضان والعيد وصرف الأيام السابقة.</string>
     <string name="personal_forecast_qualification">استخدام النموذج الشخصي يتطلب اجتياز اختبارات مستقلة والتفوق على التقدير الأولي؛ اكتمال المدة وحده لا يفعله.</string>
     <string name="personal_forecast_errors">خطأ التوقع حسب المدة</string>
     <string name="personal_spending_attention">دفعات أعلى من المعتاد</string>
@@ -17,11 +17,11 @@
     <string name="personal_spending_sample">%1$d دفعات سابقة</string>
     <string name="personal_spending_previous">الدفعات المرجعية السابقة</string>
     <string name="personal_review_title">مراجعة صيغ مختلفة</string>
-    <string name="personal_review_scope">جلسة اختيارية تعرض حتى ثلاث صيغ من رسائلك المعلقة. تفتح كل رسالة المراجعة الحالية؛ القرار يخصها وحدها، وتستخدم القرارات المؤهلة فقط في التعلم.</string>
+    <string name="personal_review_scope">جلسة اختيارية تعرض حتى ثلاث صيغ من رسائلك المعلقة. تفتح كل رسالة المراجعة الحالية؛ القرار المؤهل يحفظ ويطبق على الرسائل بنفس الصيغة.</string>
     <string name="personal_review_example">الرسالة %1$d · %2$s</string>
-    <string name="personal_review_wording">صيغة غير مدعومة حاليا في التعلم؛ قد يتطلب دعمها تحديثا للتطبيق.</string>
+    <string name="personal_review_wording">صيغة لا يمكن حفظ القرار لها حاليا.</string>
     <string name="personal_review_failed">تعذر تجهيز أمثلة المراجعة.</string>
     <string name="personal_review_empty">لا توجد صيغ معلقة تحتاج مراجعتك الآن.</string>
     <string name="personal_review_open">مراجعة %1$d صيغ</string>
-    <string name="personal_recurring_decisions_hint">«ليست دفعة متكررة» قرار يتعلم منه التطبيق. «لا أريد إضافتها» يخفي الاقتراح فقط. يمكنك التراجع عن قرارك.</string>
+    <string name="personal_recurring_decisions_hint">«ليست دفعة متكررة» قرار صريح يخفي هذه السلسلة. «لا أريد إضافتها» يخفي الاقتراح فقط. يمكنك التراجع عن قرارك.</string>
 </resources>

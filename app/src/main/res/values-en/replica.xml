@@ -1,6 +1,5 @@
 <resources>
-<string name="lab_ml_source">Suggested by on-device learning</string>
-<string name="lab_template_source">Learned from your previous correction</string>
+<string name="lab_template_source">Applied your earlier decision for the same wording</string>
 <string name="lab_inferred_family">Read as: %1$s</string>
 <string name="lab_inference_pending">This suggestion is not approved yet. Follow the review reason and actions below.</string>
 <string name="lab_manual_source">Type set by your decision</string>

@@ -42,6 +42,12 @@ interface ReviewRepository {
         now: Instant,
     ): ReviewItem
 
+    /**
+     * Puts an automatically settled review back in the queue, for a message whose remembered "not financial"
+     * no longer holds. A user's resolution is never reopened. Returns whether a row changed.
+     */
+    suspend fun reopenAutomatic(rawSmsId: String, now: Instant): Boolean = false
+
     suspend fun markResolved(
         id: String,
         resolutionKind: ReviewResolutionKind,

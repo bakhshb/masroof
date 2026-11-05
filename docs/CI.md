@@ -15,7 +15,7 @@ for Kotlin feature stability and the published toolchain compatibility limits.
 
 ## Execution and coverage
 
-Unit tests (including pure modules), lint/detekt and the shared APK build run independently. The feature export is a declared unit-test output, so model reproducibility consumes the export from that same test execution/cache without a second Gradle test invocation.
+Unit tests (including pure modules), lint/detekt and the shared APK build run independently. The recurring seed reproducibility check runs the Kotlin trainer after the unit tests.
 
 Financial policy tests live in `finance-core` and run through `:finance-core:test`
 in the existing unit job. The existing root `detekt` task also checks finance-core

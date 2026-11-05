@@ -38,7 +38,7 @@ The app includes an update checker. Choose stable or nightly releases in Setting
 - **Explore spending:** historical spending, purchase forecasts, recurring-payment suggestions, and optional phone alerts.
 - **Keep a backup:** encrypted export and recovery, including settings, analysis, and message patterns.
 
-Forecasts and suggestions are advisory. Local learning can assist eligible message families, but never supplies money, ownership, or posting approval. Statistical models remain disabled when their qualification requirements are not met; rules and consistent explicit human templates remain available.
+Forecasts and suggestions are advisory. Local learning reuses your explicit corrections for messages with the same template, but never supplies money, ownership, or posting approval.
 
 ## Bank support
 
@@ -66,7 +66,7 @@ Install JDK 27 for Gradle, JDK 21 for compilation/Android unit tests, and Androi
 ./gradlew lintDebug detekt
 ```
 
-Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Android-compatible runner. Run focused tests locally. Full unit suites, model reproducibility, APK builds, device shards, and process-death recovery run in PR/main CI. Release publication checks successful CI for the exact commit before building the APK.
+Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Android-compatible runner. Run focused tests locally. Full unit suites, recurring seed reproducibility, APK builds, device shards, and process-death recovery run in PR/main CI. Release publication checks successful CI for the exact commit before building the APK.
 
 | Module | Responsibility |
 | --- | --- |
@@ -76,4 +76,4 @@ Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Andro
 | `ml-assist` | Local family assistance, forecasting, and recurrence detection |
 | `ui-kit` | Shared theme, fonts, components, and charts |
 
-Read the [architecture](docs/ARCHITECTURE.md), [testing and CI](docs/CI.md), [release workflow](docs/RELEASE.md), [design system](docs/DESIGN_SYSTEM.md), [analytics](docs/ANALYTICS.md), [learning tools](ml-assist/tools/README.md), and [agent conventions](AGENTS.md) before changing financial behavior. The [modernization record](docs/KOTLIN_MODERNIZATION.md) documents version choices and compatibility verification.
+Read the [architecture](docs/ARCHITECTURE.md), [testing and CI](docs/CI.md), [release workflow](docs/RELEASE.md), [design system](docs/DESIGN_SYSTEM.md), [analytics](docs/ANALYTICS.md), and [agent conventions](AGENTS.md) before changing financial behavior. The [modernization record](docs/KOTLIN_MODERNIZATION.md) documents version choices and compatibility verification.

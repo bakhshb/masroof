@@ -237,7 +237,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val committed = read.committed
             val decisions = store.analytics().candidates().filter { it.status != "SUGGESTED" }.sortedBy { it.id }.map { it.id to it.status }
             val feedback = store.analytics().feedback().joinToString { "${it.seriesKey}:${it.kind}:${it.decidedAt}:${hash(it.payload)}" }
-            val canonical = "continuous-learning-v1|${RecurringLearningWorkflow.version}|${ForecastPerformancePolicy.VERSION}|${AnalyticsVersion.EVALUATION}|${AnalyticsVersion.MODEL}|${AnalyticsVersion.FEATURES}|${clean.fingerprint}|$dues|${committed.sorted()}|$blocked|${current.summary.reviewRequiredCount}|${period.startDate}|$prefs|$decisions|$feedback|${read.committedCadences}|${clock.millis() / SIX_HOURS_MS}"
+            val canonical = "continuous-learning-v1|${RecurringDecisionWorkflow.version}|${ForecastPerformancePolicy.VERSION}|${AnalyticsVersion.EVALUATION}|${AnalyticsVersion.MODEL}|${AnalyticsVersion.FEATURES}|${clean.fingerprint}|$dues|${committed.sorted()}|$blocked|${current.summary.reviewRequiredCount}|${period.startDate}|$prefs|$decisions|$feedback|${read.committedCadences}|${clock.millis() / SIX_HOURS_MS}"
             return Source(clean, period.startDate.toEpochDay(), period.endDateExclusive.toEpochDay(), todayDay, completed,
                 dues, committed, current.summary.reviewRequiredCount, blocked, hash(canonical), reasons, insights, read.committedCadences)
     }
@@ -267,8 +267,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
                 } else row
             }
         }
-        val recurring = RecurringLearningWorkflow.build(input.clean.recurring, feedback, input.today, input.committedCadences)
-        val (patterns, recurringStatus) = recurring
+        val patterns = RecurringDecisionWorkflow.build(input.clean.recurring, feedback, input.today, input.committedCadences)
         val priorCandidates = dao.candidates().associateBy { it.id }
         val legacy = priorCandidates.values.filter { it.status != "SUGGESTED" }.mapNotNull { row ->
             runCatching { json.decodeFromString<AnalysisCandidate>(row.payload) }.getOrNull()?.takeIf { it.seriesKey == null }?.let { row to it }
@@ -277,7 +276,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             AnalysisCandidate(pattern.key, pattern.name, pattern.estimate, pattern.lower, pattern.upper, pattern.nextDay,
                 pattern.cadence, pattern.sourceIds, input.clean.recurring.first { it.id == pattern.sourceIds.last() }.day,
                 pattern.latestAmount, pattern.referenceAmount, pattern.amountIncreased, pattern.nextDay < input.today,
-                pattern.seriesKey, pattern.origin, pattern.modelVersion)
+                pattern.seriesKey, pattern.origin)
         }
         fun status(item: AnalysisCandidate) = priorCandidates[item.key]?.status ?: legacy.firstOrNull { (_, old) -> old.sourceIds.any { it in item.sourceIds } }?.first?.status
         val suggested = candidates.filter { item -> item.sourceIds.none { it in input.committed } && status(item) !in setOf("ACCEPTED", "REJECTED") }
@@ -301,8 +300,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             insights = input.insights, evaluations = result.evaluations.map { AnalysisEvaluation(it.horizon, it.count, it.mae, it.bias) },
             modelReason = result.reason, evaluationVersion = AnalyticsVersion.EVALUATION,
             wholeDaysFrom = (input.today + 1).takeIf { it < input.end }, wholeDaysLower = result.wholeDaysLower,
-            wholeDaysUpper = result.wholeDaysUpper, budgetLower = result.wholeDaysLower?.let { Math.addExact(result.actual, it) },
-            recurringLearning = recurringStatus)
+            wholeDaysUpper = result.wholeDaysUpper, budgetLower = result.wholeDaysLower?.let { Math.addExact(result.actual, it) })
         // A committed source invalidation while fitting invalidates the entire result.
         // Room tables, preferences, import completion and the clock bump generation; SMS permission does not.
         if (generation.get() != version || ("SMS_PERMISSION" in input.reasons) != smsPermissionMissing()) { request(); return@withLock }
@@ -406,7 +404,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         require(draft.name.isNotBlank() && draft.amount.amount.signum() > 0)
         mutex.withLock { if (closed) return false
             container.databaseAccessGate.withAccess {
-            recordRecurringFeedback(c, "CONFIRM_PENDING", draft.recurrence?.name?.takeIf { it in setOf("WEEKLY", "MONTHLY") })
+            recordRecurringFeedback(c, "CONFIRM_PENDING", draft.recurrence?.name?.takeIf { it in setOf("WEEKLY", "MONTHLY", "YEARLY") })
             container.database.withTransaction {
                 val source = container.financialTransactionRepository.getById(c.sourceIds.last()) ?: error("Source changed")
                 val existing = container.commitmentRepository.getBySourceTransactionId(source.id)
@@ -418,7 +416,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             }
             val row = store.analytics().candidates().firstOrNull { it.id == key }
             val saved = container.commitmentRepository.getBySourceTransactionId(c.sourceIds.last())
-            val learnedCadence = draft.recurrence?.name?.takeIf { it in setOf("WEEKLY", "MONTHLY") && saved?.recurrence?.name == it }
+            val learnedCadence = draft.recurrence?.name?.takeIf { it in setOf("WEEKLY", "MONTHLY", "YEARLY") && saved?.recurrence?.name == it }
             store.withTransaction {
                 recordRecurringFeedback(c, "CONFIRMED", learnedCadence)
                 if (row != null) store.analytics().candidates(listOf(row.copy(status = "ACCEPTED")))
@@ -491,20 +489,6 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
                 ForecastReplay.evaluate(input.clean, period.start, period.end, origin, completedAnalysisPeriods(input.clean, origin),
                     ::periodOffset,
                     { day -> completedAnalysisPeriods(input.clean, day) })
-            }
-        }
-    }
-
-    /** Explicit developer-only export; no UI, network upload, names, dates or monetary amounts. */
-    internal suspend fun exportReviewedRecurrence(contributorGroup: String): String = withContext(Dispatchers.Default) {
-        require(contributorGroup.matches(Regex("[A-Za-z0-9_-]{1,64}")))
-        mutex.withLock {
-            if (closed) return@withLock ""
-            val input = source()
-            val result = RecurringLearningWorkflow.build(input.clean.recurring, store.analytics().feedback(), input.today, input.committedCadences)
-            result.reviewedExamples.sortedBy { it.seriesKey }.joinToString("\n", postfix = "\n") { row ->
-                listOf(hash("$contributorGroup|${row.seriesKey}"), contributorGroup, "train", row.label.name,
-                    result.ruleLabels.getValue(row.seriesKey).name).joinToString("\t") + "\t" + row.features.joinToString("\t")
             }
         }
     }

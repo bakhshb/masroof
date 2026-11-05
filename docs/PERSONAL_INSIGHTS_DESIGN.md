@@ -45,12 +45,12 @@ materially harm these results.
 | Spending | Actual/net purchase scope, equal-length comparison, components, merchants and contribution drilldowns | Retain; add at most three eligible contextual observations |
 | Forecasts | Actual + estimated remainder, daily bars, quality, performance/history | Retain; make method/readiness and error understandable |
 | Recurrence | Numerical classifier plus deterministic rules, durable decisions and undo in #329 | Retain; evidence-first review and explicit feedback semantics |
-| Messages | Rules first, exact human-template memory, gated statistical personalization | Retain; review unsupported formulations and select diverse examples |
+| Messages | Rules first, then "remember my decision" (exact template, every bank, including not financial) | Retain |
 
 Current sources: `AnalyticsScreen.kt`, `AnalysisSpendingCharts.kt`,
 `AnalysisForecastViews.kt`, `AnalysisExplanationViews.kt`,
 `FinancialAnalysisReader.kt`, `AnalyticsWorkflow.kt`,
-`PurchaseForecaster.kt`, `RecurringLearning.kt`, `FamilyPersonalization.kt`.
+`PurchaseForecaster.kt`, `RecurringDetector.kt`, `FamilyClassifier.kt`.
 Readiness must come from current production workflow output, not the backup's
 calendar span alone. Archived snapshots are not independent accuracy samples.
 
@@ -58,18 +58,16 @@ calendar span alone. Archived snapshots are not independent accuracy samples.
 
 | Use | Method | Training | What the user sees |
 |---|---|---|---|
-| Initial forecast | Median by weekday (existing) | Local covered spending history | “Initial estimate based on your history” |
+| Initial forecast | Mean by weekday; the single largest day capped at the second largest | Local covered spending history | “Initial estimate based on your history” |
 | Personal forecast | Huber regression with L2 (existing) | Local, eligible history only | “Personal estimate”; error in SAR over a named horizon |
 | Recurrence | Regularized three-class softmax / logistic classifier (existing in #329): NONE, WEEKLY, MONTHLY | Reviewed base corpus offline; explicit personal labels on-device | “Rules”, “Your confirmation”, or “Learned model” |
-| Message family | Multinomial Naive Bayes (existing) | Reviewed templates offline; gated local statistics | Source of interpretation and whether a correction was used |
+| Message family | Exact human-template memory (Naive Bayes removed: it never qualified a family) | Explicit human decisions on-device | Source of interpretation and whether a correction was used |
 | Unusual spending | Median and median absolute deviation; no new trained model initially | Recomputed from comparable prior approved facts | Observed amount vs personal reference, with evidence |
 | Review selection | Grouping and priority rules initially | No learned ranking model | A small set of distinct examples worth reviewing |
 
-Exact human-template memory is distinct from statistical generalization.
 No LLM, embeddings, cloud inference or additional ML dependency is required
 for the first release. Predictions, ordinary dismissals and absence of correction
-must never become training truth. Statistical message learning cannot activate
-an ineligible seed family. Statistical recurrence cannot activate an ineligible
+must never become training truth. Statistical recurrence cannot activate an ineligible
 base model. Do not relax gates to make the preview or private evaluation succeed.
 
 ## User journeys and screen design
@@ -150,12 +148,12 @@ with undo. Candidate summary: cadence, estimated amount/date, method actually
 used and prior payments. “Review and save” opens the existing commitment editor.
 The reviewer can change the draft; only Save applies it.
 
-“Not recurring” records an explicit negative. “Don't add” hides the suggestion
-without a negative training label. Undo revokes the decision. Removing/changing a
-commitment revokes its old label; missing evidence prevents statistical training.
-Do not turn every frequent merchant into a subscription. Keep bank/container
-identity in series keys. Show “Needs reviewed examples” rather than pretending
-the shipped recurring model is active.
+Recurring payments come from rules only; the recurrence model was removed because
+it needed years of reviewed series for one person. “Not recurring” records an
+explicit decision that hides the series. “Don't add” hides the suggestion only.
+Undo revokes the decision. A confirmed cadence counts only while its saved
+commitment keeps it. Do not turn every frequent merchant into a subscription.
+Keep bank/container identity in series keys.
 
 ### Message learning (existing Settings route)
 

@@ -54,11 +54,13 @@ class AnalyticsEvaluationRegressionTest {
         assertFalse(result.model!!.accepted)
     }
 
-    @Test fun intermittentLargePaymentsStayInActualAndExposeUnderestimationBias() {
+    @Test fun intermittentLargePaymentsStayInActualAndAreNotForecastAsZero() {
         val result = forecast(data(119, { if (it % 19 == 0) 100000 else 0 }), 119)
         assertTrue(result.actual > 0)
-        assertTrue(result.evaluations.first { it.horizon == 28 }.bias > 0)
-        assertTrue(result.evaluations.first { it.horizon == 28 }.mae > 0)
+        val month = result.evaluations.first { it.horizon == 28 }
+        // Every weekday median here is 0; the old baseline missed each 28-day total by about 141667.
+        assertTrue(month.mae in 1 until 100000)
+        assertTrue(kotlin.math.abs(month.bias) < month.mae)
     }
 
     private fun monthly() = listOf("2026-07-20", "2026-08-20", "2026-09-20").mapIndexed { i, day ->

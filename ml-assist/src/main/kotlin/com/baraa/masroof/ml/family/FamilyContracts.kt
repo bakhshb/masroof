@@ -6,8 +6,8 @@ enum class SmsFamilyLabel {
     WITHDRAWAL, REFUND, FEE, BALANCE_NOTICE, OTP, NON_FINANCIAL, UNKNOWN,
 }
 
-enum class SuggestionOrigin { ML, HUMAN_TEMPLATE }
-data class FamilyPrediction(val family: SmsFamilyLabel, val score: Double, val modelVersion: String, val origin: SuggestionOrigin)
+/** Always an exact human template; there is no statistical origin. */
+data class FamilyPrediction(val family: SmsFamilyLabel, val modelVersion: String)
 
 enum class HumanLabelSource { USER_MESSAGE_FAMILY, USER_EVENT_KIND, USER_NON_FINANCIAL }
 

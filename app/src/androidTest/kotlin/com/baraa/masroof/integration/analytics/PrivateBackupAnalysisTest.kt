@@ -75,11 +75,9 @@ class PrivateBackupAnalysisTest {
             analysis.refresh()
             val snapshot = requireNotNull(analysis.state.value.snapshot)
             val replay = analysis.replayForecasts()
-            File(host.filesDir, "private-recurring-corpus.tsv").writeText(analysis.exportReviewedRecurrence("private-owner"))
             assertTrue("Analysis must not change the financial ledger", MessageDigest.isEqual(before, ledgerFingerprint()))
-            assertNotNull(snapshot.recurringLearning)
             File(host.filesDir, "private-probe-summary.json").writeText(
-                """{"forecastMethod":"${snapshot.method}","forecastReason":"${snapshot.modelReason}","coveredDays":${snapshot.quality.coveredDays},"recurringMethod":"${snapshot.recurringLearning!!.method}","trainingSeries":${snapshot.recurringLearning.trainingSeries},"validationSeries":${snapshot.recurringLearning.validationSeries},"spendingObservations":${analysis.state.value.observations.size},"replayEligible":${replay.count { it.forecast.total != null }},"ledgerUnchanged":true}""")
+                """{"forecastMethod":"${snapshot.method}","forecastReason":"${snapshot.modelReason}","coveredDays":${snapshot.quality.coveredDays}","recurringCandidates":${snapshot.candidates.size},"spendingObservations":${analysis.state.value.observations.size},"replayEligible":${replay.count { it.forecast.total != null }},"ledgerUnchanged":true}""")
         } finally {
             workflow?.close()
             container?.close()

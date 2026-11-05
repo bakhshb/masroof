@@ -125,15 +125,17 @@ object AnalyticsBackup {
                 return@forEach
             }
             val m = json.decodeFromString(StoredHuber.serializer(), row.payload)
-            require(m.weights.size == 12 && m.means.size == 12 && m.scales.size == 12)
+            // The weight count must match the declared features: v1 has 12, v2 adds salary start, Ramadan and Eid.
+            val size = when (m.features) { "purchase-days-v1" -> 12; com.baraa.masroof.analytics.AnalyticsVersion.FEATURES -> 15; else -> -1 }
+            require(m.weights.size == size && m.means.size == size && m.scales.size == size)
             require((m.weights + m.means + m.scales).all { it.isFinite() } && m.scales.all { it > 0 })
             require(m.baselineMae.isFinite() && m.modelMae.isFinite())
             require((m.signedErrors + m.wholeDayErrors).all { (h, values) -> h in 1..31 && values.all { it.isFinite() } })
         }
         archive.candidates.forEach { row ->
             val c = json.decodeFromString(AnalysisCandidate.serializer(), row.payload)
-            require(c.key == row.id && c.sourceIds.size >= 3 && c.sourceIds.distinct().size == c.sourceIds.size)
-            require(c.amount > 0 && c.lower >= 0 && c.upper >= c.lower && c.cadence in setOf("WEEKLY", "MONTHLY"))
+            require(c.key == row.id && c.sourceIds.size >= 2 && c.sourceIds.distinct().size == c.sourceIds.size)
+            require(c.amount > 0 && c.lower >= 0 && c.upper >= c.lower && c.cadence in setOf("WEEKLY", "MONTHLY", "YEARLY"))
             require(row.status in setOf("SUGGESTED", "ACCEPTED", "REJECTED"))
             if (c.seriesKey != null) {
                 require(c.seriesKey.matches(Regex("[0-9a-f]{64}")))
@@ -145,7 +147,7 @@ object AnalyticsBackup {
             require(when (row.kind) {
                 "NOT_RECURRING" -> payload.label == "NONE"
                 "DISMISSED" -> payload.label == null
-                else -> payload.label == null || payload.label in setOf("WEEKLY", "MONTHLY")
+                else -> payload.label == null || payload.label in setOf("WEEKLY", "MONTHLY", "YEARLY")
             })
         }
         archive.alerts.forEach { require(it.kind in setOf("ACTUAL", "BUDGET", "DUE", "PAYMENT") && it.amount >= 0 && it.firstSeen >= 0 && it.observedAt >= it.firstSeen && it.readAt >= 0) }

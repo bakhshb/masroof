@@ -84,4 +84,65 @@ class AnalyticsEngineTest {
         assertEquals(first.model!!.weights, changed.model!!.weights)
         assertEquals(first.actual + 900000, changed.actual)
     }
+    @Test fun sparseSpendingBaselineForecastsTheExpectedTotalNotAZeroMedian() {
+        // Spending every third day: each weekday's median is 0, its mean is a third of the purchase.
+        val rows = (0 until 90 step 3).map { FinancialFact("p$it", start + it, 9000, false, true) }
+        val result = PurchaseForecaster.forecast(clean(rows, 90), start + 60, start + 91, start + 90, 2, { 0 })
+        assertEquals("WEEKDAY_MEDIAN", result.method)
+        assertEquals(3000.0, result.remaining!!.toDouble(), 600.0)
+    }
+    @Test fun oneHugeDayIsCappedInTheBaseline() {
+        val days = (0 until 84).map { PurchaseDay(start + it, if (it == 40) 10_000_000 else 1000, 0, 1, 0, true) }
+        assertTrue(PurchaseForecaster.weekdayBaseline(days).all { it < 2000 })
+    }
+    @Test fun hijriSeasonsFollowUmmAlQura() {
+        assertEquals(PurchaseForecaster.Season.RAMADAN, PurchaseForecaster.season(LocalDate.of(2026, 3, 1).toEpochDay()))
+        assertEquals(PurchaseForecaster.Season.EID, PurchaseForecaster.season(LocalDate.of(2026, 3, 20).toEpochDay()))
+        assertEquals(PurchaseForecaster.Season.NONE, PurchaseForecaster.season(LocalDate.of(2026, 1, 15).toEpochDay()))
+        assertEquals(PurchaseForecaster.Season.NONE, PurchaseForecaster.season(LocalDate.of(1800, 1, 1).toEpochDay()))
+    }
+    @Test fun modelIsStillReusedAfterTheTrainingWindowStartsMoving() {
+        fun rows(n: Int) = (0 until n).map { FinancialFact("p$it", start + it, 1000 + (it % 9) * 300L, false, true) }
+        val first = PurchaseForecaster.forecast(clean(rows(400), 400), start + 390, start + 420, start + 400, 12, { 0 }).model!!
+        val next = PurchaseForecaster.forecast(clean(rows(401), 401), start + 390, start + 420, start + 401, 12, { 0 }, first).model!!
+        assertEquals(first, next)
+    }
+    @Test fun aSeasonSeenOnFewTrainingDaysIsNotLearned() {
+        // Training starts in mid-February 2026, so only the last few days of Ramadan 1447 are fitted rows.
+        val from = LocalDate.of(2026, 2, 15).toEpochDay()
+        val facts = (0 until 200).map { FinancialFact("p$it", from + it, 1000 + (it % 7) * 400L, false, true) }
+        val data = FinancialCleaner.clean(facts, from, from + 200, from) { ((it - from) % 30).toInt() }
+        val model = PurchaseForecaster.forecast(data, from + 190, from + 220, from + 200, 6, { ((it - from) % 30).toInt() }).model!!
+        assertEquals(0.0, model.weights[13])
+    }
+    @Test fun oneOrTwoPurchasesAreNeverCappedAwayFromTheBaseline() {
+        val one = (0 until 84).map { PurchaseDay(start + it, if (it == 40) 300000 else 0, 0, 1, 0, true) }
+        assertTrue(PurchaseForecaster.weekdayBaseline(one).sum() > 0)
+        val two = (0 until 84).map { PurchaseDay(start + it, when (it) { 40 -> 300000; 50 -> 1000; else -> 0 }, 0, 1, 0, true) }
+        assertEquals(301000.0 / 12, PurchaseForecaster.weekdayBaseline(two).sum(), 1.0)
+    }
+    private fun payments(vararg dates: String, amounts: List<Long> = List(dates.size) { 3500L }) = dates.mapIndexed { i, date ->
+        FinancialFact("r$i", LocalDate.parse(date).toEpochDay(), amounts[i], false, true, "Service", true)
+    }
+    @Test fun oneMissedMonthKeepsAMonthlySeries() {
+        val rows = payments("2026-01-10", "2026-02-10", "2026-04-11", "2026-05-09")
+        val pattern = RecurringDetector.detect(rows, LocalDate.of(2026, 5, 20).toEpochDay()).single()
+        assertEquals("MONTHLY", pattern.cadence)
+        assertEquals(LocalDate.of(2026, 6, 9).toEpochDay(), pattern.nextDay)
+        // Every other month, or two gaps, is not monthly.
+        assertTrue(RecurringDetector.detect(payments("2026-01-10", "2026-03-10", "2026-05-10"), LocalDate.of(2026, 5, 20).toEpochDay()).isEmpty())
+        assertTrue(RecurringDetector.detect(payments("2026-01-10", "2026-03-10", "2026-04-10", "2026-06-10"), LocalDate.of(2026, 6, 20).toEpochDay()).isEmpty())
+    }
+    @Test fun twoSimilarPaymentsAYearApartAreYearly() {
+        val pattern = RecurringDetector.detect(payments("2025-03-01", "2026-03-04", amounts = listOf(90000, 95000)),
+            LocalDate.of(2026, 6, 1).toEpochDay()).single()
+        assertEquals("YEARLY", pattern.cadence)
+        assertEquals(LocalDate.of(2027, 3, 4).toEpochDay(), pattern.nextDay)
+        // A very different amount, a different season, or two monthly-looking rows are not yearly.
+        assertTrue(RecurringDetector.detect(payments("2025-03-01", "2026-03-04", amounts = listOf(20000, 95000)), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
+        assertTrue(RecurringDetector.detect(payments("2025-03-01", "2026-05-20"), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
+        assertTrue(RecurringDetector.detect(payments("2026-04-01", "2026-05-01"), LocalDate.of(2026, 5, 10).toEpochDay()).isEmpty())
+        // An old yearly series whose renewal never came expires.
+        assertTrue(RecurringDetector.detect(payments("2024-03-01", "2025-03-01"), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
+    }
 }

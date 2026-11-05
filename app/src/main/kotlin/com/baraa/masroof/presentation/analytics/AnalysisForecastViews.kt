@@ -1,5 +1,6 @@
 package com.baraa.masroof.presentation.analytics
 
+import com.baraa.masroof.analytics.PurchaseForecaster
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
@@ -32,18 +33,14 @@ import java.time.LocalDate
 @Composable internal fun PersonalReadinessRings(snapshot: AnalysisSnapshot) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
         snapshot.quality.consecutiveCompleteDays?.let { count ->
-            com.baraa.masroof.ui.components.MasroofProgressRing(fraction(count.toLong(), PERSONAL_DAYS.toLong()),
-                AppDigits.display(stringResource(R.string.analysis_progress, count, PERSONAL_DAYS)), stringResource(R.string.analysis_personal_days))
+            com.baraa.masroof.ui.components.MasroofProgressRing(fraction(count.toLong(), PurchaseForecaster.MIN_PERSONAL_DAYS.toLong()),
+                AppDigits.display(stringResource(R.string.analysis_progress, count, PurchaseForecaster.MIN_PERSONAL_DAYS)), stringResource(R.string.analysis_personal_days))
         }
-        com.baraa.masroof.ui.components.MasroofProgressRing(fraction(snapshot.completedPeriods.toLong(), PERSONAL_PERIODS.toLong()),
-            AppDigits.display(stringResource(R.string.analysis_progress, snapshot.completedPeriods, PERSONAL_PERIODS)),
+        com.baraa.masroof.ui.components.MasroofProgressRing(fraction(snapshot.completedPeriods.toLong(), PurchaseForecaster.MIN_PERSONAL_PERIODS.toLong()),
+            AppDigits.display(stringResource(R.string.analysis_progress, snapshot.completedPeriods, PurchaseForecaster.MIN_PERSONAL_PERIODS)),
             stringResource(R.string.analysis_personal_periods), color = com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.card)
     }
 }
-
-/** Requirements the forecaster applies before fitting a personal model (PurchaseForecaster). */
-internal const val PERSONAL_DAYS = 120
-internal const val PERSONAL_PERIODS = 4
 
 /** Average error per horizon as bars; the badge says whether estimates usually ran low or high. */
 @Composable internal fun ForecastErrorBars(evaluations: List<AnalysisEvaluation>) {
@@ -53,7 +50,8 @@ internal const val PERSONAL_PERIODS = 4
         com.baraa.masroof.ui.components.MasroofValueBarRow(AppDigits.display(stringResource(R.string.analysis_error_horizon, e.horizon)),
             AppDigits.display(stringResource(R.string.analysis_error_value, visualMoney(e.mae))), fraction(e.mae, maximum),
             Modifier.testTag("forecast-error-${e.horizon}"),
-            subtitle = AppDigits.display(stringResource(if (e.bias > 0) R.string.analysis_error_low else R.string.analysis_error_high,
+            // A zero bias ran neither low nor high.
+            subtitle = if (e.bias == 0L) null else AppDigits.display(stringResource(if (e.bias > 0) R.string.analysis_error_low else R.string.analysis_error_high,
                 e.count, visualMoney(kotlin.math.abs(e.bias)))),
             style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
     }
@@ -129,8 +127,8 @@ internal const val PERSONAL_PERIODS = 4
                 explanation.anchorDay?.let { MasroofTimelineRow(AppDigits.display(stringResource(R.string.analysis_anchor_date, day(it))), "",
                     active = explanation.status != ForecastComparisonStatus.WAITING_FOR_ANCHOR) }
                 state.snapshot?.let { s -> MasroofTimelineRow(stringResource(R.string.analysis_personal_readiness),
-                    AppDigits.display(listOfNotNull(s.quality.consecutiveCompleteDays?.let { stringResource(R.string.analysis_progress, it, PERSONAL_DAYS) },
-                        stringResource(R.string.analysis_progress, s.completedPeriods, PERSONAL_PERIODS)).joinToString(" · ")),
+                    AppDigits.display(listOfNotNull(s.quality.consecutiveCompleteDays?.let { stringResource(R.string.analysis_progress, it, PurchaseForecaster.MIN_PERSONAL_DAYS) },
+                        stringResource(R.string.analysis_progress, s.completedPeriods, PurchaseForecaster.MIN_PERSONAL_PERIODS)).joinToString(" · ")),
                     active = s.method != "WEEKDAY_MEDIAN") }
                 val reason = when (explanation.status) {
                     ForecastComparisonStatus.AWAITING_ELIGIBLE_FORECAST -> R.string.analysis_wait_eligible

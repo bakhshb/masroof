@@ -107,6 +107,10 @@ class RoomParsedEventRepository(
         dao.listRawSmsIdsReferencingLoan(loan.bank.id, loan.loanType.name)
     }
 
+    override suspend fun listRememberedNonFinancial(): List<ParsedEventRecord> = accessGate.withAccess {
+        dao.listRememberedNonFinancial().map(ParsedEventMapper::toRecord)
+    }
+
     override suspend fun listCardStatementFacts(): List<ParsedEventRecord> = accessGate.withAccess {
         dao.listCardStatementFacts().map(ParsedEventMapper::toRecord)
     }

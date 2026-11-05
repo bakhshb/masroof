@@ -23,8 +23,8 @@ fun InterpretationProvenanceCard(provenance: InterpretationProvenance?) {
     // Rules are the normal path, so they show only what the message was read as; other sources say where the type came from.
     val title = when (provenance.origin) {
         InterpretationOrigin.RULES -> null
-        InterpretationOrigin.ML -> R.string.lab_ml_source
-        InterpretationOrigin.HUMAN_TEMPLATE -> R.string.lab_template_source
+        // No statistical model ships any more; an old ML stamp reads as a remembered decision.
+        InterpretationOrigin.ML, InterpretationOrigin.HUMAN_TEMPLATE -> R.string.lab_template_source
         InterpretationOrigin.MANUAL -> R.string.lab_manual_source
         InterpretationOrigin.UNRESOLVED -> R.string.lab_unresolved_source
         InterpretationOrigin.UNAVAILABLE -> R.string.lab_unavailable_source

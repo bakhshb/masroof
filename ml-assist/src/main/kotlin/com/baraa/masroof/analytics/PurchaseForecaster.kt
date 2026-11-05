@@ -1,5 +1,8 @@
 package com.baraa.masroof.analytics
 
+import java.time.LocalDate
+import java.time.chrono.HijrahDate
+import java.time.temporal.ChronoField
 import kotlin.math.*
 
 data class HuberModel(val weights: List<Double>, val means: List<Double>, val scales: List<Double>,
@@ -29,11 +32,14 @@ object PurchaseForecaster {
         if (!data.quality.coverageKnown || history.size < 56 || completedPeriods < 2) return PurchaseForecast(
             "INSUFFICIENT_DATA", "NONE", actual, null, null, null, null, emptyList(), null)
         val lastGap = history.zipWithNext().indexOfLast { (a, b) -> b.day != a.day + 1 }
+        // The newest year is enough to learn habits and keeps each refit's cost bounded.
         val training = history.drop(if (lastGap < 0) 0 else lastGap + 1).takeIf { it.lastOrNull()?.day == today - 1 }.orEmpty()
+            .takeLast(MAX_TRAINING_DAYS)
         var model: HuberModel? = null
-        if (training.size >= 120 && completedPeriods >= 4 && training.count { it.gross > 0 } >= 20) {
+        if (training.size >= MIN_PERSONAL_DAYS && completedPeriods >= MIN_PERSONAL_PERIODS && training.count { it.gross > 0 } >= 20) {
             val canReuse = previous != null && previous.featureVersion == AnalyticsVersion.FEATURES &&
-                today - previous.trainedThrough <= 7 && previous.trainingFingerprint == fingerprint(training.filter { it.day <= previous.trainedThrough })
+                today - previous.trainedThrough <= 7 && // The uncapped history: the 365-day window's start moves daily, the previous fit's range does not.
+                previous.trainingFingerprint == fingerprint(history.filter { it.day in previous.trainedFrom..previous.trainedThrough })
             model = if (canReuse) previous else runCatching { evaluateAndFit(training, phase, completedPeriodsAt) }.getOrNull()
         }
         val chosen = model?.takeIf { it.accepted && allowPersonal }
@@ -57,8 +63,8 @@ object PurchaseForecaster {
         val reason = when {
             chosen != null -> "PERSONAL_MODEL"
             !allowPersonal && model?.accepted == true -> "LIVE_BASELINE_BETTER"
-            training.size < 120 -> if (history.size >= 120) "COVERAGE_GAPS" else "NEEDS_HISTORY"
-            completedPeriods < 4 -> "NEEDS_PERIODS"
+            training.size < MIN_PERSONAL_DAYS -> if (history.size >= MIN_PERSONAL_DAYS) "COVERAGE_GAPS" else "NEEDS_HISTORY"
+            completedPeriods < MIN_PERSONAL_PERIODS -> "NEEDS_PERIODS"
             training.count { it.gross > 0 } < 20 -> "NEEDS_PURCHASE_DAYS"
             model == null -> "MODEL_UNAVAILABLE"
             CORE_HORIZONS.any { model.signedErrors[it].orEmpty().size < 8 } -> "NEEDS_EVALUATIONS"
@@ -66,7 +72,7 @@ object PurchaseForecaster {
         }
         return PurchaseForecast("READY", if (chosen == null) "WEEKDAY_MEDIAN" else AnalyticsVersion.MODEL,
             actual, remaining, total, null, null, predictions, model,
-            WeekdayModel(weekdayMedians(history).map { it.roundToLong() },
+            WeekdayModel(weekdayBaseline(history).map { it.roundToLong() },
                 history.groupBy { weekday(it.day) }.values.flatMap { it.takeLast(12) }.minOf { it.day }, history.last().day, baseErrors, baseSigned, baselineEvaluation.wholeDays),
             if (horizon == 0) 0 else margin?.let { (wholeDays - it).coerceAtLeast(0) },
             if (horizon == 0) 0 else margin?.let { Math.addExact(wholeDays, it) },
@@ -79,12 +85,33 @@ object PurchaseForecaster {
     private fun features(day: Long, phase: Int, history: List<PurchaseDay>): DoubleArray {
         fun lag(n: Int) = history.firstOrNull { it.day == day - n }?.gross?.toDouble() ?: 0.0
         fun mean(n: Int) = history.filter { it.day in (day - n) until day }.map { it.gross.toDouble() }.average().takeIf { it.isFinite() } ?: 0.0
+        val season = season(day)
         return doubleArrayOf(1.0, *(0..5).map { if (weekday(day) == it) 1.0 else 0.0 }.toDoubleArray(),
-            phase.toDouble() / 31, lag(1) / 100, lag(7) / 100, mean(7) / 100, mean(28) / 100)
+            phase.toDouble() / 31, lag(1) / 100, lag(7) / 100, mean(7) / 100, mean(28) / 100,
+            if (phase < 3) 1.0 else 0.0, if (season == Season.RAMADAN) 1.0 else 0.0, if (season == Season.EID) 1.0 else 0.0)
     }
+
+    internal enum class Season { NONE, RAMADAN, EID }
+    /** Umm al-Qura calendar from java.time; dates outside its range carry no season. */
+    private val seasons = java.util.concurrent.ConcurrentHashMap<Long, Season>()
+    // Every fit rebuilds features for the same days; the Hijri conversion is computed once per day.
+    internal fun season(day: Long): Season = seasons.computeIfAbsent(day, ::hijriSeason)
+    private fun hijriSeason(day: Long): Season = try {
+        val hijri = HijrahDate.from(LocalDate.ofEpochDay(day))
+        val month = hijri.get(ChronoField.MONTH_OF_YEAR); val date = hijri.get(ChronoField.DAY_OF_MONTH)
+        when {
+            month == 9 -> Season.RAMADAN
+            (month == 10 && date <= 3) || (month == 12 && date in 10..13) -> Season.EID
+            else -> Season.NONE
+        }
+    } catch (_: RuntimeException) { Season.NONE } // DateTimeException, or missing calendar data on a device
 
     private fun fit(history: List<PurchaseDay>): HuberModel {
         val rows = history.drop(28).map { features(it.day, it.phase, history.filter { row -> row.day < it.day }) }
+        // A season seen on only a few days would fit those days' spikes exactly; leave it unlearned (weight 0).
+        // features() puts the Ramadan and Eid columns last.
+        val seasonColumns = rows.first().size.let { it - SEASONS until it }
+        seasonColumns.filter { j -> rows.count { it[j] > 0 } < MIN_SEASON_DAYS }.forEach { j -> rows.forEach { it[j] = 0.0 } }
         val targets = history.drop(28).map { it.gross.toDouble() / 100 }.toDoubleArray()
         val p = rows.first().size
         val means = DoubleArray(p) { j -> if (j == 0) 0.0 else rows.map { it[j] }.average() }
@@ -110,9 +137,9 @@ object PurchaseForecaster {
 
     private fun predict(history: List<PurchaseDay>, from: Long, through: Long, phase: (Long) -> Int, model: HuberModel?): List<ForecastPoint> {
         val rolling = history.toMutableList()
-        val medians = weekdayMedians(history)
+        val baseline = weekdayBaseline(history)
         return (from..through).map { day ->
-            val amount = if (model == null) medians[weekday(day)] else {
+            val amount = if (model == null) baseline[weekday(day)] else {
                 val x = features(day, phase(day), rolling)
                 dot(model.weights.toDoubleArray(), DoubleArray(x.size) { (x[it] - model.means[it]) / model.scales[it] }) * 100
             }
@@ -122,11 +149,26 @@ object PurchaseForecaster {
             ForecastPoint(day, cents)
         }
     }
-    private fun weekdayMedians(history: List<PurchaseDay>) = (0..6).map { dow ->
-        median(history.filter { weekday(it.day) == dow }.takeLast(12).map { it.gross.toDouble() })
+    /**
+     * A period total needs the expected (mean) day, not the typical one: medians of mostly-empty or
+     * skewed days forecast far too little. The single largest day is capped at the second largest
+     * spending day, and only when there are at least three, so a sparse spender's few days stay whole.
+     * The method is still stored as "WEEKDAY_MEDIAN" because that persisted key predates this estimator.
+     */
+    internal fun weekdayBaseline(history: List<PurchaseDay>): List<Double> {
+        val recent = history.groupBy { weekday(it.day) }.mapValues { (_, rows) -> rows.takeLast(12).map { it.gross.toDouble() } }
+        val spending = recent.values.flatten().filter { it > 0 }.sorted()
+        val cap = if (spending.size >= 3) spending[spending.size - 2] else Double.MAX_VALUE
+        return (0..6).map { dow -> recent[dow]?.map { minOf(it, cap) }?.average() ?: 0.0 }
     }
 
     private val CORE_HORIZONS = listOf(1, 7, 14, 28)
+    private const val MAX_TRAINING_DAYS = 365
+    private const val SEASONS = 2
+    private const val MIN_SEASON_DAYS = 7
+    /** History the personal model needs before it is even tried; the readiness rings show progress to these. */
+    const val MIN_PERSONAL_DAYS = 120
+    const val MIN_PERSONAL_PERIODS = 4
 
     private fun evaluateAndFit(history: List<PurchaseDay>, phase: (Long) -> Int, periods: (Long) -> Int): HuberModel {
         val candidateEvaluation = evaluate(history, phase, true, periods)

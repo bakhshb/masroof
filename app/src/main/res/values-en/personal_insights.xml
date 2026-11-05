@@ -4,8 +4,8 @@
     <string name="personal_forecast_model">Your personal model is in use</string>
     <string name="personal_forecast_unavailable">Estimate currently unavailable</string>
     <string name="personal_forecast_refreshing">Updating the estimate; these details describe the last saved result.</string>
-    <string name="personal_forecast_initial_hint">The estimate uses your median spending on matching weekdays.</string>
-    <string name="personal_forecast_model_hint">The model learns locally from weekdays, the day within your salary period, and previous spending.</string>
+    <string name="personal_forecast_initial_hint">The estimate uses your average spending on matching weekdays.</string>
+    <string name="personal_forecast_model_hint">The model learns locally from weekdays, the day within your salary period, the days after salary, Ramadan and Eid, and previous spending.</string>
     <string name="personal_forecast_qualification">The personal model must pass independent checks and beat the initial estimate; history alone does not activate it.</string>
     <string name="personal_forecast_errors">Forecast error by horizon</string>
     <string name="personal_spending_attention">Higher payments than usual</string>
@@ -17,11 +17,11 @@
     <string name="personal_spending_sample">%1$d previous payments</string>
     <string name="personal_spending_previous">Previous reference payments</string>
     <string name="personal_review_title">Review distinct message patterns</string>
-    <string name="personal_review_scope">An optional session with up to three patterns from pending messages. Each opens the existing review; your decision applies to that message only, and only eligible decisions teach the model.</string>
+    <string name="personal_review_scope">An optional session with up to three wordings from pending messages. Each opens the existing review; an eligible decision is remembered and applied to messages with the same wording.</string>
     <string name="personal_review_example">Message %1$d · %2$s</string>
-    <string name="personal_review_wording">This wording is currently unsupported for learning; supporting it may require an app update.</string>
+    <string name="personal_review_wording">A decision cannot be remembered for this wording yet.</string>
     <string name="personal_review_failed">Could not prepare review examples.</string>
     <string name="personal_review_empty">No pending patterns need your review right now.</string>
     <string name="personal_review_open">Review %1$d patterns</string>
-    <string name="personal_recurring_decisions_hint">“Not recurring” is an explicit learning decision. “Don’t add” only hides the suggestion. You can undo your decision.</string>
+    <string name="personal_recurring_decisions_hint">“Not recurring” is an explicit decision that hides this series. “Don’t add” only hides the suggestion. You can undo your decision.</string>
 </resources>

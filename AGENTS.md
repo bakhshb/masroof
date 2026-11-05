@@ -36,7 +36,7 @@ This file wins when older records disagree.
 
 ## Financial rules
 - Posting gate (`TransactionAssembler.isAutomationEligible`): only `ParseStatus.SUCCESS`, an automation-confirming correction (family/amount) or `USER_FINANCIAL_TYPE`. Merchant/counterparty edits never lift it; reconciliation never bypasses it.
-- Auto-ignore and stale-link cleanup follow the parsed family (`OTP`, `NON_FINANCIAL`, `BALANCE_NOTICE`) via `InformationalMessagePolicy`; never re-read wording. `UNKNOWN` stays reviewable.
+- Auto-ignore and stale-link cleanup follow the parsed family (`OTP`, `NON_FINANCIAL`, `BALANCE_NOTICE`) via `InformationalMessagePolicy`; never re-read wording. `UNKNOWN` stays reviewable; the one exception is a message without an amount whose exact wording the user already marked not financial (`FamilyAssistBridge.rememberNonFinancial`), which returns to review if that decision is later contradicted.
 - Time: `BankTransactionTimePolicy` is the only bank→zone map (AlJazira `Asia/Riyadh`; others keep the stored `occurredAtZone`). `resolveTransferAsExternal`/`resolveAsFinancialType` use `TransactionTiming.effectiveOccurredAt` and persist that zone. Dashboard code never branches on bank time zones.
 - FX: `ExchangeRateEnrichmentWorkflow` persists rates; dashboards apply them in memory. A complete `(appliedExchangeRate, exchangeRateSource)` pair is immutable; repair a half pair from one resolution.
 

@@ -2,14 +2,12 @@ package com.baraa.masroof.data.learning
 
 import android.content.Context
 import androidx.room.Room
-import com.baraa.masroof.ml.family.FamilyModel
 import java.io.File
 
 class LearningStore(private val context: Context) : AutoCloseable {
     private val databaseLazy = lazy {Room.databaseBuilder(context,LearningDatabase::class.java,NAME)
         .addMigrations(LearningDatabase.MIGRATION_1_2).build()}
     private val database get()=databaseLazy.value
-    fun loadSeed() = FamilyModelCodec.seed(requireNotNull(FamilyModel::class.java.getResourceAsStream("/ml/family-seed.json")).bufferedReader().use {it.readText()})
     suspend fun record(row: EngineInterpretationRow) = database.learning().record(row)
     suspend fun saveFeedback(labels: List<LearningLabelRow>, feedback: List<LearningFeedbackRow>) = database.learning().replaceFeedback(labels, feedback)
     suspend fun feedback() = database.learning().feedback()
