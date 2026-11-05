@@ -19,7 +19,8 @@ class SenderBankDetector(
     displayName: String? = null,
 ) : BankDetector {
     private val exact = senders.map(SenderIdentity::key).filter { it.isNotEmpty() }.toSet()
-    private val senderStems = exact.filter { it.length >= MIN_SENDER_STEM }
+    // Numeric senders are never stems: phone numbers would contain them.
+    private val senderStems = exact.filter { it.length >= MIN_SENDER_STEM && !it.all(Char::isDigit) }
     // A real bank SMS from a new sender usually names the bank; a long name keeps short ones (SAB) from matching words.
     private val bodyNames = (exact + listOfNotNull(displayName?.let(SenderIdentity::key)))
         .filter { it.length >= MIN_BODY_NAME && !it.all(Char::isDigit) }.toSet()

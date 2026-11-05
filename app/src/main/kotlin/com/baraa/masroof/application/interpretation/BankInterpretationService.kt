@@ -286,11 +286,11 @@ class BankInterpretationService(
     suspend fun learningLabels() = store.labels()
     suspend fun interpretations() = store.interpretations()
     private suspend fun schedulePendingRefresh() {
-        val version = refreshVersion
+        val configuration = patterns()
+        val version = "${PatternFactInterpreter.of(configuration).fingerprint}|${modelVersion ?: "rules-only"}"
         val required = reviews.listRequired()
         val records = parsed.listByRawSmsIds(required.map { it.rawSmsId })
         val models = classifiers.orEmpty()
-        val configuration = patterns()
         // Outside role rules only a remembered "not financial" can change a message, and only one without an amount.
         val roled = ruleBanks(configuration)
         // Rules ask for a family only when they found none; a message already read with this model is never re-read,

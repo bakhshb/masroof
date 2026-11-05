@@ -15,9 +15,10 @@ object SenderIdentity {
             if (type == Character.FORMAT.toInt() || type == Character.NON_SPACING_MARK.toInt() || c == '\u0640') continue
             val folded = when (c) {
                 'أ', 'إ', 'آ', 'ٱ' -> 'ا'
-                'ى' -> 'ي'
+                'ى', 'ی' -> 'ي'
                 'ة' -> 'ه'
-                else -> c.lowercaseChar()
+                // Arabic-Indic and Persian digits are the same digits.
+                else -> if (c.isDigit()) '0' + Character.digit(c, 10) else c.lowercaseChar()
             }
             if (folded.isLetterOrDigit()) append(folded)
         }

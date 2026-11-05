@@ -1,5 +1,6 @@
 package com.baraa.masroof.data.patterns
 
+import com.baraa.masroof.engine.bank.patterns.SenderIdentity
 import android.content.Context
 import com.baraa.masroof.engine.bank.patterns.BankMessagePatterns
 import com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration
@@ -112,7 +113,7 @@ class MessagePatternStore(private val file: File, private val beforeReplace: () 
         fun installation(configuration: MessagePatternConfiguration, seed: BankMessagePatterns,
             mergeBankIds: Set<String>): BankMessagePatterns? {
             val prior = configuration.banks.singleOrNull { it.bankId == seed.bankId }
-                ?: return seed.takeIf { seed.bankId in mergeBankIds || configuration.banks.none { bank -> seed.senders.any(bank::ownsSender) } }
+                ?: return seed.takeIf { seed.bankId in mergeBankIds || configuration.banks.none { bank -> seed.senders.any { mine -> bank.senders.any { SenderIdentity.overlap(it, mine) } } } }
             val installed = prior.currentPatterns.associateBy { it.id }
             val updates = seed.patterns.mapNotNull { bundled ->
                 val mine = installed[bundled.id]

@@ -72,6 +72,8 @@ class SenderBankDetectorTest {
         assertTrue(!SenderIdentity.names("---", "---"))
         // A numeric sender never matches digits that happen to run together in a body.
         assertTrue(SenderBankDetector(Bank("NUM"), listOf("880012345")).detect("Mom", "pay 8800 12345 now") is BankDetectionResult.Unknown)
+        assertTrue(SenderBankDetector(Bank("NUM"), listOf("900900")).detect("+966500900900", "hi") is BankDetectionResult.Unknown)
+        assertTrue(SenderIdentity.names("٨٨٠٠", "8800"))
     }
 
     @Test

@@ -87,7 +87,7 @@ class MessagePatternsWorkflow(
         accessGate.withExclusiveAccess {
             val current = store.load()
             val bank = current.banks.single { it.bankId == bankId }
-            val addresses = senders.map(String::trim).distinct()
+            val addresses = senders.map(String::trim).distinctBy(SenderIdentity::key)
             validateBankEdit(current.banks, bankId, name, addresses)
             require(bank.currentPatterns.all { it.sender in addresses }) { "A sender is still used by a pattern" }
             store.saveBank(generation, bank.copy(displayName = name.trim(), senders = addresses, patterns = emptyList())).toCatalog()
