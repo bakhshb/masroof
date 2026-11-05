@@ -213,9 +213,10 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val cashIds = categories[ChartDataCategory.CASH_WITHDRAWALS]?.transactionIdsByDate?.values?.flatten()?.toSet().orEmpty()
             val transferIds = categories[ChartDataCategory.EXTERNAL_TRANSFERS]?.transactionIdsByDate?.values?.flatten()?.toSet().orEmpty()
             val invalidIds = clean.quality.excluded.filterKeys { it != "DUPLICATE_ID" }.values.flatten().toSet()
+            val storedCategories = historical.transactions.associate { it.id to it.categoryId }
             val insightFacts = facts.distinctBy { it.id }.filter { it.included && it.id !in invalidIds && it.amount != null }.map {
                 AnalysisSpendingFact(it.id, it.day, if (it.refund) Math.negateExact(it.amount!!) else it.amount!!,
-                    when { it.refund -> "REFUNDS"; it.id in cashIds -> "CASH"; it.id in transferIds -> "TRANSFERS"; else -> "PURCHASES" }, it.merchant)
+                    when { it.refund -> "REFUNDS"; it.id in cashIds -> "CASH"; it.id in transferIds -> "TRANSFERS"; else -> "PURCHASES" }, it.merchant, storedCategories[it.id])
             }
             val previousPeriod = FinancialPeriodPolicy.previous(period)
             val insights = AnalysisSpendingInsightsBuilder.build(insightFacts, period.startDate.toEpochDay(), todayDay,
@@ -237,7 +238,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val committed = read.committed
             val decisions = store.analytics().candidates().filter { it.status != "SUGGESTED" }.sortedBy { it.id }.map { it.id to it.status }
             val feedback = store.analytics().feedback().joinToString { "${it.seriesKey}:${it.kind}:${it.decidedAt}:${hash(it.payload)}" }
-            val canonical = "continuous-learning-v1|${RecurringLearningWorkflow.version}|${ForecastPerformancePolicy.VERSION}|${AnalyticsVersion.EVALUATION}|${AnalyticsVersion.MODEL}|${AnalyticsVersion.FEATURES}|${clean.fingerprint}|$dues|${committed.sorted()}|$blocked|${current.summary.reviewRequiredCount}|${period.startDate}|$prefs|$decisions|$feedback|${read.committedCadences}|${clock.millis() / SIX_HOURS_MS}"
+            val canonical = "continuous-learning-v1|${RecurringLearningWorkflow.version}|${ForecastPerformancePolicy.VERSION}|${AnalyticsVersion.EVALUATION}|${AnalyticsVersion.MODEL}|${AnalyticsVersion.FEATURES}|${clean.fingerprint}|$dues|${committed.sorted()}|$blocked|${current.summary.reviewRequiredCount}|${period.startDate}|$prefs|$decisions|$feedback|${read.committedCadences}|${hash(insightFacts.filter { it.category != null }.joinToString { "${it.id}:${it.category}" })}|${clock.millis() / SIX_HOURS_MS}"
             return Source(clean, period.startDate.toEpochDay(), period.endDateExclusive.toEpochDay(), todayDay, completed,
                 dues, committed, current.summary.reviewRequiredCount, blocked, hash(canonical), reasons, insights, read.committedCadences)
     }
@@ -401,6 +402,24 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             }
         } }; request()
     }
+    /**
+     * The user's category for a merchant, stored on its current-period rows. The newest stored choice applies to
+     * the merchant's whole history and to new rows, so stamping its latest rows is enough. Never reparses SMS.
+     */
+    suspend fun setMerchantCategory(merchantGroupKey: String, category: String): Boolean {
+        val chosen = com.baraa.masroof.analytics.SpendingCategory.fromStored(category) ?: return false
+        val ids = mutable.value.snapshot?.insights?.merchants?.firstOrNull { it.key == merchantGroupKey }?.ids ?: return false
+        mutex.withLock { if (closed) return false
+            container.databaseAccessGate.withAccess {
+                container.database.withTransaction {
+                    container.financialTransactionRepository.getByIds(ids).filter { it.categoryId != chosen.name }
+                        .forEach { check(container.financialTransactionRepository.update(it.copy(categoryId = chosen.name))) }
+                }
+            }
+        }
+        request(); return true
+    }
+
     suspend fun acceptCandidate(key: String, draft: SettingsCommitmentsWorkflow.CommitmentEditorDraft): Boolean {
         val c = mutable.value.snapshot?.candidates?.firstOrNull { it.key == key } ?: return false
         require(draft.name.isNotBlank() && draft.amount.amount.signum() > 0)

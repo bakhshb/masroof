@@ -111,6 +111,7 @@ object AnalyticsBackup {
                 require(insight.components.map { it.key }.toSet() == setOf("PURCHASES", "CASH", "TRANSFERS", "REFUNDS"))
                 require(insight.components.size == 4 && insight.components.fold(0L) { sum, c -> Math.addExact(sum, c.amount) } == s.actual)
                 // The builder keeps every ranked merchant for the analysis "view all" list.
+                require(insight.categories.all { it.key == "category:${it.category}" && it.amount > 0 })
                 require(insight.merchants.all { it.key.startsWith("merchant:") && it.amount > 0 } &&
                     insight.merchants.distinctBy { it.key }.size == insight.merchants.size)
                 insight.comparison?.let { c -> require(c.through >= c.from && c.previousThrough - c.previousFrom == c.through - c.from &&
