@@ -6,13 +6,13 @@ package com.baraa.masroof.engine.bank.patterns
  * Detection, sender ownership and teaching all use it, so a sender routed to a bank is also one that bank owns.
  */
 object SenderIdentity {
-    private val PROMO_SUFFIX = Regex("(?i)[\\s\\-_.]+ad$")
+    private val PROMO_SUFFIX = Regex("(?i)[\\s\\-_.]*ad$")
 
     /** Comparison key; empty when the name has no letter or digit. */
     fun key(sender: String): String = buildString {
         for (c in sender) {
             val type = Character.getType(c)
-            if (type == Character.FORMAT.toInt() || type == Character.NON_SPACING_MARK.toInt() || c == 'ـ') continue
+            if (type == Character.FORMAT.toInt() || type == Character.NON_SPACING_MARK.toInt() || c == '\u0640') continue
             val folded = when (c) {
                 'أ', 'إ', 'آ', 'ٱ' -> 'ا'
                 'ى' -> 'ي'
@@ -23,13 +23,19 @@ object SenderIdentity {
         }
     }
 
-    /** The key without a promotional suffix, or null when there is none. */
+    /** The key without a promotional -AD suffix, or null when there is none. */
     fun promotionalKey(sender: String): String? = sender.trim().takeIf { PROMO_SUFFIX.containsMatchIn(it) }
         ?.replace(PROMO_SUFFIX, "")?.let(::key)?.takeIf { it.isNotEmpty() }
 
-    fun same(configured: String, incoming: String): Boolean {
+    /** Whether an incoming sender is the [configured] one: the same key, or that key plus a promotional suffix. */
+    fun names(configured: String, incoming: String): Boolean {
         val wanted = key(configured)
-        return wanted.isNotEmpty() && (wanted == key(incoming) || wanted == promotionalKey(incoming) ||
-            key(incoming) == promotionalKey(configured))
+        return wanted.isNotEmpty() && (wanted == key(incoming) || wanted == promotionalKey(incoming))
     }
+
+    /** Whether two configured senders could detect the same incoming sender. */
+    fun overlap(first: String, second: String): Boolean = names(first, second) || names(second, first)
+
+    /** The configured sender that [incoming] names, or null. */
+    fun configuredSender(senders: Collection<String>, incoming: String): String? = senders.firstOrNull { names(it, incoming) }
 }

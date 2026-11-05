@@ -1,6 +1,6 @@
 # Bank interpretation
 
-The production adapter is `app/.../bank/MessagePatternSmsAdapter.kt`; `application/interpretation/ConfiguredPatternAdapters` supplies immutable bank-scoped snapshots from the pattern store. Interpretation runs in `bank-engine/`. Routing evaluates all adapters before parsing. The retained `AlJaziraBankDetector` is a routing detector, not the retired parser.
+The production adapter is `app/.../bank/MessagePatternSmsAdapter.kt`; `application/interpretation/ConfiguredPatternAdapters` supplies immutable bank-scoped snapshots from the pattern store. Interpretation runs in `bank-engine/`. Routing evaluates all adapters before parsing. Every adapter detects its bank with `SenderBankDetector`, using `SenderIdentity` (bank-engine) as the one rule for when two sender names are the same sender.
 
 Bundled JSON assets in `app/src/main/assets/bank-patterns/` define the production bank patterns. `PatternFactInterpreter` extracts facts with evidence and blockers, delegating AlJazira role profiles to the shared `RuleInterpreter`. Kotlin `RuleLibrary` and `AlJaziraRuleProfile` are interpreter/reference test vocabulary; production does not load them. Local family assistance is injected from `ml-assist`; rules and security checks remain authoritative. `InterpretationDraftMapper` preserves blockers and sends drafts through the existing validator and `ParseFinalizer`. Only that finalizer emits successful financial parse results.
 

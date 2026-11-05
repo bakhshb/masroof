@@ -11,8 +11,9 @@ import com.baraa.masroof.core.money.Currency
 data class PatternCatalog(val generation: Long, val banks: List<PatternBankView>)
 data class PatternBankView(val bankId: String, val displayName: String?, val senders: List<String>,
     val currentPatterns: List<PatternDefinitionView>) {
-    /** Same rule as detection, so a message routed to this bank can be taught for it. */
-    fun ownsSender(sender: String): Boolean = senders.any { com.baraa.masroof.engine.bank.patterns.SenderIdentity.same(it, sender) }
+    /** Same rule as detection, so a message routed to this bank can be taught for it under its configured sender. */
+    fun configuredSender(sender: String): String? = com.baraa.masroof.engine.bank.patterns.SenderIdentity.configuredSender(senders, sender)
+    fun ownsSender(sender: String): Boolean = configuredSender(sender) != null
 }
 enum class PatternApprovalStatus { BUNDLED, PREVIEW_ONLY, APPROVED }
 data class PatternApprovalSettings(val operation: PatternOperation?, val accountLast4: String?,

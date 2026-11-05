@@ -17,7 +17,7 @@ data class BankMessagePatterns(
         require(patterns.none { it.id in deletedPatternIds }) { "Deleted patterns cannot be restored as revisions" }
     }
     /** The configured sender that [sender] names under [SenderIdentity], or null. */
-    fun configuredSender(sender: String): String? = senders.firstOrNull { SenderIdentity.same(it, sender) }
+    fun configuredSender(sender: String): String? = SenderIdentity.configuredSender(senders, sender)
     fun ownsSender(sender: String): Boolean = configuredSender(sender) != null
 
     val currentPatterns: List<SavedMessagePattern>

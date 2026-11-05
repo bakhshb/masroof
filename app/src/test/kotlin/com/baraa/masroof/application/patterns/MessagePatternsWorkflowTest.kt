@@ -97,6 +97,18 @@ class MessagePatternsWorkflowTest {
         } finally { directory.deleteRecursively() }
     }
 
+    @Test fun aMessageFromAFoldEqualSenderIsTaughtUnderTheConfiguredSender() = runBlocking {
+        val directory = Files.createTempDirectory("masroof-teach-folded-").toFile()
+        try {
+            val w = MessagePatternsWorkflow(MessagePatternStore(directory.resolve("patterns.json")), DatabaseAccessGate())
+            w.saveBank(0, BankMessagePatterns("STC", listOf("STC Bank")))
+            val body = "Payment\nAmount:10SAR\nTo:SHOP"
+            val preview = w.teach(1, "STC", "STC BANK-AD", PatternOperation.PURCHASE, body, listOf(PatternBinding("amount", 15, 20)))
+            assertEquals("STC Bank", preview.pattern.sender)
+            assertNotNull(w.tryPreview(preview, "stc bank", body))
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun editingKeepsPatternIdentityAndHistoryButRequiresFreshFinancialApproval() = runBlocking {
         val directory = Files.createTempDirectory("masroof-edit-pattern-").toFile()
         try {

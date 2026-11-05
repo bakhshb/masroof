@@ -101,7 +101,8 @@ class MessagePatternsWorkflow(
         require(senders.all { SenderIdentity.key(it).isNotEmpty() })
         val existing = banks.singleOrNull { it.bankId == bankId }
         val others = banks.filter { it.bankId != bankId }
-        require(senders.filterNot { existing?.ownsSender(it) == true }.none { sender -> others.any { it.ownsSender(sender) } }) {
+        require(senders.filterNot { existing?.ownsSender(it) == true }.none { sender ->
+            others.any { other -> other.senders.any { SenderIdentity.overlap(it, sender) } } }) {
             "Sender belongs to another bank"
         }
     }
@@ -146,7 +147,7 @@ class MessagePatternsWorkflow(
             val (pattern, fixed) = runCatching { build(bindings + auto) to emptyList<PatternBinding>() }
                 .getOrElse { if (auto.isEmpty()) throw it else build(bindings) to auto }
             PatternTeachingPreview(configuration.generation, pattern,
-                requireNotNull(pattern.copy(enabled = true).preview(bankId, sender, body)).fields.displayFields(),
+                requireNotNull(pattern.copy(enabled = true).preview(bankId, configured, body)).fields.displayFields(),
                 fixed.map { PatternText(body.substring(it.start, it.end), it.start, it.end) }, body)
         }
     }
@@ -166,7 +167,9 @@ class MessagePatternsWorkflow(
     }
 
     suspend fun tryPreview(preview: PatternTeachingPreview, sender: String, body: String) = withContext(ioDispatcher) {
-        preview.pattern.copy(enabled = true).preview(preview.bankId, sender, body)?.fields?.displayFields()
+        // A sample from a fold-equal sender (ALJAZIRA for AlJazira) is read under the pattern's configured sender.
+        val configured = if (SenderIdentity.names(preview.pattern.sender, sender)) preview.pattern.sender else sender
+        preview.pattern.copy(enabled = true).preview(preview.bankId, configured, body)?.fields?.displayFields()
     }
 
     suspend fun saveTeaching(preview: PatternTeachingPreview): com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration {

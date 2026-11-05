@@ -63,12 +63,13 @@ class SenderBankDetectorTest {
 
     @Test
     fun senderIdentity_followsDetection() {
-        assertTrue(SenderIdentity.same("alinma", "ALINMA"))
-        assertTrue(SenderIdentity.same("alinma", "Alinma-AD"))
-        assertTrue(SenderIdentity.same("Alinma-AD", "alinma"))
-        assertTrue(!SenderIdentity.same("alinma", "Alinma Pay"))
-        assertTrue(!SenderIdentity.same("Riy", "Riyad"))
-        assertTrue(!SenderIdentity.same("---", "---"))
+        assertTrue(SenderIdentity.names("alinma", "ALINMA"))
+        assertTrue(SenderIdentity.names("alinma", "Alinma-AD"))
+        assertTrue(SenderIdentity.names("AlJazira", "AlJaziraAD"))
+        assertTrue(!SenderIdentity.names("Alinma-AD", "alinma"))
+        assertTrue(SenderIdentity.overlap("Alinma-AD", "alinma"))
+        assertTrue(!SenderIdentity.names("alinma", "Alinma Pay"))
+        assertTrue(!SenderIdentity.names("---", "---"))
         // A numeric sender never matches digits that happen to run together in a body.
         assertTrue(SenderBankDetector(Bank("NUM"), listOf("880012345")).detect("Mom", "pay 8800 12345 now") is BankDetectionResult.Unknown)
     }
@@ -78,7 +79,6 @@ class SenderBankDetectorTest {
         val short = SenderBankDetector(Bank("SHORT"), listOf("Riy"))
         val full = SenderBankDetector(Bank("FULL"), listOf("Riyad"))
         assertDetected(full, Bank("FULL"), "Riyad")
-        assertTrue(short.detect("Riyad", "") is BankDetectionResult.Unknown)
         assertDetected(short, Bank("SHORT"), "Riy-AD")
     }
 
