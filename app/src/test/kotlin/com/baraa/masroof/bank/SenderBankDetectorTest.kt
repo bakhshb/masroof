@@ -46,13 +46,25 @@ class SenderBankDetectorTest {
     }
 
     @Test
-    fun plausibleSender_isSuspectedWithoutClaimingTheBank() {
+    fun plausibleSenderOrBody_isSuspectedWithoutClaimingTheBank() {
         listOf("NotAlJazira", "AlJaziraX", "AlJaziraBanks", "NotAlJaziraBank").forEach { sender ->
             assertTrue("$sender should be Suspected", aljazira.detect(sender, "hello") is BankDetectionResult.Suspected)
         }
-        // A message that only mentions a bank is someone else's SMS: it is never stored or reviewed as bank evidence.
-        assertTrue(aljazira.detect("Mom", "تحويل عبر بنك الجزيرة بمبلغ 10") is BankDetectionResult.Unknown)
-        assertTrue(aljazira.detect("Jarir", "خصم مع بطاقات البنك الأهلي السعودي") is BankDetectionResult.Unknown)
+        assertTrue(aljazira.detect("Mom", "تحويل عبر بنك الجزيرة بمبلغ 10") is BankDetectionResult.Suspected)
+        assertTrue(aljazira.detect("Mom", "Paid with Bank AlJazira card") is BankDetectionResult.Suspected)
+        assertTrue(aljazira.detect("Mom", "See you at 6") is BankDetectionResult.Unknown)
+        val alinma = SenderBankDetector(Bank("BANK_ALINMA"), listOf("alinma"), "مصرف الإنماء")
+        assertTrue(alinma.detect("Mom", "حوالة من مصرف الانماء") is BankDetectionResult.Suspected)
+        // A short name never matches inside ordinary words.
+        val sab = SenderBankDetector(Bank("BANK_SAB"), listOf("SAB"), "ساب")
+        assertTrue(sab.detect("Mom", "hasab sabah") is BankDetectionResult.Unknown)
+    }
+
+    @Test
+    fun sameSender_followsDetection() {
+        assertTrue(SenderBankDetector.sameSender("alinma", "ALINMA"))
+        assertTrue(SenderBankDetector.sameSender("alinma", "Alinma-AD"))
+        assertTrue(!SenderBankDetector.sameSender("alinma", "Alinma Pay"))
     }
 
     @Test

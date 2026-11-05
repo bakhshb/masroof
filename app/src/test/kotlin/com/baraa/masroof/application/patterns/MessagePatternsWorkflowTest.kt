@@ -35,7 +35,7 @@ class MessagePatternsWorkflowTest {
             store.saveBank(0, BankMessagePatterns("BANK_ALINMA", listOf("alinma"), "Alinma"))
             val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate())
             val generation = store.load().generation
-            for (sender in listOf("ALINMA", "Al-inma")) {
+            for (sender in listOf("ALINMA", "Al-inma", "Alinma-AD", "---")) {
                 assertThrows(IllegalArgumentException::class.java) { runBlocking { workflow.addBank(generation, "Mine", sender) } }
             }
             workflow.addBank(generation, "Mine", "Alinma Pay")
