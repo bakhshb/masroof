@@ -92,6 +92,9 @@ class TransactionRestoreService(
                 logRestore(rawSmsId, result.transaction.id, newType)
                 RestoreResult.Success(result.transaction)
             }
+            // A failed write leaves the posted row and the financial decision in place; the user can pick the type again.
+            is ReclassificationResult.Rejected if result.reason == ReclassificationResult.UPDATE_FAILED ->
+                RestoreResult.Rejected(result.reason)
             is ReclassificationResult.Rejected -> {
                 val rollbackReason = rollbackToIgnored(review.id, rawSmsId)
                 RestoreResult.Rejected(rollbackReason ?: result.reason)

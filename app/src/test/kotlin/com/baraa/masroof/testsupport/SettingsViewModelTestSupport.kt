@@ -42,6 +42,7 @@ internal object SettingsViewModelTestSupport {
         reviewRepository: ReviewRepository = emptyReviewRepository(),
         financialTransactionRepository: FinancialTransactionRepository = emptyFinancialTransactionRepository(),
         clock: InstantClock = InstantClock.System,
+        reclassificationEvents: ParsedEventRepository = emptyParsedEventRepository(),
     ): TransactionRestoreService {
         val ownershipResolver = OwnershipResolver(
             accountRegistry = emptyAccountRegistry(),
@@ -60,7 +61,7 @@ internal object SettingsViewModelTestSupport {
             reclassification = TransactionReclassificationService(
                 financialTransactionRepository = financialTransactionRepository,
                 effectiveParsedEventProvider = EffectiveParsedEventProvider(
-                    parsedEventRepository = emptyParsedEventRepository(),
+                    parsedEventRepository = reclassificationEvents,
                     userCorrectionRepository = emptyUserCorrectionRepository(),
                 ),
                 ownershipResolver = ownershipResolver,

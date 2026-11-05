@@ -19,6 +19,10 @@ sealed interface ReclassificationResult {
     data class Success(val transaction: FinancialTransaction) : ReclassificationResult
 
     data class Rejected(val reason: String) : ReclassificationResult
+
+    companion object {
+        const val UPDATE_FAILED = "update_failed"
+    }
 }
 
 /**
@@ -136,7 +140,7 @@ class TransactionReclassificationService(
         catch(e: kotlinx.coroutines.CancellationException) { throw e }
         catch(_: Exception) { false }
         if (!saved) {
-            return ReclassificationResult.Rejected("update_failed")
+            return ReclassificationResult.Rejected(ReclassificationResult.UPDATE_FAILED)
         }
         // Only a saved repayment may mark its loan owned. The repayment is already saved, so a failed
         // confirmation leaves the loan for the user to confirm instead of reporting the save as failed.
