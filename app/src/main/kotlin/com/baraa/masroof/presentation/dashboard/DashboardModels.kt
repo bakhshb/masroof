@@ -2,6 +2,7 @@ package com.baraa.masroof.presentation.dashboard
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.baraa.masroof.R
+import com.baraa.masroof.application.dashboard.DashboardSalaryPeriod
 import com.baraa.masroof.application.dashboard.BankHierarchyOverview
 import com.baraa.masroof.application.dashboard.CommitmentsOverview
 import com.baraa.masroof.application.dashboard.CreditFacilitiesOverview
@@ -17,7 +18,6 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.period.FinancialPeriod
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -88,7 +88,7 @@ data class DashboardUiState(
     val transactionListQuery: TransactionListFilterState = TransactionListFilterState(),
     val transactionListProjection: TransactionListProjectionUi = TransactionListProjectionUi(),
     val loading: Boolean = true,
-    val period: FinancialPeriod? = null,
+    val period: DashboardSalaryPeriod? = null,
     val periodLabel: String = "",
     val periodAdjustmentHint: String? = null,
     val summary: MonthlyFinancialSummary? = null,

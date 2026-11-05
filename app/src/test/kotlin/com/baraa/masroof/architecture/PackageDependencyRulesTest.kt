@@ -111,29 +111,33 @@ class PackageDependencyRulesTest {
         )
     }
 
+    /** No import prefix: a fully qualified name used inline is caught too. */
     @Test
-    fun presentation_doesNotDependOnDataOrSmsOutsideTemporaryExceptions() {
+    fun presentation_doesNotDependOnInnerLayersOrPureEngines() {
         assertPackagesDoNotImport(
             packages = listOf("presentation"),
             forbiddenImports = listOf(
-                "import com.baraa.masroof.data.",
-                "import com.baraa.masroof.sms.",
+                "com.baraa.masroof.data.",
+                "com.baraa.masroof.sms.",
+                "com.baraa.masroof.engine.",
+                "com.baraa.masroof.bank.",
+                "com.baraa.masroof.parsing.",
+                "com.baraa.masroof.analytics.",
+                "com.baraa.masroof.ml.",
             ),
-            allowedFiles = emptySet(),
         )
     }
 
     @Test
-    fun presentation_doesNotUseDomainServicesOrPortsOutsideTemporaryExceptions() {
-        assertFilesDoNotImport(
-            files = kotlinFilesIn("presentation").filter { it.name.endsWith("ViewModel.kt") },
+    fun presentation_doesNotUseDomainServicesOrPorts() {
+        assertPackagesDoNotImport(
+            packages = listOf("presentation"),
             forbiddenImports = listOf(
-                "import com.baraa.masroof.domain.ownership.",
-                "import com.baraa.masroof.domain.period.",
-                "import com.baraa.masroof.domain.repository.",
-                "import com.baraa.masroof.domain.rules.",
+                "com.baraa.masroof.domain.ownership.",
+                "com.baraa.masroof.domain.period.",
+                "com.baraa.masroof.domain.repository.",
+                "com.baraa.masroof.domain.rules.",
             ),
-            allowedFiles = emptySet(),
         )
     }
 

@@ -23,7 +23,14 @@ data class AnalysisCommitmentsView(val confirmedTotal: Long, val confirmedCount:
 }
 data class AnalysisCompositionPart(val group: com.baraa.masroof.application.dashboard.AnalysisSpendingGroup, val percent: Int, val share: Float)
 
+/** A spending observation as the analysis screens show it. */
+typealias AnalysisSpendingObservation = com.baraa.masroof.analytics.SpendingObservation
+
 object AnalysisPresentationBuilder {
+    /** Personal-forecast readiness targets, shown as progress. */
+    const val MIN_PERSONAL_DAYS = com.baraa.masroof.analytics.PurchaseForecaster.MIN_PERSONAL_DAYS
+    const val MIN_PERSONAL_PERIODS = com.baraa.masroof.analytics.PurchaseForecaster.MIN_PERSONAL_PERIODS
+
     fun forecast(snapshot: AnalysisSnapshot): ForecastExplanation {
         val method = when {
             snapshot.quality.blocked || snapshot.status != "READY" || snapshot.total == null -> ForecastMethod.UNAVAILABLE

@@ -11,7 +11,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import com.baraa.masroof.R
 import com.baraa.masroof.application.analytics.*
-import com.baraa.masroof.analytics.SpendingObservation
 import com.baraa.masroof.application.locale.AppDigits
 import com.baraa.masroof.presentation.common.*
 import com.baraa.masroof.presentation.common.MasroofText as Text
@@ -44,7 +43,7 @@ internal fun fraction(value: Long, maximum: Long) = com.baraa.masroof.ui.compone
     }
 }
 
-@Composable internal fun AnalysisSpendingObservationBars(observation: SpendingObservation) {
+@Composable internal fun AnalysisSpendingObservationBars(observation: AnalysisSpendingObservation) {
     val maximum = maxOf(observation.amount, observation.reference)
     MasroofValueBarRow(stringResource(R.string.personal_spending_payment), visualMoney(observation.amount),
         fraction(observation.amount, maximum), Modifier.testTag("spending-observation-current-${observation.id}"),

@@ -121,8 +121,9 @@ import java.time.ZoneId
 }
 
 /** Original and analytics rows share one list/card. Analytics read state remains in its existing store. */
-@Composable fun AnalysisNotificationContent(state: NotificationCenterUiState, analysis: AnalysisUiState, alerts: List<com.baraa.masroof.data.analytics.AnalysisAlertRow>,
+@Composable fun AnalysisNotificationContent(state: NotificationCenterUiState, analysis: AnalysisUiState, now: Long,
     modifier: Modifier, originalRow: @Composable (NotificationItem, Boolean) -> Unit) {
+    val alerts = remember(analysis, now) { visibleAnalysisAlerts(analysis, now) }
     // The original notification screen also renders independently in the design matrix.
     // Only expose analysis actions when its workflow is supplied by the app root.
     val workflow = LocalAnalyticsWorkflow.current

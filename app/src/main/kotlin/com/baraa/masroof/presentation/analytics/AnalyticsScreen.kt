@@ -304,7 +304,7 @@ private fun statusRes(state: AnalysisUiState): Pair<Int, Int?> {
 @Composable fun unreadAnalysisAlerts(workflow: AnalyticsWorkflow?): Int {
     if (workflow == null) return 0
     val state by workflow.state.collectAsState()
-    return visibleAnalysisAlerts(state, currentAnalysisTime()).count { !it.read }
+    return unreadAnalysisAlertCount(state, currentAnalysisTime())
 }
 
 @Composable private fun SpendingTab(state: AnalysisUiState, range: Int, onRangeChanged: (Int) -> Unit,

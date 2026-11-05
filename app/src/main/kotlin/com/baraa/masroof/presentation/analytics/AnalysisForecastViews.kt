@@ -1,6 +1,5 @@
 package com.baraa.masroof.presentation.analytics
 
-import com.baraa.masroof.analytics.PurchaseForecaster
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
@@ -33,11 +32,11 @@ import java.time.LocalDate
 @Composable internal fun PersonalReadinessRings(snapshot: AnalysisSnapshot) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
         snapshot.quality.consecutiveCompleteDays?.let { count ->
-            com.baraa.masroof.ui.components.MasroofProgressRing(fraction(count.toLong(), PurchaseForecaster.MIN_PERSONAL_DAYS.toLong()),
-                AppDigits.display(stringResource(R.string.analysis_progress, count, PurchaseForecaster.MIN_PERSONAL_DAYS)), stringResource(R.string.analysis_personal_days))
+            com.baraa.masroof.ui.components.MasroofProgressRing(fraction(count.toLong(), AnalysisPresentationBuilder.MIN_PERSONAL_DAYS.toLong()),
+                AppDigits.display(stringResource(R.string.analysis_progress, count, AnalysisPresentationBuilder.MIN_PERSONAL_DAYS)), stringResource(R.string.analysis_personal_days))
         }
-        com.baraa.masroof.ui.components.MasroofProgressRing(fraction(snapshot.completedPeriods.toLong(), PurchaseForecaster.MIN_PERSONAL_PERIODS.toLong()),
-            AppDigits.display(stringResource(R.string.analysis_progress, snapshot.completedPeriods, PurchaseForecaster.MIN_PERSONAL_PERIODS)),
+        com.baraa.masroof.ui.components.MasroofProgressRing(fraction(snapshot.completedPeriods.toLong(), AnalysisPresentationBuilder.MIN_PERSONAL_PERIODS.toLong()),
+            AppDigits.display(stringResource(R.string.analysis_progress, snapshot.completedPeriods, AnalysisPresentationBuilder.MIN_PERSONAL_PERIODS)),
             stringResource(R.string.analysis_personal_periods), color = com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.card)
     }
 }
@@ -127,8 +126,8 @@ import java.time.LocalDate
                 explanation.anchorDay?.let { MasroofTimelineRow(AppDigits.display(stringResource(R.string.analysis_anchor_date, day(it))), "",
                     active = explanation.status != ForecastComparisonStatus.WAITING_FOR_ANCHOR) }
                 state.snapshot?.let { s -> MasroofTimelineRow(stringResource(R.string.analysis_personal_readiness),
-                    AppDigits.display(listOfNotNull(s.quality.consecutiveCompleteDays?.let { stringResource(R.string.analysis_progress, it, PurchaseForecaster.MIN_PERSONAL_DAYS) },
-                        stringResource(R.string.analysis_progress, s.completedPeriods, PurchaseForecaster.MIN_PERSONAL_PERIODS)).joinToString(" · ")),
+                    AppDigits.display(listOfNotNull(s.quality.consecutiveCompleteDays?.let { stringResource(R.string.analysis_progress, it, AnalysisPresentationBuilder.MIN_PERSONAL_DAYS) },
+                        stringResource(R.string.analysis_progress, s.completedPeriods, AnalysisPresentationBuilder.MIN_PERSONAL_PERIODS)).joinToString(" · ")),
                     active = s.method != "WEEKDAY_MEDIAN") }
                 val reason = when (explanation.status) {
                     ForecastComparisonStatus.AWAITING_ELIGIBLE_FORECAST -> R.string.analysis_wait_eligible

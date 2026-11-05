@@ -96,6 +96,8 @@ internal fun purchasePeriodHistory(data: CleanData, currentStart: Long): List<An
 fun visibleAnalysisAlerts(state: AnalysisUiState, now: Long): List<com.baraa.masroof.data.analytics.AnalysisAlertRow> =
     state.alerts.filter { !it.resolved && it.snoozedUntil <= now }.sortedByDescending { it.observedAt }
 
+fun unreadAnalysisAlertCount(state: AnalysisUiState, now: Long): Int = visibleAnalysisAlerts(state, now).count { !it.read }
+
 /** The id of this due's DUE alert, `due:<id>:<day>`; the one place the format is built. */
 val AnalysisDue.alertId: String get() = "due:$id:$day"
 
