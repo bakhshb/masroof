@@ -13,9 +13,6 @@ package com.baraa.masroof.application.transaction
 object ReconciliationCompletionPolicy {
     fun isComplete(report: ReconciliationReport): Boolean = report.summary.failed == 0
 
-    /** Failed operations in [report]; 0 exactly when [isComplete]. */
-    fun failureCount(report: ReconciliationReport): Int = if (isComplete(report)) 0 else report.summary.failed
-
     /**
      * Nonthrowing incomplete result for [report], or null when the pass is complete.
      * [maskedRawSmsId] must already be masked; this type never stores a raw identifier
