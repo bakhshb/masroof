@@ -155,8 +155,7 @@ internal fun fraction(value: Long, maximum: Long) = com.baraa.masroof.ui.compone
             (if (showAll) merchants else merchants.take(5)).forEach { group ->
                 MasroofValueBarRow(AppDigits.display(group.name.orEmpty()), visualMoney(group.amount), fraction(group.amount, merchants.first().amount),
                     modifier = Modifier.testTag("analysis-merchant-${group.key}"),
-                    subtitle = AppDigits.display(stringResource(R.string.analysis_merchant_count, group.ids.size) + " · " + spendingCategoryName(group.category)),
-                    onClick = { onOpenGroup(group.key) },
+                    subtitle = AppDigits.display(stringResource(R.string.analysis_merchant_count, group.ids.size)), onClick = { onOpenGroup(group.key) },
                     style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
             }
         }

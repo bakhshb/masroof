@@ -48,32 +48,4 @@ class AnalysisSpendingInsightsBuilderTest {
         assertEquals(listOf("now"), change.group.ids); assertEquals(listOf("old"), change.previousIds)
         assertEquals(1500L, change.delta)
     }
-
-    @Test fun categoriesGuessFromTheMerchantAndTheUsersLatestChoiceWinsForTheWholeMerchant() {
-        val rows = listOf(fact("k1", 31, 4000, merchant = "Keeta"), fact("k2", 32, 2000, merchant = "KEETA "),
-            fact("p", 33, 3000, merchant = "PANDA 100"), fact("x", 33, 500, merchant = "TEST CO"),
-            fact("cash", 33, 9000, "CASH"), fact("r", 34, -1000, "REFUNDS", merchant = "PANDA 100"))
-        val guessed = build(rows).categories.associate { it.category to it.amount }
-        assertEquals(mapOf("FOOD_DELIVERY" to 6000L, "GROCERIES" to 2000L, "OTHER" to 500L), guessed)
-        // An older choice on one row is replaced by a newer one; a new row without a choice follows the merchant.
-        val chosen = build(rows.map { when (it.id) { "k1" -> it.copy(category = "GROCERIES"); "k2" -> it.copy(category = "RESTAURANTS"); else -> it } } +
-            fact("k3", 35, 100, merchant = "Keeta")).categories.associate { it.category to it.amount }
-        assertEquals(mapOf("RESTAURANTS" to 6100L, "GROCERIES" to 2000L, "OTHER" to 500L), chosen)
-        assertEquals("RESTAURANTS", build(rows.map { if (it.id == "k2") it.copy(category = "RESTAURANTS") else it })
-            .merchants.first { it.name?.trim().equals("keeta", ignoreCase = true) }.category)
-        // An unknown stored value (from a newer or older build) is ignored, not trusted.
-        assertEquals(6000L, build(rows.map { if (it.id == "k1") it.copy(category = "RETIRED") else it })
-            .categories.first { it.category == "FOOD_DELIVERY" }.amount)
-        assertTrue(build(rows).categories.all { it.key == "category:${it.category}" && it.amount > 0 })
-    }
-
-    @Test fun aChoiceOlderThanTheAnalysisWindowStillAppliesToNewRows() {
-        val rows = listOf(fact("k", 31, 4000, merchant = "Keeta"))
-        val old = AnalysisSpendingFact("choice:0", -400, 0, "CHOICE", "keeta", "RESTAURANTS")
-        val result = AnalysisSpendingInsightsBuilder.build(rows, 30, 35, 0, 30, (0L..35L).toSet(), listOf(old))
-        assertEquals(mapOf("RESTAURANTS" to 4000L), result.categories.associate { it.category to it.amount })
-        // Choices only resolve categories; they never add money or rows.
-        assertEquals(4000L, result.components.sumOf { it.amount })
-        assertFalse(result.categories.flatMap { it.ids }.contains("choice:0"))
-    }
 }

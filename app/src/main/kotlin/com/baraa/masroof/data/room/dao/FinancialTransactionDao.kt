@@ -77,12 +77,6 @@ interface FinancialTransactionDao {
     suspend fun listAll(): List<FinancialTransactionEntity>
 
     @Query(
-        "SELECT COALESCE(merchant, counterparty) AS merchant, categoryId, occurredAtEpochMillis FROM financial_transaction " +
-            "WHERE categoryId IS NOT NULL AND COALESCE(merchant, counterparty) IS NOT NULL ORDER BY occurredAtEpochMillis, id",
-    )
-    suspend fun listCategoryChoices(): List<CategoryChoiceRow>
-
-    @Query(
         """
         SELECT * FROM financial_transaction
         WHERE type IN (:types)
@@ -322,6 +316,3 @@ interface FinancialTransactionDao {
         ) : SaveAtomicOutcome
     }
 }
-
-/** Projection of a stored user category choice; no schema change. */
-data class CategoryChoiceRow(val merchant: String, val categoryId: String, val occurredAtEpochMillis: Long)

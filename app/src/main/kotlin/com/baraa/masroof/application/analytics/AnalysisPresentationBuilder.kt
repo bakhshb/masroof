@@ -69,13 +69,8 @@ object AnalysisPresentationBuilder {
     }
 
     /** Positive spending components as shares of their sum; refunds stay a separate, subtracted line. */
-    fun composition(snapshot: AnalysisSnapshot): List<AnalysisCompositionPart> = shares(snapshot.insights?.components.orEmpty())
-
-    /** Spending categories (purchases net of refunds) as shares of their sum, largest first. */
-    fun categories(snapshot: AnalysisSnapshot): List<AnalysisCompositionPart> = shares(snapshot.insights?.categories.orEmpty())
-
-    private fun shares(groups: List<com.baraa.masroof.application.dashboard.AnalysisSpendingGroup>): List<AnalysisCompositionPart> {
-        val parts = groups.filter { it.amount > 0 }
+    fun composition(snapshot: AnalysisSnapshot): List<AnalysisCompositionPart> {
+        val parts = snapshot.insights?.components.orEmpty().filter { it.amount > 0 }
         val total = parts.fold(0L) { sum, part -> Math.addExact(sum, part.amount) }
         if (total <= 0) return emptyList()
         return parts.map { part ->

@@ -319,7 +319,6 @@ private fun statusRes(state: AnalysisUiState): Pair<Int, Int?> {
     state.snapshot?.let { s ->
         if (range == 0) {
             AnalysisSpendingHero(s)
-            AnalysisCategoryCard(s, onOpenGroup)
             AnalysisSpendingExplanation(s, onOpenGroup)
             AnalysisMerchantCard(s, onOpenGroup, onViewAll = onMerchants)
             AnalysisChangeCard(s, onOpenGroup)

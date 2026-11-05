@@ -13,8 +13,7 @@ import com.baraa.masroof.application.dashboard.AnalysisSpendingGroup
 import com.baraa.masroof.presentation.common.*
 import com.baraa.masroof.presentation.common.MasroofText as Text
 
-@Composable internal fun spendingGroupName(group: AnalysisSpendingGroup): String = group.name ?:
-    if (group.key.startsWith("category:")) spendingCategoryName(group.category) else stringResource(when (group.key) {
+@Composable internal fun spendingGroupName(group: AnalysisSpendingGroup): String = group.name ?: stringResource(when (group.key) {
     "CASH" -> R.string.lab_analysis_component_cash
     "TRANSFERS" -> R.string.lab_analysis_component_transfers
     "REFUNDS" -> R.string.lab_analysis_component_refunds

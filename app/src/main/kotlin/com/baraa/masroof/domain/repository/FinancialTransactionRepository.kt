@@ -104,9 +104,6 @@ interface FinancialTransactionRepository {
 
     suspend fun isRawSmsLinked(rawSmsId: String): Boolean
 
-    /** Every stored spending-category choice across all history, oldest first. Read only by analysis. */
-    suspend fun listCategoryChoices(): List<StoredCategoryChoice> = emptyList()
-
     /** Stored transactions among [ids], in one batch lookup. Missing ids are omitted. */
     suspend fun getByIds(ids: Collection<String>): List<FinancialTransaction> =
         ids.distinct().mapNotNull { getById(it) }
@@ -185,6 +182,3 @@ sealed interface FinancialTransactionSaveResult {
         val existingTransactionId: String,
     ) : FinancialTransactionSaveResult
 }
-
-/** A user's spending category stored on one transaction, with the merchant name it was chosen for. */
-data class StoredCategoryChoice(val merchant: String, val categoryId: String, val occurredAt: Instant)

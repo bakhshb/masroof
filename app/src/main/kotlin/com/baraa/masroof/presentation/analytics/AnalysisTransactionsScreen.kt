@@ -25,7 +25,7 @@ import com.baraa.masroof.ui.theme.MasroofSpacing
     val insights = snapshot?.insights
     val comparison = insights?.comparison
     val change = comparison?.changes?.firstOrNull { "change:${it.group.key}" == selection }
-    val group = change?.group ?: (insights?.components.orEmpty() + insights?.merchants.orEmpty() + insights?.categories.orEmpty()).firstOrNull { it.key == selection }
+    val group = change?.group ?: (insights?.components.orEmpty() + insights?.merchants.orEmpty()).firstOrNull { it.key == selection }
     val title = observation?.merchant ?: group?.let { spendingGroupName(it) } ?: stringResource(R.string.transaction_detail_title)
     MasroofSecondaryScaffold(title, onBack, stringResource(R.string.lab_analysis_back)) { modifier ->
         Column(modifier.testTag("analysis-transactions").verticalScroll(rememberScrollState()),
@@ -64,8 +64,6 @@ import com.baraa.masroof.ui.theme.MasroofSpacing
                 }
             } else {
                 Text("${day(snapshot.periodStart)} — ${day(snapshot.periodEnd - 1)}", style = MaterialTheme.typography.bodySmall)
-                // Stays on screen while analysis refreshes, so a running save is never dropped with its sheet.
-                if (group.key.startsWith("merchant:") && !state.unavailable) MerchantCategoryEditor(group, workflow, enabled = !state.updating)
                 MasroofCard {
                     Amount(title, group.amount)
                     EvidenceGroup(group.ids, title, workflow, snapshot.sourceHash, onOpenTransaction, collapsible = false)
