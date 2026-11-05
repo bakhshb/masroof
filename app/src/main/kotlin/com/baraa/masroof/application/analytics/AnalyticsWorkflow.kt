@@ -237,7 +237,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val committed = read.committed
             val decisions = store.analytics().candidates().filter { it.status != "SUGGESTED" }.sortedBy { it.id }.map { it.id to it.status }
             val feedback = store.analytics().feedback().joinToString { "${it.seriesKey}:${it.kind}:${it.decidedAt}:${hash(it.payload)}" }
-            val canonical = "continuous-learning-v1|${RecurringLearningWorkflow.version}|${ForecastPerformancePolicy.VERSION}|${AnalyticsVersion.EVALUATION}|${AnalyticsVersion.MODEL}|${AnalyticsVersion.FEATURES}|${clean.fingerprint}|$dues|${committed.sorted()}|$blocked|${current.summary.reviewRequiredCount}|${period.startDate}|$prefs|$decisions|$feedback|${read.committedCadences}|${clock.millis() / SIX_HOURS_MS}"
+            val canonical = "continuous-learning-v1|${RecurringDecisionWorkflow.version}|${ForecastPerformancePolicy.VERSION}|${AnalyticsVersion.EVALUATION}|${AnalyticsVersion.MODEL}|${AnalyticsVersion.FEATURES}|${clean.fingerprint}|$dues|${committed.sorted()}|$blocked|${current.summary.reviewRequiredCount}|${period.startDate}|$prefs|$decisions|$feedback|${read.committedCadences}|${clock.millis() / SIX_HOURS_MS}"
             return Source(clean, period.startDate.toEpochDay(), period.endDateExclusive.toEpochDay(), todayDay, completed,
                 dues, committed, current.summary.reviewRequiredCount, blocked, hash(canonical), reasons, insights, read.committedCadences)
     }
@@ -267,7 +267,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
                 } else row
             }
         }
-        val patterns = RecurringLearningWorkflow.build(input.clean.recurring, feedback, input.today, input.committedCadences)
+        val patterns = RecurringDecisionWorkflow.build(input.clean.recurring, feedback, input.today, input.committedCadences)
         val priorCandidates = dao.candidates().associateBy { it.id }
         val legacy = priorCandidates.values.filter { it.status != "SUGGESTED" }.mapNotNull { row ->
             runCatching { json.decodeFromString<AnalysisCandidate>(row.payload) }.getOrNull()?.takeIf { it.seriesKey == null }?.let { row to it }
@@ -276,7 +276,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             AnalysisCandidate(pattern.key, pattern.name, pattern.estimate, pattern.lower, pattern.upper, pattern.nextDay,
                 pattern.cadence, pattern.sourceIds, input.clean.recurring.first { it.id == pattern.sourceIds.last() }.day,
                 pattern.latestAmount, pattern.referenceAmount, pattern.amountIncreased, pattern.nextDay < input.today,
-                pattern.seriesKey, pattern.origin, pattern.modelVersion)
+                pattern.seriesKey, pattern.origin)
         }
         fun status(item: AnalysisCandidate) = priorCandidates[item.key]?.status ?: legacy.firstOrNull { (_, old) -> old.sourceIds.any { it in item.sourceIds } }?.first?.status
         val suggested = candidates.filter { item -> item.sourceIds.none { it in input.committed } && status(item) !in setOf("ACCEPTED", "REJECTED") }

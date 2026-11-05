@@ -13,7 +13,7 @@ data class RecurringPrediction(val label: RecurringLabel, val origin: String = "
 data class RecurringPattern(val key: String, val name: String, val cadence: String, val nextDay: Long,
     val estimate: Long, val lower: Long, val upper: Long, val sourceIds: List<String>,
     val latestAmount: Long, val referenceAmount: Long?, val amountIncreased: Boolean,
-    val seriesKey: String = "", val origin: String = "RULES", val modelVersion: String? = null)
+    val seriesKey: String = "", val origin: String = "RULES")
 
 data class RecurringSeries(val key: String, val rows: List<FinancialFact>) {
     val dates = rows.takeLast(6).map { LocalDate.ofEpochDay(it.day) }

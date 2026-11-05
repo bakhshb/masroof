@@ -46,10 +46,13 @@ class BankInterpretationService(
     // Templates of pending messages in banks other than the seed bank that learned decisions would now change.
     @Volatile private var assistable: Set<String> = emptySet()
     @Volatile private var seedRead: Set<String> = emptySet()
+    // Messages hidden by a remembered "not financial" that the current decisions no longer hide.
+    @Volatile private var revoked: Set<String> = emptySet()
+    fun revokedMemories(): Set<String> = revoked
     @Volatile private var synchronizedDecisions: String? = null
     @Volatile private var pendingFeedback = false
     private data class Attempt(val bank: String, val classifier: FamilyClassifier?, var requested: Boolean = false,
-        var outcome: String = "RULES")
+        var outcome: String = "RULES", var suggestion: FamilySuggestion? = null)
     private val attempt = ThreadLocal<Attempt>()
     private fun engine() = PatternFactInterpreter.of(patterns())
     private val familyAssist = FamilyAssist { input,title ->
@@ -57,6 +60,7 @@ class BankInterpretationService(
         trace?.requested = true
         val features = FamilyAssistBridge.clean(input.body).features
         val result = trace?.let { FamilyAssistBridge.suggest(it.classifier,it.bank,input.body,title) }
+        trace?.suggestion = result
         trace?.outcome = when {
             trace?.classifier == null -> "FEEDBACK_PENDING"
             features == null -> "CLEANING_REJECTED"
@@ -91,8 +95,9 @@ class BankInterpretationService(
         val activeModel = trace.classifier?.version
         attempt.set(trace)
         val ruled = try { snapshot.interpretRouted(input,BankId(bankId),familyAssist) } finally { attempt.remove() }
-        val result = if (ruled.facts.family != MessageFamily.UNKNOWN) ruled else
-            FamilyAssistBridge.rememberNonFinancial(ruled, FamilyAssistBridge.suggest(trace.classifier, bankId, input.body,
+        // Role rules may already have asked for this message's family; reuse that answer.
+        val result = if (ruled.facts.family != MessageFamily.UNKNOWN) ruled else FamilyAssistBridge.rememberNonFinancial(ruled,
+            if (trace.requested) trace.suggestion else FamilyAssistBridge.suggest(trace.classifier, bankId, input.body,
                 FamilyTextPreparation.prepare(input.body).title)).also { if (it !== ruled) { trace.requested = true; trace.outcome = "SUGGESTED" } }
         val interpretedAt = System.currentTimeMillis()
         // Advisory audit writes never decide whether a transaction may be posted.
@@ -291,8 +296,11 @@ class BankInterpretationService(
         seedRead = records.filter { it.event.bank.id == SEED_BANK && it.event.messageFamily.name == "UNKNOWN" &&
             store.history(it.event.rawSmsId).lastOrNull()?.activeModelVersion == models[SEED_BANK]?.version }
             .map { it.event.rawSmsId }.toSet()
+        val remembered = parsed.listRememberedNonFinancial()
+        revoked = FamilyAssistBridge.revokedMemories(remembered,
+            raw.getByIds(remembered.map { it.event.rawSmsId }.toSet()).associate { it.id to it.body }, models)
         val needs = refreshFilter()
-        val pending = records.any { needs(it) && mayRefresh(it.event.rawSmsId) }
+        val pending = records.any { needs(it) && mayRefresh(it.event.rawSmsId) } || revoked.any { mayRefresh(it) }
         if (pending) ModelRefreshWorker.enqueue(context, version)
     }
     fun needsRefresh(record: com.baraa.masroof.parsing.repository.ParsedEventRecord): Boolean = refreshFilter()(record)
@@ -308,6 +316,7 @@ class BankInterpretationService(
     }
     private fun needsRefresh(record: com.baraa.masroof.parsing.repository.ParsedEventRecord, rules: Lazy<String>,
         read: Set<String>): Boolean {
+        if (record.event.rawSmsId in revoked) return true
         // Successful facts resume derived work.
         if (record.event.parseStatus.name == "SUCCESS") return false
         val bank = record.event.bank.id

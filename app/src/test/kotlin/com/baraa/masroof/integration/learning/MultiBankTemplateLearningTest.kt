@@ -77,6 +77,31 @@ class MultiBankTemplateLearningTest {
                 label.copy(rawId = "raw-2", decisionId = "decision-2", family = SmsFamilyLabel.PURCHASE, provenance = "USER_MESSAGE_FAMILY")))))
             val other = "عرض حصري آخر لعملائنا\nاستمتع بمزايا البطاقة"
             assertNull(bank, FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, other, FamilyTextPreparation.prepare(other).title))
+            // A message with a transaction amount stays reviewable even with the remembered wording.
+            val withAmount = ruled.copy(facts = ruled.facts.copy(amount = com.baraa.masroof.finance.value.Money.of("250",
+                com.baraa.masroof.finance.value.Currency.SAR)))
+            assertSame(bank, withAmount, FamilyAssistBridge.rememberNonFinancial(withAmount,
+                FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, body, FamilyTextPreparation.prepare(body).title)))
         }
+    }
+
+    /** A hidden copy goes back to review once the remembered decision no longer holds, and only then. */
+    @Test fun aContradictedMemoryReturnsItsHiddenMessagesToReview() {
+        val bank = "BANK_STC"
+        val body = "عرض حصري لعملائنا الكرام\nاستمتع بمزايا البطاقة الجديدة"
+        val features = requireNotNull(FamilyAssistBridge.clean(body).features)
+        val ignored = HumanFamilyLabel(bank, "raw-1", "decision-1", SmsFamilyLabel.NON_FINANCIAL, features.template,
+            features.terms, 1, "USER_NON_FINANCIAL")
+        val hidden = com.baraa.masroof.parsing.repository.ParsedEventRecord(com.baraa.masroof.domain.model.ParsedEvent(
+            "evt-hidden", "hidden", Bank.fromId(bank), com.baraa.masroof.domain.model.MessageFamily.NON_FINANCIAL, null, null,
+            null, null, null, null, null, null, null, null, com.baraa.masroof.domain.model.Confidence(1.0,
+                listOf("family_origin:HUMAN_TEMPLATE")), com.baraa.masroof.domain.model.ParseStatus.REVIEW_REQUIRED),
+            com.baraa.masroof.parsing.model.ParsedEventDetails())
+        val bodies = mapOf("hidden" to body)
+        assertTrue(FamilyAssistBridge.revokedMemories(listOf(hidden), bodies, mapOf(bank to FamilyClassifier(bank, listOf(ignored)))).isEmpty())
+        val contradicted = FamilyClassifier(bank, listOf(ignored, ignored.copy(rawId = "raw-2", decisionId = "decision-2",
+            family = SmsFamilyLabel.PURCHASE, provenance = "USER_MESSAGE_FAMILY")))
+        assertEquals(setOf("hidden"), FamilyAssistBridge.revokedMemories(listOf(hidden), bodies, mapOf(bank to contradicted)))
+        assertEquals(setOf("hidden"), FamilyAssistBridge.revokedMemories(listOf(hidden), bodies, emptyMap()))
     }
 }

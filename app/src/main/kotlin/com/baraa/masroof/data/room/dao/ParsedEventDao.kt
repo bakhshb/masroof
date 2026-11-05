@@ -140,6 +140,9 @@ interface ParsedEventDao {
     )
     suspend fun listRawSmsIdsReferencingLoan(bankId: String, loanType: String): List<String>
 
+    @Query("SELECT * FROM parsed_event WHERE messageFamily = 'NON_FINANCIAL' AND confidenceReasons LIKE '%family_origin:%' ORDER BY id")
+    suspend fun listRememberedNonFinancial(): List<ParsedEventEntity>
+
     @Query("SELECT * FROM parsed_event WHERE cardSmsChannel = 'STATEMENT' ORDER BY id")
     suspend fun listCardStatementFacts(): List<ParsedEventEntity>
 

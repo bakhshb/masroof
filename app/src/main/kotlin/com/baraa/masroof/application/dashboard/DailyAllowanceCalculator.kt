@@ -8,7 +8,7 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /**
- * [left] is this period's money in minus money out minus unpaid commitments (negative when overspent);
+ * [left] is this period's money in minus money out minus unpaid commitments due from today on (negative when overspent);
  * [perDay] spreads what is left over the [days] until the next salary, today included, never below zero.
  */
 data class DailyAllowance(val perDay: Money, val left: SignedMoneyAmount, val days: Long, val unpaidCommitments: Money)
@@ -19,7 +19,10 @@ object DailyAllowanceCalculator {
     fun calculate(net: SignedMoneyAmount?, commitments: CommitmentsOverview, period: FinancialPeriod, today: LocalDate): DailyAllowance? {
         net ?: return null
         if (today < period.startDate || today >= period.endDateExclusive) return null
-        val dues = commitments.remaining.takeIf { it.currency == net.currency } ?: return null
+        // Overdue rows are left out: a payment that was made but not matched already lowered [net].
+        val upcoming = commitments.upcomingUnpaid.filter { it.expectedDate == null || it.expectedDate >= today }
+        if (upcoming.any { it.amount.currency != net.currency }) return null
+        val dues = upcoming.fold(Money.zero(net.currency)) { sum, row -> sum + row.amount }
         val days = ChronoUnit.DAYS.between(today, period.endDateExclusive)
         val left = net.amount.subtract(dues.amount)
         val perDay = left.max(BigDecimal.ZERO).divide(BigDecimal.valueOf(days), Money.SCALE, RoundingMode.DOWN)

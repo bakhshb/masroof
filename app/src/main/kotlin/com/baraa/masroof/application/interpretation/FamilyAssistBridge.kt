@@ -9,6 +9,7 @@ import com.baraa.masroof.engine.bank.interpretation.FamilyOrigin
 import com.baraa.masroof.engine.bank.interpretation.FamilySuggestion
 import com.baraa.masroof.engine.bank.interpretation.FamilyTextPreparation
 import com.baraa.masroof.ml.family.*
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /** The single bridge used by live intake, feedback and offline fixture exports. */
 object FamilyAssistBridge {
@@ -26,14 +27,24 @@ object FamilyAssistBridge {
     }
 
     /**
-     * A remembered "not financial" decision settles only a message the rules could not identify, in any bank.
-     * The existing informational policy then keeps it out of review; it never touches money or posting.
+     * A remembered "not financial" decision settles only a message the rules could not identify and that carries no
+     * transaction amount, in any bank. The existing informational policy then keeps it out of review; it never
+     * touches money or posting. A message with an amount stays reviewable even with the same wording.
      */
     fun rememberNonFinancial(result: Interpretation, suggestion: FamilySuggestion?): Interpretation =
-        if (suggestion?.family != MessageFamily.NON_FINANCIAL || result.facts.family != MessageFamily.UNKNOWN || result.bank == null) result
+        if (suggestion?.family != MessageFamily.NON_FINANCIAL || result.facts.family != MessageFamily.UNKNOWN ||
+            result.facts.amount != null || result.bank == null) result
         else Interpretation(result.evidenceId, result.version, result.bank, Facts(MessageFamily.NON_FINANCIAL), ParseStatus.NON_FINANCIAL,
             Confidence(1.0, listOf("family_origin:${suggestion.origin}", "model:${suggestion.modelVersion}")), emptyList(), emptySet(),
             result.diagnostics, suggestion, result.patternProvenance)
+
+    /** Messages a remembered "not financial" once settled that today's decisions no longer settle; they go back to review. */
+    fun revokedMemories(records: List<ParsedEventRecord>, bodies: Map<String, String>,
+        models: Map<String, FamilyClassifier>): Set<String> = records.filter { record ->
+            val body = bodies[record.event.rawSmsId] ?: return@filter false
+            suggest(models[record.event.bank.id], record.event.bank.id, body, FamilyTextPreparation.prepare(body).title)?.family !=
+                MessageFamily.NON_FINANCIAL
+        }.map { it.event.rawSmsId }.toSet()
 
     fun toModel(family: MessageFamily): SmsFamilyLabel = when (family) {
         MessageFamily.PURCHASE -> SmsFamilyLabel.PURCHASE

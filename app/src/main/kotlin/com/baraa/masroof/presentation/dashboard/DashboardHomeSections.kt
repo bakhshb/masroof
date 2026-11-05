@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.baraa.masroof.R
 import com.baraa.masroof.application.dashboard.AccountsSummary
@@ -41,7 +42,7 @@ fun DashboardHeroCard(
 fun DashboardDailyAllowanceRow(allowance: com.baraa.masroof.application.dashboard.DailyAllowance, modifier: Modifier = Modifier) {
     val overspent = allowance.left.isNegative
     com.baraa.masroof.presentation.common.MasroofMetricRow(modifier) { tile ->
-        MasroofMetric(stringResource(R.string.home_daily_allowance, allowance.days.toInt()), formatLocalizedMoney(allowance.perDay),
+        MasroofMetric(pluralStringResource(R.plurals.home_daily_allowance, allowance.days.toInt(), allowance.days.toInt()), formatLocalizedMoney(allowance.perDay),
             if (overspent) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
             modifier = tile.then(Modifier.testTag("home-daily-allowance")),
             guidance = stringResource(if (overspent) R.string.home_daily_allowance_over else R.string.home_daily_allowance_hint,

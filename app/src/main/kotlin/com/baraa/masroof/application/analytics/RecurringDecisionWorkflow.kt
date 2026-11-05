@@ -18,7 +18,7 @@ import kotlinx.serialization.decodeFromString
 }
 
 /** Recurring payments come from the rules; the user's explicit decision for a series overrides its cadence. */
-internal object RecurringLearningWorkflow {
+internal object RecurringDecisionWorkflow {
     const val version = "recurring-rules-v1"
 
     /** A "confirmed" decision counts only while its saved commitment still has that cadence. */

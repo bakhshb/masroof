@@ -18,23 +18,23 @@ class RecurringDecisionsTest {
     }
 
     @Test fun rulesFindTheSeriesAndNotRecurringHidesIt() {
-        assertEquals("WEEKLY", RecurringLearningWorkflow.build(facts, emptyList(), 22).single().cadence)
-        assertTrue(RecurringLearningWorkflow.build(facts, listOf(feedback("NOT_RECURRING", "NONE")), 22).isEmpty())
+        assertEquals("WEEKLY", RecurringDecisionWorkflow.build(facts, emptyList(), 22).single().cadence)
+        assertTrue(RecurringDecisionWorkflow.build(facts, listOf(feedback("NOT_RECURRING", "NONE")), 22).isEmpty())
         // Dismissing a suggestion is not a statement about the series.
-        assertEquals(1, RecurringLearningWorkflow.build(facts, listOf(feedback("DISMISSED", null)), 22).size)
+        assertEquals(1, RecurringDecisionWorkflow.build(facts, listOf(feedback("DISMISSED", null)), 22).size)
     }
 
     @Test fun aPendingSaveOrAnotherAccountsDecisionChangesNothing() {
-        assertEquals("WEEKLY", RecurringLearningWorkflow.build(facts, listOf(feedback("CONFIRM_PENDING", "MONTHLY")), 22).single().cadence)
+        assertEquals("WEEKLY", RecurringDecisionWorkflow.build(facts, listOf(feedback("CONFIRM_PENDING", "MONTHLY")), 22).single().cadence)
         val other = facts.map { it.copy(recurringScope = "OTHER_BANK:account:1234") }
-        assertEquals(1, RecurringLearningWorkflow.build(other, listOf(feedback("NOT_RECURRING", "NONE")), 22).size)
+        assertEquals(1, RecurringDecisionWorkflow.build(other, listOf(feedback("NOT_RECURRING", "NONE")), 22).size)
     }
 
     @Test fun aConfirmedCadenceCountsOnlyWhileTheSavedCommitmentKeepsIt() {
         val row = feedback("CONFIRMED", "MONTHLY")
-        assertEquals("MONTHLY", RecurringLearningWorkflow.build(facts, listOf(row), 22, mapOf("payment-3" to "MONTHLY")).single().cadence)
-        assertEquals("WEEKLY", RecurringLearningWorkflow.build(facts, listOf(row), 22).single().cadence)
-        assertEquals("WEEKLY", RecurringLearningWorkflow.build(facts, listOf(row), 22, mapOf("payment-3" to "WEEKLY")).single().cadence)
+        assertEquals("MONTHLY", RecurringDecisionWorkflow.build(facts, listOf(row), 22, mapOf("payment-3" to "MONTHLY")).single().cadence)
+        assertEquals("WEEKLY", RecurringDecisionWorkflow.build(facts, listOf(row), 22).single().cadence)
+        assertEquals("WEEKLY", RecurringDecisionWorkflow.build(facts, listOf(row), 22, mapOf("payment-3" to "WEEKLY")).single().cadence)
     }
 
     @Test fun aStoredPayloadFromTheOldModelStillReads() {

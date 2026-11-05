@@ -185,6 +185,11 @@ interface ParsedEventRepository {
                 record.event.cardRef?.last4 != null
         }
 
+    /** "Not financial" rows settled by a remembered decision (a `family_origin:` stamp). */
+    suspend fun listRememberedNonFinancial(): List<ParsedEventRecord> =
+        listAll().filter { record -> record.event.messageFamily == MessageFamily.NON_FINANCIAL &&
+            record.event.confidence.reasons.any { it.startsWith("family_origin:") } }
+
     /** [MessageFamily.FINANCING_INSTALLMENT] rows with a loan type. */
     suspend fun listFinancingInstallmentFacts(): List<ParsedEventRecord> =
         listAll().filter { record ->

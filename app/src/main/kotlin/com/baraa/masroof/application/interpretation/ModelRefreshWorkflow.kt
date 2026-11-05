@@ -22,19 +22,21 @@ class ModelRefreshWorkflow(
     private val inTransaction: suspend (suspend () -> Unit) -> Unit,
     private val recoverDerived: suspend () -> Unit,
     private val clock: InstantClock,
+    /** Messages outside the review queue that must be read again (a revoked remembered decision). */
+    private val extra: suspend () -> Collection<String> = { emptyList() },
 ) {
     /** Returns false when a parse failed; thrown failures retain committed retry markers. */
     suspend fun refresh(): Boolean {
-        val pending = reviews.listRequired().filter {
-            mayRefresh(it.rawSmsId) && parsed.findByRawSmsId(it.rawSmsId)?.let(needsRefresh) == true
+        val pending = (reviews.listRequired().map { it.rawSmsId } + extra()).distinct().filter {
+            mayRefresh(it) && parsed.findByRawSmsId(it)?.let(needsRefresh) == true
         }
         var complete = true
-        for (review in pending) {
+        for (rawSmsId in pending) {
             // The marker and parse commit together. A current ParsedEvent is not proof
             // that discovery/reconciliation/review finished before a process interruption.
             inTransaction {
-                if (mayRefresh(review.rawSmsId)) {
-                    val evidence = raw.getById(review.rawSmsId)
+                if (mayRefresh(rawSmsId)) {
+                    val evidence = raw.getById(rawSmsId)
                     if (evidence != null) {
                         retries.markRequired(evidence.id, clock.now(), ProcessingRetryMode.HISTORICAL_BATCH)
                         if (processor.reparseAndStore(evidence) is SmsIngestionResult.Failed) complete = false
