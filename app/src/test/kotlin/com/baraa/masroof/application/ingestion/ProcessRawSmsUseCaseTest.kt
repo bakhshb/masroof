@@ -188,7 +188,7 @@ class ProcessRawSmsUseCaseTest {
             val result = svc.ingest(raw)
             assertTrue(result is SmsIngestionResult.NotRelevant)
             assertEquals(
-                "sender_not_recognized_as_bank_aljazira",
+                "sender_not_in_scope",
                 (result as SmsIngestionResult.NotRelevant).reason,
             )
             assertNull(rawRepo.getById(raw.id))

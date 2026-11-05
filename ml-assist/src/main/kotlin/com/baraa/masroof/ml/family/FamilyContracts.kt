@@ -15,7 +15,7 @@ enum class HumanLabelSource { USER_MESSAGE_FAMILY, USER_EVENT_KIND, USER_NON_FIN
 data class HumanTemplateBlock(val bankId: String, val rawId: String, val decisionId: String,
     val template: String, val at: Long) {
     init {
-        require(bankId.matches(Regex("[A-Z][A-Z0-9_]{0,63}")))
+        require(bankId.matches(Regex("[A-Za-z][A-Za-z0-9_]{0,63}")))
         require(rawId.isNotBlank() && decisionId.isNotBlank() && at >= 0)
         require(template.matches(Regex("[0-9a-f]{64}")))
     }
@@ -26,7 +26,7 @@ data class HumanFamilyLabel(
     val template: String, val terms: Map<String, Int>, val at: Long, val provenance: String,
 ) {
     init {
-        require(bankId.matches(Regex("[A-Z][A-Z0-9_]{0,63}")))
+        require(bankId.matches(Regex("[A-Za-z][A-Za-z0-9_]{0,63}")))
         require(rawId.isNotBlank() && decisionId.isNotBlank() && at >= 0)
         require(template.matches(Regex("[0-9a-f]{64}")) && FamilyInputCleaner.validTerms(terms))
         require(provenance in HumanLabelSource.entries.map { it.name })

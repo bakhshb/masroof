@@ -1,7 +1,6 @@
 package com.baraa.masroof.bank
 
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.engine.bank.MessageInput
 import com.baraa.masroof.engine.bank.patterns.BankMessagePatterns
 import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
@@ -14,15 +13,8 @@ class MessagePatternSmsAdapter(definition: BankMessagePatterns, private val inte
     private val interpret: ((MessageInput, PatternFactInterpreter) -> com.baraa.masroof.engine.bank.Interpretation)? = null) : BankSmsAdapter {
     override val bank = Bank(definition.bankId)
     val configurationFingerprint: String get() = interpreter.fingerprint
-    private val senders = definition.senders.toSet()
-    private val primaryDetector = com.baraa.masroof.bank.aljazira.AlJaziraBankDetector().takeIf { bank == Bank.BANK_ALJAZIRA }
-    override fun detect(sender: String, body: String): BankDetectionResult {
-        val primary = primaryDetector?.detect(sender, body)
-        if (primary is BankDetectionResult.Detected) return primary
-        // A sender the user configured is authoritative, including one added to a bank with a bundled detector.
-        if (sender in senders) return BankDetectionResult.Detected(bank, Confidence(1.0), listOf("configured_exact_sender"))
-        return primary ?: BankDetectionResult.Unknown(listOf("sender_not_in_scope"))
-    }
+    private val detector = SenderBankDetector(bank, definition.senders, definition.displayName)
+    override fun detect(sender: String, body: String): BankDetectionResult = detector.detect(sender, body)
 
     override fun parse(input: SmsParseInput) = MessageInput(input.rawSmsId, input.sender, input.body, input.receivedAt, true).let {
         InterpretationDraftMapper().map(it, interpret?.invoke(it, interpreter) ?: interpreter.interpretRouted(it, BankId(bank.id)), bank)

@@ -45,7 +45,7 @@ class BankInterpretationService(
     @Volatile private var classifiers: Map<String, FamilyClassifier>? = null
     // Templates of pending messages in banks other than the seed bank that learned decisions would now change.
     @Volatile private var assistable: Set<String> = emptySet()
-    @Volatile private var seedRead: Set<String> = emptySet()
+    @Volatile private var ruleRead: Set<String> = emptySet()
     // Messages hidden by a remembered "not financial" that the current decisions no longer hide.
     @Volatile private var revoked: Set<String> = emptySet()
     fun revokedMemories(): Set<String> = revoked
@@ -91,9 +91,9 @@ class BankInterpretationService(
      * a remembered financial family is used where the bank's role rules ask for one.
      */
     fun assistedBanks(configuration: MessagePatternConfiguration = patterns()): Set<String> =
-        configuration.banks.filter { bank -> bank.bankId.matches(BANK_ID) }.map { it.bankId }.toSet() + SEED_BANK
+        configuration.banks.filter { bank -> bank.bankId.matches(BANK_ID) }.map { it.bankId }.toSet()
     val refreshVersion: String get() = "${engine().fingerprint}|${modelVersion ?: "rules-only"}"
-    fun interpret(input: MessageInput, snapshot: PatternFactInterpreter = engine(), bankId: String = SEED_BANK): Interpretation {
+    fun interpret(input: MessageInput, snapshot: PatternFactInterpreter = engine(), bankId: String): Interpretation {
         val trace = Attempt(bankId, classifiers?.get(bankId))
         val activeModel = trace.classifier?.version
         attempt.set(trace)
@@ -292,23 +292,22 @@ class BankInterpretationService(
         val models = classifiers.orEmpty()
         val configuration = patterns()
         // Outside role rules only a remembered "not financial" can change a message, and only one without an amount.
-        val roled = configuration.banks.filter { bank -> bank.currentPatterns.any { it.roleProfile != null } }.map { it.bankId }.toSet()
+        val roled = ruleBanks(configuration)
         // Rules ask for a family only when they found none; a message already read with this model is never re-read,
         // otherwise a suggestion the rules cannot use would refresh the same message forever.
         val candidates = records.filter { record -> val bank = record.event.bank.id
-            bank != SEED_BANK && bank in models && record.event.parseStatus.name != "SUCCESS" &&
+            bank !in roled && bank in models && record.event.parseStatus.name != "SUCCESS" &&
                 record.event.messageFamily.name == "UNKNOWN" &&
                 store.history(record.event.rawSmsId).lastOrNull()?.activeModelVersion != models.getValue(bank).version }
         val bodies = raw.getByIds(candidates.map { it.event.rawSmsId }.toSet()).associateBy { it.id }
         assistable = candidates.filter { record -> bodies[record.event.rawSmsId]?.body?.let { body ->
             FamilyAssistBridge.suggest(models[record.event.bank.id], record.event.bank.id, body)?.let {
-                it.family == MessageFamily.NON_FINANCIAL && record.event.amount == null && !FamilyAssistBridge.showsMoney(body) ||
-                    record.event.bank.id in roled }
+                it.family == MessageFamily.NON_FINANCIAL && record.event.amount == null && !FamilyAssistBridge.showsMoney(body) }
         } == true }
             .map { it.event.rawSmsId }.toSet()
-        // Seed UNKNOWN messages already read with the current seed model are not read again (same guard as above).
-        seedRead = records.filter { it.event.bank.id == SEED_BANK && it.event.messageFamily.name == "UNKNOWN" &&
-            store.history(it.event.rawSmsId).lastOrNull()?.activeModelVersion == models[SEED_BANK]?.version }
+        // Role-rule UNKNOWN messages already read with their bank's current model are not read again (same guard as above).
+        ruleRead = records.filter { it.event.bank.id in roled && it.event.messageFamily.name == "UNKNOWN" &&
+            store.history(it.event.rawSmsId).lastOrNull()?.activeModelVersion == models[it.event.bank.id]?.version }
             .map { it.event.rawSmsId }.toSet()
         // A message read with its bank's current decisions is still settled by them; only older reads can be revoked.
         val remembered = parsed.listRememberedNonFinancial().filter { record ->
@@ -327,11 +326,12 @@ class BankInterpretationService(
      */
     fun refreshFilter(readHistory: Boolean = true): (com.baraa.masroof.parsing.repository.ParsedEventRecord) -> Boolean {
         val rules = lazy { engine().fingerprint }
-        val read = if (readHistory) seedRead else emptySet()
-        return { record -> needsRefresh(record, rules, read) }
+        val roled = lazy { ruleBanks(patterns()) }
+        val read = if (readHistory) ruleRead else emptySet()
+        return { record -> needsRefresh(record, rules, roled, read) }
     }
     private fun needsRefresh(record: com.baraa.masroof.parsing.repository.ParsedEventRecord, rules: Lazy<String>,
-        read: Set<String>): Boolean {
+        roled: Lazy<Set<String>>, read: Set<String>): Boolean {
         // Only while it is still hidden: once read again it is an ordinary review message.
         if (record.event.rawSmsId in revoked && record.event.messageFamily.name == "NON_FINANCIAL") return true
         // Successful facts resume derived work.
@@ -339,8 +339,8 @@ class BankInterpretationService(
         val bank = record.event.bank.id
         val reasons = record.event.confidence.reasons
         val staleInference = reasons.any { it.startsWith("family_origin:") } && "model:${classifiers?.get(bank)?.version}" !in reasons
-        // Other banks refresh only what learning now changes, so an approved pattern is still applied explicitly.
-        if (bank != SEED_BANK) return bank in classifiers.orEmpty() && (staleInference || record.event.rawSmsId in assistable)
+        // Banks without role rules refresh only what learning now changes, so a taught pattern is still applied explicitly.
+        if (bank !in roled.value) return bank in classifiers.orEmpty() && (staleInference || record.event.rawSmsId in assistable)
         val fingerprint = rules.value
         return record.event.messageFamily.name == "UNKNOWN" && record.event.rawSmsId !in read ||
             reasons.none { it == "rules:$fingerprint" || it.startsWith("rules:$fingerprint:") } || staleInference
@@ -379,8 +379,9 @@ class BankInterpretationService(
         store.close()
     }
     companion object {
-        /** The bundled bank whose rules always ask for a family and refresh unread UNKNOWN messages. */
-        const val SEED_BANK="BANK_ALJAZIRA"
-        private val BANK_ID = Regex("[A-Z][A-Z0-9_]{0,63}")
+        private val BANK_ID = Regex("[A-Za-z][A-Za-z0-9_]{0,63}")
+        /** Banks whose role rules ask for a family and refresh unread UNKNOWN messages when the rules change. */
+        private fun ruleBanks(configuration: MessagePatternConfiguration) =
+            configuration.banks.filter { bank -> bank.currentPatterns.any { it.roleProfile != null } }.map { it.bankId }.toSet()
     }
 }

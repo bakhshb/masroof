@@ -1,0 +1,57 @@
+package com.baraa.masroof.bank
+
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.parsing.model.BankDetectionResult
+import com.baraa.masroof.testsupport.aljaziraSenderDetector
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SenderBankDetectorTest {
+    private val aljazira = aljaziraSenderDetector()
+
+    @Test
+    fun aljaziraSenderForms_areDetected() {
+        listOf(
+            "AlJazira", "ALJAZIRA", "Al-Jazira", "Al Jazira", "AlJazira-AD", "Al-Jazira-AD", "Jazira Bank", "Jazira-Bank",
+            "Jazira Bank.", "Bank AlJazira", "Bank Al Jazira", "AlJaziraBank", "Al Jazira Bank", "Al-Jazira-Bank",
+            "AlJaziraBank-AD", "Jazira Bank-AD", "Jazira Bank", "بنك الجزيرة", "بنك الجزيره",
+        ).forEach { sender -> assertDetected(aljazira, Bank.BANK_ALJAZIRA, sender) }
+    }
+
+    @Test
+    fun otherBanks_getTheSameSenderNormalization() {
+        val barq = SenderBankDetector(Bank("BANK_BARQ"), listOf("barq app"), "برق")
+        listOf("barq app", "Barq App", "BARQ-APP", "Barq App-AD").forEach { assertDetected(barq, Bank("BANK_BARQ"), it) }
+        val snb = SenderBankDetector(Bank("BANK_SNB"), listOf("SNB-AlAhli"), "البنك الأهلي السعودي")
+        listOf("SNB-AlAhli", "snb-alahli", "SNB AlAhli", "SNB-AlAhli-AD").forEach { assertDetected(snb, Bank("BANK_SNB"), it) }
+        // A short sender is never a stem, so unrelated senders that contain it stay unknown.
+        val sab = SenderBankDetector(Bank("BANK_SAB"), listOf("SAB"), "البنك الأول (ساب)")
+        assertTrue(sab.detect("HASABAT", "hello") is BankDetectionResult.Unknown)
+    }
+
+    @Test
+    fun nearMissSenders_areNotDetected() {
+        listOf("JaziraNews", "OtherBank", "MyJaziraService", "jazira", "AD").forEach { sender ->
+            assertTrue("$sender should be Unknown", aljazira.detect(sender, "شراء بمبلغ: 10.00 SAR") is BankDetectionResult.Unknown)
+        }
+    }
+
+    @Test
+    fun plausibleSenderOrBody_isSuspectedWithoutClaimingTheBank() {
+        listOf("NotAlJazira", "AlJaziraX", "AlJaziraBanks", "NotAlJaziraBank").forEach { sender ->
+            assertTrue("$sender should be Suspected", aljazira.detect(sender, "hello") is BankDetectionResult.Suspected)
+        }
+        assertTrue(aljazira.detect("Mom", "تحويل عبر بنك الجزيرة بمبلغ 10") is BankDetectionResult.Suspected)
+        assertTrue(aljazira.detect("Mom", "Paid with Bank AlJazira card") is BankDetectionResult.Suspected)
+        assertTrue(aljazira.detect("Mom", "See you at 6") is BankDetectionResult.Unknown)
+        val alinma = SenderBankDetector(Bank("BANK_ALINMA"), listOf("alinma"), "مصرف الإنماء")
+        assertTrue(alinma.detect("Mom", "حوالة من مصرف الانماء") is BankDetectionResult.Suspected)
+    }
+
+    private fun assertDetected(detector: SenderBankDetector, bank: Bank, sender: String) {
+        val result = detector.detect(sender, "body")
+        assertTrue("$sender should be Detected", result is BankDetectionResult.Detected)
+        assertEquals(bank, (result as BankDetectionResult.Detected).bank)
+    }
+}
