@@ -228,7 +228,8 @@ class ReportedMessagesJourneyTest {
             c=TestRuntime.container(host)
             c.awaitPostStartupBackgroundWorkForTesting()
             requireNotNull(c.interpretationService).synchronizeFeedback()
-            withTimeout(30_000) {while(c.financialTransactionRepository.listAll().size!=3 || c.reviewRepository.listRequired().isNotEmpty()) delay(50)}
+            // A worker admitted by the previous container can retry during close/reopen; cover one default backoff.
+            withTimeout(androidx.work.WorkRequest.DEFAULT_BACKOFF_DELAY_MILLIS + 15_000) {while(c.financialTransactionRepository.listAll().size!=3 || c.reviewRepository.listRequired().isNotEmpty()) delay(50)}
             assertEquals(setOf("100.00","300.00","16.23"),c.financialTransactionRepository.listAll().map {it.amount.amount.toPlainString()}.toSet())
             assertEquals(3,c.rawSmsRepository.listIdsByReceivedAt().size)
         } finally {TestRuntime.reset(host)}
