@@ -5,13 +5,13 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.notification.NotificationCenterMetricsWorkflow
 import com.baraa.masroof.application.notification.NotificationCenterService
-import com.baraa.masroof.application.notification.NotificationPreferencesRepository
 import com.baraa.masroof.application.notification.NotificationType
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.testsupport.FakeNotificationPreferencesRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -66,7 +66,7 @@ class NotificationCenterViewModelTest {
         }
         val vm = NotificationCenterViewModel(
             NotificationCenterMetricsWorkflow(reviews, RoomCardRegistryRepository.from(db), RoomAccountRegistryRepository.from(db)),
-            NotificationCenterService(InMemoryPrefs()),
+            NotificationCenterService(FakeNotificationPreferencesRepository()),
             permissionStateProvider = { true },
         )
 
@@ -78,12 +78,5 @@ class NotificationCenterViewModelTest {
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value.items.none { it.type == NotificationType.FOREIGN_CURRENCY })
-    }
-
-    private class InMemoryPrefs : NotificationPreferencesRepository {
-        private var ids: Set<String> = emptySet()
-        override fun getReadIds(): Set<String> = ids
-        override fun markRead(id: String) { ids = ids + id }
-        override fun setReadIds(ids: Set<String>) { this.ids = ids }
     }
 }

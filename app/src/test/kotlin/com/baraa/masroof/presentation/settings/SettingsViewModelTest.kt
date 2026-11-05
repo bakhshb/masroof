@@ -1,15 +1,14 @@
 package com.baraa.masroof.presentation.settings
 
 import com.baraa.masroof.testsupport.FakeAppLocaleRepository
+import com.baraa.masroof.testsupport.FakeDatabaseBackupGateway
+import com.baraa.masroof.testsupport.FakeThemePreferencesRepository
 import com.baraa.masroof.testsupport.MutableCardRegistryRepository
 import com.baraa.masroof.testsupport.MutableCardRegistryRepository as TrackingCardRegistry
 import com.baraa.masroof.testsupport.StubAccountRegistryRepository
 
 import com.baraa.masroof.application.backup.BackupImportOutcome
-import com.baraa.masroof.application.backup.BackupPackageKind
-import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.theme.ThemeMode
-import com.baraa.masroof.application.theme.ThemePreferencesRepository
 import com.baraa.masroof.application.update.ApkIntegrityVerifier
 import com.baraa.masroof.application.update.UpdateChannel
 import com.baraa.masroof.application.update.UpdateManifest
@@ -890,7 +889,7 @@ class SettingsViewModelTest {
             settingsCommitmentsWorkflow = commitmentsWorkflow,
             appLocaleRepository = FakeAppLocaleRepository(),
             themePreferencesRepository = FakeThemePreferencesRepository(themeMode),
-            databaseBackupService = FakeDatabaseBackupGateway(),
+            databaseBackupService = FakeDatabaseBackupGateway(outcome = BackupImportOutcome.Failed),
             reconcileOwnershipChange = { onReconcileOwnership(it) },
             reparseStoredEvents = reparse,
             permissionStateProvider = permissionStateProvider,
@@ -901,29 +900,6 @@ class SettingsViewModelTest {
             apkInstaller = SettingsViewModelTestFixtures.apkInstaller(),
             canInstallPackages = { true },
         )
-
-    private class FakeThemePreferencesRepository(
-        private var mode: ThemeMode = ThemeMode.SYSTEM,
-    ) : ThemePreferencesRepository {
-        override fun getThemeMode(): ThemeMode = mode
-
-        override fun setThemeMode(mode: ThemeMode) {
-            this.mode = mode
-        }
-    }
-
-    private class FakeDatabaseBackupGateway : DatabaseBackupGateway {
-        override suspend fun exportTo(destination: android.net.Uri, passphrase: CharArray): Result<Unit> =
-            Result.success(Unit)
-
-        override suspend fun inspect(source: android.net.Uri): BackupPackageKind = BackupPackageKind.UNRECOGNIZED
-
-        override suspend fun importFrom(
-            source: android.net.Uri,
-            passphrase: CharArray,
-            confirmLegacyPlaintext: Boolean,
-        ): BackupImportOutcome = BackupImportOutcome.Failed
-    }
 
     private class FakeCardRegistry(
         vararg initial: CardRegistryEntry,

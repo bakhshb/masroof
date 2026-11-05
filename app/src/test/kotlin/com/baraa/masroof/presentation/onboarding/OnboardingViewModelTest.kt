@@ -2,9 +2,6 @@ package com.baraa.masroof.presentation.onboarding
 
 import com.baraa.masroof.testsupport.EmptyReviewRepository
 import com.baraa.masroof.application.onboarding.ImportDatePolicy
-import com.baraa.masroof.application.backup.BackupImportOutcome
-import com.baraa.masroof.application.backup.BackupPackageKind
-import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.domain.model.CardNetwork
@@ -20,6 +17,7 @@ import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.testsupport.FakeDatabaseBackupGateway
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -647,21 +645,6 @@ AccountRegistryEntry.forTest(
                 )) },
             )
         }
-    }
-
-    private class FakeDatabaseBackupGateway(
-        var outcome: BackupImportOutcome = BackupImportOutcome.InvalidPackage,
-    ) : DatabaseBackupGateway {
-        override suspend fun exportTo(destination: android.net.Uri, passphrase: CharArray): Result<Unit> =
-            Result.success(Unit)
-
-        override suspend fun inspect(source: android.net.Uri): BackupPackageKind = BackupPackageKind.UNRECOGNIZED
-
-        override suspend fun importFrom(
-            source: android.net.Uri,
-            passphrase: CharArray,
-            confirmLegacyPlaintext: Boolean,
-        ): BackupImportOutcome = outcome
     }
 
     private class FakeOnboardingPrefs : OnboardingPreferencesRepository {

@@ -1,12 +1,11 @@
 package com.baraa.masroof.presentation.settings
 
 import android.net.Uri
-import com.baraa.masroof.application.backup.BackupImportOutcome
 import com.baraa.masroof.application.backup.BackupPackageKind
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
-import com.baraa.masroof.application.theme.ThemeMode
-import com.baraa.masroof.application.theme.ThemePreferencesRepository
 import com.baraa.masroof.application.settings.SettingsCommitmentsWorkflow
+import com.baraa.masroof.testsupport.FakeDatabaseBackupGateway
+import com.baraa.masroof.testsupport.FakeThemePreferencesRepository
 import com.baraa.masroof.testsupport.SettingsViewModelTestSupport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,7 +40,7 @@ class SettingsImportConfirmTest {
 
     @Test
     fun offerImport_asksForConfirm_withoutImporting() = runTest {
-        val backup = RecordingBackupGateway()
+        val backup = FakeDatabaseBackupGateway(kind = BackupPackageKind.ENCRYPTED)
         val vm = viewModel(backup)
         vm.onImportPassphraseChange("secret")
         vm.offerImport(Uri.parse("content://backup/copy.masroof"))
@@ -52,7 +51,7 @@ class SettingsImportConfirmTest {
 
     @Test
     fun cancelPendingImport_doesNotImport() = runTest {
-        val backup = RecordingBackupGateway()
+        val backup = FakeDatabaseBackupGateway(kind = BackupPackageKind.ENCRYPTED)
         val vm = viewModel(backup)
         vm.onImportPassphraseChange("secret")
         vm.offerImport(Uri.parse("content://backup/copy.masroof"))
@@ -64,7 +63,7 @@ class SettingsImportConfirmTest {
 
     @Test
     fun confirmPendingImport_runsImport() = runTest {
-        val backup = RecordingBackupGateway()
+        val backup = FakeDatabaseBackupGateway(kind = BackupPackageKind.ENCRYPTED)
         val vm = viewModel(backup)
         vm.onImportPassphraseChange("secret")
         vm.offerImport(Uri.parse("content://backup/copy.masroof"))
@@ -79,7 +78,7 @@ class SettingsImportConfirmTest {
 
     @Test
     fun cancelLegacyImport_doesNotImport() = runTest {
-        val backup = RecordingBackupGateway(kind = BackupPackageKind.LEGACY_PLAINTEXT)
+        val backup = FakeDatabaseBackupGateway(kind = BackupPackageKind.LEGACY_PLAINTEXT)
         val vm = viewModel(backup)
         vm.offerImport(Uri.parse("content://backup/legacy.masroof"))
         advanceUntilIdle()
@@ -92,7 +91,7 @@ class SettingsImportConfirmTest {
 
     @Test
     fun export_afterProcessRecreation_failsClosedWithExplicitRetryMessage() = runTest {
-        val backup = RecordingBackupGateway()
+        val backup = FakeDatabaseBackupGateway(kind = BackupPackageKind.ENCRYPTED)
         val old = viewModel(backup)
         old.onExportPassphraseChange("secret")
         assertTrue(old.prepareExport())
@@ -107,7 +106,7 @@ class SettingsImportConfirmTest {
 
     @Test
     fun export_retainedViewModel_consumesPhraseOnceAndWipesIt() = runTest {
-        val backup = RecordingBackupGateway()
+        val backup = FakeDatabaseBackupGateway(kind = BackupPackageKind.ENCRYPTED)
         val vm = viewModel(backup)
         vm.onExportPassphraseChange("secret")
         assertTrue(vm.prepareExport())
@@ -123,7 +122,7 @@ class SettingsImportConfirmTest {
 
     @Test
     fun export_cancelledPicker_discardsSecretAndRequiresNewPreparation() = runTest {
-        val backup = RecordingBackupGateway()
+        val backup = FakeDatabaseBackupGateway(kind = BackupPackageKind.ENCRYPTED)
         val vm = viewModel(backup)
         vm.onExportPassphraseChange("secret")
         assertTrue(vm.prepareExport())
@@ -141,10 +140,7 @@ class SettingsImportConfirmTest {
                 commitmentRepository = com.baraa.masroof.testsupport.NoOpCommitmentRepository(),
             ),
             appLocaleRepository = com.baraa.masroof.testsupport.FakeAppLocaleRepository(),
-            themePreferencesRepository = object : ThemePreferencesRepository {
-                override fun getThemeMode() = ThemeMode.SYSTEM
-                override fun setThemeMode(mode: ThemeMode) = Unit
-            },
+            themePreferencesRepository = FakeThemePreferencesRepository(),
             databaseBackupService = backup,
             reparseStoredEvents = { com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult(0, 0) },
             permissionStateProvider = { true },
@@ -155,30 +151,4 @@ class SettingsImportConfirmTest {
             apkInstaller = SettingsViewModelTestFixtures.apkInstaller(),
             canInstallPackages = { true },
         )
-
-    private class RecordingBackupGateway(
-        private val kind: BackupPackageKind = BackupPackageKind.ENCRYPTED,
-    ) : DatabaseBackupGateway {
-        var importCalls: Int = 0
-
-        var exportCalls = 0
-        var exportPhrase: CharArray? = null
-
-        override suspend fun exportTo(destination: Uri, passphrase: CharArray): Result<Unit> {
-            exportCalls++
-            exportPhrase = passphrase
-            return Result.success(Unit)
-        }
-
-        override suspend fun inspect(source: Uri): BackupPackageKind = kind
-
-        override suspend fun importFrom(
-            source: Uri,
-            passphrase: CharArray,
-            confirmLegacyPlaintext: Boolean,
-        ): BackupImportOutcome {
-            importCalls++
-            return BackupImportOutcome.InvalidPackage
-        }
-    }
 }
