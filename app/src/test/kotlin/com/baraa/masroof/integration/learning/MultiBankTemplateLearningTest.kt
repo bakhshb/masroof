@@ -38,7 +38,7 @@ class MultiBankTemplateLearningTest {
             val engine = PatternFactInterpreter.of(bundledPatterns(bank))
             fun read(classifier: FamilyClassifier?) = engine.interpretRouted(
                 MessageInput("learn-$bank", row.text("sender"), body, Instant.parse("2026-09-15T09:30:00Z"), true), BankId(bank),
-                classifier?.let { c -> FamilyAssist { input, title -> FamilyAssistBridge.suggest(c, bank, input.body, title) } })
+                classifier?.let { c -> FamilyAssist { input, title -> FamilyAssistBridge.suggest(c, bank, input.body) } })
             assertEquals(bank, MessageFamily.UNKNOWN, read(null).facts.family)
             val features = requireNotNull(FamilyAssistBridge.clean(body).features) { "$bank wording rejected" }
             val label = HumanFamilyLabel(bank, "raw-$bank", "decision-$bank", SmsFamilyLabel.PURCHASE, features.template,
@@ -65,7 +65,7 @@ class MultiBankTemplateLearningTest {
             val label = HumanFamilyLabel(bank, "raw-$bank", "decision-$bank", SmsFamilyLabel.NON_FINANCIAL, features.template,
                 features.terms, 1, "USER_NON_FINANCIAL")
             fun remembered(classifier: FamilyClassifier) = FamilyAssistBridge.rememberNonFinancial(ruled,
-                FamilyAssistBridge.suggest(classifier, bank, body, FamilyTextPreparation.prepare(body).title))
+                FamilyAssistBridge.suggest(classifier, bank, body))
             val settled = remembered(FamilyClassifier(bank, listOf(label)))
             assertEquals(bank, MessageFamily.NON_FINANCIAL, settled.facts.family)
             assertTrue(bank, mapper.map(input, settled, Bank.fromId(bank)) is ParseResult.NonFinancial)
@@ -76,12 +76,12 @@ class MultiBankTemplateLearningTest {
             assertSame(bank, ruled, remembered(FamilyClassifier(bank, listOf(label,
                 label.copy(rawId = "raw-2", decisionId = "decision-2", family = SmsFamilyLabel.PURCHASE, provenance = "USER_MESSAGE_FAMILY")))))
             val other = "عرض حصري آخر لعملائنا\nاستمتع بمزايا البطاقة"
-            assertNull(bank, FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, other, FamilyTextPreparation.prepare(other).title))
+            assertNull(bank, FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, other))
             // A message with a transaction amount stays reviewable even with the remembered wording.
             val withAmount = ruled.copy(facts = ruled.facts.copy(amount = com.baraa.masroof.finance.value.Money.of("250",
                 com.baraa.masroof.finance.value.Currency.SAR)))
             assertSame(bank, withAmount, FamilyAssistBridge.rememberNonFinancial(withAmount,
-                FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, body, FamilyTextPreparation.prepare(body).title)))
+                FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, body)))
         }
     }
 

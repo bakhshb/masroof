@@ -52,15 +52,18 @@ class BankInterpretationService(
     @Volatile private var synchronizedDecisions: String? = null
     @Volatile private var pendingFeedback = false
     private data class Attempt(val bank: String, val classifier: FamilyClassifier?, var requested: Boolean = false,
-        var outcome: String = "RULES", var suggestion: FamilySuggestion? = null)
+        var outcome: String = "RULES", var suggestion: FamilySuggestion? = null, var template: String? = null)
     private val attempt = ThreadLocal<Attempt>()
     private fun engine() = PatternFactInterpreter.of(patterns())
     private val familyAssist = FamilyAssist { input,title ->
         val trace = attempt.get()
         trace?.requested = true
-        val features = FamilyAssistBridge.clean(input.body).features
-        val result = trace?.let { FamilyAssistBridge.suggest(it.classifier,it.bank,input.body,title) }
+        val shape = FamilyTextPreparation.prepare(input.body)
+        val features = FamilyAssistBridge.clean(shape).features
+        // The structural view must belong to the title the interpreter is reading.
+        val result = trace?.takeIf { shape.title == title }?.let { FamilyAssistBridge.suggest(it.classifier, it.bank, features) }
         trace?.suggestion = result
+        trace?.template = features?.template
         trace?.outcome = when {
             trace?.classifier == null -> "FEEDBACK_PENDING"
             features == null -> "CLEANING_REJECTED"
@@ -94,11 +97,14 @@ class BankInterpretationService(
         val trace = Attempt(bankId, classifiers?.get(bankId))
         val activeModel = trace.classifier?.version
         attempt.set(trace)
-        val ruled = try { snapshot.interpretRouted(input,BankId(bankId),familyAssist) } finally { attempt.remove() }
-        // Role rules may already have asked for this message's family; reuse that answer.
-        val result = if (ruled.facts.family != MessageFamily.UNKNOWN) ruled else FamilyAssistBridge.rememberNonFinancial(ruled,
-            if (trace.requested) trace.suggestion else FamilyAssistBridge.suggest(trace.classifier, bankId, input.body,
-                FamilyTextPreparation.prepare(input.body).title)).also { if (it !== ruled) { trace.requested = true; trace.outcome = "SUGGESTED" } }
+        val ruled = try {
+            snapshot.interpretRouted(input,BankId(bankId),familyAssist).also { ruled ->
+                // Banks without role rules never ask; an unidentified message without an amount asks once here.
+                if (!trace.requested && ruled.facts.family == MessageFamily.UNKNOWN && ruled.facts.amount == null)
+                    familyAssist.suggest(input, FamilyTextPreparation.prepare(input.body).title)
+            }
+        } finally { attempt.remove() }
+        val result = FamilyAssistBridge.rememberNonFinancial(ruled, trace.suggestion)
         val interpretedAt = System.currentTimeMillis()
         // Advisory audit writes never decide whether a transaction may be posted.
         if(!closed) auditScope.launch {
@@ -108,7 +114,7 @@ class BankInterpretationService(
                     result.familyInference?.modelVersion?:activeModel,result.familyInference?.origin?.name?:"RULES",result.facts.family.name,result.status.name,
                     result.blockers.joinToString(",") {it.name},SmsBodyHasher.sha256Hex(input.body),input.receivedAt.toEpochMilli(),interpretedAt,
                     trace.requested,trace.outcome,null,null,null,
-                    if(trace.requested) FamilyAssistBridge.clean(input.body).features?.template else null))
+                    trace.template))
             } catch (e: CancellationException) { throw e }
               catch (e: Exception) { log.warn("ML","Interpretation audit pending: ${e.javaClass.simpleName}") }
         }
@@ -251,8 +257,10 @@ class BankInterpretationService(
         }
         val learned = labels.map { row -> HumanFamilyLabel(row.bankId,row.rawId,row.decisionId,SmsFamilyLabel.valueOf(row.family),
             row.template,FamilyModelCodec.terms(kotlinx.serialization.json.Json.parseToJsonElement(row.featuresJson)),row.sourceAt,row.provenance) }
+        val labelsByBank = learned.groupBy { it.bankId }
+        val blocksByBank = blocks.groupBy { it.bankId }
         val updated = banks.associateWith { bank ->
-            FamilyClassifier(bank, learned.filter { it.bankId == bank }, blocks.filter { it.bankId == bank })
+            FamilyClassifier(bank, labelsByBank[bank].orEmpty(), blocksByBank[bank].orEmpty())
         }
         val conflicted = learned.groupBy { it.bankId to it.template }.filterValues { rows -> rows.map { it.family }.distinct().size > 1 }.keys +
             updated.values.flatMap { classifier -> classifier.latestBlocks.map { it.bankId to it.template } }
@@ -289,8 +297,7 @@ class BankInterpretationService(
                 store.history(record.event.rawSmsId).lastOrNull()?.activeModelVersion != models.getValue(bank).version }
         val bodies = raw.getByIds(candidates.map { it.event.rawSmsId }.toSet()).associateBy { it.id }
         assistable = candidates.filter { record -> bodies[record.event.rawSmsId]?.body?.let { body ->
-            FamilyAssistBridge.suggest(models[record.event.bank.id], record.event.bank.id, body,
-                com.baraa.masroof.engine.bank.interpretation.FamilyTextPreparation.prepare(body).title)
+            FamilyAssistBridge.suggest(models[record.event.bank.id], record.event.bank.id, body)
         } != null }.map { it.event.rawSmsId }.toSet()
         // Seed UNKNOWN messages already read with the current seed model are not read again (same guard as above).
         seedRead = records.filter { it.event.bank.id == SEED_BANK && it.event.messageFamily.name == "UNKNOWN" &&

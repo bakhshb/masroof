@@ -27,9 +27,9 @@ class ModelRefreshWorkflow(
 ) {
     /** Returns false when a parse failed; thrown failures retain committed retry markers. */
     suspend fun refresh(): Boolean {
-        val pending = (reviews.listRequired().map { it.rawSmsId } + extra()).distinct().filter {
-            mayRefresh(it) && parsed.findByRawSmsId(it)?.let(needsRefresh) == true
-        }
+        val ids = (reviews.listRequired().map { it.rawSmsId } + extra()).distinct()
+        val records = parsed.listByRawSmsIds(ids).associateBy { it.event.rawSmsId }
+        val pending = ids.filter { mayRefresh(it) && records[it]?.let(needsRefresh) == true }
         var complete = true
         for (rawSmsId in pending) {
             // The marker and parse commit together. A current ParsedEvent is not proof

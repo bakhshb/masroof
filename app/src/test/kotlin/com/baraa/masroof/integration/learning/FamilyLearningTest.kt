@@ -13,7 +13,7 @@ import java.time.Instant
 class FamilyLearningTest {
     private val bank = BankId("BANK_ALJAZIRA")
     private fun input(body: String) = MessageInput("learning", "AlJazira",body,Instant.parse("2026-10-06T09:00:00Z"),true)
-    private fun parse(body: String,classifier: FamilyClassifier?=null) = RuleInterpreter(AlJaziraRuleProfile.current(),classifier?.let {c->FamilyAssist {message,title->FamilyAssistBridge.suggest(c,bank.value,message.body,title)}}).interpretRouted(input(body),bank)
+    private fun parse(body: String,classifier: FamilyClassifier?=null) = RuleInterpreter(AlJaziraRuleProfile.current(),classifier?.let {c->FamilyAssist {message,title->FamilyAssistBridge.suggest(c, bank.value, message.body)}}).interpretRouted(input(body),bank)
     @Test fun runtimeAndTrainingBridgeShareArabicNormalizationAndExcludePersonalValues() {
         val first="حَوَالَة مَحَلِّيَّة وَارِدَة\nبنك المرسل: بنك الرياض\nاودعت الى حساب: ٣٠٠١\nمن: شخص أول\nمبلغ العملية: SAR ٢٠٠٠.٠٠\nفي: 2026-10-06 09:00"
         val second="حوالة محلية واردة\nبنك المرسل: بنك آخر\nاودعت الى حساب: 9999\nمن: Different Person\nمبلغ العملية: SAR 15.00\nفي: 2026-10-07 12:00"
@@ -27,7 +27,7 @@ class FamilyLearningTest {
 
     @Test fun knownRulesNeverAskTheClassifierAndSecurityStillWins() {
         var called=0
-        val engine=RuleInterpreter(AlJaziraRuleProfile.current(),FamilyAssist {_,_->called++;FamilySuggestion(MessageFamily.REFUND,1.0,"fake",FamilyOrigin.ML)})
+        val engine=RuleInterpreter(AlJaziraRuleProfile.current(),FamilyAssist {_,_->called++;FamilySuggestion(MessageFamily.REFUND,1.0,"fake",FamilyOrigin.HUMAN_TEMPLATE)})
         val body="شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nمبلغ: SAR 60.99\nلدى: TEST\nفي: 2026-10-06 09:00"
         assertEquals(MessageFamily.PURCHASE,engine.interpretRouted(input(body),bank).facts.family)
         assertEquals(0,called)

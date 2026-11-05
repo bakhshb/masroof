@@ -24,17 +24,14 @@ internal object RecurringDecisionWorkflow {
     /** A "confirmed" decision counts only while its saved commitment still has that cadence. */
     fun build(facts: List<FinancialFact>, feedback: List<RecurringFeedbackRow>, today: Long,
         committedCadences: Map<String, String> = emptyMap()): List<RecurringPattern> {
-        val series = RecurringDetector.series(facts).associateBy { it.key }
         val overrides = feedback.mapNotNull { row ->
             if (row.kind == "CONFIRM_PENDING") return@mapNotNull null
             val payload = runCatching { AnalyticsJson.format.decodeFromString<RecurringFeedbackPayload>(row.payload).also { it.validate() } }.getOrNull()
                 ?: return@mapNotNull null
-            if (payload.seriesKey != row.seriesKey || row.seriesKey !in series) return@mapNotNull null
+            if (payload.seriesKey != row.seriesKey) return@mapNotNull null
             if (row.kind == "CONFIRMED" && committedCadences[payload.sourceIds.last()] != payload.label) return@mapNotNull null
             payload.label?.let { row.seriesKey to RecurringLabel.valueOf(it) }
         }.toMap()
-        return RecurringDetector.detect(facts, today, if (overrides.isEmpty()) null else { item ->
-            overrides[item.key]?.let { RecurringPrediction(it, "HUMAN_DECISION") } ?: RecurringPrediction(item.ruleLabel)
-        })
+        return RecurringDetector.detect(facts, today, overrides)
     }
 }

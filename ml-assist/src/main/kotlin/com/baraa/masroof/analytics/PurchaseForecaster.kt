@@ -109,7 +109,9 @@ object PurchaseForecaster {
     private fun fit(history: List<PurchaseDay>): HuberModel {
         val rows = history.drop(28).map { features(it.day, it.phase, history.filter { row -> row.day < it.day }) }
         // A season seen on only a few days would fit those days' spikes exactly; leave it unlearned (weight 0).
-        SEASON_COLUMNS.filter { j -> rows.count { it[j] > 0 } < MIN_SEASON_DAYS }.forEach { j -> rows.forEach { it[j] = 0.0 } }
+        // features() puts the Ramadan and Eid columns last.
+        val seasonColumns = rows.first().size.let { it - SEASONS until it }
+        seasonColumns.filter { j -> rows.count { it[j] > 0 } < MIN_SEASON_DAYS }.forEach { j -> rows.forEach { it[j] = 0.0 } }
         val targets = history.drop(28).map { it.gross.toDouble() / 100 }.toDoubleArray()
         val p = rows.first().size
         val means = DoubleArray(p) { j -> if (j == 0) 0.0 else rows.map { it[j] }.average() }
@@ -162,7 +164,7 @@ object PurchaseForecaster {
 
     private val CORE_HORIZONS = listOf(1, 7, 14, 28)
     private const val MAX_TRAINING_DAYS = 365
-    private val SEASON_COLUMNS = listOf(13, 14)
+    private const val SEASONS = 2
     private const val MIN_SEASON_DAYS = 7
     /** History the personal model needs before it is even tried; the readiness rings show progress to these. */
     const val MIN_PERSONAL_DAYS = 120

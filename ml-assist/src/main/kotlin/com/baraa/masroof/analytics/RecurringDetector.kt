@@ -8,7 +8,6 @@ import kotlin.math.roundToLong
 
 /** Cadence from the rules, or the user's own decision for a series. */
 enum class RecurringLabel { NONE, WEEKLY, MONTHLY, YEARLY }
-data class RecurringPrediction(val label: RecurringLabel, val origin: String = "RULES")
 
 data class RecurringPattern(val key: String, val name: String, val cadence: String, val nextDay: Long,
     val estimate: Long, val lower: Long, val upper: Long, val sourceIds: List<String>,
@@ -49,13 +48,14 @@ object RecurringDetector {
             if (ordered.size < 2) null else RecurringSeries(hash("series:$identity"), ordered)
         }
 
+    /** [overrides] are the user's explicit cadence decisions by series key; every other series uses its rule label. */
     fun detect(facts: List<FinancialFact>, today: Long,
-        classify: ((RecurringSeries) -> RecurringPrediction?)? = null): List<RecurringPattern> = series(facts).mapNotNull { series ->
+        overrides: Map<String, RecurringLabel> = emptyMap()): List<RecurringPattern> = series(facts).mapNotNull { series ->
             val ordered = series.rows
             val recent = ordered.takeLast(6)
             val dates = series.dates
-            val prediction = if (classify == null) RecurringPrediction(series.ruleLabel) else classify(series)
-            val label = prediction?.label?.takeIf { it != RecurringLabel.NONE } ?: return@mapNotNull null
+            val decided = overrides[series.key]
+            val label = (decided ?: series.ruleLabel).takeIf { it != RecurringLabel.NONE } ?: return@mapNotNull null
             if (label != RecurringLabel.YEARLY && ordered.size < 3) return@mapNotNull null
             val cadence = label.name
             fun endAligned(date: LocalDate, next: LocalDate) =
@@ -77,6 +77,6 @@ object RecurringDetector {
             RecurringPattern(hash("${series.key}|$cadence"), ordered.last().merchant!!, cadence, due.toEpochDay(),
                 smoothed.roundToLong(), (smoothed - margin).roundToLong().coerceAtLeast(0), (smoothed + margin).roundToLong(),
                 ordered.map { it.id }, last, reference?.roundToLong(), reference != null && last - reference >= maxOf(reference * .2, 1000.0),
-                series.key, prediction.origin)
+                series.key, if (decided != null) "HUMAN_DECISION" else "RULES")
         }.sortedBy { it.nextDay }
 }

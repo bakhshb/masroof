@@ -8,23 +8,22 @@ import com.baraa.masroof.engine.bank.ParseStatus
 import com.baraa.masroof.engine.bank.interpretation.FamilyOrigin
 import com.baraa.masroof.engine.bank.interpretation.FamilySuggestion
 import com.baraa.masroof.engine.bank.interpretation.FamilyTextPreparation
+import com.baraa.masroof.engine.bank.interpretation.FamilyTextShape
 import com.baraa.masroof.ml.family.*
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /** The single bridge used by live intake, feedback and offline fixture exports. */
 object FamilyAssistBridge {
-    fun clean(body: String): FamilyCleaningResult {
-        val shape = FamilyTextPreparation.prepare(body)
-        return FamilyInputCleaner.clean(shape.title, shape.fieldLabels)
-    }
+    fun clean(body: String): FamilyCleaningResult = clean(FamilyTextPreparation.prepare(body))
+    fun clean(shape: FamilyTextShape): FamilyCleaningResult = FamilyInputCleaner.clean(shape.title, shape.fieldLabels)
 
-    fun suggest(classifier: FamilyClassifier?, bankId: String, body: String, normalizedTitle: String): FamilySuggestion? {
-        // Ensure the structural view belongs to the same title the interpreter is interpreting.
-        if (FamilyTextPreparation.prepare(body).title != normalizedTitle) return null
-        val features = clean(body).features ?: return null
-        val proposal = classifier?.suggest(bankId, features) ?: return null
+    fun suggest(classifier: FamilyClassifier?, bankId: String, features: CleanFamilyFeatures?): FamilySuggestion? {
+        val proposal = classifier?.suggest(bankId, features ?: return null) ?: return null
         return FamilySuggestion(toBank(proposal.family), 1.0, proposal.modelVersion, FamilyOrigin.HUMAN_TEMPLATE)
     }
+
+    fun suggest(classifier: FamilyClassifier?, bankId: String, body: String): FamilySuggestion? =
+        classifier?.let { suggest(it, bankId, clean(body).features) }
 
     /**
      * A remembered "not financial" decision settles only a message the rules could not identify and that carries no
@@ -34,15 +33,15 @@ object FamilyAssistBridge {
     fun rememberNonFinancial(result: Interpretation, suggestion: FamilySuggestion?): Interpretation =
         if (suggestion?.family != MessageFamily.NON_FINANCIAL || result.facts.family != MessageFamily.UNKNOWN ||
             result.facts.amount != null || result.bank == null) result
-        else Interpretation(result.evidenceId, result.version, result.bank, Facts(MessageFamily.NON_FINANCIAL), ParseStatus.NON_FINANCIAL,
-            Confidence(1.0, listOf("family_origin:${suggestion.origin}", "model:${suggestion.modelVersion}")), emptyList(), emptySet(),
-            result.diagnostics, suggestion, result.patternProvenance)
+        // The draft mapper stamps family_origin/model reasons from [Interpretation.familyInference].
+        else result.copy(facts = Facts(MessageFamily.NON_FINANCIAL), status = ParseStatus.NON_FINANCIAL,
+            confidence = Confidence(suggestion.score, emptyList()), evidence = emptyList(), blockers = emptySet(), familyInference = suggestion)
 
     /** Messages a remembered "not financial" once settled that today's decisions no longer settle; they go back to review. */
     fun revokedMemories(records: List<ParsedEventRecord>, bodies: Map<String, String>,
         models: Map<String, FamilyClassifier>): Set<String> = records.filter { record ->
             val body = bodies[record.event.rawSmsId] ?: return@filter false
-            suggest(models[record.event.bank.id], record.event.bank.id, body, FamilyTextPreparation.prepare(body).title)?.family !=
+            suggest(models[record.event.bank.id], record.event.bank.id, body)?.family !=
                 MessageFamily.NON_FINANCIAL
         }.map { it.event.rawSmsId }.toSet()
 

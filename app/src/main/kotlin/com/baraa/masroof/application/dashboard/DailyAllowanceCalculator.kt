@@ -20,7 +20,7 @@ object DailyAllowanceCalculator {
         net ?: return null
         if (today < period.startDate || today >= period.endDateExclusive) return null
         // Overdue rows are left out: a payment that was made but not matched already lowered [net].
-        val upcoming = commitments.upcomingUnpaid.filter { it.expectedDate == null || it.expectedDate >= today }
+        val upcoming = commitments.upcomingUnpaid.filter { (it.daysUntil(today) ?: 0) >= 0 }
         if (upcoming.any { it.amount.currency != net.currency }) return null
         val dues = upcoming.fold(Money.zero(net.currency)) { sum, row -> sum + row.amount }
         val days = ChronoUnit.DAYS.between(today, period.endDateExclusive)

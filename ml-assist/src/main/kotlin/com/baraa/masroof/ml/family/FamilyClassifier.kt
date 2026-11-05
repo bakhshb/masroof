@@ -35,9 +35,7 @@ class FamilyClassifier(val bankId: String, labels: List<HumanFamilyLabel> = empt
 
     companion object {
         const val VERSION = "family-template-v1"
-        val FINANCIAL = setOf(SmsFamilyLabel.PURCHASE, SmsFamilyLabel.TRANSFER_IN, SmsFamilyLabel.TRANSFER_OUT,
-            SmsFamilyLabel.CARD_PAYMENT, SmsFamilyLabel.BILL_PAYMENT, SmsFamilyLabel.FINANCING_INSTALLMENT,
-            SmsFamilyLabel.WITHDRAWAL, SmsFamilyLabel.REFUND, SmsFamilyLabel.FEE)
-        val REMEMBERED = FINANCIAL + SmsFamilyLabel.NON_FINANCIAL
+        /** Families a decision can be remembered for: every financial family plus "not financial". */
+        private val REMEMBERED = SmsFamilyLabel.entries.toSet() - setOf(SmsFamilyLabel.OTP, SmsFamilyLabel.BALANCE_NOTICE, SmsFamilyLabel.UNKNOWN)
     }
 }
