@@ -5,6 +5,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
@@ -22,9 +23,9 @@ class DailySpendingTrendBuilderTest {
     fun zeroFillsEveryPeriodDay_andAveragesNetDailySpending() {
         val trend = build(
             transactions = listOf(
-                transaction("expense", FinancialTransactionType.EXPENSE, "100", "2026-07-27T07:00:00Z"),
-                transaction("bill", FinancialTransactionType.BILL_PAYMENT, "30", "2026-07-28T07:00:00Z"),
-                transaction("refund", FinancialTransactionType.REFUND, "20", "2026-07-28T08:00:00Z"),
+                tx("expense", FinancialTransactionType.EXPENSE, "100", occurredAt = Instant.parse("2026-07-27T07:00:00Z")),
+                tx("bill", FinancialTransactionType.BILL_PAYMENT, "30", occurredAt = Instant.parse("2026-07-28T07:00:00Z")),
+                tx("refund", FinancialTransactionType.REFUND, "20", occurredAt = Instant.parse("2026-07-28T08:00:00Z")),
             ),
             today = LocalDate.parse("2026-07-29"),
         )
@@ -46,21 +47,21 @@ class DailySpendingTrendBuilderTest {
 
     @Test
     fun excludesNonSpendingMovements_andUsesSarEquivalents() {
-        val foreignExpense = transaction(
+        val foreignExpense = tx(
             id = "foreign",
             type = FinancialTransactionType.EXPENSE,
             amount = "10",
-            occurredAt = "2026-07-27T07:00:00Z",
+            occurredAt = Instant.parse("2026-07-27T07:00:00Z"),
             currency = Currency.USD,
         )
         val trend = DailySpendingTrendBuilder.build(
             period = period,
             transactions = listOf(
                 foreignExpense,
-                transaction("cash", FinancialTransactionType.CASH_WITHDRAWAL, "100", "2026-07-27T07:00:00Z"),
-                transaction("transfer", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100", "2026-07-27T07:00:00Z"),
-                transaction("payment", FinancialTransactionType.CREDIT_CARD_PAYMENT, "100", "2026-07-27T07:00:00Z"),
-                transaction("loan", FinancialTransactionType.LOAN_REPAYMENT, "100", "2026-07-27T07:00:00Z"),
+                tx("cash", FinancialTransactionType.CASH_WITHDRAWAL, "100", occurredAt = Instant.parse("2026-07-27T07:00:00Z")),
+                tx("transfer", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "100", occurredAt = Instant.parse("2026-07-27T07:00:00Z")),
+                tx("payment", FinancialTransactionType.CREDIT_CARD_PAYMENT, "100", occurredAt = Instant.parse("2026-07-27T07:00:00Z")),
+                tx("loan", FinancialTransactionType.LOAN_REPAYMENT, "100", occurredAt = Instant.parse("2026-07-27T07:00:00Z")),
             ),
             parsedRecords = emptyList(),
             primaryCurrency = Currency.SAR,
@@ -77,7 +78,7 @@ class DailySpendingTrendBuilderTest {
     fun currentPeriod_omitsFutureDaysFromChartAndAverage() {
         val trend = build(
             transactions = listOf(
-                transaction("expense", FinancialTransactionType.EXPENSE, "100", "2026-07-27T07:00:00Z"),
+                tx("expense", FinancialTransactionType.EXPENSE, "100", occurredAt = Instant.parse("2026-07-27T07:00:00Z")),
             ),
             today = LocalDate.parse("2026-07-28"),
         )
@@ -108,7 +109,7 @@ class DailySpendingTrendBuilderTest {
             FinancialTransactionType.INCOME to "1000",
         )
         val trend = DailySpendingTrendBuilder.build(period,
-            types.mapIndexed { index, (type, amount) -> transaction("$index", type, amount, at) },
+            types.mapIndexed { index, (type, amount) -> tx("$index", type, amount, occurredAt = Instant.parse(at)) },
             emptyList(), Currency.SAR, emptyMap(), zone, LocalDate.parse("2026-07-29"),
             includeFinancialOutflows = true)
         assertEquals("670.00", trend.totalSpending.amount.toPlainString())
@@ -120,7 +121,7 @@ class DailySpendingTrendBuilderTest {
     fun averageUsesElapsedDays_includingZeroDays_beyondFourteenDays() {
         val longPeriod = FinancialPeriod(LocalDate.parse("2026-07-01"), LocalDate.parse("2026-08-01"))
         val trend = DailySpendingTrendBuilder.build(longPeriod,
-            listOf(transaction("expense", FinancialTransactionType.EXPENSE, "200", "2026-07-01T07:00:00Z")),
+            listOf(tx("expense", FinancialTransactionType.EXPENSE, "200", occurredAt = Instant.parse("2026-07-01T07:00:00Z"))),
             emptyList(), Currency.SAR, emptyMap(), zone, LocalDate.parse("2026-07-20"), true)
         assertEquals(20, trend.points.size)
         assertEquals("10.00", trend.averageDailySpending.amount.toPlainString())
@@ -129,14 +130,14 @@ class DailySpendingTrendBuilderTest {
     @Test
     fun unresolvedForeignAmounts_areNotAddedAsLocalCurrency() {
         val trend = DailySpendingTrendBuilder.build(period,
-            listOf(transaction("usd", FinancialTransactionType.EXPENSE, "100", "2026-07-27T07:00:00Z", Currency.USD)),
+            listOf(tx("usd", FinancialTransactionType.EXPENSE, "100", occurredAt = Instant.parse("2026-07-27T07:00:00Z"), currency = Currency.USD)),
             emptyList(), Currency.SAR, emptyMap(), zone, LocalDate.parse("2026-07-29"), true)
         assertEquals("0.00", trend.totalSpending.amount.toPlainString())
     }
 
     @Test
     fun futurePeriod_hasNoPointsNoAverageAndNoTransactionIds() {
-        val trend = build(listOf(transaction("future", FinancialTransactionType.EXPENSE, "100", "2026-07-27T07:00:00Z")),
+        val trend = build(listOf(tx("future", FinancialTransactionType.EXPENSE, "100", occurredAt = Instant.parse("2026-07-27T07:00:00Z"))),
             today = LocalDate.parse("2026-07-26"))
         assertEquals(emptyList<DailySpendingPoint>(), trend.points)
         assertEquals("0.00", trend.averageDailySpending.amount.toPlainString())
@@ -145,7 +146,7 @@ class DailySpendingTrendBuilderTest {
 
     @Test
     fun futureTransactionsInCurrentPeriod_doNotLeakIntoDaySelection() {
-        val trend = build(listOf(transaction("future", FinancialTransactionType.EXPENSE, "100", "2026-07-29T07:00:00Z")),
+        val trend = build(listOf(tx("future", FinancialTransactionType.EXPENSE, "100", occurredAt = Instant.parse("2026-07-29T07:00:00Z"))),
             today = LocalDate.parse("2026-07-28"))
         assertEquals(2, trend.points.size)
         assertEquals("0.00", trend.totalSpending.amount.toPlainString())
@@ -164,25 +165,5 @@ class DailySpendingTrendBuilderTest {
             sarEquivalents = emptyMap(),
             zoneId = zone,
             today = today,
-        )
-
-    private fun transaction(
-        id: String,
-        type: FinancialTransactionType,
-        amount: String,
-        occurredAt: String,
-        currency: Currency = Currency.SAR,
-    ): FinancialTransaction =
-        FinancialTransaction(
-            id = id,
-            type = type,
-            amount = Money.of(amount, currency),
-            occurredAt = Instant.parse(occurredAt),
-            sourceContainerId = null,
-            destinationContainerId = null,
-            merchant = null,
-            counterparty = null,
-            categoryId = null,
-            linkedParsedEventIds = emptyList(),
         )
 }

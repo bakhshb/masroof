@@ -1,13 +1,12 @@
 package com.baraa.masroof.application.commitment
 
 import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.CommitmentRecurrence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.repository.CommitmentRepository
+import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
@@ -28,7 +27,7 @@ class CommitmentFromTransactionServiceTest {
         val repository = object : CommitmentRepository by ThrowOnDuplicateCommitmentRepository() {
             override suspend fun create(commitment: Commitment): Unit = throw cancelled
         }
-        val tx = transaction("cancelled")
+        val tx = tx("cancelled", amount = "71.00", merchant = "Netflix")
         val service = CommitmentFromTransactionService(repository, FakeFinancialTransactionRepository(listOf(tx)), zone, clock)
         try {
             service.createFromTransaction(tx.id)
@@ -40,7 +39,7 @@ class CommitmentFromTransactionServiceTest {
 
     @Test
     fun createFromTransaction_insertRaceWithAStoredRow_returnsAlreadyExists() = runBlocking {
-        val tx = transaction(id = "tx-netflix")
+        val tx = tx(id = "tx-netflix", amount = "71.00", merchant = "Netflix")
         val stored = ThrowOnDuplicateCommitmentRepository()
         // A concurrent writer stores the row between the pre-check and this insert.
         val racing = object : CommitmentRepository by stored {
@@ -57,7 +56,7 @@ class CommitmentFromTransactionServiceTest {
 
     @Test
     fun createFromTransaction_failedInsertWithoutARow_isRejected() = runBlocking {
-        val tx = transaction(id = "tx-netflix")
+        val tx = tx(id = "tx-netflix", amount = "71.00", merchant = "Netflix")
         val failing = object : CommitmentRepository by ThrowOnDuplicateCommitmentRepository() {
             override suspend fun create(commitment: Commitment): Unit = throw IllegalStateException("disk full")
         }
@@ -68,7 +67,7 @@ class CommitmentFromTransactionServiceTest {
 
     @Test
     fun createFromTransaction_defaultsToMonthlyRecurrence() = runBlocking {
-        val tx = transaction(id = "tx-netflix")
+        val tx = tx(id = "tx-netflix", amount = "71.00", merchant = "Netflix")
         val repository = ThrowOnDuplicateCommitmentRepository()
         val service = CommitmentFromTransactionService(
             commitmentRepository = repository,
@@ -84,7 +83,7 @@ class CommitmentFromTransactionServiceTest {
 
     @Test
     fun createFromTransaction_refundIsRejected() = runBlocking {
-        val refund = transaction(id = "tx-refund", type = FinancialTransactionType.REFUND)
+        val refund = tx(id = "tx-refund", type = FinancialTransactionType.REFUND, amount = "71.00", merchant = "Netflix")
         val service = CommitmentFromTransactionService(
             commitmentRepository = ThrowOnDuplicateCommitmentRepository(),
             financialTransactionRepository = FakeFinancialTransactionRepository(listOf(refund)),
@@ -97,23 +96,6 @@ class CommitmentFromTransactionServiceTest {
             service.createFromTransaction(refund.id),
         )
     }
-
-    private fun transaction(
-        id: String,
-        type: FinancialTransactionType = FinancialTransactionType.EXPENSE,
-    ): FinancialTransaction =
-        FinancialTransaction(
-            id = id,
-            type = type,
-            amount = Money.of("71.00", Currency.SAR),
-            occurredAt = Instant.parse("2026-08-01T12:00:00Z"),
-            sourceContainerId = null,
-            destinationContainerId = null,
-            merchant = "Netflix",
-            counterparty = null,
-            categoryId = null,
-            linkedParsedEventIds = emptyList(),
-        )
 
     private class FakeFinancialTransactionRepository(
         private val all: List<FinancialTransaction>,
@@ -150,6 +132,5 @@ class CommitmentFromTransactionServiceTest {
             bySource[sourceTransactionId]
 
         override suspend fun listAll(): List<Commitment> = bySource.values.toList()
-
     }
 }

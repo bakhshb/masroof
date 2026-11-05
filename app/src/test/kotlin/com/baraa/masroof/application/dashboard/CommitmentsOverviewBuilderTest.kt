@@ -12,6 +12,7 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,11 +30,11 @@ class CommitmentsOverviewBuilderTest {
     @Test
     fun userCommitmentWithoutRecurrence_countsAsPaidInSourcePeriod() {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
-        val tx = transaction(
+        val tx = tx(
             id = "tx-netflix",
             merchant = "Netflix",
             amount = "71",
-            at = start.plusSeconds(60),
+            occurredAt = start.plusSeconds(60),
         )
         val commitment = commitment(
             name = "Netflix",
@@ -84,11 +85,11 @@ class CommitmentsOverviewBuilderTest {
             startDate = LocalDate.parse("2026-06-27"),
             endDateExclusive = LocalDate.parse("2026-07-27"),
         )
-        val sourceTx = transaction(
+        val sourceTx = tx(
             id = "tx-netflix",
             merchant = "Netflix",
             amount = "71",
-            at = FinancialPeriodPolicy.toInclusiveStartInstant(previousPeriod.startDate, zone).plusSeconds(60),
+            occurredAt = FinancialPeriodPolicy.toInclusiveStartInstant(previousPeriod.startDate, zone).plusSeconds(60),
         )
         val commitment = commitment(
             name = "Netflix",
@@ -157,11 +158,11 @@ class CommitmentsOverviewBuilderTest {
             recurrence = CommitmentRecurrence.WEEKLY,
             transactionDate = LocalDate.parse("2026-07-28"),
         )
-        val payment = transaction(
+        val payment = tx(
             id = "payment-cleaning",
             merchant = "Cleaning",
             amount = "100",
-            at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
+            occurredAt = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
         )
 
         val overview = build(
@@ -186,18 +187,18 @@ class CommitmentsOverviewBuilderTest {
             recurrence = CommitmentRecurrence.WEEKLY,
             transactionDate = LocalDate.parse("2026-07-28"),
         )
-        val earlierPayment = transaction(
+        val earlierPayment = tx(
             id = "payment-cleaning-earlier",
             merchant = "Cleaning",
             amount = "100",
-            at = FinancialPeriodPolicy.toInclusiveStartInstant(LocalDate.parse("2026-07-28"), zone)
+            occurredAt = FinancialPeriodPolicy.toInclusiveStartInstant(LocalDate.parse("2026-07-28"), zone)
                 .plusSeconds(60),
         )
-        val laterPayment = transaction(
+        val laterPayment = tx(
             id = "payment-cleaning-later",
             merchant = "Cleaning",
             amount = "120",
-            at = FinancialPeriodPolicy.toInclusiveStartInstant(LocalDate.parse("2026-08-04"), zone)
+            occurredAt = FinancialPeriodPolicy.toInclusiveStartInstant(LocalDate.parse("2026-08-04"), zone)
                 .plusSeconds(60),
         )
 
@@ -221,11 +222,11 @@ class CommitmentsOverviewBuilderTest {
             LocalDate.parse("2026-08-05"),
             zone,
         ).plusSeconds(60)
-        val payment = transaction(
+        val payment = tx(
             id = "tx-stc-payment",
             merchant = "STC",
             amount = "165",
-            at = paymentAt,
+            occurredAt = paymentAt,
         )
         val commitment = commitment(
             name = "STC",
@@ -318,11 +319,11 @@ class CommitmentsOverviewBuilderTest {
 
     @Test
     fun refundDoesNotCountAsRecurringCommitmentPayment() {
-        val refund = transaction(
+        val refund = tx(
             id = "refund-stc",
             merchant = "STC",
             amount = "173",
-            at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
+            occurredAt = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
             type = FinancialTransactionType.REFUND,
         )
         val commitment = commitment(
@@ -347,13 +348,13 @@ class CommitmentsOverviewBuilderTest {
             due = Money.of("500.00", Currency.SAR),
             last4 = "1234",
         )
-        val payment = transaction(
+        val payment = tx(
             id = "payment-card",
             merchant = "Card payment",
             amount = "500",
-            at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
+            occurredAt = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
             type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
-            destinationContainerId = "card:${Bank.BANK_ALJAZIRA.id}:1234",
+            dest = "card:${Bank.BANK_ALJAZIRA.id}:1234",
         )
 
         val overview = build(
@@ -371,13 +372,13 @@ class CommitmentsOverviewBuilderTest {
     fun cardsAndCommitments_agreeOnPaidAndUnpaidFacilityDues() {
         val paidFacility = creditFacility(due = Money.of("500.00", Currency.SAR), last4 = "7271")
         val unpaidFacility = creditFacility(due = Money.of("300.00", Currency.SAR), last4 = "1234")
-        val payment = transaction(
+        val payment = tx(
             id = "payment-7271",
             merchant = "Card payment",
             amount = "500",
-            at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
+            occurredAt = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
             type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
-            destinationContainerId = "card:${Bank.BANK_ALJAZIRA.id}:7271",
+            dest = "card:${Bank.BANK_ALJAZIRA.id}:7271",
         )
         val facilities = CreditFacilitiesOverview(listOf(paidFacility, unpaidFacility), emptyList(), Currency.SAR)
 
@@ -405,13 +406,13 @@ class CommitmentsOverviewBuilderTest {
             due = Money.of("500.00", Currency.SAR),
             last4 = "1234",
         )
-        val payment = transaction(
+        val payment = tx(
             id = "payment-card",
             merchant = "Card payment",
             amount = "500",
-            at = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
+            occurredAt = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone).plusSeconds(60),
             type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
-            destinationContainerId = "card:${Bank.BANK_ALJAZIRA.id}:1234",
+            dest = "card:${Bank.BANK_ALJAZIRA.id}:1234",
         )
         val laterPeriod = FinancialPeriod(
             startDate = LocalDate.parse("2026-08-27"),
@@ -436,13 +437,13 @@ class CommitmentsOverviewBuilderTest {
             due = Money.of("500.00", Currency.SAR),
             last4 = "1234",
         )
-        val payment = transaction(
+        val payment = tx(
             id = "payment-card",
             merchant = "Card payment",
             amount = "500",
-            at = Instant.parse("2026-07-26T12:00:00Z"),
+            occurredAt = Instant.parse("2026-07-26T12:00:00Z"),
             type = FinancialTransactionType.CREDIT_CARD_PAYMENT,
-            destinationContainerId = "card:${Bank.BANK_ALJAZIRA.id}:1234",
+            dest = "card:${Bank.BANK_ALJAZIRA.id}:1234",
         )
 
         val overview = build(
@@ -457,11 +458,11 @@ class CommitmentsOverviewBuilderTest {
     @Test
     fun duplicateRecurringCommitments_shareSingleInPeriodPayment() {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
-        val payment = transaction(
+        val payment = tx(
             id = "payment-netflix",
             merchant = "Netflix",
             amount = "71",
-            at = start.plusSeconds(120),
+            occurredAt = start.plusSeconds(120),
         )
         val first = commitment(
             id = "cmt_first",
@@ -600,11 +601,11 @@ class CommitmentsOverviewBuilderTest {
     @Test
     fun paidCommitment_usesActualPaymentAmountNotStoredCommitmentAmount() {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
-        val tx = transaction(
+        val tx = tx(
             id = "tx-stc",
             merchant = "STC",
             amount = "173",
-            at = start.plusSeconds(60),
+            occurredAt = start.plusSeconds(60),
         )
         val commitment = commitment(
             name = "STC",
@@ -627,11 +628,11 @@ class CommitmentsOverviewBuilderTest {
     @Test
     fun recurringCommitment_marksPaidWhenPaymentAmountDiffersFromCommitmentAmount() {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
-        val payment = transaction(
+        val payment = tx(
             id = "tx-stc-payment",
             merchant = "STC",
             amount = "165",
-            at = start.plusSeconds(120),
+            occurredAt = start.plusSeconds(120),
         )
         val commitment = commitment(
             name = "STC",
@@ -655,11 +656,11 @@ class CommitmentsOverviewBuilderTest {
     @Test
     fun editedCommitmentAmount_marksPaidWhenSourceTransactionMatchesEditedAmount() {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
-        val tx = transaction(
+        val tx = tx(
             id = "tx-stc",
             merchant = "STC",
             amount = "200",
-            at = start.plusSeconds(60),
+            occurredAt = start.plusSeconds(60),
         )
         val commitment = commitment(
             name = "STC",
@@ -707,11 +708,11 @@ class CommitmentsOverviewBuilderTest {
             categoryId = null,
             linkedParsedEventIds = emptyList(),
         )
-        val paymentTx = transaction(
+        val paymentTx = tx(
             id = "tx-payment",
             merchant = "Amazon",
             amount = "112.50",
-            at = start.plusSeconds(120),
+            occurredAt = start.plusSeconds(120),
         )
         val commitment = commitment(
             name = "Amazon",
@@ -732,7 +733,7 @@ class CommitmentsOverviewBuilderTest {
     @Test
     fun foreignCurrencyCommitment_scalesSourceSarWithoutRoundingTheRatio() {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
-        val sourceTx = transaction(id = "tx-usd", merchant = "Amazon", amount = "30", at = start.minusSeconds(3600))
+        val sourceTx = tx(id = "tx-usd", merchant = "Amazon", amount = "30", occurredAt = start.minusSeconds(3600))
             .copy(amount = Money.of("30.00", Currency.USD))
         val overview = build(
             commitments = listOf(commitment(name = "Amazon", amount = Money.of("20.00", Currency.USD),
@@ -828,17 +829,17 @@ class CommitmentsOverviewBuilderTest {
             startDate = LocalDate.parse("2026-09-27"),
             endDateExclusive = LocalDate.parse("2026-10-27"),
         )
-        val septemberPayment = transaction(
+        val septemberPayment = tx(
             id = "chatgpt-september",
             merchant = "Google ChatGPT",
             amount = "267.93",
-            at = Instant.parse("2026-09-29T18:21:00Z"),
+            occurredAt = Instant.parse("2026-09-29T18:21:00Z"),
         )
-        val octoberPayment = transaction(
+        val octoberPayment = tx(
             id = "chatgpt-october",
             merchant = "Google ChatGPT",
             amount = "429.99",
-            at = Instant.parse("2026-10-21T18:21:00Z"),
+            occurredAt = Instant.parse("2026-10-21T18:21:00Z"),
         )
         val beforePeriod = septemberPayment.copy(
             id = "before-period",
@@ -877,11 +878,11 @@ class CommitmentsOverviewBuilderTest {
 
     @Test
     fun recurringCommitment_keepsSeparatePaymentsOnSameDayWithUniqueKeys() {
-        val firstPayment = transaction(
+        val firstPayment = tx(
             id = "first-payment",
             merchant = "Subscription",
             amount = "100",
-            at = Instant.parse("2026-08-01T10:00:00Z"),
+            occurredAt = Instant.parse("2026-08-01T10:00:00Z"),
         )
         val secondPayment = firstPayment.copy(id = "second-payment", amount = Money.of("150", Currency.SAR))
         val overview = build(
@@ -952,27 +953,6 @@ class CommitmentsOverviewBuilderTest {
             updatedAt = updatedAt,
         )
     }
-
-    private fun transaction(
-        id: String,
-        merchant: String,
-        amount: String,
-        at: Instant,
-        type: FinancialTransactionType = FinancialTransactionType.EXPENSE,
-        destinationContainerId: String? = null,
-    ): FinancialTransaction =
-        FinancialTransaction(
-            id = id,
-            type = type,
-            amount = Money.of(amount, Currency.SAR),
-            occurredAt = at,
-            sourceContainerId = null,
-            destinationContainerId = destinationContainerId,
-            merchant = merchant,
-            counterparty = null,
-            categoryId = null,
-            linkedParsedEventIds = emptyList(),
-        )
 
     private fun creditFacility(
         due: Money,

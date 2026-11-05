@@ -7,14 +7,13 @@ import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
-import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,12 +23,12 @@ class CardTransactionInvolvementResolverTest {
     @Test
     fun buildIndex_usesParsedCardRefAndContainerIds() {
         val cardId = FinancialContainerIdFactory.cardId(Bank.BANK_ALJAZIRA, "2210")
-        val txWithContainer = transaction(
+        val txWithContainer = tx(
             id = "container",
             source = cardId,
             linked = emptyList(),
         )
-        val txWithParsedRef = transaction(
+        val txWithParsedRef = tx(
             id = "parsed",
             source = null,
             linked = listOf("evt-1"),
@@ -66,7 +65,7 @@ class CardTransactionInvolvementResolverTest {
         )
 
         val key = CardTransactionInvolvementResolver.resolvePrimaryCardKey(
-            transaction = transaction(id = "tx", source = null, linked = emptyList()),
+            transaction = tx(id = "tx", source = null, linked = emptyList()),
             index = index,
         )
 
@@ -91,7 +90,7 @@ class CardTransactionInvolvementResolverTest {
 
     @Test
     fun buildIndex_doesNotInferCardFromSmsBodyWhenParsedCardRefMissing() {
-        val txWithParsedRef = transaction(
+        val txWithParsedRef = tx(
             id = "atm",
             source = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
             linked = listOf("evt-atm"),
@@ -142,8 +141,8 @@ class CardTransactionInvolvementResolverTest {
         val other = FinancialContainerIdFactory.cardId(Bank("OTHER_BANK"), "7271")
         val index = CardTransactionInvolvementResolver.buildIndex(
             transactions = listOf(
-                transaction(id = "alj", source = aljazira, linked = emptyList()),
-                transaction(id = "other", source = other, linked = emptyList()),
+                tx(id = "alj", source = aljazira, linked = emptyList()),
+                tx(id = "other", source = other, linked = emptyList()),
             ),
             parsedRecords = emptyList(),
         )
@@ -157,24 +156,6 @@ class CardTransactionInvolvementResolverTest {
             !CardTransactionInvolvementResolver.matchesCard("alj", "OTHER_BANK", "7271", index),
         )
     }
-
-    private fun transaction(
-        id: String,
-        source: String?,
-        linked: List<String>,
-    ): FinancialTransaction =
-        FinancialTransaction(
-            id = id,
-            type = FinancialTransactionType.EXPENSE,
-            amount = Money.of("10.00", Currency.SAR),
-            occurredAt = Instant.parse("2026-08-05T11:05:00Z"),
-            sourceContainerId = source,
-            destinationContainerId = null,
-            linkedParsedEventIds = linked,
-            merchant = null,
-            counterparty = null,
-            categoryId = null,
-        )
 
     private fun parsedRecord(
         id: String,

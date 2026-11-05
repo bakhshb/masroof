@@ -3,14 +3,11 @@ package com.baraa.masroof.data.repository
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.room.MasroofDatabase
-import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
+import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -19,7 +16,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.math.BigDecimal
 import java.time.Instant
 
 /** Batch lookups return exactly what the per-id lookups they replace return, across chunk boundaries. */
@@ -48,7 +44,7 @@ class BatchLookupRepositoryContractTest {
     @Test
     fun getByIdsAndLinkedRawSmsIds_matchPerIdLookups() = runBlocking {
         (1..5).forEach { raw.insertIfAbsent(rawSms("sms-$it")) }
-        (1..3).forEach { ledger.save(transaction("tx-$it"), listOf("sms-$it")) }
+        (1..3).forEach { ledger.save(tx("tx-$it", occurredAt = now), listOf("sms-$it")) }
         val perId = object : FinancialTransactionRepository by ledger {
             override suspend fun getByIds(ids: Collection<String>) = ids.distinct().mapNotNull { getById(it) }
             override suspend fun listLinkedRawSmsIds(rawSmsIds: Collection<String>) =
@@ -65,7 +61,7 @@ class BatchLookupRepositoryContractTest {
     @Test
     fun rawSmsKeyedBatchLookups_matchPerIdLookups() = runBlocking {
         (1..5).forEach { raw.insertIfAbsent(rawSms("sms-$it").copy(receivedAt = now.plusSeconds(it.toLong()))) }
-        (1..3).forEach { ledger.save(transaction("tx-$it"), listOf("sms-$it")) }
+        (1..3).forEach { ledger.save(tx("tx-$it", occurredAt = now), listOf("sms-$it")) }
         val reviews = RoomReviewRepository(db.reviewItemDao())
         reviews.upsertRequired("sms-2", com.baraa.masroof.domain.model.ReviewKind.NEEDS_REVIEW, listOf("missing_amount"), now)
         val ids = (1..5).map { "sms-$it" } + "sms-missing"
@@ -88,17 +84,4 @@ class BatchLookupRepositoryContractTest {
     }
 
     private fun rawSms(id: String) = RawSms(id, "AlJazira", "body-$id", now, null, "hash-$id")
-
-    private fun transaction(id: String) = FinancialTransaction(
-        id = id,
-        type = FinancialTransactionType.EXPENSE,
-        amount = Money.of(BigDecimal("10.00"), Currency.SAR),
-        occurredAt = now,
-        sourceContainerId = null,
-        destinationContainerId = null,
-        merchant = null,
-        counterparty = null,
-        categoryId = null,
-        linkedParsedEventIds = emptyList(),
-    )
 }

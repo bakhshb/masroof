@@ -38,6 +38,7 @@ import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
+import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -109,29 +110,32 @@ class ScopedReconciliationTest {
         persistTransfer("sms-linked", "pe-linked", inside.plusSeconds(30), MessageFamily.TRANSFER_IN)
         persistPurchase("sms-purchase", "pe-purchase", inside.plusSeconds(10))
         ftDelegate.save(
-            transaction(
+            tx(
                 id = "tx-linked",
                 type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
                 occurredAt = inside.plusSeconds(30),
-                eventId = "pe-linked",
+                linked = listOf("pe-linked"),
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-linked"),
         )
         ftDelegate.save(
-            transaction(
+            tx(
                 id = "tx-old-expense",
                 type = FinancialTransactionType.EXPENSE,
                 occurredAt = inside,
-                eventId = "pe-purchase",
+                linked = listOf("pe-purchase"),
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-purchase"),
         )
         ftDelegate.save(
-            transaction(
+            tx(
                 id = "tx-later-external",
                 type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
                 occurredAt = inside.plus(Duration.ofDays(30)),
-                eventId = "pe-out-range",
+                linked = listOf("pe-out-range"),
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-out-range"),
         )
@@ -186,11 +190,12 @@ class ScopedReconciliationTest {
             details = ParsedEventDetails(occurredAtLocal = localInside.plusMinutes(1)),
         )
         ftDelegate.save(
-            transaction(
+            tx(
                 id = "tx-local-linked",
                 type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
                 occurredAt = inside.plus(Duration.ofDays(4)),
-                eventId = "pe-local-linked",
+                linked = listOf("pe-local-linked"),
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-local-linked"),
         )
@@ -329,11 +334,12 @@ class ScopedReconciliationTest {
             amount = "10.00",
         )
         ftDelegate.save(
-            transaction(
+            tx(
                 id = "tx-ancient",
                 type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
                 occurredAt = Instant.parse("2019-01-01T00:00:00Z"),
-                eventId = "pe-ancient",
+                linked = listOf("pe-ancient"),
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-ancient"),
         )
@@ -496,12 +502,13 @@ class ScopedReconciliationTest {
                 amount = "2000.00",
             )
             ftDelegate.save(
-                transaction(
+                tx(
                     id = "tx-$smsId",
                     type = FinancialTransactionType.SELF_TRANSFER,
                     occurredAt = at.plusSeconds(index.toLong()),
-                    eventId = "pe-$smsId",
-                    sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+                    linked = listOf("pe-$smsId"),
+                    source = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+                    occurredAtZone = zoneId.id,
                 ).copy(
                     amount = Money.of("2000.00", Currency.SAR),
                     destinationContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3003"),
@@ -569,13 +576,14 @@ class ScopedReconciliationTest {
             counterparty = "تمويل شخصي",
         )
         ftDelegate.save(
-            transaction(
+            tx(
                 id = TransactionIdFactory.fromRawSmsIds(listOf("sms-loan")),
                 type = FinancialTransactionType.FEE,
                 occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
-                eventId = "evt-loan",
-                sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+                linked = listOf("evt-loan"),
+                source = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
                 counterparty = "تمويل شخصي",
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-loan"),
         )
@@ -821,27 +829,6 @@ class ScopedReconciliationTest {
         bankNetworkType = network,
         confidence = Confidence(1.0),
         parseStatus = status,
-    )
-
-    private fun transaction(
-        id: String,
-        type: FinancialTransactionType,
-        occurredAt: Instant,
-        eventId: String,
-        sourceContainerId: String? = null,
-        counterparty: String? = null,
-    ) = FinancialTransaction(
-        id = id,
-        type = type,
-        amount = Money.of("10.00", Currency.SAR),
-        occurredAt = occurredAt,
-        sourceContainerId = sourceContainerId,
-        destinationContainerId = null,
-        merchant = null,
-        counterparty = counterparty,
-        categoryId = null,
-        linkedParsedEventIds = listOf(eventId),
-        occurredAtZone = zoneId.id,
     )
 
     private class CountingParsedEventRepository(
