@@ -29,6 +29,7 @@ import com.baraa.masroof.application.statement.StatementReconciliationService
 import com.baraa.masroof.application.statement.StatementReconciliationWorkflow
 import com.baraa.masroof.application.statement.statementLedgerReferences
 import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
+import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
 import com.baraa.masroof.application.transaction.HistoricalMerchantRateCorrectionWorkflow
 import com.baraa.masroof.application.transaction.FinancialTransactionEvidenceSyncer
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
@@ -889,7 +890,9 @@ class AppContainer(
             repairStoredTransfers = {
                 val report = transactionReconciliationService.repairLegacyTransfersDetailed()
                 reviewQueueUpdater.applyReport(report)
-                TransferIntegrityRepairResult(failedCount = report.summary.failed)
+                TransferIntegrityRepairResult(
+                    failedCount = ReconciliationCompletionPolicy.failureCount(report),
+                )
             },
             completionSignal = maintenanceCompletionSignal,
         )
