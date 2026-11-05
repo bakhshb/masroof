@@ -214,6 +214,9 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val transferIds = categories[ChartDataCategory.EXTERNAL_TRANSFERS]?.transactionIdsByDate?.values?.flatten()?.toSet().orEmpty()
             val invalidIds = clean.quality.excluded.filterKeys { it != "DUPLICATE_ID" }.values.flatten().toSet()
             val storedCategories = historical.transactions.associate { it.id to it.categoryId }
+            val choices = container.financialTransactionRepository.listCategoryChoices().mapIndexed { index, choice ->
+                AnalysisSpendingFact("choice:$index", choice.occurredAt.atZone(zone).toLocalDate().toEpochDay(), 0, "CHOICE",
+                    choice.merchant, choice.categoryId) }
             val insightFacts = facts.distinctBy { it.id }.filter { it.included && it.id !in invalidIds && it.amount != null }.map {
                 AnalysisSpendingFact(it.id, it.day, if (it.refund) Math.negateExact(it.amount!!) else it.amount!!,
                     when { it.refund -> "REFUNDS"; it.id in cashIds -> "CASH"; it.id in transferIds -> "TRANSFERS"; else -> "PURCHASES" }, it.merchant, storedCategories[it.id])
@@ -221,7 +224,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val previousPeriod = FinancialPeriodPolicy.previous(period)
             val insights = AnalysisSpendingInsightsBuilder.build(insightFacts, period.startDate.toEpochDay(), todayDay,
                 previousPeriod.startDate.toEpochDay(), previousPeriod.endDateExclusive.toEpochDay(),
-                clean.days.filter { it.covered }.map { it.day }.toSet())
+                clean.days.filter { it.covered }.map { it.day }.toSet(), choices)
             val reasons = buildList {
                 if (noPermission) add("SMS_PERMISSION")
                 if (retry) add("PROCESSING_RETRY")
@@ -238,7 +241,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val committed = read.committed
             val decisions = store.analytics().candidates().filter { it.status != "SUGGESTED" }.sortedBy { it.id }.map { it.id to it.status }
             val feedback = store.analytics().feedback().joinToString { "${it.seriesKey}:${it.kind}:${it.decidedAt}:${hash(it.payload)}" }
-            val canonical = "continuous-learning-v1|${RecurringLearningWorkflow.version}|${ForecastPerformancePolicy.VERSION}|${AnalyticsVersion.EVALUATION}|${AnalyticsVersion.MODEL}|${AnalyticsVersion.FEATURES}|${clean.fingerprint}|$dues|${committed.sorted()}|$blocked|${current.summary.reviewRequiredCount}|${period.startDate}|$prefs|$decisions|$feedback|${read.committedCadences}|${hash(insightFacts.filter { it.category != null }.joinToString { "${it.id}:${it.category}" })}|${clock.millis() / SIX_HOURS_MS}"
+            val canonical = "continuous-learning-v1|${RecurringLearningWorkflow.version}|${ForecastPerformancePolicy.VERSION}|${AnalyticsVersion.EVALUATION}|${AnalyticsVersion.MODEL}|${AnalyticsVersion.FEATURES}|${clean.fingerprint}|$dues|${committed.sorted()}|$blocked|${current.summary.reviewRequiredCount}|${period.startDate}|$prefs|$decisions|$feedback|${read.committedCadences}|${hash(choices.joinToString { "${it.day}:${it.merchant}:${it.category}" })}|${clock.millis() / SIX_HOURS_MS}"
             return Source(clean, period.startDate.toEpochDay(), period.endDateExclusive.toEpochDay(), todayDay, completed,
                 dues, committed, current.summary.reviewRequiredCount, blocked, hash(canonical), reasons, insights, read.committedCadences)
     }

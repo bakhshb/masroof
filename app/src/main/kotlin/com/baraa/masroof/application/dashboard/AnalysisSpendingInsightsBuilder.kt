@@ -54,10 +54,11 @@ object AnalysisSpendingInsightsBuilder {
                 members.sortedWith(compareByDescending<AnalysisSpendingFact> { it.day }.thenBy { it.id }).map { it.id }, category = name.name)
         }.filter { it.amount > 0 }.sortedWith(compareByDescending<AnalysisSpendingGroup> { it.amount }.thenBy { it.key })
 
+    /** [choices] are stored category choices from all history, so a choice outlives the analysis window. */
     fun build(facts: List<AnalysisSpendingFact>, start: Long, today: Long, previousStart: Long, previousEnd: Long,
-        coveredDays: Set<Long>): AnalysisSpendingInsights {
+        coveredDays: Set<Long>, choices: List<AnalysisSpendingFact> = emptyList()): AnalysisSpendingInsights {
         val rows = facts.distinctBy { it.id }
-        val category = categoryResolver(rows)
+        val category = categoryResolver(rows + choices)
         val current = rows.filter { it.day in start..today }
         val elapsed = today - start // Compare complete days only; today's partial receipts cannot distort the comparison.
         val comparison = if (elapsed <= 0 || previousStart + elapsed > previousEnd ||

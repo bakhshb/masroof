@@ -64,7 +64,8 @@ import com.baraa.masroof.ui.theme.MasroofSpacing
                 }
             } else {
                 Text("${day(snapshot.periodStart)} — ${day(snapshot.periodEnd - 1)}", style = MaterialTheme.typography.bodySmall)
-                if (group.key.startsWith("merchant:") && !state.updating && !state.unavailable) MerchantCategoryEditor(group, workflow)
+                // Stays on screen while analysis refreshes, so a running save is never dropped with its sheet.
+                if (group.key.startsWith("merchant:") && !state.unavailable) MerchantCategoryEditor(group, workflow, enabled = !state.updating)
                 MasroofCard {
                     Amount(title, group.amount)
                     EvidenceGroup(group.ids, title, workflow, snapshot.sourceHash, onOpenTransaction, collapsible = false)

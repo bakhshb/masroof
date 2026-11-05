@@ -80,7 +80,7 @@ import com.baraa.masroof.ui.theme.MasroofThemeExtras
 }
 
 /** The merchant's category with a change action. The choice applies only on Save; saving blocks dismissal. */
-@Composable internal fun MerchantCategoryEditor(group: AnalysisSpendingGroup, workflow: AnalyticsWorkflow) {
+@Composable internal fun MerchantCategoryEditor(group: AnalysisSpendingGroup, workflow: AnalyticsWorkflow, enabled: Boolean = true) {
     var open by rememberSaveable(group.key) { mutableStateOf(false) }
     var draft by rememberSaveable(group.key) { mutableStateOf(group.category ?: SpendingCategory.OTHER.name) }
     var busy by remember { mutableStateOf(false) }
@@ -91,10 +91,8 @@ import com.baraa.masroof.ui.theme.MasroofThemeExtras
             Text(stringResource(R.string.analysis_category_of, spendingCategoryName(group.category)), Modifier.weight(1f),
                 style = MaterialTheme.typography.titleSmall)
             MasroofTextButton(onClick = { draft = group.category ?: SpendingCategory.OTHER.name; failed = false; open = true },
-                modifier = Modifier.testTag("merchant-category-change")) { Text(stringResource(R.string.analysis_category_change)) }
+                enabled = enabled || open, modifier = Modifier.testTag("merchant-category-change")) { Text(stringResource(R.string.analysis_category_change)) }
         }
-        if (failed) Text(stringResource(R.string.analysis_category_failed), style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error)
     }
     if (open) MasroofBottomSheet(stringResource(R.string.analysis_category_change), { if (!busy) open = false }, {
         busy = true
@@ -104,7 +102,9 @@ import com.baraa.masroof.ui.theme.MasroofThemeExtras
         }
     }, stringResource(R.string.settings_save), subtitle = AppDigits.display(group.name.orEmpty()), busy = busy,
         canApply = draft != group.category) {
+        if (failed) Text(stringResource(R.string.analysis_category_failed), style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error)
         MasroofSheetChoices(SpendingCategory.entries.map { it.name }, setOf(draft), { spendingCategoryName(it) },
-            { draft = it }, { it })
+            { draft = it; failed = false }, { it })
     }
 }

@@ -142,6 +142,11 @@ class RoomFinancialTransactionRepository(
         dao.findLinkByRawSmsId(rawSmsId) != null
     }
 
+    override suspend fun listCategoryChoices(): List<com.baraa.masroof.domain.repository.StoredCategoryChoice> = accessGate.withAccess {
+        dao.listCategoryChoices().map { com.baraa.masroof.domain.repository.StoredCategoryChoice(it.merchant, it.categoryId,
+            java.time.Instant.ofEpochMilli(it.occurredAtEpochMillis)) }
+    }
+
     override suspend fun getByIds(ids: Collection<String>): List<FinancialTransaction> = accessGate.withAccess {
         reconstructBatch(RoomBatch.query(ids.distinct(), batchChunkSize) { chunk -> dao.listByIds(chunk) })
     }

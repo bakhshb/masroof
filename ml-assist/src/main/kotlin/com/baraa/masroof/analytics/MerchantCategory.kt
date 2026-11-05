@@ -26,7 +26,7 @@ object MerchantCategoryRules {
             "lulu", "carrefour", "farm superstores", "ninja", "amazon now", "nesto", "manuel", "butcher", "bakery", "hatab",
             "grocer", "supermarket", "hypermarket", "بنده", "الدانوب", "التميمي", "العثيم", "بقالة", "مخبز", "ملحمة", "تموينات"),
         SpendingCategory.RESTAURANTS to listOf("restaurant", "restau", "resta ", "matam", "mtam", "kitchen", "coffee", "cafe",
-            "dunkin", "starbucks", "juice", "kudu", "albaik", "mcdonald", "burger", "pizza", "shawarma", "grill", "bakery cafe",
+            "dunkin", "starbucks", "juice", "kudu", "albaik", "mcdonald", "burger", "pizza", "shawarma", "grill",
             "مطعم", "مطاعم", "مقهى", "كافيه", "قهوة"),
         SpendingCategory.FUEL_CAR to listOf("petromin", "wafi energy", "aldrees", "sasco", "naft", "gas station", " gas ",
             "fuel", "motor laundry", "car wash", "محطة", "وقود", "بترومين", "الدريس", "ساسكو"),

@@ -66,4 +66,14 @@ class AnalysisSpendingInsightsBuilderTest {
             .categories.first { it.category == "FOOD_DELIVERY" }.amount)
         assertTrue(build(rows).categories.all { it.key == "category:${it.category}" && it.amount > 0 })
     }
+
+    @Test fun aChoiceOlderThanTheAnalysisWindowStillAppliesToNewRows() {
+        val rows = listOf(fact("k", 31, 4000, merchant = "Keeta"))
+        val old = AnalysisSpendingFact("choice:0", -400, 0, "CHOICE", "keeta", "RESTAURANTS")
+        val result = AnalysisSpendingInsightsBuilder.build(rows, 30, 35, 0, 30, (0L..35L).toSet(), listOf(old))
+        assertEquals(mapOf("RESTAURANTS" to 4000L), result.categories.associate { it.category to it.amount })
+        // Choices only resolve categories; they never add money or rows.
+        assertEquals(4000L, result.components.sumOf { it.amount })
+        assertFalse(result.categories.flatMap { it.ids }.contains("choice:0"))
+    }
 }
