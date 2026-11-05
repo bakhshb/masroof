@@ -552,7 +552,7 @@ class AppContainer(
                 com.baraa.masroof.application.interpretation.ConfiguredPatternAdapters(messagePatternStore,
                     assistedBanks = { requireNotNull(interpretationService).assistedBanks(it) },
                     assistedInterpret = { input, snapshot, bankId ->
-                        requireNotNull(interpretationService).interpret(input, snapshot, bankId) })::snapshot,
+                        requireNotNull(interpretationService).interpret(input, bankId, snapshot) })::snapshot,
         )
 
     val statementReconciliationWorkflow: StatementReconciliationWorkflow =

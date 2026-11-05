@@ -93,7 +93,7 @@ class BankInterpretationService(
     fun assistedBanks(configuration: MessagePatternConfiguration = patterns()): Set<String> =
         configuration.banks.filter { bank -> bank.bankId.matches(com.baraa.masroof.ml.family.LEARNABLE_BANK_ID) }.map { it.bankId }.toSet()
     val refreshVersion: String get() = "${engine().fingerprint}|${modelVersion ?: "rules-only"}"
-    fun interpret(input: MessageInput, snapshot: PatternFactInterpreter, bankId: String): Interpretation {
+    fun interpret(input: MessageInput, bankId: String, snapshot: PatternFactInterpreter = engine()): Interpretation {
         val trace = Attempt(bankId, classifiers?.get(bankId))
         val activeModel = trace.classifier?.version
         attempt.set(trace)
