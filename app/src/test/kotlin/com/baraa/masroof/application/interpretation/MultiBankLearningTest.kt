@@ -42,7 +42,7 @@ class MultiBankLearningTest {
         try {
             val service = requireNotNull(c.interpretationService)
             assertTrue("BANK_SNB" in service.assistedBanks())
-            assertFalse("BANK_STC" in service.assistedBanks())
+            assertTrue("BANK_STC" in service.assistedBanks()) // Every bank remembers decisions.
             val snb = Bank("BANK_SNB")
             c.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(snb, "3001"))
             val at = LocalDateTime.now().minusMinutes(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
@@ -86,6 +86,46 @@ class MultiBankLearningTest {
             repeat(50) { if (!settled) {
                 service.synchronizeFeedback(); settled = !service.needsRefresh(unknown); if (!settled) kotlinx.coroutines.delay(100) } }
             assertTrue(settled)
+        } finally {
+            c.close()
+            WorkManagerTestInitHelper.closeWorkDatabase()
+        }
+    }
+
+    /** "Not financial" once: the waiting copy and the next copy of the same wording leave review, in a bank without role rules. */
+    @Test fun aNotFinancialDecisionClearsTheSameWordingInAnyBank() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        WorkManagerTestInitHelper.initializeTestWorkManager(app, Configuration.Builder().setExecutor(SynchronousExecutor())
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker =
+                    object : Worker(appContext, workerParameters) { override fun doWork() = Result.success() }
+            }).build())
+        val c = AppContainer(TestStorageContext(app, "remember-not-financial"))
+        try {
+            val service = requireNotNull(c.interpretationService)
+            fun raw(id: String) = "عرض حصري لعملائنا الكرام\nاستمتع بمزايا البطاقة الجديدة".let { text ->
+                RawSms(id, "STC Bank", "$text $id", Instant.now(), id, SmsBodyHasher.sha256Hex("$text $id")) }
+            service.synchronizeFeedback()
+            c.processRawSmsUseCase.ingest(raw("promo-one"))
+            c.processRawSmsUseCase.ingest(raw("promo-waiting"))
+            assertEquals(2, c.reviewRepository.listRequired().size)
+
+            c.reviewWorkflowService.resolveAsNonFinancial(requireNotNull(c.reviewRepository.findByRawSmsId("promo-one")).id)
+            service.synchronizeFeedback()
+            assertEquals(LearningFeedbackState.LEARNED, service.feedbackStatus("promo-one")!!.state)
+            assertTrue(service.needsRefresh(requireNotNull(c.parsedEventRepository.findByRawSmsId("promo-waiting"))))
+            ModelRefreshWorkflow(c.reviewRepository, c.parsedEventRepository, c.rawSmsRepository, c.processingRetryRepository,
+                c.processStoredSmsUseCase, service::mayRefresh, service::needsRefresh, { c.withDatabaseTransaction(it) },
+                { c.historicalDerivedRecovery.recoverPending() }, c.clock).refresh()
+            assertEquals("NON_FINANCIAL", c.parsedEventRepository.findByRawSmsId("promo-waiting")!!.event.messageFamily.name)
+            assertTrue(c.reviewRepository.listRequired().isEmpty())
+
+            c.processRawSmsUseCase.ingest(raw("promo-next"))
+            val next = requireNotNull(c.parsedEventRepository.findByRawSmsId("promo-next"))
+            assertEquals("NON_FINANCIAL", next.event.messageFamily.name)
+            assertTrue("family_origin:HUMAN_TEMPLATE" in next.event.confidence.reasons)
+            assertTrue(c.reviewRepository.listRequired().isEmpty())
+            assertTrue(c.financialTransactionRepository.listAll().isEmpty())
         } finally {
             c.close()
             WorkManagerTestInitHelper.closeWorkDatabase()

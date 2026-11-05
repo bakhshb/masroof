@@ -1,6 +1,10 @@
 package com.baraa.masroof.application.interpretation
 
+import com.baraa.masroof.engine.bank.Confidence
+import com.baraa.masroof.engine.bank.Facts
+import com.baraa.masroof.engine.bank.Interpretation
 import com.baraa.masroof.engine.bank.MessageFamily
+import com.baraa.masroof.engine.bank.ParseStatus
 import com.baraa.masroof.engine.bank.interpretation.FamilyOrigin
 import com.baraa.masroof.engine.bank.interpretation.FamilySuggestion
 import com.baraa.masroof.engine.bank.interpretation.FamilyTextPreparation
@@ -20,6 +24,16 @@ object FamilyAssistBridge {
         val proposal = classifier?.suggest(bankId, features) ?: return null
         return FamilySuggestion(toBank(proposal.family), 1.0, proposal.modelVersion, FamilyOrigin.HUMAN_TEMPLATE)
     }
+
+    /**
+     * A remembered "not financial" decision settles only a message the rules could not identify, in any bank.
+     * The existing informational policy then keeps it out of review; it never touches money or posting.
+     */
+    fun rememberNonFinancial(result: Interpretation, suggestion: FamilySuggestion?): Interpretation =
+        if (suggestion?.family != MessageFamily.NON_FINANCIAL || result.facts.family != MessageFamily.UNKNOWN || result.bank == null) result
+        else Interpretation(result.evidenceId, result.version, result.bank, Facts(MessageFamily.NON_FINANCIAL), ParseStatus.NON_FINANCIAL,
+            Confidence(1.0, listOf("family_origin:${suggestion.origin}", "model:${suggestion.modelVersion}")), emptyList(), emptySet(),
+            result.diagnostics, suggestion, result.patternProvenance)
 
     fun toModel(family: MessageFamily): SmsFamilyLabel = when (family) {
         MessageFamily.PURCHASE -> SmsFamilyLabel.PURCHASE

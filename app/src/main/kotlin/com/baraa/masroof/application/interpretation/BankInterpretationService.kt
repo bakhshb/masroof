@@ -79,16 +79,21 @@ class BankInterpretationService(
     /** Whether any bank's template memory can propose a family right now. */
     val suggesting: Boolean get() = classifiers?.values?.any { it.canSuggest } == true
     val modelVersion: String? get() = classifiers?.entries?.sortedBy { it.key }?.joinToString(",") { "${it.key}=${it.value.version}" }
-    /** Banks whose bundled role rules can ask for a family; only these learn and receive suggestions. */
+    /**
+     * Every configured bank remembers the user's decisions. A remembered "not financial" applies in any bank;
+     * a remembered financial family is used where the bank's role rules ask for one.
+     */
     fun assistedBanks(configuration: MessagePatternConfiguration = patterns()): Set<String> =
-        configuration.banks.filter { bank -> bank.bankId.matches(BANK_ID) && bank.currentPatterns.any { it.roleProfile != null } }
-            .map { it.bankId }.toSet() + SEED_BANK
+        configuration.banks.filter { bank -> bank.bankId.matches(BANK_ID) }.map { it.bankId }.toSet() + SEED_BANK
     val refreshVersion: String get() = "${engine().fingerprint}|${modelVersion ?: "rules-only"}"
     fun interpret(input: MessageInput, snapshot: PatternFactInterpreter = engine(), bankId: String = SEED_BANK): Interpretation {
         val trace = Attempt(bankId, classifiers?.get(bankId))
         val activeModel = trace.classifier?.version
         attempt.set(trace)
-        val result = try { snapshot.interpretRouted(input,BankId(bankId),familyAssist) } finally { attempt.remove() }
+        val ruled = try { snapshot.interpretRouted(input,BankId(bankId),familyAssist) } finally { attempt.remove() }
+        val result = if (ruled.facts.family != MessageFamily.UNKNOWN) ruled else
+            FamilyAssistBridge.rememberNonFinancial(ruled, FamilyAssistBridge.suggest(trace.classifier, bankId, input.body,
+                FamilyTextPreparation.prepare(input.body).title)).also { if (it !== ruled) { trace.requested = true; trace.outcome = "SUGGESTED" } }
         val interpretedAt = System.currentTimeMillis()
         // Advisory audit writes never decide whether a transaction may be posted.
         if(!closed) auditScope.launch {

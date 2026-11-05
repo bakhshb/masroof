@@ -22,7 +22,7 @@ class FamilyClassifierTest {
         assertFalse(FamilyClassifier("BANK_TEST").canSuggest)
         assertTrue(FamilyClassifier("BANK_TEST", listOf(label())).canSuggest)
         assertFalse(FamilyClassifier("BANK_TEST", listOf(label(family = SmsFamilyLabel.OTP))).canSuggest)
-        assertFalse(FamilyClassifier("BANK_TEST", listOf(label(family = SmsFamilyLabel.NON_FINANCIAL).copy(provenance = "USER_NON_FINANCIAL"))).canSuggest)
+        assertTrue(FamilyClassifier("BANK_TEST", listOf(label(family = SmsFamilyLabel.NON_FINANCIAL).copy(provenance = "USER_NON_FINANCIAL"))).canSuggest)
         assertFalse(FamilyClassifier("BANK_TEST", listOf(label(), label("two", SmsFamilyLabel.FEE))).canSuggest)
         assertFalse(FamilyClassifier("BANK_TEST", listOf(label()), listOf(HumanTemplateBlock("BANK_TEST", "x", "b", f.template, 2))).canSuggest)
         assertTrue(FamilyClassifier("BANK_TEST", listOf(label()), listOf(HumanTemplateBlock("OTHER_BANK", "x", "b", f.template, 2))).canSuggest)
@@ -45,11 +45,13 @@ class FamilyClassifierTest {
         assertNull(FamilyClassifier("OTHER_BANK", listOf(label())).suggest("OTHER_BANK", f))
     }
 
-    @Test fun latestHumanIgnoreRevokesEarlierFamilyWithoutAutoIgnoringNewEvidence() {
+    @Test fun aLaterNotFinancialDecisionReplacesTheEarlierFamilyAndIsRemembered() {
         val ignored = label(family = SmsFamilyLabel.NON_FINANCIAL, at = 2).copy(provenance = "USER_NON_FINANCIAL")
         val c = FamilyClassifier("BANK_TEST", listOf(label(), ignored))
         assertEquals(listOf(ignored), c.latestLabels)
-        assertNull(c.suggest("BANK_TEST", f))
+        assertEquals(SmsFamilyLabel.NON_FINANCIAL, c.suggest("BANK_TEST", f)?.family)
+        // The same wording decided both ways on two messages stays undecided.
+        assertNull(FamilyClassifier("BANK_TEST", listOf(label(), label("two", SmsFamilyLabel.NON_FINANCIAL))).suggest("BANK_TEST", f))
     }
 
     @Test fun versionChangesWithDecisionsSoStaleInferencesRefresh() {

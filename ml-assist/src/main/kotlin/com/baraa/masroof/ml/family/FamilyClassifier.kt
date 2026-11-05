@@ -1,8 +1,9 @@
 package com.baraa.masroof.ml.family
 
 /**
- * Exact human-template memory for one bank. Human decisions are the only labels and predictions
- * never teach themselves; a conflicted or blocked template proposes nothing.
+ * Exact human-template memory for one bank ("remember my decision"). Human decisions are the only labels and
+ * predictions never teach themselves; a conflicted or blocked template proposes nothing. A remembered
+ * "not financial" decision is proposed too, so the same wording stops returning to review.
  */
 class FamilyClassifier(val bankId: String, labels: List<HumanFamilyLabel> = emptyList(),
     blocks: List<HumanTemplateBlock> = emptyList()) {
@@ -24,11 +25,11 @@ class FamilyClassifier(val bankId: String, labels: List<HumanFamilyLabel> = empt
 
     /** True when at least one learned template can propose; the same rule as [suggest]. */
     val canSuggest: Boolean = templates.any { (template, families) ->
-        template !in blockedTemplates && families.singleOrNull() in FINANCIAL }
+        template !in blockedTemplates && families.singleOrNull() in REMEMBERED }
 
     fun suggest(bankId: String, features: CleanFamilyFeatures): FamilyPrediction? {
         if (bankId != this.bankId || features.template in blockedTemplates) return null
-        val family = templates[features.template]?.singleOrNull()?.takeIf { it in FINANCIAL } ?: return null
+        val family = templates[features.template]?.singleOrNull()?.takeIf { it in REMEMBERED } ?: return null
         return FamilyPrediction(family, version)
     }
 
@@ -37,5 +38,6 @@ class FamilyClassifier(val bankId: String, labels: List<HumanFamilyLabel> = empt
         val FINANCIAL = setOf(SmsFamilyLabel.PURCHASE, SmsFamilyLabel.TRANSFER_IN, SmsFamilyLabel.TRANSFER_OUT,
             SmsFamilyLabel.CARD_PAYMENT, SmsFamilyLabel.BILL_PAYMENT, SmsFamilyLabel.FINANCING_INSTALLMENT,
             SmsFamilyLabel.WITHDRAWAL, SmsFamilyLabel.REFUND, SmsFamilyLabel.FEE)
+        val REMEMBERED = FINANCIAL + SmsFamilyLabel.NON_FINANCIAL
     }
 }
