@@ -64,7 +64,6 @@ import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.model.CardSmsChannel
 import com.baraa.masroof.parsing.model.ParsedEventDetails
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
@@ -649,19 +648,6 @@ class WriteRejectingFinancialTransactionRepository(
 
     private fun rejected(operation: String): Nothing =
         throw AssertionError("FinancialTransactionRepository.$operation called during a read-only load")
-}
-
-/** Counts whole-history and per-row reads made through the wrapped repositories. */
-class CountingParsedEventRepository(
-    private val delegate: ParsedEventRepository,
-) : ParsedEventRepository by delegate {
-    var listAllCalls = 0
-        private set
-
-    override suspend fun listAll(): List<ParsedEventRecord> {
-        listAllCalls++
-        return delegate.listAll()
-    }
 }
 
 class CountingRawSmsRepository(

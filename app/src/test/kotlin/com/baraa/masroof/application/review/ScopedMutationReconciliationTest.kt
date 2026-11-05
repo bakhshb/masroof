@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.testsupport.CountingFinancialTransactionRepository
+import com.baraa.masroof.testsupport.CountingParsedEventRepository
 import com.baraa.masroof.testsupport.RoomReviewWiring
 import android.content.Context
 import androidx.room.Room
@@ -21,7 +23,6 @@ import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
@@ -34,7 +35,6 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.time.InstantClock
@@ -467,57 +467,4 @@ class ScopedMutationReconciliationTest {
     }
 
     private fun money(value: String) = Money.of(value, Currency.SAR)
-
-    private class CountingParsedEventRepository(
-        private val delegate: ParsedEventRepository,
-    ) : ParsedEventRepository by delegate {
-        var listAllCalls: Int = 0
-        var globalUnlinkedCalls: Int = 0
-        val loadedRawSmsIdSets: MutableList<Collection<String>> = mutableListOf()
-
-        fun reset() {
-            listAllCalls = 0
-            globalUnlinkedCalls = 0
-            loadedRawSmsIdSets.clear()
-        }
-
-        override suspend fun listAll(): List<ParsedEventRecord> {
-            listAllCalls += 1
-            return delegate.listAll()
-        }
-
-        override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> {
-            globalUnlinkedCalls += 1
-            return delegate.listUnlinkedTransfers()
-        }
-
-        override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
-            loadedRawSmsIdSets += rawSmsIds
-            return delegate.listByRawSmsIds(rawSmsIds)
-        }
-    }
-
-    private class CountingFinancialTransactionRepository(
-        private val delegate: FinancialTransactionRepository,
-    ) : FinancialTransactionRepository by delegate {
-        var listAllCalls: Int = 0
-        var listByTypesCalls: Int = 0
-
-        fun reset() {
-            listAllCalls = 0
-            listByTypesCalls = 0
-        }
-
-        override suspend fun listAll(): List<FinancialTransaction> {
-            listAllCalls += 1
-            return delegate.listAll()
-        }
-
-        override suspend fun listByTypes(
-            types: Collection<FinancialTransactionType>,
-        ): List<FinancialTransaction> {
-            listByTypesCalls += 1
-            return delegate.listByTypes(types)
-        }
-    }
 }

@@ -31,11 +31,10 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
-import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
-import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
+import com.baraa.masroof.testsupport.CountingFinancialTransactionRepository
+import com.baraa.masroof.testsupport.CountingParsedEventRepository
 import com.baraa.masroof.testsupport.event
 import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
@@ -799,94 +798,4 @@ class ScopedReconciliationTest {
         val listByTypesCalls: Int,
         val boundedLocalCalls: Int,
     )
-
-    private class CountingParsedEventRepository(
-        private val delegate: ParsedEventRepository,
-    ) : ParsedEventRepository by delegate {
-        var listAllCalls: Int = 0
-        var globalUnlinkedCalls: Int = 0
-        var boundedUnlinkedCalls: Int = 0
-        var boundedLocalCalls: Int = 0
-        var listByRawSmsIdsCalls: Int = 0
-        val boundedWindows: MutableList<Pair<Instant, Instant>> = mutableListOf()
-
-        fun reset() {
-            listAllCalls = 0
-            globalUnlinkedCalls = 0
-            boundedUnlinkedCalls = 0
-            boundedLocalCalls = 0
-            listByRawSmsIdsCalls = 0
-            boundedWindows.clear()
-        }
-
-        override suspend fun listAll(): List<ParsedEventRecord> {
-            listAllCalls += 1
-            return delegate.listAll()
-        }
-
-        override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> {
-            globalUnlinkedCalls += 1
-            return delegate.listUnlinkedTransfers()
-        }
-
-        override suspend fun listUnlinkedTransfersReceivedBetween(
-            startInclusive: Instant,
-            endExclusive: Instant,
-        ): List<ParsedEventRecord> {
-            boundedUnlinkedCalls += 1
-            boundedWindows += startInclusive to endExclusive
-            return delegate.listUnlinkedTransfersReceivedBetween(startInclusive, endExclusive)
-        }
-
-        override suspend fun listUnlinkedTransfersOccurredLocalBetween(
-            startInclusive: LocalDateTime,
-            endExclusive: LocalDateTime,
-        ): List<ParsedEventRecord> {
-            boundedLocalCalls += 1
-            return delegate.listUnlinkedTransfersOccurredLocalBetween(startInclusive, endExclusive)
-        }
-
-        override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
-            listByRawSmsIdsCalls += 1
-            return delegate.listByRawSmsIds(rawSmsIds)
-        }
-    }
-
-    private class CountingFinancialTransactionRepository(
-        private val delegate: FinancialTransactionRepository,
-    ) : FinancialTransactionRepository by delegate {
-        var listAllCalls: Int = 0
-        var listByTypesCalls: Int = 0
-        var boundedTypeCalls: Int = 0
-        val boundedWindows: MutableList<Pair<Instant, Instant>> = mutableListOf()
-
-        fun reset() {
-            listAllCalls = 0
-            listByTypesCalls = 0
-            boundedTypeCalls = 0
-            boundedWindows.clear()
-        }
-
-        override suspend fun listAll(): List<FinancialTransaction> {
-            listAllCalls += 1
-            return delegate.listAll()
-        }
-
-        override suspend fun listByTypes(
-            types: Collection<FinancialTransactionType>,
-        ): List<FinancialTransaction> {
-            listByTypesCalls += 1
-            return delegate.listByTypes(types)
-        }
-
-        override suspend fun listByTypesOccurredBetween(
-            types: Collection<FinancialTransactionType>,
-            startInclusive: Instant,
-            endExclusive: Instant,
-        ): List<FinancialTransaction> {
-            boundedTypeCalls += 1
-            boundedWindows += startInclusive to endExclusive
-            return delegate.listByTypesOccurredBetween(types, startInclusive, endExclusive)
-        }
-    }
 }
