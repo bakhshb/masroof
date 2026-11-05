@@ -25,6 +25,8 @@ data class DashboardOverview(
     val creditFacilities: CreditFacilitiesOverview,
     val loansOverview: LoansOverview? = null,
     val commitmentsOverview: CommitmentsOverview = CommitmentsOverview.empty(),
+    /** Current period only: what can be spent per day until the next salary. */
+    val dailyAllowance: DailyAllowance? = null,
     val merchantSpending: MerchantSpendingOverview = MerchantSpendingOverview.empty(),
     val dailySpendingTrend: DailySpendingTrend = DailySpendingTrend.empty(period),
     val spendingTrends: DashboardSpendingTrends? = null,

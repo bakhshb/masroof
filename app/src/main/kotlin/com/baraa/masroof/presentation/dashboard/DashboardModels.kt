@@ -101,6 +101,7 @@ data class DashboardUiState(
     val spendingTrends: com.baraa.masroof.application.dashboard.DashboardSpendingTrends? = null,
     val bankHierarchy: BankHierarchyOverview? = null,
     val accountsFleet: AccountsSummary? = null,
+    val dailyAllowance: com.baraa.masroof.application.dashboard.DailyAllowance? = null,
     val recentTransactions: List<TransactionPreviewUi> = emptyList(),
     val allTransactions: List<TransactionPreviewUi> = emptyList(),
     val isCurrentPeriod: Boolean = true,

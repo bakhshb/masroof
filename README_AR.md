@@ -76,4 +76,4 @@
 | `ml-assist` | مساعدة تصنيف الرسائل والتوقعات واكتشاف التكرار محليًا |
 | `ui-kit` | الثيم والخطوط والمكونات والرسوم المشتركة |
 
-قبل تعديل السلوك المالي، راجع [الهيكلية](docs/ARCHITECTURE.md)، و[الاختبارات وCI](docs/CI.md)، و[مسار الإصدار](docs/RELEASE.md)، و[نظام التصميم](docs/DESIGN_SYSTEM.md)، و[التحليل](docs/ANALYTICS.md)، و[أدوات التعلم](ml-assist/tools/README.md)، و[تعليمات الوكلاء](AGENTS.md). يوثّق [سجل التحديث والتبسيط](docs/KOTLIN_MODERNIZATION.md) قرارات الإصدارات والتحقق من التوافق.
+قبل تعديل السلوك المالي، راجع [الهيكلية](docs/ARCHITECTURE.md)، و[الاختبارات وCI](docs/CI.md)، و[مسار الإصدار](docs/RELEASE.md)، و[نظام التصميم](docs/DESIGN_SYSTEM.md)، و[التحليل](docs/ANALYTICS.md)، و[تعليمات الوكلاء](AGENTS.md). يوثّق [سجل التحديث والتبسيط](docs/KOTLIN_MODERNIZATION.md) قرارات الإصدارات والتحقق من التوافق.

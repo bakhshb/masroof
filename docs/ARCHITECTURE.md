@@ -180,7 +180,7 @@ Live SMS is captured durably before WorkManager receives a raw SMS id. Historica
 
 The engine uses rules first. Eligible local family inference never supplies an amount, ownership or approval. Explicit corrections feed local learning. Rule/model refreshes target unresolved, unposted evidence without a manual decision. Previously posted history is preserved.
 
-Family learning is per bank. Every bank with bundled role rules gets its own classifier built only from that bank's human decisions, so a corrected message teaches later messages with the same template in that bank. There is no statistical message model: the Naive Bayes seed never qualified a family and was removed, so suggestions come only from exact human templates. Banks without role rules (taught patterns only) are `UNSUPPORTED_BANK` for learning, because a taught pattern already fixes its family. Outside the seed bank, a learning change refreshes only the pending messages it would change, so approved patterns are still applied explicitly.
+Message learning is "remember my decision", per bank, for every configured bank. Each bank's exact-template memory is built only from that bank's human decisions; there is no statistical message model. A remembered "not financial" decision settles a later message with the same template that the rules could not identify, in any bank, and `InformationalMessagePolicy` keeps it out of review. A remembered financial family is used only where the bank's role rules ask for one; it never supplies money, ownership or posting. Conflicting decisions for one template propose nothing. Outside the seed bank, a learning change refreshes only the pending messages it would change, so approved patterns are still applied explicitly.
 
 ## Data and recovery
 

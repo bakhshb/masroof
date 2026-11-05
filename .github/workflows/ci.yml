@@ -78,9 +78,6 @@ jobs:
             finance-core/build/reports/tests/
             ml-assist/build/reports/tests/
           if-no-files-found: error
-      - name: Verify recurring seed reproducibility
-        run: |
-          ./gradlew :ml-assist:trainRecurringSeed -PrecurringCheck=true --console=plain
 
   static-analysis:
     runs-on: ubuntu-24.04

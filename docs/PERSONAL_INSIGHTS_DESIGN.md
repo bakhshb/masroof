@@ -45,12 +45,12 @@ materially harm these results.
 | Spending | Actual/net purchase scope, equal-length comparison, components, merchants and contribution drilldowns | Retain; add at most three eligible contextual observations |
 | Forecasts | Actual + estimated remainder, daily bars, quality, performance/history | Retain; make method/readiness and error understandable |
 | Recurrence | Numerical classifier plus deterministic rules, durable decisions and undo in #329 | Retain; evidence-first review and explicit feedback semantics |
-| Messages | Rules first, exact human-template memory (statistical model removed) | Retain; review unsupported formulations and select diverse examples |
+| Messages | Rules first, then "remember my decision" (exact template, every bank, including not financial) | Retain |
 
 Current sources: `AnalyticsScreen.kt`, `AnalysisSpendingCharts.kt`,
 `AnalysisForecastViews.kt`, `AnalysisExplanationViews.kt`,
 `FinancialAnalysisReader.kt`, `AnalyticsWorkflow.kt`,
-`PurchaseForecaster.kt`, `RecurringLearning.kt`, `FamilyClassifier.kt`.
+`PurchaseForecaster.kt`, `RecurringDetector.kt`, `FamilyClassifier.kt`.
 Readiness must come from current production workflow output, not the backup's
 calendar span alone. Archived snapshots are not independent accuracy samples.
 
@@ -148,12 +148,12 @@ with undo. Candidate summary: cadence, estimated amount/date, method actually
 used and prior payments. “Review and save” opens the existing commitment editor.
 The reviewer can change the draft; only Save applies it.
 
-“Not recurring” records an explicit negative. “Don't add” hides the suggestion
-without a negative training label. Undo revokes the decision. Removing/changing a
-commitment revokes its old label; missing evidence prevents statistical training.
-Do not turn every frequent merchant into a subscription. Keep bank/container
-identity in series keys. Show “Needs reviewed examples” rather than pretending
-the shipped recurring model is active.
+Recurring payments come from rules only; the recurrence model was removed because
+it needed years of reviewed series for one person. “Not recurring” records an
+explicit decision that hides the series. “Don't add” hides the suggestion only.
+Undo revokes the decision. A confirmed cadence counts only while its saved
+commitment keeps it. Do not turn every frequent merchant into a subscription.
+Keep bank/container identity in series keys.
 
 ### Message learning (existing Settings route)
 

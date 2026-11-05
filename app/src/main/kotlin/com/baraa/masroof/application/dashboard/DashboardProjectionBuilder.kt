@@ -78,6 +78,7 @@ class DashboardProjectionBuilder(
             creditFacilities = creditFacilities,
             loansOverview = commitments.loansOverview,
             commitmentsOverview = commitments.commitmentsOverview,
+            dailyAllowance = DailyAllowanceCalculator.calculate(accounts.accountsFleet?.totalRemaining, commitments.commitmentsOverview, period, context.today),
             merchantSpending = analysis.merchantSpending,
             dailySpendingTrend = analysis.dailySpendingTrend,
             spendingTrends = DashboardSpendingTrendsBuilder.build(context, accounts, cards),

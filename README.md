@@ -76,4 +76,4 @@ Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Andro
 | `ml-assist` | Local family assistance, forecasting, and recurrence detection |
 | `ui-kit` | Shared theme, fonts, components, and charts |
 
-Read the [architecture](docs/ARCHITECTURE.md), [testing and CI](docs/CI.md), [release workflow](docs/RELEASE.md), [design system](docs/DESIGN_SYSTEM.md), [analytics](docs/ANALYTICS.md), [learning tools](ml-assist/tools/README.md), and [agent conventions](AGENTS.md) before changing financial behavior. The [modernization record](docs/KOTLIN_MODERNIZATION.md) documents version choices and compatibility verification.
+Read the [architecture](docs/ARCHITECTURE.md), [testing and CI](docs/CI.md), [release workflow](docs/RELEASE.md), [design system](docs/DESIGN_SYSTEM.md), [analytics](docs/ANALYTICS.md), and [agent conventions](AGENTS.md) before changing financial behavior. The [modernization record](docs/KOTLIN_MODERNIZATION.md) documents version choices and compatibility verification.
