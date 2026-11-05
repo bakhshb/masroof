@@ -5,7 +5,6 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
@@ -13,6 +12,7 @@ import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.testsupport.parsedRecord
 import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -37,6 +37,7 @@ class CardTransactionInvolvementResolverTest {
             parsedRecord(
                 id = "evt-1",
                 cardLast4 = "3109",
+                sourceLast4 = "3001",
             ),
         )
 
@@ -155,30 +156,5 @@ class CardTransactionInvolvementResolverTest {
         assertTrue(
             !CardTransactionInvolvementResolver.matchesCard("alj", "OTHER_BANK", "7271", index),
         )
-    }
-
-    private fun parsedRecord(
-        id: String,
-        cardLast4: String,
-    ): ParsedEventRecord {
-        val event = ParsedEvent(
-            id = id,
-            rawSmsId = "sms-$id",
-            bank = Bank.BANK_ALJAZIRA,
-            messageFamily = MessageFamily.PURCHASE,
-            direction = MoneyDirection.OUTGOING,
-            amount = Money.of("1.00", Currency.SAR),
-            purchaseChannel = null,
-            sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
-            destinationAccountRef = null,
-            cardRef = CardReference(Bank.BANK_ALJAZIRA, cardLast4),
-            merchant = null,
-            counterparty = null,
-            occurredAt = Instant.parse("2026-08-05T11:05:00Z"),
-            bankNetworkType = null,
-            confidence = Confidence(1.0),
-            parseStatus = ParseStatus.SUCCESS,
-        )
-        return ParsedEventRecord(event = event, details = ParsedEventDetails())
     }
 }

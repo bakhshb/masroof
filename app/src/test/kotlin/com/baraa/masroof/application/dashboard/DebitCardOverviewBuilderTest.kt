@@ -1,28 +1,19 @@
 package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
-import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.CardType
-import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.model.ParseStatus
-import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
-import com.baraa.masroof.parsing.model.ParsedEventDetails
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.testsupport.parsedRecord
 import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -54,14 +45,14 @@ class DebitCardOverviewBuilderTest {
                 family = MessageFamily.PURCHASE,
                 sourceLast4 = "3001",
                 cardLast4 = "2210",
-                rawBody = "شراء من نقاط البيع\nبطاقة مدى: 2210",
+                body = "شراء من نقاط البيع\nبطاقة مدى: 2210",
             ),
             parsedRecord(
                 id = "evt-cash",
                 family = MessageFamily.WITHDRAWAL,
                 sourceLast4 = "3001",
                 cardLast4 = "2210",
-                rawBody = "سحب نقدي\nبطاقة مدى: 2210",
+                body = "سحب نقدي\nبطاقة مدى: 2210",
             ),
         )
         val debit = CardRegistryEntry.forTest(
@@ -115,14 +106,14 @@ class DebitCardOverviewBuilderTest {
                 family = MessageFamily.PURCHASE,
                 sourceLast4 = "3001",
                 cardLast4 = "2210",
-                rawBody = "شراء من نقاط البيع\nبطاقة مدى: 2210",
+                body = "شراء من نقاط البيع\nبطاقة مدى: 2210",
             ),
             parsedRecord(
                 id = "evt-refund",
                 family = MessageFamily.REFUND,
                 sourceLast4 = "3001",
                 cardLast4 = "2210",
-                rawBody = "استرداد\nبطاقة مدى: 2210",
+                body = "استرداد\nبطاقة مدى: 2210",
             ),
         )
         val debit = CardRegistryEntry.forTest(
@@ -175,7 +166,7 @@ class DebitCardOverviewBuilderTest {
                 family = MessageFamily.WITHDRAWAL,
                 sourceLast4 = "3001",
                 cardLast4 = "8219",
-                rawBody = body,
+                body = body,
             ),
         )
         val debit = CardRegistryEntry.forTest(
@@ -220,7 +211,7 @@ class DebitCardOverviewBuilderTest {
                 family = MessageFamily.BILL_PAYMENT,
                 sourceLast4 = "3001",
                 cardLast4 = "2210",
-                rawBody = "سداد فاتورة\nبطاقة مدى: 2210",
+                body = "سداد فاتورة\nبطاقة مدى: 2210",
             ),
         )
         val debit = CardRegistryEntry.forTest(
@@ -247,33 +238,5 @@ class DebitCardOverviewBuilderTest {
 
         assertEquals(BigDecimal("0.00"), result.spendingByCardKey["BANK_ALJAZIRA:2210"]?.amount)
         assertTrue(result.transactionDebitSpendInvolvement.isEmpty())
-    }
-
-    private fun parsedRecord(
-        id: String,
-        family: MessageFamily,
-        sourceLast4: String,
-        cardLast4: String,
-        rawBody: String,
-    ): ParsedEventRecord {
-        val event = ParsedEvent(
-            id = id,
-            rawSmsId = "sms-$id",
-            bank = Bank.BANK_ALJAZIRA,
-            messageFamily = family,
-            direction = MoneyDirection.OUTGOING,
-            amount = Money.of("1.00", Currency.SAR),
-            purchaseChannel = null,
-            sourceAccountRef = AccountReference(Bank.BANK_ALJAZIRA, sourceLast4),
-            destinationAccountRef = null,
-            cardRef = CardReference(Bank.BANK_ALJAZIRA, cardLast4),
-            merchant = null,
-            counterparty = rawBody,
-            occurredAt = Instant.parse("2026-08-05T11:05:00Z"),
-            bankNetworkType = null,
-            confidence = Confidence(1.0),
-            parseStatus = ParseStatus.SUCCESS,
-        )
-        return ParsedEventRecord(event = event, details = ParsedEventDetails())
     }
 }

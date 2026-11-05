@@ -3,18 +3,14 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
-import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.domain.model.ParsedEvent
+import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
-import com.baraa.masroof.parsing.model.CardSmsChannel
-import com.baraa.masroof.parsing.model.ParsedEventDetails
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.testsupport.parsedRecord
 import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -67,6 +63,7 @@ class CurrentAccountSummaryCalculatorTest {
                     "evt-salary",
                     MessageFamily.TRANSFER_IN,
                     salaryIncomeWording = true,
+                    direction = MoneyDirection.INCOMING,
                 ),
             ),
         )
@@ -88,7 +85,7 @@ class CurrentAccountSummaryCalculatorTest {
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(billTx),
             parsedRecords = listOf(
-                parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT),
+                parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT, direction = MoneyDirection.INCOMING),
             ),
             ownedAccountContainerIds = setOf(owned),
         )
@@ -114,7 +111,8 @@ class CurrentAccountSummaryCalculatorTest {
                     id = "evt-fee-bill",
                     family = MessageFamily.BILL_PAYMENT,
                     sourceLast4 = "3001",
-                    rawBody = "سداد فاتورة\nالمفوتر: STC",
+                    body = "سداد فاتورة\nالمفوتر: STC",
+                    direction = MoneyDirection.INCOMING,
                 ),
             ),
             ownedAccountContainerIds = setOf(owned),
@@ -130,7 +128,7 @@ class CurrentAccountSummaryCalculatorTest {
         val summary = CurrentAccountSummaryCalculator.summarize(
             transactions = listOf(billTx),
             parsedRecords = listOf(
-                parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT),
+                parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT, direction = MoneyDirection.INCOMING),
             ),
         )
         assertEquals(Money.of("210.00", Currency.SAR), summary.outflow.billPayments)
@@ -250,19 +248,22 @@ class CurrentAccountSummaryCalculatorTest {
                 family = MessageFamily.CARD_PAYMENT,
                 sourceLast4 = "3001",
                 cardLast4 = "7271",
-                rawBody = "سداد بطاقة ائتمانية\nمن حساب: 3001\nبطاقة: 7271",
+                body = "سداد بطاقة ائتمانية\nمن حساب: 3001\nبطاقة: 7271",
+                direction = MoneyDirection.INCOMING,
             ),
             parsedRecord(
                 id = "evt-cash",
                 family = MessageFamily.WITHDRAWAL,
                 sourceLast4 = "3001",
-                rawBody = "سحب نقدي\nمن حساب: 3001",
+                body = "سحب نقدي\nمن حساب: 3001",
+                direction = MoneyDirection.INCOMING,
             ),
             parsedRecord(
                 id = "evt-bill",
                 family = MessageFamily.BILL_PAYMENT,
                 sourceLast4 = "3001",
-                rawBody = "سداد فاتورة\nالمفوتر: TEST",
+                body = "سداد فاتورة\nالمفوتر: TEST",
+                direction = MoneyDirection.INCOMING,
             ),
         )
         val summary = CurrentAccountSummaryCalculator.summarize(
@@ -309,7 +310,8 @@ class CurrentAccountSummaryCalculatorTest {
                 family = MessageFamily.PURCHASE,
                 sourceLast4 = "3001",
                 cardLast4 = "2210",
-                rawBody = "شراء من نقاط البيع\nبطاقة مدى: 2210\nخصمت من حساب: 3001",
+                body = "شراء من نقاط البيع\nبطاقة مدى: 2210\nخصمت من حساب: 3001",
+                direction = MoneyDirection.INCOMING,
             ),
         )
         val summary = CurrentAccountSummaryCalculator.summarize(
@@ -387,8 +389,9 @@ class CurrentAccountSummaryCalculatorTest {
                     id = "evt-fee-loan",
                     family = MessageFamily.FINANCING_INSTALLMENT,
                     sourceLast4 = "3001",
-                    rawBody = "خصم: قسط تمويل\nمن: 3001\nلـ: تمويل شخصي",
+                    body = "خصم: قسط تمويل\nمن: 3001\nلـ: تمويل شخصي",
                     loanType = com.baraa.masroof.domain.model.LoanType.PERSONAL,
+                    direction = MoneyDirection.INCOMING,
                 ),
             ),
             ownedAccountContainerIds = setOf(owned),
@@ -632,6 +635,7 @@ class CurrentAccountSummaryCalculatorTest {
                     id = "evt-loan",
                     family = MessageFamily.FINANCING_INSTALLMENT,
                     sourceLast4 = "3001",
+                    direction = MoneyDirection.INCOMING,
                 ),
             ),
             ownedAccountContainerIds = setOf(owned),
@@ -659,43 +663,5 @@ class CurrentAccountSummaryCalculatorTest {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val end = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zone)
         return !instant.isBefore(start) && instant.isBefore(end)
-    }
-
-    private fun parsedRecord(
-        id: String,
-        family: MessageFamily,
-        sourceLast4: String? = null,
-        cardLast4: String? = null,
-        rawBody: String? = null,
-        loanType: com.baraa.masroof.domain.model.LoanType? = null,
-        salaryIncomeWording: Boolean? = null,
-        cardSmsChannel: CardSmsChannel? = null,
-    ): ParsedEventRecord {
-        val event = ParsedEvent(
-            id = id,
-            rawSmsId = "sms-$id",
-            bank = Bank.BANK_ALJAZIRA,
-            messageFamily = family,
-            direction = com.baraa.masroof.domain.model.MoneyDirection.INCOMING,
-            amount = Money.of("1.00", Currency.SAR),
-            purchaseChannel = null,
-            sourceAccountRef = sourceLast4?.let { AccountReference(Bank.BANK_ALJAZIRA, it) },
-            destinationAccountRef = null,
-            cardRef = cardLast4?.let { CardReference(Bank.BANK_ALJAZIRA, it) },
-            merchant = null,
-            counterparty = rawBody,
-            occurredAt = Instant.parse("2026-08-10T12:00:00Z"),
-            bankNetworkType = null,
-            confidence = com.baraa.masroof.domain.model.Confidence(1.0),
-            parseStatus = com.baraa.masroof.domain.model.ParseStatus.SUCCESS,
-        )
-        return ParsedEventRecord(
-            event = event,
-            details = ParsedEventDetails(
-                loanType = loanType,
-                salaryIncomeWording = salaryIncomeWording,
-                cardSmsChannel = cardSmsChannel,
-            ),
-        )
     }
 }

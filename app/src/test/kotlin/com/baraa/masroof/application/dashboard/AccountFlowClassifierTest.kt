@@ -4,21 +4,15 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
-import com.baraa.masroof.domain.model.ParseStatus
-import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.parsing.model.CardSmsChannel
-import com.baraa.masroof.parsing.model.ParsedEventDetails
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.testsupport.parsedRecord
 import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
 
 class AccountFlowClassifierTest {
     private val accountId = "account:bank_aljazira:3001"
@@ -32,7 +26,7 @@ class AccountFlowClassifierTest {
     fun income_onOwnedDestination_classifiedAsSalaryWhenHeuristicMatches() {
         val tx = tx("salary", FinancialTransactionType.INCOME, "15000", dest = accountId, linked = listOf("evt-1"))
         val context = AccountFlowClassifier.buildContext(
-            parsedRecords = listOf(parsedRecord("evt-1", MessageFamily.TRANSFER_IN)),
+            parsedRecords = listOf(parsedRecord("evt-1", MessageFamily.TRANSFER_IN, direction = MoneyDirection.INCOMING)),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
         )
@@ -80,6 +74,7 @@ class AccountFlowClassifierTest {
                     MessageFamily.REFUND,
                     destinationLast4 = "3001",
                     body = "استرداد مبلغ راتب إلى الحساب",
+                    direction = MoneyDirection.INCOMING,
                 ),
             ),
             primaryCurrency = Currency.SAR,
@@ -111,6 +106,7 @@ class AccountFlowClassifierTest {
                     destinationLast4 = "3001",
                     cardLast4 = "7271",
                     cardSmsChannel = CardSmsChannel.CREDIT,
+                    direction = MoneyDirection.INCOMING,
                 ),
             ),
             primaryCurrency = Currency.SAR,
@@ -131,6 +127,7 @@ class AccountFlowClassifierTest {
                     MessageFamily.REFUND,
                     cardLast4 = "7271",
                     cardSmsChannel = CardSmsChannel.CREDIT,
+                    direction = MoneyDirection.INCOMING,
                 ),
             ),
             primaryCurrency = Currency.SAR,
@@ -168,6 +165,7 @@ class AccountFlowClassifierTest {
                     MessageFamily.REFUND,
                     cardLast4 = "2210",
                     cardSmsChannel = CardSmsChannel.DEBIT,
+                    direction = MoneyDirection.INCOMING,
                 ),
             ),
             primaryCurrency = Currency.SAR,
@@ -214,7 +212,7 @@ class AccountFlowClassifierTest {
     fun billPaymentExpense_usesBillPaymentCategory() {
         val tx = tx("bill", FinancialTransactionType.EXPENSE, "120", source = accountId, linked = listOf("evt-bill"))
         val context = AccountFlowClassifier.buildContext(
-            parsedRecords = listOf(parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT)),
+            parsedRecords = listOf(parsedRecord("evt-bill", MessageFamily.BILL_PAYMENT, direction = MoneyDirection.INCOMING)),
             primaryCurrency = Currency.SAR,
             sarEquivalents = emptyMap(),
         )
@@ -243,7 +241,7 @@ class AccountFlowClassifierTest {
     @Test
     fun refund_persistedForeignAccountFact_doesNotMatchOwnedSuffix() {
         val refund = tx("fact-refund", FinancialTransactionType.REFUND, "100", linked = listOf("foreign"))
-        val original = parsedRecord("foreign", MessageFamily.REFUND, destinationLast4 = "3001")
+        val original = parsedRecord("foreign", MessageFamily.REFUND, destinationLast4 = "3001", direction = MoneyDirection.INCOMING)
         val foreign = original.copy(event = original.event.copy(
             bank = Bank("OTHER_BANK"),
             destinationAccountRef = AccountReference(Bank("OTHER_BANK"), "3001"),
@@ -287,34 +285,5 @@ class AccountFlowClassifierTest {
         parsedRecordsById = emptyMap(),
         primaryCurrency = Currency.SAR,
         sarEquivalents = emptyMap(),
-    )
-
-    private fun parsedRecord(
-        id: String,
-        family: MessageFamily,
-        destinationLast4: String? = null,
-        cardLast4: String? = null,
-        cardSmsChannel: CardSmsChannel? = null,
-        body: String? = null,
-    ) = ParsedEventRecord(
-        event = ParsedEvent(
-            id = id,
-            rawSmsId = "sms-$id",
-            bank = Bank.BANK_ALJAZIRA,
-            messageFamily = family,
-            direction = MoneyDirection.INCOMING,
-            amount = Money.of("1.00", Currency.SAR),
-            purchaseChannel = null,
-            sourceAccountRef = null,
-            destinationAccountRef = destinationLast4?.let { AccountReference(Bank.BANK_ALJAZIRA, it) },
-            cardRef = cardLast4?.let { CardReference(Bank.BANK_ALJAZIRA, it) },
-            merchant = null,
-            counterparty = body,
-            occurredAt = Instant.parse("2026-08-01T12:00:00Z"),
-            bankNetworkType = null,
-            confidence = Confidence(1.0),
-            parseStatus = ParseStatus.SUCCESS,
-        ),
-        details = ParsedEventDetails(cardSmsChannel = cardSmsChannel),
     )
 }

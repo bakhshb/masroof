@@ -1,8 +1,9 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.MoneyDirection
+import com.baraa.masroof.testsupport.parsedRecord
 import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -26,7 +27,7 @@ class SalaryIncomeHeuristicsTest {
             dest = "account:bank_aljazira:3001",
         )
         val records = mapOf(
-            "evt-1" to parsedRecord("evt-1", salaryIncomeWording = true),
+            "evt-1" to parsedRecord("evt-1", salaryIncomeWording = true, family = MessageFamily.TRANSFER_IN, direction = MoneyDirection.INCOMING),
         )
         assertTrue(SalaryIncomeHeuristics.isSalaryIncome(tx, records))
     }
@@ -40,7 +41,7 @@ class SalaryIncomeHeuristicsTest {
             dest = "account:bank_aljazira:3001",
         )
         val records = mapOf(
-            "evt-1" to parsedRecord("evt-1", salaryIncomeWording = false),
+            "evt-1" to parsedRecord("evt-1", salaryIncomeWording = false, family = MessageFamily.TRANSFER_IN, direction = MoneyDirection.INCOMING),
         )
         assertFalse(SalaryIncomeHeuristics.isSalaryIncome(tx, records))
     }
@@ -54,35 +55,10 @@ class SalaryIncomeHeuristicsTest {
             dest = "account:bank_aljazira:3001",
         ).copy(counterparty = "Payroll Co", merchant = "راتب")
         val records = mapOf(
-            "evt-1" to parsedRecord("evt-1", salaryIncomeWording = false),
+            "evt-1" to parsedRecord("evt-1", salaryIncomeWording = false, family = MessageFamily.TRANSFER_IN, direction = MoneyDirection.INCOMING),
         )
         assertFalse(SalaryIncomeHeuristics.isSalaryIncome(tx, records))
         // A row parsed before the fact existed keeps its name match.
-        assertTrue(SalaryIncomeHeuristics.isSalaryIncome(tx, mapOf("evt-1" to parsedRecord("evt-1", salaryIncomeWording = null))))
+        assertTrue(SalaryIncomeHeuristics.isSalaryIncome(tx, mapOf("evt-1" to parsedRecord("evt-1", salaryIncomeWording = null, family = MessageFamily.TRANSFER_IN, direction = MoneyDirection.INCOMING))))
     }
-
-    private fun parsedRecord(eventId: String, salaryIncomeWording: Boolean?) =
-        com.baraa.masroof.parsing.repository.ParsedEventRecord(
-            event = com.baraa.masroof.domain.model.ParsedEvent(
-                id = eventId,
-                rawSmsId = "sms-$eventId",
-                bank = com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA,
-                messageFamily = com.baraa.masroof.domain.model.MessageFamily.TRANSFER_IN,
-                direction = com.baraa.masroof.domain.model.MoneyDirection.INCOMING,
-                amount = Money.of("100.00", Currency.SAR),
-                purchaseChannel = null,
-                sourceAccountRef = null,
-                destinationAccountRef = null,
-                cardRef = null,
-                merchant = null,
-                counterparty = null,
-                occurredAt = java.time.Instant.parse("2026-08-10T12:00:00Z"),
-                bankNetworkType = null,
-                confidence = com.baraa.masroof.domain.model.Confidence(1.0),
-                parseStatus = com.baraa.masroof.domain.model.ParseStatus.SUCCESS,
-            ),
-            details = com.baraa.masroof.parsing.model.ParsedEventDetails(
-                salaryIncomeWording = salaryIncomeWording,
-            ),
-        )
 }
