@@ -100,11 +100,11 @@ class BankInterpretationService(
         val ruled = try {
             snapshot.interpretRouted(input,BankId(bankId),familyAssist).also { ruled ->
                 // Banks without role rules never ask; an unidentified message without an amount asks once here.
-                if (!trace.requested && FamilyAssistBridge.mayRemember(ruled))
+                if (!trace.requested && FamilyAssistBridge.mayRemember(ruled, input.body))
                     familyAssist.suggest(input, FamilyTextPreparation.prepare(input.body).title)
             }
         } finally { attempt.remove() }
-        val result = FamilyAssistBridge.rememberNonFinancial(ruled, trace.suggestion)
+        val result = FamilyAssistBridge.rememberNonFinancial(ruled, input.body, trace.suggestion)
         val interpretedAt = System.currentTimeMillis()
         // Advisory audit writes never decide whether a transaction may be posted.
         if(!closed) auditScope.launch {
@@ -301,8 +301,10 @@ class BankInterpretationService(
                 store.history(record.event.rawSmsId).lastOrNull()?.activeModelVersion != models.getValue(bank).version }
         val bodies = raw.getByIds(candidates.map { it.event.rawSmsId }.toSet()).associateBy { it.id }
         assistable = candidates.filter { record -> bodies[record.event.rawSmsId]?.body?.let { body ->
-            FamilyAssistBridge.suggest(models[record.event.bank.id], record.event.bank.id, body)
-        }?.let { it.family == MessageFamily.NON_FINANCIAL && record.event.amount == null || record.event.bank.id in roled } == true }
+            FamilyAssistBridge.suggest(models[record.event.bank.id], record.event.bank.id, body)?.let {
+                it.family == MessageFamily.NON_FINANCIAL && record.event.amount == null && !FamilyAssistBridge.showsMoney(body) ||
+                    record.event.bank.id in roled }
+        } == true }
             .map { it.event.rawSmsId }.toSet()
         // Seed UNKNOWN messages already read with the current seed model are not read again (same guard as above).
         seedRead = records.filter { it.event.bank.id == SEED_BANK && it.event.messageFamily.name == "UNKNOWN" &&

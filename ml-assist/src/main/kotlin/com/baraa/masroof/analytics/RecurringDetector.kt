@@ -28,9 +28,10 @@ data class RecurringSeries(val key: String, val rows: List<FinancialFact>) {
             // One missed month (a skipped or unreceived payment) does not break a monthly series.
             dates.size >= 3 && steps.all { it in 1L..2L } && steps.count { it == 2L } <= 1 &&
                 pairs.all { (a, b) -> sameDay(a, b, 5) } -> RecurringLabel.MONTHLY
-            // Two similar payments a year apart are enough: few users have three years of messages.
-            steps.all { it == 12L } && pairs.all { (a, b) -> sameDay(a, b, 10) } &&
-                amounts.max() - amounts.min() <= amounts.max() / 4 -> RecurringLabel.YEARLY
+            // Two payments a year apart are enough (few users have three years of messages), so both must look
+            // like a renewal: nearly the same day and amount, not two visits to a shop in the same season.
+            steps.all { it == 12L } && pairs.all { (a, b) -> sameDay(a, b, 3) } &&
+                amounts.max() - amounts.min() <= amounts.max() / 10 -> RecurringLabel.YEARLY
             else -> RecurringLabel.NONE
         }
     }

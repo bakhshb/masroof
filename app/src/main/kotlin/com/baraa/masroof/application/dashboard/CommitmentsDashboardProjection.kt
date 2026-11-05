@@ -9,7 +9,6 @@ data class CommitmentsDashboardSection(
     val loansOverview: LoansOverview,
     val transactionLoanInvolvement: Map<String, Set<String>>,
     val commitmentsOverview: CommitmentsOverview,
-    val dailyAllowance: DailyAllowance?,
 )
 
 /**
@@ -28,8 +27,6 @@ class CommitmentsDashboardProjection(
     suspend fun build(
         context: DashboardProjectionContext,
         creditFacilities: CreditFacilitiesOverview,
-        /** The owned accounts' money in minus money out this period. */
-        accountsNet: SignedMoneyAmount?,
     ): CommitmentsDashboardSection = with(context) {
         val commitments = commitmentRepository.listAll()
         val commitmentSourceTransactions = financialTransactionRepository.getByIds(
@@ -56,25 +53,23 @@ class CommitmentsDashboardProjection(
             addAll(creditCardPaymentTransactions)
         }.distinctBy { it.id }
         val recordsById = expanded.parsedRecords.associateBy { it.event.id }
-        val commitmentsOverview = CommitmentsOverviewBuilder.build(
-            salaryPeriod = period,
-            commitments = commitments,
-            creditFacilities = creditFacilities,
-            loansOverview = loansOverview,
-            transactions = commitmentTransactions,
-            primaryCurrency = primaryCurrency,
-            sarEquivalents = sarEquivalents + additionalSarEquivalents,
-            zoneId = zoneId,
-            paymentIdentities = commitmentTransactions.associate { tx -> tx.id to CommitmentPaymentIdentity.from(tx, recordsById) },
-        )
         CommitmentsDashboardSection(
             loansOverview = loansOverview,
             transactionLoanInvolvement = LoanRepaymentAttribution.buildInvolvementIndex(
                 transactions = transactions,
                 parsedRecords = parsedRecords,
             ),
-            commitmentsOverview = commitmentsOverview,
-            dailyAllowance = DailyAllowanceCalculator.calculate(accountsNet, commitmentsOverview, period, today),
+            commitmentsOverview = CommitmentsOverviewBuilder.build(
+                salaryPeriod = period,
+                commitments = commitments,
+                creditFacilities = creditFacilities,
+                loansOverview = loansOverview,
+                transactions = commitmentTransactions,
+                primaryCurrency = primaryCurrency,
+                sarEquivalents = sarEquivalents + additionalSarEquivalents,
+                zoneId = zoneId,
+                paymentIdentities = commitmentTransactions.associate { tx -> tx.id to CommitmentPaymentIdentity.from(tx, recordsById) },
+            ),
         )
     }
 

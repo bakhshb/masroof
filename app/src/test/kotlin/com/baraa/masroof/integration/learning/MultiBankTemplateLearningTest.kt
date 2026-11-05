@@ -64,7 +64,7 @@ class MultiBankTemplateLearningTest {
             val features = requireNotNull(FamilyAssistBridge.clean(body).features) { "$bank wording rejected" }
             val label = HumanFamilyLabel(bank, "raw-$bank", "decision-$bank", SmsFamilyLabel.NON_FINANCIAL, features.template,
                 features.terms, 1, "USER_NON_FINANCIAL")
-            fun remembered(classifier: FamilyClassifier) = FamilyAssistBridge.rememberNonFinancial(ruled,
+            fun remembered(classifier: FamilyClassifier) = FamilyAssistBridge.rememberNonFinancial(ruled, body,
                 FamilyAssistBridge.suggest(classifier, bank, body))
             val settled = remembered(FamilyClassifier(bank, listOf(label)))
             assertEquals(bank, MessageFamily.NON_FINANCIAL, settled.facts.family)
@@ -80,13 +80,18 @@ class MultiBankTemplateLearningTest {
             // A message with a transaction amount stays reviewable even with the remembered wording.
             val withAmount = ruled.copy(facts = ruled.facts.copy(amount = com.baraa.masroof.finance.value.Money.of("250",
                 com.baraa.masroof.finance.value.Currency.SAR)))
-            assertSame(bank, withAmount, FamilyAssistBridge.rememberNonFinancial(withAmount,
+            assertSame(bank, withAmount, FamilyAssistBridge.rememberNonFinancial(withAmount, body,
                 FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, body)))
             // Conflicting wording stops the rules before an amount is read, so a missing amount proves nothing there.
             val conflicted = ruled.copy(diagnostics = ruled.diagnostics + com.baraa.masroof.engine.bank.InterpretationDiagnostic(
                 "FAMILY_OR_DIRECTION_CONFLICT", "conflict", com.baraa.masroof.engine.bank.DiagnosticSeverity.ERROR))
-            assertSame(bank, conflicted, FamilyAssistBridge.rememberNonFinancial(conflicted,
+            assertSame(bank, conflicted, FamilyAssistBridge.rememberNonFinancial(conflicted, body,
                 FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, body)))
+            // Unmatched wording never has its amount read, so money in the text itself keeps the message reviewable.
+            listOf("شراء من متجر\nمبلغ: 120.50 ريال", "Purchase\nAmount: SAR 120.50").forEach { money ->
+                assertSame(bank, ruled, FamilyAssistBridge.rememberNonFinancial(ruled, money,
+                    FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(label)), bank, body)))
+            }
         }
     }
 
@@ -108,5 +113,10 @@ class MultiBankTemplateLearningTest {
             family = SmsFamilyLabel.PURCHASE, provenance = "USER_MESSAGE_FAMILY")))
         assertEquals(setOf("hidden"), FamilyAssistBridge.revokedMemories(listOf(hidden), bodies, mapOf(bank to contradicted)))
         assertEquals(setOf("hidden"), FamilyAssistBridge.revokedMemories(listOf(hidden), bodies, emptyMap()))
+        // A message hidden before the amount check returns to review even while the decision still holds.
+        val withMoney = "$body 120 ريال"
+        assertEquals(MessageFamily.NON_FINANCIAL, FamilyAssistBridge.suggest(FamilyClassifier(bank, listOf(ignored)), bank, withMoney)?.family)
+        assertEquals(setOf("hidden"), FamilyAssistBridge.revokedMemories(listOf(hidden),
+            mapOf("hidden" to withMoney), mapOf(bank to FamilyClassifier(bank, listOf(ignored)))))
     }
 }
