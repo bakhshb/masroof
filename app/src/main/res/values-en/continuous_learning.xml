@@ -1,9 +1,5 @@
 <resources>
     <string name="learning_distinct_origins">Templates from your corrections: %1$d</string>
-    <string name="recurring_personal_used">Using your personal recurring model after passing evaluation.</string>
-    <string name="recurring_seed_used">Using the pretrained recurring model and learning locally from your decisions.</string>
-    <string name="recurring_rules_used">Using recurrence rules for now. The learned model needs sufficient data and evaluations.</string>
-    <string name="recurring_learning_examples">Training series: %1$d · Independent validation series: %2$d</string>
     <string name="recurring_model_origin">Machine learning suggestion</string>
     <string name="recurring_human_origin">Based on your confirmation</string>
     <string name="recurring_rules_origin">Recurrence rule suggestion</string>
@@ -12,9 +8,4 @@
     <string name="forecast_continuous_learning">Spending forecasts learn from completed days on your device and retrain automatically. Your personal model is used when it outperforms the initial estimate.</string>
     <string name="recurring_previous_decisions">Your previous decisions</string>
     <string name="recurring_undo">Undo this decision</string>
-    <string name="learning_seed_not_eligible">The base model needs more training and evaluation in an app update. Your direct corrections remain saved.</string>
-    <string name="learning_personal_safety">Keeping the base method because the personal candidate did not pass safety evaluations.</string>
-    <string name="learning_baseline_better">The base method performs better in the current evaluation.</string>
-    <string name="learning_personal_used_reason">The personal model passed evaluation and improved the results.</string>
-    <string name="learning_needs_examples">More independent training and validation examples are needed before personal generalization.</string>
 </resources>

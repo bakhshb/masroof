@@ -41,9 +41,6 @@
     <string name="analysis_wait_eligible">لم يحفظ توقع مؤهل للمقارنة بعد. يحفظ أول توقع صالح من اليوم الثامن وحتى نهاية الفترة، عند اكتمال شروط النموذج والتغطية.</string>
     <string name="analysis_commitments_total">المتبقي للدفع هذه الفترة</string>
     <string name="analysis_commitments_count">%1$d التزامات</string>
-    <string name="analysis_recurring_personal">نموذج شخصي</string>
-    <string name="analysis_recurring_seed">نموذج أساسي</string>
-    <string name="analysis_recurring_rules">قواعد التكرار</string>
     <string name="analysis_due_today">اليوم</string>
     <string name="analysis_due_tomorrow">غدا</string>
     <plurals name="analysis_due_in_days">

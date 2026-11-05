@@ -41,9 +41,6 @@
     <string name="analysis_wait_eligible">No eligible comparison forecast has been saved yet. The first valid forecast can be saved from day eight until period end, once model and coverage requirements are met.</string>
     <string name="analysis_commitments_total">Still to pay this period</string>
     <string name="analysis_commitments_count">%1$d bills</string>
-    <string name="analysis_recurring_personal">Personal model</string>
-    <string name="analysis_recurring_seed">Base model</string>
-    <string name="analysis_recurring_rules">Recurrence rules</string>
     <string name="analysis_due_today">Today</string>
     <string name="analysis_due_tomorrow">Tomorrow</string>
     <plurals name="analysis_due_in_days">

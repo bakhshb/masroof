@@ -185,14 +185,6 @@ internal fun forecastReasonResource(reason: String?): Int = when (reason) {
     }
 }
 
-internal fun personalLearningReason(reason: String): Int = when (reason) {
-    "SEED_NOT_ELIGIBLE" -> R.string.learning_seed_not_eligible
-    "SAFETY_VALIDATION_FAILED" -> R.string.learning_personal_safety
-    "BASELINE_BETTER" -> R.string.learning_baseline_better
-    "PERSONAL_MODEL" -> R.string.learning_personal_used_reason
-    else -> R.string.learning_needs_examples
-}
-
 @Composable internal fun ForecastPerformanceDetails(state: AnalysisUiState) {
     MasroofCard(Modifier.testTag("forecast-performance")) {
         Column(verticalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofSpacing.sectionGap)) {

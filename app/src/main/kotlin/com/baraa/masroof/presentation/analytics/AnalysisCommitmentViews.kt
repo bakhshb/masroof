@@ -31,21 +31,6 @@ import com.baraa.masroof.ui.theme.MasroofThemeExtras
             Row(verticalAlignment = Alignment.CenterVertically) {
                 MasroofGuidanceLabel(stringResource(R.string.analysis_commitments_total), stringResource(R.string.lab_analysis_commitments_hint),
                     Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                snapshot.recurringLearning?.let { learning ->
-                    // The method stays visible as a badge; its explanation and counts sit behind the help icon.
-                    val method = stringResource(when (learning.method) {
-                        "PERSONAL_MODEL" -> R.string.analysis_recurring_personal
-                        "SEED_MODEL" -> R.string.analysis_recurring_seed
-                        else -> R.string.analysis_recurring_rules
-                    })
-                    MasroofBadge(method, MasroofCardAccent.None)
-                    MasroofGuidanceButton(method, listOf(stringResource(when (learning.method) {
-                        "PERSONAL_MODEL" -> R.string.recurring_personal_used
-                        "SEED_MODEL" -> R.string.recurring_seed_used
-                        else -> R.string.recurring_rules_used
-                    }), stringResource(R.string.recurring_learning_examples, learning.trainingSeries, learning.validationSeries),
-                        stringResource(personalLearningReason(learning.reason))).joinToString("\n\n"))
-                }
             }
             if (view.rows.isEmpty()) {
                 com.baraa.masroof.ui.components.MasroofAnalysisEmptyState(stringResource(R.string.analysis_no_due),

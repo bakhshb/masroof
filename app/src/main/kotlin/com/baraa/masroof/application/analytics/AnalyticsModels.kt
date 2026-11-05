@@ -35,10 +35,7 @@ internal fun List<AnalysisDue>.nearestFirst() = sortedWith(compareBy<AnalysisDue
     val evaluations: List<AnalysisEvaluation> = emptyList(), val modelReason: String? = null,
     val evaluationVersion: String? = null, val wholeDaysFrom: Long? = null,
     val wholeDaysLower: Long? = null, val wholeDaysUpper: Long? = null,
-    val budgetLower: Long? = null, val recurringLearning: RecurringLearningStatus? = null)
-
-@Serializable data class RecurringLearningStatus(val method: String, val reason: String,
-    val trainingSeries: Int, val validationSeries: Int)
+    val budgetLower: Long? = null)
 data class AnalysisRecurringCorrection(val seriesKey: String, val name: String, val kind: String)
 data class AnalysisUiState(val snapshot: AnalysisSnapshot? = null, val updating: Boolean = true,
     val unavailable: Boolean = false, val alerts: List<AnalysisAlertRow> = emptyList(),

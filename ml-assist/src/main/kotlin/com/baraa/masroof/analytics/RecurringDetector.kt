@@ -6,6 +6,10 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
+/** Cadence from the rules, or the user's own decision for a series. */
+enum class RecurringLabel { NONE, WEEKLY, MONTHLY, YEARLY }
+data class RecurringPrediction(val label: RecurringLabel, val origin: String = "RULES")
+
 data class RecurringPattern(val key: String, val name: String, val cadence: String, val nextDay: Long,
     val estimate: Long, val lower: Long, val upper: Long, val sourceIds: List<String>,
     val latestAmount: Long, val referenceAmount: Long?, val amountIncreased: Boolean,
@@ -31,16 +35,6 @@ data class RecurringSeries(val key: String, val rows: List<FinancialFact>) {
             else -> RecurringLabel.NONE
         }
     }
-    val features: List<Double> get() {
-        val amounts = rows.takeLast(6).map { it.amount!!.toDouble() }
-        val gap = median(gaps)
-        val amount = median(amounts).coerceAtLeast(1.0)
-        return listOf(rows.takeLast(6).size / 6.0, gap / 31,
-            median(gaps.map { abs(it - gap) }) / 31, gaps.map { abs(it - 7) }.average() / 31,
-            dates.zipWithNext().map { (a, b) -> abs(b.toEpochDay() - a.plusMonths(1).toEpochDay()).toDouble() }.average() / 31,
-            median(amounts.map { abs(it - amount) }) / amount, amounts.last() / amount,
-            (rows.last().day - rows.takeLast(6).first().day) / 180.0).map { it.coerceIn(0.0, 4.0) }
-    }
 }
 
 object RecurringDetector {
@@ -60,7 +54,7 @@ object RecurringDetector {
             val ordered = series.rows
             val recent = ordered.takeLast(6)
             val dates = series.dates
-            val prediction = if (classify == null) RecurringPrediction(series.ruleLabel, 1.0, "RULES") else classify(series)
+            val prediction = if (classify == null) RecurringPrediction(series.ruleLabel) else classify(series)
             val label = prediction?.label?.takeIf { it != RecurringLabel.NONE } ?: return@mapNotNull null
             if (label != RecurringLabel.YEARLY && ordered.size < 3) return@mapNotNull null
             val cadence = label.name
@@ -83,6 +77,6 @@ object RecurringDetector {
             RecurringPattern(hash("${series.key}|$cadence"), ordered.last().merchant!!, cadence, due.toEpochDay(),
                 smoothed.roundToLong(), (smoothed - margin).roundToLong().coerceAtLeast(0), (smoothed + margin).roundToLong(),
                 ordered.map { it.id }, last, reference?.roundToLong(), reference != null && last - reference >= maxOf(reference * .2, 1000.0),
-                series.key, prediction.origin, prediction.modelVersion)
+                series.key, prediction.origin)
         }.sortedBy { it.nextDay }
 }

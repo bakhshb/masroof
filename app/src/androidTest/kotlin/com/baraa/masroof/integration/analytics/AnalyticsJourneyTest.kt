@@ -535,18 +535,16 @@ class AnalyticsJourneyTest {
             } }
             compose.onNodeWithTag("analysis-tab-2").performClick()
             compose.onNodeWithTag("recurring-not-${candidate.key}").performScrollTo().performClick()
-            val corrected = awaitAnalysis(c.analytics) { state -> state.recurringCorrections.any {
+            awaitAnalysis(c.analytics) { state -> state.recurringCorrections.any {
                 it.seriesKey == candidate.seriesKey && it.kind == "NOT_RECURRING"
-            } }.snapshot!!.recurringLearning!!
-            assertEquals(1, corrected.trainingSeries + corrected.validationSeries)
+            } && state.snapshot!!.candidates.none { it.key == candidate.key } }
             compose.onNodeWithTag("recurring-undo-${candidate.seriesKey}").performScrollTo().performClick()
             awaitAnalysis(c.analytics) { state -> state.snapshot!!.candidates.any { it.key == candidate.key } &&
                 state.recurringCorrections.none { it.seriesKey == candidate.seriesKey } }
             compose.onNodeWithTag("recurring-dismiss-${candidate.key}").performScrollTo().performClick()
-            val dismissed = awaitAnalysis(c.analytics) { state -> state.recurringCorrections.any {
+            awaitAnalysis(c.analytics) { state -> state.recurringCorrections.any {
                 it.seriesKey == candidate.seriesKey && it.kind == "DISMISSED"
-            } }.snapshot!!.recurringLearning!!
-            assertEquals(0, dismissed.trainingSeries + dismissed.validationSeries)
+            } }
             assertEquals(before, runBlocking { c.financialTransactionRepository.listAll() })
             screen("recurring-explicit-feedback")
         } finally {

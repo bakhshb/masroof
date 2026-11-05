@@ -267,8 +267,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
                 } else row
             }
         }
-        val recurring = RecurringLearningWorkflow.build(input.clean.recurring, feedback, input.today, input.committedCadences)
-        val (patterns, recurringStatus) = recurring
+        val patterns = RecurringLearningWorkflow.build(input.clean.recurring, feedback, input.today, input.committedCadences)
         val priorCandidates = dao.candidates().associateBy { it.id }
         val legacy = priorCandidates.values.filter { it.status != "SUGGESTED" }.mapNotNull { row ->
             runCatching { json.decodeFromString<AnalysisCandidate>(row.payload) }.getOrNull()?.takeIf { it.seriesKey == null }?.let { row to it }
@@ -301,8 +300,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             insights = input.insights, evaluations = result.evaluations.map { AnalysisEvaluation(it.horizon, it.count, it.mae, it.bias) },
             modelReason = result.reason, evaluationVersion = AnalyticsVersion.EVALUATION,
             wholeDaysFrom = (input.today + 1).takeIf { it < input.end }, wholeDaysLower = result.wholeDaysLower,
-            wholeDaysUpper = result.wholeDaysUpper, budgetLower = result.wholeDaysLower?.let { Math.addExact(result.actual, it) },
-            recurringLearning = recurringStatus)
+            wholeDaysUpper = result.wholeDaysUpper, budgetLower = result.wholeDaysLower?.let { Math.addExact(result.actual, it) })
         // A committed source invalidation while fitting invalidates the entire result.
         // Room tables, preferences, import completion and the clock bump generation; SMS permission does not.
         if (generation.get() != version || ("SMS_PERMISSION" in input.reasons) != smsPermissionMissing()) { request(); return@withLock }
@@ -491,20 +489,6 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
                 ForecastReplay.evaluate(input.clean, period.start, period.end, origin, completedAnalysisPeriods(input.clean, origin),
                     ::periodOffset,
                     { day -> completedAnalysisPeriods(input.clean, day) })
-            }
-        }
-    }
-
-    /** Explicit developer-only export; no UI, network upload, names, dates or monetary amounts. */
-    internal suspend fun exportReviewedRecurrence(contributorGroup: String): String = withContext(Dispatchers.Default) {
-        require(contributorGroup.matches(Regex("[A-Za-z0-9_-]{1,64}")))
-        mutex.withLock {
-            if (closed) return@withLock ""
-            val input = source()
-            val result = RecurringLearningWorkflow.build(input.clean.recurring, store.analytics().feedback(), input.today, input.committedCadences)
-            result.reviewedExamples.sortedBy { it.seriesKey }.joinToString("\n", postfix = "\n") { row ->
-                listOf(hash("$contributorGroup|${row.seriesKey}"), contributorGroup, "train", row.label.name,
-                    result.ruleLabels.getValue(row.seriesKey).name).joinToString("\t") + "\t" + row.features.joinToString("\t")
             }
         }
     }
