@@ -9,6 +9,8 @@ import com.baraa.masroof.engine.bank.interpretation.FamilyOrigin
 import com.baraa.masroof.engine.bank.interpretation.FamilySuggestion
 import com.baraa.masroof.engine.bank.interpretation.FamilyTextPreparation
 import com.baraa.masroof.engine.bank.interpretation.FamilyTextShape
+import com.baraa.masroof.engine.bank.patterns.CandidateKind
+import com.baraa.masroof.engine.bank.patterns.GenericCandidateExtractor
 import com.baraa.masroof.ml.family.*
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
@@ -30,8 +32,8 @@ object FamilyAssistBridge {
      * transaction amount, in any bank. The existing informational policy then keeps it out of review; it never
      * touches money or posting. A message with an amount stays reviewable even with the same wording.
      */
-    fun rememberNonFinancial(result: Interpretation, suggestion: FamilySuggestion?): Interpretation =
-        if (suggestion?.family != MessageFamily.NON_FINANCIAL || !mayRemember(result)) result
+    fun rememberNonFinancial(result: Interpretation, body: String, suggestion: FamilySuggestion?): Interpretation =
+        if (suggestion?.family != MessageFamily.NON_FINANCIAL || !mayRemember(result, body)) result
         // The draft mapper stamps family_origin/model reasons from [Interpretation.familyInference].
         else result.copy(facts = Facts(MessageFamily.NON_FINANCIAL), status = ParseStatus.NON_FINANCIAL,
             confidence = Confidence(suggestion.score, emptyList()), evidence = emptyList(), blockers = emptySet(), familyInference = suggestion)
@@ -40,8 +42,11 @@ object FamilyAssistBridge {
      * Only an unidentified message whose amount the rules looked for and found none may be settled. These stops end
      * the rules before they read an amount, or drop one they could not trust, so a missing amount proves nothing.
      */
-    fun mayRemember(result: Interpretation): Boolean = result.bank != null && result.facts.family == MessageFamily.UNKNOWN &&
-        result.facts.amount == null && result.diagnostics.none { it.code in AMOUNT_NOT_READ }
+    fun mayRemember(result: Interpretation, body: String): Boolean = result.bank != null && result.facts.family == MessageFamily.UNKNOWN &&
+        result.facts.amount == null && result.diagnostics.none { it.code in AMOUNT_NOT_READ } && !showsMoney(body)
+
+    /** A bank without role rules, or a pattern that did not match, never reads the amount, so the text itself is checked. */
+    fun showsMoney(body: String): Boolean = GenericCandidateExtractor.extract(body).any { it.kind == CandidateKind.MONEY }
     private val AMOUNT_NOT_READ = setOf("MESSAGE_TOO_LONG", "UNSUPPORTED_RULE_CAPABILITY", "FAMILY_OR_DIRECTION_CONFLICT",
         "INVALID_OR_CONFLICTING_PRINCIPAL_CURRENCY", "CONFLICTING_FOREIGN_PRINCIPAL")
 
@@ -49,7 +54,7 @@ object FamilyAssistBridge {
     fun revokedMemories(records: List<ParsedEventRecord>, bodies: Map<String, String>,
         models: Map<String, FamilyClassifier>): Set<String> = records.filter { record ->
             val body = bodies[record.event.rawSmsId] ?: return@filter false
-            suggest(models[record.event.bank.id], record.event.bank.id, body)?.family !=
+            showsMoney(body) || suggest(models[record.event.bank.id], record.event.bank.id, body)?.family !=
                 MessageFamily.NON_FINANCIAL
         }.map { it.event.rawSmsId }.toSet()
 
