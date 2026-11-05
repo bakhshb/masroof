@@ -73,7 +73,8 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
         // Same split as the Forecasts tab: spent so far vs expected for the rest.
         value?.remaining?.let { remaining -> com.baraa.masroof.ui.components.MasroofForecastSplit(analysisAmount(value.actual).amount,
             analysisAmount(remaining).amount, com.baraa.masroof.application.locale.AppDigits.display(
-                "${stringResource(R.string.lab_analysis_actual)} ${visualMoney(value.actual)} · ${stringResource(R.string.lab_analysis_remaining)} ${visualMoney(remaining)}")) }
+                "${stringResource(R.string.lab_analysis_actual)} ${visualMoney(value.actual)} · ${stringResource(R.string.lab_analysis_remaining)} ${visualMoney(remaining)}"),
+                Modifier.padding(bottom = MasroofSpacing.inlineGap)) }
         Text(stringResource(R.string.lab_analysis_sections), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
