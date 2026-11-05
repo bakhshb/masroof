@@ -36,6 +36,7 @@ class LearningInsightsWorkflow(private val learning: BankInterpretationService?,
             excluded.size,repeat,excluded.groupingBy { it.reason ?: "AMBIGUOUS_FAMILY" }.eachCount(),effective.count { it.state == "PENDING" },
             audits.filter { it.origin == "HUMAN_TEMPLATE" }.map { it.rawId }.distinct().size,
             // Only financial templates propose; an ignored message teaches nothing to suggest.
-            labels.any { it.template !in blocked && it.family != "NON_FINANCIAL" })
+            labels.any { it.template !in blocked &&
+                com.baraa.masroof.ml.family.SmsFamilyLabel.valueOf(it.family) in com.baraa.masroof.ml.family.FamilyClassifier.FINANCIAL })
     }
 }
