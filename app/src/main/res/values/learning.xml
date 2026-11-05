@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="learning_title">أثر التعلم من قراراتك</string>
-    <string name="learning_used">استخدم قرارك لتعلم عائلة الرسالة.</string>
-    <string name="learning_blocked">منع اقتراح القالب المتعارض تلقائيا.</string>
-    <string name="learning_excluded">لم يستخدم هذا التعديل لتدريب العائلة.</string>
-    <string name="learning_pending">تحديث التعلم معلق؛ تستمر القواعد أثناء إعادة المحاولة.</string>
+    <string name="learning_title">تذكر قراراتك</string>
+    <string name="learning_used">حفظ قرارك؛ الرسائل بنفس الصيغة تتبعه.</string>
+    <string name="learning_blocked">على هذه الصيغة قرارات متعارضة، فلا يطبق عليها قرار تلقائيا.</string>
+    <string name="learning_excluded">لم يحفظ هذا التعديل كقرار للصيغة.</string>
+    <string name="learning_pending">حفظ القرار معلق؛ تستمر القواعد أثناء إعادة المحاولة.</string>
     <string name="learning_reason_fields">تعديل المبلغ أو التاجر أو الطرف لا يحدد عائلة الرسالة.</string>
     <string name="learning_reason_context">قرار الملكية أو ربط التحويل لا يؤكد عائلة جديدة.</string>
-    <string name="learning_reason_bank">التعلم الشخصي غير متاح لهذا البنك بعد.</string>
-    <string name="learning_reason_conflict">يوجد تعارض مع قرار بشري؛ يبقى هذا القالب دون مساعدة آلية حتى يحسم.</string>
+    <string name="learning_reason_bank">هذا البنك لا يدعم تذكر القرارات بعد.</string>
+    <string name="learning_reason_conflict">يوجد تعارض مع قرار سابق لنفس الصيغة؛ لا يطبق عليها قرار تلقائيا حتى يحسم.</string>
     <string name="learning_reason_pending">لم يكتمل تحميل الدليل أو القرار؛ سيعاد التحقق.</string>
-    <string name="learning_reason_cleaning">صياغة الرسالة غير مؤهلة لاستخراج خصائص تدريب آمنة.</string>
+    <string name="learning_reason_cleaning">صيغة الرسالة لا تصلح للحفظ كقالب آمن.</string>
     <string name="learning_reason_ambiguous">النوع المالي المختار لا يكفي وحده لتحديد عائلة الرسالة.</string>
-    <string name="learning_counts_hint">الأعداد من السجل المتاح، وليست نسبة دقة. غياب التصحيح لا يثبت صحة الاقتراح، وقد تكون بعض قرارات الماضي غير قابلة للإثبات.</string>
+    <string name="learning_counts_hint">الأعداد من السجل المتاح، وليست نسبة دقة. بعض قرارات الماضي قد لا يمكن إثباتها.</string>
     <string name="learning_forecast_title">التوقع المنشور مقابل الفعلي</string>
     <string name="learning_forecast_periods">فترات مقارنة مكتملة ومؤهلة: %1$d</string>
     <string name="learning_forecast_paused">يستخدم خط الأساس بعد ثبوت تراجع الشخصي. يستمر تقييم الشخصي في الخلفية.</string>

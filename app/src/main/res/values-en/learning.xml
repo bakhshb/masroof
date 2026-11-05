@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="learning_title">Learning from your decisions</string>
-    <string name="learning_used">Your decision taught the message family.</string>
-    <string name="learning_blocked">Automatic suggestions for the conflicting template are blocked.</string>
-    <string name="learning_excluded">This edit was not used to train the family classifier.</string>
-    <string name="learning_pending">Learning update pending. Rules continue while the update retries.</string>
+    <string name="learning_title">Remembering your decisions</string>
+    <string name="learning_used">Your decision is remembered for messages with the same wording.</string>
+    <string name="learning_blocked">This wording has conflicting decisions, so none is applied automatically.</string>
+    <string name="learning_excluded">This edit was not remembered for the wording.</string>
+    <string name="learning_pending">Saving the decision is pending. Rules continue while it retries.</string>
     <string name="learning_reason_fields">Editing the amount, merchant or counterparty does not identify the message family.</string>
     <string name="learning_reason_context">An ownership or transfer pairing decision does not confirm a new family.</string>
-    <string name="learning_reason_bank">Personal learning is not available for this bank yet.</string>
-    <string name="learning_reason_conflict">A human decision conflicts with this template. Assistance stays blocked until the conflict is resolved.</string>
+    <string name="learning_reason_bank">This bank cannot remember decisions yet.</string>
+    <string name="learning_reason_conflict">An earlier decision for the same wording conflicts; nothing is applied automatically until it is settled.</string>
     <string name="learning_reason_pending">Evidence or the decision is not fully available. The update will retry.</string>
-    <string name="learning_reason_cleaning">The wording cannot produce eligible, privacy-preserving training features.</string>
+    <string name="learning_reason_cleaning">This wording cannot be stored as a safe template.</string>
     <string name="learning_reason_ambiguous">The selected financial type alone does not identify the message family.</string>
-    <string name="learning_counts_hint">Counts reflect available records, not accuracy. No correction does not prove a suggestion correct. Some past decisions cannot be verified.</string>
+    <string name="learning_counts_hint">Counts reflect available records, not accuracy. Some past decisions cannot be verified.</string>
     <string name="learning_forecast_title">Published forecast versus actual spending</string>
     <string name="learning_forecast_periods">Completed eligible comparison periods: %1$d</string>
     <string name="learning_forecast_paused">The baseline is used after sustained personal-model regression. Personal evaluation continues in the background.</string>

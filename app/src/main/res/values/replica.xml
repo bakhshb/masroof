@@ -1,6 +1,5 @@
 <resources>
-<string name="lab_ml_source">اقترحها التعلم على جهازك</string>
-<string name="lab_template_source">تعلم من تصحيحك السابق</string>
+<string name="lab_template_source">طبق قرارك السابق لنفس الصيغة</string>
 <string name="lab_inferred_family">فهمت كـ: %1$s</string>
 <string name="lab_inference_pending">هذا اقتراح لم يعتمد بعد؛ اتبع سبب المراجعة والخطوات الموضحة أدناه.</string>
 <string name="lab_manual_source">النوع بقرارك اليدوي</string>

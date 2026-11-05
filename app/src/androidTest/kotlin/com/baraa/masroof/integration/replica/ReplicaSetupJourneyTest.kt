@@ -244,7 +244,7 @@ class ReplicaSetupJourneyTest {
             compose.onNodeWithTag("review-why").performScrollTo().performClick()
             compose.onNodeWithTag("interpretation_provenance").performScrollTo().assertIsDisplayed()
             compose.onNodeWithText(text(R.string.lab_unresolved_source)).assertExists()
-            compose.onNodeWithText(text(R.string.lab_ml_source)).assertDoesNotExist()
+            compose.onNodeWithText(text(R.string.lab_template_source)).assertDoesNotExist()
             compose.onNodeWithText(text(R.string.lab_understanding_pending)).assertExists()
             screenshot("13-statistical-abstention-review")
             compose.runOnUiThread { review.closeDetail() }

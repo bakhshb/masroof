@@ -1,6 +1,5 @@
 <resources>
-    <string name="learning_distinct_origins">قوالب من تصحيحاتك: %1$d</string>
-    <string name="recurring_model_origin">اقتراح من نموذج تعلم الآلة</string>
+    <string name="learning_distinct_origins">صيغ محفوظة من قراراتك: %1$d</string>
     <string name="recurring_human_origin">بناء على تأكيدك</string>
     <string name="recurring_rules_origin">اقتراح من قواعد التكرار</string>
     <string name="recurring_not_recurring">ليست دفعة متكررة</string>

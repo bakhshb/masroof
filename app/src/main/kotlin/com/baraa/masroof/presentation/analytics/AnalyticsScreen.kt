@@ -260,7 +260,6 @@ private fun statusRes(state: AnalysisUiState): Pair<Int, Int?> {
                             MasroofCard(Modifier.testTag("lab-candidate-${c.key}")) {
                                 Text(c.name, style = MaterialTheme.typography.titleSmall)
                                 Text(stringResource(when (c.origin) {
-                                    "MODEL" -> R.string.recurring_model_origin
                                     "HUMAN_DECISION" -> R.string.recurring_human_origin
                                     else -> R.string.recurring_rules_origin
                                 }), style = MaterialTheme.typography.bodySmall)

@@ -1,6 +1,5 @@
 <resources>
-    <string name="learning_distinct_origins">Templates from your corrections: %1$d</string>
-    <string name="recurring_model_origin">Machine learning suggestion</string>
+    <string name="learning_distinct_origins">Wordings remembered from your decisions: %1$d</string>
     <string name="recurring_human_origin">Based on your confirmation</string>
     <string name="recurring_rules_origin">Recurrence rule suggestion</string>
     <string name="recurring_not_recurring">This is not a recurring payment</string>
