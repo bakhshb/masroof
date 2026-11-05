@@ -121,4 +121,28 @@ class AnalyticsEngineTest {
         val two = (0 until 84).map { PurchaseDay(start + it, when (it) { 40 -> 300000; 50 -> 1000; else -> 0 }, 0, 1, 0, true) }
         assertEquals(301000.0 / 12, PurchaseForecaster.weekdayBaseline(two).sum(), 1.0)
     }
+    private fun payments(vararg dates: String, amounts: List<Long> = List(dates.size) { 3500L }) = dates.mapIndexed { i, date ->
+        FinancialFact("r$i", LocalDate.parse(date).toEpochDay(), amounts[i], false, true, "Service", true)
+    }
+    @Test fun oneMissedMonthKeepsAMonthlySeries() {
+        val rows = payments("2026-01-10", "2026-02-10", "2026-04-11", "2026-05-09")
+        val pattern = RecurringDetector.detect(rows, LocalDate.of(2026, 5, 20).toEpochDay()).single()
+        assertEquals("MONTHLY", pattern.cadence)
+        assertEquals(LocalDate.of(2026, 6, 9).toEpochDay(), pattern.nextDay)
+        // Every other month, or two gaps, is not monthly.
+        assertTrue(RecurringDetector.detect(payments("2026-01-10", "2026-03-10", "2026-05-10"), LocalDate.of(2026, 5, 20).toEpochDay()).isEmpty())
+        assertTrue(RecurringDetector.detect(payments("2026-01-10", "2026-03-10", "2026-04-10", "2026-06-10"), LocalDate.of(2026, 6, 20).toEpochDay()).isEmpty())
+    }
+    @Test fun twoSimilarPaymentsAYearApartAreYearly() {
+        val pattern = RecurringDetector.detect(payments("2025-03-01", "2026-03-04", amounts = listOf(90000, 95000)),
+            LocalDate.of(2026, 6, 1).toEpochDay()).single()
+        assertEquals("YEARLY", pattern.cadence)
+        assertEquals(LocalDate.of(2027, 3, 4).toEpochDay(), pattern.nextDay)
+        // A very different amount, a different season, or two monthly-looking rows are not yearly.
+        assertTrue(RecurringDetector.detect(payments("2025-03-01", "2026-03-04", amounts = listOf(20000, 95000)), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
+        assertTrue(RecurringDetector.detect(payments("2025-03-01", "2026-05-20"), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
+        assertTrue(RecurringDetector.detect(payments("2026-04-01", "2026-05-01"), LocalDate.of(2026, 5, 10).toEpochDay()).isEmpty())
+        // An old yearly series whose renewal never came expires.
+        assertTrue(RecurringDetector.detect(payments("2024-03-01", "2025-03-01"), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
+    }
 }

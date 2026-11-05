@@ -8,6 +8,7 @@ class RecurringLearningTest {
         RecurringLabel.WEEKLY -> listOf(1.0, .2, 0.0, 0.0, 1.0, 0.0, 1.0, .2)
         RecurringLabel.MONTHLY -> listOf(1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0)
         RecurringLabel.NONE -> listOf(1.0, .5, 1.0, 1.0, 1.0, 1.0, 2.0, 1.0)
+        RecurringLabel.YEARLY -> error("rules and human decisions only")
     }
     private fun examples(count: Int) = (1..count).map { index ->
         val label = RecurringLabel.entries[index % 3]
@@ -16,7 +17,7 @@ class RecurringLearningTest {
 
     @Test fun fittingLearnsNumericalWeightsAndPredictsUnseenSeries() {
         val model = RecurringLearning.fit(examples(90))
-        RecurringLabel.entries.forEach { label -> assertEquals(label, model.predict(features(label))?.label) }
+        RecurringLabel.entries.take(RecurringLearning.CLASSES).forEach { label -> assertEquals(label, model.predict(features(label))?.label) }
         assertTrue(model.weights.flatten().any { it != 0.0 })
         assertFalse(model.accepted) // Fitting alone does not authorize production use.
     }
@@ -48,6 +49,14 @@ class RecurringLearningTest {
         assertEquals(2, RecurringDetector.series(rows).size)
         assertEquals(2, RecurringDetector.detect(rows, 15).size)
         assertNotEquals(RecurringDetector.detect(rows, 15)[0].key, RecurringDetector.detect(rows, 15)[1].key)
-        assertEquals(1, RecurringDetector.series(rows + rows.first().copy(id = "other")).size)
+        // The ambiguous same-day pair is dropped; the rest of that merchant's history stays.
+        val ambiguous = RecurringDetector.series(rows + rows.first().copy(id = "other"))
+        assertEquals(listOf("a1", "a2"), ambiguous.single { s -> s.rows.any { it.id.startsWith("a") } }.rows.map { it.id })
+        assertEquals(1, RecurringDetector.detect(rows + rows.first().copy(id = "other"), 15).size)
+    }
+
+    @Test fun yearlyDecisionsNeverBecomeModelTrainingRows() {
+        val yearly = RecurringExample("yearly", features(RecurringLabel.MONTHLY), RecurringLabel.YEARLY, 1)
+        assertEquals(RecurringLearning.fit(examples(30)).weights, RecurringLearning.fit(examples(30) + yearly).weights)
     }
 }

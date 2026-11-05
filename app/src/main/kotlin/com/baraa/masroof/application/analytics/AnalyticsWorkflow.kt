@@ -406,7 +406,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         require(draft.name.isNotBlank() && draft.amount.amount.signum() > 0)
         mutex.withLock { if (closed) return false
             container.databaseAccessGate.withAccess {
-            recordRecurringFeedback(c, "CONFIRM_PENDING", draft.recurrence?.name?.takeIf { it in setOf("WEEKLY", "MONTHLY") })
+            recordRecurringFeedback(c, "CONFIRM_PENDING", draft.recurrence?.name?.takeIf { it in setOf("WEEKLY", "MONTHLY", "YEARLY") })
             container.database.withTransaction {
                 val source = container.financialTransactionRepository.getById(c.sourceIds.last()) ?: error("Source changed")
                 val existing = container.commitmentRepository.getBySourceTransactionId(source.id)
@@ -418,7 +418,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             }
             val row = store.analytics().candidates().firstOrNull { it.id == key }
             val saved = container.commitmentRepository.getBySourceTransactionId(c.sourceIds.last())
-            val learnedCadence = draft.recurrence?.name?.takeIf { it in setOf("WEEKLY", "MONTHLY") && saved?.recurrence?.name == it }
+            val learnedCadence = draft.recurrence?.name?.takeIf { it in setOf("WEEKLY", "MONTHLY", "YEARLY") && saved?.recurrence?.name == it }
             store.withTransaction {
                 recordRecurringFeedback(c, "CONFIRMED", learnedCadence)
                 if (row != null) store.analytics().candidates(listOf(row.copy(status = "ACCEPTED")))

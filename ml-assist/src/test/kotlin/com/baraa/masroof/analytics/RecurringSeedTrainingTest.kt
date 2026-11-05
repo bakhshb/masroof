@@ -10,6 +10,7 @@ class RecurringSeedTrainingTest {
             RecurringLabel.WEEKLY -> listOf(1.0, .2, 0.0, 0.0, 1.0, 0.0, 1.0, .2)
             RecurringLabel.MONTHLY -> listOf(1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0)
             RecurringLabel.NONE -> listOf(1.0, .5, 1.0, 1.0, 1.0, 1.0, 2.0, 1.0)
+            RecurringLabel.YEARLY -> error("rules and human decisions only")
         }
         return listOf(id, owner, partition, label.name, "NONE").joinToString("\t") + "\t" + features.joinToString("\t")
     }

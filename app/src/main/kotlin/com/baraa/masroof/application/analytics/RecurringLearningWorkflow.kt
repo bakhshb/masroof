@@ -21,7 +21,7 @@ import kotlinx.serialization.decodeFromString
 @Serializable data class RecurringFeedbackPayload(val seriesKey: String, val sourceIds: List<String>,
     val label: String? = null, val featureVersion: String = RecurringLearning.FEATURE_VERSION) {
     fun validate() {
-        require(seriesKey.isNotBlank() && sourceIds.size >= 3 && sourceIds.size <= 5000 && sourceIds.distinct().size == sourceIds.size)
+        require(seriesKey.isNotBlank() && sourceIds.size >= 2 && sourceIds.size <= 5000 && sourceIds.distinct().size == sourceIds.size)
         require(featureVersion == RecurringLearning.FEATURE_VERSION)
         label?.let { RecurringLabel.valueOf(it) }
     }
@@ -53,7 +53,7 @@ internal object RecurringLearningWorkflow {
         }
         val explicitSeries = decisions.map { it.first.seriesKey }.toSet()
         val confirmed = series.values.filter { it.key !in explicitSeries }.mapNotNull { current ->
-            val labels = current.rows.mapNotNull { committedCadences[it.id] }.filter { it in setOf("WEEKLY", "MONTHLY") }.distinct()
+            val labels = current.rows.mapNotNull { committedCadences[it.id] }.filter { it in setOf("WEEKLY", "MONTHLY", "YEARLY") }.distinct()
             labels.singleOrNull()?.let { RecurringExample(current.key, current.features, RecurringLabel.valueOf(it), 0) }
         }
         val examples = confirmed + decisions.mapNotNull { (row, pair) ->

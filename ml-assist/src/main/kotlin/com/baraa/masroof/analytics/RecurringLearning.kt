@@ -3,7 +3,8 @@ package com.baraa.masroof.analytics
 import kotlin.math.exp
 import kotlin.math.sqrt
 
-enum class RecurringLabel { NONE, WEEKLY, MONTHLY }
+/** The model scores the first [RecurringLearning.CLASSES] labels; YEARLY comes only from rules or a human decision. */
+enum class RecurringLabel { NONE, WEEKLY, MONTHLY, YEARLY }
 data class RecurringPrediction(val label: RecurringLabel, val score: Double,
     val origin: String = "MODEL", val modelVersion: String? = null)
 data class RecurringExample(val seriesKey: String, val features: List<Double>, val label: RecurringLabel, val decidedAt: Long) {
@@ -35,6 +36,7 @@ data class RecurringPersonalization(val model: RecurringModel?, val personalUsed
 /** Small regularized softmax classifier. Only explicit human labels are training truth. */
 object RecurringLearning {
     const val FEATURE_VERSION = "recurring-numeric-v1"
+    const val CLASSES = 3
     fun requireFeatures(features: List<Double>) {
         require(features.size == 8 && features.all { it.isFinite() && it in 0.0..4.0 })
     }
@@ -97,5 +99,5 @@ object RecurringLearning {
         // Conflicting simultaneous decisions are not resolved by list order.
         val latest = rows.filter { it.decidedAt == rows.maxOf { it.decidedAt } }
         latest.distinctBy { it.label to it.features }.singleOrNull()
-    }.filterNotNull().sortedBy { it.seriesKey }.also { require(it.size <= 5000) }
+    }.filterNotNull().filter { it.label.ordinal < CLASSES }.sortedBy { it.seriesKey }.also { require(it.size <= 5000) }
 }
