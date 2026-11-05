@@ -46,7 +46,7 @@ import java.time.format.DateTimeFormatter
 
 val LocalAnalyticsWorkflow = staticCompositionLocalOf<AnalyticsWorkflow?> { null }
 /** Rendering seam for comparing the exact same Home with/without the additive card. */
-val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
+val LocalAnalyticsCardsEnabled = staticCompositionLocalOf { true }
 @Composable private fun workflow(): AnalyticsWorkflow {
     LocalAnalyticsWorkflow.current?.let { return it }
     val context = LocalContext.current
@@ -54,7 +54,7 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
 }
 
 @Composable fun ForecastCard(onOpen: () -> Unit) {
-    if (!LocalLabAnalyticsCardsEnabled.current) return
+    if (!LocalAnalyticsCardsEnabled.current) return
     val workflow = workflow()
     val state by workflow.state.collectAsState()
     val value = state.snapshot

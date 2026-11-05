@@ -220,11 +220,11 @@ private fun MasroofContent(
         // A full-screen detail hides the dashboard, which is what opens the alert.
         if (top.destination == HomeDestination.Dashboard) closeTransactionDetailUnlessBusy() else push(HomeDestination.Dashboard)
     }
-    val labCenterReturns by AnalyticsNavigation.centerReturns.collectAsState()
-    var consumedLabCenterReturn by rememberSaveable { mutableLongStateOf(labCenterReturns) }
-    LaunchedEffect(labCenterReturns) {
-        if (labCenterReturns > consumedLabCenterReturn) pop()
-        consumedLabCenterReturn = labCenterReturns
+    val analyticsCenterReturns by AnalyticsNavigation.centerReturns.collectAsState()
+    var consumedAnalyticsCenterReturn by rememberSaveable { mutableLongStateOf(analyticsCenterReturns) }
+    LaunchedEffect(analyticsCenterReturns) {
+        if (analyticsCenterReturns > consumedAnalyticsCenterReturn) pop()
+        consumedAnalyticsCenterReturn = analyticsCenterReturns
     }
 
     // A detail opened straight from another screen backs out of the summary, not to its list.
