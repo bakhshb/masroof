@@ -30,16 +30,19 @@ import java.time.LocalDate
 
 /** Progress toward the personal model's fixed history requirements, as rings. */
 @Composable internal fun PersonalReadinessRings(snapshot: AnalysisSnapshot) {
+    val readiness = AnalysisPresentationBuilder.readiness(snapshot)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-        snapshot.quality.consecutiveCompleteDays?.let { count ->
-            com.baraa.masroof.ui.components.MasroofProgressRing(fraction(count.toLong(), AnalysisPresentationBuilder.MIN_PERSONAL_DAYS.toLong()),
-                AppDigits.display(stringResource(R.string.analysis_progress, count, AnalysisPresentationBuilder.MIN_PERSONAL_DAYS)), stringResource(R.string.analysis_personal_days))
+        readiness.days?.let { step ->
+            com.baraa.masroof.ui.components.MasroofProgressRing(step.fraction,
+                AppDigits.display(readinessLabel(step)), stringResource(R.string.analysis_personal_days))
         }
-        com.baraa.masroof.ui.components.MasroofProgressRing(fraction(snapshot.completedPeriods.toLong(), AnalysisPresentationBuilder.MIN_PERSONAL_PERIODS.toLong()),
-            AppDigits.display(stringResource(R.string.analysis_progress, snapshot.completedPeriods, AnalysisPresentationBuilder.MIN_PERSONAL_PERIODS)),
+        com.baraa.masroof.ui.components.MasroofProgressRing(readiness.periods.fraction,
+            AppDigits.display(readinessLabel(readiness.periods)),
             stringResource(R.string.analysis_personal_periods), color = com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors.card)
     }
 }
+
+@Composable private fun readinessLabel(step: AnalysisReadinessStep) = stringResource(R.string.analysis_progress, step.count, step.target)
 
 /** Average error per horizon as bars; the badge says whether estimates usually ran low or high. */
 @Composable internal fun ForecastErrorBars(evaluations: List<AnalysisEvaluation>) {
@@ -125,9 +128,9 @@ import java.time.LocalDate
                 explanation.enabledDay?.let { MasroofTimelineRow(AppDigits.display(stringResource(R.string.analysis_enabled_date, day(it))), "") }
                 explanation.anchorDay?.let { MasroofTimelineRow(AppDigits.display(stringResource(R.string.analysis_anchor_date, day(it))), "",
                     active = explanation.status != ForecastComparisonStatus.WAITING_FOR_ANCHOR) }
-                state.snapshot?.let { s -> MasroofTimelineRow(stringResource(R.string.analysis_personal_readiness),
-                    AppDigits.display(listOfNotNull(s.quality.consecutiveCompleteDays?.let { stringResource(R.string.analysis_progress, it, AnalysisPresentationBuilder.MIN_PERSONAL_DAYS) },
-                        stringResource(R.string.analysis_progress, s.completedPeriods, AnalysisPresentationBuilder.MIN_PERSONAL_PERIODS)).joinToString(" · ")),
+                state.snapshot?.let { s -> val readiness = AnalysisPresentationBuilder.readiness(s)
+                    MasroofTimelineRow(stringResource(R.string.analysis_personal_readiness),
+                    AppDigits.display(listOfNotNull(readiness.days?.let { readinessLabel(it) }, readinessLabel(readiness.periods)).joinToString(" · ")),
                     active = s.method != "WEEKDAY_MEDIAN") }
                 val reason = when (explanation.status) {
                     ForecastComparisonStatus.AWAITING_ELIGIBLE_FORECAST -> R.string.analysis_wait_eligible

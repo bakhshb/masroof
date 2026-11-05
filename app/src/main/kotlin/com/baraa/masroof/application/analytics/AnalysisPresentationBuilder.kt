@@ -23,13 +23,17 @@ data class AnalysisCommitmentsView(val confirmedTotal: Long, val confirmedCount:
 }
 data class AnalysisCompositionPart(val group: com.baraa.masroof.application.dashboard.AnalysisSpendingGroup, val percent: Int, val share: Float)
 
-/** A spending observation as the analysis screens show it. */
-typealias AnalysisSpendingObservation = com.baraa.masroof.analytics.SpendingObservation
+/** Progress toward one personal-forecast history target. */
+data class AnalysisReadinessStep(val count: Int, val target: Int) {
+    val fraction: Float get() = if (target <= 0) 0f else (count.toFloat() / target).coerceIn(0f, 1f)
+}
+/** [days] is null while consecutive complete days are unknown. */
+data class AnalysisReadiness(val days: AnalysisReadinessStep?, val periods: AnalysisReadinessStep)
 
 object AnalysisPresentationBuilder {
-    /** Personal-forecast readiness targets, shown as progress. */
-    const val MIN_PERSONAL_DAYS = com.baraa.masroof.analytics.PurchaseForecaster.MIN_PERSONAL_DAYS
-    const val MIN_PERSONAL_PERIODS = com.baraa.masroof.analytics.PurchaseForecaster.MIN_PERSONAL_PERIODS
+    fun readiness(snapshot: AnalysisSnapshot) = AnalysisReadiness(
+        snapshot.quality.consecutiveCompleteDays?.let { AnalysisReadinessStep(it, com.baraa.masroof.analytics.PurchaseForecaster.MIN_PERSONAL_DAYS) },
+        AnalysisReadinessStep(snapshot.completedPeriods, com.baraa.masroof.analytics.PurchaseForecaster.MIN_PERSONAL_PERIODS))
 
     fun forecast(snapshot: AnalysisSnapshot): ForecastExplanation {
         val method = when {

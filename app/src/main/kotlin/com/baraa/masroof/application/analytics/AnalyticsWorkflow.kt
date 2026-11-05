@@ -354,6 +354,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         val observations = if (input.blocked || input.reasons.isNotEmpty() || !input.clean.quality.coverageKnown) emptyList() else
             SpendingObservationBuilder.build(input.clean.recurring, input.start, input.today,
                 input.clean.days.filter { it.covered }.map { it.day }.toSet())
+                .map { AnalysisSpendingObservation(it.id, it.merchant, it.day, it.amount, it.reference, it.referenceIds, it.from, it.through) }
         mutable.update { it.copy(updating = false, unavailable = false, historyActuals = actuals,
             purchasePeriods = purchasePeriodHistory(input.clean, input.start), observations = observations) }
     }
