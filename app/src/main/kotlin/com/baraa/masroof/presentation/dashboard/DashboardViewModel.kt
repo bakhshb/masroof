@@ -21,7 +21,6 @@ import com.baraa.masroof.application.dashboard.DashboardOverviewLoader
 import com.baraa.masroof.application.dashboard.DashboardSectionId
 import com.baraa.masroof.application.dashboard.DashboardTransactionFacts
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
-import com.baraa.masroof.application.dashboard.TransactionLocalDate
 import com.baraa.masroof.application.transaction.IgnoreResult
 import com.baraa.masroof.application.transaction.ReclassificationResult
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
@@ -535,7 +534,8 @@ class DashboardViewModel(
     ): TransactionPreviewUi {
         val title = tx.merchant?.takeIf { it.isNotBlank() }
             ?: tx.counterparty?.takeIf { it.isNotBlank() }
-        val localDate = TransactionLocalDate.of(tx, zoneId)
+        // Rows share the device-zone period window; dating them by another zone would list a row outside its period.
+        val localDate = tx.occurredAt.atZone(zoneId).toLocalDate()
         val searchText = listOfNotNull(
             tx.merchant?.trim()?.takeIf { it.isNotEmpty() },
             tx.counterparty?.trim()?.takeIf { it.isNotEmpty() },

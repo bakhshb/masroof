@@ -51,6 +51,8 @@ class SalaryIncomeHeuristicsTest {
             "evt-1" to parsedRecord("evt-1", salaryIncomeWording = false),
         )
         assertFalse(SalaryIncomeHeuristics.isSalaryIncome(tx, records))
+        // A row parsed before the fact existed keeps its name match.
+        assertTrue(SalaryIncomeHeuristics.isSalaryIncome(tx, mapOf("evt-1" to parsedRecord("evt-1", salaryIncomeWording = null))))
     }
 
     private fun transaction(
@@ -70,7 +72,7 @@ class SalaryIncomeHeuristicsTest {
             linkedParsedEventIds = linked,
         )
 
-    private fun parsedRecord(eventId: String, salaryIncomeWording: Boolean) =
+    private fun parsedRecord(eventId: String, salaryIncomeWording: Boolean?) =
         com.baraa.masroof.parsing.repository.ParsedEventRecord(
             event = com.baraa.masroof.domain.model.ParsedEvent(
                 id = eventId,

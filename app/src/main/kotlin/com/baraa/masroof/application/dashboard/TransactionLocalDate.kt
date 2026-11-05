@@ -12,11 +12,12 @@ import java.util.concurrent.ConcurrentHashMap
  * Each distinct zone string is parsed once.
  */
 object TransactionLocalDate {
-    private val parsed = ConcurrentHashMap<String, ZoneId>()
+    // Invalid ids are cached too (as Optional.empty), so a bad stored zone is not re-parsed for every row.
+    private val parsed = ConcurrentHashMap<String, java.util.Optional<ZoneId>>()
 
     fun storedZoneOrNull(tx: FinancialTransaction): ZoneId? {
         val id = tx.occurredAtZone ?: return null
-        return parsed[id] ?: BankTransactionTimePolicy.storedZoneOrNull(id)?.also { parsed[id] = it }
+        return parsed.getOrPut(id) { java.util.Optional.ofNullable(BankTransactionTimePolicy.storedZoneOrNull(id)) }.orElse(null)
     }
 
     fun zoneOf(tx: FinancialTransaction, fallback: ZoneId): ZoneId = storedZoneOrNull(tx) ?: fallback

@@ -126,10 +126,12 @@ class PackageDependencyRulesTest {
     /** An application typealias would let presentation use a banned type under an application name. */
     @Test
     fun application_doesNotAliasTypesPresentationMayNotUse() {
-        val alias = Regex("""^\s*(?:(?:public|internal|private)\s+)?typealias\s+\w+(?:<[^=]*>)?\s*=\s*([\w.]+)""")
+        val alias = Regex("""^\s*(?:(?:public|internal|private)\s+)?typealias\s+\w+(?:<[^=]*>)?\s*=\s*(.+)$""")
+        val name = Regex("""[A-Za-z_][\w.]*""")
         kotlinFilesIn("application").forEach { file ->
             val source = file.readText()
-            source.lineSequence().mapNotNull { alias.find(it)?.groupValues?.get(1) }.forEach { target ->
+            // Every type named on the right side counts, including generic arguments (List<FinancialPeriod>).
+            source.lineSequence().mapNotNull { alias.find(it)?.groupValues?.get(1) }.flatMap { name.findAll(it).map { m -> m.value } }.forEach { target ->
                 val head = target.substringBefore('.')
                 val qualified = if (target.startsWith("com.baraa.masroof.")) target
                     else Regex("""^import\s+([\w.]+\.$head)\s*$""", RegexOption.MULTILINE).find(source)?.groupValues?.get(1) ?: target

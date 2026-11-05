@@ -6,6 +6,8 @@ import java.time.LocalDate
 
 /** A salary period as the dashboard shows and navigates it: [startDate, endDateExclusive). */
 data class DashboardSalaryPeriod(val startDate: LocalDate, val endDateExclusive: LocalDate) {
+    init { require(endDateExclusive.isAfter(startDate)) { "Period must end after it starts" } }
+
     /** Inclusive last calendar day shown in labels. */
     val displayEndDateInclusive: LocalDate get() = endDateExclusive.minusDays(1)
 

@@ -19,8 +19,14 @@ object SalaryIncomeHeuristics {
         if (transaction.type == FinancialTransactionType.INCOME) return true
         if (transaction.type != FinancialTransactionType.EXTERNAL_TRANSFER_IN) return false
 
-        return transaction.linkedParsedEventIds.any { eventId ->
-            parsedRecordsById[eventId]?.details?.salaryIncomeWording == true
-        }
+        val records = transaction.linkedParsedEventIds.mapNotNull { parsedRecordsById[it] }
+        val facts = records.mapNotNull { it.details.salaryIncomeWording }
+        if (facts.isNotEmpty()) return true in facts
+        // Rows parsed before the fact existed have none, and history is never re-parsed: keep their old name match.
+        val names = listOfNotNull(transaction.counterparty, transaction.merchant) +
+            records.flatMap { listOfNotNull(it.event.counterparty, it.event.merchant) }
+        return names.any { name -> LEGACY_SALARY_WORDS.any { name.lowercase().contains(it) } }
     }
+
+    private val LEGACY_SALARY_WORDS = listOf("راتب", "رواتب", "salary", "payroll", "wage")
 }
