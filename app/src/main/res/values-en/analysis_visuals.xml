@@ -84,7 +84,4 @@
     <string name="learning_blocked_badge">Blocked templates: %1$d</string>
     <string name="learning_contradictions_badge">Suggestions contradicting a correction: %1$d</string>
     <string name="learning_pending_badge">Decisions awaiting evidence: %1$d</string>
-    <string name="learning_templates_title">Templates</string>
-    <string name="learning_templates_training">Templates to learn from</string>
-    <string name="learning_templates_validation">Templates to test with</string>
 </resources>

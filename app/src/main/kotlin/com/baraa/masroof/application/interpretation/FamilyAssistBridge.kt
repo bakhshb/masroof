@@ -18,10 +18,7 @@ object FamilyAssistBridge {
         if (FamilyTextPreparation.prepare(body).title != normalizedTitle) return null
         val features = clean(body).features ?: return null
         val proposal = classifier?.suggest(bankId, features) ?: return null
-        return FamilySuggestion(toBank(proposal.family), proposal.score, proposal.modelVersion, when (proposal.origin) {
-            SuggestionOrigin.ML -> FamilyOrigin.ML
-            SuggestionOrigin.HUMAN_TEMPLATE -> FamilyOrigin.HUMAN_TEMPLATE
-        })
+        return FamilySuggestion(toBank(proposal.family), 1.0, proposal.modelVersion, FamilyOrigin.HUMAN_TEMPLATE)
     }
 
     fun toModel(family: MessageFamily): SmsFamilyLabel = when (family) {

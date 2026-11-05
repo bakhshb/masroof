@@ -29,8 +29,8 @@ negatives. Personal fitting holds out 20% of series and needs at least eight
 held-out series (two recurring and two non-recurring), 95% precision, better
 coverage and no increased false-positive rate.
 
-The last recorded evaluation was ineligible; the shipped family seed enabled no
-statistical family. Insufficient real labels keep models ineligible. Synthetic
+The family Naive Bayes seed never qualified a family and was removed; message
+learning is exact human-template memory. Insufficient real labels keep models ineligible. Synthetic
 examples test behavior rather than establish real-world accuracy. Preserve
 forecast evaluation gates, published comparisons, human decisions and financial
 schema v18. Qualification is a data milestone, not an automatic consequence of

@@ -1,7 +1,5 @@
 <resources>
-    <string name="learning_distinct_origins">Statistical suggestions: %1$d · Templates from your corrections: %2$d</string>
-    <string name="learning_personal_used">Your personal message model is in use after passing evaluation.</string>
-    <string name="learning_personal_collecting">Learning from your corrections; personal generalization needs enough independent examples and evaluations.</string>
+    <string name="learning_distinct_origins">Templates from your corrections: %1$d</string>
     <string name="recurring_personal_used">Using your personal recurring model after passing evaluation.</string>
     <string name="recurring_seed_used">Using the pretrained recurring model and learning locally from your decisions.</string>
     <string name="recurring_rules_used">Using recurrence rules for now. The learned model needs sufficient data and evaluations.</string>
@@ -19,5 +17,4 @@
     <string name="learning_baseline_better">The base method performs better in the current evaluation.</string>
     <string name="learning_personal_used_reason">The personal model passed evaluation and improved the results.</string>
     <string name="learning_needs_examples">More independent training and validation examples are needed before personal generalization.</string>
-    <string name="learning_needs_examples_count">You have %1$d of %2$d independent validation examples. Each Al Jazira message you correct yourself brings personal learning closer.</string>
 </resources>

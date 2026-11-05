@@ -92,7 +92,4 @@
     <string name="learning_blocked_badge">قوالب محظورة: %1$d</string>
     <string name="learning_contradictions_badge">اقتراحات تعارض تصحيحا: %1$d</string>
     <string name="learning_pending_badge">قرارات تنتظر دليلا: %1$d</string>
-    <string name="learning_templates_title">القوالب</string>
-    <string name="learning_templates_training">قوالب للتعلم</string>
-    <string name="learning_templates_validation">قوالب للاختبار</string>
 </resources>

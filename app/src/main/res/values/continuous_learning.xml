@@ -1,7 +1,5 @@
 <resources>
-    <string name="learning_distinct_origins">اقتراحات إحصائية: %1$d · قوالب من تصحيحاتك: %2$d</string>
-    <string name="learning_personal_used">يستخدم نموذج فهم الرسائل الشخصي بعد اجتياز التقييم.</string>
-    <string name="learning_personal_collecting">أتعلم من تصحيحاتك؛ التعميم الشخصي ينتظر أمثلة واختبارات كافية.</string>
+    <string name="learning_distinct_origins">قوالب من تصحيحاتك: %1$d</string>
     <string name="recurring_personal_used">أستخدم نموذجك الشخصي لاكتشاف التكرار بعد اجتياز التقييم.</string>
     <string name="recurring_seed_used">أستخدم نموذج اكتشاف التكرار المدرب مسبقا، وأتعلم من قراراتك محليا.</string>
     <string name="recurring_rules_used">أستخدم قواعد التكرار حاليا. النموذج المتعلم ينتظر بيانات واختبارات كافية.</string>
@@ -19,5 +17,4 @@
     <string name="learning_baseline_better">الطريقة الأساسية أفضل في التقييم الحالي.</string>
     <string name="learning_personal_used_reason">النسخة الشخصية اجتازت الاختبارات وحسنت النتائج.</string>
     <string name="learning_needs_examples">أحتاج أمثلة مستقلة أكثر للتدريب والتحقق قبل تعميم التعلم.</string>
-    <string name="learning_needs_examples_count">لديك %1$d من %2$d أمثلة تحقق مستقلة. كل رسالة من بنك الجزيرة تصححها بنفسك تقربك من التعلم الشخصي.</string>
 </resources>

@@ -139,24 +139,19 @@ internal fun forecastReasonResource(reason: String?): Int = when (reason) {
         val bar = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default
         MasroofCard(Modifier.testTag("learning-insights")) {
             Column(verticalArrangement = Arrangement.spacedBy(com.baraa.masroof.ui.theme.MasroofSpacing.sectionGap)) {
+                // Suggestions come only from templates you corrected, so they start with your first correction.
+                val active = learning.learned > 0
                 val status = stringResource(when {
                     learning.pending -> R.string.learning_pending
-                    learning.statisticalFamilies == 0 -> R.string.learning_status_paused
-                    else -> R.string.learning_status_active
+                    active -> R.string.learning_status_active
+                    else -> R.string.learning_status_paused
                 })
-                // Full wording of the state, the personal-model reason and the suggestion origins stays one tap away.
                 val help = listOf(stringResource(R.string.learning_counts_hint),
-                    if (learning.pending) null else if (learning.statisticalFamilies == 0) stringResource(R.string.learning_statistical_paused)
-                        else stringResource(R.string.learning_statistical_active, learning.statisticalFamilies),
-                    stringResource(R.string.learning_distinct_origins, learning.statisticalSuggestions, learning.templateSuggestions),
-                    stringResource(if (learning.personalUsed) R.string.learning_personal_used else R.string.learning_personal_collecting),
-                    if (learning.personalReason == "NEEDS_EVALUATIONS") stringResource(R.string.learning_needs_examples_count,
-                        learning.validationTemplates, learning.requiredValidationTemplates) else stringResource(personalLearningReason(learning.personalReason)))
-                    .filterNotNull().joinToString("\n\n")
+                    stringResource(R.string.learning_distinct_origins, learning.templateSuggestions)).joinToString("\n\n")
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     MasroofGuidanceLabel(stringResource(R.string.learning_title), help, Modifier.weight(1f),
                         style = MaterialTheme.typography.titleMedium, contentColor = MaterialTheme.colorScheme.onSurface)
-                    MasroofBadge(status, if (learning.statisticalFamilies == 0 && !learning.pending) MasroofCardAccent.Liability else MasroofCardAccent.Inflow)
+                    MasroofBadge(status, if (active) MasroofCardAccent.Inflow else MasroofCardAccent.None)
                 }
                 MasroofSectionHeader(stringResource(R.string.learning_flow_title))
                 val reached = learning.attempted.toLong()
@@ -185,13 +180,6 @@ internal fun forecastReasonResource(reason: String?): Int = when (reason) {
                     R.string.learning_pending_badge to learning.pendingDecisions).filter { it.second > 0 }.forEach { (label, count) ->
                     MasroofBadge(digits(stringResource(label, count)), MasroofCardAccent.Liability)
                 }
-                MasroofSectionHeader(stringResource(R.string.learning_templates_title))
-                com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.learning_templates_training),
-                    digits(learning.trainingTemplates.toString()), if (learning.trainingTemplates > 0) 1f else 0f, style = bar)
-                com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.learning_templates_validation),
-                    digits(stringResource(R.string.analysis_progress, learning.validationTemplates, learning.requiredValidationTemplates)),
-                    fraction(learning.validationTemplates.toLong(), learning.requiredValidationTemplates.toLong()),
-                    style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Outflow)
             }
         }
     }

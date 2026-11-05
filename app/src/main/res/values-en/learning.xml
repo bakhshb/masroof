@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="learning_title">Learning from your decisions</string>
-    <string name="learning_statistical_paused">Statistical assistance is suspended until evaluation evidence is sufficient. Rules and consistent human templates continue.</string>
-    <string name="learning_statistical_active">Families eligible for statistical assistance: %1$d</string>
     <string name="learning_used">Your decision taught the message family.</string>
     <string name="learning_blocked">Automatic suggestions for the conflicting template are blocked.</string>
     <string name="learning_excluded">This edit was not used to train the family classifier.</string>

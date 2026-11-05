@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="learning_title">أثر التعلم من قراراتك</string>
-    <string name="learning_statistical_paused">المساعدة الإحصائية معلقة حتى تكفي أدلة التقييم. تستمر القواعد والقوالب البشرية المتسقة.</string>
-    <string name="learning_statistical_active">عائلات مؤهلة للمساعدة الإحصائية: %1$d</string>
     <string name="learning_used">استخدم قرارك لتعلم عائلة الرسالة.</string>
     <string name="learning_blocked">منع اقتراح القالب المتعارض تلقائيا.</string>
     <string name="learning_excluded">لم يستخدم هذا التعديل لتدريب العائلة.</string>

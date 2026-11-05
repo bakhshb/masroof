@@ -38,7 +38,7 @@ The app includes an update checker. Choose stable or nightly releases in Setting
 - **Explore spending:** historical spending, purchase forecasts, recurring-payment suggestions, and optional phone alerts.
 - **Keep a backup:** encrypted export and recovery, including settings, analysis, and message patterns.
 
-Forecasts and suggestions are advisory. Local learning can assist eligible message families, but never supplies money, ownership, or posting approval. Statistical models remain disabled when their qualification requirements are not met; rules and consistent explicit human templates remain available.
+Forecasts and suggestions are advisory. Local learning reuses your explicit corrections for messages with the same template, but never supplies money, ownership, or posting approval.
 
 ## Bank support
 
