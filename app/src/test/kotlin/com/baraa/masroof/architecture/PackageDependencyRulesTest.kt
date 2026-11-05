@@ -111,50 +111,34 @@ class PackageDependencyRulesTest {
         )
     }
 
-    /** No import prefix: a fully qualified name used inline is caught too. */
+    /**
+     * Screens show prepared facts: identity, ownership, policy, ledger rules and pure engines stay in
+     * application and below. No import prefix: a fully qualified name used inline is caught too.
+     */
     @Test
     fun presentation_doesNotDependOnInnerLayersOrPureEngines() {
         assertPackagesDoNotImport(
             packages = listOf("presentation"),
-            forbiddenImports = listOf(
-                "com.baraa.masroof.data.",
-                "com.baraa.masroof.sms.",
-                "com.baraa.masroof.engine.",
-                "com.baraa.masroof.bank.",
-                "com.baraa.masroof.parsing.",
-                "com.baraa.masroof.analytics.",
-                "com.baraa.masroof.ml.",
-            ),
+            forbiddenImports = presentationBannedPackages,
         )
     }
 
+    /** An application typealias would let presentation use a banned type under an application name. */
     @Test
-    fun presentation_doesNotUseDomainServicesOrPorts() {
-        assertPackagesDoNotImport(
-            packages = listOf("presentation"),
-            forbiddenImports = listOf(
-                "com.baraa.masroof.domain.ownership.",
-                "com.baraa.masroof.domain.period.",
-                "com.baraa.masroof.domain.repository.",
-                "com.baraa.masroof.domain.rules.",
-            ),
-        )
-    }
-
-    /** Screens show prepared facts: identity, ownership, policy and ledger rules stay in application and below. */
-    @Test
-    fun presentation_neverReachesFinancialIdentityOrPolicy() {
-        assertFilesDoNotImport(
-            files = kotlinFilesIn("presentation"),
-            forbiddenImports = listOf(
-                "com.baraa.masroof.domain.ids.",
-                "com.baraa.masroof.domain.rules.",
-                "com.baraa.masroof.domain.repository.",
-                "com.baraa.masroof.domain.ownership.",
-                "com.baraa.masroof.domain.assembly.",
-                "com.baraa.masroof.domain.matching.",
-            ),
-        )
+    fun application_doesNotAliasTypesPresentationMayNotUse() {
+        val alias = Regex("""^\s*(?:(?:public|internal|private)\s+)?typealias\s+\w+(?:<[^=]*>)?\s*=\s*([\w.]+)""")
+        kotlinFilesIn("application").forEach { file ->
+            val source = file.readText()
+            source.lineSequence().mapNotNull { alias.find(it)?.groupValues?.get(1) }.forEach { target ->
+                val head = target.substringBefore('.')
+                val qualified = if (target.startsWith("com.baraa.masroof.")) target
+                    else Regex("""^import\s+([\w.]+\.$head)\s*$""", RegexOption.MULTILINE).find(source)?.groupValues?.get(1) ?: target
+                assertFalse(
+                    "${sourceRelativePath(file)} aliases '$target', which presentation may not use. Add an application type instead.",
+                    presentationBannedPackages.any { qualified.startsWith(it) },
+                )
+            }
+        }
     }
 
     @Test
@@ -387,6 +371,23 @@ class PackageDependencyRulesTest {
     private companion object {
         val sourceRoot = File("src/main/kotlin/com/baraa/masroof")
         val sourceRoots = listOf(sourceRoot, File("../finance-core/src/main/kotlin/com/baraa/masroof"))
+
+        val presentationBannedPackages = listOf(
+            "com.baraa.masroof.data.",
+            "com.baraa.masroof.sms.",
+            "com.baraa.masroof.engine.",
+            "com.baraa.masroof.bank.",
+            "com.baraa.masroof.parsing.",
+            "com.baraa.masroof.analytics.",
+            "com.baraa.masroof.ml.",
+            "com.baraa.masroof.domain.period.",
+            "com.baraa.masroof.domain.ids.",
+            "com.baraa.masroof.domain.rules.",
+            "com.baraa.masroof.domain.repository.",
+            "com.baraa.masroof.domain.ownership.",
+            "com.baraa.masroof.domain.assembly.",
+            "com.baraa.masroof.domain.matching.",
+        )
 
         val outerLayerImports = listOf(
             "import com.baraa.masroof.application.",
