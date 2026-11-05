@@ -41,9 +41,8 @@ import java.time.LocalDate
     }
 }
 
-/** Requirements the forecaster applies before fitting a personal model (PurchaseForecaster). */
-internal const val PERSONAL_DAYS = 120
-internal const val PERSONAL_PERIODS = 4
+internal const val PERSONAL_DAYS = com.baraa.masroof.analytics.PurchaseForecaster.MIN_PERSONAL_DAYS
+internal const val PERSONAL_PERIODS = com.baraa.masroof.analytics.PurchaseForecaster.MIN_PERSONAL_PERIODS
 
 /** Average error per horizon as bars; the badge says whether estimates usually ran low or high. */
 @Composable internal fun ForecastErrorBars(evaluations: List<AnalysisEvaluation>) {
@@ -53,7 +52,8 @@ internal const val PERSONAL_PERIODS = 4
         com.baraa.masroof.ui.components.MasroofValueBarRow(AppDigits.display(stringResource(R.string.analysis_error_horizon, e.horizon)),
             AppDigits.display(stringResource(R.string.analysis_error_value, visualMoney(e.mae))), fraction(e.mae, maximum),
             Modifier.testTag("forecast-error-${e.horizon}"),
-            subtitle = AppDigits.display(stringResource(if (e.bias > 0) R.string.analysis_error_low else R.string.analysis_error_high,
+            // A zero bias ran neither low nor high.
+            subtitle = if (e.bias == 0L) null else AppDigits.display(stringResource(if (e.bias > 0) R.string.analysis_error_low else R.string.analysis_error_high,
                 e.count, visualMoney(kotlin.math.abs(e.bias)))),
             style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
     }

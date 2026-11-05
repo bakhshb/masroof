@@ -37,7 +37,7 @@ object PurchaseForecaster {
         val training = history.drop(if (lastGap < 0) 0 else lastGap + 1).takeIf { it.lastOrNull()?.day == today - 1 }.orEmpty()
             .takeLast(MAX_TRAINING_DAYS)
         var model: HuberModel? = null
-        if (training.size >= 120 && completedPeriods >= 4 && training.count { it.gross > 0 } >= 20) {
+        if (training.size >= MIN_PERSONAL_DAYS && completedPeriods >= MIN_PERSONAL_PERIODS && training.count { it.gross > 0 } >= 20) {
             val canReuse = previous != null && previous.featureVersion == AnalyticsVersion.FEATURES &&
                 today - previous.trainedThrough <= 7 && previous.trainingFingerprint == fingerprint(training.filter { it.day in previous.trainedFrom..previous.trainedThrough })
             model = if (canReuse) previous else runCatching { evaluateAndFit(training, phase, completedPeriodsAt) }.getOrNull()
@@ -63,8 +63,8 @@ object PurchaseForecaster {
         val reason = when {
             chosen != null -> "PERSONAL_MODEL"
             !allowPersonal && model?.accepted == true -> "LIVE_BASELINE_BETTER"
-            training.size < 120 -> if (history.size >= 120) "COVERAGE_GAPS" else "NEEDS_HISTORY"
-            completedPeriods < 4 -> "NEEDS_PERIODS"
+            training.size < MIN_PERSONAL_DAYS -> if (history.size >= MIN_PERSONAL_DAYS) "COVERAGE_GAPS" else "NEEDS_HISTORY"
+            completedPeriods < MIN_PERSONAL_PERIODS -> "NEEDS_PERIODS"
             training.count { it.gross > 0 } < 20 -> "NEEDS_PURCHASE_DAYS"
             model == null -> "MODEL_UNAVAILABLE"
             CORE_HORIZONS.any { model.signedErrors[it].orEmpty().size < 8 } -> "NEEDS_EVALUATIONS"
@@ -156,6 +156,9 @@ object PurchaseForecaster {
 
     private val CORE_HORIZONS = listOf(1, 7, 14, 28)
     private const val MAX_TRAINING_DAYS = 365
+    /** History the personal model needs before it is even tried; the readiness rings show progress to these. */
+    const val MIN_PERSONAL_DAYS = 120
+    const val MIN_PERSONAL_PERIODS = 4
 
     private fun evaluateAndFit(history: List<PurchaseDay>, phase: (Long) -> Int, periods: (Long) -> Int): HuberModel {
         val candidateEvaluation = evaluate(history, phase, true, periods)
