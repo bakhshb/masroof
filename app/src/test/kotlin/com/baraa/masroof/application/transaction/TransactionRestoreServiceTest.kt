@@ -119,7 +119,7 @@ class TransactionRestoreServiceTest {
 
         val result = service.restore("sms-1", FinancialTransactionType.INCOME)
 
-        assertEquals(RestoreResult.Success(sampleTransaction()), result)
+        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction()), result)
         assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
         assertEquals(0, txRepo.deletes)
     }

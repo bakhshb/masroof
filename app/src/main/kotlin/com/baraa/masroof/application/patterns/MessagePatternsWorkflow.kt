@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.engine.bank.patterns.SenderIdentity
 import com.baraa.masroof.data.patterns.MessagePatternStore
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.engine.bank.patterns.BankMessagePatterns
@@ -96,12 +97,11 @@ class MessagePatternsWorkflow(
     private fun validateBankEdit(banks: List<BankMessagePatterns>, bankId: String, name: String, senders: List<String>) {
         require(name.trim().isNotEmpty() && name.length <= 120)
         require(senders.isNotEmpty() && senders.size <= 16 && senders.all { it.isNotBlank() && it.length <= 120 })
-        // Detection folds case, spacing, letter forms and the -AD suffix, so ownership compares senders the same way.
-        require(senders.all { com.baraa.masroof.bank.SenderBankDetector.senderKey(it).isNotEmpty() })
-        val existing = banks.singleOrNull { it.bankId == bankId }?.senders.orEmpty()
-        val others = banks.filter { it.bankId != bankId }.flatMap { it.senders }
-        require(senders.filterNot { sender -> existing.any { com.baraa.masroof.bank.SenderBankDetector.sameSender(it, sender) } }
-            .none { sender -> others.any { com.baraa.masroof.bank.SenderBankDetector.sameSender(it, sender) } }) {
+        // Ownership uses the detection rule, so a sender can never be detected as two banks.
+        require(senders.all { SenderIdentity.key(it).isNotEmpty() })
+        val existing = banks.singleOrNull { it.bankId == bankId }
+        val others = banks.filter { it.bankId != bankId }
+        require(senders.filterNot { existing?.ownsSender(it) == true }.none { sender -> others.any { it.ownsSender(sender) } }) {
             "Sender belongs to another bank"
         }
     }
@@ -135,11 +135,11 @@ class MessagePatternsWorkflow(
             val bank = configuration.banks.single { it.bankId == bankId }
             val prior = patternId?.let { id -> bank.currentPatterns.single { it.id == id } }
             require(prior?.roleProfile == null) { "Bundled patterns cannot be edited" }
-            require(sender in bank.senders) { "Select a configured sender" }
+            val configured = requireNotNull(bank.configuredSender(sender)) { "Select a configured sender" }
             require(bindings.any { it.field == "amount" && !it.ignored }) { "Bind the transaction amount" }
             require(bindings.all { it.ignored || it.field in operation.fields }) { "Field does not belong to operation" }
             fun build(choices: List<PatternBinding>) = SavedMessagePattern.fromChoices(prior?.id ?: java.util.UUID.randomUUID().toString(),
-                bankId, sender, operation.name, body, choices.choices()).copy(revision = prior?.let { Math.addExact(it.revision, 1) } ?: 1,
+                bankId, configured, operation.name, body, choices.choices()).copy(revision = prior?.let { Math.addExact(it.revision, 1) } ?: 1,
                     enabled = prior?.enabled ?: false)
             // Unselected amounts, dates and numbers vary between messages; ignoring them keeps the pattern from matching only its teacher.
             val auto = autoIgnored(body, bindings)

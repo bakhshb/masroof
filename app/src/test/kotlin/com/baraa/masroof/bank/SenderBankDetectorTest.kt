@@ -1,6 +1,7 @@
 package com.baraa.masroof.bank
 
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.engine.bank.patterns.SenderIdentity
 import com.baraa.masroof.parsing.model.BankDetectionResult
 import com.baraa.masroof.testsupport.ALJAZIRA_BUNDLED_SENDERS
 import com.baraa.masroof.testsupport.aljaziraSenderDetector
@@ -61,10 +62,15 @@ class SenderBankDetectorTest {
     }
 
     @Test
-    fun sameSender_followsDetection() {
-        assertTrue(SenderBankDetector.sameSender("alinma", "ALINMA"))
-        assertTrue(SenderBankDetector.sameSender("alinma", "Alinma-AD"))
-        assertTrue(!SenderBankDetector.sameSender("alinma", "Alinma Pay"))
+    fun senderIdentity_followsDetection() {
+        assertTrue(SenderIdentity.same("alinma", "ALINMA"))
+        assertTrue(SenderIdentity.same("alinma", "Alinma-AD"))
+        assertTrue(SenderIdentity.same("Alinma-AD", "alinma"))
+        assertTrue(!SenderIdentity.same("alinma", "Alinma Pay"))
+        assertTrue(!SenderIdentity.same("Riy", "Riyad"))
+        assertTrue(!SenderIdentity.same("---", "---"))
+        // A numeric sender never matches digits that happen to run together in a body.
+        assertTrue(SenderBankDetector(Bank("NUM"), listOf("880012345")).detect("Mom", "pay 8800 12345 now") is BankDetectionResult.Unknown)
     }
 
     @Test
@@ -72,8 +78,8 @@ class SenderBankDetectorTest {
         val short = SenderBankDetector(Bank("SHORT"), listOf("Riy"))
         val full = SenderBankDetector(Bank("FULL"), listOf("Riyad"))
         assertDetected(full, Bank("FULL"), "Riyad")
+        assertTrue(short.detect("Riyad", "") is BankDetectionResult.Unknown)
         assertDetected(short, Bank("SHORT"), "Riy-AD")
-        assertTrue(SenderBankDetector(Bank("BOTH"), listOf("Riy", "Riyad")).detect("Riyad", "") is BankDetectionResult.Detected)
     }
 
     private fun assertDetected(detector: SenderBankDetector, bank: Bank, sender: String) {

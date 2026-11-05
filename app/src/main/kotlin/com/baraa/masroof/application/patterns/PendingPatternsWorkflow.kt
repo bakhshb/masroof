@@ -154,7 +154,7 @@ class PendingPatternsWorkflow(
                             is BankRoutingResult.Ambiguous -> route.banks.mapTo(hashSetOf()) { it.id }
                             else -> emptySet()
                         }
-                        routed + configuration.banks.filter { message.sender in it.senders }.map { it.bankId }
+                        routed + configuration.banks.filter { it.ownsSender(message.sender) }.map { it.bankId }
                     }
                     if (bankId !in candidates) continue
                     requiredReviewCount++
