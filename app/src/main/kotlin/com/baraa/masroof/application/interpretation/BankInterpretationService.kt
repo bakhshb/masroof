@@ -91,9 +91,9 @@ class BankInterpretationService(
      * a remembered financial family is used where the bank's role rules ask for one.
      */
     fun assistedBanks(configuration: MessagePatternConfiguration = patterns()): Set<String> =
-        configuration.banks.filter { bank -> bank.bankId.matches(BANK_ID) }.map { it.bankId }.toSet()
+        configuration.banks.filter { bank -> bank.bankId.matches(com.baraa.masroof.ml.family.LEARNABLE_BANK_ID) }.map { it.bankId }.toSet()
     val refreshVersion: String get() = "${engine().fingerprint}|${modelVersion ?: "rules-only"}"
-    fun interpret(input: MessageInput, snapshot: PatternFactInterpreter = engine(), bankId: String): Interpretation {
+    fun interpret(input: MessageInput, snapshot: PatternFactInterpreter, bankId: String): Interpretation {
         val trace = Attempt(bankId, classifiers?.get(bankId))
         val activeModel = trace.classifier?.version
         attempt.set(trace)
@@ -325,8 +325,10 @@ class BankInterpretationService(
      * false) and a failed, retried run still refreshes the message.
      */
     fun refreshFilter(readHistory: Boolean = true): (com.baraa.masroof.parsing.repository.ParsedEventRecord) -> Boolean {
-        val rules = lazy { engine().fingerprint }
-        val roled = lazy { ruleBanks(patterns()) }
+        // One file version decides both the rules fingerprint and which banks have role rules.
+        val configuration = lazy { patterns() }
+        val rules = lazy { PatternFactInterpreter.of(configuration.value).fingerprint }
+        val roled = lazy { ruleBanks(configuration.value) }
         val read = if (readHistory) ruleRead else emptySet()
         return { record -> needsRefresh(record, rules, roled, read) }
     }
@@ -379,7 +381,6 @@ class BankInterpretationService(
         store.close()
     }
     companion object {
-        private val BANK_ID = Regex("[A-Za-z][A-Za-z0-9_]{0,63}")
         /** Banks whose role rules ask for a family and refresh unread UNKNOWN messages when the rules change. */
         private fun ruleBanks(configuration: MessagePatternConfiguration) =
             configuration.banks.filter { bank -> bank.currentPatterns.any { it.roleProfile != null } }.map { it.bankId }.toSet()

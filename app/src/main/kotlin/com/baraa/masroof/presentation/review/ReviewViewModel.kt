@@ -522,12 +522,10 @@ class ReviewViewModel(
     private fun bankChoicesFor(
         review: com.baraa.masroof.domain.model.ReviewItem,
         ignored: Boolean,
-    ): List<ReviewBankChoiceUi> {
+    ): List<String> {
         if (ignored || review.kind != ReviewKind.NEEDS_REVIEW) return emptyList()
         if (!ExplicitBankSelection.offersBankChoice(review.reasons)) return emptyList()
-        return selectableBanks.map { bank ->
-            ReviewBankChoiceUi(bankId = bank.id)
-        }
+        return selectableBanks.map { it.id }
     }
 
     private companion object {

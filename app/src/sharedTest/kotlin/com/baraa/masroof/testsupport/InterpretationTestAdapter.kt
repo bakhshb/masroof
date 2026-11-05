@@ -20,6 +20,8 @@ class InterpretationTestAdapter(private val interpret: (MessageInput) -> Interpr
     }
 }
 
-/** The detector production builds from the bundled AlJazira senders. */
-fun aljaziraSenderDetector() = SenderBankDetector(Bank.BANK_ALJAZIRA,
-    listOf("AlJazira", "JaziraBank", "BankAlJazira", "AlJaziraBank", "بنك الجزيرة", "بنك الجزيره"), "بنك الجزيرة")
+/** The bundled AlJazira senders; `SenderBankDetectorTest` keeps this copy equal to the asset. */
+val ALJAZIRA_BUNDLED_SENDERS = listOf("AlJazira", "JaziraBank", "BankAlJazira", "AlJaziraBank", "بنك الجزيرة", "بنك الجزيره")
+
+/** The detector production builds from the bundled AlJazira definition. */
+fun aljaziraSenderDetector() = SenderBankDetector(Bank.BANK_ALJAZIRA, ALJAZIRA_BUNDLED_SENDERS, "بنك الجزيرة")

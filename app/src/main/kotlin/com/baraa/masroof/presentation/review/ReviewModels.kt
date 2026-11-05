@@ -25,10 +25,6 @@ data class ReviewListItemUi(
     val ignoredReasonRes: Int? = null,
 )
 
-data class ReviewBankChoiceUi(
-    val bankId: String,
-)
-
 data class ReviewDetailUi(
     val id: String,
     val rawSmsId: String,
@@ -51,7 +47,8 @@ data class ReviewDetailUi(
     val showOwnershipActions: Boolean = false,
     val showRestoreActions: Boolean = false,
     val resolvedAtLabel: String? = null,
-    val bankChoices: List<ReviewBankChoiceUi> = emptyList(),
+    /** Bank ids the user may choose to parse this message with. */
+    val bankChoices: List<String> = emptyList(),
     val provenance: com.baraa.masroof.application.interpretation.InterpretationProvenance? = null,
     val bankId: String? = null,
     val transferBetweenOwnAccounts: Boolean = false,

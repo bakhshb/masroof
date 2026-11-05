@@ -2,13 +2,22 @@ package com.baraa.masroof.bank
 
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.parsing.model.BankDetectionResult
+import com.baraa.masroof.testsupport.ALJAZIRA_BUNDLED_SENDERS
 import com.baraa.masroof.testsupport.aljaziraSenderDetector
+import com.baraa.masroof.testsupport.bundledPatterns
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SenderBankDetectorTest {
     private val aljazira = aljaziraSenderDetector()
+
+    @Test
+    fun sharedTestCopy_matchesTheBundledSenders() {
+        val bank = bundledPatterns("BANK_ALJAZIRA").banks.single()
+        assertEquals(bank.senders, ALJAZIRA_BUNDLED_SENDERS)
+        assertEquals(bank.displayName, "بنك الجزيرة")
+    }
 
     @Test
     fun aljaziraSenderForms_areDetected() {

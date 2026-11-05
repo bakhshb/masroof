@@ -1,10 +1,10 @@
 package com.baraa.masroof.bank
 
+import com.baraa.masroof.core.text.ArabicTextFolding
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.parsing.detector.BankDetector
 import com.baraa.masroof.parsing.model.BankDetectionResult
-import java.util.Locale
 
 /**
  * Conservative sender detection for one bank, built from its configured senders.
@@ -33,7 +33,7 @@ class SenderBankDetector(
         return BankDetectionResult.Unknown(reasons = listOf("sender_not_in_scope"))
     }
 
-    internal fun normalizeSender(sender: String): String {
+    private fun normalizeSender(sender: String): String {
         val key = compact(sender)
         // A promotional suffix (BankName-AD) still names the bank, but only when the rest is a known sender.
         return key.removeSuffix("ad").takeIf { key.endsWith("ad") && it in exact } ?: key
@@ -42,14 +42,10 @@ class SenderBankDetector(
     private companion object {
         const val MIN_SENDER_STEM = 6
         const val MIN_BODY_NAME = 9
-        val FORMAT_AND_MARKS = Regex("[\\p{Cf}\\p{Mn}]")
         val NOT_LETTER_OR_DIGIT = Regex("[^\\p{L}\\p{Nd}]")
 
-        fun compact(value: String): String = value
-            .replace(FORMAT_AND_MARKS, "")
-            .replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
-            .replace('ى', 'ي').replace('ة', 'ه')
-            .lowercase(Locale.ROOT)
-            .replace(NOT_LETTER_OR_DIGIT, "")
+        // Sender labels also fold ة to ه (بنك الجزيرة / بنك الجزيره); body matching only needs the sender view.
+        fun compact(value: String): String =
+            ArabicTextFolding.foldForComparison(value).replace('ة', 'ه').replace(NOT_LETTER_OR_DIGIT, "")
     }
 }

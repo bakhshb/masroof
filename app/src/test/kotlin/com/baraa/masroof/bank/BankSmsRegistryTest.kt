@@ -47,7 +47,7 @@ class BankSmsRegistryTest {
         val adapter = FakeBankSmsAdapter(
             bank = Bank.BANK_ALJAZIRA,
             detection = BankDetectionResult.Unknown(
-                reasons = listOf("sender_not_recognized_as_bank_aljazira"),
+                reasons = listOf("sender_not_in_scope"),
             ),
         )
         val registry = BankSmsRegistry(listOf(adapter))
@@ -56,7 +56,7 @@ class BankSmsRegistryTest {
 
         assertTrue(result is BankRoutingResult.NotMatched)
         assertEquals(
-            "sender_not_recognized_as_bank_aljazira",
+            "sender_not_in_scope",
             (result as BankRoutingResult.NotMatched).reason,
         )
     }
