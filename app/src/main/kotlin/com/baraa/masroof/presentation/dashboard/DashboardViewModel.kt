@@ -532,7 +532,9 @@ class DashboardViewModel(
     ): TransactionPreviewUi {
         val title = tx.merchant?.takeIf { it.isNotBlank() }
             ?: tx.counterparty?.takeIf { it.isNotBlank() }
-        val localDate = tx.occurredAt.atZone(zoneId).toLocalDate()
+        // The transaction's stored zone keeps it on its own day; the device zone only fills a missing one.
+        val zone = tx.occurredAtZone?.takeIf { it.isNotBlank() }?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: zoneId
+        val localDate = tx.occurredAt.atZone(zone).toLocalDate()
         val searchText = listOfNotNull(
             tx.merchant?.trim()?.takeIf { it.isNotEmpty() },
             tx.counterparty?.trim()?.takeIf { it.isNotEmpty() },

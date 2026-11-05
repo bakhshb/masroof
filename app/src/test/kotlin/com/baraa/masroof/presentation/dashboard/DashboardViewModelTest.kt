@@ -91,6 +91,21 @@ class DashboardViewModelTest {
         assertEquals(Money.of("20", Currency.SAR), vm.uiState.value.transactionListProjection.result.totalAmount)
     }
 
+    @Test
+    fun aTransactionNearMidnightStaysOnItsStoredZoneDayWhenTheDeviceZoneDiffers() = runTest {
+        val loader = FakeLoader()
+        // 2026-08-09 23:30 in Riyadh, already 2026-08-10 in Dubai.
+        val transaction = foreignTransaction().copy(
+            occurredAt = Instant.parse("2026-08-09T20:30:00Z"),
+            occurredAtZone = "Asia/Riyadh",
+        )
+        loader.put(currentPeriod, overview(currentPeriod, "10").copy(transactions = listOf(transaction)))
+        val vm = viewModel(loader, deviceZoneId = ZoneId.of("Asia/Dubai"))
+        vm.refresh()
+        advanceUntilIdle()
+        assertEquals(LocalDate.parse("2026-08-09"), vm.uiState.value.allTransactions.single().localDate)
+    }
+
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
@@ -797,6 +812,7 @@ class DashboardViewModelTest {
             financialTransactionRepository = SettingsViewModelTestSupport.emptyFinancialTransactionRepository(),
             rawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
         ),
+        deviceZoneId: java.time.ZoneId = zone,
     ): DashboardViewModel =
         DashboardViewModel(
             overviewLoader = loader,
@@ -836,7 +852,7 @@ class DashboardViewModelTest {
             ),
             appContext = appContext,
             appLocaleRepository = FakeAppLocaleRepository(),
-            zoneId = zone,
+            zoneId = deviceZoneId,
             maintenanceCompletions = maintenanceCompletions,
         )
 
