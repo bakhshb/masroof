@@ -217,8 +217,8 @@ class IntraBankSelfTransferIngestionTest {
     assertTrue(ingestion.ingest(out) is SmsIngestionResult.Duplicate)
     assertTrue(ingestion.ingest(inSms) is SmsIngestionResult.Duplicate)
 
-    assertTrue(ingestion.reparseStored(out) is SmsIngestionResult.Parsed)
-    assertTrue(ingestion.reparseStored(inSms) is SmsIngestionResult.Parsed)
+    assertTrue(ingestion.processStored.reparseStored(out) is SmsIngestionResult.Parsed)
+    assertTrue(ingestion.processStored.reparseStored(inSms) is SmsIngestionResult.Parsed)
 
     assertEquals(1, ftRepo.listAll().size)
     assertEquals(FinancialTransactionType.SELF_TRANSFER, ftRepo.listAll().single().type)
