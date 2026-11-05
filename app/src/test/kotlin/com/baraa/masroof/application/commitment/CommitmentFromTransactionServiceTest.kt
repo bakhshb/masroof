@@ -1,11 +1,10 @@
 package com.baraa.masroof.application.commitment
 
-import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
 import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.CommitmentRecurrence
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.repository.CommitmentRepository
+import com.baraa.masroof.testsupport.FakeFinancialTransactionRepository
 import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CancellationException
@@ -95,20 +94,6 @@ class CommitmentFromTransactionServiceTest {
             CommitmentCreationResult.Rejected("invalid_transaction"),
             service.createFromTransaction(refund.id),
         )
-    }
-
-    private class FakeFinancialTransactionRepository(
-        private val all: List<FinancialTransaction>,
-    ) : EmptyFinancialTransactionRepository() {
-        override suspend fun getById(id: String): FinancialTransaction? = all.firstOrNull { it.id == id }
-
-        override suspend fun listAll(): List<FinancialTransaction> = all
-
-        override suspend fun listOccurredBetween(
-            startInclusive: Instant,
-            endExclusive: Instant,
-        ): List<FinancialTransaction> =
-            all.filter { !it.occurredAt.isBefore(startInclusive) && it.occurredAt.isBefore(endExclusive) }
     }
 
     private class ThrowOnDuplicateCommitmentRepository : CommitmentRepository {

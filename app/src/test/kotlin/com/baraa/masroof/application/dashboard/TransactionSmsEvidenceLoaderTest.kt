@@ -1,8 +1,8 @@
 package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.testsupport.EmptyRawSmsRepository
-import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
 import com.baraa.masroof.domain.model.RawSms
+import com.baraa.masroof.testsupport.FakeFinancialTransactionRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -67,12 +67,6 @@ class TransactionSmsEvidenceLoaderTest {
         deviceMessageId = id,
         bodyHash = "hash-$id",
     )
-
-    private class FakeFinancialTransactionRepository(
-        private val links: Map<String, List<String>> = emptyMap(),
-    ) : EmptyFinancialTransactionRepository() {
-        override suspend fun listRawSmsIds(transactionId: String) = links[transactionId].orEmpty()
-    }
 
     private class FakeRawSmsRepository(
         private val rows: Map<String, RawSms>,

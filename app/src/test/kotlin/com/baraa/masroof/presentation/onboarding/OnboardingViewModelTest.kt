@@ -1,6 +1,5 @@
 package com.baraa.masroof.presentation.onboarding
 
-import com.baraa.masroof.testsupport.EmptyReviewRepository
 import com.baraa.masroof.application.onboarding.ImportDatePolicy
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
@@ -12,12 +11,10 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.model.ReviewItem
-import com.baraa.masroof.domain.model.ReviewKind
-import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.testsupport.FakeDatabaseBackupGateway
+import com.baraa.masroof.testsupport.FakeReviewRepo
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -766,27 +763,5 @@ AccountRegistryEntry.forTest(
         override suspend fun updateCardNetwork(reference: CardReference, network: CardNetwork?) = Unit
 
         override suspend fun updateCardType(reference: CardReference, cardType: CardType?) = Unit
-    }
-
-    private class FakeReviewRepo : EmptyReviewRepository() {
-        override suspend fun upsertRequired(
-            rawSmsId: String,
-            kind: ReviewKind,
-            reasons: List<String>,
-            now: Instant,
-        ): ReviewItem {
-            return ReviewItem(
-                id = "review:$rawSmsId",
-                rawSmsId = rawSmsId,
-                kind = kind,
-                status = ReviewStatus.REQUIRED,
-                reasons = reasons,
-                createdAt = now,
-                updatedAt = now,
-                resolvedAt = null,
-                resolutionKind = null,
-                resolvedTransactionId = null,
-            )
-        }
     }
 }

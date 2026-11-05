@@ -2,18 +2,14 @@ package com.baraa.masroof.application.dashboard
 
 import com.baraa.masroof.testsupport.EmptyRawSmsRepository
 import com.baraa.masroof.testsupport.EmptyParsedEventRepository
-import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
-import com.baraa.masroof.testsupport.EmptyReviewRepository
 import com.baraa.masroof.testsupport.FakeAppLocaleRepository
+import com.baraa.masroof.testsupport.FakeFinancialTransactionRepository
+import com.baraa.masroof.testsupport.FakeReviewRepo
 import com.baraa.masroof.testsupport.StubAccountRegistryRepository
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.model.ReviewItem
-import com.baraa.masroof.domain.model.ReviewKind
-import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
@@ -50,7 +46,7 @@ class DashboardServiceTest {
     fun visaPurchaseAndCardPayment_regression() = runBlocking {
         val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
-        val ftRepo = FakeFtRepo(
+        val ftRepo = FakeFinancialTransactionRepository(
             listOf(
                 tx("e1", FinancialTransactionType.EXPENSE, "100", occurredAt = start.plusSeconds(3600)),
                 tx("p1", FinancialTransactionType.CREDIT_CARD_PAYMENT, "100", occurredAt = start.plusSeconds(7200)),
@@ -69,7 +65,7 @@ class DashboardServiceTest {
         val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val service = dashboardService(
-            FakeFtRepo(listOf(tx("s1", FinancialTransactionType.SELF_TRANSFER, "500", occurredAt = start.plusSeconds(10)))),
+            FakeFinancialTransactionRepository(listOf(tx("s1", FinancialTransactionType.SELF_TRANSFER, "500", occurredAt = start.plusSeconds(10)))),
             FakeReviewRepo(),
         )
         val overview = service.loadOverview(period)
@@ -83,7 +79,7 @@ class DashboardServiceTest {
         val period = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-08-11"))
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val service = dashboardService(
-            FakeFtRepo(
+            FakeFinancialTransactionRepository(
                 listOf(
                     tx(
                         id = "w1",
@@ -108,7 +104,7 @@ class DashboardServiceTest {
             endDateExclusive = LocalDate.parse("2026-08-27"),
         )
         val service = dashboardService(
-            FakeFtRepo(emptyList()),
+            FakeFinancialTransactionRepository(emptyList()),
             FakeReviewRepo(requiredCount = 3),
         )
         val overview = service.loadOverview(period)
@@ -124,7 +120,7 @@ class DashboardServiceTest {
         val start = FinancialPeriodPolicy.toInclusiveStartInstant(period.startDate, zone)
         val end = FinancialPeriodPolicy.toExclusiveEndInstant(period.endDateExclusive, zone)
         val service = dashboardService(
-            FakeFtRepo(
+            FakeFinancialTransactionRepository(
                 listOf(
                     tx("before", FinancialTransactionType.EXPENSE, "1", occurredAt = start.minusSeconds(1)),
                     tx("start", FinancialTransactionType.EXPENSE, "2", occurredAt = start),
@@ -159,7 +155,7 @@ class DashboardServiceTest {
             )
         }
         val overview = dashboardService(
-            FakeFtRepo(
+            FakeFinancialTransactionRepository(
                 purchases + listOf(
                     tx("before", FinancialTransactionType.EXPENSE, "99", occurredAt = start.minusSeconds(1), merchant = "Cafe"),
                     tx("end", FinancialTransactionType.EXPENSE, "99", occurredAt = end, merchant = "Cafe"),
@@ -176,7 +172,7 @@ class DashboardServiceTest {
 
     @Test
     fun loadCurrentOverview_marksCurrentPeriod() = runBlocking {
-        val service = dashboardService(FakeFtRepo(emptyList()), FakeReviewRepo())
+        val service = dashboardService(FakeFinancialTransactionRepository(emptyList()), FakeReviewRepo())
         val overview = service.loadCurrentOverview()
         assertTrue(overview.isCurrentPeriod)
         val previous = FinancialPeriodPolicy.previous(overview.period)
@@ -197,7 +193,7 @@ class DashboardServiceTest {
             details = ParsedEventDetails(exchangeRate = java.math.BigDecimal("3.75")),
         )
         val ftRepo = WriteRejectingFinancialTransactionRepository(
-            object : FinancialTransactionRepository by FakeFtRepo(listOf(foreign)) {
+            object : FinancialTransactionRepository by FakeFinancialTransactionRepository(listOf(foreign)) {
                 override suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> =
                     if ("usd" in transactionIds) setOf("sms-usd") else emptySet()
             },
@@ -296,40 +292,5 @@ class DashboardServiceTest {
     ) : EmptyRawSmsRepository() {
         override suspend fun getById(id: String): RawSms? = byId[id]
         override suspend fun listIdsByReceivedAt(): List<String> = byId.keys.toList()
-    }
-
-    private class FakeFtRepo(
-        private val all: List<FinancialTransaction>,
-    ) : EmptyFinancialTransactionRepository() {
-        override suspend fun getById(id: String): FinancialTransaction? = all.firstOrNull { it.id == id }
-        override suspend fun listAll(): List<FinancialTransaction> = all
-        override suspend fun listOccurredBetween(
-            startInclusive: Instant,
-            endExclusive: Instant,
-        ): List<FinancialTransaction> =
-            all.filter { !it.occurredAt.isBefore(startInclusive) && it.occurredAt.isBefore(endExclusive) }
-                .sortedWith(compareByDescending<FinancialTransaction> { it.occurredAt }.thenByDescending { it.id })
-    }
-
-    private class FakeReviewRepo(
-        private val requiredCount: Int = 0,
-    ) : EmptyReviewRepository() {
-        override suspend fun listRequired(): List<ReviewItem> =
-            (1..requiredCount).map { idx ->
-                ReviewItem(
-                    id = "r$idx",
-                    rawSmsId = "sms$idx",
-                    kind = ReviewKind.NEEDS_REVIEW,
-                    status = ReviewStatus.REQUIRED,
-                    reasons = listOf("x"),
-                    createdAt = Instant.parse("2026-08-01T00:00:00Z"),
-                    updatedAt = Instant.parse("2026-08-01T00:00:00Z"),
-                    resolvedAt = null,
-                    resolutionKind = null,
-                    resolvedTransactionId = null,
-                )
-            }
-
-        override suspend fun listAll(): List<ReviewItem> = listRequired()
     }
 }
