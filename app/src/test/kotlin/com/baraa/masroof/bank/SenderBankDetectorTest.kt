@@ -16,7 +16,6 @@ class SenderBankDetectorTest {
     fun sharedTestCopy_matchesTheBundledSenders() {
         val bank = bundledPatterns("BANK_ALJAZIRA").banks.single()
         assertEquals(bank.senders, ALJAZIRA_BUNDLED_SENDERS)
-        assertEquals(bank.displayName, "بنك الجزيرة")
     }
 
     @Test
@@ -30,12 +29,12 @@ class SenderBankDetectorTest {
 
     @Test
     fun otherBanks_getTheSameSenderNormalization() {
-        val barq = SenderBankDetector(Bank("BANK_BARQ"), listOf("barq app"), "برق")
+        val barq = SenderBankDetector(Bank("BANK_BARQ"), listOf("barq app"))
         listOf("barq app", "Barq App", "BARQ-APP", "Barq App-AD").forEach { assertDetected(barq, Bank("BANK_BARQ"), it) }
-        val snb = SenderBankDetector(Bank("BANK_SNB"), listOf("SNB-AlAhli"), "البنك الأهلي السعودي")
+        val snb = SenderBankDetector(Bank("BANK_SNB"), listOf("SNB-AlAhli"))
         listOf("SNB-AlAhli", "snb-alahli", "SNB AlAhli", "SNB-AlAhli-AD").forEach { assertDetected(snb, Bank("BANK_SNB"), it) }
         // A short sender is never a stem, so unrelated senders that contain it stay unknown.
-        val sab = SenderBankDetector(Bank("BANK_SAB"), listOf("SAB"), "البنك الأول (ساب)")
+        val sab = SenderBankDetector(Bank("BANK_SAB"), listOf("SAB"))
         assertTrue(sab.detect("HASABAT", "hello") is BankDetectionResult.Unknown)
     }
 
@@ -47,15 +46,22 @@ class SenderBankDetectorTest {
     }
 
     @Test
-    fun plausibleSenderOrBody_isSuspectedWithoutClaimingTheBank() {
+    fun plausibleSender_isSuspectedWithoutClaimingTheBank() {
         listOf("NotAlJazira", "AlJaziraX", "AlJaziraBanks", "NotAlJaziraBank").forEach { sender ->
             assertTrue("$sender should be Suspected", aljazira.detect(sender, "hello") is BankDetectionResult.Suspected)
         }
-        assertTrue(aljazira.detect("Mom", "تحويل عبر بنك الجزيرة بمبلغ 10") is BankDetectionResult.Suspected)
-        assertTrue(aljazira.detect("Mom", "Paid with Bank AlJazira card") is BankDetectionResult.Suspected)
-        assertTrue(aljazira.detect("Mom", "See you at 6") is BankDetectionResult.Unknown)
-        val alinma = SenderBankDetector(Bank("BANK_ALINMA"), listOf("alinma"), "مصرف الإنماء")
-        assertTrue(alinma.detect("Mom", "حوالة من مصرف الانماء") is BankDetectionResult.Suspected)
+        // A message that only mentions a bank is someone else's SMS: it is never stored or reviewed as bank evidence.
+        assertTrue(aljazira.detect("Mom", "تحويل عبر بنك الجزيرة بمبلغ 10") is BankDetectionResult.Unknown)
+        assertTrue(aljazira.detect("Jarir", "خصم مع بطاقات البنك الأهلي السعودي") is BankDetectionResult.Unknown)
+    }
+
+    @Test
+    fun anExactSenderIsNeverAlsoReadAsAnotherBanksAdSuffix() {
+        val short = SenderBankDetector(Bank("SHORT"), listOf("Riy"))
+        val full = SenderBankDetector(Bank("FULL"), listOf("Riyad"))
+        assertDetected(full, Bank("FULL"), "Riyad")
+        assertDetected(short, Bank("SHORT"), "Riy-AD")
+        assertTrue(SenderBankDetector(Bank("BOTH"), listOf("Riy", "Riyad")).detect("Riyad", "") is BankDetectionResult.Detected)
     }
 
     private fun assertDetected(detector: SenderBankDetector, bank: Bank, sender: String) {

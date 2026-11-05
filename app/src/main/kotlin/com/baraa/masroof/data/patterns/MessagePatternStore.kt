@@ -107,8 +107,7 @@ class MessagePatternStore(private val file: File, private val beforeReplace: () 
         /**
          * The bank to store for one bundled definition, or null when nothing changes. A missing bank installs unless
          * another bank owns its sender; an installed bank gains missing patterns and newer bundled role rules the user
-         * left untouched (deleted, disabled and edited patterns stay the user's decision) and new senders no other bank owns.
-         * [mergeBankIds] install even when another bank already owns a sender.
+         * left untouched (deleted, disabled and edited patterns stay the user's decision). [mergeBankIds] also merge senders.
          */
         fun installation(configuration: MessagePatternConfiguration, seed: BankMessagePatterns,
             mergeBankIds: Set<String>): BankMessagePatterns? {
@@ -131,9 +130,7 @@ class MessagePatternStore(private val file: File, private val beforeReplace: () 
                     else -> null
                 }
             }
-            // Every installed bundled bank gains new bundled senders, except one another bank already owns.
-            val owned = configuration.banks.filter { it.bankId != seed.bankId }.flatMap { it.senders }.toSet()
-            val senders = (prior.senders + seed.senders.filterNot(owned::contains)).distinct()
+            val senders = if (seed.bankId in mergeBankIds) (prior.senders + seed.senders).distinct() else prior.senders
             if (updates.isEmpty() && senders == prior.senders) return null
             // An upgraded role keeps only its new revision, so repeated updates never grow the bounded history.
             val upgraded = updates.map { it.id }.toSet()

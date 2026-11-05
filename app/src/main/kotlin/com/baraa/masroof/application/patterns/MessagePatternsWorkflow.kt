@@ -96,8 +96,11 @@ class MessagePatternsWorkflow(
     private fun validateBankEdit(banks: List<BankMessagePatterns>, bankId: String, name: String, senders: List<String>) {
         require(name.trim().isNotEmpty() && name.length <= 120)
         require(senders.isNotEmpty() && senders.size <= 16 && senders.all { it.isNotBlank() && it.length <= 120 })
-        val existing = banks.singleOrNull { it.bankId == bankId }?.senders.orEmpty()
-        require(senders.filterNot { it in existing }.none { sender -> banks.any { it.bankId != bankId && sender in it.senders } }) {
+        // Detection folds case, spacing and letter forms, so ownership compares the same folded keys.
+        val key = com.baraa.masroof.bank.SenderBankDetector::senderKey
+        val existing = banks.singleOrNull { it.bankId == bankId }?.senders.orEmpty().map(key)
+        val others = banks.filter { it.bankId != bankId }.flatMap { it.senders }.map(key).toSet()
+        require(senders.map(key).filterNot { it in existing }.none { it in others }) {
             "Sender belongs to another bank"
         }
     }

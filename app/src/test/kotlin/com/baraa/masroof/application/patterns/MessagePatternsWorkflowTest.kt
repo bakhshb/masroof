@@ -28,16 +28,19 @@ class MessagePatternsWorkflowTest {
         assertEquals(links, upgraded.factContract!!.accountBindings)
     }
 
-    @Test fun newBundledSendersReachEveryInstalledBankUnlessAnotherBankOwnsThem() {
-        val seed = com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec.decode(
-            java.io.File("src/main/assets/bank-patterns/BANK_BARQ.patterns.json").readText()).banks.single()
-        val installed = seed.copy(senders = listOf("barq app"))
-        val other = BankMessagePatterns("BANK_USER", listOf("Barq"), "Mine")
-        val bundled = seed.copy(senders = listOf("barq app", "Barq App 2", "Barq"))
-        val configuration = com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration(banks = listOf(installed, other))
-        val updated = MessagePatternStore.installation(configuration, bundled, emptySet())!!
-        assertEquals(listOf("barq app", "Barq App 2"), updated.senders)
-        assertNull(MessagePatternStore.installation(configuration.copy(banks = listOf(updated, other)), bundled, emptySet()))
+    @Test fun aSenderThatDetectsAsAnotherBanksSenderCannotBeAdded() = runBlocking {
+        val directory = Files.createTempDirectory("masroof-sender-owner-").toFile()
+        try {
+            val store = MessagePatternStore(directory.resolve("patterns.json"))
+            store.saveBank(0, BankMessagePatterns("BANK_ALINMA", listOf("alinma"), "Alinma"))
+            val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate())
+            val generation = store.load().generation
+            for (sender in listOf("ALINMA", "Al-inma")) {
+                assertThrows(IllegalArgumentException::class.java) { runBlocking { workflow.addBank(generation, "Mine", sender) } }
+            }
+            workflow.addBank(generation, "Mine", "Alinma Pay")
+            Unit
+        } finally { directory.deleteRecursively() }
     }
 
     @Test fun newerBundledRolesReachInstalledBanksUnlessTheUserDisabledThem() = runBlocking {

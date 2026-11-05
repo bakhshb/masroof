@@ -43,7 +43,7 @@ class BankInterpretationService(
     private val stopSignal = CompletableDeferred<Unit>()
     // Rebuild assistance from durable human decisions before enabling it; one classifier per assisted bank.
     @Volatile private var classifiers: Map<String, FamilyClassifier>? = null
-    // Templates of pending messages in banks other than the seed bank that learned decisions would now change.
+    // Pending messages in banks without role rules that learned decisions would now change.
     @Volatile private var assistable: Set<String> = emptySet()
     @Volatile private var ruleRead: Set<String> = emptySet()
     // Messages hidden by a remembered "not financial" that the current decisions no longer hide.
@@ -314,7 +314,7 @@ class BankInterpretationService(
             "model:${models[record.event.bank.id]?.version}" !in record.event.confidence.reasons }
         revoked = FamilyAssistBridge.revokedMemories(remembered,
             raw.getByIds(remembered.map { it.event.rawSmsId }.toSet()).associate { it.id to it.body }, models)
-        val needs = refreshFilter()
+        val needs = refreshFilter(loaded = configuration)
         val pending = records.any { needs(it) && mayRefresh(it.event.rawSmsId) } || revoked.any { mayRefresh(it) }
         if (pending) ModelRefreshWorker.enqueue(context, version)
     }
@@ -324,9 +324,10 @@ class BankInterpretationService(
      * the parse commits, so it only decides whether to schedule work; the worker itself ignores it ([readHistory]
      * false) and a failed, retried run still refreshes the message.
      */
-    fun refreshFilter(readHistory: Boolean = true): (com.baraa.masroof.parsing.repository.ParsedEventRecord) -> Boolean {
+    fun refreshFilter(readHistory: Boolean = true, loaded: MessagePatternConfiguration? = null):
+        (com.baraa.masroof.parsing.repository.ParsedEventRecord) -> Boolean {
         // One file version decides both the rules fingerprint and which banks have role rules.
-        val configuration = lazy { patterns() }
+        val configuration = lazy { loaded ?: patterns() }
         val rules = lazy { PatternFactInterpreter.of(configuration.value).fingerprint }
         val roled = lazy { ruleBanks(configuration.value) }
         val read = if (readHistory) ruleRead else emptySet()
