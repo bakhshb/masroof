@@ -141,6 +141,9 @@ class AnalyticsEngineTest {
         // A very different amount, a different season, or two monthly-looking rows are not yearly.
         assertTrue(RecurringDetector.detect(payments("2025-03-01", "2026-03-04", amounts = listOf(20000, 95000)), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
         assertTrue(RecurringDetector.detect(payments("2025-03-01", "2026-05-20"), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
+        // Two shop visits in the same season are not a renewal: ten days apart, or a fifth more.
+        assertTrue(RecurringDetector.detect(payments("2025-03-01", "2026-03-11"), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
+        assertTrue(RecurringDetector.detect(payments("2025-03-01", "2026-03-02", amounts = listOf(80000, 100000)), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
         assertTrue(RecurringDetector.detect(payments("2026-04-01", "2026-05-01"), LocalDate.of(2026, 5, 10).toEpochDay()).isEmpty())
         // An old yearly series whose renewal never came expires.
         assertTrue(RecurringDetector.detect(payments("2024-03-01", "2025-03-01"), LocalDate.of(2026, 6, 1).toEpochDay()).isEmpty())
