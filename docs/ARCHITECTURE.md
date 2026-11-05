@@ -38,8 +38,9 @@ Keep the existing five modules. Organize by responsibility; a filename containin
 missing bundled definitions before admitting work, and wires the store into
 `ConfiguredPatternAdapters`. Each routing attempt receives a complete immutable
 snapshot. `BankSmsRegistry` evaluates every adapter; only a resolved bank reaches
-`PatternFactInterpreter`. AlJazira uses the generic role interpreter within that
-snapshot; STC's six bundled templates require explicit financial approval.
+`PatternFactInterpreter`. Banks with bundled role rules (AlJazira, Alinma, Barq,
+Emirates NBD, SAB, SNB) use the shared role interpreter within that snapshot; STC's
+eight bundled templates require explicit financial approval.
 
 A free-text `account_reference` slot may be empty while its literal label remains
 required (for example, STC SARIE's blank `Account` line). Empty values produce no
@@ -142,6 +143,26 @@ is another production definition source. Preserve the frozen AlJazira baselines.
 checks and remaining signed-upgrade/restore release gates. The production ownership
 table above supersedes the completed migration plans and prototype execution logs.
 
+## Bank interpretation
+
+`MessagePatternSmsAdapter` is the one production adapter; `ConfiguredPatternAdapters`
+gives it immutable bank-scoped snapshots from the pattern store. Every adapter detects
+its bank with `SenderBankDetector`, and `SenderIdentity` (bank-engine) is the one rule
+for when two sender names are the same sender: case, spacing, punctuation, Arabic letter
+forms and digit scripts do not matter, and a promotional `-AD` suffix still names the
+sender. Only an equal sender is detected. A sender containing a long configured sender
+stem, or a body naming the bank, is only Suspected: stored and reviewed, never parsed.
+
+`PatternFactInterpreter` extracts facts with evidence and blockers, delegating role
+rules to the shared `RuleInterpreter`. Kotlin `RuleLibrary` and `AlJaziraRuleProfile`
+are test vocabulary; production does not load them. Local family assistance comes from
+`ml-assist`; rules and security checks stay authoritative. `InterpretationDraftMapper`
+keeps blockers and sends drafts through the validator and `ParseFinalizer`, the only
+source of successful financial parse results. A parse result is not a posted
+transaction; missing, contradictory or unexecuted facts stay reviewable, and
+bank-qualified references never infer ownership. See
+[pattern facts and write gate](PATTERN_FACT_CONTRACT.md).
+
 ## Financial policy ownership
 
 The extracted sources keep their original `com.baraa.masroof.core.money` and
@@ -180,7 +201,7 @@ Live SMS is captured durably before WorkManager receives a raw SMS id. Historica
 
 The engine uses rules first. Eligible local family inference never supplies an amount, ownership or approval. Explicit corrections feed local learning. Rule/model refreshes target unresolved, unposted evidence without a manual decision. Previously posted history is preserved.
 
-Message learning is "remember my decision", per bank, for every configured bank. Each bank's exact-template memory is built only from that bank's human decisions; there is no statistical message model. A remembered "not financial" decision settles a later message with the same template that the rules could not identify, in any bank, and `InformationalMessagePolicy` keeps it out of review. A remembered financial family is used only where the bank's role rules ask for one; it never supplies money, ownership or posting. Conflicting decisions for one template propose nothing. Banks with role rules re-read their pending messages when the rules or their decisions change; banks without role rules refresh only the pending messages a learning change would change, so taught patterns are still applied explicitly.
+Message learning is "remember my decision", per bank, for every configured bank. Each bank's exact-template memory is built only from that bank's human decisions; there is no statistical message model. A remembered "not financial" decision settles a later message with the same template that the rules could not identify, in any bank, and `InformationalMessagePolicy` keeps it out of review. A remembered financial family is used only where the bank's role rules ask for one; it never supplies money, ownership or posting. Conflicting decisions for one template propose nothing. Banks with role rules re-read their pending messages when the rules or their decisions change; banks without role rules refresh only the pending messages a learning change would change, so taught patterns are still applied explicitly. Banks the user adds learn the same way.
 
 ## Data and recovery
 
@@ -214,35 +235,19 @@ See [AGENTS.md](../AGENTS.md) for enforced boundaries and [ANALYTICS.md](ANALYTI
 
 Application shutdown stops producers and drains admitted startup/database work before closing Room. Never cancel a first-open Room continuation and assume SQLite has stopped: its connection callback can still own the open-helper monitor while invalidation setup requests the Room close read lock. Taking Room's close write lock at that point deadlocks. Startup, learning/audit and analytics drain normally; the database access gate also drains independent WorkManager leases. `StartupQueryShutdownTest` controls that native first-open boundary.
 
-## Continuous local personalization
+## Recurring suggestions and forecast replay
 
-Message learning is exact human-template memory only; there is no held-out statistical message candidate.
+Recurring suggestions come from rules only; there is no recurrence model. Analytics
+schema 4 stores recurring feedback, including an intent recorded before the financial
+save; a later pass completes it only when the saved commitment's source and cadence
+agree. Feedback failure never undoes a saved commitment. Legacy rejection stays a
+dismissal; explicit "not recurring" decisions stay until undone. Archive 4 reads
+archives 1-3 and financial schema 18.
 
-Recurring detection has a small numerical L2-regularized softmax classifier,
-shared by offline training and on-device fitting. Entire series are held out;
-only explicit human recurrence decisions and currently saved human commitments
-supply labels. Prediction, rejection-by-absence and ordinary dismissal do not.
-Series identities include the existing bank-qualified source container. Rules
-remain the fallback when neither seed nor personal model is eligible; an eligible
-model's abstention never falls through to rules. Amount/date estimates remain
-deterministic. The current reviewed recurring seed corpus is empty, and its
-artifact explicitly reports ineligibility, rather than shipping invented training
-labels or forcing activation.
-
-Analytics schema 4 adds durable recurring feedback, including an intent recorded
-before the financial save. A later pass completes that intent only when the
-saved commitment's source/cadence agrees. Feedback failure cannot undo a saved
-financial commitment. Legacy rejection remains dismissal, not a negative label.
-Explicit negative preferences remain until undone; missing evidence disqualifies
-them from statistical training. Removing/changing a confirmed commitment revokes
-its earlier training label. Numerical models are rebuilt from current facts and human decisions; unused
-candidate weights and duplicate feature snapshots are not persisted.
-Archive 4 retains compatibility with archives 1-3 and financial schema 18.
-
-Forecast replay uses the existing forecaster on a strict historical prefix with
-an empty origin day; later actuals are evaluation targets only. Replay results
-never become published forecast history. Existing readiness and live performance
-rollback gates are unchanged.
+The forecast baseline is a capped weekday mean (stored key `WEEKDAY_MEDIAN` for
+compatibility); the personal Huber model must beat it to be used. `ForecastReplay`
+runs the forecaster on a strict historical prefix; replay results never become
+published forecast history. See [ANALYTICS.md](ANALYTICS.md).
 
 ## Transaction list projection and confirmation state
 

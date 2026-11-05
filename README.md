@@ -45,7 +45,12 @@ Forecasts and suggestions are advisory. Local learning reuses your explicit corr
 | Bank or catalog entry | Current status |
 | --- | --- |
 | Bank AlJazira | Bundled role definitions and fixture-tested interpretation |
-| STC Bank | Six bundled templates; explicit financial approval is required |
+| Alinma Bank | Bundled role definitions |
+| Barq | Bundled role definitions |
+| Emirates NBD | Bundled role definitions |
+| SAB | Bundled role definitions |
+| Saudi National Bank (SNB) | Bundled role definitions |
+| STC Bank | Eight bundled templates; preview only until you approve them financially |
 | Other configured banks | Catalog visibility is not automatic parsing support; teach and approve suitable patterns in Settings |
 
 A bank name in the catalog does not guarantee every message format is supported. Unknown, suspected, and ambiguous messages remain reviewable. Account/card ownership is always a separate decision.
@@ -66,7 +71,7 @@ Install JDK 27 for Gradle, JDK 21 for compilation/Android unit tests, and Androi
 ./gradlew lintDebug detekt
 ```
 
-Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Android-compatible runner. Run focused tests locally. Full unit suites, recurring seed reproducibility, APK builds, device shards, and process-death recovery run in PR/main CI. Release publication checks successful CI for the exact commit before building the APK.
+Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Android-compatible runner. Run focused tests locally. Full unit suites, APK builds, device shards, and process-death recovery run in PR/main CI. Release publication checks successful CI for the exact commit before building the APK.
 
 | Module | Responsibility |
 | --- | --- |
@@ -76,4 +81,4 @@ Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Andro
 | `ml-assist` | Local family assistance, forecasting, and recurrence detection |
 | `ui-kit` | Shared theme, fonts, components, and charts |
 
-Read the [architecture](docs/ARCHITECTURE.md), [testing and CI](docs/CI.md), [release workflow](docs/RELEASE.md), [design system](docs/DESIGN_SYSTEM.md), [analytics](docs/ANALYTICS.md), and [agent conventions](AGENTS.md) before changing financial behavior. The [modernization record](docs/KOTLIN_MODERNIZATION.md) documents version choices and compatibility verification.
+Read the [architecture](docs/ARCHITECTURE.md), [testing and CI](docs/CI.md), [release workflow](docs/RELEASE.md), [design system](docs/DESIGN_SYSTEM.md), [analytics](docs/ANALYTICS.md), and [agent conventions](AGENTS.md) before changing financial behavior.

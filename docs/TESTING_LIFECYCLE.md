@@ -8,7 +8,7 @@ This is a map of existing production paths and executable coverage, not a claim 
 | SMS capture -> durable raw evidence -> parse -> reconciliation -> review | Bank adapter contracts/fixtures, parse validator tests, historical/live retry unit tests, and M13 real process-death phases at each boundary |
 | Reconciliation failures remain incomplete and recoverable | `HistoricalDerivedRecoveryTest`, processing retry repository/workflow tests, native retry/process-death journeys |
 | Manual decisions survive refresh and restart | `ModelRefreshWorkflowTest`, learning persistence/device tests, `LearningProcessDeathJourneyTest` |
-| ML assists family only, and unsafe assistance abstains | Family feature export/runtime residue, trainer validation/test acceptance gates, `FamilyLearningTest`, interpretation device journeys |
+| ML assists family only, and unsafe assistance abstains | `FamilyLearningTest`, interpretation device journeys |
 | Forecast coverage, published-vs-actual and baseline gate | `AnalysisLifecyclePolicyTest`, pure analytics policy tests and advisory SQLite migration tests; estimator algorithms are unchanged |
 | Commitment identity, changed amount, financial period | `CommitmentPaymentAttributionTest`, `CommitmentsOverviewBuilderTest`, `DashboardFixtureCharacterizationTest`, `DashboardViewModelTest`, `CommitmentPeriodLifecycleTest` |
 | Current period rolls forward while explicit history stays selected | Moving-clock ViewModel tests; application period workflow remains the only period authority |
@@ -27,20 +27,14 @@ No financial database, schema version, application identity, preference namespac
 
 Restore also retires queued readers immediately. A reader waiting behind exclusive restore has not started Room work; it must receive `DatabaseRestartRequiredException` when that instance is retired. Waiting until the restore block exits deadlocks when restore first joins an analytics refresh that is itself waiting for that block. `DatabaseAccessGateTest.retirementReleasesQueuedReadersBeforeTheRestoreBlockCanFinish` controls that order, and the native shutdown/backup restore cases cover it through production wiring. Admitted leases still drain normally.
 
-## Modernization scenario map
+## Reconciliation test split
 
-The original 60 `TransactionReconciliationServiceTest` methods retain their bodies and names:
-29 posting/matching/idempotence scenarios remain there, 16 automation/informational-authority
-scenarios live in `ReconciliationAuthorityTest`, 11 pairing/healing scenarios in
-`ReconciliationTransferHealingTest`, and four persisted-timezone scenarios in
-`ReconciliationTimingTest`. An inherited fixture opens a fresh in-memory Room database before
-each test and closes it afterward; no ledger or database is shared between scenarios.
-
-Pure-module Jupiter migration preserves all 267 original test methods (95 finance-core,
-121 bank-engine, 51 ml-assist). Android/Robolectric tests remain JUnit 4. Added regressions cover
-cancellation propagation, SDK package/runtime separation, transaction-list query refresh,
-duplicate display IDs, foreign-currency totals and explicit money-span scaling. The complete
-baseline contains 2,027 named test methods; [modernization report](KOTLIN_MODERNIZATION.md) records current verification.
+`TransactionReconciliationServiceTest` keeps posting/matching/idempotence scenarios;
+automation/informational authority is in `ReconciliationAuthorityTest`, pairing and
+healing in `ReconciliationTransferHealingTest`, persisted time zones in
+`ReconciliationTimingTest`. Each test opens a fresh in-memory Room database; no ledger
+is shared between scenarios. Pure modules use JUnit Jupiter; Android/Robolectric tests
+stay on JUnit 4.
 
 ## Retained lifecycle regression requirements
 

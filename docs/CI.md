@@ -10,12 +10,14 @@ Dependency versions are pinned in `gradle/libs.versions.toml`; the wrapper pins
 Gradle. Pure JVM dependency boundaries are enforced by
 `build-logic/pure-jvm-boundaries.gradle.kts`. The existing Detekt 2 alpha is a
 tooling-only exception for the Kotlin frontend; production dependencies remain
-stable. See the [source modernization reference](KOTLIN_MODERNIZATION.md#release-reference)
-for Kotlin feature stability and the published toolchain compatibility limits.
+stable. Kotlin 2.4.21 with Gradle 9.8.2 and AGP 9.5.0 is beyond Kotlin's published
+fully supported range (Gradle 9.7.0, AGP 9.3.1); rely on actual build and device
+results, not vendor qualification. Do not enable experimental or pre-stable Kotlin
+features. minSdk 26, compileSdk 37, targetSdk 36 and JVM 21 bytecode stay fixed.
 
 ## Execution and coverage
 
-Unit tests (including pure modules), lint/detekt and the shared APK build run independently. The recurring seed reproducibility check runs the Kotlin trainer after the unit tests.
+Unit tests (including pure modules), lint/detekt and the shared APK build run independently.
 
 Financial policy tests live in `finance-core` and run through `:finance-core:test`
 in the existing unit job. The existing root `detekt` task also checks finance-core
