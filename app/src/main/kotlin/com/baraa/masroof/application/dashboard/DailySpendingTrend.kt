@@ -102,7 +102,7 @@ object DailySpendingTrendBuilder {
 
         transactions.distinctBy { it.id }.forEach { transaction ->
             val signedAmount = signedAmounts[transaction.id] ?: return@forEach
-            val date = TransactionLocalDate.of(transaction, zoneId)
+            val date = transaction.occurredAt.atZone(zoneId).toLocalDate()
             if (date.isBefore(period.startDate) || !date.isBefore(period.endDateExclusive) || date.isAfter(today)) return@forEach
             idsByDay.getOrPut(date) { mutableSetOf() }.add(transaction.id)
             if (signedAmount.signum() >= 0) grossByDay[date] = (grossByDay[date] ?: BigDecimal.ZERO).add(signedAmount)
