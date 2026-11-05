@@ -6,7 +6,7 @@
     <string name="lab_analysis_expected_total">Expected spending by period end</string>
     <string name="lab_analysis_actual">Actual so far</string>
     <string name="lab_analysis_remaining">Expected for the rest of the period</string>
-    <string name="lab_analysis_sections">Includes purchases, cash withdrawals and outgoing transfers</string>
+    <string name="lab_analysis_sections">Includes purchases and commitments</string>
     <string name="lab_analysis_need_data">Estimates become available after two complete salary periods and 56 covered days. Your actual purchases remain visible while history builds.</string>
     <string name="lab_analysis_preparing">Preparing forecast</string>
     <string name="lab_analysis_failed">Analysis unavailable; the next update will retry</string>
