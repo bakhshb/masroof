@@ -46,8 +46,22 @@
     <string name="analysis_recurring_rules">قواعد التكرار</string>
     <string name="analysis_due_today">اليوم</string>
     <string name="analysis_due_tomorrow">غدا</string>
-    <string name="analysis_due_in_days">بعد %1$d أيام</string>
-    <string name="analysis_due_overdue">متأخر %1$d أيام</string>
+    <plurals name="analysis_due_in_days">
+        <item quantity="zero">بعد %1$d يوم</item>
+        <item quantity="one">بعد يوم واحد</item>
+        <item quantity="two">بعد يومين</item>
+        <item quantity="few">بعد %1$d أيام</item>
+        <item quantity="many">بعد %1$d يوما</item>
+        <item quantity="other">بعد %1$d يوم</item>
+    </plurals>
+    <plurals name="analysis_due_overdue">
+        <item quantity="zero">متأخر %1$d يوم</item>
+        <item quantity="one">متأخر يوما واحدا</item>
+        <item quantity="two">متأخر يومين</item>
+        <item quantity="few">متأخر %1$d أيام</item>
+        <item quantity="many">متأخر %1$d يوما</item>
+        <item quantity="other">متأخر %1$d يوم</item>
+    </plurals>
     <string name="analysis_due_timeline">مواعيد الاستحقاق من اليوم حتى %1$s</string>
     <string name="analysis_change_down">↓ %1$s%%</string>
     <string name="analysis_change_up">↑ %1$s%%</string>

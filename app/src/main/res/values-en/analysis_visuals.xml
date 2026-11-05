@@ -46,8 +46,14 @@
     <string name="analysis_recurring_rules">Recurrence rules</string>
     <string name="analysis_due_today">Today</string>
     <string name="analysis_due_tomorrow">Tomorrow</string>
-    <string name="analysis_due_in_days">In %1$d days</string>
-    <string name="analysis_due_overdue">%1$d days late</string>
+    <plurals name="analysis_due_in_days">
+        <item quantity="one">In %1$d day</item>
+        <item quantity="other">In %1$d days</item>
+    </plurals>
+    <plurals name="analysis_due_overdue">
+        <item quantity="one">%1$d day late</item>
+        <item quantity="other">%1$d days late</item>
+    </plurals>
     <string name="analysis_due_timeline">Due dates from today to %1$s</string>
     <string name="analysis_change_down">↓ %1$s%%</string>
     <string name="analysis_change_up">↑ %1$s%%</string>

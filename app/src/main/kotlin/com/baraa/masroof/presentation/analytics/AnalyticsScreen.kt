@@ -68,8 +68,12 @@ val LocalLabAnalyticsCardsEnabled = staticCompositionLocalOf { true }
             guidance?.let { MasroofGuidanceButton(status, stringResource(it)) }
         }
         Text(updatedLine(state)?.let { stringResource(R.string.home_forecast_status_line, status, it) } ?: status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        value?.total?.let { Amount(stringResource(R.string.lab_analysis_expected_total), it) }
-        if (value != null && value.total == null) Amount(stringResource(R.string.lab_analysis_actual), value.actual)
+        value?.total?.let { Amount(stringResource(R.string.lab_analysis_expected_total), it, MasroofAmountRole.Hero) }
+        if (value != null && value.total == null) Amount(stringResource(R.string.lab_analysis_actual), value.actual, MasroofAmountRole.Hero)
+        // Same split as the Forecasts tab: spent so far vs expected for the rest.
+        value?.remaining?.let { remaining -> com.baraa.masroof.ui.components.MasroofForecastSplit(analysisAmount(value.actual).amount,
+            analysisAmount(remaining).amount, com.baraa.masroof.application.locale.AppDigits.display(
+                "${stringResource(R.string.lab_analysis_actual)} ${visualMoney(value.actual)} · ${stringResource(R.string.lab_analysis_remaining)} ${visualMoney(remaining)}")) }
         Text(stringResource(R.string.lab_analysis_sections), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
