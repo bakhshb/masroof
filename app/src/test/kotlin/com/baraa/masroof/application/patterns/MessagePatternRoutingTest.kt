@@ -45,7 +45,8 @@ class MessagePatternRoutingTest {
             store.saveBank(2, bank.copy(patterns = listOf(approved.copy(revision = 3, enabled = false))))
             assertTrue(registry.adapterFor(Bank("BANK_STC"))!!.parse(input) is ParseResult.ReviewRequired)
             assertTrue(registry.route("STC Bank", body) is BankRoutingResult.Matched)
-            assertTrue(registry.route("STC BankX", body) is BankRoutingResult.NotMatched)
+            // A sender containing a configured name is held for review, never claimed or dropped.
+            assertTrue(registry.route("STC BankX", body) is BankRoutingResult.SuspectedBank)
         } finally { directory.deleteRecursively() }
     }
 

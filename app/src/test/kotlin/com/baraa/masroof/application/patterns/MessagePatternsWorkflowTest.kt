@@ -28,6 +28,18 @@ class MessagePatternsWorkflowTest {
         assertEquals(links, upgraded.factContract!!.accountBindings)
     }
 
+    @Test fun newBundledSendersReachEveryInstalledBankUnlessAnotherBankOwnsThem() {
+        val seed = com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec.decode(
+            java.io.File("src/main/assets/bank-patterns/BANK_BARQ.patterns.json").readText()).banks.single()
+        val installed = seed.copy(senders = listOf("barq app"))
+        val other = BankMessagePatterns("BANK_USER", listOf("Barq"), "Mine")
+        val bundled = seed.copy(senders = listOf("barq app", "Barq App 2", "Barq"))
+        val configuration = com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration(banks = listOf(installed, other))
+        val updated = MessagePatternStore.installation(configuration, bundled, emptySet())!!
+        assertEquals(listOf("barq app", "Barq App 2"), updated.senders)
+        assertNull(MessagePatternStore.installation(configuration.copy(banks = listOf(updated, other)), bundled, emptySet()))
+    }
+
     @Test fun newerBundledRolesReachInstalledBanksUnlessTheUserDisabledThem() = runBlocking {
         val directory = Files.createTempDirectory("masroof-bundled-update-").toFile()
         try {

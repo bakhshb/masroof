@@ -460,7 +460,7 @@ internal fun ReviewDetailScreen(
                     icon = MasroofIcons.moneyMovement,
                 )
                 detail.bankChoices.forEach { choice ->
-                    val bankName = choice.labelRes?.let { stringResource(it) } ?: choice.bankId
+                    val bankName = com.baraa.masroof.presentation.settings.settingsBankLabel(com.baraa.masroof.domain.model.Bank(choice.bankId))
                     IconTextButton(
                         onClick = { onSelectBank(choice.bankId) },
                         enabled = !resolving,

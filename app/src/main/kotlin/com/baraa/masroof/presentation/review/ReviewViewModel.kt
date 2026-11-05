@@ -526,10 +526,7 @@ class ReviewViewModel(
         if (ignored || review.kind != ReviewKind.NEEDS_REVIEW) return emptyList()
         if (!ExplicitBankSelection.offersBankChoice(review.reasons)) return emptyList()
         return selectableBanks.map { bank ->
-            ReviewBankChoiceUi(
-                bankId = bank.id,
-                labelRes = if (bank == Bank.BANK_ALJAZIRA) com.baraa.masroof.R.string.bank_aljazira else null,
-            )
+            ReviewBankChoiceUi(bankId = bank.id)
         }
     }
 

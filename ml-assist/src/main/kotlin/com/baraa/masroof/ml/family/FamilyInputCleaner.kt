@@ -19,7 +19,7 @@ data class FamilyCleaningResult(val features: CleanFamilyFeatures?, val rejectio
 
 /** Task-specific minimization, after the bank's normalization. Never remove negation/security words. */
 object FamilyInputCleaner {
-    const val VERSION = "sms-family-clean-v2"
+    const val VERSION = "sms-family-clean-v3"
     const val FEATURES_VERSION = "bank-family-title-v2"
     private val spaces = Regex("\\s+")
     private val words = Regex("[\\p{L}]+")
@@ -40,16 +40,20 @@ object FamilyInputCleaner {
         لا تشاركه مع اي شخص تم تسجيل الدخول الي بنجاح تطبيق بنك الجزيرة لعملية طلب مرفوضة رفض
         الغاء ملغاة عكس فشل غير مكتملة قيد التنفيذ لم يتم ليست ناجحة تحويل دولية
     """.trimIndent().split(spaces).toSet()
+    // Labels arrive normalized by the engine (no hamza or marks, ى as ي, lowercase), so they are written that way here.
     private val labels = setOf(
-        "بطاقة", "بطاقة ايتمانية", "بطاقة ائتمانية", "بطاقة مدى", "حساب", "من حساب", "خصمت من حساب",
-        "اودعت الى حساب", "اودعت الي حساب", "من", "الي", "الى", "لدى", "لدي", "مبلغ", "مبلغ العملية",
-        "المبلغ", "العملة", "القسط", "المبلغ المتبقي", "لـ", "ل", "في", "الدولة", "رقم المعاملة",
-        "المرجع", "المعرف البديل الايبان", "رسوم العمليات الدولية", "سعر الصرف", "الرصيد المتاح",
-        "اجمالي المستحق", "الرصيد", "بنك المرسل", "بنك المستفيد", "الاسم المختصر", "حالة",
-        "credit card", "debit card", "card", "account", "from", "to", "at", "on", "of", "amount",
-        "currency", "available balance", "available balance is", "due amount", "reference", "fee",
+        "بطاقة", "بطاقة ايتمانية", "بطاقة مدي", "حساب", "من حساب", "خصمت من حساب", "اودعت الي حساب",
+        "من", "الي", "لدي", "مبلغ", "مبلغ العملية", "المبلغ", "العملة", "القسط", "المبلغ المتبقي", "ل", "في",
+        "الدولة", "رقم المعاملة", "المرجع", "المعرف البديل الايبان", "رسوم العمليات الدولية", "سعر الصرف",
+        "الرصيد المتاح", "اجمالي المستحق", "الرصيد", "بنك المرسل", "بنك المستفيد", "الاسم المختصر", "حالة",
+        "حساب المرسل", "حساب المستفيد", "رقم الحساب", "ايبان", "مرسل", "مستفيد", "الجهة", "مفوتر", "المفوتر",
+        "القسط الشهري", "القسط المستحق", "اجمالي المبلغ المتبقي", "الرصيد المتبقي", "المبلغ المستحق",
+        "تاريخ", "تاريخ الاستحقاق", "نوع التمويل",
+        "credit card", "debit card", "mada card", "card", "account", "from account", "to account", "from a/c",
+        "to a/c", "from", "to", "at", "on", "of", "amount", "currency", "balance", "available balance",
+        "available balance is", "due amount", "reference", "fee", "merchant", "biller",
     )
-    private val titleValueFields = setOf("اسم المستفيد", "الاسم المختصر", "من", "الي", "الى", "لدى", "لدي", "from", "to", "at")
+    private val titleValueFields = setOf("اسم المستفيد", "الاسم المختصر", "من", "الي", "لدي", "from", "to", "at")
 
     fun clean(normalizedTitle: String, normalizedFieldLabels: List<String>): FamilyCleaningResult {
         if (normalizedTitle.length > 512 || normalizedFieldLabels.size > 128) return rejected(CleaningRejection.TOO_LARGE)

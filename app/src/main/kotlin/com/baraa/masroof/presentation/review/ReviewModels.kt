@@ -27,7 +27,6 @@ data class ReviewListItemUi(
 
 data class ReviewBankChoiceUi(
     val bankId: String,
-    val labelRes: Int?,
 )
 
 data class ReviewDetailUi(

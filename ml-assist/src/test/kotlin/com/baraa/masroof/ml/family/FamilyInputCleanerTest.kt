@@ -17,6 +17,14 @@ class FamilyInputCleanerTest {
         assertFalse(first.terms.keys.any {it.contains("sarah") || it.contains("private") || it.any(Char::isDigit) && !it.startsWith("c")})
     }
 
+    @Test fun otherBanksFieldLabelsSeparateMessagesWithTheSameTitle() {
+        // Barq and Alinma label lines, as the engine normalizes them (no hamza, ى as ي).
+        assertNotEquals(clean("pos purchase", listOf("mada card", "amount")).template,
+            clean("pos purchase", listOf("amount", "balance")).template)
+        assertNotEquals(clean("حوالة صادرة", listOf("المبلغ", "الي")).template,
+            clean("حوالة صادرة", listOf("المبلغ", "حساب المرسل")).template)
+    }
+
     @Test fun whitespaceAndInvisibleFormattingDoNotFragmentTemplates() {
         val a = clean("حوالة محلية واردة", listOf("من", "مبلغ العملية"))
         val b = clean("  حوالة\u200f\u00a0محلية\tواردة  ", listOf("مبلغ\tالعملية", "من", "من"))
