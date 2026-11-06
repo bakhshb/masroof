@@ -64,21 +64,21 @@ class TransactionRestoreService(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            return incompleteRestore(rawSmsId, failureCount = 1)
+            null
         }
-        if (!ReconciliationCompletionPolicy.isComplete(report)) {
-            return incompleteRestore(rawSmsId, report.summary.failed)
-        }
+        // An incomplete pass keeps the financial decision and the RawSms durably retryable; it never rolls back.
+        val complete = report != null && ReconciliationCompletionPolicy.isComplete(report)
+        if (!complete) retainRetry(rawSmsId, report?.summary?.failed ?: 1, ReconciliationCompletionPolicy.STAGE_RECONCILIATION)
         val tx = financialTransactionRepository.findByRawSmsId(rawSmsId)
         if (tx == null) {
-            // Pending match and needs-review are not failures: keep the financial decision so a later pass posts it.
-            if (report.reviewCandidates.any { it.rawSmsId == rawSmsId }) return RestoreResult.AwaitingReview
+            // Retrying, pending match and needs-review are not failures: a later pass posts it.
+            if (!complete || report?.reviewCandidates?.any { it.rawSmsId == rawSmsId } == true) return RestoreResult.AwaitingReview
             val rollbackReason = rollbackToIgnored(review.id, rawSmsId)
             return RestoreResult.Rejected(rollbackReason ?: "reconcile_failed")
         }
 
         try {
-            reviewQueueUpdater?.applyReport(report)
+            if (complete) reviewQueueUpdater?.applyReport(requireNotNull(report))
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -101,19 +101,6 @@ class TransactionRestoreService(
                 RestoreResult.TypeNotChanged(tx)
             }
         }
-    }
-
-    /**
-     * The caller already recorded [ReviewResolutionKind.USER_FINANCIAL_TYPE].
-     * A failed reconcile keeps that decision and the RawSms durably retryable.
-     * It does not write [ReviewResolutionKind.USER_NON_FINANCIAL] back.
-     */
-    private suspend fun incompleteRestore(
-        rawSmsId: String,
-        failureCount: Int,
-    ): RestoreResult {
-        retainRetry(rawSmsId, failureCount, ReconciliationCompletionPolicy.STAGE_RECONCILIATION)
-        return RestoreResult.AwaitingReview
     }
 
     private suspend fun retainRetry(rawSmsId: String, failureCount: Int, stage: String) {

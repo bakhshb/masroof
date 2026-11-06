@@ -591,18 +591,7 @@ private fun ReviewMessageRow(message: ReviewMessage) {
             tint = tint,
         )
         Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
-        Text(
-            stringResource(
-                when (message) {
-                    ReviewMessage.RESOLVED -> R.string.review_resolved
-                    ReviewMessage.STILL_NEEDS_REVIEW -> R.string.review_still_pending
-                    ReviewMessage.RESTORED -> R.string.review_restored
-                    ReviewMessage.RESTORED_PENDING -> R.string.review_restored_pending
-                    ReviewMessage.RESTORED_TYPE_KEPT -> R.string.review_restored_type_kept
-                },
-            ),
-            color = tint,
-        )
+        Text(stringResource(message.label), color = tint)
     }
 }
 
