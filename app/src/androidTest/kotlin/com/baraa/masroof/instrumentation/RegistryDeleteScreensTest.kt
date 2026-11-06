@@ -19,6 +19,7 @@ import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.presentation.locale.AppLocaleContext
 import com.baraa.masroof.presentation.settings.*
+import com.baraa.masroof.testsupport.ar
 import com.baraa.masroof.ui.theme.MasroofTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -33,7 +34,6 @@ class RegistryDeleteScreensTest {
         OwnershipStatus.UNKNOWN to R.string.reference_unconfirmed,
         OwnershipStatus.EXTERNAL to R.string.reference_stopped,
     )
-    private fun ar(id: Int) = AppLocaleContext.wrap(compose.activity, "ar").getString(id)
     private var state by mutableStateOf(SettingsUiState(loading = false))
     private val requested = mutableListOf<StopTrackingTarget>()
     private val actions = RegistryDeleteActions(
@@ -59,7 +59,7 @@ class RegistryDeleteScreensTest {
     /** Presses Delete on each tab and returns the targets in tab order, checking the dialog names that item. */
     private fun deleteOnEveryTab(names: List<String>): List<StopTrackingTarget> {
         tabs.forEachIndexed { index, (_, tab) ->
-            compose.onNodeWithText(ar(tab)).performClick()
+            compose.onNodeWithText(compose.ar(tab)).performClick()
             // Followed cards keep Delete in the row's overflow menu.
             if (compose.onAllNodesWithTag("registry-more-actions").fetchSemanticsNodes().isNotEmpty())
                 compose.onNodeWithTag("registry-more-actions").performScrollTo().performClick()

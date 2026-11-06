@@ -26,6 +26,7 @@ import com.baraa.masroof.presentation.settings.RegistryDeleteUi
 import com.baraa.masroof.presentation.settings.SettingsDeleteDialog
 import com.baraa.masroof.presentation.settings.StopTrackingTarget
 import com.baraa.masroof.testsupport.ScreenshotArtifactWriter
+import com.baraa.masroof.testsupport.ar
 import com.baraa.masroof.ui.theme.MasroofTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -37,7 +38,6 @@ import java.time.LocalDate
 class RegistryDeleteJourneyTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val name = "حساب الرواتب"
-    private fun ar(id: Int) = AppLocaleContext.wrap(compose.activity, "ar").getString(id)
     private fun account(ownership: OwnershipStatus = OwnershipStatus.OWNED) =
         ManagedAccountUi("areg_1", Bank.BANK_ALJAZIRA, "3001", ownership, displayName = name)
 
@@ -57,7 +57,7 @@ class RegistryDeleteJourneyTest {
     @Test fun unlinkedAccountDeletesOnlyAfterTheCopiedNameIsPasted() {
         var deleted = false
         show(RegistryDeleteUi(StopTrackingTarget.Account(account()), emptyList(), 0, null), onDelete = { deleted = true })
-        compose.onNodeWithText(ar(R.string.registry_delete_account_title)).assertIsDisplayed()
+        compose.onNodeWithText(compose.ar(R.string.registry_delete_account_title)).assertIsDisplayed()
         compose.onNodeWithTag("registry-delete-confirm").assertIsNotEnabled()
         compose.onNodeWithTag("registry-delete-confirmation").performTextInput("اسم آخر")
         compose.onNodeWithTag("registry-delete-confirm").assertIsNotEnabled()
@@ -83,7 +83,7 @@ class RegistryDeleteJourneyTest {
         compose.onNodeWithTag("registry-delete-blocked-name").assertTextEquals(name)
         compose.onAllNodesWithTag("registry-delete-linked").assertCountEquals(2)
         compose.onNodeWithText("TEST SHOP").assertIsDisplayed()
-        compose.onNodeWithText(ar(R.string.txn_type_fee)).assertIsDisplayed()
+        compose.onNodeWithText(compose.ar(R.string.txn_type_fee)).assertIsDisplayed()
         // Resolved in the app language, not the dialog window's default locale.
         compose.onNodeWithText(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy",
             com.baraa.masroof.application.locale.AppLocale.displayLocale("ar")).format(LocalDate.of(2026, 9, 2))).assertIsDisplayed()
@@ -96,7 +96,7 @@ class RegistryDeleteJourneyTest {
 
     @Test fun anAlreadyStoppedLinkedItemOnlyOffersClose() {
         show(RegistryDeleteUi(StopTrackingTarget.Account(account(OwnershipStatus.EXTERNAL)), emptyList(), 0, DeleteBlocker.MESSAGE_PATTERN))
-        compose.onNodeWithText(ar(R.string.registry_delete_blocked_pattern)).assertIsDisplayed()
+        compose.onNodeWithText(compose.ar(R.string.registry_delete_blocked_pattern)).assertIsDisplayed()
         compose.onNodeWithTag("registry-delete-stop").assertDoesNotExist()
         compose.onNodeWithTag("registry-delete-close").assertIsDisplayed()
     }
