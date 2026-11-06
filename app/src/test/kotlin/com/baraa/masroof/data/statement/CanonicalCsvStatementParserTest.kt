@@ -5,6 +5,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.statement.CanonicalStatementFormat
 import com.baraa.masroof.domain.statement.StatementParseResult
 import com.baraa.masroof.domain.statement.StatementRejection
+import com.baraa.masroof.testsupport.testdataFile
 import java.io.ByteArrayInputStream
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -200,8 +201,4 @@ class CanonicalCsvStatementParserTest {
     private fun fixture(name: String) = statementFixture(name).inputStream()
 }
 
-internal fun statementFixture(name: String): File =
-    listOf(
-        File("src/test/resources/testdata/statements/$name"),
-        File("app/src/test/resources/testdata/statements/$name"),
-    ).firstOrNull { it.isFile } ?: error("Missing testdata/statements/$name")
+internal fun statementFixture(name: String): File = testdataFile("statements/$name")

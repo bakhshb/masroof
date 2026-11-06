@@ -1,5 +1,6 @@
 package com.baraa.masroof.parsing.fixtures
 
+import com.baraa.masroof.testsupport.testdataFile
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -39,12 +40,5 @@ object AlJaziraFixtureLoader {
         }
     }
 
-    fun resolveTestdataRoot(): File {
-        val candidates = listOf(
-            File("src/test/resources/testdata/bank_aljazira"),
-            File("app/src/test/resources/testdata/bank_aljazira"),
-        )
-        return candidates.firstOrNull { it.isDirectory }
-            ?: error("Could not locate testdata/bank_aljazira")
-    }
+    fun resolveTestdataRoot(): File = testdataFile("bank_aljazira")
 }
