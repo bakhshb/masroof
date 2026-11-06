@@ -168,6 +168,8 @@ internal fun ReviewListScreen(
                     enabled = !state.loading || state.items.isNotEmpty(),
                 )
             }
+            // An action that closed its message reports its outcome here.
+            state.message?.let { ReviewMessageRow(it, state.actionErrorDetail.takeIf { state.error == null }) }
             when {
             state.loading && state.items.isEmpty() -> {
                 Column(
@@ -549,30 +551,7 @@ internal fun ReviewDetailScreen(
                 }
             }
 
-            message?.let { shown ->
-                val warning = shown == ReviewMessage.STILL_NEEDS_REVIEW
-                val tint = if (warning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = if (warning) MasroofIcons.warning else MasroofIcons.success,
-                        contentDescription = null,
-                        tint = tint,
-                    )
-                    Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
-                    Text(
-                        stringResource(
-                            when (shown) {
-                                ReviewMessage.RESOLVED -> R.string.review_resolved
-                                ReviewMessage.STILL_NEEDS_REVIEW -> R.string.review_still_pending
-                                ReviewMessage.RESTORED -> R.string.review_restored
-                                ReviewMessage.RESTORED_PENDING -> R.string.review_restored_pending
-                                ReviewMessage.RESTORED_TYPE_KEPT -> R.string.review_restored_type_kept
-                            },
-                        ),
-                        color = tint,
-                    )
-                }
-            }
+            message?.let { ReviewMessageRow(it, actionErrorDetail.takeIf { error == null }) }
             if (error == ReviewError.ACTION_FAILED) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -597,6 +576,36 @@ internal fun ReviewDetailScreen(
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             }
         }
+    }
+}
+
+/** The outcome of the last action; [detail] is a reason code shown only when it has a label. */
+@Composable
+private fun ReviewMessageRow(message: ReviewMessage, detail: String?) {
+    val warning = message == ReviewMessage.STILL_NEEDS_REVIEW || message == ReviewMessage.RESTORED_TYPE_KEPT
+    val tint = if (warning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = if (warning) MasroofIcons.warning else MasroofIcons.success,
+            contentDescription = null,
+            tint = tint,
+        )
+        Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
+        Text(
+            stringResource(
+                when (message) {
+                    ReviewMessage.RESOLVED -> R.string.review_resolved
+                    ReviewMessage.STILL_NEEDS_REVIEW -> R.string.review_still_pending
+                    ReviewMessage.RESTORED -> R.string.review_restored
+                    ReviewMessage.RESTORED_PENDING -> R.string.review_restored_pending
+                    ReviewMessage.RESTORED_TYPE_KEPT -> R.string.review_restored_type_kept
+                },
+            ),
+            color = tint,
+        )
+    }
+    detail?.let(ReviewReasonLabels::labelRes)?.let {
+        Text(stringResource(it), color = tint, style = MaterialTheme.typography.bodySmall)
     }
 }
 

@@ -221,6 +221,7 @@ class ReviewListRefreshTest {
             advanceUntilIdle()
 
             assertEquals(ReviewMessage.RESTORED_TYPE_KEPT, viewModel.uiState.value.message)
+            assertEquals("missing_source", viewModel.uiState.value.actionErrorDetail)
             assertNull(viewModel.uiState.value.error)
             assertEquals(com.baraa.masroof.domain.model.FinancialTransactionType.EXPENSE, world.transactions.findByRawSmsId("sms-buy")!!.type)
         }

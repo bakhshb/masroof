@@ -91,13 +91,34 @@ class TransactionRestoreServiceTest {
     @Test
     fun restore_keepsPostedRowWhenTheChosenTypeIsRejected() = runBlocking {
         val reviewRepo = TrackingReviewRepository(ignoredReview())
+        // Deletes are counted: the old code rolled the restore back by deleting the posted row.
         val txRepo = FailingUpdateRepository(sampleTransaction())
         val service = service(reviewRepository = reviewRepo, financialTransactionRepository = txRepo)
 
         // No parsed event: reclassification rejects with parsed_event_missing, a reason other than a failed write.
         val result = service.restore("sms-1", FinancialTransactionType.INCOME)
 
-        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction()), result)
+        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction(), "parsed_event_missing"), result)
+        assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
+        assertEquals(0, txRepo.deletes)
+    }
+
+    @Test
+    fun restore_stillAppliesTheChosenTypeWhenTheReviewQueueUpdateFails() = runBlocking {
+        val reviewRepo = TrackingReviewRepository(ignoredReview())
+        val txRepo = FailingUpdateRepository(sampleTransaction())
+        val service = SettingsViewModelTestSupport.restoreService(
+            reviewRepository = reviewRepo,
+            financialTransactionRepository = txRepo,
+            clock = InstantClock { Instant.parse("2026-08-02T00:00:00Z") },
+            reviewQueueUpdater = com.baraa.masroof.application.review.ReviewQueueUpdater(
+                reviewRepo, txRepo, InstantClock { error("queue write failed") }),
+        )
+
+        val result = service.restore("sms-1", FinancialTransactionType.INCOME)
+
+        // The row stays posted and the type change is still attempted (here it is refused: no parsed event).
+        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction(), "parsed_event_missing"), result)
         assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
         assertEquals(0, txRepo.deletes)
     }
@@ -117,7 +138,7 @@ class TransactionRestoreServiceTest {
 
         val result = service.restore("sms-1", FinancialTransactionType.INCOME)
 
-        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction()), result)
+        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction(), "update_failed"), result)
         assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
         assertEquals(0, txRepo.deletes)
     }

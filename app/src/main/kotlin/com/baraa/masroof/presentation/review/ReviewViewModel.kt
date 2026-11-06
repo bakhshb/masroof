@@ -242,37 +242,31 @@ class ReviewViewModel(
             }
         }) {
             _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
-            val result = transactionRestoreService.restore(rawSmsId, newType)
             // A failed type change still restored the message; the transaction shows the type it kept.
-            val message = when (result) {
-                is RestoreResult.Success -> ReviewMessage.RESTORED
-                RestoreResult.AwaitingReview -> ReviewMessage.RESTORED_PENDING
-                is RestoreResult.TypeNotChanged -> ReviewMessage.RESTORED_TYPE_KEPT
-                is RestoreResult.Rejected -> null
+            val (message, detail) = when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
+                is RestoreResult.Rejected -> {
+                    _uiState.update {
+                        it.copy(resolving = false, error = ReviewError.ACTION_FAILED, actionErrorDetail = result.reason)
+                    }
+                    return@launchLogged
+                }
+                is RestoreResult.Success -> ReviewMessage.RESTORED to null
+                // It posts later with the type the engine reads; a chosen type is not kept for that pass.
+                RestoreResult.AwaitingReview ->
+                    (if (newType == null) ReviewMessage.RESTORED_PENDING else ReviewMessage.RESTORED_TYPE_KEPT) to null
+                is RestoreResult.TypeNotChanged -> ReviewMessage.RESTORED_TYPE_KEPT to result.reason
             }
-            when {
-                message != null -> {
-                    val summaries = loadCurrentSummaries()
-                    applySummaries(summaries)
-                    _uiState.update {
-                        it.copy(
-                            loading = false,
-                            resolving = false,
-                            selectedDetail = null,
-                            message = message,
-                            error = null,
-                        )
-                    }
-                }
-                result is RestoreResult.Rejected -> {
-                    _uiState.update {
-                        it.copy(
-                            resolving = false,
-                            error = ReviewError.ACTION_FAILED,
-                            actionErrorDetail = result.reason,
-                        )
-                    }
-                }
+            val summaries = loadCurrentSummaries()
+            applySummaries(summaries)
+            _uiState.update {
+                it.copy(
+                    loading = false,
+                    resolving = false,
+                    selectedDetail = null,
+                    message = message,
+                    actionErrorDetail = detail,
+                    error = null,
+                )
             }
         }
     }
