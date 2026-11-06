@@ -89,19 +89,17 @@ class TransactionRestoreServiceTest {
     }
 
     @Test
-    fun restore_rollsBackWhenReclassifyFails() = runBlocking {
+    fun restore_keepsPostedRowWhenTheChosenTypeIsRejected() = runBlocking {
         val reviewRepo = TrackingReviewRepository(ignoredReview())
-        val tx = sampleTransaction()
-        val service = service(
-            reviewRepository = reviewRepo,
-            financialTransactionRepository = SingleTransactionRepository(tx),
-        )
+        val txRepo = FailingUpdateRepository(sampleTransaction())
+        val service = service(reviewRepository = reviewRepo, financialTransactionRepository = txRepo)
 
+        // No parsed event: reclassification rejects with parsed_event_missing, a reason other than a failed write.
         val result = service.restore("sms-1", FinancialTransactionType.INCOME)
 
-        assertTrue(result is RestoreResult.Rejected)
-        assertEquals("parsed_event_missing", (result as RestoreResult.Rejected).reason)
-        assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, reviewRepo.lastResolutionKind)
+        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction()), result)
+        assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
+        assertEquals(0, txRepo.deletes)
     }
 
     @Test

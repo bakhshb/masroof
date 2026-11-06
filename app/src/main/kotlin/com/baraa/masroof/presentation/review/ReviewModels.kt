@@ -80,6 +80,8 @@ enum class ReviewMessage {
     RESOLVED,
     STILL_NEEDS_REVIEW,
     RESTORED,
+    RESTORED_PENDING,
+    RESTORED_TYPE_KEPT,
 }
 
 val REVIEW_FINANCIAL_TYPE_ACTIONS: List<FinancialTransactionType> = listOf(

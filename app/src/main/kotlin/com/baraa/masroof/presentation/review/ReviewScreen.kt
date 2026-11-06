@@ -574,7 +574,7 @@ internal fun ReviewDetailScreen(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
-                ReviewMessage.RESTORED -> Row(verticalAlignment = Alignment.CenterVertically) {
+                ReviewMessage.RESTORED, ReviewMessage.RESTORED_PENDING, ReviewMessage.RESTORED_TYPE_KEPT -> Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = MasroofIcons.success,
                         contentDescription = null,
@@ -582,7 +582,13 @@ internal fun ReviewDetailScreen(
                     )
                     Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
                     Text(
-                        stringResource(R.string.review_restored),
+                        stringResource(
+                            when (message) {
+                                ReviewMessage.RESTORED_PENDING -> R.string.review_restored_pending
+                                ReviewMessage.RESTORED_TYPE_KEPT -> R.string.review_restored_type_kept
+                                else -> R.string.review_restored
+                            },
+                        ),
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }

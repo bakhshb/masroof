@@ -19,10 +19,10 @@ sealed interface RestoreResult {
 
     data class Rejected(val reason: String) : RestoreResult
 
-    /** Restored as financial; it posts once its other leg or an ownership answer arrives. */
+    /** Restored as financial; it shows once processing finishes, or its other leg or an ownership answer arrives. */
     data object AwaitingReview : RestoreResult
 
-    /** Restored and posted, but the chosen type could not be saved; the user can change it on the transaction. */
+    /** Restored and posted, but the chosen type could not be applied; the user can change it on the transaction. */
     data class TypeNotChanged(val transaction: FinancialTransaction) : RestoreResult
 }
 
@@ -83,7 +83,7 @@ class TransactionRestoreService(
             throw e
         } catch (_: Exception) {
             retainRetry(rawSmsId, failureCount = 1, stage = ReconciliationCompletionPolicy.STAGE_REVIEW_UPDATE)
-            return RestoreResult.Rejected("review_update_incomplete")
+            return RestoreResult.AwaitingReview
         }
         if (newType == null || newType == tx.type) {
             logRestore(rawSmsId, tx.id, newType)
@@ -96,13 +96,9 @@ class TransactionRestoreService(
                 RestoreResult.Success(result.transaction)
             }
             // The restore itself succeeded: keep the posted row and the financial decision; only the type change failed.
-            is ReclassificationResult.Rejected if result.reason == ReclassificationResult.UPDATE_FAILED -> {
+            is ReclassificationResult.Rejected -> {
                 logRestore(rawSmsId, tx.id, null)
                 RestoreResult.TypeNotChanged(tx)
-            }
-            is ReclassificationResult.Rejected -> {
-                val rollbackReason = rollbackToIgnored(review.id, rawSmsId)
-                RestoreResult.Rejected(rollbackReason ?: result.reason)
             }
         }
     }
@@ -117,7 +113,7 @@ class TransactionRestoreService(
         failureCount: Int,
     ): RestoreResult {
         retainRetry(rawSmsId, failureCount, ReconciliationCompletionPolicy.STAGE_RECONCILIATION)
-        return RestoreResult.Rejected("reconciliation_incomplete")
+        return RestoreResult.AwaitingReview
     }
 
     private suspend fun retainRetry(rawSmsId: String, failureCount: Int, stage: String) {

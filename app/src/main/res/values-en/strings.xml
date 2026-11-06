@@ -499,6 +499,8 @@
     <string name="review_load_error">Could not load review queue</string>
     <string name="review_resolved">Resolved successfully</string>
     <string name="review_restored">Message restored successfully</string>
+    <string name="review_restored_pending">Restored. The transaction appears when processing finishes</string>
+    <string name="review_restored_type_kept">Restored with its current type; the type was not changed</string>
     <string name="review_restore_hint">You can restore this message as a financial transaction, or choose a different classification.</string>
     <string name="review_restore_actions_title">Restore and classify</string>
     <string name="review_action_restore">Restore as-is</string>

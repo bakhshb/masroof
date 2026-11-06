@@ -245,6 +245,11 @@ class ReviewViewModel(
             when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
                 // A failed type change still restored the message; the transaction shows the type it kept.
                 is RestoreResult.Success, RestoreResult.AwaitingReview, is RestoreResult.TypeNotChanged -> {
+                    val message = when (result) {
+                        RestoreResult.AwaitingReview -> ReviewMessage.RESTORED_PENDING
+                        is RestoreResult.TypeNotChanged -> ReviewMessage.RESTORED_TYPE_KEPT
+                        else -> ReviewMessage.RESTORED
+                    }
                     val summaries = loadCurrentSummaries()
                     applySummaries(summaries)
                     _uiState.update {
@@ -252,7 +257,7 @@ class ReviewViewModel(
                             loading = false,
                             resolving = false,
                             selectedDetail = null,
-                            message = ReviewMessage.RESTORED,
+                            message = message,
                             error = null,
                         )
                     }
