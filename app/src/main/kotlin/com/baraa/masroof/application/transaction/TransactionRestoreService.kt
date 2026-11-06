@@ -67,18 +67,18 @@ class TransactionRestoreService(
             null
         }
         // An incomplete pass keeps the financial decision and the RawSms durably retryable; it never rolls back.
-        val complete = report != null && ReconciliationCompletionPolicy.isComplete(report)
-        if (!complete) retainRetry(rawSmsId, report?.summary?.failed ?: 1, ReconciliationCompletionPolicy.STAGE_RECONCILIATION)
+        val completeReport = report?.takeIf(ReconciliationCompletionPolicy::isComplete)
+        if (completeReport == null) retainRetry(rawSmsId, report?.summary?.failed ?: 1, ReconciliationCompletionPolicy.STAGE_RECONCILIATION)
         val tx = financialTransactionRepository.findByRawSmsId(rawSmsId)
         if (tx == null) {
             // Retrying, pending match and needs-review are not failures: a later pass posts it.
-            if (!complete || report?.reviewCandidates?.any { it.rawSmsId == rawSmsId } == true) return RestoreResult.AwaitingReview
+            if (completeReport == null || completeReport.reviewCandidates.any { it.rawSmsId == rawSmsId }) return RestoreResult.AwaitingReview
             val rollbackReason = rollbackToIgnored(review.id, rawSmsId)
             return RestoreResult.Rejected(rollbackReason ?: "reconcile_failed")
         }
 
         try {
-            if (complete) reviewQueueUpdater?.applyReport(requireNotNull(report))
+            completeReport?.let { reviewQueueUpdater?.applyReport(it) }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
