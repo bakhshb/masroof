@@ -99,8 +99,8 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
         val security = otpEvidence(bodyText)
         if (security.isNotEmpty()) return Interpretation(input.evidenceId, version, bank, Facts(MessageFamily.OTP),
             ParseStatus.NON_FINANCIAL, null, security, emptySet())
-        val contextBlocks = listOfNotNull("PATTERN_EXECUTION_NOT_PROVEN".takeIf { hasUnprovenExecution(bodyText) },
-            "PATTERN_NOTICE_CONTEXT".takeIf { hasNoticeContext(bodyText) }, "PATTERN_QUOTED_MESSAGE_CONTEXT".takeIf { hasQuotedContext(bodyText) })
+        val contextBlocks by lazy { listOfNotNull("PATTERN_EXECUTION_NOT_PROVEN".takeIf { hasUnprovenExecution(bodyText) },
+            "PATTERN_NOTICE_CONTEXT".takeIf { hasNoticeContext(bodyText) }, "PATTERN_QUOTED_MESSAGE_CONTEXT".takeIf { hasQuotedContext(bodyText) }) }
         fun readTaught(pattern: SavedMessagePattern, preview: Preview): Interpretation {
             val contract = checkNotNull(pattern.factContract)
             if (contract.version !in 1..2 || (contract.version == 1 && (contract.accountBindings.isNotEmpty() || contract.contextReferences.isNotEmpty())))
@@ -239,6 +239,8 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
             return withLinks(roleResult, linked).copy(version = InterpretationVersion(1, "message-pattern-roles-v1", "$fingerprint:${stamp.id}:${stamp.revision}"),
                 patternProvenance = PatternProvenance(fingerprint, stamp.id, stamp.revision, emptySet(), false, roleProfile = true))
         }
+        // Without an active role rule (e.g. a learned family hint), a contradicting completion still never posts.
+        if (completion != null && !completesRole) return unresolved("PATTERN_CONFLICT", Blocker.CONFLICTING_FACTS)
         if (roleResult?.blockers?.contains(Blocker.CONFLICTING_FACTS) == true)
             return unresolved("PATTERN_PROFILE_CONTEXT_CONFLICT", Blocker.CONFLICTING_FACTS)
         if (matches.isEmpty()) return unresolved(if (taught.isEmpty()) "PATTERN_NOT_MATCHED" else "PATTERN_CONTRACT_MISSING")
@@ -258,17 +260,22 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
             last?.takeIf { it.source === configuration } ?: PatternFactInterpreter(configuration).also { last = it }
 
         /**
-         * The taught reading posts the same money as the role reading: family, direction, amount, accounts and card.
-         * A complete role reading must be matched exactly; an incomplete one only on the facts both read. Agreement is
-         * checked before [withLinks], which fills only roles the message left empty.
+         * The taught reading posts the same money as the role reading: family, direction, amount, accounts, card and
+         * time. A complete role reading must be matched exactly; an incomplete one only on the facts, or parts of a
+         * reference, both read. Agreement is checked before [withLinks], which fills only roles the message left empty.
          */
         private fun consistent(taught: Interpretation, role: Interpretation): Boolean {
             val complete = role.status == ParseStatus.SUCCESS
             fun same(taughtValue: Any?, roleValue: Any?) = taughtValue == roleValue || (!complete && (taughtValue == null || roleValue == null))
+            fun sameAccount(t: AccountReference?, r: AccountReference?) =
+                same(t, r) || (t != null && r != null && !complete && same(t.bank, r.bank) && same(t.maskedNumber, r.maskedNumber))
             val a = taught.facts
             val b = role.facts
-            return a.family == b.family && same(a.direction, b.direction) && same(a.amount, b.amount) &&
-                same(a.sourceAccount, b.sourceAccount) && same(a.destinationAccount, b.destinationAccount) && same(a.card, b.card)
+            val sameCard = same(a.card, b.card) || (a.card != null && b.card != null && !complete &&
+                same(a.card.bank, b.card.bank) && same(a.card.last4, b.card.last4))
+            return a.family == b.family && same(a.direction, b.direction) && same(a.amount, b.amount) && sameCard &&
+                sameAccount(a.sourceAccount, b.sourceAccount) && sameAccount(a.destinationAccount, b.destinationAccount) &&
+                same(a.occurredAtLocal, b.occurredAtLocal)
         }
 
         /**

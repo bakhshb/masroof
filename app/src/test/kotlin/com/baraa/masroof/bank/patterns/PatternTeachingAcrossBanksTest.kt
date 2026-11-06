@@ -122,10 +122,10 @@ class PatternTeachingAcrossBanksTest {
         val sample = samples.first()
         val input = input(barq, sample)
         assertEquals(ParseStatus.REVIEW_REQUIRED, PatternFactInterpreter(barq).interpretRouted(input, BankId("BANK_BARQ")).status)
-        // The slot reads 400.0 in the declared USD, so the amount differs from the built-in 400 SAR.
+        // The amount slot catches the card digits: 7271 SAR, not the built-in 400 SAR.
         val wrongAmount = Sample(sample.body, sample.family, sample.reference,
-            sample.fields.map { if (it.first == "amount") "amount" to "400.0" else it })
-        val config = taught(barq, wrongAmount, sample.family, linkedContract(barq, sample, sample.family).copy(currency = Currency.USD))
+            sample.fields.filter { it.first != "funding_reference" }.map { if (it.first == "amount") "amount" to "7271" else it })
+        val config = taught(barq, wrongAmount, sample.family, linkedContract(barq, sample, sample.family).copy(currency = Currency.SAR))
         val result = PatternFactInterpreter(config).interpretRouted(input, BankId("BANK_BARQ"))
         assertEquals(listOf("PATTERN_CONFLICT"), result.diagnostics.map { it.code })
     }
