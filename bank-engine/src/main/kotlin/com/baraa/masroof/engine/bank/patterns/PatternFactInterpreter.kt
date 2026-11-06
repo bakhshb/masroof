@@ -219,7 +219,8 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
                 .associate { span -> span.field.lowercase(Locale.ROOT) to TextSpan(span.slice(input), span.start, span.end) }
             observe(taught + activeRoles.map { it to Preview(it.label, roleFields) })
         }
-        // A taught pattern may complete an incomplete recognized role, never contradict what it read.
+        // A taught pattern may complete an incomplete active role rule, never contradict what it read. Beside a rule the
+        // user switched off, or a learned family hint only, the approved taught pattern reads the message as before.
         val completion = matches.singleOrNull()?.takeIf { (pattern, _) ->
             roleResult != null && roleResult.status != ParseStatus.SUCCESS && roleResult.facts.family != MessageFamily.UNKNOWN &&
                 pattern.factContract?.family == roleResult.facts.family
@@ -261,8 +262,8 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
             last?.takeIf { it.source === configuration } ?: PatternFactInterpreter(configuration).also { last = it }
 
         /**
-         * The taught reading posts the same money as the role reading: family, direction, amount, accounts, card and
-         * time. A complete role reading must be matched exactly; an incomplete one only on the facts, or account
+         * The taught reading posts the same money as the role reading: family, direction, amount, foreign amount and
+         * fee, accounts, card and time. A complete role reading must be matched exactly; an incomplete one only on the facts, or account
          * parts, both read. Agreement is checked before [withLinks], which fills only roles the message left empty.
          */
         private fun consistent(taught: Interpretation, role: Interpretation): Boolean {
@@ -274,7 +275,8 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
             val b = role.facts
             return a.family == b.family && same(a.direction, b.direction) && same(a.amount, b.amount) && same(a.card, b.card) &&
                 sameAccount(a.sourceAccount, b.sourceAccount) && sameAccount(a.destinationAccount, b.destinationAccount) &&
-                same(a.occurredAtLocal, b.occurredAtLocal)
+                same(a.occurredAtLocal, b.occurredAtLocal) && same(a.labeledForeignAmount, b.labeledForeignAmount) &&
+                same(a.internationalFee, b.internationalFee)
         }
 
         /**
