@@ -82,9 +82,8 @@ class TransactionRestoreService(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            // The row is posted; the retry pass reconciles this SMS again, so no type change races it.
+            // The row is posted; only the queue refresh retries. The type change below saves its own user decision.
             retainRetry(rawSmsId, failureCount = 1, stage = ReconciliationCompletionPolicy.STAGE_REVIEW_UPDATE)
-            return if (newType == null || newType == tx.type) RestoreResult.Success(tx) else RestoreResult.TypeNotChanged(tx)
         }
         if (newType == null || newType == tx.type) {
             logRestore(rawSmsId, tx.id, newType)

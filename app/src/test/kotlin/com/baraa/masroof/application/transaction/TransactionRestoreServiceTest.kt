@@ -104,23 +104,28 @@ class TransactionRestoreServiceTest {
     }
 
     @Test
-    fun restore_keepsThePostedRowWhenTheReviewQueueUpdateFails() = runBlocking {
+    fun restore_stillAppliesTheChosenTypeWhenTheReviewQueueUpdateFails() = runBlocking {
         val reviewRepo = TrackingReviewRepository(ignoredReview())
-        val txRepo = FailingUpdateRepository(sampleTransaction())
+        val txRepo = object : SingleTransactionRepository(sampleTransaction()) {
+            var updated: FinancialTransaction? = null
+            override suspend fun update(transaction: FinancialTransaction): Boolean { updated = transaction; return true }
+        }
         val service = SettingsViewModelTestSupport.restoreService(
             reviewRepository = reviewRepo,
             financialTransactionRepository = txRepo,
             clock = InstantClock { Instant.parse("2026-08-02T00:00:00Z") },
+            reclassificationEvents = object : EmptyParsedEventRepository() {
+                override suspend fun findByRawSmsId(rawSmsId: String) = purchaseRecord().takeIf { rawSmsId == "sms-1" }
+            },
             reviewQueueUpdater = com.baraa.masroof.application.review.ReviewQueueUpdater(
                 reviewRepo, txRepo, InstantClock { error("queue write failed") }),
         )
 
-        val result = service.restore("sms-1", FinancialTransactionType.INCOME)
+        val result = service.restore("sms-1", FinancialTransactionType.CASH_WITHDRAWAL)
 
-        // The row stays posted; the type is not changed while the retry pass is pending.
-        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction()), result)
+        assertEquals(FinancialTransactionType.CASH_WITHDRAWAL, txRepo.updated?.type)
+        assertTrue(result.toString(), result is RestoreResult.Success)
         assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
-        assertEquals(0, txRepo.deletes)
     }
 
     @Test
