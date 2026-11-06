@@ -275,7 +275,8 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
             val b = role.facts
             return a.family == b.family && same(a.direction, b.direction) && same(a.amount, b.amount) && same(a.card, b.card) &&
                 sameAccount(a.sourceAccount, b.sourceAccount) && sameAccount(a.destinationAccount, b.destinationAccount) &&
-                same(a.occurredAtLocal, b.occurredAtLocal) && same(a.labeledForeignAmount, b.labeledForeignAmount) &&
+                // A taught reading without a time posts at receipt, which contradicts a time the role read.
+                (a.occurredAtLocal == b.occurredAtLocal || b.occurredAtLocal == null) && same(a.labeledForeignAmount, b.labeledForeignAmount) &&
                 same(a.internationalFee, b.internationalFee)
         }
 
