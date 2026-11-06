@@ -19,7 +19,7 @@ sealed interface RestoreResult {
 
     data class Rejected(val reason: String) : RestoreResult
 
-    /** Restored as financial; it shows once processing finishes, or its other leg or an ownership answer arrives. */
+    /** Restored as financial but not posted yet: it posts once processing finishes, or its other leg or an ownership answer arrives. */
     data object AwaitingReview : RestoreResult
 
     /** Restored and posted, but the chosen type could not be applied; the user can change it on the transaction. */
@@ -82,9 +82,9 @@ class TransactionRestoreService(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            // The retry pass reconciles this SMS again, so the chosen type waits for the user, not this pass.
+            // The row is posted; the retry pass reconciles this SMS again, so no type change races it.
             retainRetry(rawSmsId, failureCount = 1, stage = ReconciliationCompletionPolicy.STAGE_REVIEW_UPDATE)
-            return RestoreResult.AwaitingReview
+            return if (newType == null || newType == tx.type) RestoreResult.Success(tx) else RestoreResult.TypeNotChanged(tx)
         }
         if (newType == null || newType == tx.type) {
             logRestore(rawSmsId, tx.id, newType)

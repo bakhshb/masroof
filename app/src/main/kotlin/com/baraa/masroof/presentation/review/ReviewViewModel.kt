@@ -75,7 +75,7 @@ class ReviewViewModel(
         // A slower load for the previous tab must not overwrite the current one.
         refreshJob?.cancel()
         refreshJob = launchLogged(appLogService, AppLogCategories.REVIEW, "Review refresh", onError = { _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) } }) {
-            _uiState.update { it.copy(loading = true, error = null, message = null) }
+            _uiState.update { it.copy(loading = true, error = null) }
             val summaries = loadCurrentSummaries()
             applySummaries(summaries)
         }

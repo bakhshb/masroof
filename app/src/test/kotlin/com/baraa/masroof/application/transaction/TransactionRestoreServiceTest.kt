@@ -104,7 +104,7 @@ class TransactionRestoreServiceTest {
     }
 
     @Test
-    fun restore_keepsThePostedRowAndRetriesWhenTheReviewQueueUpdateFails() = runBlocking {
+    fun restore_keepsThePostedRowWhenTheReviewQueueUpdateFails() = runBlocking {
         val reviewRepo = TrackingReviewRepository(ignoredReview())
         val txRepo = FailingUpdateRepository(sampleTransaction())
         val service = SettingsViewModelTestSupport.restoreService(
@@ -118,7 +118,7 @@ class TransactionRestoreServiceTest {
         val result = service.restore("sms-1", FinancialTransactionType.INCOME)
 
         // The row stays posted; the type is not changed while the retry pass is pending.
-        assertEquals(RestoreResult.AwaitingReview, result)
+        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction()), result)
         assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
         assertEquals(0, txRepo.deletes)
     }
