@@ -99,8 +99,9 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
         val security = otpEvidence(bodyText)
         if (security.isNotEmpty()) return Interpretation(input.evidenceId, version, bank, Facts(MessageFamily.OTP),
             ParseStatus.NON_FINANCIAL, null, security, emptySet())
-        /** One taught pattern's reading. [completing] is the incomplete role reading it fills in: amounts must match. */
-        fun readTaught(pattern: SavedMessagePattern, preview: Preview, completing: Facts?): Interpretation {
+        val contextBlocks = listOfNotNull("PATTERN_EXECUTION_NOT_PROVEN".takeIf { hasUnprovenExecution(bodyText) },
+            "PATTERN_NOTICE_CONTEXT".takeIf { hasNoticeContext(bodyText) }, "PATTERN_QUOTED_MESSAGE_CONTEXT".takeIf { hasQuotedContext(bodyText) })
+        fun readTaught(pattern: SavedMessagePattern, preview: Preview): Interpretation {
             val contract = checkNotNull(pattern.factContract)
             if (contract.version !in 1..2 || (contract.version == 1 && (contract.accountBindings.isNotEmpty() || contract.contextReferences.isNotEmpty())))
                 return unresolved("PATTERN_CONTRACT_UNSUPPORTED", Blocker.UNSUPPORTED_RULE_SCHEMA)
@@ -109,9 +110,7 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
             val diagnostics = mutableListOf<InterpretationDiagnostic>()
             val definitionFacts = mutableSetOf("FAMILY", "DIRECTION")
             fun block(code: String) { diagnostics += diagnostic(code) }
-            if (hasUnprovenExecution(bodyText)) block("PATTERN_EXECUTION_NOT_PROVEN")
-            if (hasNoticeContext(bodyText)) block("PATTERN_NOTICE_CONTEXT")
-            if (hasQuotedContext(bodyText)) block("PATTERN_QUOTED_MESSAGE_CONTEXT")
+            contextBlocks.forEach(::block)
             fun value(field: String) = preview.fields[field]?.raw
             fun normalized(field: String) = value(field)?.let { SourceText(it).text.trim() }
             val boundFields = mutableSetOf<String>()
@@ -187,7 +186,6 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
                 availableBalance = money("available_balance"), outstandingBalance = money("outstanding_balance"),
                 internationalFee = money("international_fee"), labeledForeignAmount = money("foreign_amount"))
             if (facts.amount == null) block("PATTERN_AMOUNT_MISSING")
-            if (completing?.amount != null && facts.amount != completing.amount) block("PATTERN_COMPLETION_AMOUNT_CONFLICT")
             val blockers = buildSet {
                 if (diagnostics.isNotEmpty()) add(Blocker.VALIDATION_ERROR)
                 if (facts.family == MessageFamily.UNKNOWN) add(Blocker.UNKNOWN_FAMILY)
@@ -221,13 +219,15 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
                 .associate { span -> span.field.lowercase(Locale.ROOT) to TextSpan(span.slice(input), span.start, span.end) }
             observe(taught + activeRoles.map { it to Preview(it.label, roleFields) })
         }
-        // A taught pattern may complete an incomplete recognized role of the same family, never contradict it.
-        val completesRole = roleResult != null && roleResult.status != ParseStatus.SUCCESS && matches.size == 1 &&
-            roleResult.facts.family != MessageFamily.UNKNOWN && matches.single().first.factContract?.family == roleResult.facts.family
+        // A taught pattern may complete an incomplete recognized role, never contradict what it read.
+        val completion = matches.singleOrNull()?.takeIf {
+            roleResult != null && roleResult.status != ParseStatus.SUCCESS && roleResult.facts.family != MessageFamily.UNKNOWN
+        }?.let { (pattern, preview) -> readTaught(pattern, preview) }
+        val completesRole = completion != null && consistent(completion, requireNotNull(roleResult))
         if (roleResult != null && !completesRole && (matches.isEmpty() || activeRoles.isNotEmpty())) {
-            // A complete role reading and every approved taught reading that agrees on the money facts is not a conflict.
-            if (matches.isNotEmpty() && (roleResult.status != ParseStatus.SUCCESS ||
-                    matches.any { (pattern, preview) -> !agrees(readTaught(pattern, preview, null), roleResult) }))
+            // A complete role reading that every approved taught reading repeats exactly is not a conflict.
+            if (matches.isNotEmpty() && (roleResult.status != ParseStatus.SUCCESS || !matches.all { (pattern, preview) ->
+                    readTaught(pattern, preview).let { it.status == ParseStatus.SUCCESS && consistent(it, roleResult) } }))
                 return unresolved("PATTERN_CONFLICT", Blocker.CONFLICTING_FACTS)
             val selected = activeRoles.firstOrNull() ?: roles.firstOrNull {
                 it.enabled && roleResult.familyInference != null && it.factContract?.family == roleResult.facts.family
@@ -244,7 +244,7 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
         if (matches.isEmpty()) return unresolved(if (taught.isEmpty()) "PATTERN_NOT_MATCHED" else "PATTERN_CONTRACT_MISSING")
         if (matches.size != 1) return unresolved("PATTERN_CONFLICT", Blocker.CONFLICTING_FACTS)
         val (pattern, preview) = matches.single()
-        return readTaught(pattern, preview, roleResult?.facts?.takeIf { completesRole })
+        return completion ?: readTaught(pattern, preview)
     }
 
     companion object {
@@ -258,18 +258,23 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
             last?.takeIf { it.source === configuration } ?: PatternFactInterpreter(configuration).also { last = it }
 
         /**
+         * The taught reading posts the same money as the role reading: family, direction, amount, accounts and card.
+         * A complete role reading must be matched exactly; an incomplete one only on the facts both read. Agreement is
+         * checked before [withLinks], which fills only roles the message left empty.
+         */
+        private fun consistent(taught: Interpretation, role: Interpretation): Boolean {
+            val complete = role.status == ParseStatus.SUCCESS
+            fun same(taughtValue: Any?, roleValue: Any?) = taughtValue == roleValue || (!complete && (taughtValue == null || roleValue == null))
+            val a = taught.facts
+            val b = role.facts
+            return a.family == b.family && same(a.direction, b.direction) && same(a.amount, b.amount) &&
+                same(a.sourceAccount, b.sourceAccount) && same(a.destinationAccount, b.destinationAccount) && same(a.card, b.card)
+        }
+
+        /**
          * Fills only a role the message left empty from the user's approved link; a value the message names stays
          * the message's. Purchases and refunds take only a card, never a funding account.
          */
-        /** Two complete readings that post the same money: family, direction, amount, accounts and card. */
-        private fun agrees(taught: Interpretation, role: Interpretation): Boolean {
-            val a = taught.facts
-            val b = role.facts
-            return taught.status == ParseStatus.SUCCESS && a.family == b.family && a.direction == b.direction &&
-                a.amount == b.amount && a.sourceAccount == b.sourceAccount && a.destinationAccount == b.destinationAccount &&
-                a.card == b.card
-        }
-
         internal fun withLinks(result: Interpretation, links: List<PatternAccountBinding>): Interpretation {
             if (links.isEmpty() || result.status == ParseStatus.NON_FINANCIAL) return result
             var facts = result.facts
