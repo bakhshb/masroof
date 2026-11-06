@@ -43,6 +43,7 @@ internal object SettingsViewModelTestSupport {
         financialTransactionRepository: FinancialTransactionRepository = emptyFinancialTransactionRepository(),
         clock: InstantClock = InstantClock.System,
         reclassificationEvents: ParsedEventRepository = emptyParsedEventRepository(),
+        reviewQueueUpdater: com.baraa.masroof.application.review.ReviewQueueUpdater? = null,
     ): TransactionRestoreService {
         val ownershipResolver = OwnershipResolver(
             accountRegistry = emptyAccountRegistry(),
@@ -67,6 +68,7 @@ internal object SettingsViewModelTestSupport {
                 ownershipResolver = ownershipResolver,
             ),
             clock = clock,
+            reviewQueueUpdater = reviewQueueUpdater,
         )
     }
 

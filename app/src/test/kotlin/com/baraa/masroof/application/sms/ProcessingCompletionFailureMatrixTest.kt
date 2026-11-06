@@ -290,11 +290,7 @@ class ProcessingCompletionFailureMatrixTest {
 
         val result = restore.restore(raw.id)
 
-        assertTrue(result is com.baraa.masroof.application.transaction.RestoreResult.Rejected)
-        assertEquals(
-            "reconciliation_incomplete",
-            (result as com.baraa.masroof.application.transaction.RestoreResult.Rejected).reason,
-        )
+        assertEquals(com.baraa.masroof.application.transaction.RestoreResult.AwaitingReview, result)
         assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, resolutionOf(raw.id))
         assertNull(harness.ftRepo.findByRawSmsId(raw.id))
         assertEquals(

@@ -2,7 +2,7 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>LongMethod:PatternFactInterpreter.kt:PatternFactInterpreter$private fun interpret: Interpretation</ID>
+    <ID>LongMethod:PatternFactInterpreter.kt:PatternFactInterpreter$fun readTaught: Interpretation</ID>
     <ID>LongMethod:RuleInterpreter.kt:RuleInterpreter$private fun interpretWithBank: Interpretation</ID>
   </CurrentIssues>
 </SmellBaseline>

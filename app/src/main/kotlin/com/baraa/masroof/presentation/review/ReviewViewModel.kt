@@ -242,30 +242,29 @@ class ReviewViewModel(
             }
         }) {
             _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
-            when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
-                // A failed type change still restored the message; the transaction shows the type it kept.
-                is RestoreResult.Success, RestoreResult.AwaitingReview, is RestoreResult.TypeNotChanged -> {
-                    val summaries = loadCurrentSummaries()
-                    applySummaries(summaries)
-                    _uiState.update {
-                        it.copy(
-                            loading = false,
-                            resolving = false,
-                            selectedDetail = null,
-                            message = ReviewMessage.RESTORED,
-                            error = null,
-                        )
-                    }
-                }
+            // A failed type change still restored the message; the transaction shows the type it kept.
+            val message = when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
                 is RestoreResult.Rejected -> {
                     _uiState.update {
-                        it.copy(
-                            resolving = false,
-                            error = ReviewError.ACTION_FAILED,
-                            actionErrorDetail = result.reason,
-                        )
+                        it.copy(resolving = false, error = ReviewError.ACTION_FAILED, actionErrorDetail = result.reason)
                     }
+                    return@launchLogged
                 }
+                is RestoreResult.Success -> ReviewMessage.RESTORED
+                // It posts later with the type the engine reads; the message says the type is changed from the transaction.
+                RestoreResult.AwaitingReview -> ReviewMessage.RESTORED_PENDING
+                is RestoreResult.TypeNotChanged -> ReviewMessage.RESTORED_TYPE_KEPT
+            }
+            val summaries = loadCurrentSummaries()
+            applySummaries(summaries)
+            _uiState.update {
+                it.copy(
+                    loading = false,
+                    resolving = false,
+                    selectedDetail = null,
+                    message = message,
+                    error = null,
+                )
             }
         }
     }

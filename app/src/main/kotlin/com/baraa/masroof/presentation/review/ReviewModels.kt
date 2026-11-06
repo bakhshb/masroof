@@ -1,5 +1,7 @@
 package com.baraa.masroof.presentation.review
 
+import androidx.annotation.StringRes
+import com.baraa.masroof.R
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -76,10 +78,13 @@ enum class ReviewError {
     ACTION_FAILED,
 }
 
-enum class ReviewMessage {
-    RESOLVED,
-    STILL_NEEDS_REVIEW,
-    RESTORED,
+/** [warning] outcomes left something for the user: shown with the warning style. */
+enum class ReviewMessage(@param:StringRes val label: Int, val warning: Boolean = false) {
+    RESOLVED(R.string.review_resolved),
+    STILL_NEEDS_REVIEW(R.string.review_still_pending, warning = true),
+    RESTORED(R.string.review_restored),
+    RESTORED_PENDING(R.string.review_restored_pending, warning = true),
+    RESTORED_TYPE_KEPT(R.string.review_restored_type_kept, warning = true),
 }
 
 val REVIEW_FINANCIAL_TYPE_ACTIONS: List<FinancialTransactionType> = listOf(

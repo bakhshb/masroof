@@ -89,19 +89,43 @@ class TransactionRestoreServiceTest {
     }
 
     @Test
-    fun restore_rollsBackWhenReclassifyFails() = runBlocking {
+    fun restore_keepsPostedRowWhenTheChosenTypeIsRejected() = runBlocking {
         val reviewRepo = TrackingReviewRepository(ignoredReview())
-        val tx = sampleTransaction()
-        val service = service(
-            reviewRepository = reviewRepo,
-            financialTransactionRepository = SingleTransactionRepository(tx),
-        )
+        // Deletes are counted: the old code rolled the restore back by deleting the posted row.
+        val txRepo = FailingUpdateRepository(sampleTransaction())
+        val service = service(reviewRepository = reviewRepo, financialTransactionRepository = txRepo)
 
+        // No parsed event: reclassification rejects with parsed_event_missing, a reason other than a failed write.
         val result = service.restore("sms-1", FinancialTransactionType.INCOME)
 
-        assertTrue(result is RestoreResult.Rejected)
-        assertEquals("parsed_event_missing", (result as RestoreResult.Rejected).reason)
-        assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, reviewRepo.lastResolutionKind)
+        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction()), result)
+        assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
+        assertEquals(0, txRepo.deletes)
+    }
+
+    @Test
+    fun restore_stillAppliesTheChosenTypeWhenTheReviewQueueUpdateFails() = runBlocking {
+        val reviewRepo = TrackingReviewRepository(ignoredReview())
+        val txRepo = object : SingleTransactionRepository(sampleTransaction()) {
+            var updated: FinancialTransaction? = null
+            override suspend fun update(transaction: FinancialTransaction): Boolean { updated = transaction; return true }
+        }
+        val service = SettingsViewModelTestSupport.restoreService(
+            reviewRepository = reviewRepo,
+            financialTransactionRepository = txRepo,
+            clock = InstantClock { Instant.parse("2026-08-02T00:00:00Z") },
+            reclassificationEvents = object : EmptyParsedEventRepository() {
+                override suspend fun findByRawSmsId(rawSmsId: String) = purchaseRecord().takeIf { rawSmsId == "sms-1" }
+            },
+            reviewQueueUpdater = com.baraa.masroof.application.review.ReviewQueueUpdater(
+                reviewRepo, txRepo, InstantClock { error("queue write failed") }),
+        )
+
+        val result = service.restore("sms-1", FinancialTransactionType.CASH_WITHDRAWAL)
+
+        assertEquals(FinancialTransactionType.CASH_WITHDRAWAL, txRepo.updated?.type)
+        assertTrue(result.toString(), result is RestoreResult.Success)
+        assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
     }
 
     @Test

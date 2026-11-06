@@ -207,6 +207,26 @@ class ReviewListRefreshTest {
     }
 
     @Test
+    fun restoreWithARejectedType_keepsTheRowAndSaysTheTypeWasKept() = runTest {
+        World().use { world ->
+            world.confirmCardOwned("7271")
+            world.persistPurchase(smsId = "sms-buy", eventId = "pe-buy", amount = "40.00", last4 = "7271")
+            val reviewId = world.requireReview("sms-buy", "user_ignored_transaction")
+            world.reviewRepo.markResolved(reviewId, ReviewResolutionKind.USER_NON_FINANCIAL, clock.now(), null)
+            val viewModel = world.viewModel
+
+            viewModel.openDetail(reviewId)
+            advanceUntilIdle()
+            viewModel.restoreIgnoredMessage(com.baraa.masroof.domain.model.FinancialTransactionType.LOAN_REPAYMENT)
+            advanceUntilIdle()
+
+            assertEquals(ReviewMessage.RESTORED_TYPE_KEPT, viewModel.uiState.value.message)
+            assertNull(viewModel.uiState.value.error)
+            assertEquals(com.baraa.masroof.domain.model.FinancialTransactionType.EXPENSE, world.transactions.findByRawSmsId("sms-buy")!!.type)
+        }
+    }
+
+    @Test
     fun correctionFollowUp_readsTheQueueWithoutFullReconciliation() = runTest {
         World().use { world ->
             world.confirmCardOwned("7271")

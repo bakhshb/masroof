@@ -99,6 +99,102 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
         val security = otpEvidence(bodyText)
         if (security.isNotEmpty()) return Interpretation(input.evidenceId, version, bank, Facts(MessageFamily.OTP),
             ParseStatus.NON_FINANCIAL, null, security, emptySet())
+        val contextBlocks by lazy { listOfNotNull("PATTERN_EXECUTION_NOT_PROVEN".takeIf { hasUnprovenExecution(bodyText) },
+            "PATTERN_NOTICE_CONTEXT".takeIf { hasNoticeContext(bodyText) }, "PATTERN_QUOTED_MESSAGE_CONTEXT".takeIf { hasQuotedContext(bodyText) }) }
+        fun readTaught(pattern: SavedMessagePattern, preview: Preview): Interpretation {
+            val contract = checkNotNull(pattern.factContract)
+            if (contract.version !in 1..2 || (contract.version == 1 && (contract.accountBindings.isNotEmpty() || contract.contextReferences.isNotEmpty())))
+                return unresolved("PATTERN_CONTRACT_UNSUPPORTED", Blocker.UNSUPPORTED_RULE_SCHEMA)
+
+            val evidence = preview.fields.map { (field, span) -> Evidence(pattern.id, field.uppercase(Locale.ROOT), span.start, span.end) }.toMutableList()
+            val diagnostics = mutableListOf<InterpretationDiagnostic>()
+            val definitionFacts = mutableSetOf("FAMILY", "DIRECTION")
+            fun block(code: String) { diagnostics += diagnostic(code) }
+            contextBlocks.forEach(::block)
+            fun value(field: String) = preview.fields[field]?.raw
+            fun normalized(field: String) = value(field)?.let { SourceText(it).text.trim() }
+            val boundFields = mutableSetOf<String>()
+            fun boundAccount(role: PatternAccountRole): AccountReference? {
+                val binding = contract.accountBindings.singleOrNull { it.role == role } ?: return null
+                if (binding.field != null) {
+                    if (normalized(binding.field)?.let(::unmaskedReference) != binding.observedValue) { block("PATTERN_ACCOUNT_BINDING_MISMATCH"); return null }
+                    boundFields += binding.field
+                }
+                definitionFacts += "${role.name}_ACCOUNT_IDENTITY"
+                definitionFacts += "${role.name}_ACCOUNT_BANK"
+                return AccountReference(binding.bank, binding.last4)
+            }
+            val sourceBinding = boundAccount(PatternAccountRole.SOURCE)
+            val destinationBinding = boundAccount(PatternAccountRole.DESTINATION)
+            fun money(field: String): Money? {
+                val raw = normalized(field) ?: return null
+                val match = MONEY.matchEntire(raw)
+                val number = match?.groups?.get(1)?.value ?: match?.groups?.get(4)?.value
+                val currencyText = match?.groups?.get(2)?.value ?: match?.groups?.get(3)?.value
+                val observedCurrency = currencyText?.let { if (it == "sr" || it.startsWith("ر")) Currency.SAR else Currency.valueOf(it.uppercase(Locale.ROOT)) }
+                val declaredCurrency = contract.currency.takeIf { field == "amount" }
+                if (observedCurrency != null && declaredCurrency != null && observedCurrency != declaredCurrency) {
+                    block("PATTERN_CURRENCY_CONFLICT"); return null
+                }
+                val currency = observedCurrency ?: declaredCurrency
+                val magnitude = number ?: raw.takeIf { DECIMAL.matches(it) }
+                if (currency == null || magnitude == null) { block("PATTERN_MONEY_INCOMPLETE"); return null }
+                if (observedCurrency == null) definitionFacts += "${field.uppercase(Locale.ROOT)}_CURRENCY"
+                else evidence += evidence.first { it.field == field.uppercase(Locale.ROOT) }.copy(field = "${field.uppercase(Locale.ROOT)}_CURRENCY")
+                return Money.of(magnitude.replace(",", ""), currency)
+            }
+            fun account(field: String, referenceBank: BankId?): AccountReference? {
+                if (field in contract.contextReferences || field in boundFields) return null
+                val raw = normalized(field)?.let(::unmaskedReference) ?: return null
+                if (!SUFFIX.matches(raw) || referenceBank == null) { block("PATTERN_ACCOUNT_REFERENCE_UNRESOLVED"); return null }
+                definitionFacts += "${field.uppercase(Locale.ROOT)}_BANK"
+                return AccountReference(referenceBank, raw)
+            }
+            val time = normalized("occurred_at")?.let { raw ->
+                val kind = pattern.parts.filterIsInstance<FieldSlot>().single { it.field == "occurred_at" }.kind
+                val parsed = kind.dateFormat?.let { format -> runCatching {
+                    LocalDateTime.parse(raw, DateTimeFormatter.ofPattern(format).withResolverStyle(ResolverStyle.STRICT))
+                }.getOrNull() }
+                if (parsed == null) block("PATTERN_TIME_INCOMPLETE")
+                parsed
+            }
+            val observedCard = normalized("card")?.let(::unmaskedReference)?.let {
+                if (!SUFFIX.matches(it) || contract.cardBank == null) { block("PATTERN_CARD_REFERENCE_UNRESOLVED"); null }
+                else { definitionFacts += "CARD_BANK"; CardReference(contract.cardBank, it) }
+            }
+            val cardLink = contract.accountBindings.singleOrNull { it.role == PatternAccountRole.CARD }
+                ?.takeIf { contract.family in CARD_LINKED }?.let { CardReference(it.bank, it.last4) }
+            if (cardLink != null && observedCard == null) definitionFacts += setOf("CARD_IDENTITY", "CARD_BANK")
+            val card = observedCard ?: cardLink
+            preview.fields.keys.filter { it !in SUPPORTED_FIELDS }.forEach { block("PATTERN_ROLE_UNSUPPORTED") }
+            // Neutral / counterparty references retain original evidence, without padding, ownership or a guessed bank.
+            if (preview.fields.keys.any { it in NEUTRAL_REFERENCES && it !in boundFields && it !in contract.contextReferences }) block("PATTERN_REFERENCE_ROLE_UNRESOLVED")
+            if (contract.contextReferences.any { it !in preview.fields && it !in pattern.optionalTextFields }) block("PATTERN_REFERENCE_CONTEXT_MISSING")
+            val receiptTime = "occurred_at" !in preview.fields
+            if (receiptTime && !input.durableSmsReceipt) block("PATTERN_RECEIPT_NOT_DURABLE")
+            if (contract.family == MessageFamily.UNKNOWN) block("PATTERN_FAMILY_UNKNOWN")
+            val sourceObserved = account("source_account", contract.sourceAccountBank)
+            val destinationObserved = account("destination_account", contract.destinationAccountBank)
+            if (sourceBinding != null && sourceObserved != null && sourceBinding != sourceObserved) block("PATTERN_ACCOUNT_BINDING_CONFLICT")
+            if (destinationBinding != null && destinationObserved != null && destinationBinding != destinationObserved) block("PATTERN_ACCOUNT_BINDING_CONFLICT")
+            val facts = Facts(contract.family, amount = money("amount"), direction = contract.direction,
+                sourceAccount = sourceBinding ?: sourceObserved,
+                destinationAccount = destinationBinding ?: destinationObserved, card = card,
+                merchant = value("merchant"), counterparty = value("counterparty"), biller = value("biller"),
+                billerCode = value("biller_code"), transactionReference = value("reference"), occurredAtLocal = time,
+                occurredAt = input.receivedAt.takeIf { receiptTime && input.durableSmsReceipt },
+                availableBalance = money("available_balance"), outstandingBalance = money("outstanding_balance"),
+                internationalFee = money("international_fee"), labeledForeignAmount = money("foreign_amount"))
+            if (facts.amount == null) block("PATTERN_AMOUNT_MISSING")
+            val blockers = buildSet {
+                if (diagnostics.isNotEmpty()) add(Blocker.VALIDATION_ERROR)
+                if (facts.family == MessageFamily.UNKNOWN) add(Blocker.UNKNOWN_FAMILY)
+            }
+            return Interpretation(input.evidenceId, version, bank, facts,
+                if (blockers.isEmpty()) ParseStatus.SUCCESS else ParseStatus.REVIEW_REQUIRED,
+                Confidence(1.0, emptyList()), evidence, blockers, diagnostics,
+                patternProvenance = PatternProvenance(fingerprint, pattern.id, pattern.revision, definitionFacts.toSet(), receiptTime))
+        }
         val taught = definition.currentPatterns.filter { it.roleProfile == null && it.sender in definition.senders }.mapNotNull { pattern ->
             // Use the pattern's declared sender only to invoke its body compiler, after routing.
             pattern.preview(bank.value, pattern.sender, input.body)?.let { pattern to it }
@@ -123,11 +219,20 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
                 .associate { span -> span.field.lowercase(Locale.ROOT) to TextSpan(span.slice(input), span.start, span.end) }
             observe(taught + activeRoles.map { it to Preview(it.label, roleFields) })
         }
-        // A taught pattern may complete an incomplete recognized role of the same family, never contradict it.
-        val completesRole = roleResult != null && roleResult.status != ParseStatus.SUCCESS && matches.size == 1 &&
-            roleResult.facts.family != MessageFamily.UNKNOWN && matches.single().first.factContract?.family == roleResult.facts.family
+        // A taught pattern may complete an incomplete active role rule, never contradict what it read. Beside a rule the
+        // user switched off, or a learned family hint only, the approved taught pattern reads the message as before.
+        val completion = matches.singleOrNull()?.takeIf { (pattern, _) ->
+            roleResult != null && roleResult.status != ParseStatus.SUCCESS && roleResult.facts.family != MessageFamily.UNKNOWN &&
+                pattern.factContract?.family == roleResult.facts.family
+        }?.let { (pattern, preview) -> readTaught(pattern, preview) }
+        // An unreadable contract (family UNKNOWN) keeps its own diagnostic rather than reading as a conflict.
+        val completesRole = completion != null &&
+            (completion.facts.family == MessageFamily.UNKNOWN || consistent(completion, requireNotNull(roleResult)))
         if (roleResult != null && !completesRole && (matches.isEmpty() || activeRoles.isNotEmpty())) {
-            if (matches.isNotEmpty()) return unresolved("PATTERN_CONFLICT", Blocker.CONFLICTING_FACTS)
+            // A complete role reading that every approved taught reading repeats exactly is not a conflict.
+            if (matches.isNotEmpty() && (roleResult.status != ParseStatus.SUCCESS || !matches.all { (pattern, preview) ->
+                    readTaught(pattern, preview).let { it.status == ParseStatus.SUCCESS && consistent(it, roleResult) } }))
+                return unresolved("PATTERN_CONFLICT", Blocker.CONFLICTING_FACTS)
             val selected = activeRoles.firstOrNull() ?: roles.firstOrNull {
                 it.enabled && roleResult.familyInference != null && it.factContract?.family == roleResult.facts.family
             }
@@ -143,100 +248,7 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
         if (matches.isEmpty()) return unresolved(if (taught.isEmpty()) "PATTERN_NOT_MATCHED" else "PATTERN_CONTRACT_MISSING")
         if (matches.size != 1) return unresolved("PATTERN_CONFLICT", Blocker.CONFLICTING_FACTS)
         val (pattern, preview) = matches.single()
-        val contract = checkNotNull(pattern.factContract)
-        if (contract.version !in 1..2 || (contract.version == 1 && (contract.accountBindings.isNotEmpty() || contract.contextReferences.isNotEmpty())))
-            return unresolved("PATTERN_CONTRACT_UNSUPPORTED", Blocker.UNSUPPORTED_RULE_SCHEMA)
-
-        val evidence = preview.fields.map { (field, span) -> Evidence(pattern.id, field.uppercase(Locale.ROOT), span.start, span.end) }.toMutableList()
-        val diagnostics = mutableListOf<InterpretationDiagnostic>()
-        val definitionFacts = mutableSetOf("FAMILY", "DIRECTION")
-        fun block(code: String) { diagnostics += diagnostic(code) }
-        if (hasUnprovenExecution(bodyText)) block("PATTERN_EXECUTION_NOT_PROVEN")
-        if (hasNoticeContext(bodyText)) block("PATTERN_NOTICE_CONTEXT")
-        if (hasQuotedContext(bodyText)) block("PATTERN_QUOTED_MESSAGE_CONTEXT")
-        fun value(field: String) = preview.fields[field]?.raw
-        fun normalized(field: String) = value(field)?.let { SourceText(it).text.trim() }
-        val boundFields = mutableSetOf<String>()
-        fun boundAccount(role: PatternAccountRole): AccountReference? {
-            val binding = contract.accountBindings.singleOrNull { it.role == role } ?: return null
-            if (binding.field != null) {
-                if (normalized(binding.field)?.let(::unmaskedReference) != binding.observedValue) { block("PATTERN_ACCOUNT_BINDING_MISMATCH"); return null }
-                boundFields += binding.field
-            }
-            definitionFacts += "${role.name}_ACCOUNT_IDENTITY"
-            definitionFacts += "${role.name}_ACCOUNT_BANK"
-            return AccountReference(binding.bank, binding.last4)
-        }
-        val sourceBinding = boundAccount(PatternAccountRole.SOURCE)
-        val destinationBinding = boundAccount(PatternAccountRole.DESTINATION)
-        fun money(field: String): Money? {
-            val raw = normalized(field) ?: return null
-            val match = MONEY.matchEntire(raw)
-            val number = match?.groups?.get(1)?.value ?: match?.groups?.get(4)?.value
-            val currencyText = match?.groups?.get(2)?.value ?: match?.groups?.get(3)?.value
-            val observedCurrency = currencyText?.let { if (it == "sr" || it.startsWith("ر")) Currency.SAR else Currency.valueOf(it.uppercase(Locale.ROOT)) }
-            val declaredCurrency = contract.currency.takeIf { field == "amount" }
-            if (observedCurrency != null && declaredCurrency != null && observedCurrency != declaredCurrency) {
-                block("PATTERN_CURRENCY_CONFLICT"); return null
-            }
-            val currency = observedCurrency ?: declaredCurrency
-            val magnitude = number ?: raw.takeIf { DECIMAL.matches(it) }
-            if (currency == null || magnitude == null) { block("PATTERN_MONEY_INCOMPLETE"); return null }
-            if (observedCurrency == null) definitionFacts += "${field.uppercase(Locale.ROOT)}_CURRENCY"
-            else evidence += evidence.first { it.field == field.uppercase(Locale.ROOT) }.copy(field = "${field.uppercase(Locale.ROOT)}_CURRENCY")
-            return Money.of(magnitude.replace(",", ""), currency)
-        }
-        fun account(field: String, referenceBank: BankId?): AccountReference? {
-            if (field in contract.contextReferences || field in boundFields) return null
-            val raw = normalized(field)?.let(::unmaskedReference) ?: return null
-            if (!SUFFIX.matches(raw) || referenceBank == null) { block("PATTERN_ACCOUNT_REFERENCE_UNRESOLVED"); return null }
-            definitionFacts += "${field.uppercase(Locale.ROOT)}_BANK"
-            return AccountReference(referenceBank, raw)
-        }
-        val time = normalized("occurred_at")?.let { raw ->
-            val kind = pattern.parts.filterIsInstance<FieldSlot>().single { it.field == "occurred_at" }.kind
-            val parsed = kind.dateFormat?.let { format -> runCatching {
-                LocalDateTime.parse(raw, DateTimeFormatter.ofPattern(format).withResolverStyle(ResolverStyle.STRICT))
-            }.getOrNull() }
-            if (parsed == null) block("PATTERN_TIME_INCOMPLETE")
-            parsed
-        }
-        val observedCard = normalized("card")?.let(::unmaskedReference)?.let {
-            if (!SUFFIX.matches(it) || contract.cardBank == null) { block("PATTERN_CARD_REFERENCE_UNRESOLVED"); null }
-            else { definitionFacts += "CARD_BANK"; CardReference(contract.cardBank, it) }
-        }
-        val cardLink = contract.accountBindings.singleOrNull { it.role == PatternAccountRole.CARD }
-            ?.takeIf { contract.family in CARD_LINKED }?.let { CardReference(it.bank, it.last4) }
-        if (cardLink != null && observedCard == null) definitionFacts += setOf("CARD_IDENTITY", "CARD_BANK")
-        val card = observedCard ?: cardLink
-        preview.fields.keys.filter { it !in SUPPORTED_FIELDS }.forEach { block("PATTERN_ROLE_UNSUPPORTED") }
-        // Neutral / counterparty references retain original evidence, without padding, ownership or a guessed bank.
-        if (preview.fields.keys.any { it in NEUTRAL_REFERENCES && it !in boundFields && it !in contract.contextReferences }) block("PATTERN_REFERENCE_ROLE_UNRESOLVED")
-        if (contract.contextReferences.any { it !in preview.fields && it !in pattern.optionalTextFields }) block("PATTERN_REFERENCE_CONTEXT_MISSING")
-        val receiptTime = "occurred_at" !in preview.fields
-        if (receiptTime && !input.durableSmsReceipt) block("PATTERN_RECEIPT_NOT_DURABLE")
-        if (contract.family == MessageFamily.UNKNOWN) block("PATTERN_FAMILY_UNKNOWN")
-        val sourceObserved = account("source_account", contract.sourceAccountBank)
-        val destinationObserved = account("destination_account", contract.destinationAccountBank)
-        if (sourceBinding != null && sourceObserved != null && sourceBinding != sourceObserved) block("PATTERN_ACCOUNT_BINDING_CONFLICT")
-        if (destinationBinding != null && destinationObserved != null && destinationBinding != destinationObserved) block("PATTERN_ACCOUNT_BINDING_CONFLICT")
-        val facts = Facts(contract.family, amount = money("amount"), direction = contract.direction,
-            sourceAccount = sourceBinding ?: sourceObserved,
-            destinationAccount = destinationBinding ?: destinationObserved, card = card,
-            merchant = value("merchant"), counterparty = value("counterparty"), biller = value("biller"),
-            billerCode = value("biller_code"), transactionReference = value("reference"), occurredAtLocal = time,
-            occurredAt = input.receivedAt.takeIf { receiptTime && input.durableSmsReceipt },
-            availableBalance = money("available_balance"), outstandingBalance = money("outstanding_balance"),
-            internationalFee = money("international_fee"), labeledForeignAmount = money("foreign_amount"))
-        if (facts.amount == null) block("PATTERN_AMOUNT_MISSING")
-        val blockers = buildSet {
-            if (diagnostics.isNotEmpty()) add(Blocker.VALIDATION_ERROR)
-            if (facts.family == MessageFamily.UNKNOWN) add(Blocker.UNKNOWN_FAMILY)
-        }
-        return Interpretation(input.evidenceId, version, bank, facts,
-            if (blockers.isEmpty()) ParseStatus.SUCCESS else ParseStatus.REVIEW_REQUIRED,
-            Confidence(1.0, emptyList()), evidence, blockers, diagnostics,
-            patternProvenance = PatternProvenance(fingerprint, pattern.id, pattern.revision, definitionFacts.toSet(), receiptTime))
+        return completion ?: readTaught(pattern, preview)
     }
 
     companion object {
@@ -248,6 +260,25 @@ class PatternFactInterpreter(private val source: MessagePatternConfiguration) {
          */
         fun of(configuration: MessagePatternConfiguration): PatternFactInterpreter =
             last?.takeIf { it.source === configuration } ?: PatternFactInterpreter(configuration).also { last = it }
+
+        /**
+         * The taught reading posts the same money as the role reading: family, direction, amount, foreign amount and
+         * fee, accounts, card and time. A complete role reading must be matched exactly; an incomplete one only on the facts, or account
+         * parts, both read. Agreement is checked before [withLinks], which fills only roles the message left empty.
+         */
+        private fun consistent(taught: Interpretation, role: Interpretation): Boolean {
+            val complete = role.status == ParseStatus.SUCCESS
+            fun same(taughtValue: Any?, roleValue: Any?) = taughtValue == roleValue || (!complete && (taughtValue == null || roleValue == null))
+            fun sameAccount(t: AccountReference?, r: AccountReference?) =
+                same(t, r) || (t != null && r != null && !complete && same(t.bank, r.bank) && same(t.maskedNumber, r.maskedNumber))
+            val a = taught.facts
+            val b = role.facts
+            return a.family == b.family && same(a.direction, b.direction) && same(a.amount, b.amount) && same(a.card, b.card) &&
+                sameAccount(a.sourceAccount, b.sourceAccount) && sameAccount(a.destinationAccount, b.destinationAccount) &&
+                // A taught reading without a time posts at receipt, which contradicts a time the role read.
+                (a.occurredAtLocal == b.occurredAtLocal || b.occurredAtLocal == null) && same(a.labeledForeignAmount, b.labeledForeignAmount) &&
+                same(a.internationalFee, b.internationalFee)
+        }
 
         /**
          * Fills only a role the message left empty from the user's approved link; a value the message names stays
