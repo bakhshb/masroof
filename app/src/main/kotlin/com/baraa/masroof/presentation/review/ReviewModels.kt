@@ -76,12 +76,13 @@ enum class ReviewError {
     ACTION_FAILED,
 }
 
-enum class ReviewMessage {
+/** [warning] outcomes left something for the user: shown with the warning style. */
+enum class ReviewMessage(val warning: Boolean = false) {
     RESOLVED,
-    STILL_NEEDS_REVIEW,
+    STILL_NEEDS_REVIEW(warning = true),
     RESTORED,
-    RESTORED_PENDING,
-    RESTORED_TYPE_KEPT,
+    RESTORED_PENDING(warning = true),
+    RESTORED_TYPE_KEPT(warning = true),
 }
 
 val REVIEW_FINANCIAL_TYPE_ACTIONS: List<FinancialTransactionType> = listOf(

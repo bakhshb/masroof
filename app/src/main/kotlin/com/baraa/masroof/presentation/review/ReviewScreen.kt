@@ -169,7 +169,7 @@ internal fun ReviewListScreen(
                 )
             }
             // An action that closed its message reports its outcome here.
-            state.message?.let { ReviewMessageRow(it, state.actionErrorDetail.takeIf { state.error == null }) }
+            state.message?.let { ReviewMessageRow(it) }
             when {
             state.loading && state.items.isEmpty() -> {
                 Column(
@@ -551,7 +551,7 @@ internal fun ReviewDetailScreen(
                 }
             }
 
-            message?.let { ReviewMessageRow(it, actionErrorDetail.takeIf { error == null }) }
+            message?.let { ReviewMessageRow(it) }
             if (error == ReviewError.ACTION_FAILED) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -579,10 +579,10 @@ internal fun ReviewDetailScreen(
     }
 }
 
-/** The outcome of the last action; [detail] is a reason code shown only when it has a label. */
+/** The outcome of the last action. */
 @Composable
-private fun ReviewMessageRow(message: ReviewMessage, detail: String?) {
-    val warning = message == ReviewMessage.STILL_NEEDS_REVIEW || message == ReviewMessage.RESTORED_TYPE_KEPT
+private fun ReviewMessageRow(message: ReviewMessage) {
+    val warning = message.warning
     val tint = if (warning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
@@ -603,9 +603,6 @@ private fun ReviewMessageRow(message: ReviewMessage, detail: String?) {
             ),
             color = tint,
         )
-    }
-    detail?.let(ReviewReasonLabels::labelRes)?.let {
-        Text(stringResource(it), color = tint, style = MaterialTheme.typography.bodySmall)
     }
 }
 

@@ -22,8 +22,8 @@ sealed interface RestoreResult {
     /** Restored as financial; it shows once processing finishes, or its other leg or an ownership answer arrives. */
     data object AwaitingReview : RestoreResult
 
-    /** Restored and posted, but the chosen type could not be applied ([reason]); the user can change it on the transaction. */
-    data class TypeNotChanged(val transaction: FinancialTransaction, val reason: String) : RestoreResult
+    /** Restored and posted, but the chosen type could not be applied; the user can change it on the transaction. */
+    data class TypeNotChanged(val transaction: FinancialTransaction) : RestoreResult
 }
 
 /**
@@ -82,8 +82,9 @@ class TransactionRestoreService(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            // The row is posted; only the queue refresh retries, so the chosen type still applies below.
+            // The retry pass reconciles this SMS again, so the chosen type waits for the user, not this pass.
             retainRetry(rawSmsId, failureCount = 1, stage = ReconciliationCompletionPolicy.STAGE_REVIEW_UPDATE)
+            return RestoreResult.AwaitingReview
         }
         if (newType == null || newType == tx.type) {
             logRestore(rawSmsId, tx.id, newType)
@@ -98,7 +99,7 @@ class TransactionRestoreService(
             // The restore itself succeeded: keep the posted row and the financial decision; only the type change failed.
             is ReclassificationResult.Rejected -> {
                 logRestore(rawSmsId, tx.id, null)
-                RestoreResult.TypeNotChanged(tx, result.reason)
+                RestoreResult.TypeNotChanged(tx)
             }
         }
     }

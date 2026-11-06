@@ -75,7 +75,7 @@ class ReviewViewModel(
         // A slower load for the previous tab must not overwrite the current one.
         refreshJob?.cancel()
         refreshJob = launchLogged(appLogService, AppLogCategories.REVIEW, "Review refresh", onError = { _uiState.update { it.copy(loading = false, error = ReviewError.LOAD_FAILED) } }) {
-            _uiState.update { it.copy(loading = true, error = null) }
+            _uiState.update { it.copy(loading = true, error = null, message = null) }
             val summaries = loadCurrentSummaries()
             applySummaries(summaries)
         }
@@ -243,18 +243,17 @@ class ReviewViewModel(
         }) {
             _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
             // A failed type change still restored the message; the transaction shows the type it kept.
-            val (message, detail) = when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
+            val message = when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
                 is RestoreResult.Rejected -> {
                     _uiState.update {
                         it.copy(resolving = false, error = ReviewError.ACTION_FAILED, actionErrorDetail = result.reason)
                     }
                     return@launchLogged
                 }
-                is RestoreResult.Success -> ReviewMessage.RESTORED to null
-                // It posts later with the type the engine reads; a chosen type is not kept for that pass.
-                RestoreResult.AwaitingReview ->
-                    (if (newType == null) ReviewMessage.RESTORED_PENDING else ReviewMessage.RESTORED_TYPE_KEPT) to null
-                is RestoreResult.TypeNotChanged -> ReviewMessage.RESTORED_TYPE_KEPT to result.reason
+                is RestoreResult.Success -> ReviewMessage.RESTORED
+                // It posts later with the type the engine reads; the message says the type is changed from the transaction.
+                RestoreResult.AwaitingReview -> ReviewMessage.RESTORED_PENDING
+                is RestoreResult.TypeNotChanged -> ReviewMessage.RESTORED_TYPE_KEPT
             }
             val summaries = loadCurrentSummaries()
             applySummaries(summaries)
@@ -264,7 +263,6 @@ class ReviewViewModel(
                     resolving = false,
                     selectedDetail = null,
                     message = message,
-                    actionErrorDetail = detail,
                     error = null,
                 )
             }

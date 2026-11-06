@@ -98,13 +98,13 @@ class TransactionRestoreServiceTest {
         // No parsed event: reclassification rejects with parsed_event_missing, a reason other than a failed write.
         val result = service.restore("sms-1", FinancialTransactionType.INCOME)
 
-        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction(), "parsed_event_missing"), result)
+        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction()), result)
         assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
         assertEquals(0, txRepo.deletes)
     }
 
     @Test
-    fun restore_stillAppliesTheChosenTypeWhenTheReviewQueueUpdateFails() = runBlocking {
+    fun restore_keepsThePostedRowAndRetriesWhenTheReviewQueueUpdateFails() = runBlocking {
         val reviewRepo = TrackingReviewRepository(ignoredReview())
         val txRepo = FailingUpdateRepository(sampleTransaction())
         val service = SettingsViewModelTestSupport.restoreService(
@@ -117,8 +117,8 @@ class TransactionRestoreServiceTest {
 
         val result = service.restore("sms-1", FinancialTransactionType.INCOME)
 
-        // The row stays posted and the type change is still attempted (here it is refused: no parsed event).
-        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction(), "parsed_event_missing"), result)
+        // The row stays posted; the type is not changed while the retry pass is pending.
+        assertEquals(RestoreResult.AwaitingReview, result)
         assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
         assertEquals(0, txRepo.deletes)
     }
@@ -138,7 +138,7 @@ class TransactionRestoreServiceTest {
 
         val result = service.restore("sms-1", FinancialTransactionType.INCOME)
 
-        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction(), "update_failed"), result)
+        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction()), result)
         assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
         assertEquals(0, txRepo.deletes)
     }
