@@ -5,12 +5,13 @@ Reference: `docs/ARCHITECTURE.md` (modules), `docs/DESIGN_SYSTEM.md` (UI), `docs
 This file wins when older records disagree.
 
 ## Workflow
-Every change runs this loop; stop only when both reviews come back clean.
-1. Plan: what changes and how we know it is done (checks a person can run). A screen design first gets an interactive design artifact the owner confirms.
-2. Implement.
-3. Review for simplification (`/simplify`).
-4. Review for bugs (`/code-review`).
-5. Fix what both found, then repeat 3-5 until neither finds anything.
+Run this for each plan phase:
+1. Plan: what changes and the tests that prove it is done. Any change to numbers or behavior the owner sees is asked before implementing. A screen design first gets an interactive design artifact the owner confirms.
+2. Implement with its tests, and run them.
+3. Simplify the code and its tests once (`/simplify`), and rerun the tests.
+4. Review for bugs (`/code-review`), fix, rerun the tests; repeat until the review finds no real bug. Owner decisions are reported, not looped on.
+
+At the end of the PR: one review of the whole PR, then CI green including device tests, then report done.
 
 ## Never break
 - Database `masroof.db` stays schema v18 with the same identity hash; reject other database/backup schemas, no destructive fallback, no migrations or backfills. A schema change needs an explicit design and device verification.
