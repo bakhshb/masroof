@@ -242,14 +242,16 @@ class ReviewViewModel(
             }
         }) {
             _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
-            when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
-                // A failed type change still restored the message; the transaction shows the type it kept.
-                is RestoreResult.Success, RestoreResult.AwaitingReview, is RestoreResult.TypeNotChanged -> {
-                    val message = when (result) {
-                        RestoreResult.AwaitingReview -> ReviewMessage.RESTORED_PENDING
-                        is RestoreResult.TypeNotChanged -> ReviewMessage.RESTORED_TYPE_KEPT
-                        else -> ReviewMessage.RESTORED
-                    }
+            val result = transactionRestoreService.restore(rawSmsId, newType)
+            // A failed type change still restored the message; the transaction shows the type it kept.
+            val message = when (result) {
+                is RestoreResult.Success -> ReviewMessage.RESTORED
+                RestoreResult.AwaitingReview -> ReviewMessage.RESTORED_PENDING
+                is RestoreResult.TypeNotChanged -> ReviewMessage.RESTORED_TYPE_KEPT
+                is RestoreResult.Rejected -> null
+            }
+            when {
+                message != null -> {
                     val summaries = loadCurrentSummaries()
                     applySummaries(summaries)
                     _uiState.update {
@@ -262,7 +264,7 @@ class ReviewViewModel(
                         )
                     }
                 }
-                is RestoreResult.Rejected -> {
+                result is RestoreResult.Rejected -> {
                     _uiState.update {
                         it.copy(
                             resolving = false,

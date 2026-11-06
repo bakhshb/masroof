@@ -549,50 +549,29 @@ internal fun ReviewDetailScreen(
                 }
             }
 
-            when (message) {
-                ReviewMessage.RESOLVED -> Row(verticalAlignment = Alignment.CenterVertically) {
+            message?.let { shown ->
+                val warning = shown == ReviewMessage.STILL_NEEDS_REVIEW
+                val tint = if (warning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = MasroofIcons.success,
+                        imageVector = if (warning) MasroofIcons.warning else MasroofIcons.success,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
-                    Text(
-                        stringResource(R.string.review_resolved),
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                ReviewMessage.STILL_NEEDS_REVIEW -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = MasroofIcons.warning,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                    )
-                    Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
-                    Text(
-                        stringResource(R.string.review_still_pending),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-                ReviewMessage.RESTORED, ReviewMessage.RESTORED_PENDING, ReviewMessage.RESTORED_TYPE_KEPT -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = MasroofIcons.success,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = tint,
                     )
                     Spacer(Modifier.size(MasroofSpacing.compactCardLabelTop))
                     Text(
                         stringResource(
-                            when (message) {
+                            when (shown) {
+                                ReviewMessage.RESOLVED -> R.string.review_resolved
+                                ReviewMessage.STILL_NEEDS_REVIEW -> R.string.review_still_pending
+                                ReviewMessage.RESTORED -> R.string.review_restored
                                 ReviewMessage.RESTORED_PENDING -> R.string.review_restored_pending
                                 ReviewMessage.RESTORED_TYPE_KEPT -> R.string.review_restored_type_kept
-                                else -> R.string.review_restored
                             },
                         ),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = tint,
                     )
                 }
-                null -> Unit
             }
             if (error == ReviewError.ACTION_FAILED) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
