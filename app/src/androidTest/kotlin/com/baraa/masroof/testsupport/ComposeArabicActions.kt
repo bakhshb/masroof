@@ -14,8 +14,9 @@ fun AndroidComposeTestRule<*, *>.ar(id: Int): String = AppLocaleContext.wrap(act
 /** Waits for the Arabic label [id], scrolls to it when hidden, clicks it and waits for idle. */
 fun AndroidComposeTestRule<*, *>.clickAr(id: Int) {
     // Screens load in the background, outside Compose idling; wait for the node before acting on it.
-    waitUntil(10_000) { onAllNodesWithText(ar(id)).fetchSemanticsNodes().isNotEmpty() }
-    val node = onNodeWithText(ar(id))
+    val label = ar(id)
+    waitUntil(10_000) { onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty() }
+    val node = onNodeWithText(label)
     if (runCatching { node.assertIsDisplayed() }.isFailure) node.performScrollTo()
     node.performClick()
     waitForIdle()

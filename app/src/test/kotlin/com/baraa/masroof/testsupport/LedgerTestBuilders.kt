@@ -58,7 +58,8 @@ internal fun tx(
 internal fun parsedRecord(
     id: String,
     family: MessageFamily = MessageFamily.PURCHASE,
-    direction: MoneyDirection? = MoneyDirection.OUTGOING,
+    // Same rule as event(): a transfer in is incoming unless the test says otherwise.
+    direction: MoneyDirection? = if (family == MessageFamily.TRANSFER_IN) MoneyDirection.INCOMING else MoneyDirection.OUTGOING,
     amount: Money? = Money.of("1.00", Currency.SAR),
     sourceLast4: String? = null,
     destinationLast4: String? = null,

@@ -12,8 +12,8 @@ import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 
 /**
- * Facade over [CaptureBankSmsUseCase] (durable RawSms) and [ProcessStoredSmsUseCase]
- * (parse and derived processing). Production capture and processing use the two use cases directly.
+ * Bulk-maintenance wrapper: production only calls [reparseAndStore]. Capture and processing use
+ * [CaptureBankSmsUseCase] and [ProcessStoredSmsUseCase] directly; tests capture-then-process with the `ingest` helper.
  */
 class ProcessRawSmsUseCase(
     internal val capture: CaptureBankSmsUseCase,
