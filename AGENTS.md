@@ -8,7 +8,7 @@ This file wins when older records disagree.
 Run this for each plan phase:
 1. Plan: what changes and the tests that prove it is done. Any change to numbers or behavior the owner sees is asked before implementing. A screen design first gets an interactive design artifact the owner confirms.
 2. Implement with its tests, and run them.
-3. Simplify the code and its tests once (`/simplify`).
+3. Simplify the code and its tests once (`/simplify`), and rerun the tests.
 4. Review for bugs (`/code-review`), fix, rerun the tests; repeat until the review finds no real bug. Owner decisions are reported, not looped on.
 
 At the end of the PR: one review of the whole PR, then CI green including device tests, then report done.
