@@ -91,4 +91,47 @@ class PatternTeachingAcrossBanksTest {
         assertEquals(0, topUp.facts.amount!!.amount.compareTo("400".toBigDecimal()))
         assertEquals(com.baraa.masroof.engine.bank.BankNetwork.INTER_BANK, topUp.facts.bankNetwork)
     }
+
+    private fun withPattern(base: MessagePatternConfiguration, body: String, family: MessageFamily,
+        fields: List<Pair<String, String>>, contract: PatternFactContract): MessagePatternConfiguration {
+        val bank = base.banks.single()
+        val choices = fields.map { (field, value) -> body.indexOf(value).let { FieldChoice(field, it, it + value.length) } }
+        val pattern = SavedMessagePattern.fromChoices("user.taught", bank.bankId, bank.senders.first(), family.name, body, choices)
+        return base.copy(banks = listOf(bank.copy(patterns = bank.patterns + pattern.copy(factContract = contract))))
+    }
+
+    @Test fun aTaughtReadingThatAgreesWithACompleteBuiltInPostsInsteadOfConflicting() {
+        val aljazira = bundled.single { it.banks.single().bankId == "BANK_ALJAZIRA" }
+        val body = "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nمبلغ: SAR 60.99\nلدى: TEST\nفي: 2026-10-06 13:57"
+        val input = MessageInput("taught", aljazira.banks.single().senders.first(), body, Instant.EPOCH, true)
+        val builtIn = PatternFactInterpreter(aljazira).interpretRouted(input, BankId("BANK_ALJAZIRA"))
+        assertEquals(builtIn.diagnostics.toString(), ParseStatus.SUCCESS, builtIn.status)
+        fun teach(amount: String) = withPattern(aljazira, body, MessageFamily.PURCHASE,
+            listOf("card" to "7271", "amount" to amount, "merchant" to "TEST", "occurred_at" to "2026-10-06 13:57"),
+            PatternFactContract(MessageFamily.PURCHASE, MoneyDirection.OUTGOING, cardBank = BankId("BANK_ALJAZIRA")))
+
+        val agreeing = PatternFactInterpreter(teach("SAR 60.99")).interpretRouted(input, BankId("BANK_ALJAZIRA"))
+        assertEquals(agreeing.diagnostics.toString(), ParseStatus.SUCCESS, agreeing.status)
+        assertEquals(builtIn.facts, agreeing.facts)
+
+        // A different amount (here a slot ending early) is still a conflict for the user to settle.
+        val disagreeing = PatternFactInterpreter(teach("SAR 60.9")).interpretRouted(input, BankId("BANK_ALJAZIRA"))
+        assertEquals(listOf("PATTERN_CONFLICT"), disagreeing.diagnostics.map { it.code })
+    }
+
+    @Test fun aTaughtPatternCompletingABuiltInReadingMustReadTheSameAmount() {
+        val barq = bundled.single { it.banks.single().bankId == "BANK_BARQ" }
+        val sample = samples.first()
+        val input = input(barq, sample)
+        assertEquals(ParseStatus.REVIEW_REQUIRED, PatternFactInterpreter(barq).interpretRouted(input, BankId("BANK_BARQ")).status)
+        val wrongAmount = Sample(sample.body, sample.family, sample.reference,
+            sample.fields.map { if (it.first == "amount") "amount" to "400.0" else it })
+        val result = PatternFactInterpreter(taught(barq, wrongAmount, sample.family).let { config ->
+            // The slot reads 400.0 with the declared currency USD, so the amount differs from the built-in 400 SAR.
+            config.copy(banks = config.banks.map { bank -> bank.copy(patterns = bank.patterns.map { p ->
+                if (p.id != "user.taught") p else p.copy(factContract = p.factContract!!.copy(currency = com.baraa.masroof.finance.value.Currency.USD)) }) })
+        }).interpretRouted(input, BankId("BANK_BARQ"))
+        assertEquals(ParseStatus.REVIEW_REQUIRED, result.status)
+        assertTrue(result.diagnostics.map { it.code }.toString(), result.diagnostics.any { it.code == "PATTERN_COMPLETION_AMOUNT_CONFLICT" })
+    }
 }
