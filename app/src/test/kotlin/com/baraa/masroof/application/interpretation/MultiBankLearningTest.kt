@@ -16,6 +16,7 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.testsupport.TestStorageContext
+import com.baraa.masroof.testsupport.ingest
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -86,6 +87,20 @@ class MultiBankLearningTest {
             repeat(50) { if (!settled) {
                 service.synchronizeFeedback(); settled = !service.needsRefresh(unknown); if (!settled) kotlinx.coroutines.delay(100) } }
             assertTrue(settled)
+
+            // Every bank with role rules re-reads its waiting messages after a rules change, not only AlJazira.
+            c.processRawSmsUseCase.ingest(raw("snb-unknown", "عزيزنا العميل رسالة غير مفهومة 456"))
+            val snbUnknown = requireNotNull(c.parsedEventRepository.findByRawSmsId("snb-unknown"))
+            assertEquals("UNKNOWN", snbUnknown.event.messageFamily.name)
+            val olderRules = snbUnknown.copy(event = snbUnknown.event.copy(confidence = snbUnknown.event.confidence.copy(
+                reasons = snbUnknown.event.confidence.reasons.map { if (it.startsWith("rules:")) "rules:older" else it })))
+            assertTrue(service.needsRefresh(olderRules))
+
+            // A bank the user adds gets the same learning as a bundled one.
+            val generation = c.messagePatternsWorkflow.load().generation
+            c.messagePatternsWorkflow.addBank(generation, "My bank", "MYBANK")
+            val added = c.messagePatternsWorkflow.load().banks.single { it.displayName == "My bank" }.bankId
+            assertTrue(added in service.assistedBanks())
         } finally {
             c.close()
             WorkManagerTestInitHelper.closeWorkDatabase()

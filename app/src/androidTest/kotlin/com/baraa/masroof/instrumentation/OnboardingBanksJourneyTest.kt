@@ -23,6 +23,7 @@ import com.baraa.masroof.sms.datasource.InboxRow
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.testsupport.ScreenshotArtifactWriter
 import com.baraa.masroof.testsupport.TestStorageContext
+import com.baraa.masroof.testsupport.ar
 import com.baraa.masroof.ui.theme.MasroofTheme
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
@@ -34,9 +35,8 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class OnboardingBanksJourneyTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
-    private fun ar(id: Int) = AppLocaleContext.wrap(compose.activity, "ar").getString(id)
     private fun click(id: Int) {
-        val label = ar(id)
+        val label = compose.ar(id)
         compose.waitForIdle()
         if (compose.onAllNodesWithText(label).fetchSemanticsNodes().isEmpty() &&
             compose.onAllNodes(hasScrollToNodeAction()).fetchSemanticsNodes().isNotEmpty()) {
@@ -84,7 +84,7 @@ class OnboardingBanksJourneyTest {
             click(R.string.reference_start_setup)
             assertEquals(OnboardingStep.BANKS, vm.uiState.value.step)
             assertTrue(vm.uiState.value.selectedBankIds.isEmpty())
-            compose.onNodeWithText(ar(R.string.teaching_next)).assertIsNotEnabled()
+            compose.onNodeWithText(compose.ar(R.string.teaching_next)).assertIsNotEnabled()
             capture("choose-banks")
             click(R.string.settings_add_bank)
             input("bank-name", "بنك التجربة")
@@ -110,7 +110,7 @@ class OnboardingBanksJourneyTest {
             click(R.string.onboarding_start_import)
             compose.waitUntil(10_000) { vm.uiState.value.step == OnboardingStep.OWNERSHIP && !settings.uiState.value.loading }
             assertEquals(1, queries.get())
-            compose.onNodeWithText(ar(R.string.onboarding_bank_teach_later)).performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText(compose.ar(R.string.onboarding_bank_teach_later)).performScrollTo().assertIsDisplayed()
             capture("bank-needs-teaching")
 
             click(R.string.onboarding_add_manual)

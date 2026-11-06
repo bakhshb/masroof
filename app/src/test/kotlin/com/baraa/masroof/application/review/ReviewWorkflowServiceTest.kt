@@ -23,7 +23,6 @@ import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
@@ -33,7 +32,6 @@ import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.PurchaseChannel
 import com.baraa.masroof.domain.model.RawSms
@@ -45,6 +43,7 @@ import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.time.InstantClock
+import com.baraa.masroof.testsupport.event
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -479,6 +478,7 @@ class ReviewWorkflowServiceTest {
                 source = AccountReference(Bank.UNKNOWN, "9999"),
                 destination = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
                 network = BankNetworkType.INTER_BANK,
+                direction = MoneyDirection.OUTGOING,
             ),
         )
         reviewRepo.upsertRequired(
@@ -525,6 +525,7 @@ class ReviewWorkflowServiceTest {
                 amount = money("500.00"),
                 destination = AccountReference(Bank("D360"), "6810"),
                 network = BankNetworkType.INTER_BANK,
+                direction = MoneyDirection.OUTGOING,
             ),
         )
         reviewRepo.upsertRequired(
@@ -578,6 +579,7 @@ class ReviewWorkflowServiceTest {
                 id = "pe-in", rawSmsId = "sms-in", bank = Bank("D360"), family = MessageFamily.TRANSFER_IN,
                 amount = money("0.00"), destination = AccountReference(Bank("D360"), "6810"),
                 network = BankNetworkType.INTER_BANK,
+                direction = MoneyDirection.OUTGOING,
             ),
         )
         listOf("sms-out", "sms-in").forEach {
@@ -618,6 +620,7 @@ class ReviewWorkflowServiceTest {
                 family = MessageFamily.TRANSFER_IN,
                 amount = money("500.00"),
                 destination = AccountReference(Bank("D360"), "6810"),
+                direction = MoneyDirection.OUTGOING,
             ),
         )
         reviewRepo.upsertRequired(
@@ -1167,36 +1170,4 @@ class ReviewWorkflowServiceTest {
     }
 
     private fun money(v: String) = Money.of(BigDecimal(v), Currency.SAR)
-
-    private fun event(
-        id: String,
-        rawSmsId: String,
-        family: MessageFamily,
-        amount: Money?,
-        bank: Bank = Bank.BANK_ALJAZIRA,
-        source: AccountReference? = null,
-        destination: AccountReference? = null,
-        card: CardReference? = null,
-        network: BankNetworkType? = null,
-        channel: PurchaseChannel? = null,
-        merchant: String? = null,
-        counterparty: String? = null,
-    ) = ParsedEvent(
-        id = id,
-        rawSmsId = rawSmsId,
-        bank = bank,
-        messageFamily = family,
-        direction = MoneyDirection.OUTGOING,
-        amount = amount,
-        purchaseChannel = channel,
-        sourceAccountRef = source,
-        destinationAccountRef = destination,
-        cardRef = card,
-        merchant = merchant,
-        counterparty = counterparty,
-        occurredAt = null,
-        bankNetworkType = network,
-        confidence = Confidence(1.0),
-        parseStatus = ParseStatus.SUCCESS,
-    )
 }

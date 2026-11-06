@@ -90,8 +90,8 @@ class BankSmsAdapterContractTest(
                 ContractSms("stc-qattah-${it.getValue("teach").jsonPrimitive.boolean}", "STC Bank", it.getValue("body").jsonPrimitive.content)
             }
             val otp = Json.parseToJsonElement(File("src/test/resources/testdata/patterns/stc-otp-redacted.json").readText()).jsonObject
-            return BankSmsAdapterContractCase(adapter, BankSmsAdapterContractSamples(listOf("STC Bank"),
-                listOf("AlJazira", "STC BankX", "stc bank", "PERSON"), financial,
+            return BankSmsAdapterContractCase(adapter, BankSmsAdapterContractSamples(listOf("STC Bank", "stc bank"),
+                listOf("AlJazira", "STC BankX", "PERSON"), financial,
                 listOf(ContractSms("stc-real-otp-redacted", otp.getValue("sender").jsonPrimitive.content, otp.getValue("body").jsonPrimitive.content)),
                 listOf(ContractSms("stc-unmatched", "STC Bank", "Unrecognized message"),
                     ContractSms("stc-preview-only", "STC Bank", rows.first().getValue("body").jsonPrimitive.content))))

@@ -34,6 +34,7 @@ import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.sms.time.InstantClock
+import com.baraa.masroof.testsupport.ingest
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -216,8 +217,8 @@ class IntraBankSelfTransferIngestionTest {
     assertTrue(ingestion.ingest(out) is SmsIngestionResult.Duplicate)
     assertTrue(ingestion.ingest(inSms) is SmsIngestionResult.Duplicate)
 
-    assertTrue(ingestion.reparseStored(out) is SmsIngestionResult.Parsed)
-    assertTrue(ingestion.reparseStored(inSms) is SmsIngestionResult.Parsed)
+    assertTrue(ingestion.processStored.reparseStored(out) is SmsIngestionResult.Parsed)
+    assertTrue(ingestion.processStored.reparseStored(inSms) is SmsIngestionResult.Parsed)
 
     assertEquals(1, ftRepo.listAll().size)
     assertEquals(FinancialTransactionType.SELF_TRANSFER, ftRepo.listAll().single().type)

@@ -5,6 +5,7 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.period.FinancialPeriod
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.math.BigDecimal
@@ -19,7 +20,7 @@ class MonthlyFinancialSummaryCalculatorTest {
 
     @Test
     fun expenseOnly_grossAndNet100() {
-        val summary = summarize(tx(FinancialTransactionType.EXPENSE, "100"))
+        val summary = summarize(tx(id = "tx-1", type = FinancialTransactionType.EXPENSE, amount = "100"))
         assertEquals(Money.of("100.00", Currency.SAR), summary.spendingGross)
         assertEquals(Money.zero(Currency.SAR), summary.refunds)
         assertEquals(SignedMoneyAmount.of(Money.of("100.00", Currency.SAR)), summary.spendingNet)
@@ -28,8 +29,8 @@ class MonthlyFinancialSummaryCalculatorTest {
     @Test
     fun expensePlusFee_gross105() {
         val summary = summarize(
-            tx(FinancialTransactionType.EXPENSE, "100"),
-            tx(FinancialTransactionType.FEE, "5"),
+            tx(id = "tx-2", type = FinancialTransactionType.EXPENSE, amount = "100"),
+            tx(id = "tx-3", type = FinancialTransactionType.FEE, amount = "5"),
         )
         assertEquals(Money.of("105.00", Currency.SAR), summary.spendingGross)
         assertEquals(SignedMoneyAmount.of(Money.of("105.00", Currency.SAR)), summary.spendingNet)
@@ -38,8 +39,8 @@ class MonthlyFinancialSummaryCalculatorTest {
     @Test
     fun expensePlusRefund_net80() {
         val summary = summarize(
-            tx(FinancialTransactionType.EXPENSE, "100"),
-            tx(FinancialTransactionType.REFUND, "20"),
+            tx(id = "tx-4", type = FinancialTransactionType.EXPENSE, amount = "100"),
+            tx(id = "tx-5", type = FinancialTransactionType.REFUND, amount = "20"),
         )
         assertEquals(Money.of("100.00", Currency.SAR), summary.spendingGross)
         assertEquals(Money.of("20.00", Currency.SAR), summary.refunds)
@@ -49,8 +50,8 @@ class MonthlyFinancialSummaryCalculatorTest {
     @Test
     fun refundExceedsExpense_netNegative() {
         val summary = summarize(
-            tx(FinancialTransactionType.REFUND, "120"),
-            tx(FinancialTransactionType.EXPENSE, "100"),
+            tx(id = "tx-6", type = FinancialTransactionType.REFUND, amount = "120"),
+            tx(id = "tx-7", type = FinancialTransactionType.EXPENSE, amount = "100"),
         )
         assertEquals(Money.of("100.00", Currency.SAR), summary.spendingGross)
         assertEquals(Money.of("120.00", Currency.SAR), summary.refunds)
@@ -63,8 +64,8 @@ class MonthlyFinancialSummaryCalculatorTest {
     @Test
     fun visaPurchaseAndCardPayment_noDoubleCount() {
         val summary = summarize(
-            tx(FinancialTransactionType.EXPENSE, "100"),
-            tx(FinancialTransactionType.CREDIT_CARD_PAYMENT, "100"),
+            tx(id = "tx-8", type = FinancialTransactionType.EXPENSE, amount = "100"),
+            tx(id = "tx-9", type = FinancialTransactionType.CREDIT_CARD_PAYMENT, amount = "100"),
         )
         assertEquals(Money.of("100.00", Currency.SAR), summary.spendingGross)
         assertEquals(SignedMoneyAmount.of(Money.of("100.00", Currency.SAR)), summary.spendingNet)
@@ -74,7 +75,7 @@ class MonthlyFinancialSummaryCalculatorTest {
 
     @Test
     fun selfTransfer_notSpendingOrIncome() {
-        val summary = summarize(tx(FinancialTransactionType.SELF_TRANSFER, "500"))
+        val summary = summarize(tx(id = "tx-10", type = FinancialTransactionType.SELF_TRANSFER, amount = "500"))
         assertEquals(Money.zero(Currency.SAR), summary.spendingGross)
         assertEquals(SignedMoneyAmount.zero(Currency.SAR), summary.spendingNet)
         assertEquals(Money.zero(Currency.SAR), summary.income)
@@ -83,37 +84,37 @@ class MonthlyFinancialSummaryCalculatorTest {
 
     @Test
     fun externalTransferOut_notSpending() {
-        val summary = summarize(tx(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "300"))
+        val summary = summarize(tx(id = "tx-11", type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT, amount = "300"))
         assertEquals(Money.zero(Currency.SAR), summary.spendingGross)
         assertEquals(Money.of("300.00", Currency.SAR), summary.externalTransfersOut)
     }
 
     @Test
     fun externalTransferIn_notIncome() {
-        val summary = summarize(tx(FinancialTransactionType.EXTERNAL_TRANSFER_IN, "300"))
+        val summary = summarize(tx(id = "tx-12", type = FinancialTransactionType.EXTERNAL_TRANSFER_IN, amount = "300"))
         assertEquals(Money.zero(Currency.SAR), summary.income)
         assertEquals(Money.of("300.00", Currency.SAR), summary.externalTransfersIn)
     }
 
     @Test
     fun cashWithdrawal_notSpending() {
-        val summary = summarize(tx(FinancialTransactionType.CASH_WITHDRAWAL, "500"))
+        val summary = summarize(tx(id = "tx-13", type = FinancialTransactionType.CASH_WITHDRAWAL, amount = "500"))
         assertEquals(Money.zero(Currency.SAR), summary.spendingGross)
         assertEquals(Money.of("500.00", Currency.SAR), summary.cashWithdrawals)
     }
 
     @Test
     fun income_countsAsIncome() {
-        val summary = summarize(tx(FinancialTransactionType.INCOME, "1000"))
+        val summary = summarize(tx(id = "tx-14", type = FinancialTransactionType.INCOME, amount = "1000"))
         assertEquals(Money.of("1000.00", Currency.SAR), summary.income)
     }
 
     @Test
     fun adjustmentAndUnknown_excludedFromTotals_butCountedInTransactionCount() {
         val summary = summarize(
-            tx(FinancialTransactionType.ADJUSTMENT, "40"),
-            tx(FinancialTransactionType.UNKNOWN, "10"),
-            tx(FinancialTransactionType.EXPENSE, "5"),
+            tx(id = "tx-15", type = FinancialTransactionType.ADJUSTMENT, amount = "40"),
+            tx(id = "tx-16", type = FinancialTransactionType.UNKNOWN, amount = "10"),
+            tx(id = "tx-17", type = FinancialTransactionType.EXPENSE, amount = "5"),
         )
         assertEquals(Money.of("5.00", Currency.SAR), summary.spendingGross)
         assertEquals(3, summary.transactionCount)
@@ -126,8 +127,8 @@ class MonthlyFinancialSummaryCalculatorTest {
         // future non-SAR currency can set excludedOtherCurrencyCount without changing
         // "how many transactions exist" semantics.
         val summary = summarize(
-            tx(FinancialTransactionType.EXPENSE, "10"),
-            tx(FinancialTransactionType.SELF_TRANSFER, "20"),
+            tx(id = "tx-18", type = FinancialTransactionType.EXPENSE, amount = "10"),
+            tx(id = "tx-19", type = FinancialTransactionType.SELF_TRANSFER, amount = "20"),
         )
         assertEquals(2, summary.transactionCount)
         assertEquals(0, summary.excludedOtherCurrencyCount)
@@ -135,7 +136,7 @@ class MonthlyFinancialSummaryCalculatorTest {
 
     @Test
     fun loanRepayment_notCreditCardPaymentOrSpending() {
-        val summary = summarize(tx(FinancialTransactionType.LOAN_REPAYMENT, "3036.11"))
+        val summary = summarize(tx(id = "tx-20", type = FinancialTransactionType.LOAN_REPAYMENT, amount = "3036.11"))
         assertEquals(Money.zero(Currency.SAR), summary.spendingGross)
         assertEquals(Money.zero(Currency.SAR), summary.creditCardPayments)
         assertEquals(1, summary.transactionCount)
@@ -198,19 +199,5 @@ class MonthlyFinancialSummaryCalculatorTest {
             period = period,
             transactions = transactions.toList(),
             reviewRequiredCount = 0,
-        )
-
-    private fun tx(type: FinancialTransactionType, amount: String): FinancialTransaction =
-        FinancialTransaction(
-            id = "tx-$type-$amount-${System.nanoTime()}",
-            type = type,
-            amount = Money.of(amount, Currency.SAR),
-            occurredAt = Instant.parse("2026-08-01T10:00:00Z"),
-            sourceContainerId = null,
-            destinationContainerId = null,
-            merchant = null,
-            counterparty = null,
-            categoryId = null,
-            linkedParsedEventIds = emptyList(),
         )
 }

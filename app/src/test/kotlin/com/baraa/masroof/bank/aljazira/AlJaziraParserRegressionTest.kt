@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira
 
+import com.baraa.masroof.testsupport.aljaziraSenderDetector
 import com.baraa.masroof.testsupport.EngineFixtureParser
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 
@@ -34,7 +35,7 @@ import java.time.Instant
 class AlJaziraParserRegressionTest {
     private val pipeline = EngineFixtureParser()
     private val validator = DefaultParsedEventValidator()
-    private val detector = AlJaziraBankDetector()
+    private val detector = aljaziraSenderDetector()
     private val registry = BankSmsRegistry(listOf(engineFixtureAdapter()))
 
     @Test
@@ -505,7 +506,7 @@ class AlJaziraParserRegressionTest {
         val route = registry.route("OtherBank", "شراء عبر الانترنت بمبلغ: 10.00 SAR")
         assertTrue(route is BankRoutingResult.NotMatched)
         assertEquals(
-            "sender_not_recognized_as_bank_aljazira",
+            "sender_not_in_scope",
             (route as BankRoutingResult.NotMatched).reason,
         )
     }

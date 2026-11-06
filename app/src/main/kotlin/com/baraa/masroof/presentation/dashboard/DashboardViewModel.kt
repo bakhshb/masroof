@@ -12,6 +12,8 @@ import com.baraa.masroof.application.dashboard.DashboardCommitmentsWorkflow
 import com.baraa.masroof.application.dashboard.DashboardPeriodWorkflow
 import com.baraa.masroof.application.dashboard.DashboardRegistryWorkflow
 import com.baraa.masroof.application.dashboard.DashboardSalaryPeriod
+import com.baraa.masroof.application.dashboard.loadOverview
+import com.baraa.masroof.application.dashboard.salaryPeriod
 import com.baraa.masroof.application.dashboard.CommitmentsOverview
 import com.baraa.masroof.application.dashboard.DashboardLayoutPreferencesRepository
 import com.baraa.masroof.application.dashboard.DashboardLayoutSnapshot
@@ -411,7 +413,7 @@ class DashboardViewModel(
         // overview result must never overwrite a newer open/close/select action.
         if (resetSelection) closeTransactionDetail()
         val samePeriodRefresh =
-            _uiState.value.period == period && _uiState.value.summary?.period == period
+            _uiState.value.period == period && _uiState.value.summary?.salaryPeriod == period
         val (periodLabel, periodAdjustmentHint) = periodPresentation(period)
 
         loadJob?.cancel()
@@ -470,11 +472,11 @@ class DashboardViewModel(
                 val previews = overview.transactions.map { tx ->
                     toPreview(tx = tx, facts = overview.transactionFacts[tx.id], tag = tag, formatter = formatter)
                 }
-                val (loadedLabel, loadedHint) = periodPresentation(overview.period)
+                val (loadedLabel, loadedHint) = periodPresentation(overview.salaryPeriod)
                 _uiState.update {
                     it.copy(
                         loading = false,
-                        period = overview.period,
+                        period = overview.salaryPeriod,
                         periodLabel = loadedLabel,
                         periodAdjustmentHint = loadedHint,
                         summary = overview.summary,
@@ -532,6 +534,7 @@ class DashboardViewModel(
     ): TransactionPreviewUi {
         val title = tx.merchant?.takeIf { it.isNotBlank() }
             ?: tx.counterparty?.takeIf { it.isNotBlank() }
+        // Rows share the device-zone period window; dating them by another zone would list a row outside its period.
         val localDate = tx.occurredAt.atZone(zoneId).toLocalDate()
         val searchText = listOfNotNull(
             tx.merchant?.trim()?.takeIf { it.isNotEmpty() },

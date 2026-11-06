@@ -17,6 +17,7 @@ import com.baraa.masroof.application.sms.LiveSmsProcessingWorker
 import com.baraa.masroof.application.sms.LiveSmsWorkScheduler
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankSmsRegistry
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
@@ -32,14 +33,10 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ProcessingRetryMode
-import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
-import com.baraa.masroof.domain.model.LoanReference
-import com.baraa.masroof.domain.model.LoanRegistryEntry
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
-import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import com.baraa.masroof.sms.time.InstantClock
@@ -163,7 +160,7 @@ class LiveRetryRestartTest {
         appLog: AppLogService,
         registry: BankSmsRegistry,
     ): ProcessStoredSmsUseCase {
-        val loans = EmptyLoanRegistry
+        val loans = NoOpLoanRegistryRepository
         val resolver = OwnershipResolver(accounts, cards, loans)
         val ingestionReview = IngestionReviewService(reviewRepo, clock)
         return ProcessStoredSmsUseCase(
@@ -205,15 +202,6 @@ class LiveRetryRestartTest {
             .setRunAttemptCount(attempt)
             .setWorkerFactory(LiveSmsProcessingWorker.Factory({ processStored }, null))
             .build()
-
-    private object EmptyLoanRegistry : LoanRegistryRepository {
-        override suspend fun observe(reference: LoanReference, rawSmsId: String) = Unit
-        override suspend fun setOwnership(reference: LoanReference, status: OwnershipStatus) = Unit
-        override suspend fun resolve(reference: LoanReference): OwnershipStatus = OwnershipStatus.UNKNOWN
-        override suspend fun get(reference: LoanReference): LoanRegistryEntry? = null
-        override suspend fun listAll(): List<LoanRegistryEntry> = emptyList()
-        override suspend fun updateDisplayName(reference: LoanReference, displayName: String?) = Unit
-    }
 
     private companion object {
         val PURCHASE_BODY = """

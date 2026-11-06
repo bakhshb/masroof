@@ -20,6 +20,7 @@ import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.sms.hash.SmsBodyHasher
+import com.baraa.masroof.testsupport.ingest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.time.Instant

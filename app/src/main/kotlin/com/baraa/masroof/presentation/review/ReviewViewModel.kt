@@ -243,7 +243,8 @@ class ReviewViewModel(
         }) {
             _uiState.update { it.copy(resolving = true, error = null, message = null, actionErrorDetail = null) }
             when (val result = transactionRestoreService.restore(rawSmsId, newType)) {
-                is RestoreResult.Success, RestoreResult.AwaitingReview -> {
+                // A failed type change still restored the message; the transaction shows the type it kept.
+                is RestoreResult.Success, RestoreResult.AwaitingReview, is RestoreResult.TypeNotChanged -> {
                     val summaries = loadCurrentSummaries()
                     applySummaries(summaries)
                     _uiState.update {
@@ -522,15 +523,10 @@ class ReviewViewModel(
     private fun bankChoicesFor(
         review: com.baraa.masroof.domain.model.ReviewItem,
         ignored: Boolean,
-    ): List<ReviewBankChoiceUi> {
+    ): List<String> {
         if (ignored || review.kind != ReviewKind.NEEDS_REVIEW) return emptyList()
         if (!ExplicitBankSelection.offersBankChoice(review.reasons)) return emptyList()
-        return selectableBanks.map { bank ->
-            ReviewBankChoiceUi(
-                bankId = bank.id,
-                labelRes = if (bank == Bank.BANK_ALJAZIRA) com.baraa.masroof.R.string.bank_aljazira else null,
-            )
-        }
+        return selectableBanks.map { it.id }
     }
 
     private companion object {

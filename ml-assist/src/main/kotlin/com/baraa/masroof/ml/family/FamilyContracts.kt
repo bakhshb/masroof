@@ -11,11 +11,14 @@ data class FamilyPrediction(val family: SmsFamilyLabel, val modelVersion: String
 
 enum class HumanLabelSource { USER_MESSAGE_FAMILY, USER_EVENT_KIND, USER_NON_FINANCIAL }
 
+/** Bank ids the template memory accepts: bundled ids and the ids the app gives user-added banks. */
+val LEARNABLE_BANK_ID = Regex("[A-Za-z][A-Za-z0-9_]{0,63}")
+
 /** Revokes assistance for an exact template without inventing a replacement label. */
 data class HumanTemplateBlock(val bankId: String, val rawId: String, val decisionId: String,
     val template: String, val at: Long) {
     init {
-        require(bankId.matches(Regex("[A-Z][A-Z0-9_]{0,63}")))
+        require(bankId.matches(LEARNABLE_BANK_ID))
         require(rawId.isNotBlank() && decisionId.isNotBlank() && at >= 0)
         require(template.matches(Regex("[0-9a-f]{64}")))
     }
@@ -26,7 +29,7 @@ data class HumanFamilyLabel(
     val template: String, val terms: Map<String, Int>, val at: Long, val provenance: String,
 ) {
     init {
-        require(bankId.matches(Regex("[A-Z][A-Z0-9_]{0,63}")))
+        require(bankId.matches(LEARNABLE_BANK_ID))
         require(rawId.isNotBlank() && decisionId.isNotBlank() && at >= 0)
         require(template.matches(Regex("[0-9a-f]{64}")) && FamilyInputCleaner.validTerms(terms))
         require(provenance in HumanLabelSource.entries.map { it.name })

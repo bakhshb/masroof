@@ -29,7 +29,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import androidx.compose.runtime.*
-import com.baraa.masroof.presentation.analytics.LocalLabAnalyticsCardsEnabled
+import com.baraa.masroof.presentation.analytics.LocalAnalyticsCardsEnabled
 
 /** Real source UI + real ViewModels + scanner + Room; only the device inbox is a fixture. */
 @RunWith(AndroidJUnit4::class)
@@ -61,7 +61,7 @@ class ReplicaSetupJourneyTest {
                 statement = ViewModelProvider(store,statementReconciliationViewModelFactory(container.statementReconciliationWorkflow))[StatementReconciliationViewModel::class.java]
                 notifications = ViewModelProvider(store,notificationCenterViewModelFactory(container,{true}))[NotificationCenterViewModel::class.java]
             }
-            compose.setContent { CompositionLocalProvider(LocalLabAnalyticsCardsEnabled provides analyticsVisible) { MasroofTheme {
+            compose.setContent { CompositionLocalProvider(LocalAnalyticsCardsEnabled provides analyticsVisible) { MasroofTheme {
                 MasroofRoot(onboarding,dashboard,review,settings,statement,notifications,
                     onRequestPermissions = {},onOpenAppSettings = {},onLocaleChanged = {},onRequestExport = {},onRequestImport = {},onRequestExportLogs = {},onRequestRestoreBackup = {})
             } } }

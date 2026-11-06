@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.engine.bank.patterns.SenderIdentity
 import com.baraa.masroof.data.patterns.MessagePatternStore
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.engine.bank.patterns.BankMessagePatterns
@@ -86,7 +87,7 @@ class MessagePatternsWorkflow(
         accessGate.withExclusiveAccess {
             val current = store.load()
             val bank = current.banks.single { it.bankId == bankId }
-            val addresses = senders.map(String::trim).distinct()
+            val addresses = senders.map(String::trim).distinctBy(SenderIdentity::key)
             validateBankEdit(current.banks, bankId, name, addresses)
             require(bank.currentPatterns.all { it.sender in addresses }) { "A sender is still used by a pattern" }
             store.saveBank(generation, bank.copy(displayName = name.trim(), senders = addresses, patterns = emptyList())).toCatalog()
@@ -96,8 +97,12 @@ class MessagePatternsWorkflow(
     private fun validateBankEdit(banks: List<BankMessagePatterns>, bankId: String, name: String, senders: List<String>) {
         require(name.trim().isNotEmpty() && name.length <= 120)
         require(senders.isNotEmpty() && senders.size <= 16 && senders.all { it.isNotBlank() && it.length <= 120 })
-        val existing = banks.singleOrNull { it.bankId == bankId }?.senders.orEmpty()
-        require(senders.filterNot { it in existing }.none { sender -> banks.any { it.bankId != bankId && sender in it.senders } }) {
+        // Ownership uses the detection rule, so a sender can never be detected as two banks.
+        require(senders.all { SenderIdentity.key(it).isNotEmpty() })
+        val existing = banks.singleOrNull { it.bankId == bankId }
+        val others = banks.filter { it.bankId != bankId }
+        require(senders.filterNot { existing?.ownsSender(it) == true }.none { sender ->
+            others.any { other -> other.senders.any { SenderIdentity.overlap(it, sender) } } }) {
             "Sender belongs to another bank"
         }
     }
@@ -131,18 +136,18 @@ class MessagePatternsWorkflow(
             val bank = configuration.banks.single { it.bankId == bankId }
             val prior = patternId?.let { id -> bank.currentPatterns.single { it.id == id } }
             require(prior?.roleProfile == null) { "Bundled patterns cannot be edited" }
-            require(sender in bank.senders) { "Select a configured sender" }
+            val configured = requireNotNull(bank.configuredSender(sender)) { "Select a configured sender" }
             require(bindings.any { it.field == "amount" && !it.ignored }) { "Bind the transaction amount" }
             require(bindings.all { it.ignored || it.field in operation.fields }) { "Field does not belong to operation" }
             fun build(choices: List<PatternBinding>) = SavedMessagePattern.fromChoices(prior?.id ?: java.util.UUID.randomUUID().toString(),
-                bankId, sender, operation.name, body, choices.choices()).copy(revision = prior?.let { Math.addExact(it.revision, 1) } ?: 1,
+                bankId, configured, operation.name, body, choices.choices()).copy(revision = prior?.let { Math.addExact(it.revision, 1) } ?: 1,
                     enabled = prior?.enabled ?: false)
             // Unselected amounts, dates and numbers vary between messages; ignoring them keeps the pattern from matching only its teacher.
             val auto = autoIgnored(body, bindings)
             val (pattern, fixed) = runCatching { build(bindings + auto) to emptyList<PatternBinding>() }
                 .getOrElse { if (auto.isEmpty()) throw it else build(bindings) to auto }
             PatternTeachingPreview(configuration.generation, pattern,
-                requireNotNull(pattern.copy(enabled = true).preview(bankId, sender, body)).fields.displayFields(),
+                requireNotNull(pattern.copy(enabled = true).preview(bankId, configured, body)).fields.displayFields(),
                 fixed.map { PatternText(body.substring(it.start, it.end), it.start, it.end) }, body)
         }
     }
@@ -162,7 +167,9 @@ class MessagePatternsWorkflow(
     }
 
     suspend fun tryPreview(preview: PatternTeachingPreview, sender: String, body: String) = withContext(ioDispatcher) {
-        preview.pattern.copy(enabled = true).preview(preview.bankId, sender, body)?.fields?.displayFields()
+        // A sample from a fold-equal sender (ALJAZIRA for AlJazira) is read under the pattern's configured sender.
+        val configured = if (SenderIdentity.names(preview.pattern.sender, sender)) preview.pattern.sender else sender
+        preview.pattern.copy(enabled = true).preview(preview.bankId, configured, body)?.fields?.displayFields()
     }
 
     suspend fun saveTeaching(preview: PatternTeachingPreview): com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration {

@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.testsupport.CountingFinancialTransactionRepository
+import com.baraa.masroof.testsupport.CountingParsedEventRepository
 import com.baraa.masroof.testsupport.RoomReviewWiring
 import android.content.Context
 import androidx.room.Room
@@ -21,14 +23,10 @@ import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.Confidence
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.domain.model.MoneyDirection
-import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewKind
@@ -37,10 +35,10 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.time.InstantClock
+import com.baraa.masroof.testsupport.event
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -282,6 +280,7 @@ class ScopedMutationReconciliationTest {
                 source = AccountReference(Bank.BANK_ALJAZIRA, "4100"),
                 destination = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
                 network = BankNetworkType.INTRA_BANK,
+                merchant = "Shop",
             ),
         )
         persistTransfer(smsId = "sms-else", eventId = "pe-else", source = "3003", destination = "6810")
@@ -296,6 +295,7 @@ class ScopedMutationReconciliationTest {
                 family = MessageFamily.FINANCING_INSTALLMENT,
                 amount = money("500.00"),
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                merchant = "Shop",
             ),
         )
         persist(
@@ -308,6 +308,7 @@ class ScopedMutationReconciliationTest {
                 family = MessageFamily.FINANCING_INSTALLMENT,
                 amount = money("700.00"),
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3003"),
+                merchant = "Shop",
             ),
         )
 
@@ -345,6 +346,7 @@ class ScopedMutationReconciliationTest {
                 family = MessageFamily.FINANCING_INSTALLMENT,
                 amount = money("500.00"),
                 source = AccountReference(Bank.BANK_ALJAZIRA, "3001"),
+                merchant = "Shop",
             ),
         )
         persistPurchase(smsId = "sms-buy", eventId = "pe-buy", amount = "15.00", last4 = "7271")
@@ -415,6 +417,7 @@ class ScopedMutationReconciliationTest {
                 family = MessageFamily.PURCHASE,
                 amount = amount?.let(::money),
                 card = CardReference(Bank.BANK_ALJAZIRA, last4),
+                merchant = "Shop",
             ),
         )
     }
@@ -436,6 +439,7 @@ class ScopedMutationReconciliationTest {
                 source = AccountReference(Bank.BANK_ALJAZIRA, source),
                 destination = AccountReference(Bank.UNKNOWN, destination),
                 network = BankNetworkType.INTER_BANK,
+                merchant = "Shop",
             ),
         )
     }
@@ -463,85 +467,4 @@ class ScopedMutationReconciliationTest {
     }
 
     private fun money(value: String) = Money.of(value, Currency.SAR)
-
-    private fun event(
-        id: String,
-        rawSmsId: String,
-        family: MessageFamily,
-        amount: Money?,
-        source: AccountReference? = null,
-        destination: AccountReference? = null,
-        card: CardReference? = null,
-        network: BankNetworkType? = null,
-    ) = ParsedEvent(
-        id = id,
-        rawSmsId = rawSmsId,
-        bank = Bank.BANK_ALJAZIRA,
-        messageFamily = family,
-        direction = if (family == MessageFamily.TRANSFER_IN) MoneyDirection.INCOMING else MoneyDirection.OUTGOING,
-        amount = amount,
-        purchaseChannel = null,
-        sourceAccountRef = source,
-        destinationAccountRef = destination,
-        cardRef = card,
-        merchant = "Shop",
-        counterparty = null,
-        occurredAt = null,
-        bankNetworkType = network,
-        confidence = Confidence(1.0),
-        parseStatus = ParseStatus.SUCCESS,
-    )
-
-    private class CountingParsedEventRepository(
-        private val delegate: ParsedEventRepository,
-    ) : ParsedEventRepository by delegate {
-        var listAllCalls: Int = 0
-        var globalUnlinkedCalls: Int = 0
-        val loadedRawSmsIdSets: MutableList<Collection<String>> = mutableListOf()
-
-        fun reset() {
-            listAllCalls = 0
-            globalUnlinkedCalls = 0
-            loadedRawSmsIdSets.clear()
-        }
-
-        override suspend fun listAll(): List<ParsedEventRecord> {
-            listAllCalls += 1
-            return delegate.listAll()
-        }
-
-        override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> {
-            globalUnlinkedCalls += 1
-            return delegate.listUnlinkedTransfers()
-        }
-
-        override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
-            loadedRawSmsIdSets += rawSmsIds
-            return delegate.listByRawSmsIds(rawSmsIds)
-        }
-    }
-
-    private class CountingFinancialTransactionRepository(
-        private val delegate: FinancialTransactionRepository,
-    ) : FinancialTransactionRepository by delegate {
-        var listAllCalls: Int = 0
-        var listByTypesCalls: Int = 0
-
-        fun reset() {
-            listAllCalls = 0
-            listByTypesCalls = 0
-        }
-
-        override suspend fun listAll(): List<FinancialTransaction> {
-            listAllCalls += 1
-            return delegate.listAll()
-        }
-
-        override suspend fun listByTypes(
-            types: Collection<FinancialTransactionType>,
-        ): List<FinancialTransaction> {
-            listByTypesCalls += 1
-            return delegate.listByTypes(types)
-        }
-    }
 }

@@ -3,30 +3,31 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.ExchangeRateSource
-import com.baraa.masroof.domain.model.FinancialTransaction
-import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.testsupport.tx
 import java.math.BigDecimal
-import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AppliedExchangeRateSyncerTest {
     @Test
     fun completePair_staysWhileAnOrphanTakesTheWholeResolution() {
-        val complete = transaction(
+        val complete = tx(
             id = "complete",
             rate = BigDecimal("9.99"),
-            source = ExchangeRateSource.MARKET,
+            rateSource = ExchangeRateSource.MARKET,
+            currency = Currency.USD,
         )
-        val orphanRate = transaction(
+        val orphanRate = tx(
             id = "orphan-rate",
             rate = BigDecimal("8.888"),
-            source = null,
+            rateSource = null,
+            currency = Currency.USD,
         )
-        val orphanSource = transaction(
+        val orphanSource = tx(
             id = "orphan-source",
             rate = null,
-            source = ExchangeRateSource.SMS,
+            rateSource = ExchangeRateSource.SMS,
+            currency = Currency.USD,
         )
         val resolution = SarEquivalentResolution(
             sarAmount = Money.of("38.00", Currency.SAR),
@@ -51,23 +52,4 @@ class AppliedExchangeRateSyncerTest {
         assertEquals(BigDecimal("3.80"), shown.getValue("orphan-source").appliedExchangeRate)
         assertEquals(ExchangeRateSource.MARKET, shown.getValue("orphan-source").exchangeRateSource)
     }
-
-    private fun transaction(
-        id: String,
-        rate: BigDecimal?,
-        source: ExchangeRateSource?,
-    ) = FinancialTransaction(
-        id = id,
-        type = FinancialTransactionType.EXPENSE,
-        amount = Money.of("10.00", Currency.USD),
-        occurredAt = Instant.parse("2026-08-05T11:05:00Z"),
-        sourceContainerId = null,
-        destinationContainerId = null,
-        merchant = null,
-        counterparty = null,
-        categoryId = null,
-        linkedParsedEventIds = emptyList(),
-        appliedExchangeRate = rate,
-        exchangeRateSource = source,
-    )
 }

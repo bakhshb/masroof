@@ -45,8 +45,32 @@ class MessagePatternRoutingTest {
             store.saveBank(2, bank.copy(patterns = listOf(approved.copy(revision = 3, enabled = false))))
             assertTrue(registry.adapterFor(Bank("BANK_STC"))!!.parse(input) is ParseResult.ReviewRequired)
             assertTrue(registry.route("STC Bank", body) is BankRoutingResult.Matched)
-            assertTrue(registry.route("STC BankX", body) is BankRoutingResult.NotMatched)
+            // A sender containing a configured name is held for review, never claimed or dropped.
+            assertTrue(registry.route("STC BankX", body) is BankRoutingResult.SuspectedBank)
         } finally { directory.deleteRecursively() }
+    }
+
+    /** An edit of a built-in adds a taught pattern next to it; both stay on and each reads its own wording. */
+    @Test fun aTaughtPatternWorksNextToTheBuiltInItWasMadeFrom() {
+        val bundled = com.baraa.masroof.testsupport.bundledPatterns("BANK_BARQ").banks.single()
+        val sender = bundled.senders.single()
+        val rows = kotlinx.serialization.json.Json.parseToJsonElement(
+            java.io.File("src/test/resources/testdata/multibank/messages.json").readText()).let { it as kotlinx.serialization.json.JsonArray }
+            .map { it as kotlinx.serialization.json.JsonObject }
+        fun text(row: kotlinx.serialization.json.JsonObject, key: String) = (row.getValue(key) as kotlinx.serialization.json.JsonPrimitive).content
+        val ruleMessage = text(rows.first { text(it, "bankId") == "BANK_BARQ" && text(it, "status") == "SUCCESS" }, "body")
+        val newWording = "Barq split bill\nAmount: 10SAR\nTo: TEST"
+        val fields = listOf("amount" to "10SAR", "counterparty" to "TEST")
+        val taught = SavedMessagePattern.fromChoices("barq-split", "BANK_BARQ", sender, "TRANSFER_OUT", newWording,
+            fields.map { (role, value) -> FieldChoice(role, newWording.indexOf(value), newWording.indexOf(value) + value.length) })
+            .copy(enabled = true, factContract = PatternFactContract(MessageFamily.TRANSFER_OUT, MoneyDirection.OUTGOING))
+        val bank = bundled.copy(patterns = bundled.patterns + taught)
+        assertTrue(bank.currentPatterns.filter { it.roleProfile != null }.all { it.enabled })
+        val adapter = MessagePatternSmsAdapter(bank, PatternFactInterpreter(MessagePatternConfiguration(banks = listOf(bank))))
+        val at = Instant.parse("2026-10-15T10:00:00Z")
+        assertTrue(adapter.parse(SmsParseInput("rule", sender, ruleMessage, at)) is ParseResult.Success)
+        val result = adapter.parse(SmsParseInput("taught", sender, newWording, at))
+        assertTrue(result.toString(), result is ParseResult.Success)
     }
 
     @Test fun configuredSendersPreserveBankCollisions() {

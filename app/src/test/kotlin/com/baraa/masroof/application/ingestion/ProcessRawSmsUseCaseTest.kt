@@ -47,6 +47,7 @@ import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import com.baraa.masroof.sms.time.InstantClock
+import com.baraa.masroof.testsupport.ingest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -188,7 +189,7 @@ class ProcessRawSmsUseCaseTest {
             val result = svc.ingest(raw)
             assertTrue(result is SmsIngestionResult.NotRelevant)
             assertEquals(
-                "sender_not_recognized_as_bank_aljazira",
+                "sender_not_in_scope",
                 (result as SmsIngestionResult.NotRelevant).reason,
             )
             assertNull(rawRepo.getById(raw.id))
@@ -205,7 +206,7 @@ class ProcessRawSmsUseCaseTest {
         val raw = aljaziraPurchase(id = "android-sms:reparse", deviceId = "reparse")
         assertTrue(useCase.ingest(raw) is SmsIngestionResult.Parsed)
         parseCalls.set(0)
-        val result = useCase.reparseStored(raw)
+        val result = useCase.processStored.reparseStored(raw)
         assertTrue(result is SmsIngestionResult.Parsed)
         assertEquals(Money.of("51.99", Currency.SAR), (result as SmsIngestionResult.Parsed).event.amount)
         assertEquals(MessageFamily.PURCHASE, result.event.messageFamily)
@@ -245,7 +246,7 @@ class ProcessRawSmsUseCaseTest {
                 parseStatus = ParseStatus.SUCCESS,
             ),
         )
-        val result = svc.reparseStored(raw)
+        val result = svc.processStored.reparseStored(raw)
         assertTrue(result is SmsIngestionResult.Failed)
         assertEquals(raw, rawRepo.getById(raw.id))
         assertNotNull(parsedRepo.findByRawSmsId(raw.id))
@@ -264,7 +265,7 @@ class ProcessRawSmsUseCaseTest {
             bodyHash = SmsBodyHasher.sha256Hex("شراء عبر الانترنت بمبلغ: 10.00 SAR"),
         )
         rawRepo.insertIfAbsent(raw)
-        val result = svc.reparseStored(raw)
+        val result = svc.processStored.reparseStored(raw)
         assertTrue(result is SmsIngestionResult.Failed)
         assertTrue(result !is SmsIngestionResult.NotRelevant)
         assertEquals(raw, rawRepo.getById(raw.id))
@@ -276,12 +277,12 @@ class ProcessRawSmsUseCaseTest {
         val raw = aljaziraPurchase(id = "android-sms:recover", deviceId = "recover")
         rawRepo.insertIfAbsent(raw)
         assertNull(parsedRepo.findByRawSmsId(raw.id))
-        val result = useCase.reparseStored(raw)
+        val result = useCase.processStored.reparseStored(raw)
         assertTrue(result is SmsIngestionResult.Parsed)
         assertEquals(ParseStatus.SUCCESS, parsedRepo.findByRawSmsId(raw.id)!!.event.parseStatus)
         assertEquals(1, db.rawSmsDao().count())
         assertEquals(1, db.parsedEventDao().count())
-        useCase.reparseStored(raw)
+        useCase.processStored.reparseStored(raw)
         assertEquals(1, db.parsedEventDao().count())
     }
 
@@ -683,7 +684,7 @@ class ProcessRawSmsUseCaseTest {
         assertEquals(0, parseCalls.get())
         assertEquals(0, db.financialTransactionDao().count())
 
-        val again = useCase.reparseStored(rawRepo.getById(raw.id)!!)
+        val again = useCase.processStored.reparseStored(rawRepo.getById(raw.id)!!)
         assertTrue(again is SmsIngestionResult.ReviewRequired)
         assertEquals(0, parseCalls.get())
         assertNull(parsedRepo.findByRawSmsId(raw.id))
@@ -697,7 +698,7 @@ class ProcessRawSmsUseCaseTest {
         val raw = aljaziraPurchase(id = "android-sms:ambiguous-reparse", deviceId = "ambiguous-reparse")
         rawRepo.insertIfAbsent(raw)
 
-        val result = ambiguousUseCase(ambiguousRegistry(alJaziraParses, lookalike), reviewRepo).reparseStored(raw)
+        val result = ambiguousUseCase(ambiguousRegistry(alJaziraParses, lookalike), reviewRepo).processStored.reparseStored(raw)
 
         assertTrue(result is SmsIngestionResult.ReviewRequired)
         assertNull(parsedRepo.findByRawSmsId(raw.id))
@@ -746,11 +747,11 @@ class ProcessRawSmsUseCaseTest {
         assertTrue(refreshed.reasons.contains(ExplicitBankSelection.reasonFor(Bank.BANK_ALJAZIRA)))
         assertTrue(refreshed.reasons.contains("needs_review"))
 
-        harness.facade.reparseStored(chosen)
+        harness.facade.processStored.reparseStored(chosen)
         assertEquals(2, alJaziraParses.get())
         assertEquals(0, lookalike.parseCalls.get())
         assertNull(parsedRepo.findByRawSmsId(other.id))
-        harness.facade.reparseStored(other)
+        harness.facade.processStored.reparseStored(other)
         assertEquals(2, alJaziraParses.get())
         assertEquals(0, lookalike.parseCalls.get())
         assertDirectReview(reviewRepo, other.id, "ambiguous_bank_route")
@@ -850,7 +851,7 @@ class ProcessRawSmsUseCaseTest {
         assertTrue(refreshed.reasons.contains(ExplicitBankSelection.reasonFor(Bank.BANK_ALJAZIRA)))
         assertTrue(refreshed.reasons.contains("needs_review"))
 
-        facade.reparseStored(other)
+        facade.processStored.reparseStored(other)
         assertEquals(1, parses.get())
         assertNull(parsedRepo.findByRawSmsId(other.id))
         assertDirectReview(reviewRepo, other.id, "suspected_bank_sender")
@@ -897,7 +898,7 @@ class ProcessRawSmsUseCaseTest {
         val raw = purchase.copy(sender = "LegacyAlJaziraLabel")
         rawRepo.insertIfAbsent(raw)
 
-        val result = svc.reparseStored(raw)
+        val result = svc.processStored.reparseStored(raw)
 
         assertTrue("got $result", result is SmsIngestionResult.ReviewRequired)
         assertNull(parsedRepo.findByRawSmsId(raw.id))
@@ -911,7 +912,7 @@ class ProcessRawSmsUseCaseTest {
         val raw = purchase.copy(sender = "LegacyInboxLabel")
         rawRepo.insertIfAbsent(raw)
 
-        val result = svc.reparseStored(raw)
+        val result = svc.processStored.reparseStored(raw)
 
         assertTrue("got $result", result is SmsIngestionResult.Parsed)
         val event = (result as SmsIngestionResult.Parsed).event

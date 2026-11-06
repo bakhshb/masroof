@@ -171,10 +171,10 @@ internal fun forecastReasonResource(reason: String?): Int = when (reason) {
                         color = MaterialTheme.colorScheme.primary)
                     Text(digits(stringResource(R.string.learning_corrections_excluded, learning.excluded)), style = MaterialTheme.typography.titleSmall)
                 }
-                val excluded = learning.exclusions.values.sum().toLong()
+                val exclusionTotal = learning.exclusionTotal
                 learning.exclusions.forEach { (reason, count) ->
                     com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(com.baraa.masroof.presentation.interpretation.learningReasonResource(reason)),
-                        digits(count.toString()), fraction(count.toLong(), excluded), previous = true, style = bar)
+                        digits(count.toString()), fraction(count.toLong(), exclusionTotal), previous = true, style = bar)
                 }
                 listOf(R.string.learning_blocked_badge to learning.blocked, R.string.learning_contradictions_badge to learning.repeatedContradictions,
                     R.string.learning_pending_badge to learning.pendingDecisions).filter { it.second > 0 }.forEach { (label, count) ->
@@ -193,17 +193,16 @@ internal fun forecastReasonResource(reason: String?): Int = when (reason) {
             if (!state.forecastPerformance.allowPersonal) Text(stringResource(R.string.learning_forecast_paused), style = MaterialTheme.typography.bodySmall)
             state.forecastPerformance.personalMae?.let { Amount(stringResource(R.string.learning_forecast_personal_error), it) }
             state.forecastPerformance.baselineMae?.let { Amount(stringResource(R.string.learning_forecast_baseline_error), it) }
-            state.forecastComparisons.filter { ForecastPerformancePolicy.supports(it) }.groupBy { it.periodStart }.values.map { it.minBy { row -> row.issuedAt } }.sortedBy { it.periodStart }.takeLast(3).forEach { comparison ->
+            state.forecastPerformance.recent.forEach { comparison ->
                 Text("${day(comparison.periodStart)} — ${day(comparison.periodEnd - 1)}", style = MaterialTheme.typography.titleSmall)
                 Text(timestamp(comparison.issuedAt), style = MaterialTheme.typography.bodySmall)
-                com.baraa.masroof.application.analytics.ForecastPerformancePolicy.originDay(comparison)?.let { origin ->
+                comparison.originDay?.let { origin ->
                     Text(stringResource(R.string.learning_forecast_origin, day(origin), (comparison.periodEnd - origin).toInt()), style = MaterialTheme.typography.bodySmall)
                 }
-                val maximum = maxOf(comparison.personalTotal, comparison.baselineTotal, comparison.actual ?: 0, 0)
-                com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.learning_forecast_personal), visualMoney(comparison.personalTotal), fraction(comparison.personalTotal, maximum), style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
-                com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.learning_forecast_baseline), visualMoney(comparison.baselineTotal), fraction(comparison.baselineTotal, maximum), previous = true, style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
+                com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.learning_forecast_personal), visualMoney(comparison.personalTotal), fraction(comparison.personalTotal, comparison.barScale), style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
+                com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.learning_forecast_baseline), visualMoney(comparison.baselineTotal), fraction(comparison.baselineTotal, comparison.barScale), previous = true, style = com.baraa.masroof.ui.components.MasroofHorizontalBarStyle.Default)
                 comparison.actual?.let { actual ->
-                    com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.lab_analysis_final_actual), visualMoney(actual), fraction(actual, maximum))
+                    com.baraa.masroof.ui.components.MasroofValueBarRow(stringResource(R.string.lab_analysis_final_actual), visualMoney(actual), fraction(actual, comparison.barScale))
                 } ?: Text(stringResource(R.string.analysis_wait_period), style = MaterialTheme.typography.bodySmall)
             }
         }

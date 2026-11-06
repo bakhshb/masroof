@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.baraa.masroof.application.backup.DatabaseBackupGateway
+import com.baraa.masroof.application.dashboard.TransactionLocalDate
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.locale.AppLocaleRepository
 import com.baraa.masroof.application.theme.ThemeMode
@@ -282,7 +283,7 @@ class SettingsViewModel(
             val preview = settingsRegistryWorkflow.deletionPreview(target.registryDeleteTarget())
             _uiState.update { it.copy(deleteRequest = RegistryDeleteUi(target,
                 preview.linked.map { tx -> LinkedTransactionUi(tx.id, tx.merchant ?: tx.counterparty, tx.type, tx.amount,
-                    tx.occurredAt.atZone(tx.occurredAtZone?.let(java.time.ZoneId::of) ?: java.time.ZoneId.systemDefault()).toLocalDate()) },
+                    TransactionLocalDate.of(tx, java.time.ZoneId.systemDefault())) },
                 preview.linkedCount, preview.blocker)) }
         }
     }

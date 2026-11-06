@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.notification
 
+import com.baraa.masroof.testsupport.FakeNotificationPreferencesRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -133,19 +134,5 @@ class NotificationCenterServiceTest {
         val expected = starts.takeLast(NotificationCenterService.MAX_KEPT_FOREIGN_CURRENCY_PERIODS)
             .map { NotificationCenterService.foreignCurrencyId(it.toString()) }.toSet()
         assertEquals(expected, prefs.getReadIds())
-    }
-
-    private class FakeNotificationPreferencesRepository : NotificationPreferencesRepository {
-        private var readIds: Set<String> = emptySet()
-
-        override fun getReadIds(): Set<String> = readIds
-
-        override fun markRead(id: String) {
-            readIds = readIds + id
-        }
-
-        override fun setReadIds(ids: Set<String>) {
-            readIds = ids.toSet()
-        }
     }
 }

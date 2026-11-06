@@ -17,8 +17,8 @@
     <string name="pattern_preview_done">Done</string>
     <string name="pattern_builtin_phrases">Recognition phrases</string>
     <string name="pattern_builtin_phrases_help">The app recognizes a message that contains any of these phrases. Line order does not matter.</string>
-    <string name="pattern_builtin_fields_help">Each value is read after the word before it in the message. Tap Edit to change them.</string>
+    <string name="pattern_builtin_fields_help">Each value is read after the word before it in the message. If a message is not read, tap Edit to add a pattern for it.</string>
     <string name="pattern_builtin_edit">Edit</string>
-    <string name="pattern_builtin_edit_help">Creates a new pattern from a real message and turns this one off after saving.</string>
+    <string name="pattern_builtin_edit_help">Adds a new pattern from a real message. This pattern stays on for the other messages.</string>
     <string name="pattern_copy">Copy as a new pattern</string>
 </resources>

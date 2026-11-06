@@ -1,6 +1,8 @@
 
 package com.baraa.masroof.presentation.review
 
+import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.presentation.settings.settingsBankLabel
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.clickable
@@ -459,10 +461,10 @@ internal fun ReviewDetailScreen(
                     title = stringResource(R.string.review_bank_choice_title),
                     icon = MasroofIcons.moneyMovement,
                 )
-                detail.bankChoices.forEach { choice ->
-                    val bankName = choice.labelRes?.let { stringResource(it) } ?: choice.bankId
+                detail.bankChoices.forEach { bankId ->
+                    val bankName = settingsBankLabel(Bank(bankId))
                     IconTextButton(
-                        onClick = { onSelectBank(choice.bankId) },
+                        onClick = { onSelectBank(bankId) },
                         enabled = !resolving,
                         icon = MasroofIcons.moneyMovement,
                         text = stringResource(R.string.review_parse_with_bank, bankName),

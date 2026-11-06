@@ -1,25 +1,17 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.core.money.Currency
-import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
-import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.AccountRegistryEntry
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.Confidence
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.model.ParseStatus
-import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.parsing.model.ParsedEventDetails
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.testsupport.parsedRecord
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
 
 class AccountTransactionInvolvementResolverTest {
     @Test
@@ -43,6 +35,7 @@ class AccountTransactionInvolvementResolverTest {
             id = "evt-cash",
             family = MessageFamily.WITHDRAWAL,
             sourceLast4 = "3001",
+            direction = MoneyDirection.INCOMING,
         )
 
         val index = AccountTransactionInvolvementResolver.buildIndex(
@@ -79,52 +72,5 @@ class AccountTransactionInvolvementResolverTest {
         )
 
         assertTrue(index["other"].isNullOrEmpty())
-    }
-
-    private fun tx(
-        id: String,
-        type: FinancialTransactionType,
-        amount: String,
-        source: String? = null,
-        linked: List<String> = listOf("evt-$id"),
-    ): FinancialTransaction =
-        FinancialTransaction(
-            id = id,
-            type = type,
-            amount = Money.of(amount, Currency.SAR),
-            occurredAt = Instant.parse("2026-08-10T12:00:00Z"),
-            sourceContainerId = source,
-            destinationContainerId = null,
-            merchant = null,
-            counterparty = null,
-            categoryId = null,
-            linkedParsedEventIds = linked,
-        )
-
-    private fun parsedRecord(
-        id: String,
-        family: MessageFamily,
-        sourceLast4: String? = null,
-        rawBody: String? = null,
-    ): ParsedEventRecord {
-        val event = ParsedEvent(
-            id = id,
-            rawSmsId = "sms-$id",
-            bank = Bank.BANK_ALJAZIRA,
-            messageFamily = family,
-            direction = MoneyDirection.INCOMING,
-            amount = Money.of("1.00", Currency.SAR),
-            purchaseChannel = null,
-            sourceAccountRef = sourceLast4?.let { AccountReference(Bank.BANK_ALJAZIRA, it) },
-            destinationAccountRef = null,
-            cardRef = null,
-            merchant = null,
-            counterparty = rawBody,
-            occurredAt = Instant.parse("2026-08-10T12:00:00Z"),
-            bankNetworkType = null,
-            confidence = Confidence(1.0),
-            parseStatus = ParseStatus.SUCCESS,
-        )
-        return ParsedEventRecord(event = event, details = ParsedEventDetails())
     }
 }

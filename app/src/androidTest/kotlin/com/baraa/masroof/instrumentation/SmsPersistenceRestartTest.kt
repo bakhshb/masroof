@@ -33,6 +33,7 @@ import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankSmsRegistry
+import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
@@ -52,8 +53,6 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
-import com.baraa.masroof.domain.model.LoanReference
-import com.baraa.masroof.domain.model.LoanRegistryEntry
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
@@ -64,7 +63,6 @@ import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
-import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
@@ -985,7 +983,7 @@ private class DeviceSmsSession(
         } else {
             reviewRepo
         }
-        val loans = EmptyLoanRegistry
+        val loans = NoOpLoanRegistryRepository
         val ingestionReview = IngestionReviewService(reviewRepo, clock)
         return ProcessStoredSmsUseCase(
             rawSmsRepository = rawRepo,
@@ -1039,15 +1037,6 @@ private class DeviceSmsSession(
     }
 
     private fun masked(id: String): String = AppLogFormatting.maskId(id)
-
-    private object EmptyLoanRegistry : LoanRegistryRepository {
-        override suspend fun observe(reference: LoanReference, rawSmsId: String) = Unit
-        override suspend fun setOwnership(reference: LoanReference, status: OwnershipStatus) = Unit
-        override suspend fun resolve(reference: LoanReference): OwnershipStatus = OwnershipStatus.UNKNOWN
-        override suspend fun get(reference: LoanReference): LoanRegistryEntry? = null
-        override suspend fun listAll(): List<LoanRegistryEntry> = emptyList()
-        override suspend fun updateDisplayName(reference: LoanReference, displayName: String?) = Unit
-    }
 }
 
 private data class EvidenceCounts(

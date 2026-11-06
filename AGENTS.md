@@ -29,10 +29,11 @@ Every change runs this loop; stop only when both reviews come back clean.
 - Live: `IncomingSmsReceiver` → `LiveSmsIntake` → `CaptureBankSmsUseCase` (durable `RawSms`) → `LiveSmsWorkScheduler` → `LiveSmsProcessingWorker` → `ProcessStoredSmsUseCase`. Work input is the rawSmsId only.
 - Live `receivedAt` = PDU service-center time when valid (`LiveReceiptTimestamp`, earliest part), else the injected clock.
 - Historical: `HistoricalSmsScanner` → `HistoricalSmsBatchProcessor`: parse each row, then one discovery/reconcile/review pass per batch, never per SMS.
-- `ProcessRawSmsUseCase` is only a capture-then-process facade. No orchestration under `sms/`.
+- `ProcessRawSmsUseCase` only wraps `reparseAndStore` for bulk maintenance; tests capture-then-process through the `ingest` test helper. No orchestration under `sms/`.
 
 ## Bank routing and parsing
 - `BankSmsRegistry` evaluates every adapter. `Ambiguous`/`SuspectedBank` are stored and reviewed, never parsed by a guess; never resolve by registration order. Adapters never re-check the sender.
+- Sender detection is `SenderBankDetector` for every bank, and `SenderIdentity` (bank-engine) is the one same-sender rule. Only an equal sender is detected; a long sender stem or a body naming the bank is only `Suspected`.
 - Reprocessing order: `user_selected_bank:<bankId>`, then the stored ParsedEvent bank, then a fresh route. `Matched` parses; only a genuine `NotMatched` may use the sole-adapter fallback. Queue refresh keeps the selection prefix.
 - Match on `NormalizedSms.comparisonBody` after `ArabicTextFolding`; display with `normalizedSlice(range)`, never `comparisonBody`.
 - Bank logic stays in `bank/*`; fill `ParsedEventDetails` at parse time (`cardSmsChannel`, balances, due dates). Dashboard code reads persisted facts only: never re-parses SMS or imports `bank.*`.
@@ -43,6 +44,7 @@ Every change runs this loop; stop only when both reviews come back clean.
 - New bank: a role-rule pattern file in `app/src/main/assets/bank-patterns/` (served by `MessagePatternSmsAdapter`), fixtures under `testdata/`, and a `BankSmsAdapterContractCase` in `BankSmsAdapterContractTest` (financial + non-financial samples, positive/negative senders); no sample claimed by two adapters.
 
 ## Financial rules
+- An SMS is evidence, not a transaction. Same bank never implies a self-transfer; cross-bank can be one; unknown ownership on either side blocks it. Incoming transfers are not automatically income, outgoing not automatically expense; a card bill payment is not an expense; a refund offsets a purchase, not income. Several messages may describe one transaction.
 - Posting gate (`TransactionAssembler.isAutomationEligible`): only `ParseStatus.SUCCESS`, an automation-confirming correction (family/amount) or `USER_FINANCIAL_TYPE`. Merchant/counterparty edits never lift it; reconciliation never bypasses it.
 - Auto-ignore and stale-link cleanup follow the parsed family (`OTP`, `NON_FINANCIAL`, `BALANCE_NOTICE`) via `InformationalMessagePolicy`; never re-read wording. `UNKNOWN` stays reviewable; the one exception is a message without an amount whose exact wording the user already marked not financial (`FamilyAssistBridge.rememberNonFinancial`), which returns to review if that decision is later contradicted.
 - Time: `BankTransactionTimePolicy` is the only bank→zone map (AlJazira `Asia/Riyadh`; others keep the stored `occurredAtZone`). `resolveTransferAsExternal`/`resolveAsFinancialType` use `TransactionTiming.effectiveOccurredAt` and persist that zone. Dashboard code never branches on bank time zones.

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.ingest
 import com.baraa.masroof.testsupport.uniqueStorageContext
 import com.baraa.masroof.testsupport.withAppContainer
 import com.baraa.masroof.application.interpretation.ConfiguredPatternAdapters

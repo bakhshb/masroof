@@ -15,7 +15,7 @@ import com.baraa.masroof.R
 
 internal typealias MasroofGuidancePositionProvider = com.baraa.masroof.ui.components.MasroofGuidancePositionProvider
 
-/** Same contextual help renderer used by Beta; app owns translated display strings. */
+/** Contextual help renderer; app owns translated display strings. */
 @Composable
 fun MasroofGuidanceButton(title: String, message: String, modifier: Modifier = Modifier,
     contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant) =

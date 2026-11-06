@@ -57,7 +57,7 @@ class AnalyticsJourneyTest {
             CompositionLocalProvider(LocalContext provides host.createConfigurationContext(config),LocalConfiguration provides config) {
                 MasroofTheme(darkTheme=dark) { MasroofScreenBackground {
                     Column(androidx.compose.ui.Modifier.verticalScroll(rememberScrollState())) {
-                        ForecastPerformanceDetails(AnalysisUiState(forecastComparisons=listOf(pair)))
+                        ForecastPerformanceDetails(AnalysisUiState(forecastPerformance=ForecastPerformancePolicy.evaluate(listOf(pair)),forecastComparisons=listOf(pair)))
                     }
                 } }
             }

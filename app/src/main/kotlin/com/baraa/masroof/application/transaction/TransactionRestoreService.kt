@@ -21,6 +21,9 @@ sealed interface RestoreResult {
 
     /** Restored as financial; it posts once its other leg or an ownership answer arrives. */
     data object AwaitingReview : RestoreResult
+
+    /** Restored and posted, but the chosen type could not be saved; the user can change it on the transaction. */
+    data class TypeNotChanged(val transaction: FinancialTransaction) : RestoreResult
 }
 
 /**
@@ -91,6 +94,11 @@ class TransactionRestoreService(
             is ReclassificationResult.Success -> {
                 logRestore(rawSmsId, result.transaction.id, newType)
                 RestoreResult.Success(result.transaction)
+            }
+            // The restore itself succeeded: keep the posted row and the financial decision; only the type change failed.
+            is ReclassificationResult.Rejected if result.reason == ReclassificationResult.UPDATE_FAILED -> {
+                logRestore(rawSmsId, tx.id, null)
+                RestoreResult.TypeNotChanged(tx)
             }
             is ReclassificationResult.Rejected -> {
                 val rollbackReason = rollbackToIgnored(review.id, rawSmsId)

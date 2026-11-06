@@ -3,6 +3,7 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -132,26 +133,4 @@ class CurrentAccountFlowDetailGrouperTest {
         category: FlowExpenseCategory,
     ): Money = grouping.expense[category].orEmpty()
         .fold(Money.zero(Currency.SAR)) { acc, tx -> acc + tx.amount }
-
-    private fun tx(
-        id: String,
-        type: FinancialTransactionType,
-        amount: String,
-        source: String? = null,
-        dest: String? = null,
-    ): com.baraa.masroof.domain.model.FinancialTransaction =
-        com.baraa.masroof.domain.model.FinancialTransaction(
-            id = id,
-            type = type,
-            amount = Money.of(amount, Currency.SAR),
-            occurredAt = java.time.Instant.parse("2026-08-01T10:00:00Z"),
-            sourceContainerId = source,
-            destinationContainerId = dest,
-            merchant = null,
-            counterparty = null,
-            categoryId = null,
-            linkedParsedEventIds = emptyList(),
-            appliedExchangeRate = null,
-            exchangeRateSource = null,
-        )
 }

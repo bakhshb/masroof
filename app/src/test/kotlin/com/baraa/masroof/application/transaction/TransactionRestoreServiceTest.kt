@@ -2,6 +2,14 @@ package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
 import com.baraa.masroof.testsupport.EmptyReviewRepository
+import com.baraa.masroof.testsupport.EmptyParsedEventRepository
+import com.baraa.masroof.testsupport.InterpretationTestAdapter
+import com.baraa.masroof.engine.bank.interpretation.RuleInterpreter
+import com.baraa.masroof.engine.bank.rules.AlJaziraRuleProfile
+import com.baraa.masroof.finance.value.BankId
+import com.baraa.masroof.parsing.model.ParseResult
+import com.baraa.masroof.parsing.model.SmsParseInput
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -96,6 +104,40 @@ class TransactionRestoreServiceTest {
         assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, reviewRepo.lastResolutionKind)
     }
 
+    @Test
+    fun restore_keepsPostedRowAndFinancialDecisionWhenReclassifyWriteFails() = runBlocking {
+        val reviewRepo = TrackingReviewRepository(ignoredReview())
+        val txRepo = FailingUpdateRepository(sampleTransaction())
+        val service = SettingsViewModelTestSupport.restoreService(
+            reviewRepository = reviewRepo,
+            financialTransactionRepository = txRepo,
+            clock = InstantClock { Instant.parse("2026-08-02T00:00:00Z") },
+            reclassificationEvents = object : EmptyParsedEventRepository() {
+                override suspend fun findByRawSmsId(rawSmsId: String) = purchaseRecord().takeIf { rawSmsId == "sms-1" }
+            },
+        )
+
+        val result = service.restore("sms-1", FinancialTransactionType.INCOME)
+
+        assertEquals(RestoreResult.TypeNotChanged(sampleTransaction()), result)
+        assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE, reviewRepo.lastResolutionKind)
+        assertEquals(0, txRepo.deletes)
+    }
+
+    private fun purchaseRecord(): ParsedEventRecord {
+        val engine = RuleInterpreter(AlJaziraRuleProfile.current())
+        val result = InterpretationTestAdapter { engine.interpretRouted(it, BankId("BANK_ALJAZIRA")) }.parse(
+            SmsParseInput("sms-1", "AlJazira", "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nمبلغ: SAR 60.99\nلدى: TEST\nفي: 2026-10-06 13:57",
+                Instant.parse("2026-10-06T12:00:00Z"))) as ParseResult.Success
+        return ParsedEventRecord(result.event, result.details)
+    }
+
+    private class FailingUpdateRepository(transaction: FinancialTransaction) : SingleTransactionRepository(transaction) {
+        var deletes = 0
+        override suspend fun update(transaction: FinancialTransaction): Boolean = false
+        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean { deletes++; return true }
+    }
+
     private fun ignoredReview() = ReviewItem(
         id = "review-1",
         rawSmsId = "sms-1",
@@ -186,7 +228,7 @@ class TransactionRestoreServiceTest {
         override suspend fun isRawSmsLinked(rawSmsId: String): Boolean = true
     }
 
-    private class SingleTransactionRepository(
+    private open class SingleTransactionRepository(
         private val transaction: FinancialTransaction,
     ) : FinancialTransactionRepository {
         override suspend fun save(transaction: FinancialTransaction, rawSmsIds: Collection<String>) =

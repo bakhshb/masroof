@@ -5,9 +5,9 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.testsupport.tx
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.time.Instant
 
 /**
  * Scenario: three owned accounts with self-transfers and external outflow.
@@ -24,12 +24,12 @@ class OwnedAccountsFlowSummaryTest {
     val account2 = "account:bank_aljazira:3002"
     val account3 = "account:bank_aljazira:3003"
     val transactions = listOf(
-      tx("a1-in", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "10000", dest = account1),
-      tx("a2-in", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "5000", dest = account2),
-      tx("a1-self", FinancialTransactionType.SELF_TRANSFER, "5000", source = account1, dest = account2),
-      tx("a2-self", FinancialTransactionType.SELF_TRANSFER, "1000", source = account2, dest = account3),
-      tx("a1-pos", FinancialTransactionType.EXPENSE, "5000", source = account1),
-      tx("a2-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "7000", source = account2),
+      tx("a1-in", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "10000", dest = account1, linked = listOf("evt-a1-in")),
+      tx("a2-in", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "5000", dest = account2, linked = listOf("evt-a2-in")),
+      tx("a1-self", FinancialTransactionType.SELF_TRANSFER, "5000", source = account1, dest = account2, linked = listOf("evt-a1-self")),
+      tx("a2-self", FinancialTransactionType.SELF_TRANSFER, "1000", source = account2, dest = account3, linked = listOf("evt-a2-self")),
+      tx("a1-pos", FinancialTransactionType.EXPENSE, "5000", source = account1, linked = listOf("evt-a1-pos")),
+      tx("a2-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT, "7000", source = account2, linked = listOf("evt-a2-out")),
     )
 
     val summary1 = summarizeAccount(account1, transactions)
@@ -74,8 +74,8 @@ class OwnedAccountsFlowSummaryTest {
     val account1 = "account:bank_aljazira:3001"
     val account2 = "account:bank_aljazira:3002"
     val transactions = listOf(
-      tx("received", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "10000", dest = account1),
-      tx("moved", FinancialTransactionType.SELF_TRANSFER, "10000", source = account1, dest = account2),
+      tx("received", FinancialTransactionType.EXTERNAL_TRANSFER_IN, "10000", dest = account1, linked = listOf("evt-received")),
+      tx("moved", FinancialTransactionType.SELF_TRANSFER, "10000", source = account1, dest = account2, linked = listOf("evt-moved")),
     )
 
     val fleet = AccountsSummary.fromSummaries(
@@ -159,25 +159,5 @@ class OwnedAccountsFlowSummaryTest {
       transactions = transactions,
       parsedRecords = emptyList(),
       ownedAccountContainerIds = setOf(containerId),
-    )
-
-  private fun tx(
-    id: String,
-    type: FinancialTransactionType,
-    amount: String,
-    source: String? = null,
-    dest: String? = null,
-  ): FinancialTransaction =
-    FinancialTransaction(
-      id = id,
-      type = type,
-      amount = Money.of(amount, Currency.SAR),
-      occurredAt = Instant.parse("2026-08-10T12:00:00Z"),
-      sourceContainerId = source,
-      destinationContainerId = dest,
-      merchant = null,
-      counterparty = null,
-      categoryId = null,
-      linkedParsedEventIds = listOf("evt-$id"),
     )
 }

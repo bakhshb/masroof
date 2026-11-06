@@ -11,6 +11,7 @@ import com.baraa.masroof.domain.model.*
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.testsupport.TestRuntime
+import com.baraa.masroof.testsupport.ingest
 import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking

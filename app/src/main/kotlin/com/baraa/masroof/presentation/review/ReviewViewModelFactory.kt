@@ -22,10 +22,7 @@ fun reviewViewModelFactory(
             detailLoader = loader,
             reviewOwnershipWorkflow = container.reviewOwnershipWorkflow,
             transactionRestoreService = container.transactionRestoreService,
-            // reparseStored already reconciles and refreshes reviews for this one message.
-            reparseStoredSms = { rawSmsId ->
-                container.rawSmsRepository.getById(rawSmsId)?.let { container.processRawSmsUseCase.reparseStored(it) }
-            },
+            reparseStoredSms = container.explicitBankSelectionWorkflow::reparse,
             selectableBanks = container.explicitBankSelectionWorkflow.selectableBanks(),
             selectBankAndReparse = { rawSmsId, bankId ->
                 container.explicitBankSelectionWorkflow.selectAndReparse(rawSmsId, bankId)

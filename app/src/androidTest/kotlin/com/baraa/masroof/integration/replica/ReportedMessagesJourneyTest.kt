@@ -212,7 +212,8 @@ class ReportedMessagesJourneyTest {
             c.onboardingOwnershipWorkflow.confirmAccountOwned(account)
             c.onboardingOwnershipWorkflow.confirmCardOwned(card)
             c.cardRegistryRepository.configure(card,CardConfiguration(CardNetwork.MADA,CardType.DEBIT,linkedAccount=account))
-            val adapter=InterpretationTestAdapter(requireNotNull(c.interpretationService)::interpret)
+            val service=requireNotNull(c.interpretationService)
+            val adapter=InterpretationTestAdapter { service.interpret(it, "BANK_ALJAZIRA") }
             for(name in names) {
                 val f=ReferenceHistory.fixture(name)
                 val evidence=raw(name,f.getValue("body").jsonPrimitive.content)

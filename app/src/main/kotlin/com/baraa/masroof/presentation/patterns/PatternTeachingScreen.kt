@@ -40,7 +40,7 @@ internal fun PatternTeachingScreen(
     // Progress survives another screen covering this one. A restored preview step falls back to binding (LaunchedEffect(generation)).
     var step by rememberSaveable { mutableIntStateOf(0) }
     var operation by rememberSaveable { mutableStateOf(PatternOperation.entries.firstOrNull { it.name == existingPattern?.label } ?: initialOperation ?: PatternOperation.PURCHASE) }
-    var sender by rememberSaveable { mutableStateOf(source?.sender ?: existingPattern?.sender?.takeIf { it.isNotBlank() } ?: bank.senders.first()) }
+    var sender by rememberSaveable { mutableStateOf(source?.sender?.let(bank::configuredSender) ?: existingPattern?.sender?.takeIf { it.isNotBlank() } ?: bank.senders.first()) }
     // A Review message is read again from its source on restore, so only text the user typed is saved.
     var body by rememberSaveable(stateSaver = if (source == null) TextFieldValue.Saver else notSaved) { mutableStateOf(TextFieldValue(source?.body ?: initialBody)) }
     var fieldIndex by rememberSaveable { mutableIntStateOf(0) }

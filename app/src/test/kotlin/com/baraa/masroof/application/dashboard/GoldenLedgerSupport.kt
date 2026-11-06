@@ -25,6 +25,7 @@ import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
 import com.baraa.masroof.testsupport.LedgerImportOutcome
+import com.baraa.masroof.testsupport.testdataFile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -207,14 +208,7 @@ object GoldenLedgerCorpus {
     fun load(id: String): GoldenLedgerScenario =
         loadAll().singleOrNull { it.id == id } ?: error("Missing golden ledger scenario $id")
 
-    private fun resolveRoot(): File {
-        val candidates = listOf(
-            File("src/test/resources/testdata/golden_ledger"),
-            File("app/src/test/resources/testdata/golden_ledger"),
-        )
-        return candidates.firstOrNull { it.isDirectory }
-            ?: error("Could not locate testdata/golden_ledger")
-    }
+    private fun resolveRoot(): File = testdataFile("golden_ledger")
 }
 
 object GoldenLedgerRunner {

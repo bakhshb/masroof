@@ -12,12 +12,10 @@ import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
-import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
-import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewKind
@@ -26,6 +24,7 @@ import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.ManualReviewResolutionResult
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.sms.hash.SmsBodyHasher
+import com.baraa.masroof.testsupport.event
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -136,6 +135,7 @@ class ManualReviewResolutionAtomicityTest {
                 amount = money("500.00"),
                 destination = AccountReference(Bank("D360"), "6810"),
                 network = BankNetworkType.INTER_BANK,
+                direction = MoneyDirection.OUTGOING,
             ),
         )
         reviewRepo.upsertRequired(
@@ -252,32 +252,4 @@ class ManualReviewResolutionAtomicityTest {
     }
 
     private fun money(v: String) = Money.of(BigDecimal(v), Currency.SAR)
-
-    private fun event(
-        id: String,
-        rawSmsId: String,
-        family: MessageFamily,
-        amount: Money?,
-        bank: Bank = Bank.BANK_ALJAZIRA,
-        source: AccountReference? = null,
-        destination: AccountReference? = null,
-        network: BankNetworkType? = null,
-    ) = ParsedEvent(
-        id = id,
-        rawSmsId = rawSmsId,
-        bank = bank,
-        messageFamily = family,
-        direction = MoneyDirection.OUTGOING,
-        amount = amount,
-        purchaseChannel = null,
-        sourceAccountRef = source,
-        destinationAccountRef = destination,
-        cardRef = null,
-        merchant = null,
-        counterparty = null,
-        occurredAt = null,
-        bankNetworkType = network,
-        confidence = Confidence(1.0),
-        parseStatus = ParseStatus.SUCCESS,
-    )
 }

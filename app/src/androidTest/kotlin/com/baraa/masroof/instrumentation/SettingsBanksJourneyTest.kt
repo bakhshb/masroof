@@ -26,6 +26,7 @@ import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.datasource.InboxRow
 import com.baraa.masroof.testsupport.ScreenshotArtifactWriter
 import com.baraa.masroof.testsupport.TestStorageContext
+import com.baraa.masroof.testsupport.ar
 import com.baraa.masroof.ui.theme.MasroofTheme
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
@@ -37,15 +38,14 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SettingsBanksJourneyTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
-    private fun ar(id: Int) = AppLocaleContext.wrap(compose.activity, "ar").getString(id)
     private fun click(id: Int) {
         try {
-            compose.waitUntil(10_000) { compose.onAllNodesWithText(ar(id)).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(10_000) { compose.onAllNodesWithText(compose.ar(id)).fetchSemanticsNodes().isNotEmpty() }
         } catch (error: Throwable) {
             capture("missing-screen")
             throw error
         }
-        compose.onNodeWithText(ar(id)).performScrollTo().performClick()
+        compose.onNodeWithText(compose.ar(id)).performScrollTo().performClick()
         compose.waitForIdle()
     }
     private fun back() {
@@ -82,8 +82,8 @@ class SettingsBanksJourneyTest {
                     } }
                 }
             }
-            compose.waitUntil(10_000) { compose.onAllNodesWithText(ar(R.string.settings_banks_title)).fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithText(ar(R.string.settings_statement_reconciliation_title)).assertDoesNotExist()
+            compose.waitUntil(10_000) { compose.onAllNodesWithText(compose.ar(R.string.settings_banks_title)).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(compose.ar(R.string.settings_statement_reconciliation_title)).assertDoesNotExist()
             capture("settings-hub")
             click(R.string.settings_banks_title)
             click(R.string.settings_add_bank)
@@ -93,7 +93,7 @@ class SettingsBanksJourneyTest {
             click(R.string.settings_save)
             compose.waitUntil(10_000) { runBlocking { container.messagePatternsWorkflow.catalog().banks.any { it.displayName == "بنك التجربة" } } }
             val bankId = container.messagePatternsWorkflow.catalog().banks.single { it.displayName == "بنك التجربة" }.bankId
-            compose.waitUntil(10_000) { compose.onAllNodesWithText(ar(R.string.pattern_import_bank)).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(10_000) { compose.onAllNodesWithText(compose.ar(R.string.pattern_import_bank)).fetchSemanticsNodes().isNotEmpty() }
             capture("new-bank")
             click(R.string.pattern_import_bank)
             compose.onNodeWithTag("import-selected-sms").performScrollTo().assertIsNotEnabled()
@@ -138,7 +138,7 @@ class SettingsBanksJourneyTest {
             compose.onNodeWithText("بنك التجربة").performScrollTo().assertIsDisplayed()
             capture("about-support")
             click(R.string.settings_updates_title)
-            compose.onNodeWithText(ar(R.string.settings_current_version).replace("%1\$s", "1.0-test")).assertExists()
+            compose.onNodeWithText(compose.ar(R.string.settings_current_version).replace("%1\$s", "1.0-test")).assertExists()
             capture("updates-version")
         } finally {
             store.clear()

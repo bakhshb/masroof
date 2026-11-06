@@ -1,7 +1,7 @@
 # Bank AlJazira reference SMS bodies
 
-Preserved from the legacy `sms_corpus/jazira_real_corpus.json` during the P0 clean baseline.
+`jazira_sms_bodies.json` holds real AlJazira message bodies preserved from the legacy corpus.
 
 - Contains **message bodies only** for future fixture authoring.
 - Does **not** encode authoritative expected parser results.
-- New fixture assertions belong in a later parsing phase per `docs/PARSING_SPEC.md`.
+- Fixture assertions live in the per-family folders under `bank_aljazira/`.

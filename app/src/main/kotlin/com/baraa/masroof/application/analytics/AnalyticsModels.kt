@@ -46,7 +46,11 @@ data class AnalysisUiState(val snapshot: AnalysisSnapshot? = null, val updating:
     val forecastComparisons: List<com.baraa.masroof.data.analytics.ForecastComparisonRow> = emptyList(),
     val learning: com.baraa.masroof.application.interpretation.LearningInsights? = null,
     val recurringCorrections: List<AnalysisRecurringCorrection> = emptyList(),
-    val observations: List<SpendingObservation> = emptyList())
+    val observations: List<AnalysisSpendingObservation> = emptyList())
+
+/** A spending observation as the analysis screens show it. */
+data class AnalysisSpendingObservation(val id: String, val merchant: String, val day: Long, val amount: Long,
+    val reference: Long, val referenceIds: List<String>, val from: Long, val through: Long)
 
 data class AnalysisChartPoint(val day: Long, val amount: java.math.BigDecimal, val expected: Boolean)
 fun analysisAmount(cents: Long) = com.baraa.masroof.application.dashboard.SignedMoneyAmount(
@@ -95,6 +99,8 @@ internal fun purchasePeriodHistory(data: CleanData, currentStart: Long): List<An
 
 fun visibleAnalysisAlerts(state: AnalysisUiState, now: Long): List<com.baraa.masroof.data.analytics.AnalysisAlertRow> =
     state.alerts.filter { !it.resolved && it.snoozedUntil <= now }.sortedByDescending { it.observedAt }
+
+fun unreadAnalysisAlertCount(state: AnalysisUiState, now: Long): Int = visibleAnalysisAlerts(state, now).count { !it.read }
 
 /** The id of this due's DUE alert, `due:<id>:<day>`; the one place the format is built. */
 val AnalysisDue.alertId: String get() = "due:$id:$day"

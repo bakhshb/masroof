@@ -22,6 +22,7 @@ import com.baraa.masroof.engine.bank.patterns.BankMessagePatterns
 import com.baraa.masroof.presentation.locale.AppLocaleContext
 import com.baraa.masroof.presentation.patterns.MessagePatternsScreen
 import com.baraa.masroof.testsupport.ScreenshotArtifactWriter
+import com.baraa.masroof.testsupport.ar
 import com.baraa.masroof.ui.theme.MasroofTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -30,9 +31,9 @@ import org.junit.Test
 
 class PatternTeachingClarityJourneyTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    // A bare click, not clickAr: this journey must fail when a button drops below the fold.
+    private fun click(id: Int) = compose.onNodeWithText(compose.ar(id)).performClick()
     private val body = "Inward transfer (SARIE)\n100.00 SAR\nFrom TEST PERSON\nFrom BJAZ\nAccount\n02-09-2026 08:01\nRef. No. *8PJ7"
-    private fun ar(id: Int) = AppLocaleContext.wrap(compose.activity, "ar").getString(id)
-    private fun click(id: Int) = compose.onNodeWithText(ar(id)).performClick()
     private fun capture(name: String) {
         val size = InstrumentationRegistry.getArguments().getString("previewSize", "phone")
         ScreenshotArtifactWriter.capture(compose, "pattern-teaching", "$size-$name")
@@ -65,7 +66,7 @@ class PatternTeachingClarityJourneyTest {
             capture("message")
             click(R.string.teaching_next)
             select("100.00 SAR")
-            compose.onNodeWithContentDescription(ar(R.string.review_back)).assertIsDisplayed().performClick()
+            compose.onNodeWithContentDescription(compose.ar(R.string.review_back)).assertIsDisplayed().performClick()
             compose.onNodeWithTag("pattern-question").assertTextContains("مبلغ العملية", substring = true)
             // Every field question carries a plain explanation with an SMS example.
             compose.onNodeWithTag("pattern-field-help").assertIsDisplayed()
@@ -75,8 +76,8 @@ class PatternTeachingClarityJourneyTest {
             compose.onNodeWithTag("pattern-question").assertIsDisplayed().assertTextContains("بنك الطرف الآخر", substring = true)
             compose.onNodeWithTag("pattern-candidates").performTouchInput { swipeUp() }
             compose.onNodeWithTag("pattern-question").assertIsDisplayed()
-            compose.onNodeWithText(ar(R.string.teaching_skip_field)).assertIsDisplayed()
-            compose.onNodeWithContentDescription(ar(R.string.review_back)).assertIsDisplayed()
+            compose.onNodeWithText(compose.ar(R.string.teaching_skip_field)).assertIsDisplayed()
+            compose.onNodeWithContentDescription(compose.ar(R.string.review_back)).assertIsDisplayed()
             capture("bank-question")
             select("BJAZ")
             select("02-09-2026 08:01")
@@ -85,8 +86,8 @@ class PatternTeachingClarityJourneyTest {
             capture("review")
             click(R.string.teaching_try_another)
             compose.onNodeWithTag("pattern-sample").assertIsDisplayed()
-            compose.onNodeWithContentDescription(ar(R.string.review_back)).performClick()
-            compose.onNodeWithText(ar(R.string.pattern_save)).assertIsDisplayed()
+            compose.onNodeWithContentDescription(compose.ar(R.string.review_back)).performClick()
+            compose.onNodeWithText(compose.ar(R.string.pattern_save)).assertIsDisplayed()
             assertTrue(store.load().banks.single().patterns.isEmpty())
             click(R.string.pattern_save)
             compose.waitUntil(10_000) { store.load().banks.single().patterns.isNotEmpty() }

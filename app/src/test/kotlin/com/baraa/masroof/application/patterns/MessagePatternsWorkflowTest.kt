@@ -28,6 +28,21 @@ class MessagePatternsWorkflowTest {
         assertEquals(links, upgraded.factContract!!.accountBindings)
     }
 
+    @Test fun aSenderThatDetectsAsAnotherBanksSenderCannotBeAdded() = runBlocking {
+        val directory = Files.createTempDirectory("masroof-sender-owner-").toFile()
+        try {
+            val store = MessagePatternStore(directory.resolve("patterns.json"))
+            store.saveBank(0, BankMessagePatterns("BANK_ALINMA", listOf("alinma"), "Alinma"))
+            val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate())
+            val generation = store.load().generation
+            for (sender in listOf("ALINMA", "Al-inma", "Alinma-AD", "---")) {
+                assertThrows(IllegalArgumentException::class.java) { runBlocking { workflow.addBank(generation, "Mine", sender) } }
+            }
+            workflow.addBank(generation, "Mine", "Alinma Pay")
+            Unit
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun newerBundledRolesReachInstalledBanksUnlessTheUserDisabledThem() = runBlocking {
         val directory = Files.createTempDirectory("masroof-bundled-update-").toFile()
         try {
@@ -79,6 +94,18 @@ class MessagePatternsWorkflowTest {
             assertEquals(deleted, workflow().load())
             assertTrue(runCatching { w.restoreRevision(deleted.generation, bank.bankId, seed.id, 1) }.isFailure)
             assertEquals(deleted, w.load())
+        } finally { directory.deleteRecursively() }
+    }
+
+    @Test fun aMessageFromAFoldEqualSenderIsTaughtUnderTheConfiguredSender() = runBlocking {
+        val directory = Files.createTempDirectory("masroof-teach-folded-").toFile()
+        try {
+            val w = MessagePatternsWorkflow(MessagePatternStore(directory.resolve("patterns.json")), DatabaseAccessGate())
+            w.saveBank(0, BankMessagePatterns("STC", listOf("STC Bank")))
+            val body = "Payment\nAmount:10SAR\nTo:SHOP"
+            val preview = w.teach(1, "STC", "STC BANK-AD", PatternOperation.PURCHASE, body, listOf(PatternBinding("amount", 15, 20)))
+            assertEquals("STC Bank", preview.pattern.sender)
+            assertNotNull(w.tryPreview(preview, "stc bank", body))
         } finally { directory.deleteRecursively() }
     }
 

@@ -116,11 +116,11 @@ fun MessagePatternsScreen(workflow: MessagePatternsWorkflow, initialBankId: Stri
             catch (caught: Exception) { workflow.reportFailure("MessagePatternsScreen", caught); failed = true }
         }
     }
-    if (bank != null && teaching && (source == null || source.sender in bank.senders)) {
+    if (bank != null && teaching && (source == null || bank.ownsSender(source.sender))) {
         PatternTeachingScreen(workflow, requireNotNull(snapshot).generation, bank, source,
             onSaved = { preview, body ->
                 teaching = false; editingPatternId = null; selectedPattern = preview.patternId; savedTeaching = true; savedBody = if (source == null) body else ""
-                // A built-in edit keeps the original on until its replacement is approved, so messages never fall between them.
+                // A built-in edit adds a pattern next to the original, which stays on for every other wording.
                 val replaced = replacingPattern
                 teachingOperation = null
                 work {
@@ -142,10 +142,8 @@ fun MessagePatternsScreen(workflow: MessagePatternsWorkflow, initialBankId: Stri
             source?.body ?: savedBody, source != null || savedBody.isNotBlank(),
             onSaved = { saved ->
                 snapshot = saved; approving = false; savedTeaching = false; savedApproval = true; applied = null
-                replacingPattern?.let { replaced -> replacingPattern = null; work {
-                    workflow.setEnabled(workflow.catalog().generation, pattern.bankId, replaced, false)
-                    snapshot = workflow.catalog()
-                } }
+                // Never switch the built-in off: it still recognizes its other wordings, which would then all go to review.
+                replacingPattern = null
             }, onBack = { approving = false; replacingPattern = null })
         return
     }
@@ -285,9 +283,9 @@ fun MessagePatternsScreen(workflow: MessagePatternsWorkflow, initialBankId: Stri
                         bank.senders.filter { it != bankName }.takeIf { it.isNotEmpty() }
                             ?.let { Text(it.joinToString(), style = MaterialTheme.typography.bodySmall) }
                     }
-                    if (source != null && source.sender !in bank.senders) Text(stringResource(R.string.pattern_sender_mismatch), color = MaterialTheme.colorScheme.error)
+                    if (source != null && !bank.ownsSender(source.sender)) Text(stringResource(R.string.pattern_sender_mismatch), color = MaterialTheme.colorScheme.error)
                     MasroofButton(onClick = { teaching = true; editingPatternId = null; editingBody = ""; savedTeaching = false; savedBody = "" },
-                        enabled = !busy && (source == null || source.sender in bank.senders), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pattern_teach)) }
+                        enabled = !busy && (source == null || bank.ownsSender(source.sender)), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pattern_teach)) }
                     Text(stringResource(R.string.teaching_catalog), style = MaterialTheme.typography.titleLarge)
                     val conflicting = pending?.conflictingPatternIds.orEmpty()
                     bank.currentPatterns.groupBy { it.label }.forEach { (label, patterns) ->

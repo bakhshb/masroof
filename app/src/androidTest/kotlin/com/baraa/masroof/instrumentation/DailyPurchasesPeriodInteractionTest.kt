@@ -149,7 +149,7 @@ class DailyPurchasesPeriodInteractionTest {
         val trends = original.spendingTrends!!.copy(overall = empty, purchases = empty, accounts = empty, creditCards = empty,
             debitCards = empty, byAccount = original.spendingTrends.byAccount.mapValues { empty },
             byCard = original.spendingTrends.byCard.mapValues { empty })
-        val financial = original.copy(period = com.baraa.masroof.domain.period.FinancialPeriod(futureStart, futureStart.plusDays(30)),
+        val financial = original.copy(period = com.baraa.masroof.application.dashboard.DashboardSalaryPeriod(futureStart, futureStart.plusDays(30)),
             dailySpendingTrend = empty, spendingTrends = trends)
         val debit = financial.creditFacilities!!.debitCards.first()
         compose.setContent {

@@ -15,8 +15,7 @@ import java.time.Instant
  * [categoryId] is an opaque identifier until categorization is modeled in a
  * later phase.
  *
- * DOMAIN.md suggests a `status` / TransactionStatus field but does not enumerate
- * values; that concept is deferred rather than inventing provisional vocabulary.
+ * There is no transaction status field yet; it is deferred rather than inventing provisional vocabulary.
  */
 data class FinancialTransaction(
     val id: String,

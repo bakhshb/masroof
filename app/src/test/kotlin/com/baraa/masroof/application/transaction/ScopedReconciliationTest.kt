@@ -20,24 +20,23 @@ import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
-import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
-import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
-import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
-import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
+import com.baraa.masroof.testsupport.CountingFinancialTransactionRepository
+import com.baraa.masroof.testsupport.CountingParsedEventRepository
+import com.baraa.masroof.testsupport.event
+import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -109,29 +108,32 @@ class ScopedReconciliationTest {
         persistTransfer("sms-linked", "pe-linked", inside.plusSeconds(30), MessageFamily.TRANSFER_IN)
         persistPurchase("sms-purchase", "pe-purchase", inside.plusSeconds(10))
         ftDelegate.save(
-            transaction(
+            tx(
                 id = "tx-linked",
                 type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
                 occurredAt = inside.plusSeconds(30),
-                eventId = "pe-linked",
+                linked = listOf("pe-linked"),
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-linked"),
         )
         ftDelegate.save(
-            transaction(
+            tx(
                 id = "tx-old-expense",
                 type = FinancialTransactionType.EXPENSE,
                 occurredAt = inside,
-                eventId = "pe-purchase",
+                linked = listOf("pe-purchase"),
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-purchase"),
         )
         ftDelegate.save(
-            transaction(
+            tx(
                 id = "tx-later-external",
                 type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
                 occurredAt = inside.plus(Duration.ofDays(30)),
-                eventId = "pe-out-range",
+                linked = listOf("pe-out-range"),
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-out-range"),
         )
@@ -186,11 +188,12 @@ class ScopedReconciliationTest {
             details = ParsedEventDetails(occurredAtLocal = localInside.plusMinutes(1)),
         )
         ftDelegate.save(
-            transaction(
+            tx(
                 id = "tx-local-linked",
                 type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
                 occurredAt = inside.plus(Duration.ofDays(4)),
-                eventId = "pe-local-linked",
+                linked = listOf("pe-local-linked"),
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-local-linked"),
         )
@@ -329,11 +332,12 @@ class ScopedReconciliationTest {
             amount = "10.00",
         )
         ftDelegate.save(
-            transaction(
+            tx(
                 id = "tx-ancient",
                 type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
                 occurredAt = Instant.parse("2019-01-01T00:00:00Z"),
-                eventId = "pe-ancient",
+                linked = listOf("pe-ancient"),
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-ancient"),
         )
@@ -496,12 +500,13 @@ class ScopedReconciliationTest {
                 amount = "2000.00",
             )
             ftDelegate.save(
-                transaction(
+                tx(
                     id = "tx-$smsId",
                     type = FinancialTransactionType.SELF_TRANSFER,
                     occurredAt = at.plusSeconds(index.toLong()),
-                    eventId = "pe-$smsId",
-                    sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+                    linked = listOf("pe-$smsId"),
+                    source = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+                    occurredAtZone = zoneId.id,
                 ).copy(
                     amount = Money.of("2000.00", Currency.SAR),
                     destinationContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3003"),
@@ -569,13 +574,14 @@ class ScopedReconciliationTest {
             counterparty = "تمويل شخصي",
         )
         ftDelegate.save(
-            transaction(
+            tx(
                 id = TransactionIdFactory.fromRawSmsIds(listOf("sms-loan")),
                 type = FinancialTransactionType.FEE,
                 occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
-                eventId = "evt-loan",
-                sourceContainerId = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
+                linked = listOf("evt-loan"),
+                source = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),
                 counterparty = "تمويل شخصي",
+                occurredAtZone = zoneId.id,
             ),
             listOf("sms-loan"),
         )
@@ -792,145 +798,4 @@ class ScopedReconciliationTest {
         val listByTypesCalls: Int,
         val boundedLocalCalls: Int,
     )
-
-    private fun event(
-        id: String,
-        rawSmsId: String,
-        family: MessageFamily,
-        amount: Money?,
-        source: AccountReference? = null,
-        destination: AccountReference? = null,
-        network: BankNetworkType? = null,
-        merchant: String? = null,
-        counterparty: String? = null,
-        status: ParseStatus = ParseStatus.SUCCESS,
-    ) = ParsedEvent(
-        id = id,
-        rawSmsId = rawSmsId,
-        bank = Bank.BANK_ALJAZIRA,
-        messageFamily = family,
-        direction = if (family == MessageFamily.TRANSFER_IN) MoneyDirection.INCOMING else MoneyDirection.OUTGOING,
-        amount = amount,
-        purchaseChannel = null,
-        sourceAccountRef = source,
-        destinationAccountRef = destination,
-        cardRef = null,
-        merchant = merchant,
-        counterparty = counterparty,
-        occurredAt = null,
-        bankNetworkType = network,
-        confidence = Confidence(1.0),
-        parseStatus = status,
-    )
-
-    private fun transaction(
-        id: String,
-        type: FinancialTransactionType,
-        occurredAt: Instant,
-        eventId: String,
-        sourceContainerId: String? = null,
-        counterparty: String? = null,
-    ) = FinancialTransaction(
-        id = id,
-        type = type,
-        amount = Money.of("10.00", Currency.SAR),
-        occurredAt = occurredAt,
-        sourceContainerId = sourceContainerId,
-        destinationContainerId = null,
-        merchant = null,
-        counterparty = counterparty,
-        categoryId = null,
-        linkedParsedEventIds = listOf(eventId),
-        occurredAtZone = zoneId.id,
-    )
-
-    private class CountingParsedEventRepository(
-        private val delegate: ParsedEventRepository,
-    ) : ParsedEventRepository by delegate {
-        var listAllCalls: Int = 0
-        var globalUnlinkedCalls: Int = 0
-        var boundedUnlinkedCalls: Int = 0
-        var boundedLocalCalls: Int = 0
-        var listByRawSmsIdsCalls: Int = 0
-        val boundedWindows: MutableList<Pair<Instant, Instant>> = mutableListOf()
-
-        fun reset() {
-            listAllCalls = 0
-            globalUnlinkedCalls = 0
-            boundedUnlinkedCalls = 0
-            boundedLocalCalls = 0
-            listByRawSmsIdsCalls = 0
-            boundedWindows.clear()
-        }
-
-        override suspend fun listAll(): List<ParsedEventRecord> {
-            listAllCalls += 1
-            return delegate.listAll()
-        }
-
-        override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> {
-            globalUnlinkedCalls += 1
-            return delegate.listUnlinkedTransfers()
-        }
-
-        override suspend fun listUnlinkedTransfersReceivedBetween(
-            startInclusive: Instant,
-            endExclusive: Instant,
-        ): List<ParsedEventRecord> {
-            boundedUnlinkedCalls += 1
-            boundedWindows += startInclusive to endExclusive
-            return delegate.listUnlinkedTransfersReceivedBetween(startInclusive, endExclusive)
-        }
-
-        override suspend fun listUnlinkedTransfersOccurredLocalBetween(
-            startInclusive: LocalDateTime,
-            endExclusive: LocalDateTime,
-        ): List<ParsedEventRecord> {
-            boundedLocalCalls += 1
-            return delegate.listUnlinkedTransfersOccurredLocalBetween(startInclusive, endExclusive)
-        }
-
-        override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
-            listByRawSmsIdsCalls += 1
-            return delegate.listByRawSmsIds(rawSmsIds)
-        }
-    }
-
-    private class CountingFinancialTransactionRepository(
-        private val delegate: FinancialTransactionRepository,
-    ) : FinancialTransactionRepository by delegate {
-        var listAllCalls: Int = 0
-        var listByTypesCalls: Int = 0
-        var boundedTypeCalls: Int = 0
-        val boundedWindows: MutableList<Pair<Instant, Instant>> = mutableListOf()
-
-        fun reset() {
-            listAllCalls = 0
-            listByTypesCalls = 0
-            boundedTypeCalls = 0
-            boundedWindows.clear()
-        }
-
-        override suspend fun listAll(): List<FinancialTransaction> {
-            listAllCalls += 1
-            return delegate.listAll()
-        }
-
-        override suspend fun listByTypes(
-            types: Collection<FinancialTransactionType>,
-        ): List<FinancialTransaction> {
-            listByTypesCalls += 1
-            return delegate.listByTypes(types)
-        }
-
-        override suspend fun listByTypesOccurredBetween(
-            types: Collection<FinancialTransactionType>,
-            startInclusive: Instant,
-            endExclusive: Instant,
-        ): List<FinancialTransaction> {
-            boundedTypeCalls += 1
-            boundedWindows += startInclusive to endExclusive
-            return delegate.listByTypesOccurredBetween(types, startInclusive, endExclusive)
-        }
-    }
 }

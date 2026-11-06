@@ -16,10 +16,25 @@ data class ForecastExplanation(val method: ForecastMethod, val evaluations: List
 /** [daysUntil] is null for an undated due; [share] is its part of the confirmed total, 0 for estimates. */
 data class AnalysisDueRow(val due: AnalysisDue, val daysUntil: Long?, val share: Float)
 data class AnalysisCommitmentsView(val confirmedTotal: Long, val confirmedCount: Int, val rows: List<AnalysisDueRow>,
-    val daysToPeriodEnd: Long)
+    val daysToPeriodEnd: Long) {
+    /** Dated dues before the period ends, counted per day in row order. */
+    val dueCountsByDay: Map<Long, Int> get() = rows.mapNotNull { it.daysUntil }.filter { it in 0..daysToPeriodEnd }
+        .groupingBy { it }.eachCount()
+}
 data class AnalysisCompositionPart(val group: com.baraa.masroof.application.dashboard.AnalysisSpendingGroup, val percent: Int, val share: Float)
 
+/** Progress toward one personal-forecast history target. */
+data class AnalysisReadinessStep(val count: Int, val target: Int) {
+    val fraction: Float get() = if (target <= 0) 0f else (count.toFloat() / target).coerceIn(0f, 1f)
+}
+/** [days] is null while consecutive complete days are unknown. */
+data class AnalysisReadiness(val days: AnalysisReadinessStep?, val periods: AnalysisReadinessStep)
+
 object AnalysisPresentationBuilder {
+    fun readiness(snapshot: AnalysisSnapshot) = AnalysisReadiness(
+        snapshot.quality.consecutiveCompleteDays?.let { AnalysisReadinessStep(it, com.baraa.masroof.analytics.PurchaseForecaster.MIN_PERSONAL_DAYS) },
+        AnalysisReadinessStep(snapshot.completedPeriods, com.baraa.masroof.analytics.PurchaseForecaster.MIN_PERSONAL_PERIODS))
+
     fun forecast(snapshot: AnalysisSnapshot): ForecastExplanation {
         val method = when {
             snapshot.quality.blocked || snapshot.status != "READY" || snapshot.total == null -> ForecastMethod.UNAVAILABLE
@@ -38,7 +53,7 @@ object AnalysisPresentationBuilder {
         val snapshot = state.snapshot ?: return ForecastComparisonExplanation(ForecastComparisonStatus.UNAVAILABLE)
         val anchor = snapshot.periodStart + 7
         val enabled = state.preferences.enabledAt.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toEpochDay() }
-        val row = state.forecastComparisons.filter { it.periodStart == snapshot.periodStart && ForecastPerformancePolicy.supports(it) }.minByOrNull { it.issuedAt }
+        val row = ForecastPerformancePolicy.firstSupported(state.forecastComparisons, snapshot.periodStart)
         val status = when {
             row?.actual != null -> ForecastComparisonStatus.READY
             row != null && today < row.periodEnd -> ForecastComparisonStatus.WAITING_FOR_PERIOD

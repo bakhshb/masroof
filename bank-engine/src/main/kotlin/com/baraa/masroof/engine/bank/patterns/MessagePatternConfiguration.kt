@@ -16,6 +16,10 @@ data class BankMessagePatterns(
         require(deletedPatternIds.size <= 512 && deletedPatternIds.all { it.matches(Regex("[A-Za-z0-9_.-]{1,64}")) })
         require(patterns.none { it.id in deletedPatternIds }) { "Deleted patterns cannot be restored as revisions" }
     }
+    /** The configured sender that [sender] names under [SenderIdentity], or null. */
+    fun configuredSender(sender: String): String? = SenderIdentity.configuredSender(senders, sender)
+    fun ownsSender(sender: String): Boolean = configuredSender(sender) != null
+
     val currentPatterns: List<SavedMessagePattern>
         get() = patterns.groupBy { it.id }.values.map { versions -> versions.maxBy { it.revision } }.sortedBy { it.id }
 }

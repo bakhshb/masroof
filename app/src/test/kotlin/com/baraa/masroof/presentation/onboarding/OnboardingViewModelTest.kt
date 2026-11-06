@@ -1,10 +1,6 @@
 package com.baraa.masroof.presentation.onboarding
 
-import com.baraa.masroof.testsupport.EmptyReviewRepository
 import com.baraa.masroof.application.onboarding.ImportDatePolicy
-import com.baraa.masroof.application.backup.BackupImportOutcome
-import com.baraa.masroof.application.backup.BackupPackageKind
-import com.baraa.masroof.application.backup.DatabaseBackupGateway
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.domain.model.CardNetwork
@@ -15,11 +11,10 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardRegistryEntry
 import com.baraa.masroof.domain.model.OwnershipStatus
-import com.baraa.masroof.domain.model.ReviewItem
-import com.baraa.masroof.domain.model.ReviewKind
-import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
+import com.baraa.masroof.testsupport.FakeDatabaseBackupGateway
+import com.baraa.masroof.testsupport.FakeReviewRepo
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -649,21 +644,6 @@ AccountRegistryEntry.forTest(
         }
     }
 
-    private class FakeDatabaseBackupGateway(
-        var outcome: BackupImportOutcome = BackupImportOutcome.InvalidPackage,
-    ) : DatabaseBackupGateway {
-        override suspend fun exportTo(destination: android.net.Uri, passphrase: CharArray): Result<Unit> =
-            Result.success(Unit)
-
-        override suspend fun inspect(source: android.net.Uri): BackupPackageKind = BackupPackageKind.UNRECOGNIZED
-
-        override suspend fun importFrom(
-            source: android.net.Uri,
-            passphrase: CharArray,
-            confirmLegacyPlaintext: Boolean,
-        ): BackupImportOutcome = outcome
-    }
-
     private class FakeOnboardingPrefs : OnboardingPreferencesRepository {
         var draft: com.baraa.masroof.application.onboarding.OnboardingSetupDraft? = com.baraa.masroof.application.onboarding.OnboardingSetupDraft(
             setOf(Bank.BANK_ALJAZIRA.id), "2026-07-27", "2026-08-11", true)
@@ -783,27 +763,5 @@ AccountRegistryEntry.forTest(
         override suspend fun updateCardNetwork(reference: CardReference, network: CardNetwork?) = Unit
 
         override suspend fun updateCardType(reference: CardReference, cardType: CardType?) = Unit
-    }
-
-    private class FakeReviewRepo : EmptyReviewRepository() {
-        override suspend fun upsertRequired(
-            rawSmsId: String,
-            kind: ReviewKind,
-            reasons: List<String>,
-            now: Instant,
-        ): ReviewItem {
-            return ReviewItem(
-                id = "review:$rawSmsId",
-                rawSmsId = rawSmsId,
-                kind = kind,
-                status = ReviewStatus.REQUIRED,
-                reasons = reasons,
-                createdAt = now,
-                updatedAt = now,
-                resolvedAt = null,
-                resolutionKind = null,
-                resolvedTransactionId = null,
-            )
-        }
     }
 }

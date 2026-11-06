@@ -13,6 +13,7 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
+import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -22,7 +23,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.math.BigDecimal
-import java.time.Instant
 import java.time.YearMonth
 
 @RunWith(RobolectricTestRunner::class)
@@ -32,7 +32,7 @@ class DashboardTransactionFactsTest {
 
     @Test
     fun cardContainer_winsOverParsedCardRef() {
-        val tx = transaction(source = FinancialContainerIdFactory.cardId(bank, "7271"))
+        val tx = tx(source = FinancialContainerIdFactory.cardId(bank, "7271"))
 
         val facts = single(tx, cardInvolvement = mapOf(tx.id to setOf("${bank.id}:2210")))
 
@@ -41,7 +41,7 @@ class DashboardTransactionFactsTest {
 
     @Test
     fun withoutCardContainer_usesSmallestParsedCardKey() {
-        val tx = transaction(source = FinancialContainerIdFactory.accountId(bank, "3001"))
+        val tx = tx(source = FinancialContainerIdFactory.accountId(bank, "3001"))
 
         val facts = single(tx, cardInvolvement = mapOf(tx.id to setOf("${bank.id}:8219", "${bank.id}:2210")))
 
@@ -51,7 +51,7 @@ class DashboardTransactionFactsTest {
 
     @Test
     fun loanAttributedRow_isLoanRepayment() {
-        val tx = transaction(type = FinancialTransactionType.EXPENSE)
+        val tx = tx(type = FinancialTransactionType.EXPENSE)
         val loanId = FinancialContainerIdFactory.loanId(bank, LoanType.PERSONAL)
 
         assertEquals(FinancialTransactionType.LOAN_REPAYMENT, single(tx, loanInvolvement = mapOf(tx.id to setOf(loanId))).effectiveType)
@@ -60,11 +60,11 @@ class DashboardTransactionFactsTest {
 
     @Test
     fun appliedRate_givesSarEquivalentWithoutFee() {
-        val usd = transaction(amount = Money.of("10.00", Currency.USD), rate = BigDecimal("3.7512"))
+        val usd = tx(currency = Currency.USD, rate = BigDecimal("3.7512"), rateSource = ExchangeRateSource.SMS)
 
         assertEquals(Money.of("37.51", Currency.SAR), single(usd).sarEquivalent)
         assertNull(single(usd.copy(appliedExchangeRate = null)).sarEquivalent)
-        assertNull(single(transaction(rate = BigDecimal("3.75"))).sarEquivalent)
+        assertNull(single(tx(rate = BigDecimal("3.75"), rateSource = ExchangeRateSource.SMS)).sarEquivalent)
     }
 
     /**
@@ -151,24 +151,4 @@ class DashboardTransactionFactsTest {
         loanInvolvement: Map<String, Set<String>> = emptyMap(),
     ): DashboardTransactionFacts =
         DashboardTransactionFactsBuilder.build(listOf(tx), cardInvolvement, loanInvolvement).getValue(tx.id)
-
-    private fun transaction(
-        type: FinancialTransactionType = FinancialTransactionType.EXPENSE,
-        amount: Money = Money.of("10.00", Currency.SAR),
-        source: String? = null,
-        rate: BigDecimal? = null,
-    ) = FinancialTransaction(
-        id = "tx-1",
-        type = type,
-        amount = amount,
-        occurredAt = Instant.parse("2026-08-05T11:05:00Z"),
-        sourceContainerId = source,
-        destinationContainerId = null,
-        merchant = null,
-        counterparty = null,
-        categoryId = null,
-        linkedParsedEventIds = emptyList(),
-        appliedExchangeRate = rate,
-        exchangeRateSource = rate?.let { ExchangeRateSource.SMS },
-    )
 }

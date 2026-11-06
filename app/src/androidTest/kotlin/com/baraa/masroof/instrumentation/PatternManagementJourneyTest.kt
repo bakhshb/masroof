@@ -30,6 +30,8 @@ import com.baraa.masroof.engine.bank.patterns.PatternFactContract
 import com.baraa.masroof.presentation.locale.AppLocaleContext
 import com.baraa.masroof.presentation.patterns.MessagePatternsScreen
 import com.baraa.masroof.testsupport.ScreenshotArtifactWriter
+import com.baraa.masroof.testsupport.ar
+import com.baraa.masroof.testsupport.clickAr
 import com.baraa.masroof.ui.theme.MasroofTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -40,12 +42,6 @@ import java.io.File
 class PatternManagementJourneyTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private var keyboard: SoftwareKeyboardController? = null
-    private fun ar(id: Int) = AppLocaleContext.wrap(compose.activity, "ar").getString(id)
-    private fun click(id: Int) {
-        val node = compose.onNodeWithText(ar(id))
-        if (runCatching { node.assertIsDisplayed() }.isFailure) node.performScrollTo()
-        node.performClick()
-    }
     private fun capture(name: String) {
         compose.runOnIdle { keyboard?.hide() }
         compose.waitForIdle()
@@ -109,7 +105,7 @@ class PatternManagementJourneyTest {
             compose.onNodeWithTag("pattern-delete-confirm").assertIsEnabled()
             compose.onNodeWithTag("pattern-delete-confirmation").performImeAction()
             capture("delete-matched")
-            compose.onNodeWithText(ar(R.string.settings_cancel)).performClick()
+            compose.onNodeWithText(compose.ar(R.string.settings_cancel)).performClick()
             assertTrue(store.load().banks.single().patterns.any { it.id == "stc-sarie-in" })
             compose.onNodeWithTag("pattern-delete").performScrollTo().performClick()
             compose.onNodeWithTag("pattern-delete-confirm").assertIsNotEnabled()
@@ -134,11 +130,11 @@ class PatternManagementJourneyTest {
             compose.onNodeWithTag("pattern-edit").performScrollTo().performClick()
             val body = "Inward transfer (SARIE)\n100.00 SAR\nFrom TEST PERSON\nFrom BJAZ\nAccount\n02-09-2026 08:01\nRef. No. *8PJ7"
             compose.onNodeWithTag("pattern-body").performTextInput(body)
-            compose.waitUntil(10_000) { runCatching { compose.onNodeWithText(ar(R.string.teaching_next)).assertIsEnabled() }.isSuccess }
-            click(R.string.teaching_next)
+            compose.waitUntil(10_000) { runCatching { compose.onNodeWithText(compose.ar(R.string.teaching_next)).assertIsEnabled() }.isSuccess }
+            compose.clickAr(R.string.teaching_next)
             capture("edit-fields")
-            click(R.string.pattern_preview)
-            click(R.string.pattern_save)
+            compose.clickAr(R.string.pattern_preview)
+            compose.clickAr(R.string.pattern_save)
             compose.waitUntil(10_000) { store.load().banks.single().currentPatterns.single { it.id == pattern.id }.revision == 3 }
             val versions = store.load().banks.single().patterns.filter { it.id == pattern.id }
             assertEquals(listOf(1, 2, 3), versions.map { it.revision })
@@ -159,12 +155,12 @@ class PatternManagementJourneyTest {
             compose.onNodeWithTag("pattern-body").performTextInput(body)
             // Rotation or process restore while editing must keep editing the same pattern.
             restoration.emulateSavedInstanceStateRestore()
-            compose.waitUntil(10_000) { compose.onAllNodesWithText(ar(R.string.pattern_edit_title)).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(10_000) { compose.onAllNodesWithText(compose.ar(R.string.pattern_edit_title)).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("pattern-body").assertTextContains("Inward transfer (SARIE)", substring = true)
-            compose.waitUntil(10_000) { runCatching { compose.onNodeWithText(ar(R.string.teaching_next)).assertIsEnabled() }.isSuccess }
-            click(R.string.teaching_next)
-            click(R.string.pattern_preview)
-            click(R.string.pattern_save)
+            compose.waitUntil(10_000) { runCatching { compose.onNodeWithText(compose.ar(R.string.teaching_next)).assertIsEnabled() }.isSuccess }
+            compose.clickAr(R.string.teaching_next)
+            compose.clickAr(R.string.pattern_preview)
+            compose.clickAr(R.string.pattern_save)
             compose.waitUntil(10_000) { store.load().banks.single().currentPatterns.single { it.id == pattern.id }.revision == pattern.revision + 1 }
             assertEquals(patternsBefore.map { it.id }.sorted(), store.load().banks.single().currentPatterns.map { it.id }.sorted())
         }

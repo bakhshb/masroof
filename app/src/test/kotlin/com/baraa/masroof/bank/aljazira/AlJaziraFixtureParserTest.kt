@@ -1,5 +1,6 @@
 package com.baraa.masroof.bank.aljazira
 
+import com.baraa.masroof.testsupport.aljaziraSenderDetector
 import com.baraa.masroof.testsupport.detailsOrNull
 import com.baraa.masroof.testsupport.eventOrNull
 import org.junit.Assume.assumeTrue
@@ -56,7 +57,7 @@ class AlJaziraFixtureParserTest(private val fixture: AlJaziraFixture) {
         val countingDetector = object : BankDetector {
             override fun detect(sender: String, body: String): BankDetectionResult {
                 detectCalls.incrementAndGet()
-                return AlJaziraBankDetector().detect(sender, body)
+                return aljaziraSenderDetector().detect(sender, body)
             }
         }
         val adapter = engineFixtureAdapter(detector = countingDetector)

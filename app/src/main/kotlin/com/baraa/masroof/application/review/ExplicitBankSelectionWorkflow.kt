@@ -25,6 +25,11 @@ class ExplicitBankSelectionWorkflow(
 ) {
     fun selectableBanks(): List<Bank> = bankSmsRegistry.banks()
 
+    /** Reparses one stored message on its own route; reparseStored already reconciles and refreshes its review. */
+    suspend fun reparse(rawSmsId: String) {
+        rawSmsRepository.getById(rawSmsId)?.let { processStored.reparseStored(it) }
+    }
+
     suspend fun selectAndReparse(rawSmsId: String, bankId: String) {
         if (bankId.isBlank() || '\u001e' in bankId) return
         val bank = Bank.fromId(bankId)

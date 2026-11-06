@@ -17,6 +17,9 @@ import com.baraa.masroof.presentation.locale.AppLocaleContext
 import com.baraa.masroof.presentation.patterns.MessagePatternsScreen
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.testsupport.TestStorageContext
+import com.baraa.masroof.testsupport.ar
+import com.baraa.masroof.testsupport.clickAr
+import com.baraa.masroof.testsupport.ingest
 import com.baraa.masroof.ui.theme.MasroofTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -28,12 +31,6 @@ class PatternCurrentMessageJourneyTest {
     // The prefilled selection repeats the value as text, so a chip is found by its span.
     private fun candidateTag(body: String, value: String) = body.indexOf(value).let { "pattern-candidate-$it-${it + value.length}" }
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
-    private fun ar(id: Int) = AppLocaleContext.wrap(compose.activity, "ar").getString(id)
-    private fun click(id: Int) {
-        val node = compose.onNodeWithText(ar(id))
-        if (runCatching { node.assertIsDisplayed() }.isFailure) node.performScrollTo()
-        node.performClick()
-    }
 
     @Test fun teachApproveAndApplyFromReviewPostsOnlyTheExplicitCurrentMessage() = runBlocking {
         val context = TestStorageContext(compose.activity, "ui-current-${java.util.UUID.randomUUID()}")
@@ -59,17 +56,17 @@ class PatternCurrentMessageJourneyTest {
                 }
             }
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("pattern-body").fetchSemanticsNodes().isNotEmpty() }
-            click(R.string.teaching_next)
+            compose.clickAr(R.string.teaching_next)
             compose.waitUntil(10_000) { compose.onAllNodesWithText("10SAR").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag(candidateTag(body, "10SAR")).performScrollTo().performClick()
             compose.onNodeWithTag("pattern-bind").performClick()
-            click(R.string.teaching_skip_field)
-            click(R.string.teaching_skip_field)
+            compose.clickAr(R.string.teaching_skip_field)
+            compose.clickAr(R.string.teaching_skip_field)
             compose.onNodeWithTag(candidateTag(body, "2026-10-15 12:30")).performScrollTo().performClick()
             compose.onNodeWithTag("pattern-bind").performClick()
-            click(R.string.pattern_preview)
-            compose.waitUntil(10_000) { compose.onAllNodesWithText(ar(R.string.pattern_save)).fetchSemanticsNodes().isNotEmpty() }
-            click(R.string.pattern_save)
+            compose.clickAr(R.string.pattern_preview)
+            compose.waitUntil(10_000) { compose.onAllNodesWithText(compose.ar(R.string.pattern_save)).fetchSemanticsNodes().isNotEmpty() }
+            compose.clickAr(R.string.pattern_save)
             // From Review, saving opens the financial approval directly.
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("pattern-financial-save").fetchSemanticsNodes().isNotEmpty() }
             assertTrue(c.financialTransactionRepository.listAll().isEmpty())
@@ -85,14 +82,14 @@ class PatternCurrentMessageJourneyTest {
                 throw failure
             }
             compose.onNodeWithTag("pattern-apply-current").performScrollTo().performClick()
-            compose.waitUntil(15_000) { compose.onAllNodesWithText(ar(R.string.teaching_apply_posted)).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitUntil(15_000) { compose.onAllNodesWithText(compose.ar(R.string.teaching_apply_posted)).fetchSemanticsNodes().isNotEmpty() }
             assertEquals(ReviewStatus.RESOLVED, c.reviewRepository.getById(current.id)?.status)
             assertEquals(1, c.financialTransactionRepository.listAll().size)
             assertEquals(ReviewStatus.REQUIRED, c.reviewRepository.findByRawSmsId("ui-other")!!.status)
             assertEquals(untouched, c.parsedEventRepository.findByRawSmsId("ui-other"))
-            compose.onNodeWithText(ar(R.string.teaching_apply_posted)).assertExists()
+            compose.onNodeWithText(compose.ar(R.string.teaching_apply_posted)).assertExists()
             // Back is ignored while the post-apply pending refresh is still busy, so retry until it lands.
-            val returnToReview = compose.onNodeWithContentDescription(ar(R.string.teaching_return_review))
+            val returnToReview = compose.onNodeWithContentDescription(compose.ar(R.string.teaching_return_review))
             compose.waitUntil(10_000) { if (!returnedToReview) returnToReview.performClick(); returnedToReview }
         } finally { c.close(); context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
         Unit
