@@ -12,7 +12,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import com.baraa.masroof.application.logging.AppLogCategories
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.data.room.DatabaseRestartRequiredException
 import kotlinx.coroutines.CancellationException
 import java.time.Instant
@@ -36,7 +36,7 @@ class LiveCaptureRecoveryWorker(
     params: WorkerParameters,
     private val scan: suspend (receivedAfter: Instant) -> SmsScanResult,
     private val startupReady: suspend () -> Boolean,
-    private val appLogService: AppLogService? = null,
+    private val appLogService: AppLog,
     private val onFinished: () -> Unit = {},
     private val requeue: (receivedAfter: Instant, requeues: Int) -> Unit = { _, _ -> },
 ) : CoroutineWorker(appContext, params) {
@@ -70,7 +70,7 @@ class LiveCaptureRecoveryWorker(
     /** Nothing durable remembers a lost capture but this work, so exhausted attempts hand over to a later request. */
     private fun retryOrRequeue(after: Long, reason: String): Result {
         val exhausted = runAttemptCount + 1 >= MAX_ATTEMPTS
-        appLogService?.warn(
+        appLogService.warn(
             AppLogCategories.SMS,
             "LiveCaptureRecoveryWorker scan incomplete attempt=${runAttemptCount + 1} " +
                 "retry_state=${if (exhausted) "exhausted" else "retry"} ($reason)",
@@ -93,14 +93,14 @@ class LiveCaptureRecoveryWorker(
 
     // Success, not failure: a scan appended behind this one in the chain must still run.
     private fun giveUp(reason: String): Result {
-        appLogService?.warn(AppLogCategories.SMS, "LiveCaptureRecoveryWorker gave up ($reason)")
+        appLogService.warn(AppLogCategories.SMS, "LiveCaptureRecoveryWorker gave up ($reason)")
         return Result.success()
     }
 
     class Factory(
         private val scanner: () -> HistoricalSmsScanner,
         private val startupReady: suspend () -> Boolean,
-        private val appLogService: AppLogService? = null,
+        private val appLogService: AppLog,
         private val onFinished: () -> Unit = {},
     ) : WorkerFactory() {
         override fun createWorker(

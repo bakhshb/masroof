@@ -2,7 +2,7 @@ package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.domain.repository.TransactionIgnoreOutcome
 import com.baraa.masroof.domain.repository.TransactionIgnoreRepository
 import com.baraa.masroof.sms.time.InstantClock
@@ -17,13 +17,13 @@ sealed interface IgnoreResult {
 class TransactionIgnoreService(
     private val persistence: TransactionIgnoreRepository,
     private val clock: InstantClock,
-    private val appLogService: AppLogService? = null,
+    private val appLogService: AppLog,
 ) {
     suspend fun ignore(transactionId: String): IgnoreResult =
         try {
             when (val result = persistence.ignoreSingle(transactionId, clock.now())) {
                 TransactionIgnoreOutcome.Ignored -> {
-                    appLogService?.info(
+                    appLogService.info(
                         AppLogCategories.TRANSACTION,
                         "Ignored transaction ${AppLogFormatting.maskId(transactionId)}",
                     )

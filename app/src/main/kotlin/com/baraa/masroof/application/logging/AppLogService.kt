@@ -15,7 +15,7 @@ class AppLogService(
     private val maxEntries: Int = DEFAULT_MAX_ENTRIES,
     private val retentionDays: Long = DEFAULT_RETENTION_DAYS,
     private val clock: () -> Long = { System.currentTimeMillis() },
-) {
+) : AppLog {
     private val lock = Any()
     private val logFile: File = File(context.filesDir, LOG_FILE_NAME)
     private var nextId = 1L
@@ -26,7 +26,7 @@ class AppLogService(
         pruneExpiredLocked()
     }
 
-    fun log(level: AppLogLevel, category: String, message: String) {
+    override fun log(level: AppLogLevel, category: String, message: String) {
         val entry = AppLogEntry(
             id = synchronized(lock) { nextId++ },
             timestampEpochMs = clock(),
@@ -41,15 +41,6 @@ class AppLogService(
             runCatching { rewriteDiskLocked() }
         }
     }
-
-    fun info(category: String, message: String) = log(AppLogLevel.INFO, category, message)
-
-    fun warn(category: String, message: String) = log(AppLogLevel.WARN, category, message)
-
-    fun error(category: String, message: String) = log(AppLogLevel.ERROR, category, message)
-
-    /** A caught failure: the step, exception type and a masked message, so a report can be traced without SMS data. */
-    fun failure(category: String, action: String, error: Throwable) = error(category, "$action failed (${describe(error)})")
 
     fun readAll(): List<AppLogEntry> =
         synchronized(lock) { entries.toList() }

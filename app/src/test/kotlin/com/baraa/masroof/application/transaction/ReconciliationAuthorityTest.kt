@@ -22,6 +22,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpReclassificationRepository
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -405,6 +410,7 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
                 parsedRepo,
                 correctionRepo,
             ),
+            reviewRepository = EmptyReviewRepository(),
         )
         persistEvent(
             smsId = "sms-rr-merchant-only",
@@ -485,8 +491,11 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
             reviewRepository = reviewRepo,
             financialTransactionRepository = ftRepo,
             reconciliation = withReviews,
-            reclassification = TransactionReclassificationService(ftRepo, effective, resolver, confirmation),
+            reclassification = TransactionReclassificationService(ftRepo, effective, resolver, confirmation, appLogService = NoOpAppLog, persistence = noOpReclassificationRepository(ftRepo)),
             clock = clock,
+            appLogService = NoOpAppLog,
+            processingRecovery = noOpProcessingRecovery(),
+            reviewQueueUpdater = noOpReviewQueueUpdater(),
         )
         val result = restore.restore("sms-rr-restore")
 

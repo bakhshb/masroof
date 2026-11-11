@@ -17,6 +17,7 @@ import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.zip.ZipInputStream
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /** A restore accepts only known (version, identity hash) pairs and migrates the staged copy; device twin `BackupMigrationDeviceTest`. */
 @RunWith(RobolectricTestRunner::class)
@@ -46,7 +47,8 @@ class BackupOlderSchemaImportTest {
         val live = MasroofDatabase.builder(context, MasroofDatabase::class.java, "verify-live.db").build()
         try {
             val service = DatabaseBackupService(context, live, { error("verify must not close") }, "test",
-                schema = BackupMigrationContract.nextVersionSchema(context))
+                schema = BackupMigrationContract.nextVersionSchema(context),
+                appLogService = NoOpAppLog,)
             assertEquals(BackupVerificationOutcome.VERIFIED, service.verify(
                 Uri.fromFile(File(fixtures, "masroof-v18-backup.masroof")), BackupMigrationContract.PASSPHRASE.toCharArray()))
         } finally {
@@ -80,7 +82,8 @@ class BackupOlderSchemaImportTest {
         val archive = File(context.cacheDir, "export.masroof")
         try {
             val service = DatabaseBackupService(context, live, { error("export must not close") }, "test",
-                kdfIterations = 2, schema = BackupMigrationContract.nextVersionSchema(context))
+                kdfIterations = 2, schema = BackupMigrationContract.nextVersionSchema(context),
+                appLogService = NoOpAppLog,)
             assertTrue(service.exportTo(Uri.fromFile(archive), "secret".toCharArray()).isSuccess)
             val plain = ByteArrayOutputStream().also { out -> archive.inputStream().use { BackupEnvelope.decrypt(it, out, "secret".toCharArray()) } }
             val manifest = BackupPackageCodec.decodeManifest(entries(plain.toByteArray()).getValue(BackupPackageFormat.MANIFEST_ENTRY).decodeToString())

@@ -37,6 +37,8 @@ import org.robolectric.annotation.Config
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
 
 /** Reconciling many messages costs a few batched reads, not several queries for each message. */
 @RunWith(RobolectricTestRunner::class)
@@ -88,6 +90,8 @@ class ReconciliationQueryBudgetTest {
             financialTransactionRepository = ledger,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
             reviewRepository = RoomReviewRepository(db.reviewItemDao()),
+            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
+            ownershipConfirmationService = noOpOwnershipConfirmation(),
         )
 
         reads.set(0)

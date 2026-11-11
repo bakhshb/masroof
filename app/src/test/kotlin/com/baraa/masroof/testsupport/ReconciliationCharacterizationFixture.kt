@@ -231,9 +231,10 @@ class ReconciliationCharacterizationFixture private constructor(
         effectiveParsedEventProvider = if (withCorrections) {
             EffectiveParsedEventProvider(parsedRepo, corrections)
         } else {
-            null
+            noOpEffectiveParsedEventProvider(parsedRepo)
         },
         zoneId = ZONE,
+        reviewRepository = EmptyReviewRepository(),
     )
 
     private suspend fun persist(

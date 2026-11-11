@@ -22,6 +22,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -110,7 +111,8 @@ class ReviewDetailLoaderTest {
         try {
             val patterns = com.baraa.masroof.application.patterns.MessagePatternsWorkflow(
                 com.baraa.masroof.data.patterns.MessagePatternStore(directory.resolve("patterns.json")),
-                com.baraa.masroof.data.room.DatabaseAccessGate())
+                com.baraa.masroof.data.room.DatabaseAccessGate(),
+                appLogService = NoOpAppLog,)
             patterns.addBank(0, "Synthetic bank", detail.sender!!, detail.bankId)
             val preview = patterns.teach(1, detail.bankId!!, detail.sender,
                 com.baraa.masroof.application.patterns.PatternOperation.PURCHASE, detail.body!!,

@@ -24,6 +24,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.time.LocalDateTime
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 /** Pairing wins over posting a leg alone, including when a pair save loses a race. */
 @RunWith(RobolectricTestRunner::class)
@@ -130,6 +132,8 @@ class TransferPairPersistenceTest : ReconciliationTestFixture() {
         financialTransactionRepository = ledger,
         ownershipResolver = OwnershipResolver(accounts, cards, loans),
         ownershipConfirmationService = confirmation,
+        effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+        reviewRepository = EmptyReviewRepository(),
     )
 
     private companion object {

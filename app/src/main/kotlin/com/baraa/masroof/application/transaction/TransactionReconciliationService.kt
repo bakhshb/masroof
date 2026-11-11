@@ -47,8 +47,8 @@ data class ReconciliationSummary(
 /**
  * Orchestrates ownership-aware matching/assembly and FinancialTransaction persistence.
  *
- * When [effectiveParsedEventProvider] is present, reconciliation uses corrected
- * projections without mutating stored ParsedEvent rows.
+ * Reconciliation reads corrected projections through [effectiveParsedEventProvider]
+ * without mutating stored ParsedEvent rows.
  *
  * Only automation-eligible evidence ([TransactionAssembler.isAutomationEligible])
  * may create, pair, or heal transactions; non-SUCCESS parses become review
@@ -59,9 +59,9 @@ class TransactionReconciliationService(
     private val rawSmsRepository: RawSmsRepository,
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val ownershipResolver: OwnershipResolver,
-    private val ownershipConfirmationService: OwnershipConfirmationService? = null,
-    private val effectiveParsedEventProvider: EffectiveParsedEventProvider? = null,
-    private val reviewRepository: ReviewRepository? = null,
+    private val ownershipConfirmationService: OwnershipConfirmationService,
+    private val effectiveParsedEventProvider: EffectiveParsedEventProvider,
+    private val reviewRepository: ReviewRepository,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val automaticWrite: (suspend (List<ParsedEventRecord>, suspend () -> FinancialTransactionSaveResult) -> FinancialTransactionSaveResult)? = null,
 ) {
@@ -146,33 +146,25 @@ class TransactionReconciliationService(
     }
 
     private suspend fun loadRecords(): List<ParsedEventRecord> =
-        effectiveParsedEventProvider?.listAllEffective()
-            ?: parsedEventRepository.listAll()
+        effectiveParsedEventProvider.listAllEffective()
 
     private fun MessageFamily.isTransferFamily(): Boolean =
         this == MessageFamily.TRANSFER_IN || this == MessageFamily.TRANSFER_OUT
 
     private suspend fun loadByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> =
-        effectiveParsedEventProvider?.listEffectiveByRawSmsIds(rawSmsIds)
-            ?: parsedEventRepository.listByRawSmsIds(rawSmsIds)
+        effectiveParsedEventProvider.listEffectiveByRawSmsIds(rawSmsIds)
 
     private suspend fun loadUnlinkedTransfersReceivedBetween(
         startInclusive: Instant,
         endExclusive: Instant,
     ): List<ParsedEventRecord> =
-        effectiveParsedEventProvider?.listUnlinkedTransfersEffectiveReceivedBetween(
-            startInclusive,
-            endExclusive,
-        ) ?: parsedEventRepository.listUnlinkedTransfersReceivedBetween(startInclusive, endExclusive)
+        effectiveParsedEventProvider.listUnlinkedTransfersEffectiveReceivedBetween(startInclusive, endExclusive)
 
     private suspend fun loadUnlinkedTransfersOccurredLocalBetween(
         startInclusive: LocalDateTime,
         endExclusive: LocalDateTime,
     ): List<ParsedEventRecord> =
-        effectiveParsedEventProvider?.listUnlinkedTransfersEffectiveOccurredLocalBetween(
-            startInclusive,
-            endExclusive,
-        ) ?: parsedEventRepository.listUnlinkedTransfersOccurredLocalBetween(startInclusive, endExclusive)
+        effectiveParsedEventProvider.listUnlinkedTransfersEffectiveOccurredLocalBetween(startInclusive, endExclusive)
 
     /**
      * Two matcher windows cover a competing leg that can pair with an in-window
@@ -294,7 +286,7 @@ class TransactionReconciliationService(
         // Batch reads for the loop. Unlinking one leg also changes its pair's transaction, so the other
         // leg reads that transaction fresh.
         val inScopeIds = records.map { it.event.rawSmsId }.filter { scope == null || it in scope.rawSmsIds }
-        val reviewsByRawSmsId = reviewRepository?.findByRawSmsIds(inScopeIds).orEmpty()
+        val reviewsByRawSmsId = reviewRepository.findByRawSmsIds(inScopeIds)
         val linkedByRawSmsId = financialTransactionRepository.findByRawSmsIds(inScopeIds)
         val receivedAtByRawSmsId = rawSmsRepository.receivedAtByIds(inScopeIds)
         val touchedTransactionIds = mutableSetOf<String>()
@@ -307,25 +299,23 @@ class TransactionReconciliationService(
             }
             var userConfirmed = record.automationConfirmed
             val review = reviewsByRawSmsId[event.rawSmsId]
-            if (reviewRepository != null) {
-                if (review?.status == ReviewStatus.RESOLVED &&
-                    review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
-                ) {
-                    ignored++
-                    settledRawSmsIds += event.rawSmsId
-                    continue
-                }
-                if (review?.status == ReviewStatus.RESOLVED &&
-                    review.resolutionKind == ReviewResolutionKind.USER_EXTERNAL_TRANSFER
-                ) {
-                    alreadyLinked++
-                    settledRawSmsIds += event.rawSmsId
-                    continue
-                }
-                // Explicit "this SMS is financial" decision (e.g. restore from ignored).
-                if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) {
-                    userConfirmed = true
-                }
+            if (review?.status == ReviewStatus.RESOLVED &&
+                review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
+            ) {
+                ignored++
+                settledRawSmsIds += event.rawSmsId
+                continue
+            }
+            if (review?.status == ReviewStatus.RESOLVED &&
+                review.resolutionKind == ReviewResolutionKind.USER_EXTERNAL_TRANSFER
+            ) {
+                alreadyLinked++
+                settledRawSmsIds += event.rawSmsId
+                continue
+            }
+            // Explicit "this SMS is financial" decision (e.g. restore from ignored).
+            if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) {
+                userConfirmed = true
             }
             val linkedBefore = linkedByRawSmsId[event.rawSmsId]?.let {
                 if (it.id in touchedTransactionIds) financialTransactionRepository.findByRawSmsId(event.rawSmsId) else it
@@ -1078,7 +1068,7 @@ class TransactionReconciliationService(
      * repair must not delete, unlink, re-pair, or replace that SMS.
      */
     private suspend fun preservesExplicitUserDecision(rawSmsId: String): Boolean =
-        preservesExplicitUserDecision(reviewRepository?.findByRawSmsId(rawSmsId))
+        preservesExplicitUserDecision(reviewRepository.findByRawSmsId(rawSmsId))
 
     private fun preservesExplicitUserDecision(review: ReviewItem?): Boolean {
         if (review == null || review.status != ReviewStatus.RESOLVED) return false
@@ -1105,16 +1095,14 @@ class TransactionReconciliationService(
         val event = record.event
         if (!event.messageFamily.isTransferFamily()) return null
         var userConfirmed = record.automationConfirmed
-        if (reviewRepository != null) {
-            val review = reviewRepository.findByRawSmsId(event.rawSmsId)
-            if (review?.status == ReviewStatus.RESOLVED &&
-                review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
-            ) {
-                return null
-            }
-            if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) {
-                userConfirmed = true
-            }
+        val review = reviewRepository.findByRawSmsId(event.rawSmsId)
+        if (review?.status == ReviewStatus.RESOLVED &&
+            review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
+        ) {
+            return null
+        }
+        if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) {
+            userConfirmed = true
         }
         if (!TransactionAssembler.isAutomationEligible(event, userConfirmed)) return null
         val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: return null
@@ -1173,7 +1161,7 @@ class TransactionReconciliationService(
         val resolvedLoanType = loanType ?: return
         val reference = LoanReference(event.bank, resolvedLoanType)
         if (ownershipResolver.resolveLoan(reference) != OwnershipStatus.UNKNOWN) return
-        ownershipConfirmationService?.confirmLoanOwned(reference)
+        ownershipConfirmationService.confirmLoanOwned(reference)
     }
 
     private suspend fun accountOwnership(reference: AccountReference?): OwnershipStatus =

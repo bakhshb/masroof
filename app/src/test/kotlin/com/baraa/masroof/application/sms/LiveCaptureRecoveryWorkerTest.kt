@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /** The inbox re-read after a lost live capture retries until the SMS is stored. */
 @RunWith(RobolectricTestRunner::class)
@@ -117,7 +118,7 @@ class LiveCaptureRecoveryWorkerTest {
             .setRunAttemptCount(attempt)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
-                    LiveCaptureRecoveryWorker(appContext, workerParameters, scan, { ready }, onFinished = { finished++ }) { at, waits -> requeued += at to waits }
+                    LiveCaptureRecoveryWorker(appContext, workerParameters, scan, { ready }, onFinished = { finished++ }, appLogService = NoOpAppLog) { at, waits -> requeued += at to waits }
             })
             .build()
 }

@@ -50,6 +50,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpReclassificationRepository
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -98,9 +102,14 @@ class ScopedMutationReconciliationTest {
                 financialTransactionRepository = transactions,
                 effectiveParsedEventProvider = wiring.effective,
                 ownershipResolver = wiring.resolver,
+                appLogService = NoOpAppLog,
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
+                persistence = noOpReclassificationRepository(transactions),
             ),
             clock = clock,
             reviewQueueUpdater = wiring.updater,
+            appLogService = NoOpAppLog,
+            processingRecovery = noOpProcessingRecovery(),
         )
     }
 

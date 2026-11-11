@@ -51,6 +51,8 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlin.math.abs
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 /**
  * Scoped reconciliation must match full reconciliation on the affected evidence
@@ -92,6 +94,8 @@ class ScopedReconciliationTest {
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
             ownershipConfirmationService = confirmation,
             zoneId = zoneId,
+            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
+            reviewRepository = EmptyReviewRepository(),
         )
     }
 
@@ -281,6 +285,7 @@ class ScopedReconciliationTest {
             ownershipConfirmationService = confirmation,
             effectiveParsedEventProvider = EffectiveParsedEventProvider(parsed, corrections),
             zoneId = zoneId,
+            reviewRepository = EmptyReviewRepository(),
         )
         parsed.reset()
         transactions.reset()
@@ -631,6 +636,8 @@ class ScopedReconciliationTest {
                 ownershipResolver = OwnershipResolver(accounts, cards, loanRegistry),
                 ownershipConfirmationService = ownership,
                 zoneId = zoneId,
+                effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(countedParsed),
+                reviewRepository = EmptyReviewRepository(),
             )
             persistTransfer(
                 smsId = "sms-local-a",

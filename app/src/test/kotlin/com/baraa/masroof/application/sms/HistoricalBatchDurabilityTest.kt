@@ -22,6 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -70,7 +71,7 @@ class HistoricalBatchDurabilityTest {
                     InboxRow.Valid(ProviderSmsRecord("history-1", raw.sender, raw.body, raw.receivedAt)),
                 )
             }
-            val result = HistoricalSmsScanner(source, harness.historicalBatch(reconciliationFails = true)).scan()
+            val result = HistoricalSmsScanner(source, harness.historicalBatch(reconciliationFails = true), appLogService = NoOpAppLog).scan()
             assertEquals(1, result.parsed)
             assertTrue(result.failure is SmsScanFailure.DerivedIncomplete)
             assertEquals(1, harness.processingRetryRepo.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).size)
@@ -91,7 +92,7 @@ class HistoricalBatchDurabilityTest {
                 }
             }
             Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { io ->
-                HistoricalSmsScanner(source, harness.historicalBatch(), ioDispatcher = io).scan()
+                HistoricalSmsScanner(source, harness.historicalBatch(), ioDispatcher = io, appLogService = NoOpAppLog).scan()
             }
             assertNotEquals(caller, queryThread.get())
             assertEquals(queryThread.get(), iteratorThread.get())

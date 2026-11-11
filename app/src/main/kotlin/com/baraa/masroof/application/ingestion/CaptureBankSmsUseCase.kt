@@ -2,7 +2,7 @@ package com.baraa.masroof.application.ingestion
 
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.bank.BankRoutingResult
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.domain.model.Bank
@@ -25,7 +25,7 @@ import java.time.Duration
 class CaptureBankSmsUseCase(
     private val rawSmsRepository: RawSmsRepository,
     private val bankSmsRegistry: BankSmsRegistry,
-    private val appLogService: AppLogService? = null,
+    private val appLogService: AppLog,
 ) {
     private val insertMutex = Mutex()
 
@@ -51,7 +51,7 @@ class CaptureBankSmsUseCase(
             }) return BankSmsCaptureResult.NotRelevant(reason = "outside_bank_scope")
         if (route is BankRoutingResult.NotMatched) {
             if (logOutcome) {
-                appLogService?.info(
+                appLogService.info(
                     AppLogCategories.INGEST,
                     "Ignored non-bank SMS from ${AppLogFormatting.maskSender(rawSms.sender)} (${route.reason})",
                 )
@@ -75,7 +75,7 @@ class CaptureBankSmsUseCase(
         return when (insertOutcome) {
             RawSmsInsertResult.AlreadyExists -> {
                 if (logOutcome) {
-                    appLogService?.info(
+                    appLogService.info(
                         AppLogCategories.INGEST,
                         "Duplicate SMS from ${AppLogFormatting.maskSender(rawSms.sender)}",
                     )
@@ -84,7 +84,7 @@ class CaptureBankSmsUseCase(
             }
             RawSmsInsertResult.Inserted -> {
                 if (logOutcome) {
-                    appLogService?.info(
+                    appLogService.info(
                         AppLogCategories.INGEST,
                         "Inserted SMS from ${AppLogFormatting.maskSender(rawSms.sender)}",
                     )
@@ -96,7 +96,7 @@ class CaptureBankSmsUseCase(
 
     private fun failed(rawSms: RawSms, e: Exception, logOutcome: Boolean): BankSmsCaptureResult.Failed {
         if (logOutcome) {
-            appLogService?.error(
+            appLogService.error(
                 AppLogCategories.INGEST,
                 "Ingest failed for ${AppLogFormatting.maskSender(rawSms.sender)} (${e.javaClass.simpleName})",
             )

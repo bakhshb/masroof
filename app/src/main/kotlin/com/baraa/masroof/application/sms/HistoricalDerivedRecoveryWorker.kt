@@ -11,7 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import com.baraa.masroof.application.logging.AppLogCategories
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.application.transaction.ReconciliationIncompleteException
 import com.baraa.masroof.data.room.DatabaseRestartRequiredException
 import kotlinx.coroutines.CancellationException
@@ -36,7 +36,7 @@ class HistoricalDerivedRecoveryWorker(
     appContext: Context,
     params: WorkerParameters,
     private val recovery: HistoricalDerivedRecovery,
-    private val appLogService: AppLogService? = null,
+    private val appLogService: AppLog,
     private val startupReady: suspend () -> Boolean = { true },
     /** Lets open screens reload; a pass can post rows even when it ends incomplete. */
     private val onFinished: () -> Unit = {},
@@ -66,7 +66,7 @@ class HistoricalDerivedRecoveryWorker(
         val incomplete = error as? ReconciliationIncompleteException
         val failures = incomplete?.let { " failures=${it.failureCount} id=${it.maskedRawSmsId}" }.orEmpty()
         val stage = incomplete?.stage ?: "reconciliation"
-        appLogService?.warn(
+        appLogService.warn(
             AppLogCategories.SMS,
             "HistoricalDerivedRecoveryWorker $stage incomplete$failures " +
                 "attempt=${runAttemptCount + 1} retry_state=retained (${error.javaClass.simpleName})",
@@ -74,7 +74,7 @@ class HistoricalDerivedRecoveryWorker(
     }
 
     class Factory(
-        private val appLogService: AppLogService? = null,
+        private val appLogService: AppLog,
         private val startupReady: suspend () -> Boolean = { true },
         private val onFinished: () -> Unit = {},
         private val recovery: () -> HistoricalDerivedRecovery,

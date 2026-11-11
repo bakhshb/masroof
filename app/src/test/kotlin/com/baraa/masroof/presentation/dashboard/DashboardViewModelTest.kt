@@ -60,6 +60,9 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpReclassificationRepository
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -825,12 +828,16 @@ class DashboardViewModelTest {
                     NoOpCardRegistryRepository(),
                     com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
                 ),
+                appLogService = NoOpAppLog,
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
+                persistence = noOpReclassificationRepository(SettingsViewModelTestSupport.emptyFinancialTransactionRepository()),
             ),
             ignoreService = TransactionIgnoreService(
                 persistence = com.baraa.masroof.domain.repository.TransactionIgnoreRepository { _, _ ->
                     com.baraa.masroof.domain.repository.TransactionIgnoreOutcome.Rejected("transaction_not_found")
                 },
                 clock = com.baraa.masroof.sms.time.InstantClock.System,
+                appLogService = NoOpAppLog,
             ),
             dashboardCommitmentsWorkflow = DashboardCommitmentsWorkflow(
                 commitmentFromTransactionService = CommitmentFromTransactionService(

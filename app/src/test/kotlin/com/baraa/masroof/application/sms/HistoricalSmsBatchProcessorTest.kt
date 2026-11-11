@@ -60,6 +60,16 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.IOException
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpOwnershipDiscovery
+import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
+import com.baraa.masroof.testsupport.noOpReconciliation
+import com.baraa.masroof.testsupport.noOpIngestionReviewService
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 /**
  * One historical batch finishes with one ownership pass, one reconciliation,
@@ -364,13 +374,22 @@ class HistoricalSmsBatchProcessorTest {
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             sarEquivalentResolver = TransactionSarEquivalentResolver(marketRateProvider = { _, _ -> null }),
+            appLogService = NoOpAppLog,
         )
         return HistoricalSmsBatchProcessor(
-            capture = CaptureBankSmsUseCase(rawRepo, registry),
+            capture = CaptureBankSmsUseCase(rawRepo, registry, appLogService = NoOpAppLog),
             processStored = ProcessStoredSmsUseCase(
                 rawSmsRepository = rawRepo,
                 parsedEventRepository = parsedRepo,
                 bankSmsRegistry = registry,
+                appLogService = NoOpAppLog,
+                exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+                ingestionReviewService = noOpIngestionReviewService(),
+                ownershipDiscovery = noOpOwnershipDiscovery(),
+                processingRecovery = noOpProcessingRecovery(),
+                reconciliation = noOpReconciliation(),
+                reviewQueueUpdater = noOpReviewQueueUpdater(),
+                reviewRepository = EmptyReviewRepository(),
             ),
             ownershipDiscovery = OwnershipDiscoveryService(accounts, cards, NoOpLoanRegistryRepository),
             reconciliation = TransactionReconciliationService(
@@ -378,6 +397,9 @@ class HistoricalSmsBatchProcessorTest {
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = transactions,
                 ownershipResolver = OwnershipResolver(accounts, realCards, NoOpLoanRegistryRepository),
+                effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
+                reviewRepository = EmptyReviewRepository(),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviews, transactions, clock),
             exchangeRateEnrichmentScheduler = ImmediateExchangeRateEnrichmentScheduler(
@@ -390,6 +412,7 @@ class HistoricalSmsBatchProcessorTest {
                 clock = clock,
             ),
             batchRecoveryScheduler = { recoverySchedules += 1 },
+            appLogService = NoOpAppLog,
         )
     }
 

@@ -11,6 +11,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 class StcBundledPatternsTest {
     @Test fun sarieTransferMatchesAnEmptyAccountLineWithoutInventingAnAccountReference() {
@@ -79,7 +80,7 @@ class StcBundledPatternsTest {
         val directory = Files.createTempDirectory("stc-defaults-").toFile()
         try {
             val store = MessagePatternStore(directory.resolve("patterns.json"))
-            val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(generate()))
+            val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(generate()), appLogService = NoOpAppLog)
             val seeded = workflow.load()
             assertEquals(1L, seeded.generation)
             assertEquals(8, seeded.banks.single().patterns.size)

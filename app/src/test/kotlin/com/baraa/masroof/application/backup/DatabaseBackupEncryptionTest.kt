@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.locale.AppLocale
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.data.preferences.SharedPrefsOnboardingPreferencesRepository
@@ -29,6 +30,7 @@ import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -152,6 +154,7 @@ class DatabaseBackupEncryptionTest {
                         restartRequested.set(true)
                     },
                     kdfIterations = TEST_KDF_ITERATIONS,
+                    appLogService = NoOpAppLog,
                 ).importFrom(Uri.fromFile(destination), passphrase.copyOf())
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
                 assertTrue(restartRequested.get())
@@ -249,6 +252,7 @@ class DatabaseBackupEncryptionTest {
                         assertNoBackupStaging()
                         restartRequested.set(true)
                     },
+                    appLogService = NoOpAppLog,
                 ).importFrom(Uri.fromFile(zip), confirmLegacyPlaintext = true)
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, confirmed)
                 assertTrue(restartRequested.get())
@@ -437,6 +441,7 @@ class DatabaseBackupEncryptionTest {
                 restartProcess = { assertNoBackupStaging() },
                 beforeValidatedInstall = { error("injected install failure") },
                 kdfIterations = TEST_KDF_ITERATIONS,
+                appLogService = NoOpAppLog,
             )
             assertEquals(BackupImportOutcome.Failed, importer.importFrom(Uri.fromFile(archive), passphrase.copyOf()))
             assertNoBackupStaging()
@@ -471,6 +476,7 @@ class DatabaseBackupEncryptionTest {
                 val importer = DatabaseBackupService(
                     failingContext, live, { live.close() }, "test",
                     restartProcess = { assertNoBackupStaging(); restarted = true }, kdfIterations = TEST_KDF_ITERATIONS,
+                    appLogService = NoOpAppLog,
                 )
                 assertEquals(BackupImportOutcome.Failed, importer.importFrom(Uri.fromFile(archive), passphrase.copyOf()))
                 assertTrue("commit failure was exercised for $preferenceName", failingContext.failed)
@@ -523,7 +529,7 @@ class DatabaseBackupEncryptionTest {
 
     private fun service(
         database: MasroofDatabase,
-        logs: AppLogService? = null,
+        logs: AppLog = NoOpAppLog,
         closeDatabase: () -> Unit = { error("live database must stay open") },
         archiveLimits: BackupArchiveLimits = BackupArchiveLimits.PRODUCTION,
     ) = DatabaseBackupService(

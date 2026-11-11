@@ -39,6 +39,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -65,6 +68,7 @@ class TransactionIgnoreServiceTest {
         service = TransactionIgnoreService(
             persistence = com.baraa.masroof.data.repository.RoomTransactionIgnoreRepository(db),
             clock = clock,
+            appLogService = NoOpAppLog,
         )
         reconciliation = TransactionReconciliationService(
             parsedEventRepository = parsedRepo,
@@ -76,6 +80,8 @@ class TransactionIgnoreServiceTest {
                 com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
             ),
             reviewRepository = reviewRepo,
+            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+            ownershipConfirmationService = noOpOwnershipConfirmation(),
         )
     }
 
@@ -150,6 +156,7 @@ class TransactionIgnoreServiceTest {
                 error("injected failure inside ignore transaction")
             }),
             clock = InstantClock { Instant.parse("2026-08-02T12:00:00Z") },
+            appLogService = NoOpAppLog,
         )
         assertEquals(IgnoreResult.Rejected("ignore_failed"), failing.ignore(id))
         org.junit.Assert.assertNotNull(ftRepo.getById(id))

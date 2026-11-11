@@ -31,6 +31,8 @@ import org.junit.After
 import org.junit.Before
 import java.math.BigDecimal
 import java.time.Instant
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 /** One fresh in-memory Room ledger per scenario; inherited setup/teardown never share state. */
 abstract class ReconciliationTestFixture {
@@ -63,6 +65,8 @@ abstract class ReconciliationTestFixture {
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
             ownershipConfirmationService = confirmation,
+            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+            reviewRepository = EmptyReviewRepository(),
         )
     }
 
@@ -78,6 +82,8 @@ abstract class ReconciliationTestFixture {
         ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(accounts, cards, loans),
         ownershipConfirmationService = confirmation,
         zoneId = zone,
+        effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+        reviewRepository = EmptyReviewRepository(),
     )
 
     protected suspend fun persistEvent(

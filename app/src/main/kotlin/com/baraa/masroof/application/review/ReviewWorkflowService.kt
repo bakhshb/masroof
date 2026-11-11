@@ -3,7 +3,7 @@ package com.baraa.masroof.application.review
 import com.baraa.masroof.application.ingestion.ProcessingRecovery
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
 import com.baraa.masroof.application.transaction.ReconciliationIncompleteException
 import com.baraa.masroof.application.transaction.ReconciliationReport
@@ -69,8 +69,8 @@ class ReviewWorkflowService(
     private val manualReviewResolutionRepository: ManualReviewResolutionRepository,
     private val clock: InstantClock,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
-    private val appLogService: AppLogService? = null,
-    private val processingRecovery: ProcessingRecovery? = null,
+    private val appLogService: AppLog,
+    private val processingRecovery: ProcessingRecovery,
     private val onHistoricalRetry: (() -> Unit)? = null,
     private val newCorrectionId: () -> String = {
         UserCorrectionIdFactory.create(UUID.randomUUID().toString())
@@ -630,7 +630,7 @@ class ReviewWorkflowService(
             rawSmsIds = rawSmsIds,
             retryState = "historical_batch",
         )
-        processingRecovery?.markForHistoricalRetry(rawSmsIds.toList(), onHistoricalRetry)
+        processingRecovery.markForHistoricalRetry(rawSmsIds.toList(), onHistoricalRetry)
     }
 
     private fun incomplete(
@@ -651,7 +651,7 @@ class ReviewWorkflowService(
         retryState: String,
     ) {
         val masked = AppLogFormatting.maskId(rawSmsIds.firstOrNull { it.isNotBlank() } ?: "none")
-        appLogService?.error(
+        appLogService.error(
             AppLogCategories.REVIEW,
             "Derived $stage incomplete failures=$failureCount affected=${rawSmsIds.size} " +
                 "id=$masked retry_state=$retryState",
@@ -659,7 +659,7 @@ class ReviewWorkflowService(
     }
 
     private fun logReviewAction(action: String, reviewId: String) {
-        appLogService?.info(
+        appLogService.info(
             AppLogCategories.REVIEW,
             "$action for review ${AppLogFormatting.maskId(reviewId)}",
         )

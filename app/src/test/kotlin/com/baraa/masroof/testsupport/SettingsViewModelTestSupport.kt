@@ -5,7 +5,6 @@ import com.baraa.masroof.application.settings.SettingsRegistryWorkflow
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionRestoreService
-import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
@@ -23,7 +22,7 @@ internal object SettingsViewModelTestSupport {
         cards: CardRegistryRepository = emptyCardRegistry(),
         accounts: AccountRegistryRepository = emptyAccountRegistry(),
         loans: com.baraa.masroof.domain.repository.LoanRegistryRepository = NoOpLoanRegistryRepository,
-        transactions: FinancialTransactionRepository? = null,
+        transactions: FinancialTransactionRepository = EmptyFinancialTransactionRepository(),
     ): SettingsRegistryWorkflow =
         SettingsRegistryWorkflow(
             cardRegistryRepository = cards,
@@ -36,6 +35,7 @@ internal object SettingsViewModelTestSupport {
             ),
             transactions = transactions,
             ioDispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+            parsedEvents = EmptyParsedEventRepository(),
         )
 
     fun restoreService(
@@ -43,7 +43,7 @@ internal object SettingsViewModelTestSupport {
         financialTransactionRepository: FinancialTransactionRepository = emptyFinancialTransactionRepository(),
         clock: InstantClock = InstantClock.System,
         reclassificationEvents: ParsedEventRepository = emptyParsedEventRepository(),
-        reviewQueueUpdater: com.baraa.masroof.application.review.ReviewQueueUpdater? = null,
+        reviewQueueUpdater: com.baraa.masroof.application.review.ReviewQueueUpdater = noOpReviewQueueUpdater(),
     ): TransactionRestoreService {
         val ownershipResolver = OwnershipResolver(
             accountRegistry = emptyAccountRegistry(),
@@ -58,6 +58,9 @@ internal object SettingsViewModelTestSupport {
                 rawSmsRepository = emptyRawSmsRepository(),
                 financialTransactionRepository = financialTransactionRepository,
                 ownershipResolver = ownershipResolver,
+                effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(emptyParsedEventRepository()),
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
+                reviewRepository = EmptyReviewRepository(),
             ),
             reclassification = TransactionReclassificationService(
                 financialTransactionRepository = financialTransactionRepository,
@@ -66,20 +69,18 @@ internal object SettingsViewModelTestSupport {
                     userCorrectionRepository = emptyUserCorrectionRepository(),
                 ),
                 ownershipResolver = ownershipResolver,
+                appLogService = NoOpAppLog,
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
+                persistence = noOpReclassificationRepository(financialTransactionRepository),
             ),
             clock = clock,
             reviewQueueUpdater = reviewQueueUpdater,
+            appLogService = NoOpAppLog,
+            processingRecovery = noOpProcessingRecovery(),
         )
     }
 
-    fun emptyUserCorrectionRepository(): UserCorrectionRepository =
-        object : UserCorrectionRepository {
-            override suspend fun save(correction: UserCorrection) = Unit
-            override suspend fun latestForRawSmsId(rawSmsId: String) = null
-            override suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrection> = emptyList()
-            override suspend fun listForRawSmsIds(rawSmsIds: Collection<String>): List<UserCorrection> = emptyList()
-            override suspend fun listAll(): List<UserCorrection> = emptyList()
-        }
+    fun emptyUserCorrectionRepository(): UserCorrectionRepository = EmptyUserCorrectionRepository
 
     fun emptyRawSmsRepository(): RawSmsRepository = EmptyRawSmsRepository()
 

@@ -18,6 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -82,7 +83,8 @@ class RoomCardRegistryRepositoryTest {
         val accounts = RoomAccountRegistryRepository.from(database)
         val loans = com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
         val workflow = com.baraa.masroof.application.settings.SettingsRegistryWorkflow(repository, accounts, loans,
-            com.baraa.masroof.domain.ownership.OwnershipConfirmationService(accounts, repository, loans), parsed)
+            com.baraa.masroof.domain.ownership.OwnershipConfirmationService(accounts, repository, loans), parsed,
+            transactions = EmptyFinancialTransactionRepository(),)
         listOf("credit", "foreign", "review", "conflicting").forEach { id ->
             database.rawSmsDao().insertIfAbsent(com.baraa.masroof.data.room.entity.RawSmsEntity(
                 id, "TEST", "TEST", 1000, null, "hash-$id", "dedupe-$id"))

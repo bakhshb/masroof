@@ -8,7 +8,7 @@ import com.baraa.masroof.application.ingestion.ProcessingRecovery
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
 import com.baraa.masroof.application.transaction.ReconciliationSummary
@@ -28,7 +28,7 @@ import java.time.Instant
  */
 sealed interface HistoricalBatchDerivedResult {
     data class Succeeded(
-        val summary: ReconciliationSummary?,
+        val summary: ReconciliationSummary,
     ) : HistoricalBatchDerivedResult
 
     data class Incomplete(
@@ -54,13 +54,13 @@ sealed interface HistoricalBatchDerivedResult {
 class HistoricalSmsBatchProcessor(
     private val capture: CaptureBankSmsUseCase,
     private val processStored: ProcessStoredSmsUseCase,
-    private val ownershipDiscovery: OwnershipDiscoveryService? = null,
-    private val reconciliation: TransactionReconciliationService? = null,
-    private val reviewQueueUpdater: ReviewQueueUpdater? = null,
-    private val exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler? = null,
-    private val processingRecovery: ProcessingRecovery? = null,
-    private val batchRecoveryScheduler: HistoricalBatchRecoveryScheduler? = null,
-    private val appLogService: AppLogService? = null,
+    private val ownershipDiscovery: OwnershipDiscoveryService,
+    private val reconciliation: TransactionReconciliationService,
+    private val reviewQueueUpdater: ReviewQueueUpdater,
+    private val exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler,
+    private val processingRecovery: ProcessingRecovery,
+    private val batchRecoveryScheduler: HistoricalBatchRecoveryScheduler,
+    private val appLogService: AppLog,
 ) {
     fun startBatch(bankScope: Bank? = null, bankScopes: Set<Bank>? = null): Batch {
         require(bankScope == null || bankScopes == null)
@@ -123,7 +123,7 @@ class HistoricalSmsBatchProcessor(
                 return HistoricalBatchDerivedResult.Incomplete(DerivedProcessingStage.OWNERSHIP_DISCOVERY)
             }
             val report = try {
-                reconciliation?.reconcileAffectedRawSmsIds(affectedRawSmsIds())
+                reconciliation.reconcileAffectedRawSmsIds(affectedRawSmsIds())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -137,26 +137,24 @@ class HistoricalSmsBatchProcessor(
                 )
                 return HistoricalBatchDerivedResult.Incomplete(DerivedProcessingStage.RECONCILIATION)
             }
-            reconciliationSummary = report?.summary
-            if (report != null && reviewQueueUpdater != null) {
-                try {
-                    reviewQueueUpdater.applyReport(report)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    markAffected()
-                    logIncomplete(
-                        stage = DerivedProcessingStage.REVIEW_UPDATE,
-                        failureCount = report.summary.failed,
-                        rawSmsId = report.failedRawSmsIds.firstOrNull()
-                            ?: storedEvents.firstOrNull()?.event?.rawSmsId,
-                        retryState = "retained",
-                        errorClass = e.javaClass.simpleName,
-                    )
-                    return HistoricalBatchDerivedResult.Incomplete(DerivedProcessingStage.REVIEW_UPDATE)
-                }
+            reconciliationSummary = report.summary
+            try {
+                reviewQueueUpdater.applyReport(report)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                markAffected()
+                logIncomplete(
+                    stage = DerivedProcessingStage.REVIEW_UPDATE,
+                    failureCount = report.summary.failed,
+                    rawSmsId = report.failedRawSmsIds.firstOrNull()
+                        ?: storedEvents.firstOrNull()?.event?.rawSmsId,
+                    retryState = "retained",
+                    errorClass = e.javaClass.simpleName,
+                )
+                return HistoricalBatchDerivedResult.Incomplete(DerivedProcessingStage.REVIEW_UPDATE)
             }
-            if (report != null && !ReconciliationCompletionPolicy.isComplete(report)) {
+            if (!ReconciliationCompletionPolicy.isComplete(report)) {
                 markAffected()
                 logIncomplete(
                     stage = DerivedProcessingStage.RECONCILIATION,
@@ -169,7 +167,7 @@ class HistoricalSmsBatchProcessor(
                 return HistoricalBatchDerivedResult.Incomplete(DerivedProcessingStage.RECONCILIATION)
             }
             clearRecovered()
-            return HistoricalBatchDerivedResult.Succeeded(report?.summary)
+            return HistoricalBatchDerivedResult.Succeeded(report.summary)
         }
 
         private fun logIncomplete(
@@ -181,7 +179,7 @@ class HistoricalSmsBatchProcessor(
         ) {
             val failures = failureCount?.let { " failures=$it" }.orEmpty()
             val masked = rawSmsId?.let(AppLogFormatting::maskId) ?: "none"
-            appLogService?.error(
+            appLogService.error(
                 AppLogCategories.INGEST,
                 "Derived ${stage.name.lowercase()} incomplete$failures id=$masked " +
                     "retry_state=$retryState ($errorClass)",
@@ -189,10 +187,9 @@ class HistoricalSmsBatchProcessor(
         }
 
         private suspend fun discoverOwnership(): Boolean {
-            val discovery = ownershipDiscovery ?: return true
             for (stored in storedEvents) {
                 try {
-                    discovery.observe(stored.event, stored.loanType)
+                    ownershipDiscovery.observe(stored.event, stored.loanType)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
@@ -203,24 +200,20 @@ class HistoricalSmsBatchProcessor(
         }
 
         private suspend fun markAffected() {
-            val recovery = processingRecovery
-                ?: throw IllegalStateException("processing recovery is required when derived work fails")
             val affected = storedEvents
                 .filter { it.event.parseStatus != ParseStatus.NON_FINANCIAL }
                 .map { it.event.rawSmsId }
-            if (!recovery.markExhaustedBatch(affected)) return
+            if (!processingRecovery.markExhaustedBatch(affected)) return
             scheduleBatchRecovery()
         }
 
         private suspend fun clearRecovered() {
-            val recovery = processingRecovery ?: return
-            recovery.clearAll(storedEvents.map { it.event.rawSmsId })
+            processingRecovery.clearAll(storedEvents.map { it.event.rawSmsId })
         }
 
         private fun scheduleBatchRecovery() {
-            val scheduler = batchRecoveryScheduler ?: return
             try {
-                scheduler.schedule()
+                batchRecoveryScheduler.schedule()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -230,7 +223,7 @@ class HistoricalSmsBatchProcessor(
 
         private fun scheduleExchangeRates() {
             try {
-                exchangeRateEnrichmentScheduler?.schedule()
+                exchangeRateEnrichmentScheduler.schedule()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {

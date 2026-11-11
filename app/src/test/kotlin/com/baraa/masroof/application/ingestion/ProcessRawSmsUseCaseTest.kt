@@ -65,6 +65,16 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpReconciliation
+import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
+import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpOwnershipDiscovery
+import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
+import com.baraa.masroof.testsupport.noOpReconciliation
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -532,9 +542,13 @@ class ProcessRawSmsUseCaseTest {
                     RoomCardRegistryRepository.from(db),
                     NoOpLoanRegistryRepository,
                 ),
+                effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
+                reviewRepository = EmptyReviewRepository(),
             )
-        },
-        reviewQueueUpdater = reviews?.let { ReviewQueueUpdater(it, requireNotNull(ledger), InstantClock.System) },
+        } ?: noOpReconciliation(),
+        reviewQueueUpdater = reviews?.let { ReviewQueueUpdater(it, requireNotNull(ledger), InstantClock.System) }
+            ?: noOpReviewQueueUpdater(),
     )
 
     private fun reviewingUseCase(
@@ -638,6 +652,9 @@ class ProcessRawSmsUseCaseTest {
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
+            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+            ownershipConfirmationService = noOpOwnershipConfirmation(),
+            reviewRepository = EmptyReviewRepository(),
         )
         ReviewQueueUpdater(reviewRepo, ftRepo, InstantClock.System)
             .applyReport(reconciliation.reconcileStoredEventsDetailed())
@@ -807,9 +824,15 @@ class ProcessRawSmsUseCaseTest {
                 InstantClock { Instant.parse("2026-08-03T15:00:00Z") },
             ),
             reviewRepository = reviewRepo,
+            appLogService = NoOpAppLog,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            ownershipDiscovery = noOpOwnershipDiscovery(),
+            processingRecovery = noOpProcessingRecovery(),
+            reconciliation = noOpReconciliation(),
+            reviewQueueUpdater = noOpReviewQueueUpdater(),
         )
         val facade = ProcessRawSmsUseCase(
-            capture = CaptureBankSmsUseCase(rawSmsRepository = rawRepo, bankSmsRegistry = registry),
+            capture = CaptureBankSmsUseCase(rawSmsRepository = rawRepo, bankSmsRegistry = registry, appLogService = NoOpAppLog),
             processStored = stored,
         )
         val chosen = aljaziraPurchase(id = "android-sms:choose-suspected", deviceId = "choose-suspected")
@@ -967,9 +990,15 @@ class ProcessRawSmsUseCaseTest {
                 InstantClock { Instant.parse("2026-08-03T15:00:00Z") },
             ),
             reviewRepository = reviewRepo,
+            appLogService = NoOpAppLog,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            ownershipDiscovery = noOpOwnershipDiscovery(),
+            processingRecovery = noOpProcessingRecovery(),
+            reconciliation = noOpReconciliation(),
+            reviewQueueUpdater = noOpReviewQueueUpdater(),
         )
         val facade = ProcessRawSmsUseCase(
-            capture = CaptureBankSmsUseCase(rawSmsRepository = rawRepo, bankSmsRegistry = registry),
+            capture = CaptureBankSmsUseCase(rawSmsRepository = rawRepo, bankSmsRegistry = registry, appLogService = NoOpAppLog),
             processStored = stored,
         )
         return AmbiguousHarness(facade, stored, registry)

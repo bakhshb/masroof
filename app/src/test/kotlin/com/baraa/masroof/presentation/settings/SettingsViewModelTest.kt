@@ -861,7 +861,7 @@ class SettingsViewModelTest {
         cards: CardRegistryRepository = FakeCardRegistry(),
         accounts: AccountRegistryRepository = FakeAccountRegistry(),
         loans: LoanRegistryRepository = FakeLoanRegistry(),
-        transactions: com.baraa.masroof.domain.repository.FinancialTransactionRepository? = null,
+        transactions: com.baraa.masroof.domain.repository.FinancialTransactionRepository = com.baraa.masroof.testsupport.EmptyFinancialTransactionRepository(),
         permissionStateProvider: () -> Boolean = { true },
         themeMode: ThemeMode = ThemeMode.SYSTEM,
         reparseResult: com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult =

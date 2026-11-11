@@ -27,6 +27,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.IOException
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpOwnershipDiscovery
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -114,9 +119,14 @@ class HistoricalDerivedRecoveryTest {
                     RoomCardRegistryRepository.from(harness.db),
                     NoOpLoanRegistryRepository,
                 ),
+                effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(harness.parsedRepo),
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
+                reviewRepository = EmptyReviewRepository(),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(failingReviews, harness.ftRepo, clock),
             rawSmsRepository = harness.rawRepo,
+            appLogService = NoOpAppLog,
+            ownershipDiscovery = noOpOwnershipDiscovery(),
         )
 
         val failure = runCatching { recovery.recoverPending() }.exceptionOrNull()

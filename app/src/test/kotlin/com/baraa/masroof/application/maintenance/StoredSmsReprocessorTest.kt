@@ -54,6 +54,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -96,6 +98,7 @@ class StoredSmsReprocessorTest {
             ),
             effectiveParsedEventProvider = EffectiveParsedEventProvider(parsedRepo, correctionRepo),
             reviewRepository = reviewRepo,
+            ownershipConfirmationService = noOpOwnershipConfirmation(),
         )
         reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock)
         ingestionReviews = IngestionReviewService(reviewRepo, clock)
@@ -174,6 +177,7 @@ class StoredSmsReprocessorTest {
                 reviewQueueUpdater.applyReport(reconciliation.reconcileStoredEventsDetailed())
             },
             processingRetryRepository = retries,
+            appLogService = NoOpAppLog,
         )
 
         val result = processor.reprocessAll()
@@ -281,6 +285,7 @@ class StoredSmsReprocessorTest {
         processRawSms = useCase(pipeline),
         refreshDerivedState = refreshDerivedState,
         processingRetryRepository = retries,
+        appLogService = NoOpAppLog,
     )
 
     private fun purchase(id: String, at: Instant = Instant.parse("2026-08-03T14:32:00Z")): RawSms {

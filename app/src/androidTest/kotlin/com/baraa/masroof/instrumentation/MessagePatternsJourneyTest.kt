@@ -24,6 +24,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 @RunWith(AndroidJUnit4::class)
 class MessagePatternsJourneyTest {
@@ -35,7 +36,7 @@ class MessagePatternsJourneyTest {
         val file = compose.activity.cacheDir.resolve("synthetic-pattern-journey.json")
         file.delete()
         val store = MessagePatternStore(file)
-        val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate())
+        val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), appLogService = NoOpAppLog)
         workflow.saveBank(0, BankMessagePatterns("STC", listOf("STC Bank"), "بنك التجربة"))
         val dark = androidx.compose.runtime.mutableStateOf(false)
         compose.setContent {
@@ -94,7 +95,7 @@ class MessagePatternsJourneyTest {
         val file = compose.activity.cacheDir.resolve("synthetic-review-pattern-journey.json")
         file.delete()
         val store = MessagePatternStore(file)
-        val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate())
+        val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), appLogService = NoOpAppLog)
         val source = com.baraa.masroof.application.patterns.PatternTeachingSource(null, "STC Bank", "Payment\nAmount:73SAR")
         val returned = androidx.compose.runtime.mutableStateOf(false)
         compose.setContent {
@@ -133,7 +134,7 @@ class MessagePatternsJourneyTest {
         val file = compose.activity.cacheDir.resolve("synthetic-review-copy-restore.json")
         file.delete()
         val store = MessagePatternStore(file)
-        val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate())
+        val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), appLogService = NoOpAppLog)
         val source = com.baraa.masroof.application.patterns.PatternTeachingSource(null, "STC Bank", "Payment\nAmount:73SAR")
         val returned = androidx.compose.runtime.mutableStateOf(false)
         val restoration = androidx.compose.ui.test.junit4.StateRestorationTester(compose)
@@ -197,7 +198,8 @@ class MessagePatternsJourneyTest {
                 store, gate, reviews, raw, com.baraa.masroof.data.repository.RoomParsedEventRepository(db.parsedEventDao()),
                 com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao()),
                 com.baraa.masroof.data.repository.RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao()),
-                com.baraa.masroof.bank.BankSmsRegistry(emptyList())))
+                com.baraa.masroof.bank.BankSmsRegistry(emptyList())),
+                appLogService = NoOpAppLog,)
             var openedReview: String? = null
             compose.setContent {
                 val localized = AppLocaleContext.wrap(LocalContext.current, "ar")
@@ -236,7 +238,7 @@ class MessagePatternsJourneyTest {
         try {
             val banks = com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec.decode(
                 compose.activity.assets.open("bank-patterns/BANK_STC.patterns.json").bufferedReader().use { it.readText() }).banks
-            val workflow = MessagePatternsWorkflow(MessagePatternStore(file), DatabaseAccessGate(), bundledBanks = banks)
+            val workflow = MessagePatternsWorkflow(MessagePatternStore(file), DatabaseAccessGate(), bundledBanks = banks, appLogService = NoOpAppLog)
             compose.setContent {
                 val localized = AppLocaleContext.wrap(LocalContext.current, "ar")
                 CompositionLocalProvider(LocalContext provides localized, LocalConfiguration provides localized.resources.configuration) {
@@ -249,7 +251,7 @@ class MessagePatternsJourneyTest {
             compose.onNodeWithTag("pattern-open-BANK_STC-stc-internal-in").performScrollTo().performClick()
             compose.onNodeWithTag("pattern-toggle-BANK_STC-stc-internal-in").performScrollTo().performClick()
             compose.waitUntil(10_000) { MessagePatternStore(file).load().generation == 2L }
-            val reopened = MessagePatternsWorkflow(MessagePatternStore(file), DatabaseAccessGate(), bundledBanks = banks).load()
+            val reopened = MessagePatternsWorkflow(MessagePatternStore(file), DatabaseAccessGate(), bundledBanks = banks, appLogService = NoOpAppLog).load()
             assertEquals(2L, reopened.generation)
             assertEquals(1, reopened.banks.single().currentPatterns.count { !it.enabled })
         } finally { file.delete() }

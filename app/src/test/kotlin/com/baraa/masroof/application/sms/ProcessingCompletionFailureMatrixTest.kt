@@ -38,6 +38,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
+import com.baraa.masroof.testsupport.noOpReclassificationRepository
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 /**
  * Completion contract for a reconciliation report that counts failures without throwing,
@@ -258,6 +263,8 @@ class ProcessingCompletionFailureMatrixTest {
                     NoOpLoanRegistryRepository,
                 ),
                 reviewRepository = harness.reviewRepo,
+                effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(harness.parsedRepo),
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
             ),
             reclassification = com.baraa.masroof.application.transaction.TransactionReclassificationService(
                 financialTransactionRepository = harness.ftRepo,
@@ -270,6 +277,9 @@ class ProcessingCompletionFailureMatrixTest {
                     RoomCardRegistryRepository.from(harness.db),
                     NoOpLoanRegistryRepository,
                 ),
+                appLogService = NoOpAppLog,
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
+                persistence = noOpReclassificationRepository(harness.ftRepo),
             ),
             clock = com.baraa.masroof.sms.time.InstantClock { Instant.parse("2026-08-14T12:00:00Z") },
             reviewQueueUpdater = com.baraa.masroof.application.review.ReviewQueueUpdater(
@@ -286,6 +296,7 @@ class ProcessingCompletionFailureMatrixTest {
                 ),
                 clock = com.baraa.masroof.sms.time.InstantClock { Instant.parse("2026-08-14T12:00:00Z") },
             ),
+            appLogService = NoOpAppLog,
         )
 
         val result = restore.restore(raw.id)
@@ -369,6 +380,9 @@ class ProcessingCompletionFailureMatrixTest {
             rawSmsRepository = harness.rawRepo,
             financialTransactionRepository = harness.ledgerUnderTest,
             ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
+            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(harness.parsedRepo),
+            ownershipConfirmationService = noOpOwnershipConfirmation(),
+            reviewRepository = EmptyReviewRepository(),
         ).reconcileStoredEventsDetailed()
         assertEquals(1, report.summary.failed)
 
@@ -490,6 +504,7 @@ class ProcessingCompletionFailureMatrixTest {
                 ownershipResolver = resolver,
                 effectiveParsedEventProvider = effective,
                 reviewRepository = harness.reviewRepo,
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
             ),
             reviewQueueUpdater = com.baraa.masroof.application.review.ReviewQueueUpdater(
                 reviewUpdateRepo,

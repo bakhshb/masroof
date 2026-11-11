@@ -44,7 +44,7 @@ internal class RoomReviewWiring(
     reconcileWithReviews: Boolean = true,
     reconcileWithConfirmation: Boolean = false,
     zoneId: ZoneId = ZoneId.systemDefault(),
-    processingRecovery: ProcessingRecovery? = null,
+    processingRecovery: ProcessingRecovery = noOpProcessingRecovery(),
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val accounts = RoomAccountRegistryRepository.from(db)
@@ -57,9 +57,9 @@ internal class RoomReviewWiring(
         rawSmsRepository = raw,
         financialTransactionRepository = ledger,
         ownershipResolver = resolver,
-        ownershipConfirmationService = confirmation.takeIf { reconcileWithConfirmation },
+        ownershipConfirmationService = if (reconcileWithConfirmation) confirmation else noOpOwnershipConfirmation(),
         effectiveParsedEventProvider = effective,
-        reviewRepository = reviews.takeIf { reconcileWithReviews },
+        reviewRepository = if (reconcileWithReviews) reviews else EmptyReviewRepository(),
         zoneId = zoneId,
     )
     val updater = ReviewQueueUpdater(reviewQueueReviews, ledger, clock)
@@ -79,5 +79,6 @@ internal class RoomReviewWiring(
         zoneId = zoneId,
         processingRecovery = processingRecovery,
         ioDispatcher = ioDispatcher,
+        appLogService = NoOpAppLog,
     )
 }

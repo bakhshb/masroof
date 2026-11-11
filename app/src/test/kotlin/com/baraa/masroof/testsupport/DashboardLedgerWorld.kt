@@ -132,7 +132,7 @@ class DashboardLedgerWorld(
         reviewRepo, IngestionReviewService(reviewRepo, importClock), importClock,
     )
 
-    val captureBankSms = CaptureBankSmsUseCase(rawRepo, registry)
+    val captureBankSms = CaptureBankSmsUseCase(rawRepo, registry, appLogService = NoOpAppLog)
 
     fun processStoredSms(exchangeRateEnrichment: ExchangeRateEnrichmentWorkflow? = null) =
         ProcessStoredSmsUseCase(
@@ -151,7 +151,9 @@ class DashboardLedgerWorld(
                 com.baraa.masroof.application.sms.ImmediateExchangeRateEnrichmentScheduler(
                     com.baraa.masroof.application.sms.PendingExchangeRateEnricher { workflow.enrichPending() },
                 )
-            },
+            } ?: NoOpExchangeRateEnrichmentScheduler,
+            appLogService = NoOpAppLog,
+            reviewRepository = EmptyReviewRepository(),
         )
 
     suspend fun ownFixtureInstruments() {
@@ -179,7 +181,9 @@ class DashboardLedgerWorld(
                 com.baraa.masroof.application.sms.ImmediateExchangeRateEnrichmentScheduler(
                     com.baraa.masroof.application.sms.PendingExchangeRateEnricher { workflow.enrichPending() },
                 )
-            },
+            } ?: NoOpExchangeRateEnrichmentScheduler,
+            appLogService = NoOpAppLog,
+            batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
         ).startBatch()
         rows.forEach { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
         batch.finish()
@@ -197,6 +201,9 @@ class DashboardLedgerWorld(
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
             processingRecovery = processingRecovery,
+            appLogService = NoOpAppLog,
+            batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
         ).startBatch()
         val ingest = rows.map { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
         return LedgerImportOutcome(
@@ -303,6 +310,7 @@ class DashboardLedgerWorld(
             parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             sarEquivalentResolver = TransactionSarEquivalentResolver(marketRateProvider),
+            appLogService = NoOpAppLog,
         )
 
     override fun close() {

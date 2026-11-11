@@ -2,7 +2,7 @@ package com.baraa.masroof.application.ingestion
 
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.sms.DebugProcessHalt
@@ -56,14 +56,14 @@ class ProcessStoredSmsUseCase(
     private val rawSmsRepository: RawSmsRepository,
     private val parsedEventRepository: ParsedEventRepository,
     private val bankSmsRegistry: BankSmsRegistry,
-    private val ownershipDiscovery: OwnershipDiscoveryService? = null,
-    private val reconciliation: TransactionReconciliationService? = null,
-    private val reviewQueueUpdater: ReviewQueueUpdater? = null,
-    private val ingestionReviewService: IngestionReviewService? = null,
-    private val appLogService: AppLogService? = null,
-    private val exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler? = null,
-    private val processingRecovery: ProcessingRecovery? = null,
-    private val reviewRepository: ReviewRepository? = null,
+    private val ownershipDiscovery: OwnershipDiscoveryService,
+    private val reconciliation: TransactionReconciliationService,
+    private val reviewQueueUpdater: ReviewQueueUpdater,
+    private val ingestionReviewService: IngestionReviewService,
+    private val appLogService: AppLog,
+    private val exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler,
+    private val processingRecovery: ProcessingRecovery,
+    private val reviewRepository: ReviewRepository,
     private val debugProcessHalt: DebugProcessHaltProbe = DebugProcessHaltProbe.NONE,
     private val patternProcessing: (suspend (String, suspend () -> SmsIngestionResult, suspend () -> SmsIngestionResult) -> SmsIngestionResult)? = null,
     /** Enqueues the one historical recovery pass after an interactive retry row is written. */
@@ -136,14 +136,13 @@ class ProcessStoredSmsUseCase(
     }
 
     private suspend fun retainHistoricalRetry(rawSmsId: String) {
-        val recovery = processingRecovery ?: return
         try {
             // A failed schedule is logged here (the other callers ignore it), so keep the inline call.
-            if (recovery.markExhaustedBatch(listOf(rawSmsId))) onHistoricalRetry?.invoke()
+            if (processingRecovery.markExhaustedBatch(listOf(rawSmsId))) onHistoricalRetry?.invoke()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            appLogService?.warn(
+            appLogService.warn(
                 AppLogCategories.INGEST,
                 "Interactive reparse retry not recorded id=${AppLogFormatting.maskId(rawSmsId)} (${e.javaClass.simpleName})",
             )
@@ -194,8 +193,7 @@ class ProcessStoredSmsUseCase(
      * adapter selection instead of guessing.
      */
     private suspend fun explicitSelectionAdapter(rawSms: RawSms): BankSmsAdapter? {
-        val reviews = reviewRepository ?: return null
-        val reasons = reviews.findByRawSmsId(rawSms.id)?.reasons ?: return null
+        val reasons = reviewRepository.findByRawSmsId(rawSms.id)?.reasons ?: return null
         val bankId = ExplicitBankSelection.selectedBankId(reasons) ?: return null
         return bankSmsRegistry.adapterFor(Bank.fromId(bankId))
     }
@@ -207,7 +205,7 @@ class ProcessStoredSmsUseCase(
         logOutcome: Boolean,
         logMessage: () -> String,
     ): SmsIngestionResult {
-        if (logOutcome) appLogService?.warn(AppLogCategories.INGEST, logMessage())
+        if (logOutcome) appLogService.warn(AppLogCategories.INGEST, logMessage())
         reviewOrRetry(rawSms.id, reviewReason)?.let { return it }
         return SmsIngestionResult.ReviewRequired(
             rawSmsId = rawSms.id,
@@ -329,7 +327,7 @@ class ProcessStoredSmsUseCase(
 
         suspend fun invalid(findings: List<ValidationFinding>): SmsIngestionResult {
             if (logOutcome) {
-                appLogService?.warn(
+                appLogService.warn(
                     AppLogCategories.INGEST,
                     "Invalid parse from ${AppLogFormatting.maskSender(rawSms.sender)}",
                 )
@@ -363,7 +361,7 @@ class ProcessStoredSmsUseCase(
                     save(parseResult.event, parseResult.details, "review_required")?.let { return it }
                 } else {
                     if (logOutcome) {
-                        appLogService?.info(
+                        appLogService.info(
                             AppLogCategories.INGEST,
                             "Review required from ${AppLogFormatting.maskSender(rawSms.sender)}",
                         )
@@ -382,7 +380,7 @@ class ProcessStoredSmsUseCase(
                 if (parseResult.event != null) {
                     save(parseResult.event, parseResult.details, "non_financial")?.let { return it }
                 } else if (logOutcome) {
-                    appLogService?.info(
+                    appLogService.info(
                         AppLogCategories.INGEST,
                         "Non-financial SMS from ${AppLogFormatting.maskSender(rawSms.sender)}",
                     )
@@ -397,7 +395,7 @@ class ProcessStoredSmsUseCase(
 
             is ParseResult.Unsupported -> {
                 if (logOutcome) {
-                    appLogService?.info(
+                    appLogService.info(
                         AppLogCategories.INGEST,
                         "Unsupported message from ${AppLogFormatting.maskSender(rawSms.sender)} (${parseResult.reason})",
                     )
@@ -441,7 +439,7 @@ class ProcessStoredSmsUseCase(
     ): SmsIngestionResult.DerivedIncomplete? {
         debugProcessHalt.afterDurableWrite(DebugProcessHalt.PARSED)
         val incomplete = if (deriveImmediately) afterParsedEvent(event, details, logOutcome) else null
-        if (incomplete == null && deriveImmediately) processingRecovery?.clear(event.rawSmsId)
+        if (incomplete == null && deriveImmediately) processingRecovery.clear(event.rawSmsId)
         // A reader seeing this marker must observe the retained processing-retry row.
         debugProcessHalt.markIfReconcileHeld()
         return incomplete
@@ -460,13 +458,10 @@ class ProcessStoredSmsUseCase(
 
     /**
      * @return false when the review row could not be saved. RawSms is already durable.
-     * A missing review service is not a failure; callers that have no review store
-     * keep their previous outcome.
      */
     private suspend fun recordIngestionReview(rawSmsId: String, reason: String): Boolean {
-        val service = ingestionReviewService ?: return true
         return try {
-            service.requireReview(rawSmsId, reason)
+            ingestionReviewService.requireReview(rawSmsId, reason)
             true
         } catch (e: CancellationException) {
             throw e
@@ -489,14 +484,14 @@ class ProcessStoredSmsUseCase(
         family: MessageFamily,
         outcome: String,
     ) {
-        appLogService?.info(
+        appLogService.info(
             AppLogCategories.INGEST,
             "${outcome.replace('_', ' ')} ${AppLogFormatting.messageFamilyLabel(family)} from ${AppLogFormatting.maskSender(rawSms.sender)}",
         )
     }
 
     private fun logIngestFailure(rawSms: RawSms, message: String) {
-        appLogService?.error(
+        appLogService.error(
             AppLogCategories.INGEST,
             "Ingest failed for ${AppLogFormatting.maskSender(rawSms.sender)}: $message",
         )
@@ -509,7 +504,6 @@ class ProcessStoredSmsUseCase(
     ): SmsIngestionResult.DerivedIncomplete? {
         discoverOwnership(event, details, logOutcome)?.let { return it }
         return when (val reconciled = reconcileDerived(event, details, logOutcome)) {
-            ReconcileDerivedResult.NotConfigured -> null
             is ReconcileDerivedResult.Incomplete -> reconciled.result
             is ReconcileDerivedResult.Ready -> refreshReviewQueue(event, details, reconciled.report, logOutcome)
         }
@@ -520,9 +514,8 @@ class ProcessStoredSmsUseCase(
         details: ParsedEventDetails,
         logOutcome: Boolean,
     ): SmsIngestionResult.DerivedIncomplete? {
-        val discovery = ownershipDiscovery ?: return null
         return try {
-            discovery.observe(event, details.loanType)
+            ownershipDiscovery.observe(event, details.loanType)
             null
         } catch (e: CancellationException) {
             throw e
@@ -551,9 +544,8 @@ class ProcessStoredSmsUseCase(
                 ),
             )
         }
-        val svc = reconciliation ?: return ReconcileDerivedResult.NotConfigured
         val report = try {
-            svc.reconcileAffectedRawSmsIds(listOf(event.rawSmsId))
+            reconciliation.reconcileAffectedRawSmsIds(listOf(event.rawSmsId))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -587,9 +579,8 @@ class ProcessStoredSmsUseCase(
     }
 
     private fun scheduleExchangeRateEnrichment() {
-        val scheduler = exchangeRateEnrichmentScheduler ?: return
         try {
-            scheduler.schedule()
+            exchangeRateEnrichmentScheduler.schedule()
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -603,9 +594,8 @@ class ProcessStoredSmsUseCase(
         report: ReconciliationReport,
         logOutcome: Boolean,
     ): SmsIngestionResult.DerivedIncomplete? {
-        val updater = reviewQueueUpdater ?: return null
         return try {
-            updater.applyReport(report)
+            reviewQueueUpdater.applyReport(report)
             debugProcessHalt.afterDurableWrite(DebugProcessHalt.REVIEW)
             null
         } catch (e: CancellationException) {
@@ -626,7 +616,7 @@ class ProcessStoredSmsUseCase(
     ): SmsIngestionResult.DerivedIncomplete {
         if (logOutcome) {
             val failures = failureCount?.let { " failures=$it" }.orEmpty()
-            appLogService?.error(
+            appLogService.error(
                 AppLogCategories.INGEST,
                 "Derived ${stage.name.lowercase()} incomplete$failures " +
                     "id=${AppLogFormatting.maskId(event.rawSmsId)} " +
@@ -644,7 +634,6 @@ class ProcessStoredSmsUseCase(
     }
 
     private sealed interface ReconcileDerivedResult {
-        data object NotConfigured : ReconcileDerivedResult
         data class Ready(val report: ReconciliationReport) : ReconcileDerivedResult
         data class Incomplete(val result: SmsIngestionResult.DerivedIncomplete) : ReconcileDerivedResult
     }
@@ -654,13 +643,7 @@ class ProcessStoredSmsUseCase(
      * Throws when that marker cannot be saved. Does not reopen a non-financial resolution.
      */
     suspend fun recordExhaustedDerivedProcessing(rawSmsId: String) {
-        val recovery = processingRecovery
-        if (recovery != null) {
-            recovery.markExhausted(rawSmsId)
-            return
-        }
-        val service = ingestionReviewService ?: return
-        service.requireReview(rawSmsId, IngestionReviewService.REASON_PROCESSING_ERROR)
+        processingRecovery.markExhausted(rawSmsId)
     }
 
     companion object {

@@ -81,6 +81,12 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
+import com.baraa.masroof.testsupport.NoOpLiveCaptureRecoveryScheduler
+import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
+import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
 
 private const val OTP_CODE: String = "482913"
 private const val PURCHASE_AT: String = "2026-08-03T14:32:00Z"
@@ -453,6 +459,7 @@ class SmsPersistenceRestartTest {
                     clockEpochMillis = { 1_700_000_000_000L },
                     restartProcess = { secondRestart.incrementAndGet() },
                     kdfIterations = RESTORE_KDF_ITERATIONS,
+                    appLogService = NoOpAppLog,
                 ).importFrom(Uri.fromFile(packageZip), restorePassphrase())
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, second)
             } finally {
@@ -506,6 +513,7 @@ class SmsPersistenceRestartTest {
             clockEpochMillis = { 1_700_000_000_000L },
             restartProcess = { error("export must not restart the process") },
             kdfIterations = RESTORE_KDF_ITERATIONS,
+            appLogService = NoOpAppLog,
         ).exportTo(Uri.fromFile(packageZip), restorePassphrase())
         assertTrue(exported.exceptionOrNull()?.let { "export failed: ${it.javaClass.simpleName}" } ?: "export failed", exported.isSuccess)
         session.checkpointAndClose()
@@ -551,6 +559,7 @@ class SmsPersistenceRestartTest {
                 restartProcess = onRestart,
                 afterRestoreStage = afterStage,
                 kdfIterations = RESTORE_KDF_ITERATIONS,
+                appLogService = NoOpAppLog,
             ).importFrom(Uri.fromFile(packageZip), restorePassphrase())
         } finally {
             if (liveDatabase.isOpen) liveDatabase.close()
@@ -854,12 +863,15 @@ private class DeviceSmsSession(
 
     fun intake(workScheduler: LiveSmsWorkScheduler = scheduler): LiveSmsIntake =
         LiveSmsIntake(
-            captureBankSms = CaptureBankSmsUseCase(rawRepo, registry),
+            captureBankSms = CaptureBankSmsUseCase(rawRepo, registry, NoOpAppLog),
             scheduler = workScheduler,
             rawSmsRepository = rawRepo,
             reviewRepository = reviewRepo,
             processingRetryRepository = retryRepo,
             appLogService = appLog,
+            batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
+            captureRecoveryScheduler = NoOpLiveCaptureRecoveryScheduler,
+            missedSmsScheduler = NoOpLiveCaptureRecoveryScheduler,
         )
 
     suspend fun ingest(body: String, receivedAt: String): CapturedSms {
@@ -1000,6 +1012,7 @@ private class DeviceSmsSession(
                     RoomUserCorrectionRepository(database.userCorrectionDao()),
                 ),
                 reviewRepository = reviewRepo,
+                ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewForUpdate, ftRepo, clock),
             ingestionReviewService = ingestionReview,
@@ -1011,6 +1024,7 @@ private class DeviceSmsSession(
                 clock = clock,
             ),
             reviewRepository = reviewRepo,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
         )
     }
 

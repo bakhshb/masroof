@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.database.sqlite.SQLiteDatabase
 import com.baraa.masroof.application.logging.AppLogCategories
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
 import com.baraa.masroof.data.room.DatabaseAccessGate
@@ -26,7 +27,7 @@ class DatabaseBackupService(
     private val database: MasroofDatabase,
     private val closeDatabase: () -> Unit,
     private val appVersionName: String,
-    private val appLogService: AppLogService? = null,
+    private val appLogService: AppLog,
     private val clockEpochMillis: () -> Long = { System.currentTimeMillis() },
     private val restartProcess: (() -> Unit)? = null,
     private val beforeValidatedInstall: () -> Unit = {},
@@ -108,11 +109,11 @@ class DatabaseBackupService(
                     // A cleanup error must not fail a written backup (onFailure would delete it) or hide the real error.
                     // The next staging sweep retries it.
                     runCatching { SensitiveFileCleanup.delete(staging) }.onFailure {
-                        appLogService?.warn(AppLogCategories.BACKUP, "Export staging cleanup failed (${it.javaClass.simpleName})")
+                        appLogService.warn(AppLogCategories.BACKUP, "Export staging cleanup failed (${it.javaClass.simpleName})")
                     }
                 }
             }.onSuccess {
-                appLogService?.info(AppLogCategories.BACKUP, "Database export succeeded")
+                appLogService.info(AppLogCategories.BACKUP, "Database export succeeded")
             }.onFailure { error ->
                 logExportFailure(
                     (error as? BackupFailureException)?.category ?: BackupFailureCategory.EXPORT_FAILED,
@@ -181,7 +182,7 @@ class DatabaseBackupService(
                 else -> BackupVerificationOutcome.INVALID_PACKAGE
             }
         } catch (error: Exception) {
-            appLogService?.failure(AppLogCategories.BACKUP, "Backup verification", error)
+            appLogService.failure(AppLogCategories.BACKUP, "Backup verification", error)
             BackupVerificationOutcome.FAILED
         } finally {
             passphrase.fill('\u0000')
@@ -359,7 +360,7 @@ class DatabaseBackupService(
                     error("Imported database failed verification; original database restored")
                 }
                 secret.fill('\u0000')
-                appLogService?.info(AppLogCategories.BACKUP, "Database import succeeded; restart required")
+                appLogService.info(AppLogCategories.BACKUP, "Database import succeeded; restart required")
                 restartAttempted = true
                 restart(BackupImportOutcome.SuccessNeedsRestart)
                 BackupImportOutcome.SuccessNeedsRestart
@@ -370,7 +371,7 @@ class DatabaseBackupService(
             }
         } catch (error: BackupArchiveException) {
             handledFailure = true
-            appLogService?.error(AppLogCategories.BACKUP, error.category.logMessage())
+            appLogService.error(AppLogCategories.BACKUP, error.category.logMessage())
             BackupImportOutcome.InvalidPackage
         } catch (error: BackupFailureException) {
             handledFailure = true
@@ -385,7 +386,7 @@ class DatabaseBackupService(
             // A cleanup error here must neither hide the outcome nor skip the restart below.
             staging?.let { directory ->
                 runCatching { SensitiveFileCleanup.delete(directory) }.onFailure {
-                    appLogService?.warn(AppLogCategories.BACKUP, "Import staging cleanup failed (${it.javaClass.simpleName})")
+                    appLogService.warn(AppLogCategories.BACKUP, "Import staging cleanup failed (${it.javaClass.simpleName})")
                 }
             }
             // A failed install may have closed Room too. Clean sensitive bytes before a fresh process.
@@ -706,7 +707,7 @@ class DatabaseBackupService(
     }
 
     private fun logExportFailure(category: BackupFailureCategory, detail: String? = null) {
-        appLogService?.error(
+        appLogService.error(
             AppLogCategories.BACKUP,
             "Database export failed: ${category.logToken}" + (detail?.let { " ($it)" } ?: ""),
         )
@@ -718,7 +719,7 @@ class DatabaseBackupService(
     }
 
     private fun logImportFailure(category: BackupFailureCategory, detail: String? = null) {
-        appLogService?.error(
+        appLogService.error(
             AppLogCategories.BACKUP,
             "Database import failed: ${category.logToken}" + (detail?.let { " ($it)" } ?: ""),
         )

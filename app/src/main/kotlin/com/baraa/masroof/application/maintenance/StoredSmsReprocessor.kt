@@ -3,7 +3,7 @@ package com.baraa.masroof.application.maintenance
 import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.logging.AppLogCategories
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
@@ -28,10 +28,10 @@ class StoredSmsReprocessor(
     private val processRawSms: ProcessRawSmsUseCase,
     private val refreshDerivedState: suspend () -> Unit,
     private val processingRetryRepository: ProcessingRetryRepository,
-    private val appLogService: AppLogService? = null,
+    private val appLogService: AppLog,
 ) {
     suspend fun reprocessAll(): ReparseAllStoredEventsResult {
-        appLogService?.info(AppLogCategories.PARSE, "Reparse started")
+        appLogService.info(AppLogCategories.PARSE, "Reparse started")
         var refreshedCount = 0
         var failedCount = 0
         val reparsed = mutableListOf<String>()
@@ -53,7 +53,7 @@ class StoredSmsReprocessor(
         // The full pass covered every successfully reparsed row; a reparsed LIVE marker became HISTORICAL_BATCH and is cleared here.
         val historical = processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).toSet()
         processingRetryRepository.clear(reparsed.filter { it in historical })
-        appLogService?.info(
+        appLogService.info(
             AppLogCategories.PARSE,
             "Reparse finished: $refreshedCount refreshed, $failedCount failed",
         )

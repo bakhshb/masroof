@@ -4,7 +4,7 @@ import com.baraa.masroof.application.dashboard.SarEquivalentResolution
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -59,7 +59,7 @@ class HistoricalMerchantRateCorrectionWorkflow(
     private val parsedEventRepository: ParsedEventRepository,
     private val rawSmsRepository: RawSmsRepository,
     private val sarEquivalentResolver: TransactionSarEquivalentResolver,
-    private val appLogService: AppLogService? = null,
+    private val appLogService: AppLog,
     private val primaryCurrency: Currency = Currency.SAR,
 ) {
     private val mutex = Mutex()
@@ -157,7 +157,7 @@ class HistoricalMerchantRateCorrectionWorkflow(
             true -> " applied=true"
             false -> " applied=false"
         }
-        appLogService?.info(
+        appLogService.info(
             AppLogCategories.TRANSACTION,
             "Historical merchant rate correction $phase " +
                 "id=${AppLogFormatting.maskId(candidate.transactionId)} " +

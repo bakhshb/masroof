@@ -16,6 +16,7 @@ import com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.testsupport.EngineFixtureParser
+import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
@@ -57,6 +58,17 @@ import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpOwnershipDiscovery
+import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
+import com.baraa.masroof.testsupport.noOpReconciliation
+import com.baraa.masroof.testsupport.noOpIngestionReviewService
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
+import com.baraa.masroof.testsupport.EmptyReviewRepository
+import com.baraa.masroof.testsupport.NoOpLiveCaptureRecoveryScheduler
 
 /** In-memory Room wiring of the live capture → stored processing path for worker tests. */
 internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
@@ -116,7 +128,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         ),
     )
 
-    val capture = CaptureBankSmsUseCase(rawRepo, registry)
+    val capture = CaptureBankSmsUseCase(rawRepo, registry, appLogService = NoOpAppLog)
 
     init {
         runBlocking { cards.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "7271"), OwnershipStatus.OWNED) }
@@ -126,7 +138,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         rawSmsRepository: RawSmsRepository = rawRepo,
         derivedFailures: DerivedFailureInjection = DerivedFailureInjection(),
         exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler? = null,
-        appLogService: com.baraa.masroof.application.logging.AppLogService? = null,
+        appLogService: com.baraa.masroof.application.logging.AppLog = NoOpAppLog,
     ): ProcessStoredSmsUseCase {
         val parsedForReconcile = object : ParsedEventRepository by parsedRepo {
             override suspend fun listAll(): List<ParsedEventRecord> {
@@ -228,6 +240,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                     RoomUserCorrectionRepository(db.userCorrectionDao()),
                 ),
                 reviewRepository = reviewRepo,
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewForUpdate, ftRepo, clock),
             ingestionReviewService = ingestionReview,
@@ -242,9 +255,11 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                         sarEquivalentResolver = TransactionSarEquivalentResolver(
                             marketRateProvider = ForeignSarMarketRateProvider { _, _ -> null },
                         ),
+                        appLogService = NoOpAppLog,
                     ).enrichPending()
                 },
             ),
+            reviewRepository = EmptyReviewRepository(),
         )
     }
 
@@ -254,7 +269,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
      */
     fun historicalBatch(
         reconciliationFails: Boolean = false,
-        batchRecoveryScheduler: HistoricalBatchRecoveryScheduler? = null,
+        batchRecoveryScheduler: HistoricalBatchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
         processingRetryRepository: ProcessingRetryRepository = processingRetryRepo,
         reviewRepository: ReviewRepository = reviewRepo,
     ): HistoricalSmsBatchProcessor {
@@ -265,6 +280,14 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 rawSmsRepository = rawRepo,
                 parsedEventRepository = parsedRepo,
                 bankSmsRegistry = registry,
+                appLogService = NoOpAppLog,
+                exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+                ingestionReviewService = noOpIngestionReviewService(),
+                ownershipDiscovery = noOpOwnershipDiscovery(),
+                processingRecovery = noOpProcessingRecovery(),
+                reconciliation = noOpReconciliation(),
+                reviewQueueUpdater = noOpReviewQueueUpdater(),
+                reviewRepository = EmptyReviewRepository(),
             ),
             reconciliation = batchReconciliation(reconciliationFails),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepository, ftRepo, clock),
@@ -275,6 +298,9 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 clock = clock,
             ),
             batchRecoveryScheduler = batchRecoveryScheduler,
+            appLogService = NoOpAppLog,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            ownershipDiscovery = noOpOwnershipDiscovery(),
         )
     }
 
@@ -300,6 +326,9 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 cards,
                 NoOpLoanRegistryRepository,
             ),
+            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedForBatch),
+            ownershipConfirmationService = noOpOwnershipConfirmation(),
+            reviewRepository = EmptyReviewRepository(),
         )
     }
 
@@ -311,13 +340,15 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             reconciliation = batchReconciliation(reconciliationFails),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
             rawSmsRepository = rawRepo,
+            appLogService = NoOpAppLog,
+            ownershipDiscovery = noOpOwnershipDiscovery(),
         )
     }
 
-    fun intake(scheduler: LiveSmsWorkScheduler): LiveSmsIntake = intake(batchRecoveryScheduler = null, scheduler = scheduler)
+    fun intake(scheduler: LiveSmsWorkScheduler): LiveSmsIntake = intake(batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler, scheduler = scheduler)
 
     fun intake(
-        batchRecoveryScheduler: HistoricalBatchRecoveryScheduler?,
+        batchRecoveryScheduler: HistoricalBatchRecoveryScheduler,
         scheduler: LiveSmsWorkScheduler,
     ): LiveSmsIntake =
         LiveSmsIntake(
@@ -328,6 +359,8 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             processingRetryRepository = processingRetryRepo,
             appLogService = appLog,
             batchRecoveryScheduler = batchRecoveryScheduler,
+            captureRecoveryScheduler = NoOpLiveCaptureRecoveryScheduler,
+            missedSmsScheduler = NoOpLiveCaptureRecoveryScheduler,
         )
 
     override fun close() {

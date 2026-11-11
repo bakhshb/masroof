@@ -23,9 +23,9 @@ class SettingsRegistryWorkflow(
     private val accountRegistryRepository: AccountRegistryRepository,
     private val loanRegistryRepository: LoanRegistryRepository,
     private val ownershipConfirmationService: OwnershipConfirmationService,
-    private val parsedEvents: com.baraa.masroof.parsing.repository.ParsedEventRepository? = null,
+    private val parsedEvents: com.baraa.masroof.parsing.repository.ParsedEventRepository,
     private val inTransaction: suspend (suspend () -> Unit) -> Unit = { it() },
-    private val transactions: com.baraa.masroof.domain.repository.FinancialTransactionRepository? = null,
+    private val transactions: com.baraa.masroof.domain.repository.FinancialTransactionRepository,
     /** Accounts a taught message pattern posts to; deleting one would keep receiving transactions. */
     private val patternBoundAccounts: suspend () -> Set<AccountReference> = { emptySet() },
     /** Cards a message pattern links to; deleting one would keep receiving transactions. */
@@ -62,8 +62,7 @@ class SettingsRegistryWorkflow(
 
     /** A suggestion only. Conflicting evidence stays unknown; existing user choices are never overwritten. */
     suspend fun suggestedCardType(card: CardReference): com.baraa.masroof.domain.model.CardType? {
-        val repository = parsedEvents ?: return null
-        val signals = repository.listByRawSmsIds(repository.listRawSmsIdsReferencingCard(card))
+        val signals = parsedEvents.listByRawSmsIds(parsedEvents.listRawSmsIdsReferencingCard(card))
             .filter { it.event.cardRef == card && it.event.bank == card.bank && it.event.parseStatus == com.baraa.masroof.domain.model.ParseStatus.SUCCESS }
             .mapNotNull { record -> when (record.details.cardSmsChannel) {
                 com.baraa.masroof.parsing.model.CardSmsChannel.CREDIT,
@@ -143,7 +142,6 @@ class SettingsRegistryWorkflow(
     }
 
     private suspend fun linkedTransactions(target: RegistryDeleteTarget): List<com.baraa.masroof.domain.model.FinancialTransaction> {
-        val ledger = transactions ?: return emptyList()
         val containerIds = when (target) {
             // Legacy rows may still hold the bank-less account id; treat them as linked rather than guess.
             is RegistryDeleteTarget.Account -> setOfNotNull(FinancialContainerIdFactory.accountId(target.account),
@@ -151,13 +149,13 @@ class SettingsRegistryWorkflow(
             is RegistryDeleteTarget.Card -> setOfNotNull(FinancialContainerIdFactory.cardId(target.card))
             is RegistryDeleteTarget.Loan -> setOfNotNull(FinancialContainerIdFactory.loanId(target.loan))
         }
-        val all = ledger.listAll()
-        val rawSmsIds = parsedEvents?.let { events -> when (target) {
-            is RegistryDeleteTarget.Account -> events.listRawSmsIdsReferencingAccount(target.account)
-            is RegistryDeleteTarget.Card -> events.listRawSmsIdsReferencingCard(target.card)
-            is RegistryDeleteTarget.Loan -> events.listRawSmsIdsReferencingLoan(target.loan)
-        } }.orEmpty()
-        val evidenceLinked = ledger.listTransactionIdsForRawSmsIds(rawSmsIds)
+        val all = transactions.listAll()
+        val rawSmsIds = when (target) {
+            is RegistryDeleteTarget.Account -> parsedEvents.listRawSmsIdsReferencingAccount(target.account)
+            is RegistryDeleteTarget.Card -> parsedEvents.listRawSmsIdsReferencingCard(target.card)
+            is RegistryDeleteTarget.Loan -> parsedEvents.listRawSmsIdsReferencingLoan(target.loan)
+        }
+        val evidenceLinked = transactions.listTransactionIdsForRawSmsIds(rawSmsIds)
         return all.filter { it.sourceContainerId in containerIds || it.destinationContainerId in containerIds || it.id in evidenceLinked }
             .sortedByDescending { it.occurredAt }
     }

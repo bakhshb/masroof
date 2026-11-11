@@ -29,6 +29,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /**
  * The pre-3.27 snapshot path has to run on a device SQLite that does not implement
@@ -129,6 +130,7 @@ class PreVacuumBackupSnapshotTest {
                     clockEpochMillis = { 1_700_000_000_000L },
                     restartProcess = { error("export must not restart the process") },
                     kdfIterations = 4_096,
+                    appLogService = NoOpAppLog,
                 ).exportTo(Uri.fromFile(zip), passphrase.copyOf())
             }
             stop.set(true)
@@ -147,6 +149,7 @@ class PreVacuumBackupSnapshotTest {
                     appVersionName = "test",
                     clockEpochMillis = { 1_700_000_000_000L },
                     restartProcess = { restartRequested.set(true) },
+                    appLogService = NoOpAppLog,
                 ).importFrom(Uri.fromFile(zip), passphrase.copyOf())
             }
             assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)

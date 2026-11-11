@@ -28,6 +28,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 class PatternTeachingClarityJourneyTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -48,7 +49,7 @@ class PatternTeachingClarityJourneyTest {
     @Test fun questionBackAndMissingAnswerRemainVisibleThroughTheWholeTeachingFlow() = runBlocking {
         val file = compose.activity.cacheDir.resolve("teaching-clarity-${java.util.UUID.randomUUID()}.json")
         val store = MessagePatternStore(file)
-        val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate())
+        val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), appLogService = NoOpAppLog)
         workflow.saveBank(0, BankMessagePatterns("STC", listOf("STC Bank"), "STC Bank"))
         try {
             compose.setContent {

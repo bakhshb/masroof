@@ -33,6 +33,9 @@ import org.robolectric.annotation.Config
 import java.io.IOException
 import java.time.Duration
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
+import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
 
 /** A live SMS that could not be stored must not crash the receiver, and must leave a way back. */
 @RunWith(RobolectricTestRunner::class)
@@ -58,7 +61,7 @@ class LiveCaptureFailureTest {
 
     @Test
     fun adapterThatThrowsWhileRouting_returnsFailedAndStoresNothing() = runBlocking {
-        val result = CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(throwingAdapter()))).capture(live())
+        val result = CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(throwingAdapter())), appLogService = NoOpAppLog).capture(live())
 
         assertTrue(result is BankSmsCaptureResult.Failed)
         assertEquals(0, db.rawSmsDao().count())
@@ -68,7 +71,7 @@ class LiveCaptureFailureTest {
     fun routingFailure_schedulesAnInboxReReadThatCoversBothClocks() = runBlocking {
         val raw = live(at = "2026-08-03T14:32:00Z")
 
-        val result = intake(CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(throwingAdapter())))).ingest(raw)
+        val result = intake(CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(throwingAdapter())), appLogService = NoOpAppLog)).ingest(raw)
 
         assertTrue(result is BankSmsCaptureResult.Failed)
         assertEquals(listOf(raw.receivedAt.minus(Duration.ofMinutes(10))), recoveryScheduled)
@@ -79,7 +82,7 @@ class LiveCaptureFailureTest {
     fun serviceCenterTimeAheadOfDevice_windowStartsBeforeDeviceArrival() = runBlocking {
         val raw = live(at = "2026-08-03T15:30:00Z")
 
-        intake(CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(throwingAdapter())))).ingest(raw)
+        intake(CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(throwingAdapter())), appLogService = NoOpAppLog)).ingest(raw)
 
         assertEquals(listOf(now.minus(Duration.ofMinutes(10))), recoveryScheduled)
     }
@@ -89,7 +92,7 @@ class LiveCaptureFailureTest {
         val failingInsert = object : RawSmsRepository by rawRepo {
             override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult = throw IOException("disk full")
         }
-        val capture = CaptureBankSmsUseCase(failingInsert, BankSmsRegistry(listOf(engineFixtureAdapter())))
+        val capture = CaptureBankSmsUseCase(failingInsert, BankSmsRegistry(listOf(engineFixtureAdapter())), appLogService = NoOpAppLog)
 
         val result = intake(capture).ingest(live())
 
@@ -104,7 +107,7 @@ class LiveCaptureFailureTest {
             override suspend fun insertIfAbsent(rawSms: RawSms): RawSmsInsertResult = throw DatabaseRestartRequiredException()
         }
 
-        val result = intake(CaptureBankSmsUseCase(retired, BankSmsRegistry(listOf(engineFixtureAdapter())))).ingest(live())
+        val result = intake(CaptureBankSmsUseCase(retired, BankSmsRegistry(listOf(engineFixtureAdapter())), appLogService = NoOpAppLog)).ingest(live())
 
         assertTrue(result is BankSmsCaptureResult.Failed)
         assertEquals(1, recoveryScheduled.size)
@@ -114,7 +117,7 @@ class LiveCaptureFailureTest {
     fun capturedSms_schedulesProcessingAndNoReRead() = runBlocking {
         val raw = live()
 
-        val result = intake(CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(engineFixtureAdapter())))).ingest(raw)
+        val result = intake(CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(engineFixtureAdapter())), appLogService = NoOpAppLog)).ingest(raw)
 
         assertTrue(result is BankSmsCaptureResult.Captured)
         assertEquals(listOf(raw.id), processingScheduled)
@@ -123,7 +126,7 @@ class LiveCaptureFailureTest {
 
     @Test
     fun missedSmsCatchUp_reReadsTheInboxFromTheNewestStoredSmsNotAfterNow() = runBlocking {
-        val capture = CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(engineFixtureAdapter())))
+        val capture = CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(engineFixtureAdapter())), appLogService = NoOpAppLog)
         intake(capture).scheduleMissedSmsCatchUp()
         assertTrue("nothing stored: no catch-up", catchUpScheduled.isEmpty())
         intake(capture).ingest(live("2026-08-03T18:00:00Z"))
@@ -149,6 +152,7 @@ class LiveCaptureFailureTest {
         captureRecoveryScheduler = { recoveryScheduled += it },
         clock = InstantClock { now },
         missedSmsScheduler = { catchUpScheduled += it },
+        batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
     )
 
     private fun throwingAdapter(): BankSmsAdapter {

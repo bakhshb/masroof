@@ -28,6 +28,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.nio.file.Files
 import java.time.Instant
+import com.baraa.masroof.testsupport.StubAccountRegistryRepository
+import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -43,7 +45,7 @@ class AutomaticPatternWriteGuardTest {
             val result = InterpretationDraftMapper().map(input,
                 PatternFactInterpreter(snapshot).interpretRouted(input, BankId(definition.bankId)), Bank.BANK_ALJAZIRA) as ParseResult.Success
             val record = ParsedEventRecord(result.event, result.details)
-            val policy = PatternInterpretationWritePolicy(store)
+            val policy = PatternInterpretationWritePolicy(store, accounts = StubAccountRegistryRepository(), cards = NoOpCardRegistryRepository())
             assertTrue(PatternInterpretationWritePolicy.isPatternDerived(record))
             assertTrue(policy.isCurrent(record))
             val purchase = definition.patterns.single { it.id == "bank.purchase" }
@@ -87,7 +89,7 @@ class AutomaticPatternWriteGuardTest {
             parsed.save(result.event, result.details)
             val corrections = RoomUserCorrectionRepository(db.userCorrectionDao())
             val effective = EffectiveParsedEventProvider(parsed, corrections)
-            val policy = PatternInterpretationWritePolicy(store)
+            val policy = PatternInterpretationWritePolicy(store, accounts = StubAccountRegistryRepository(), cards = NoOpCardRegistryRepository())
             val guard = AutomaticInterpretationWriteGuard(effective, RoomReviewRepository(db.reviewItemDao()),
                 RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao()), { true },
                 { work -> gate.withAccess { db.withTransaction { work() } } },

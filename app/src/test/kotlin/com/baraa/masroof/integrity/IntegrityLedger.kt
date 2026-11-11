@@ -51,6 +51,15 @@ import org.junit.Assert.fail
 import java.io.IOException
 import java.time.Instant
 import kotlin.random.Random
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
+import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpOwnershipDiscovery
+import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
+import com.baraa.masroof.testsupport.noOpReconciliation
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 /**
  * Fixed seeds for M18 sequences. Every failing assertion names the seed that produced it.
@@ -218,6 +227,7 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         ownershipConfirmationService = confirmation,
         reviewRepository = reviews,
         zoneId = world.zone,
+        effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
     )
 
     val productionReconciliation = TransactionReconciliationService(
@@ -247,11 +257,21 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
             parsedEventRepository = parsed,
             bankSmsRegistry = registry,
             ingestionReviewService = IngestionReviewService(reviews, clock),
+            appLogService = NoOpAppLog,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            ownershipDiscovery = noOpOwnershipDiscovery(),
+            processingRecovery = noOpProcessingRecovery(),
+            reconciliation = noOpReconciliation(),
+            reviewQueueUpdater = noOpReviewQueueUpdater(),
+            reviewRepository = EmptyReviewRepository(),
         ),
         ownershipDiscovery = discovery,
         reconciliation = reconciliation,
         reviewQueueUpdater = reviewQueue,
         processingRecovery = recovery,
+        appLogService = NoOpAppLog,
+        batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
+        exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
     )
 
     val liveProcessing = ProcessStoredSmsUseCase(
@@ -263,6 +283,9 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         reviewQueueUpdater = reviewQueue,
         ingestionReviewService = IngestionReviewService(reviews, clock),
         processingRecovery = recovery,
+        appLogService = NoOpAppLog,
+        exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+        reviewRepository = EmptyReviewRepository(),
     )
 
     val workflow = ReviewWorkflowService(
@@ -280,6 +303,8 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         clock = clock,
         zoneId = world.zone,
         newCorrectionId = { "uc-m18-${correctionSequence++}" },
+        appLogService = NoOpAppLog,
+        processingRecovery = noOpProcessingRecovery(),
     )
 
     private var correctionSequence = 1
@@ -293,6 +318,7 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         reconciliation = reconciliation,
         reviewQueueUpdater = reviewQueue,
         rawSmsRepository = world.rawRepo,
+        appLogService = NoOpAppLog,
     )
 
     /** Reparse, reconcile, and legacy transfer repair on the unwrapped production path. */
