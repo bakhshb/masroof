@@ -227,7 +227,6 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 loanRegistry = NoOpLoanRegistryRepository,
             ),
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedForReconcile,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = ledgerUnderTest,
                 ownershipResolver = OwnershipResolver(
@@ -318,7 +317,6 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             }
         }
         return TransactionReconciliationService(
-            parsedEventRepository = parsedForBatch,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ledgerUnderTest,
             ownershipResolver = OwnershipResolver(

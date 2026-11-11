@@ -127,7 +127,6 @@ class TransferPairPersistenceTest : ReconciliationTestFixture() {
     )
 
     private fun service(ledger: FinancialTransactionRepository) = TransactionReconciliationService(
-        parsedEventRepository = parsedRepo,
         rawSmsRepository = rawRepo,
         financialTransactionRepository = ledger,
         ownershipResolver = OwnershipResolver(accounts, cards, loans),

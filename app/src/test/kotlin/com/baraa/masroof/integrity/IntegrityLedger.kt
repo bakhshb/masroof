@@ -220,7 +220,6 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
     }
 
     val reconciliation = TransactionReconciliationService(
-        parsedEventRepository = parsed,
         rawSmsRepository = world.rawRepo,
         financialTransactionRepository = posted,
         ownershipResolver = ownership,
@@ -231,7 +230,6 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
     )
 
     val productionReconciliation = TransactionReconciliationService(
-        parsedEventRepository = world.parsedRepo,
         rawSmsRepository = world.rawRepo,
         financialTransactionRepository = world.ftRepo,
         ownershipResolver = ownership,

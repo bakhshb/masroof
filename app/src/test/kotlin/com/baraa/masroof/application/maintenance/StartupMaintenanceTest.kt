@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.maintenance
 
+import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
@@ -72,6 +73,7 @@ class StartupMaintenanceTest {
             block()
             TransferIntegrityRepairResult()
         },
+        completionSignal = MaintenanceCompletionSignal(),
     )
 
     private fun lastTransferRepairVersion() =

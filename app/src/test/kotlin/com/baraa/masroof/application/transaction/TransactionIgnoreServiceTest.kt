@@ -71,7 +71,6 @@ class TransactionIgnoreServiceTest {
             appLogService = NoOpAppLog,
         )
         reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(

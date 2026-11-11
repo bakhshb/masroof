@@ -111,7 +111,6 @@ class HistoricalDerivedRecoveryTest {
             parsedEventRepository = harness.parsedRepo,
             processingRetryRepository = harness.processingRetryRepo,
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = harness.parsedRepo,
                 rawSmsRepository = harness.rawRepo,
                 financialTransactionRepository = harness.ftRepo,
                 ownershipResolver = OwnershipResolver(

@@ -106,7 +106,6 @@ class IntraBankSelfTransferIngestionTest {
 
     val ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository)
     val reconciliation = TransactionReconciliationService(
-      parsedEventRepository = parsedRepo,
       rawSmsRepository = rawRepo,
       financialTransactionRepository = ftRepo,
       ownershipResolver = ownershipResolver,

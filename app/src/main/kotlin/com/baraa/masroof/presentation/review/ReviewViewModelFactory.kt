@@ -14,7 +14,7 @@ fun reviewViewModelFactory(
             reviewWorkflowService = container.reviewWorkflowService,
             rawSmsRepository = container.rawSmsRepository,
             effectiveParsedEventProvider = container.effectiveParsedEventProvider,
-            provenanceWorkflow = container.interpretationProvenanceWorkflow,
+            provenance = container.interpretationProvenanceWorkflow::load,
         )
         ReviewViewModel(
             messagePatternsWorkflow = container.messagePatternsWorkflow,

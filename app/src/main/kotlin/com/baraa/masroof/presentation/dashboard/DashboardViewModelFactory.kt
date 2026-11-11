@@ -26,7 +26,7 @@ fun dashboardViewModelFactory(
             smsEvidenceLoader = TransactionSmsEvidenceLoader(
                 financialTransactionRepository = container.financialTransactionRepository,
                 rawSmsRepository = container.rawSmsRepository,
-                provenanceWorkflow = container.interpretationProvenanceWorkflow,
+                provenance = container.interpretationProvenanceWorkflow::load,
             ),
             permissionStateProvider = permissionStateProvider,
             appContext = container.applicationContext,

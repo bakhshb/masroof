@@ -60,7 +60,7 @@ internal fun noOpOwnershipConfirmation() =
     OwnershipConfirmationService(StubAccountRegistryRepository(), NoOpCardRegistryRepository(), NoOpLoanRegistryRepository)
 
 internal fun noOpReviewQueueUpdater() =
-    ReviewQueueUpdater(EmptyReviewRepository(), EmptyFinancialTransactionRepository(), noOpClock)
+    ReviewQueueUpdater(NoOpReviewRepository(), EmptyFinancialTransactionRepository(), noOpClock)
 
 internal fun noOpIngestionReviewService() = IngestionReviewService(NoOpReviewRepository(), noOpClock)
 
@@ -78,7 +78,6 @@ internal fun noOpReclassificationRepository(financialTransactionRepository: Fina
 internal fun noOpReconciliation(): TransactionReconciliationService {
     val parsed = EmptyParsedEventRepository()
     return TransactionReconciliationService(
-        parsedEventRepository = parsed,
         rawSmsRepository = EmptyRawSmsRepository(),
         financialTransactionRepository = EmptyFinancialTransactionRepository(),
         ownershipResolver = OwnershipResolver(StubAccountRegistryRepository(), NoOpCardRegistryRepository(), NoOpLoanRegistryRepository),

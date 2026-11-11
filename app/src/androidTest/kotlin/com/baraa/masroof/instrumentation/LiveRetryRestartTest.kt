@@ -55,7 +55,6 @@ import com.baraa.masroof.testsupport.NoOpAppLog
 import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
 import com.baraa.masroof.testsupport.NoOpLiveCaptureRecoveryScheduler
 import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
-import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
 
 /**
  * Device proof of the LIVE processing-retry row. The database is private to this test so the application
@@ -178,7 +177,6 @@ class LiveRetryRestartTest {
             bankSmsRegistry = registry,
             ownershipDiscovery = OwnershipDiscoveryService(accounts, cards, loans),
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = ledger,
                 ownershipResolver = resolver,

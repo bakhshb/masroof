@@ -54,7 +54,6 @@ internal object SettingsViewModelTestSupport {
             reviewRepository = reviewRepository,
             financialTransactionRepository = financialTransactionRepository,
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = emptyParsedEventRepository(),
                 rawSmsRepository = emptyRawSmsRepository(),
                 financialTransactionRepository = financialTransactionRepository,
                 ownershipResolver = ownershipResolver,

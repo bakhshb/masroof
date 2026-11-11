@@ -53,7 +53,6 @@ internal class RoomReviewWiring(
     val resolver = OwnershipResolver(accounts, cards, loans)
     val effective = EffectiveParsedEventProvider(parsed, corrections)
     val reconciliation = TransactionReconciliationService(
-        parsedEventRepository = parsed,
         rawSmsRepository = raw,
         financialTransactionRepository = ledger,
         ownershipResolver = resolver,

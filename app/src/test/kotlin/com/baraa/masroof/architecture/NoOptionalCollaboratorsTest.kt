@@ -11,10 +11,11 @@ import org.junit.Test
  * (`NoOp*`, `Empty*`, `testsupport/`). Lambdas, clocks, files and plain values may stay nullable.
  *
  * A collaborator is a constructor parameter whose type name ends in one of [COLLABORATOR_SUFFIXES].
- * [CAPABILITY_SWITCHES] are the listed exceptions. The pattern workflows switch what the pattern screen
- * offers (`canPreviewPending`, `canApprove`, `canApplyPending`). The provenance workflow's absence is shown
- * as no provenance, while a real one over empty stores reports `UNAVAILABLE`, which would change what the
- * loaders' tests prove.
+ * [ALLOWED] are the listed exceptions:
+ * - The pattern workflow switches decide what the pattern screen offers (`canPreviewPending`, `canApprove`,
+ *   `canApplyPending`). Production always passes all three, but the androidTest journeys build the workflow
+ *   without them and assert that screen. Making them non-null changes that UI and needs a device run.
+ * - `LearningInsightsWorkflow.learning` is really null in production when a bank adapter override is set.
  */
 class NoOptionalCollaboratorsTest {
 
@@ -36,15 +37,29 @@ class NoOptionalCollaboratorsTest {
         assertEquals(listOf("Sample.kt:3 log: AppLog?"), violations(listOf("Sample.kt" to source)))
     }
 
+    @Test
+    fun rule_flagsAParameterOnTheClassLineAndSeveralOnOneLine() {
+        val source = listOf(
+            "class A(private val a: SampleStore? = null, val b: SampleLoader?, val c: Clock?) {",
+            "    val local: SampleService? = lookup()",
+            "}",
+        )
+        assertEquals(
+            listOf("A.kt:1 a: SampleStore?", "A.kt:1 b: SampleLoader?"),
+            violations(listOf("A.kt" to source)),
+        )
+    }
+
     private fun violations(files: List<Pair<String, List<String>>>): List<String> =
         files.flatMap { (name, lines) ->
-            lines.mapIndexedNotNull { index, line ->
-                val match = NULLABLE_PARAMETER.matchEntire(line) ?: return@mapIndexedNotNull null
-                val (parameter, type) = match.destructured
-                val simpleType = type.substringAfterLast('.')
-                if (COLLABORATOR_SUFFIXES.none(simpleType::endsWith)) return@mapIndexedNotNull null
-                if ("$name $parameter" in CAPABILITY_SWITCHES) return@mapIndexedNotNull null
-                "$name:${index + 1} $parameter: $simpleType?"
+            lines.flatMapIndexed { index, line ->
+                NULLABLE_PARAMETER.findAll(line).mapNotNull { match ->
+                    val (parameter, type) = match.destructured
+                    val simpleType = type.substringAfterLast('.')
+                    if (COLLABORATOR_SUFFIXES.none(simpleType::endsWith)) return@mapNotNull null
+                    if ("$name $parameter" in ALLOWED) return@mapNotNull null
+                    "$name:${index + 1} $parameter: $simpleType?"
+                }.toList()
             }
         }
 
@@ -52,20 +67,19 @@ class NoOptionalCollaboratorsTest {
         val applicationFiles: List<File> = File("src/main/kotlin/com/baraa/masroof/application")
             .walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
 
-        /** `[private] val name: Type?[ = null]` ending the line like a constructor parameter does. */
-        val NULLABLE_PARAMETER = Regex("""\s*(?:private |internal )?val (\w+): ([\w.]+)\?(?: = null)?(?:,|\)(?: \{)?)""")
+        /** `val name: Type?[ = null]` followed by `,` or `)` like a parameter; a local `val x: T? = expr` is not. */
+        val NULLABLE_PARAMETER = Regex("""\bval (\w+): ([\w.]+)\?(?: = null)?(?=,|\))""")
 
         val COLLABORATOR_SUFFIXES = listOf(
             "Service", "Repository", "Workflow", "Policy", "Gateway", "Scheduler", "Recovery", "Updater",
-            "Provider", "Discovery", "Processor", "UseCase", "Registry", "AppLog", "Probe",
+            "Provider", "Discovery", "Processor", "UseCase", "Registry", "AppLog", "Probe", "Signal", "Store", "Loader",
         )
 
-        val CAPABILITY_SWITCHES = setOf(
+        val ALLOWED = setOf(
             "MessagePatternsWorkflow.kt pendingPreview",
             "MessagePatternsWorkflow.kt activation",
             "PendingPatternsWorkflow.kt batches",
-            "ReviewDetailLoader.kt provenanceWorkflow",
-            "TransactionSmsEvidenceLoader.kt provenanceWorkflow",
+            "LearningInsightsWorkflow.kt learning",
         )
     }
 }

@@ -254,7 +254,6 @@ class ProcessingCompletionFailureMatrixTest {
             reviewRepository = harness.reviewRepo,
             financialTransactionRepository = harness.ledgerUnderTest,
             reconciliation = com.baraa.masroof.application.transaction.TransactionReconciliationService(
-                parsedEventRepository = harness.parsedRepo,
                 rawSmsRepository = harness.rawRepo,
                 financialTransactionRepository = harness.ledgerUnderTest,
                 ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
@@ -376,7 +375,6 @@ class ProcessingCompletionFailureMatrixTest {
         val workflow = reviewWorkflow(OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository), schedules)
         harness.nonthrowingSaveConflicts.set(1)
         val report = com.baraa.masroof.application.transaction.TransactionReconciliationService(
-            parsedEventRepository = harness.parsedRepo,
             rawSmsRepository = harness.rawRepo,
             financialTransactionRepository = harness.ledgerUnderTest,
             ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
@@ -498,7 +496,6 @@ class ProcessingCompletionFailureMatrixTest {
             effectiveParsedEventProvider = effective,
             parsedEventRepository = parsed,
             reconciliationService = com.baraa.masroof.application.transaction.TransactionReconciliationService(
-                parsedEventRepository = parsed,
                 rawSmsRepository = harness.rawRepo,
                 financialTransactionRepository = harness.ledgerUnderTest,
                 ownershipResolver = resolver,

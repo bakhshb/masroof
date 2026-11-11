@@ -559,7 +559,6 @@ class HistoricalSmsScannerTest {
         private val registry = BankSmsRegistry(listOf(engineFixtureAdapter()))
         private val discovery = OwnershipDiscoveryService(accounts, cards, loans)
         private val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),

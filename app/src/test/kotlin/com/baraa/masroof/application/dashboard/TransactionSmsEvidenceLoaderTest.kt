@@ -22,6 +22,7 @@ class TransactionSmsEvidenceLoaderTest {
                     "sms-b" to raw("sms-b", "body-b"),
                 ),
             ),
+            provenance = { null },
         )
 
         val evidence = loader.loadForTransaction("tx-1")
@@ -41,6 +42,7 @@ class TransactionSmsEvidenceLoaderTest {
             rawSmsRepository = FakeRawSmsRepository(
                 mapOf("sms-a" to raw("sms-a", "body-a")),
             ),
+            provenance = { null },
         )
 
         val evidence = loader.loadForTransaction("tx-1")
@@ -54,6 +56,7 @@ class TransactionSmsEvidenceLoaderTest {
         val loader = TransactionSmsEvidenceLoader(
             financialTransactionRepository = FakeFinancialTransactionRepository(),
             rawSmsRepository = FakeRawSmsRepository(emptyMap()),
+            provenance = { null },
         )
 
         assertTrue(loader.loadForTransaction("tx-1").isEmpty())

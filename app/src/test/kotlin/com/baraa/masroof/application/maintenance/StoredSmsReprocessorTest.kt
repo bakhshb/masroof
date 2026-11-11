@@ -88,7 +88,6 @@ class StoredSmsReprocessorTest {
         cards = RoomCardRegistryRepository.from(db)
         cards.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "7271"), OwnershipStatus.OWNED)
         reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.maintenance
 
+import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
@@ -83,6 +84,7 @@ class TransferIntegrityRepairCoordinatorTest {
             prefs = CommitFailsPreferences(prefs()),
             appLogService = AppLogService(context),
             repairStoredTransfers = { TransferIntegrityRepairResult() },
+            completionSignal = MaintenanceCompletionSignal(),
         )
 
         assertEquals(BackfillOutcome.INCOMPLETE, coordinator.runIfNeeded())
@@ -110,6 +112,7 @@ class TransferIntegrityRepairCoordinatorTest {
         prefs = prefs(),
         appLogService = AppLogService(context),
         repairStoredTransfers = { block() },
+        completionSignal = MaintenanceCompletionSignal(),
     )
 
     private fun prefs() =

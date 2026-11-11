@@ -803,6 +803,7 @@ class DashboardViewModelTest {
         smsEvidenceLoader: TransactionSmsEvidenceLoader = TransactionSmsEvidenceLoader(
             financialTransactionRepository = SettingsViewModelTestSupport.emptyFinancialTransactionRepository(),
             rawSmsRepository = SettingsViewModelTestSupport.emptyRawSmsRepository(),
+            provenance = { null },
         ),
         deviceZoneId: java.time.ZoneId = zone,
     ): DashboardViewModel =

@@ -55,7 +55,6 @@ data class ReconciliationSummary(
  * candidates. Existing transaction links are preserved.
  */
 class TransactionReconciliationService(
-    private val parsedEventRepository: ParsedEventRepository,
     private val rawSmsRepository: RawSmsRepository,
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val ownershipResolver: OwnershipResolver,

@@ -92,7 +92,6 @@ class ProcessStoredSmsUseCaseTest {
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = registry,
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = ftRepo,
                 ownershipResolver = OwnershipResolver(
@@ -266,7 +265,6 @@ class ProcessStoredSmsUseCaseTest {
             parsedEventRepository = countedParsed,
             bankSmsRegistry = registry,
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = countedParsed,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = countedTransactions,
                 ownershipResolver = OwnershipResolver(

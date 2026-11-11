@@ -352,7 +352,7 @@ class ReviewListRefreshTest {
         private val reconciliation = wiring.reconciliation
         private val updater = wiring.updater
         val workflow = wiring.workflow
-        val loader = ReviewDetailLoader(workflow, rawRepo, effective)
+        val loader = ReviewDetailLoader(workflow, rawRepo, effective, provenance = { null })
         val viewModel = ReviewViewModel(
             reviewWorkflowService = workflow,
             detailLoader = loader,

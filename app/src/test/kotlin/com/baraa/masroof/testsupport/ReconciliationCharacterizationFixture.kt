@@ -223,7 +223,6 @@ class ReconciliationCharacterizationFixture private constructor(
     }
 
     private fun service(withCorrections: Boolean) = TransactionReconciliationService(
-        parsedEventRepository = parsedRepo,
         rawSmsRepository = rawRepo,
         financialTransactionRepository = ftRepo,
         ownershipResolver = OwnershipResolver(accounts, cards, loans),

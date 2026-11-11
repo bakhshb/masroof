@@ -393,7 +393,6 @@ class HistoricalSmsBatchProcessorTest {
             ),
             ownershipDiscovery = OwnershipDiscoveryService(accounts, cards, NoOpLoanRegistryRepository),
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = transactions,
                 ownershipResolver = OwnershipResolver(accounts, realCards, NoOpLoanRegistryRepository),

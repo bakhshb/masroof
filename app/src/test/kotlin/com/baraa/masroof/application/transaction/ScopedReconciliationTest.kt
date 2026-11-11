@@ -88,7 +88,6 @@ class ScopedReconciliationTest {
         loans = RoomLoanRegistryRepository.from(db)
         confirmation = OwnershipConfirmationService(accounts, cards, loans)
         reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsed,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = transactions,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
@@ -278,7 +277,6 @@ class ScopedReconciliationTest {
             ),
         )
         val scoped = TransactionReconciliationService(
-            parsedEventRepository = parsed,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = transactions,
             ownershipResolver = reconciliationOwnership(),
@@ -630,7 +628,6 @@ class ScopedReconciliationTest {
             ownership.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
             ownership.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
             val service = TransactionReconciliationService(
-                parsedEventRepository = countedParsed,
                 rawSmsRepository = raw,
                 financialTransactionRepository = countedFinancial,
                 ownershipResolver = OwnershipResolver(accounts, cards, loanRegistry),

@@ -35,7 +35,6 @@ import java.time.Duration
 import java.time.Instant
 import com.baraa.masroof.testsupport.NoOpAppLog
 import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
-import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
 
 /** A live SMS that could not be stored must not crash the receiver, and must leave a way back. */
 @RunWith(RobolectricTestRunner::class)

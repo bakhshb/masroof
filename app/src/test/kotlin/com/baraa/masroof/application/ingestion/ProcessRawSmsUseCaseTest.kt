@@ -72,8 +72,6 @@ import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
 import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
 import com.baraa.masroof.testsupport.noOpProcessingRecovery
 import com.baraa.masroof.testsupport.noOpOwnershipDiscovery
-import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
-import com.baraa.masroof.testsupport.noOpReconciliation
 import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
 
 @RunWith(RobolectricTestRunner::class)
@@ -534,7 +532,6 @@ class ProcessRawSmsUseCaseTest {
         bankSmsRegistry = alJaziraSmsRegistry(pipeline = pipeline),
         reconciliation = ledger?.let {
             TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = it,
                 ownershipResolver = OwnershipResolver(
@@ -648,7 +645,6 @@ class ProcessRawSmsUseCaseTest {
         val cards = RoomCardRegistryRepository.from(db)
         val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),

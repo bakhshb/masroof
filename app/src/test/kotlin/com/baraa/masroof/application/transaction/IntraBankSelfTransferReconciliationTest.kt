@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -120,7 +121,6 @@ class IntraBankSelfTransferReconciliationTest {
         cards = RoomCardRegistryRepository.from(db)
         confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
         reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
@@ -557,6 +557,7 @@ class IntraBankSelfTransferReconciliationTest {
             prefs = prefs,
             appLogService = AppLogService(context),
             repairStoredTransfers = { repairAndApplyReviews() },
+            completionSignal = MaintenanceCompletionSignal(),
         )
         assertEquals(BackfillOutcome.COMPLETED, coordinator.runIfNeeded())
         assertEquals(BackfillOutcome.UP_TO_DATE, coordinator.runIfNeeded())
@@ -727,7 +728,6 @@ class IntraBankSelfTransferReconciliationTest {
         seedPostedSingleLegSelf("sms-in-b", "in-b")
         val rejecting = RejectingDeleteRepository(ftRepo, rejectRemaining = 1)
         val repairing = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = rejecting,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
@@ -758,7 +758,6 @@ class IntraBankSelfTransferReconciliationTest {
         seedPostedSingleLegSelf("sms-in-b", "in-b")
         val rejecting = RejectingDeleteRepository(ftRepo, throwOnDelete = true)
         val repairing = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = rejecting,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),

@@ -60,7 +60,6 @@ abstract class ReconciliationTestFixture {
         loans = RoomLoanRegistryRepository.from(db)
         confirmation = OwnershipConfirmationService(accounts, cards, loans)
         reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
@@ -76,7 +75,6 @@ abstract class ReconciliationTestFixture {
     }
 
     protected fun serviceIn(zone: java.time.ZoneId) = TransactionReconciliationService(
-        parsedEventRepository = parsedRepo,
         rawSmsRepository = rawRepo,
         financialTransactionRepository = ftRepo,
         ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(accounts, cards, loans),

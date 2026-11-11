@@ -401,7 +401,6 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
         val correctionRepo = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())
         val withCorrections = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
@@ -451,7 +450,6 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
         val effective = com.baraa.masroof.application.review.EffectiveParsedEventProvider(parsedRepo, correctionRepo)
         val resolver = OwnershipResolver(accounts, cards, loans)
         val withReviews = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = resolver,

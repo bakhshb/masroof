@@ -86,7 +86,6 @@ import com.baraa.masroof.testsupport.NoOpAppLog
 import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
 import com.baraa.masroof.testsupport.NoOpLiveCaptureRecoveryScheduler
 import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
-import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
 
 private const val OTP_CODE: String = "482913"
 private const val PURCHASE_AT: String = "2026-08-03T14:32:00Z"
@@ -1003,7 +1002,6 @@ private class DeviceSmsSession(
             bankSmsRegistry = registry,
             ownershipDiscovery = OwnershipDiscoveryService(accounts, cards, loans),
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = effectiveLedger,
                 ownershipResolver = OwnershipResolver(accounts, cards, loans),

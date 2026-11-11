@@ -45,7 +45,7 @@ class ReviewDetailLoaderTest {
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
         val wiring = com.baraa.masroof.testsupport.RoomReviewWiring(db, clock, raw = rawRepo, reviews = reviewRepo)
         ingestionReviews = IngestionReviewService(reviewRepo, clock)
-        loader = ReviewDetailLoader(wiring.workflow, rawRepo, wiring.effective)
+        loader = ReviewDetailLoader(wiring.workflow, rawRepo, wiring.effective, provenance = { null })
     }
 
     @After

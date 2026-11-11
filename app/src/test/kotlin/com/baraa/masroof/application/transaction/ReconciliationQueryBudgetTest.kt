@@ -85,7 +85,6 @@ class ReconciliationQueryBudgetTest {
             )
         }
         val service = TransactionReconciliationService(
-            parsedEventRepository = parsed,
             rawSmsRepository = raw,
             financialTransactionRepository = ledger,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
