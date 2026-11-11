@@ -4,7 +4,6 @@ import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.IngestionReviewService
@@ -37,10 +36,11 @@ import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.parsing.model.ParseResult
-import com.baraa.masroof.parsing.parser.SmsParseGateway
+import com.baraa.masroof.testsupport.SmsParseGateway
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.time.InstantClock
 import com.baraa.masroof.testsupport.ingest
+import com.baraa.masroof.testsupport.processRawSmsUseCaseOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -262,7 +262,7 @@ class StoredSmsReprocessorTest {
         assertEquals(listOf("processing_error"), reviewRepo.findByRawSmsId(raw.id)!!.reasons)
     }
 
-    private fun useCase(pipeline: SmsParseGateway) = ProcessRawSmsUseCase(
+    private fun useCase(pipeline: SmsParseGateway) = processRawSmsUseCaseOf(
         rawSmsRepository = rawRepo,
         parsedEventRepository = parsedRepo,
         bankSmsRegistry = BankSmsRegistry(listOf(engineFixtureAdapter(pipeline = pipeline))),

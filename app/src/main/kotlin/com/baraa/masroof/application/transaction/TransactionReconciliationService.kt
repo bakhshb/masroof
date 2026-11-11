@@ -1002,7 +1002,7 @@ class TransactionReconciliationService(
     )
 
     /**
-     * Pre-M1 assemblers posted each owned-owned transfer SMS as its own
+     * Older assemblers posted each owned-owned transfer SMS as its own
      * self-transfer. Upgrade-only: uniquely pairable legs stay for
      * [upgradeStaleExternalPairs], and irreducibly ambiguous exclusive legs are
      * unlinked so the following reconcile can put them in PENDING_MATCH.

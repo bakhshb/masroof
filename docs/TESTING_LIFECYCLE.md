@@ -5,7 +5,7 @@ This is a map of existing production paths and executable coverage, not a claim 
 | Boundary | Required evidence |
 | --- | --- |
 | Pure financial policy extraction -> existing financial writes | `finance-core` policy/compatibility/ownership tests, module boundary tests, `FinancialSchemaCompatibilityTest`, app transaction/statement/dashboard integration tests and the existing real APK update journey |
-| SMS capture -> durable raw evidence -> parse -> reconciliation -> review | Bank adapter contracts/fixtures, parse validator tests, historical/live retry unit tests, and M13 real process-death phases at each boundary |
+| SMS capture -> durable raw evidence -> parse -> reconciliation -> review | Bank adapter contracts/fixtures, parse validator tests, historical/live retry unit tests, and real process-death phases at each boundary |
 | Reconciliation failures remain incomplete and recoverable | `HistoricalDerivedRecoveryTest`, processing retry repository/workflow tests, native retry/process-death journeys |
 | Manual decisions survive refresh and restart | `ModelRefreshWorkflowTest`, learning persistence/device tests, `LearningProcessDeathJourneyTest` |
 | ML assists family only, and unsafe assistance abstains | `FamilyLearningTest`, interpretation device journeys |

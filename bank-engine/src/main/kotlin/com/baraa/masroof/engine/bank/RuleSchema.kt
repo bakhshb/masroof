@@ -17,7 +17,7 @@ data class BankRule(
     val observations: Map<String, List<String>> = emptyMap(),
 )
 
-/** M6.1 first schema. Validation runs before handing literal rules to the shared lab engine. */
+/** First rule schema. Validation runs before handing literal rules to the shared lab engine. */
 data class BankRuleSchema(val schema: Int = 1, val revision: Int, val rules: List<BankRule>, val network: NetworkRules = NetworkRules()) {
     fun validate() {
         require(schema == 1) { "Unsupported rule schema" }

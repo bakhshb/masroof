@@ -63,7 +63,7 @@ import org.junit.runner.RunWith
  * each pair with the package data kept.
  */
 @RunWith(AndroidJUnit4::class)
-class M13ProcessDeathJourneyTest {
+class ProcessDeathJourneyTest {
     @Before
     fun requireEmulator() = runBlocking {
         assertFalse(
@@ -225,7 +225,7 @@ class M13ProcessDeathJourneyTest {
         val rawSmsId = singleRawSmsId()
         app().container.processingRecovery.markExhausted(rawSmsId)
         assertEquals(
-            evidence("M17 LIVE processing_retry row"),
+            evidence("LIVE processing_retry row"),
             listOf(rawSmsId),
             app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE),
         )

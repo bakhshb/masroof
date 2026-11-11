@@ -6,7 +6,7 @@ import java.time.Instant
 /**
  * Domain-facing RawSms persistence. Implementations live in the data layer.
  *
- * Duplicate-aware insertion supports safe P6 ingestion without creating
+ * Duplicate-aware insertion supports safe ingestion without creating
  * duplicate evidence rows.
  */
 interface RawSmsRepository {

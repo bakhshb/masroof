@@ -46,7 +46,7 @@ import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.SmsParseInput
-import com.baraa.masroof.parsing.parser.SmsParseGateway
+import com.baraa.masroof.testsupport.SmsParseGateway
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper

@@ -359,7 +359,6 @@ class BankInterpretationService(
     fun invalidateForRestore() {
         close()
         store.invalidate()
-        context.getSharedPreferences("learning_runtime",Context.MODE_PRIVATE).edit().clear().commit()
     }
     override fun close() {
         closed = true

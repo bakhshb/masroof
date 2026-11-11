@@ -18,7 +18,7 @@ data class TransferIntegrityRepairResult(
 }
 
 /**
- * One-time blocking repair of transfer rows stored before M1 pairing rules.
+ * One-time blocking repair of transfer rows stored before the pairing rules.
  *
  * Reconcile itself is idempotent; this coordinator records a version so startup
  * does not sweep the ledger on every launch. A thrown run or a reconcile report

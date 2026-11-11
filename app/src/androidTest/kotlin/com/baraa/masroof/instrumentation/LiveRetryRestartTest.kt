@@ -52,7 +52,7 @@ import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Device proof of M17. The database is private to this test so the application
+ * Device proof of the LIVE processing-retry row. The database is private to this test so the application
  * process's own startup worker cannot post the same SMS.
  *
  * The final [LiveSmsProcessingWorker] attempt fails, leaves a LIVE retry row, and

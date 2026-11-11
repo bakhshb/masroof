@@ -7,7 +7,6 @@ import com.baraa.masroof.engine.bank.BankRuleSchema
 import com.baraa.masroof.engine.bank.interpretation.RuleInterpreter
 import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
 import com.baraa.masroof.finance.value.BankId
-import com.baraa.masroof.parsing.parser.SmsParseGateway
 
 /** Default integration setup follows production ([bundledConfiguration] comes from each test source set). Pass a profile only for an explicit reference test. */
 fun engineFixtureAdapter(

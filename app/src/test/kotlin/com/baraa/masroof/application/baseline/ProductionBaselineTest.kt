@@ -11,11 +11,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * M0 lock for the production baseline at 5bb7e3b276b3905177482979b236362ad5b2f1df.
+ * Lock for the production tree: layout, release identity and entrypoints.
  *
  * Layer sizes are reported, not frozen as a growth ceiling.
  */
-class M0ProductionBaselineTest {
+class ProductionBaselineTest {
     @Test
     fun productionTree_reportsLayerCountsWithoutFreezingGrowth() {
         val files = sourceRoot.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
@@ -23,7 +23,7 @@ class M0ProductionBaselineTest {
         val byTop = files.groupingBy { it.relativeTo(sourceRoot).invariantSeparatorsPath.substringBefore('/') }
             .eachCount()
         println(
-            "M0_PRODUCTION_TREE total=${files.size} " +
+            "PRODUCTION_TREE total=${files.size} " +
                 byTop.entries.sortedBy { it.key }.joinToString(" ") { "${it.key}=${it.value}" },
         )
         assertTrue(byTop.getValue("application") > 0)

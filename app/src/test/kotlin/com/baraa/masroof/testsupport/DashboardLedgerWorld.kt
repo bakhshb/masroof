@@ -591,7 +591,7 @@ class DashboardLedgerWorld(
     }
 }
 
-/** Pre-M4.1 evidence load: every ParsedEvent plus one RawSms lookup per record. */
+/** Whole-history evidence load: every ParsedEvent plus one RawSms lookup per record. */
 class WholeHistoryDashboardEvidenceSource(
     private val parsedEventRepository: ParsedEventRepository,
     private val rawSmsRepository: RawSmsRepository,

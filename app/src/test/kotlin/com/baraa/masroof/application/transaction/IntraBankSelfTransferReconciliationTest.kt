@@ -550,7 +550,7 @@ class IntraBankSelfTransferReconciliationTest {
         assertEquals(BackfillOutcome.UP_TO_DATE, coordinator.runIfNeeded())
 
         assertTrue(
-            "Upgrade must drop the four pre-M1 self-transfer legs instead of leaving double-counted money",
+            "Upgrade must drop the four single-leg self-transfer legs instead of leaving double-counted money",
             ftRepo.listAll().isEmpty(),
         )
         assertEquals(4, parsedRepo.listAll().size)

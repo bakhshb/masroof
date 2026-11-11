@@ -27,7 +27,7 @@ import java.time.Instant
  * Pure assembly of [FinancialTransaction] from validated evidence + ownership.
  * No Room / Android.
  *
- * Passes only facts P8 genuinely knows into P2 classification — never fabricates
+ * Passes only facts reconciliation genuinely knows into classification — never fabricates
  * temporary account/card domain objects or invented account/card types solely to
  * satisfy the classifier. Container ids come from [FinancialContainerIdFactory]
  * on durable known-bank refs.
@@ -79,7 +79,7 @@ object TransactionAssembler {
     /**
      * Assemble a single ParsedEvent when possible.
      *
-     * [sourceOwnership]/[destinationOwnership]/[cardOwnership] come from P7.
+     * [sourceOwnership]/[destinationOwnership]/[cardOwnership] come from the ownership registries.
      * [receivedAt] is the RawSms receipt fallback clock.
      * [userConfirmed] lifts the [ParseStatus] gate for user-corrected evidence only.
      */
@@ -408,7 +408,7 @@ object TransactionAssembler {
         if (ref == null) return null
         val last4 = ref.last4?.trim().orEmpty()
         if (last4.isEmpty()) return null
-        // P7 registry does not know CardType — leave knownCardType null.
+        // The registry does not know CardType — leave knownCardType null.
         return ResolvedContainerFacts(
             kind = ContainerKind.CARD,
             ownership = ownership,

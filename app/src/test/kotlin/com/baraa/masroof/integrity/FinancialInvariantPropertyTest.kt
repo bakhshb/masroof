@@ -28,7 +28,7 @@ import org.robolectric.annotation.Config
 /**
  * Persisted-ledger invariants over the golden corpus and seeded import orders.
  * Totals come from [GoldenLedgerRunner], which reads the dashboard projection.
- * The M8 as-of rate oracle is active and is included with the other golden scenarios.
+ * The as-of rate oracle is active and is included with the other golden scenarios.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])

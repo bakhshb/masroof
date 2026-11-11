@@ -9,7 +9,7 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
-import com.baraa.masroof.application.maintenance.ParsedEventFactsBackfillWorker
+import com.baraa.masroof.application.maintenance.RetiredWorkCleanup
 import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
 import com.baraa.masroof.data.room.MasroofDatabase
 import kotlinx.coroutines.runBlocking
@@ -98,7 +98,7 @@ class AppContainerStartupMaintenanceTest {
     }
 
     private fun backfillWork(): List<WorkInfo> =
-        workManager.getWorkInfosForUniqueWork(ParsedEventFactsBackfillWorker.UNIQUE_WORK_NAME).get()
+        workManager.getWorkInfosForUniqueWork(RetiredWorkCleanup.RETIRED_BACKFILL_WORK_NAME).get()
 
     private fun prefs() = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
 

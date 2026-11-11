@@ -105,9 +105,9 @@ private val SQLITE_HEADER: ByteArray = byteArrayOf(
 )
 
 /**
- * Emulator instrumentation for M13. This is not a physical handset.
+ * Emulator instrumentation for process persistence. This is not a physical handset.
  *
- * Real process death is [com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest]:
+ * Real process death is [com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest]:
  * the manifest receiver, WorkManager, `am force-stop`, and the next process's
  * [com.baraa.masroof.MasroofApplication] startup. This class keeps the in-process
  * Room restart coverage and is not that acceptance evidence.
@@ -714,7 +714,7 @@ class SmsPersistenceRestartTest {
 
     private fun assertNotRobolectric() {
         assertFalse(
-            "M13 evidence is emulator instrumentation on API ${Build.VERSION.SDK_INT}, not Robolectric",
+            "Persistence evidence is emulator instrumentation on API ${Build.VERSION.SDK_INT}, not Robolectric",
             Build.FINGERPRINT.equals("robolectric", ignoreCase = true),
         )
     }

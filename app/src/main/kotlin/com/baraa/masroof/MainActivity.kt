@@ -55,7 +55,7 @@ import com.baraa.masroof.presentation.locale.AppLocaleContext
 import kotlinx.coroutines.launch
 
 /**
- * Launcher: P10 onboarding until complete, then P11 monthly dashboard.
+ * Launcher: onboarding until complete, then the monthly dashboard.
  */
 class MainActivity : ComponentActivity() {
     private val container by lazy { (application as MasroofApplication).container }

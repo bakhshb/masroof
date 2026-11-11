@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 object RetiredWorkCleanup {
     fun schedule(context: Context, scope: CoroutineScope, log: AppLogService) {
         val prefs = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
-        if (prefs.getBoolean("retired_lab_work_v1", false)) return
+        if (prefs.getBoolean(DONE_KEY, false)) return
         scope.launch {
             try {
                 val work = WorkManager.getInstance(context)
@@ -22,13 +22,14 @@ object RetiredWorkCleanup {
                     "lab-replica:exchange-rate-enrichment", "lab-replica:analytics")
                     .forEach { work.cancelAllWorkByTag(it).await() }
                 listOf("lab-replica:startup-recovery", "lab-replica:historical-derived-recovery",
-                    "lab-replica:parsed-event-facts-backfill", "lab-replica:masroof_update_check")
+                    "lab-replica:parsed-event-facts-backfill", "lab-replica:masroof_update_check",
+                    RETIRED_BACKFILL_WORK_NAME)
                     .forEach { work.cancelUniqueWork(it).await() }
                 val notifications = context.getSystemService(NotificationManager::class.java)
                 notifications.activeNotifications.filter { it.tag == "lab-analysis" }
                     .forEach { notifications.cancel(it.tag, it.id) }
                 notifications.deleteNotificationChannel("lab_replica_analysis")
-                check(prefs.edit().putBoolean("retired_lab_work_v1", true).commit())
+                check(prefs.edit().putBoolean(DONE_KEY, true).commit())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -37,4 +38,7 @@ object RetiredWorkCleanup {
             }
         }
     }
+
+    internal const val RETIRED_BACKFILL_WORK_NAME = "parsed-event-facts-backfill"
+    private const val DONE_KEY = "retired_lab_work_v2"
 }

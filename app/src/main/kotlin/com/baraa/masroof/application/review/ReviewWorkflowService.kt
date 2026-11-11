@@ -53,7 +53,7 @@ enum class ExternalTransferDirection(val family: MessageFamily) {
 
 /**
  * Backend review / user-resolution APIs for future UI.
- * No Compose. No automatic guessing beyond P8 + explicit human decisions.
+ * No Compose. No automatic guessing beyond reconciliation + explicit human decisions.
  */
 class ReviewWorkflowService(
     private val reviewRepository: ReviewRepository,

@@ -15,7 +15,7 @@ import java.util.concurrent.locks.LockSupport
  * and stays parked until process death. Release builds no-op. An absent request file
  * does not change capture, parse, reconciliation, or review.
  *
- * [HOLD_RECONCILE_FILE_NAME] keeps reconciliation incomplete so an M17 LIVE
+ * [HOLD_RECONCILE_FILE_NAME] keeps reconciliation incomplete so a LIVE
  * processing-retry row is not cleared. Absent, reconciliation is unchanged.
  * Neither path logs SMS bodies.
  */

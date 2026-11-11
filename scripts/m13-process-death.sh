@@ -6,7 +6,7 @@ set -euo pipefail
 
 APP_ID="com.baraa.masroof"
 RUNNER="${APP_ID}.test/com.baraa.masroof.instrumentation.MasroofAndroidTestRunner"
-CLASS="com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest"
+CLASS="com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest"
 
 adb wait-for-device
 echo "M13 emulator API $(adb shell getprop ro.build.version.sdk | tr -d '\r')"

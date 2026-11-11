@@ -4,7 +4,6 @@ import com.baraa.masroof.bank.InterpretationDraftMapper
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
 import com.baraa.masroof.finance.value.BankId
-import com.baraa.masroof.parsing.parser.SmsParseGateway
 
 internal fun bundledConfiguration() = bundledPatterns("BANK_ALJAZIRA")
 
