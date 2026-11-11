@@ -59,7 +59,7 @@ A bank name in the catalog does not guarantee every message format is supported.
 
 Financial records and SMS evidence are stored locally. Automatic Android cloud backup is disabled. Existing exchange-rate and app-update features use the network; the app is not entirely offline. Exported backups are protected by a passphrase.
 
-Updates preserve the production financial database at **schema v18**. Other financial database/backup schemas are rejected without destructive fallback. Model and engine refreshes preserve posted history and manual decisions. See [architecture and recovery](docs/ARCHITECTURE.md) for the storage contracts.
+The production financial database is at **schema v18**. Schema changes are additive, tested Room migrations only: the app opens schemas from v18 up to the current version and rejects older, unknown and newer ones without touching the file and without destructive fallback. Backups are accepted at the current schema. Model and engine refreshes preserve posted history and manual decisions. See [architecture and recovery](docs/ARCHITECTURE.md) for the storage contracts.
 
 ## Build and contribute
 

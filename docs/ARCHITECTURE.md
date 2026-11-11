@@ -205,7 +205,7 @@ Message learning is "remember my decision", per bank, for every configured bank.
 
 ## Data and recovery
 
-`masroof.db` supports schema 18 only, with its fourteen tables and unchanged identity hash. Never a destructive fallback. Until pieces 0.4a and 0.4b land, other schemas are rejected without migration; after that, schema changes are additive, tested Room migrations only (see AGENTS.md). Automatic schema-fact backfill is removed; already queued backfill work completes without parsing or writing. Existing preference files, Keystore alias, app id and worker names remain stable. `learning.db` stores labels/provenance; `analytics.db` stores advisory results and preferences. Old Lab files are neither imported nor deleted automatically.
+`masroof.db` opens schemas from the frozen v18 baseline (`MasroofDatabase.BASELINE_VERSION`, fourteen tables, unchanged identity hash) up to the current `MasroofDatabase.VERSION` (still 18) through `MasroofDatabase.MIGRATIONS`, one additive, tested Room migration per step (see AGENTS.md). `MasroofDatabase.builder` is the only builder for the live file. Older, unknown and newer schemas are rejected by Room and the file stays byte-identical (`MasroofMigrationOpenPathTest`, `MigrationOpenPathDeviceTest`). Never a destructive fallback. Automatic schema-fact backfill is removed; already queued backfill work completes without parsing or writing. Existing preference files, Keystore alias, app id and worker names remain stable. `learning.db` stores labels/provenance; `analytics.db` stores advisory results and preferences. Old Lab files are neither imported nor deleted automatically.
 
 The learning store is schema 2 and the analytics store is schema 4. Posted type edits atomically update the financial transaction and its latest `USER_FINANCIAL_TYPE` review decision in the unchanged financial schema. Message learning rebuilds from durable decisions before enabling personal assistance; no derived message-model cache is written or loaded. Exact template suppressions include bank and feature identity and revoke human-template assistance. Financial `EXPENSE`/`INCOME`, ownership decisions and field-only edits do not invent family labels. Unsupported or ambiguous decisions have an explicit feedback disposition.
 
@@ -227,7 +227,7 @@ review updates using that same report. Settings reloads registries after a compl
 reparse or rescan; it does not start another financial pass. A failed report remains
 incomplete and durably retryable even if a second pass could succeed.
 
-Encrypted backups retain the existing envelope and accept financial schema 18 only. Optional analysis is included in the durable restore journal for commit/rollback. Restoring an older backup clears stale analysis and rebuilds available results. Learning state is invalidated and reconstructed from retained human decisions.
+Encrypted backups retain the existing envelope and accept the current financial schema only. Optional analysis is included in the durable restore journal for commit/rollback. Restoring an older backup clears stale analysis and rebuilds available results. Learning state is invalidated and reconstructed from retained human decisions.
 
 See [AGENTS.md](../AGENTS.md) for enforced boundaries and [ANALYTICS.md](ANALYTICS.md) for model and alert policy.
 

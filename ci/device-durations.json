@@ -90,5 +90,8 @@
   "com.baraa.masroof.integration.replica.ReportedMessagesJourneyTest#importDateTextHasVisibleGlyphsInArabicDarkAndLightThemes": 4.106,
   "com.baraa.masroof.integration.replica.ReportedMessagesJourneyTest#manualTransfersRequireOwnedEndpointsAndRejectExternalClassificationBetweenOwnedAccounts": 2.478,
   "com.baraa.masroof.integration.replica.ReportedMessagesJourneyTest#previouslyUnresolvedReportedMessagesRecoverAfterRuleUpgradeWithoutReset": 6.664,
-  "com.baraa.masroof.integration.replica.ReportedMessagesJourneyTest#unknownMessageOffersTransfersAndManualDecisionPostsOnceWithoutClaimingMl": 3.389
+  "com.baraa.masroof.integration.replica.ReportedMessagesJourneyTest#unknownMessageOffersTransfersAndManualDecisionPostsOnceWithoutClaimingMl": 3.389,
+  "com.baraa.masroof.integration.storage.MigrationOpenPathDeviceTest#v18Fixture_upgradesToATestOnlyNextVersionWithEveryRowIntact": 0.2,
+  "com.baraa.masroof.integration.storage.MigrationOpenPathDeviceTest#olderSchema_isRejectedAndTheFileIsUntouched": 0.2,
+  "com.baraa.masroof.integration.storage.MigrationOpenPathDeviceTest#unknownIdentityHash_isRejectedAndTheFileIsUntouched": 0.2
 }
