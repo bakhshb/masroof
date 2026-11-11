@@ -15,7 +15,7 @@ import org.junit.Test
  * - The pattern workflow switches decide what the pattern screen offers (`canPreviewPending`, `canApprove`,
  *   `canApplyPending`). Production always passes all three, but the androidTest journeys build the workflow
  *   without them and assert that screen. Making them non-null changes that UI and needs a device run.
- * - `LearningInsightsWorkflow.learning` is really null in production when a bank adapter override is set.
+ * - `LearningInsightsWorkflow.learning` is null only in the adapter-override container, which device tests build.
  */
 class NoOptionalCollaboratorsTest {
 
@@ -32,9 +32,13 @@ class NoOptionalCollaboratorsTest {
             "    private val repo: SampleRepository,",
             "    private val log: AppLog? = null,",
             "    private val clock: Clock? = null,",
+            "    private var last: SampleService? = null",
             ") {",
         )
-        assertEquals(listOf("Sample.kt:3 log: AppLog?"), violations(listOf("Sample.kt" to source)))
+        assertEquals(
+            listOf("Sample.kt:3 log: AppLog?", "Sample.kt:5 last: SampleService?"),
+            violations(listOf("Sample.kt" to source)),
+        )
     }
 
     @Test
@@ -67,8 +71,11 @@ class NoOptionalCollaboratorsTest {
         val applicationFiles: List<File> = File("src/main/kotlin/com/baraa/masroof/application")
             .walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
 
-        /** `val name: Type?[ = null]` followed by `,` or `)` like a parameter; a local `val x: T? = expr` is not. */
-        val NULLABLE_PARAMETER = Regex("""\bval (\w+): ([\w.]+)\?(?: = null)?(?=,|\))""")
+        /**
+         * `val|var name: Type?[ = null]` ending in `,`, `)` or the line, like a parameter; a local
+         * `val x: T? = expr` is not. Parameters without `val`/`var` and generic types are not covered.
+         */
+        val NULLABLE_PARAMETER = Regex("""\bva[lr] (\w+): ([\w.]+)\?(?: = null)?\s*(?=,|\)|$)""")
 
         val COLLABORATOR_SUFFIXES = listOf(
             "Service", "Repository", "Workflow", "Policy", "Gateway", "Scheduler", "Recovery", "Updater",
