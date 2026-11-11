@@ -72,6 +72,7 @@ class StartupMaintenanceTest {
             block()
             TransferIntegrityRepairResult()
         },
+        completionSignal = MaintenanceCompletionSignal(),
     )
 
     private fun lastTransferRepairVersion() =

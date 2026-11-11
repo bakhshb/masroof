@@ -31,7 +31,7 @@ class PatternFinancialPreview internal constructor(internal val generation: Long
 /** Explicit approval writes configuration only. Account identity and ownership stay in the existing registry. */
 class PatternApprovalWorkflow(private val store: MessagePatternStore, private val gate: DatabaseAccessGate,
     private val accounts: AccountRegistryRepository, private val ownership: OwnershipConfirmationService,
-    private val cards: CardRegistryRepository? = null) {
+    private val cards: CardRegistryRepository) {
 
     suspend fun accounts(bankId: String): List<PatternAccountOption> = withContext(Dispatchers.IO) {
         gate.withAccess { ownedAccounts(bankId).map { PatternAccountOption(it.id, it.displayName, it.maskedNumber) } }
@@ -43,7 +43,7 @@ class PatternApprovalWorkflow(private val store: MessagePatternStore, private va
     suspend fun cards(bankId: String): List<PatternAccountOption> = withContext(Dispatchers.IO) {
         gate.withAccess { ownedCards(bankId).map { PatternAccountOption(it.id, it.displayName, it.last4) } }
     }
-    private suspend fun ownedCards(bankId: String) = cards?.listAll().orEmpty().filter {
+    private suspend fun ownedCards(bankId: String) = cards.listAll().filter {
         it.bank.id == bankId && it.ownership == OwnershipStatus.OWNED && it.cardType != null && it.last4.matches(Regex("[0-9]{4}"))
     }
 

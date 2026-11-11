@@ -30,7 +30,7 @@ class TransferIntegrityRepairCoordinator(
     private val prefs: SharedPreferences,
     private val appLogService: AppLogService,
     private val repairStoredTransfers: suspend () -> TransferIntegrityRepairResult,
-    private val completionSignal: MaintenanceCompletionSignal? = null,
+    private val completionSignal: MaintenanceCompletionSignal,
 ) {
     private val mutex = Mutex()
 
@@ -52,7 +52,7 @@ class TransferIntegrityRepairCoordinator(
             )
             null
         } finally {
-            completionSignal?.notifyCompleted()
+            completionSignal.notifyCompleted()
         }
         if (result == null) return@withLock BackfillOutcome.INCOMPLETE
         if (!result.succeeded) {

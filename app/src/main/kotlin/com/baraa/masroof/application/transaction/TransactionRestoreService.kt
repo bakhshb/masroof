@@ -3,7 +3,7 @@ package com.baraa.masroof.application.transaction
 import com.baraa.masroof.application.ingestion.ProcessingRecovery
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import kotlinx.coroutines.CancellationException
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -35,9 +35,9 @@ class TransactionRestoreService(
     private val reconciliation: TransactionReconciliationService,
     private val reclassification: TransactionReclassificationService,
     private val clock: InstantClock,
-    private val appLogService: AppLogService? = null,
-    private val reviewQueueUpdater: ReviewQueueUpdater? = null,
-    private val processingRecovery: ProcessingRecovery? = null,
+    private val appLogService: AppLog,
+    private val reviewQueueUpdater: ReviewQueueUpdater,
+    private val processingRecovery: ProcessingRecovery,
     private val onHistoricalRetry: (() -> Unit)? = null,
 ) {
     suspend fun restore(
@@ -78,7 +78,7 @@ class TransactionRestoreService(
         }
 
         try {
-            completeReport?.let { reviewQueueUpdater?.applyReport(it) }
+            completeReport?.let { reviewQueueUpdater.applyReport(it) }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -105,7 +105,7 @@ class TransactionRestoreService(
 
     private suspend fun retainRetry(rawSmsId: String, failureCount: Int, stage: String) {
         logIncomplete(rawSmsId, failureCount, retryState = "historical_batch", stage = stage)
-        processingRecovery?.markForHistoricalRetry(listOf(rawSmsId), onHistoricalRetry)
+        processingRecovery.markForHistoricalRetry(listOf(rawSmsId), onHistoricalRetry)
     }
 
     private fun logIncomplete(
@@ -114,7 +114,7 @@ class TransactionRestoreService(
         retryState: String,
         stage: String = ReconciliationCompletionPolicy.STAGE_RECONCILIATION,
     ) {
-        appLogService?.error(
+        appLogService.error(
             AppLogCategories.TRANSACTION,
             "Derived $stage incomplete failures=$failureCount " +
                 "id=${AppLogFormatting.maskId(rawSmsId)} retry_state=$retryState",
@@ -144,7 +144,7 @@ class TransactionRestoreService(
         newType: FinancialTransactionType?,
     ) {
         val typeSuffix = newType?.name?.lowercase()?.let { " as $it" } ?: ""
-        appLogService?.info(
+        appLogService.info(
             AppLogCategories.TRANSACTION,
             "Restored SMS ${AppLogFormatting.maskId(rawSmsId)} to transaction ${AppLogFormatting.maskId(transactionId)}$typeSuffix",
         )

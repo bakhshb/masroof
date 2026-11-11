@@ -46,6 +46,7 @@ import org.robolectric.annotation.Config
 import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.math.BigDecimal
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -81,6 +82,7 @@ class TransactionReclassificationServiceTest {
             ownershipConfirmationService = confirmation,
             persistence = com.baraa.masroof.data.repository.RoomTransactionReclassificationRepository(
                 db,ftRepo,com.baraa.masroof.data.room.DatabaseAccessGate()),
+                appLogService = NoOpAppLog,
         )
     }
 

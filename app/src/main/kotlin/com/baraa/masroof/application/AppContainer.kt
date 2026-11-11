@@ -328,7 +328,6 @@ class AppContainer(
 
     val transactionReconciliationService: TransactionReconciliationService =
         TransactionReconciliationService(
-            parsedEventRepository = parsedEventRepository,
             rawSmsRepository = rawSmsRepository,
             financialTransactionRepository = financialTransactionRepository,
             ownershipResolver = ownershipResolver,

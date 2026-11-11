@@ -18,6 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /** Background financial work waits for integrity repair, survives a restore, and refreshes open screens. */
 @RunWith(RobolectricTestRunner::class)
@@ -110,6 +111,7 @@ class WorkerStartupGateTest {
                     startupReady = { ready },
                     onFinished = { signals.incrementAndGet() },
                     recovery = { recovery },
+                    appLogService = NoOpAppLog,
                 ),
             )
             .build()

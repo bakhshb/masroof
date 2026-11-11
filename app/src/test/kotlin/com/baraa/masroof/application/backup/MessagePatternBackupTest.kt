@@ -21,6 +21,7 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -29,7 +30,7 @@ class MessagePatternBackupTest {
         val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "pattern-export")
         val gate = DatabaseAccessGate()
         val store = MessagePatternStore(context)
-        val workflow = MessagePatternsWorkflow(store, gate, Dispatchers.Unconfined)
+        val workflow = MessagePatternsWorkflow(store, gate, Dispatchers.Unconfined, appLogService = NoOpAppLog)
         val original = patternArchive("STC", withBindings = true)
         store.restoreRaw(original)
         val database = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
@@ -45,7 +46,8 @@ class MessagePatternBackupTest {
                     snapshotReady.countDown()
                     check(continueExport.await(10, TimeUnit.SECONDS))
                     1_700_000_000_000L
-                }, databaseAccessGate = gate, kdfIterations = 2)
+                }, databaseAccessGate = gate, kdfIterations = 2,
+                appLogService = NoOpAppLog,)
             val exporting = async(Dispatchers.IO) { backup.exportTo(Uri.fromFile(archive), secret.copyOf()) }
             assertTrue(snapshotReady.await(10, TimeUnit.SECONDS))
             val bank = store.load().banks.single()

@@ -50,6 +50,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
+import com.baraa.masroof.testsupport.NoOpLiveCaptureRecoveryScheduler
+import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
 
 /**
  * Device proof of the LIVE processing-retry row. The database is private to this test so the application
@@ -110,7 +115,7 @@ class LiveRetryRestartTest {
         val raw = AndroidSmsMapper.toRawSms(
             ProviderSmsRecord(null, "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:32:00Z")),
         )
-        val captured = CaptureBankSmsUseCase(rawRepo, registry).capture(raw)
+        val captured = CaptureBankSmsUseCase(rawRepo, registry, NoOpAppLog).capture(raw)
         assertTrue(captured is com.baraa.masroof.application.ingestion.BankSmsCaptureResult.Captured)
 
         val exhausted = worker(
@@ -124,12 +129,15 @@ class LiveRetryRestartTest {
 
         val scheduled = mutableListOf<String>()
         val restarted = LiveSmsIntake(
-            captureBankSms = CaptureBankSmsUseCase(rawRepo, registry),
+            captureBankSms = CaptureBankSmsUseCase(rawRepo, registry, NoOpAppLog),
             scheduler = LiveSmsWorkScheduler { scheduled += it },
             rawSmsRepository = rawRepo,
             reviewRepository = reviewRepo,
             processingRetryRepository = retryRepo,
             appLogService = appLog,
+            batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
+            captureRecoveryScheduler = NoOpLiveCaptureRecoveryScheduler,
+            missedSmsScheduler = NoOpLiveCaptureRecoveryScheduler,
         )
         assertEquals(1, restarted.schedulePendingProcessing())
         assertEquals(listOf(raw.id), scheduled)
@@ -169,7 +177,6 @@ class LiveRetryRestartTest {
             bankSmsRegistry = registry,
             ownershipDiscovery = OwnershipDiscoveryService(accounts, cards, loans),
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = ledger,
                 ownershipResolver = resolver,
@@ -178,6 +185,7 @@ class LiveRetryRestartTest {
                     RoomUserCorrectionRepository(db.userCorrectionDao()),
                 ),
                 reviewRepository = reviewRepo,
+                ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ledger, clock),
             ingestionReviewService = ingestionReview,
@@ -189,6 +197,7 @@ class LiveRetryRestartTest {
                 clock = clock,
             ),
             reviewRepository = reviewRepo,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
         )
     }
 
@@ -200,7 +209,7 @@ class LiveRetryRestartTest {
         TestListenableWorkerBuilder<LiveSmsProcessingWorker>(context)
             .setInputData(LiveSmsProcessingWorker.inputFor(rawSmsId))
             .setRunAttemptCount(attempt)
-            .setWorkerFactory(LiveSmsProcessingWorker.Factory({ processStored }, null))
+            .setWorkerFactory(LiveSmsProcessingWorker.Factory({ processStored }, NoOpAppLog))
             .build()
 
     private companion object {

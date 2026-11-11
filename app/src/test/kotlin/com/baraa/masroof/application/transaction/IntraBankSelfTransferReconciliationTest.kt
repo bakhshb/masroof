@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -57,6 +58,11 @@ import org.robolectric.annotation.Config
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpReclassificationRepository
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -115,12 +121,13 @@ class IntraBankSelfTransferReconciliationTest {
         cards = RoomCardRegistryRepository.from(db)
         confirmation = OwnershipConfirmationService(accounts, cards, NoOpLoanRegistryRepository)
         reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
             reviewRepository = reviewRepo,
             zoneId = zoneId,
+            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+            ownershipConfirmationService = noOpOwnershipConfirmation(),
         )
     }
 
@@ -445,9 +452,14 @@ class IntraBankSelfTransferReconciliationTest {
                 com.baraa.masroof.application.review.EffectiveParsedEventProvider(parsedRepo,
                     com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())),
                 OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
+                appLogService = NoOpAppLog,
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
+                persistence = noOpReclassificationRepository(ftRepo),
             ),
             clock = InstantClock.System,
             reviewQueueUpdater = reviewQueueUpdater,
+            appLogService = NoOpAppLog,
+            processingRecovery = noOpProcessingRecovery(),
         )
 
         val result = restore.restore("sms-out")
@@ -545,6 +557,7 @@ class IntraBankSelfTransferReconciliationTest {
             prefs = prefs,
             appLogService = AppLogService(context),
             repairStoredTransfers = { repairAndApplyReviews() },
+            completionSignal = MaintenanceCompletionSignal(),
         )
         assertEquals(BackfillOutcome.COMPLETED, coordinator.runIfNeeded())
         assertEquals(BackfillOutcome.UP_TO_DATE, coordinator.runIfNeeded())
@@ -715,12 +728,13 @@ class IntraBankSelfTransferReconciliationTest {
         seedPostedSingleLegSelf("sms-in-b", "in-b")
         val rejecting = RejectingDeleteRepository(ftRepo, rejectRemaining = 1)
         val repairing = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = rejecting,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
             reviewRepository = reviewRepo,
             zoneId = zoneId,
+            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+            ownershipConfirmationService = noOpOwnershipConfirmation(),
         )
 
         val first = repairing.repairLegacyTransfersDetailed()
@@ -744,12 +758,13 @@ class IntraBankSelfTransferReconciliationTest {
         seedPostedSingleLegSelf("sms-in-b", "in-b")
         val rejecting = RejectingDeleteRepository(ftRepo, throwOnDelete = true)
         val repairing = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = rejecting,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
             reviewRepository = reviewRepo,
             zoneId = zoneId,
+            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+            ownershipConfirmationService = noOpOwnershipConfirmation(),
         )
 
         val report = repairing.repairLegacyTransfersDetailed()

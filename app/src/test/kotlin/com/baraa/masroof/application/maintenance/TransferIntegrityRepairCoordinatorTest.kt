@@ -83,6 +83,7 @@ class TransferIntegrityRepairCoordinatorTest {
             prefs = CommitFailsPreferences(prefs()),
             appLogService = AppLogService(context),
             repairStoredTransfers = { TransferIntegrityRepairResult() },
+            completionSignal = MaintenanceCompletionSignal(),
         )
 
         assertEquals(BackfillOutcome.INCOMPLETE, coordinator.runIfNeeded())
@@ -110,6 +111,7 @@ class TransferIntegrityRepairCoordinatorTest {
         prefs = prefs(),
         appLogService = AppLogService(context),
         repairStoredTransfers = { block() },
+        completionSignal = MaintenanceCompletionSignal(),
     )
 
     private fun prefs() =

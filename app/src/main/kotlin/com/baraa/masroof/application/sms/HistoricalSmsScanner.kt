@@ -4,7 +4,7 @@ import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.application.logging.AppLogLevel
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.sms.datasource.InboxRow
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.datasource.SmsPermissionException
@@ -57,7 +57,7 @@ sealed interface SmsScanFailure {
 class HistoricalSmsScanner(
     private val dataSource: SmsDataSource,
     private val batchProcessor: HistoricalSmsBatchProcessor,
-    private val appLogService: AppLogService? = null,
+    private val appLogService: AppLog,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val coverageCompleted: suspend (Instant?, Instant) -> Unit = { _, _ -> },
     private val clock: java.time.Clock = java.time.Clock.systemUTC(),
@@ -75,7 +75,7 @@ class HistoricalSmsScanner(
     private suspend fun scanOnDispatcher(receivedAfter: Instant?, receivedBefore: Instant?, bankScopes: Set<Bank>?,
         onProgress: (Int) -> Unit = {}): SmsScanResult {
         val scanStartedAt = clock.instant()
-        appLogService?.info(
+        appLogService.info(
             AppLogCategories.SCAN,
             "Historical scan started${receivedAfter?.let { " after $it" } ?: ""}",
         )
@@ -192,7 +192,7 @@ class HistoricalSmsScanner(
         if(bankScopes == null && receivedBefore == null && result.failure == null && result.failed == 0 && result.skippedMalformed == 0) {
             try { coverageCompleted(receivedAfter, scanStartedAt) }
             catch(e: kotlinx.coroutines.CancellationException) { throw e }
-            catch(_: Exception) { appLogService?.warn(AppLogCategories.SCAN, "Coverage receipt pending; rescan required") }
+            catch(_: Exception) { appLogService.warn(AppLogCategories.SCAN, "Coverage receipt pending; rescan required") }
         }
         logScanFinished(result)
         return result
@@ -200,7 +200,7 @@ class HistoricalSmsScanner(
 
     private fun logScanFinished(result: SmsScanResult) {
         val level = if (result.failure != null) AppLogLevel.WARN else AppLogLevel.INFO
-        appLogService?.log(
+        appLogService.log(
             level,
             AppLogCategories.SCAN,
             "Historical scan finished: ${AppLogFormatting.scanSummary(result)}",

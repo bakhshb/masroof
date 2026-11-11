@@ -61,6 +61,7 @@ import org.robolectric.annotation.Config
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -100,7 +101,7 @@ class ReviewWorkflowServiceTest {
         reviewQueueReviews: com.baraa.masroof.domain.repository.ReviewRepository = reviewRepo,
         reconcileWithReviews: Boolean = true,
         zoneId: java.time.ZoneId = java.time.ZoneId.systemDefault(),
-        processingRecovery: ProcessingRecovery? = null,
+        processingRecovery: ProcessingRecovery = noOpProcessingRecovery(),
     ) = RoomReviewWiring(
         db = db,
         clock = clock,

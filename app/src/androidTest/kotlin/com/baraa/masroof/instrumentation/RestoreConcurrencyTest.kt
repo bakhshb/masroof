@@ -24,6 +24,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /** Real emulator SQLite: stage callbacks are deterministic barriers, never timing sleeps. */
 @RunWith(AndroidJUnit4::class)
@@ -61,6 +62,7 @@ class RestoreConcurrencyTest {
             val exporter = DatabaseBackupService(
                 context, database, { error("export cannot close Room") }, "test",
                 restartProcess = {}, kdfIterations = 1_000, databaseAccessGate = gate,
+                appLogService = NoOpAppLog,
             )
             assertTrue(exporter.exportTo(Uri.fromFile(backup), "test-phrase".toCharArray()).isSuccess)
             val importer = DatabaseBackupService(
@@ -87,6 +89,7 @@ class RestoreConcurrencyTest {
                         }
                     }
                 },
+                appLogService = NoOpAppLog,
             )
             val outcome = importer.importFrom(Uri.fromFile(backup), "test-phrase".toCharArray())
             assertTrue(observedStage)

@@ -4,7 +4,7 @@ import com.baraa.masroof.application.dashboard.SarEquivalentResolution
 import com.baraa.masroof.application.dashboard.TransactionDisplayEnricher
 import com.baraa.masroof.application.dashboard.TransactionSarEquivalentResolver
 import com.baraa.masroof.application.logging.AppLogCategories
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
@@ -43,7 +43,7 @@ class ExchangeRateEnrichmentWorkflow(
     private val parsedEventRepository: ParsedEventRepository,
     private val rawSmsRepository: RawSmsRepository,
     private val sarEquivalentResolver: TransactionSarEquivalentResolver,
-    private val appLogService: AppLogService? = null,
+    private val appLogService: AppLog,
     private val primaryCurrency: Currency = Currency.SAR,
 ) {
     private val mutex = Mutex()
@@ -73,7 +73,7 @@ class ExchangeRateEnrichmentWorkflow(
             if (updated) persisted++
         }
         if (persisted > 0) {
-            appLogService?.info(
+            appLogService.info(
                 AppLogCategories.TRANSACTION,
                 "Applied exchange rates to $persisted of ${pending.size} foreign transactions",
             )

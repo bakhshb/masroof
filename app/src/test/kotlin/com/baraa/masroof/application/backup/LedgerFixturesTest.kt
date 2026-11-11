@@ -27,6 +27,7 @@ import java.io.File
 import java.util.TimeZone
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /**
  * The committed v18 fixtures (plan 0.2): a `masroof.db` plus a plaintext v1 archive and an encrypted
@@ -85,6 +86,7 @@ class LedgerFixturesTest {
             appVersionName = "test",
             clockEpochMillis = { EXPORTED_AT },
             restartProcess = {},
+            appLogService = NoOpAppLog,
         ).importFrom(Uri.fromFile(fixture(ARCHIVE_FILE)), confirmLegacyPlaintext = true)
         assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
         val restored = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).allowMainThreadQueries().build()
@@ -105,6 +107,7 @@ class LedgerFixturesTest {
             appVersionName = "test",
             clockEpochMillis = { EXPORTED_AT },
             restartProcess = {},
+            appLogService = NoOpAppLog,
         )
         val file = fixture(ENCRYPTED_FILE)
         assertTrue(file.readBytes().let { BackupEnvelope.looksLikeEnvelope(it, it.size) })
@@ -152,6 +155,7 @@ class LedgerFixturesTest {
                 clockEpochMillis = { EXPORTED_AT },
                 restartProcess = { error("unexpected restart") },
                 kdfIterations = KDF_ITERATIONS,
+                appLogService = NoOpAppLog,
             ).exportTo(Uri.fromFile(File(dir, ENCRYPTED_FILE)), PASSPHRASE.toCharArray())
             assertTrue(exported.exceptionOrNull()?.toString(), exported.isSuccess)
         }

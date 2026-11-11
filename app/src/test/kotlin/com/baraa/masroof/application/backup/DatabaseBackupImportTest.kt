@@ -30,6 +30,7 @@ import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -52,7 +53,7 @@ class DatabaseBackupImportTest {
                 val zip = createBackupZip(imported, roomVersion = if (disguised) 18 else 17)
                 var closed = false
                 try {
-                    val service = DatabaseBackupService(context, live, { closed = true; live.close() }, "test", restartProcess = {})
+                    val service = DatabaseBackupService(context, live, { closed = true; live.close() }, "test", restartProcess = {}, appLogService = NoOpAppLog)
                     assertEquals(BackupImportOutcome.InvalidPackage, service.importFrom(Uri.fromFile(zip), confirmLegacyPlaintext = true))
                     assertFalse(closed)
                     assertEquals(original, patterns.captureRaw())
@@ -93,7 +94,8 @@ class DatabaseBackupImportTest {
                 val card = CardReference(Bank.BANK_ALJAZIRA, "1111")
                 RoomCardRegistryRepository.from(live).setOwnership(card, OwnershipStatus.OWNED)
                 val service = DatabaseBackupService(context, live, { closed.set(true); live.close() }, "test",
-                    restartProcess = {})
+                    restartProcess = {},
+                    appLogService = NoOpAppLog,)
                 assertEquals(BackupImportOutcome.InvalidPackage,
                     service.importFrom(Uri.fromFile(zip), confirmLegacyPlaintext = true))
                 assertFalse(closed.get())
@@ -146,6 +148,7 @@ class DatabaseBackupImportTest {
                 )
                 restartRequested.set(true)
             },
+            appLogService = NoOpAppLog,
         )
 
         val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
@@ -186,6 +189,7 @@ class DatabaseBackupImportTest {
                 clockEpochMillis = { 1_700_000_000_000L },
                 restartProcess = { restartRequested.set(true) },
                 maintenancePreferences = CommitFailsPreferences(prefs),
+                appLogService = NoOpAppLog,
             )
 
             val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
@@ -226,6 +230,7 @@ class DatabaseBackupImportTest {
             appVersionName = "test",
             clockEpochMillis = { 1_700_000_000_000L },
             restartProcess = { restartRequested.set(true) },
+            appLogService = NoOpAppLog,
         )
 
         val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
@@ -282,6 +287,7 @@ class DatabaseBackupImportTest {
                 clockEpochMillis = { 1_700_000_000_000L },
                 restartProcess = { restartRequested.set(true) },
                 beforeValidatedInstall = { check(validated.delete()) },
+                appLogService = NoOpAppLog,
             )
 
             val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
@@ -346,6 +352,7 @@ class DatabaseBackupImportTest {
                         listOf("-wal", "-shm", "-journal").forEach { File(livePath + it).delete() }
                     }
                 },
+                appLogService = NoOpAppLog,
             )
 
             val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
@@ -414,6 +421,7 @@ class DatabaseBackupImportTest {
                     afterRestoreStage = { reached ->
                         if (reached == stage) throw DatabaseRestoreRecovery.ProcessTerminated(reached)
                     },
+                    appLogService = NoOpAppLog,
                 )
                 try {
                     backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)

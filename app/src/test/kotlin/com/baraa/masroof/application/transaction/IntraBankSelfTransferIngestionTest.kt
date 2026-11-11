@@ -48,6 +48,10 @@ import org.robolectric.annotation.Config
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -102,12 +106,13 @@ class IntraBankSelfTransferIngestionTest {
 
     val ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository)
     val reconciliation = TransactionReconciliationService(
-      parsedEventRepository = parsedRepo,
       rawSmsRepository = rawRepo,
       financialTransactionRepository = ftRepo,
       ownershipResolver = ownershipResolver,
       reviewRepository = reviewRepo,
       zoneId = zoneId,
+      effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+      ownershipConfirmationService = noOpOwnershipConfirmation(),
     )
     val reviewQueueUpdater = ReviewQueueUpdater(
       reviewRepository = reviewRepo,
@@ -141,6 +146,8 @@ class IntraBankSelfTransferIngestionTest {
         financialTransactionRepository = ftRepo,
       ),
       clock = InstantClock.System,
+      appLogService = NoOpAppLog,
+      processingRecovery = noOpProcessingRecovery(),
     )
   }
 

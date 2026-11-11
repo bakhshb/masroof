@@ -34,6 +34,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /**
  * Every persisted recognized-bank RawSms ends as posted, non-financial, pending review,
@@ -269,7 +270,7 @@ class RecognizedSmsOutcomeInvariantTest {
 
         val failing = TestListenableWorkerBuilder<HistoricalDerivedRecoveryWorker>(context)
             .setWorkerFactory(
-                HistoricalDerivedRecoveryWorker.Factory {
+                HistoricalDerivedRecoveryWorker.Factory(appLogService = NoOpAppLog) {
                     harness.derivedRecovery(reconciliationFails = true)
                 },
             )
@@ -281,13 +282,13 @@ class RecognizedSmsOutcomeInvariantTest {
         )
 
         val recovering = TestListenableWorkerBuilder<HistoricalDerivedRecoveryWorker>(context)
-            .setWorkerFactory(HistoricalDerivedRecoveryWorker.Factory { harness.derivedRecovery() })
+            .setWorkerFactory(HistoricalDerivedRecoveryWorker.Factory(appLogService = NoOpAppLog) { harness.derivedRecovery() })
             .build()
         assertEquals(ListenableWorker.Result.success(), recovering.doWork())
         assertTrue(harness.processingRetryRepo.listRetryableRawSmsIds().isEmpty())
 
         val again = TestListenableWorkerBuilder<HistoricalDerivedRecoveryWorker>(context)
-            .setWorkerFactory(HistoricalDerivedRecoveryWorker.Factory { harness.derivedRecovery() })
+            .setWorkerFactory(HistoricalDerivedRecoveryWorker.Factory(appLogService = NoOpAppLog) { harness.derivedRecovery() })
             .build()
         assertEquals(ListenableWorker.Result.success(), again.doWork())
         assertEquals(2, harness.db.financialTransactionDao().count())
@@ -469,7 +470,7 @@ class RecognizedSmsOutcomeInvariantTest {
         val result = TestListenableWorkerBuilder<LiveSmsProcessingWorker>(context)
             .setInputData(LiveSmsProcessingWorker.inputFor(rawSmsId))
             .setRunAttemptCount(attempt)
-            .setWorkerFactory(LiveSmsProcessingWorker.Factory({ processStored }))
+            .setWorkerFactory(LiveSmsProcessingWorker.Factory({ processStored }, appLogService = NoOpAppLog))
             .build()
             .doWork()
         return when (result) {

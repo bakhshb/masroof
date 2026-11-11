@@ -10,7 +10,7 @@ import com.baraa.masroof.application.ingestion.ProcessStoredSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -28,7 +28,7 @@ class LiveSmsProcessingWorker(
     appContext: Context,
     params: WorkerParameters,
     private val processStoredSms: ProcessStoredSmsUseCase,
-    private val appLogService: AppLogService? = null,
+    private val appLogService: AppLog,
     /** Lets an open dashboard reload after any pass, since a failed pass may still have written rows. */
     private val onProcessed: () -> Unit = {},
     /** False while startup integrity repair has not succeeded; processing then waits for a retry. */
@@ -92,7 +92,7 @@ class LiveSmsProcessingWorker(
     private fun logDerivedIncomplete(outcome: SmsIngestionResult.DerivedIncomplete) {
         val failures = outcome.failureCount?.let { " failures=$it" }.orEmpty()
         val retryState = if (runAttemptCount + 1 < MAX_ATTEMPTS) "retry" else "exhausted"
-        appLogService?.warn(
+        appLogService.warn(
             AppLogCategories.SMS,
             "LiveSmsProcessingWorker derived ${outcome.stage.name.lowercase()} incomplete$failures " +
                 "id=${AppLogFormatting.maskId(outcome.rawSmsId)} " +
@@ -102,7 +102,7 @@ class LiveSmsProcessingWorker(
     }
 
     private fun logUnexpectedFailure(stage: String, error: Exception) {
-        appLogService?.warn(
+        appLogService.warn(
             AppLogCategories.SMS,
             "LiveSmsProcessingWorker $stage failed on attempt ${runAttemptCount + 1} (${error::class.java.simpleName})",
         )
@@ -122,7 +122,7 @@ class LiveSmsProcessingWorker(
      */
     class Factory(
         private val processStoredSms: () -> ProcessStoredSmsUseCase,
-        private val appLogService: AppLogService? = null,
+        private val appLogService: AppLog,
         private val startupReady: suspend () -> Boolean = { true },
         private val isRestartRequired: (CancellationException) -> Boolean = { false },
         private val onProcessed: () -> Unit = {},

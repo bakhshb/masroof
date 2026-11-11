@@ -61,6 +61,15 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
+import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpOwnershipDiscovery
+import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
+import com.baraa.masroof.testsupport.noOpReconciliation
+import com.baraa.masroof.testsupport.noOpIngestionReviewService
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -77,7 +86,8 @@ class HistoricalSmsScannerTest {
         ).map(InboxRow::Valid)
         var coverage = 0
         val scanner = HistoricalSmsScanner(FakeSmsDataSource(rows), batchProcessor,
-            coverageCompleted = { _, _ -> coverage++ })
+            coverageCompleted = { _, _ -> coverage++ },
+            appLogService = NoOpAppLog,)
         val result = scanner.scan(receivedAfter = from, receivedBefore = until,
             bankScopes = setOf(Bank.BANK_ALJAZIRA))
         assertEquals(1, result.parsed)
@@ -96,7 +106,7 @@ class HistoricalSmsScannerTest {
             ProviderSmsRecord("spam-ahead", "Promo", "offer", until.plusSeconds(5)),
             ProviderSmsRecord("in-range", "AlJazira", PURCHASE_BODY, until.minusSeconds(60)),
         ).map(InboxRow::Valid)
-        val result = HistoricalSmsScanner(FakeSmsDataSource(rows), batchProcessor)
+        val result = HistoricalSmsScanner(FakeSmsDataSource(rows), batchProcessor, appLogService = NoOpAppLog)
             .scan(receivedAfter = from, receivedBefore = until, bankScopes = setOf(Bank.BANK_ALJAZIRA))
         assertEquals(1, result.parsed)
     }
@@ -105,13 +115,13 @@ class HistoricalSmsScannerTest {
         val at = Instant.parse("2026-08-01T10:00:00Z")
         val rows = (1..60).map { InboxRow.Valid(ProviderSmsRecord("p-$it", "OtherBank", PURCHASE_BODY, at)) }
         val progress = mutableListOf<Int>()
-        HistoricalSmsScanner(FakeSmsDataSource(rows), batchProcessor).scan(bankScopes = setOf(Bank.BANK_ALJAZIRA)) { progress += it }
+        HistoricalSmsScanner(FakeSmsDataSource(rows), batchProcessor, appLogService = NoOpAppLog).scan(bankScopes = setOf(Bank.BANK_ALJAZIRA)) { progress += it }
         assertEquals(listOf(25, 50), progress)
     }
 
     @Test fun invalidOrEmptyScopeIsRejectedBeforeInboxAccess() = runBlocking {
         var queried = false
-        val scanner = HistoricalSmsScanner(FakeSmsDataSource(emptyList(), onQuery = { queried = true }), batchProcessor)
+        val scanner = HistoricalSmsScanner(FakeSmsDataSource(emptyList(), onQuery = { queried = true }), batchProcessor, appLogService = NoOpAppLog)
         val now = Instant.parse("2026-08-01T00:00:00Z")
         assertTrue(runCatching { scanner.scan(bankScopes = emptySet()) }.isFailure)
         assertTrue(runCatching { scanner.scan(now, receivedBefore = now) }.isFailure)
@@ -123,14 +133,16 @@ class HistoricalSmsScannerTest {
         val started=Instant.parse("2026-08-01T12:00:00Z")
         val receipts=mutableListOf<Pair<Instant?,Instant>>()
         val clean=HistoricalSmsScanner(FakeSmsDataSource(emptyList()),batchProcessor,
-            coverageCompleted={ from,at -> receipts += from to at },clock=java.time.Clock.fixed(started,java.time.ZoneOffset.UTC))
+            coverageCompleted={ from,at -> receipts += from to at },clock=java.time.Clock.fixed(started,java.time.ZoneOffset.UTC),
+            appLogService = NoOpAppLog,)
         assertNull(clean.scan(after).failure)
         assertEquals(listOf(after to started),receipts)
         receipts.clear()
         val denied=HistoricalSmsScanner(object : SmsDataSource {
             override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
             fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = throw SmsPermissionException()
-        },batchProcessor,coverageCompleted={ from,at -> receipts += from to at })
+        },batchProcessor,coverageCompleted={ from,at -> receipts += from to at },
+        appLogService = NoOpAppLog,)
         assertTrue(denied.scan(after).failure is SmsScanFailure.PermissionDenied)
         assertTrue(receipts.isEmpty())
     }
@@ -153,7 +165,8 @@ class HistoricalSmsScannerTest {
         }
         var coverage = 0
         val scanner = HistoricalSmsScanner(FakeSmsDataSource(rows),
-            batchProcessor(RoomRawSmsRepository(db.rawSmsDao()), registry), coverageCompleted = { _, _ -> coverage++ })
+            batchProcessor(RoomRawSmsRepository(db.rawSmsDao()), registry), coverageCompleted = { _, _ -> coverage++ },
+            appLogService = NoOpAppLog,)
         val result = scanner.scan(bankScopes = setOf(Bank.BANK_ALJAZIRA))
         assertEquals(1, result.reviewRequired)
         assertEquals(1, result.notRelevant)
@@ -167,7 +180,7 @@ class HistoricalSmsScannerTest {
     @Test fun bankScopeImportsMatchedMessagesAndDoesNotReparseExistingEvidence() = runBlocking {
         val source = FakeSmsDataSource(listOf(InboxRow.Valid(ProviderSmsRecord(
             "scoped-purchase", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-01T10:00:00Z")))))
-        val scanner = HistoricalSmsScanner(source, batchProcessor)
+        val scanner = HistoricalSmsScanner(source, batchProcessor, appLogService = NoOpAppLog)
         assertEquals(1, scanner.scan(bankScopes = setOf(Bank.BANK_ALJAZIRA)).parsed)
         val repository = RoomParsedEventRepository(db.parsedEventDao())
         val original = repository.listAll()
@@ -178,7 +191,7 @@ class HistoricalSmsScannerTest {
 
     @Test fun unsupportedBankScopeFailsBeforeReadingOrWritingInbox() = runBlocking {
         var queried = false
-        val scanner = HistoricalSmsScanner(FakeSmsDataSource(emptyList(), onQuery = { queried = true }), batchProcessor)
+        val scanner = HistoricalSmsScanner(FakeSmsDataSource(emptyList(), onQuery = { queried = true }), batchProcessor, appLogService = NoOpAppLog)
         try {
             scanner.scan(bankScopes = setOf(Bank("NOT_REGISTERED")))
             org.junit.Assert.fail("Unsupported bank must be rejected")
@@ -221,7 +234,7 @@ class HistoricalSmsScannerTest {
             ),
             onQuery = { receivedAfter -> order += "after=${receivedAfter?.toEpochMilli()}" },
         )
-        val result = HistoricalSmsScanner(source, batchProcessor).scan(receivedAfter = after)
+        val result = HistoricalSmsScanner(source, batchProcessor, appLogService = NoOpAppLog).scan(receivedAfter = after)
         assertEquals(listOf("after=${after.toEpochMilli()}"), order)
         assertEquals(4, result.scanned)
         assertEquals(1, result.parsed)
@@ -238,7 +251,7 @@ class HistoricalSmsScannerTest {
             override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
             fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> = throw SmsPermissionException()
         }
-        val result = HistoricalSmsScanner(source, batchProcessor).scan()
+        val result = HistoricalSmsScanner(source, batchProcessor, appLogService = NoOpAppLog).scan()
         assertEquals(SmsScanFailure.PermissionDenied, result.failure)
         assertEquals(0, result.scanned)
     }
@@ -250,7 +263,7 @@ class HistoricalSmsScannerTest {
             fun queryInbox(receivedAfter: Instant?): Sequence<InboxRow> =
                 throw SmsProviderException("boom")
         }
-        val result = HistoricalSmsScanner(source, batchProcessor).scan()
+        val result = HistoricalSmsScanner(source, batchProcessor, appLogService = NoOpAppLog).scan()
         assertTrue(result.failure is SmsScanFailure.ProviderError)
         assertEquals(0, result.scanned)
     }
@@ -263,7 +276,7 @@ class HistoricalSmsScannerTest {
                 throw SmsPermissionException("lazy")
             }
         }
-        val result = HistoricalSmsScanner(source, batchProcessor).scan()
+        val result = HistoricalSmsScanner(source, batchProcessor, appLogService = NoOpAppLog).scan()
         assertEquals(SmsScanFailure.PermissionDenied, result.failure)
         assertEquals(0, result.scanned)
     }
@@ -285,7 +298,7 @@ class HistoricalSmsScannerTest {
                 throw SmsProviderException("cursor died")
             }
         }
-        val result = HistoricalSmsScanner(source, batchProcessor).scan()
+        val result = HistoricalSmsScanner(source, batchProcessor, appLogService = NoOpAppLog).scan()
         assertTrue(result.failure is SmsScanFailure.ProviderError)
         assertEquals(1, result.scanned)
         assertEquals(1, result.parsed)
@@ -298,7 +311,7 @@ class HistoricalSmsScannerTest {
             ProviderSmsRecord("1", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-01T00:00:00Z")),
         )
         val source = FakeSmsDataSource(listOf(good, InboxRow.Malformed, InboxRow.Malformed))
-        val result = HistoricalSmsScanner(source, batchProcessor).scan()
+        val result = HistoricalSmsScanner(source, batchProcessor, appLogService = NoOpAppLog).scan()
         assertEquals(3, result.scanned)
         assertEquals(2, result.skippedMalformed)
         assertEquals(1, result.parsed)
@@ -336,7 +349,7 @@ class HistoricalSmsScannerTest {
                 ),
             ),
         )
-        val result = HistoricalSmsScanner(source, svc).scan()
+        val result = HistoricalSmsScanner(source, svc, appLogService = NoOpAppLog).scan()
         assertEquals(1, result.scanned)
         assertEquals(0, result.inserted)
         assertEquals(1, result.failed)
@@ -363,7 +376,7 @@ class HistoricalSmsScannerTest {
                 ),
             ),
         )
-        val result = HistoricalSmsScanner(source, svc).scan()
+        val result = HistoricalSmsScanner(source, svc, appLogService = NoOpAppLog).scan()
         assertEquals(1, result.scanned)
         assertEquals(1, result.inserted)
         assertEquals(1, result.failed)
@@ -376,12 +389,27 @@ class HistoricalSmsScannerTest {
         rawSmsRepository: RawSmsRepository,
         registry: BankSmsRegistry = BankSmsRegistry(listOf(engineFixtureAdapter())),
     ) = HistoricalSmsBatchProcessor(
-        capture = CaptureBankSmsUseCase(rawSmsRepository, registry),
+        capture = CaptureBankSmsUseCase(rawSmsRepository, registry, appLogService = NoOpAppLog),
         processStored = ProcessStoredSmsUseCase(
             rawSmsRepository = rawSmsRepository,
             parsedEventRepository = RoomParsedEventRepository(db.parsedEventDao()),
             bankSmsRegistry = registry,
+            appLogService = NoOpAppLog,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            ingestionReviewService = noOpIngestionReviewService(),
+            ownershipDiscovery = noOpOwnershipDiscovery(),
+            processingRecovery = noOpProcessingRecovery(),
+            reconciliation = noOpReconciliation(),
+            reviewQueueUpdater = noOpReviewQueueUpdater(),
+            reviewRepository = EmptyReviewRepository(),
         ),
+        appLogService = NoOpAppLog,
+        batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
+        exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+        ownershipDiscovery = noOpOwnershipDiscovery(),
+        processingRecovery = noOpProcessingRecovery(),
+        reconciliation = noOpReconciliation(),
+        reviewQueueUpdater = noOpReviewQueueUpdater(),
     )
 
 
@@ -431,7 +459,7 @@ class HistoricalSmsScannerTest {
             assertTrue(world.reviewRepo.listAll().isEmpty())
             assertEquals(3, batch.storedEventCount)
 
-            val summary = (batch.finish() as HistoricalBatchDerivedResult.Succeeded).summary!!
+            val summary = (batch.finish() as HistoricalBatchDerivedResult.Succeeded).summary
 
             assertEquals(3, summary.assembledSingle)
             assertEquals(3, world.db.financialTransactionDao().count())
@@ -454,7 +482,7 @@ class HistoricalSmsScannerTest {
                 }
             }
 
-            val result = HistoricalSmsScanner(source, world.batchProcessor()).scan()
+            val result = HistoricalSmsScanner(source, world.batchProcessor(), appLogService = NoOpAppLog).scan()
 
             assertEquals(List(rows.size + 1) { 0 }, transactionsSeenWhileScanning)
             assertEquals(3, result.parsed)
@@ -475,7 +503,7 @@ class HistoricalSmsScannerTest {
                 }
             }
 
-            val result = HistoricalSmsScanner(source, world.batchProcessor()).scan()
+            val result = HistoricalSmsScanner(source, world.batchProcessor(), appLogService = NoOpAppLog).scan()
 
             assertTrue(result.failure is SmsScanFailure.ProviderError)
             assertEquals(2, result.scanned)
@@ -531,7 +559,6 @@ class HistoricalSmsScannerTest {
         private val registry = BankSmsRegistry(listOf(engineFixtureAdapter()))
         private val discovery = OwnershipDiscoveryService(accounts, cards, loans)
         private val reconciliation = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
@@ -543,7 +570,7 @@ class HistoricalSmsScannerTest {
             reviewRepository = reviewRepo,
         )
         private val reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock)
-        private val capture = CaptureBankSmsUseCase(rawRepo, registry)
+        private val capture = CaptureBankSmsUseCase(rawRepo, registry, appLogService = NoOpAppLog)
         private val processStored = ProcessStoredSmsUseCase(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
@@ -552,6 +579,10 @@ class HistoricalSmsScannerTest {
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
             ingestionReviewService = IngestionReviewService(reviewRepo, clock),
+            appLogService = NoOpAppLog,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            processingRecovery = noOpProcessingRecovery(),
+            reviewRepository = EmptyReviewRepository(),
         )
         init {
             if (preOwned) {
@@ -572,10 +603,14 @@ class HistoricalSmsScannerTest {
             ownershipDiscovery = discovery,
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
+            appLogService = NoOpAppLog,
+            batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            processingRecovery = noOpProcessingRecovery(),
         )
 
         fun scanner(rows: List<ProviderSmsRecord>): HistoricalSmsScanner =
-            HistoricalSmsScanner(FakeSmsDataSource(rows.map { InboxRow.Valid(it) }), batchProcessor())
+            HistoricalSmsScanner(FakeSmsDataSource(rows.map { InboxRow.Valid(it) }), batchProcessor(), appLogService = NoOpAppLog)
 
         /** Per-message behavior: per-message derived processing, then two full passes at scan end. */
         suspend fun legacyImport(rows: List<ProviderSmsRecord>): SmsScanResult {

@@ -38,6 +38,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 class PatternManagementJourneyTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -174,7 +175,7 @@ class PatternManagementJourneyTest {
             }
             val store = MessagePatternStore(File(directory, "patterns.json"))
             store.installMissingBanks(listOf(bank))
-            block(MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(bank), requiredBundledBankIds = setOf(bank.bankId)), store)
+            block(MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(bank), requiredBundledBankIds = setOf(bank.bankId), appLogService = NoOpAppLog), store)
         } finally { directory.deleteRecursively() }
     }
 }

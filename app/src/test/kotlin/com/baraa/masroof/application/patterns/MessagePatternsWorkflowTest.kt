@@ -8,6 +8,7 @@ import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Test
 import java.nio.file.Files
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 class MessagePatternsWorkflowTest {
     @Test fun approvedLinksSurviveRestartsAndTravelWithNewerBundledRules() {
@@ -33,7 +34,7 @@ class MessagePatternsWorkflowTest {
         try {
             val store = MessagePatternStore(directory.resolve("patterns.json"))
             store.saveBank(0, BankMessagePatterns("BANK_ALINMA", listOf("alinma"), "Alinma"))
-            val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate())
+            val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), appLogService = NoOpAppLog)
             val generation = store.load().generation
             for (sender in listOf("ALINMA", "Al-inma", "Alinma-AD", "---")) {
                 assertThrows(IllegalArgumentException::class.java) { runBlocking { workflow.addBank(generation, "Mine", sender) } }
@@ -52,7 +53,7 @@ class MessagePatternsWorkflowTest {
             val updated = bank(text)
             val old = bank(text.replace("\"incoming transfer\"", "\"incoming transfer v0\"").replace("\"outgoing transfer\"", "\"outgoing transfer v0\""))
             store.installMissingBanks(listOf(old))
-            fun workflow() = MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(updated))
+            fun workflow() = MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(updated), appLogService = NoOpAppLog)
             workflow().setEnabled(store.load().generation, "BANK_BARQ", "barq.transfer-out", false)
             val installed = workflow().load().banks.single().currentPatterns.associateBy { it.id }
             val seeds = updated.patterns.associateBy { it.id }
@@ -68,7 +69,7 @@ class MessagePatternsWorkflowTest {
                 workflow().load().banks.single().currentPatterns.single { it.id == "barq.transfer-out" }.roleProfile)
             // Many releases keep one stored revision per role, far below the 128-revision bank limit.
             repeat(200) { release ->
-                MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(if (release % 2 == 0) old else updated)).load()
+                MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(if (release % 2 == 0) old else updated), appLogService = NoOpAppLog).load()
             }
             assertEquals(1, store.load().banks.single().patterns.count { it.id == "barq.transfer-in" })
         } finally { directory.deleteRecursively() }
@@ -82,7 +83,7 @@ class MessagePatternsWorkflowTest {
             val seed = com.baraa.masroof.engine.bank.patterns.SavedMessagePattern.fromChoices("bundled", "BANK_TEST", "Sender",
                 "PURCHASE", body, listOf(com.baraa.masroof.engine.bank.patterns.FieldChoice("amount", 15, body.length)))
             val bank = BankMessagePatterns("BANK_TEST", listOf("Sender"), patterns = listOf(seed))
-            fun workflow() = MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(bank), requiredBundledBankIds = setOf(bank.bankId))
+            fun workflow() = MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(bank), requiredBundledBankIds = setOf(bank.bankId), appLogService = NoOpAppLog)
             val w = workflow()
             val installed = w.load()
             assertTrue(runCatching { w.deletePattern(installed.generation, bank.bankId, seed.id) }.isFailure)
@@ -100,7 +101,7 @@ class MessagePatternsWorkflowTest {
     @Test fun aMessageFromAFoldEqualSenderIsTaughtUnderTheConfiguredSender() = runBlocking {
         val directory = Files.createTempDirectory("masroof-teach-folded-").toFile()
         try {
-            val w = MessagePatternsWorkflow(MessagePatternStore(directory.resolve("patterns.json")), DatabaseAccessGate())
+            val w = MessagePatternsWorkflow(MessagePatternStore(directory.resolve("patterns.json")), DatabaseAccessGate(), appLogService = NoOpAppLog)
             w.saveBank(0, BankMessagePatterns("STC", listOf("STC Bank")))
             val body = "Payment\nAmount:10SAR\nTo:SHOP"
             val preview = w.teach(1, "STC", "STC BANK-AD", PatternOperation.PURCHASE, body, listOf(PatternBinding("amount", 15, 20)))
@@ -113,7 +114,7 @@ class MessagePatternsWorkflowTest {
         val directory = Files.createTempDirectory("masroof-edit-pattern-").toFile()
         try {
             val store = MessagePatternStore(directory.resolve("patterns.json"))
-            val w = MessagePatternsWorkflow(store, DatabaseAccessGate())
+            val w = MessagePatternsWorkflow(store, DatabaseAccessGate(), appLogService = NoOpAppLog)
             w.saveBank(0, BankMessagePatterns("STC", listOf("STC Bank")))
             val body = "Payment\nAmount:10SAR\nTo:SHOP"
             val amount = PatternBinding("amount", 15, 20)
@@ -148,7 +149,7 @@ class MessagePatternsWorkflowTest {
     @Test fun bankEditsKeepIdentityAndRejectCrossBankSendersWithoutChangingTheCatalog() = runBlocking {
         val directory = Files.createTempDirectory("masroof-banks-").toFile()
         try {
-            val workflow = MessagePatternsWorkflow(MessagePatternStore(directory.resolve("patterns.json")), DatabaseAccessGate())
+            val workflow = MessagePatternsWorkflow(MessagePatternStore(directory.resolve("patterns.json")), DatabaseAccessGate(), appLogService = NoOpAppLog)
             workflow.addBank(0, "First bank", "FIRST", "FIRST_BANK")
             workflow.addBank(1, "Second bank", "SECOND", "SECOND_BANK")
             workflow.updateBank(2, "FIRST_BANK", "Renamed bank", listOf("FIRST", "FIRST_ALIAS"))
@@ -164,7 +165,7 @@ class MessagePatternsWorkflowTest {
     @Test fun teachingRequiresPreviewAndPreservesRevisionsWithoutFinancialWrites() = runBlocking {
         val directory = Files.createTempDirectory("masroof-teaching-").toFile()
         try {
-            val workflow = MessagePatternsWorkflow(MessagePatternStore(directory.resolve("patterns.json")), DatabaseAccessGate())
+            val workflow = MessagePatternsWorkflow(MessagePatternStore(directory.resolve("patterns.json")), DatabaseAccessGate(), appLogService = NoOpAppLog)
             workflow.saveBank(0, BankMessagePatterns("STC", listOf("STC Bank")))
             val body = "Payment\nAmount:10SAR\nTo:SHOP"
             val bindings = listOf(PatternBinding("amount", body.indexOf("10SAR"), body.indexOf("10SAR") + 5),
@@ -204,7 +205,7 @@ class MessagePatternsWorkflowTest {
     @Test fun unselectedNumbersAndDatesAreIgnoredAutomaticallySoOtherMessagesStillMatch() = runBlocking {
         val directory = Files.createTempDirectory("masroof-auto-ignore-").toFile()
         try {
-            val workflow = MessagePatternsWorkflow(MessagePatternStore(directory.resolve("patterns.json")), DatabaseAccessGate())
+            val workflow = MessagePatternsWorkflow(MessagePatternStore(directory.resolve("patterns.json")), DatabaseAccessGate(), appLogService = NoOpAppLog)
             workflow.saveBank(0, BankMessagePatterns("STC", listOf("STC Bank")))
             val body = "Payment\nAmount:10SAR\nTo:SHOP\nRef:123456\nBalance:900.25SAR\nOn:15/10/26 12:30"
             assertEquals("MONEY", workflow.candidates(body).single { it.text == "10SAR" }.kind)
@@ -229,7 +230,7 @@ class MessagePatternsWorkflowTest {
         try {
             val store = MessagePatternStore(directory.resolve("patterns.json"))
             val gate = DatabaseAccessGate()
-            val workflow = MessagePatternsWorkflow(store, gate, Dispatchers.Unconfined)
+            val workflow = MessagePatternsWorkflow(store, gate, Dispatchers.Unconfined, appLogService = NoOpAppLog)
             val release = CompletableDeferred<Unit>()
             val reader = async(start = CoroutineStart.UNDISPATCHED) { gate.withAccess { release.await() } }
             val saving = async(start = CoroutineStart.UNDISPATCHED) {

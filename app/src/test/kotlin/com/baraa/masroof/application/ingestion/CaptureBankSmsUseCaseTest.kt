@@ -38,6 +38,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -53,7 +54,7 @@ class CaptureBankSmsUseCaseTest {
         val first = adapter("FIRST", "FirstBank")
         val second = adapter("SECOND", "SecondBank")
         val third = adapter("THIRD", "ThirdBank")
-        val capture = CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(first, second, third)))
+        val capture = CaptureBankSmsUseCase(rawRepo, BankSmsRegistry(listOf(first, second, third)), appLogService = NoOpAppLog)
         val selected = setOf(first.bank, second.bank)
         listOf("FirstBank", "SecondBank", "ThirdBank").forEachIndexed { index, sender ->
             val raw = AndroidSmsMapper.toRawSms(ProviderSmsRecord("selection-$index", sender, PURCHASE_BODY,
@@ -458,7 +459,7 @@ class CaptureBankSmsUseCaseTest {
         val registry = BankSmsRegistry(listOf(engineFixtureAdapter(), LookalikeBankAdapter()))
         val raw = live(PURCHASE_BODY, "2026-08-03T14:32:00Z")
 
-        val result = CaptureBankSmsUseCase(rawRepo, registry).capture(raw)
+        val result = CaptureBankSmsUseCase(rawRepo, registry, appLogService = NoOpAppLog).capture(raw)
 
         assertTrue(result is BankSmsCaptureResult.Captured)
         assertTrue((result as BankSmsCaptureResult.Captured).route is BankRoutingResult.Ambiguous)
@@ -474,13 +475,13 @@ class CaptureBankSmsUseCaseTest {
         }
         val raw = live(PURCHASE_BODY, "2026-08-03T14:32:00Z")
 
-        val result = CaptureBankSmsUseCase(failingRepo, registry()).capture(raw)
+        val result = CaptureBankSmsUseCase(failingRepo, registry(), appLogService = NoOpAppLog).capture(raw)
 
         assertEquals("disk-full", (result as BankSmsCaptureResult.Failed).message)
         assertEquals(0, db.rawSmsDao().count())
     }
 
-    private fun capture() = CaptureBankSmsUseCase(rawRepo, registry())
+    private fun capture() = CaptureBankSmsUseCase(rawRepo, registry(), appLogService = NoOpAppLog)
 
     private fun registry() = BankSmsRegistry(listOf(engineFixtureAdapter(pipeline = countingGateway)))
 

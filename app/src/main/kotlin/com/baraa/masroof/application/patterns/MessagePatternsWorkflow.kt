@@ -21,11 +21,11 @@ class MessagePatternsWorkflow(
     private val bundledBanks: List<BankMessagePatterns> = emptyList(),
     private val activation: PatternApprovalWorkflow? = null,
     private val requiredBundledBankIds: Set<String> = emptySet(),
-    private val appLogService: com.baraa.masroof.application.logging.AppLogService? = null,
+    private val appLogService: com.baraa.masroof.application.logging.AppLog,
 ) {
     /** Pattern screens report caught failures here so they reach the app log. */
     fun reportFailure(action: String, error: Throwable) {
-        appLogService?.failure(com.baraa.masroof.application.logging.AppLogCategories.PARSE, action, error)
+        appLogService.failure(com.baraa.masroof.application.logging.AppLogCategories.PARSE, action, error)
     }
     val canPreviewPending: Boolean get() = pendingPreview != null
     val canApplyPending: Boolean get() = pendingPreview?.canApply == true

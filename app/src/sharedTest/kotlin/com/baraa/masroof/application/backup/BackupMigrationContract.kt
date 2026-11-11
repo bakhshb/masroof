@@ -14,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /** Restore of the committed v18 archives under the test-only next schema, run on the JVM and on a device. */
 object BackupMigrationContract {
@@ -108,7 +109,7 @@ object BackupMigrationContract {
         MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).allowMainThreadQueries().build()
 
     private fun service(context: Context, live: MasroofDatabase, schema: BackupSchema, close: () -> Unit) =
-        DatabaseBackupService(context, live, close, "test", restartProcess = {}, schema = schema)
+        DatabaseBackupService(context, live, close, "test", restartProcess = {}, schema = schema, appLogService = NoOpAppLog)
 
     private fun stage(context: Context, archive: () -> InputStream): Uri {
         val file = File(context.cacheDir, "backup-migration-archive")

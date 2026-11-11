@@ -49,6 +49,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.util.concurrent.Executor
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpReclassificationRepository
 
 /**
  * Opening the review list and reloading it after a resolved action reads the queue.
@@ -348,7 +352,7 @@ class ReviewListRefreshTest {
         private val reconciliation = wiring.reconciliation
         private val updater = wiring.updater
         val workflow = wiring.workflow
-        val loader = ReviewDetailLoader(workflow, rawRepo, effective)
+        val loader = ReviewDetailLoader(workflow, rawRepo, effective, provenance = { null })
         val viewModel = ReviewViewModel(
             reviewWorkflowService = workflow,
             detailLoader = loader,
@@ -361,9 +365,14 @@ class ReviewListRefreshTest {
                     financialTransactionRepository = financial,
                     effectiveParsedEventProvider = effective,
                     ownershipResolver = resolver,
+                    appLogService = NoOpAppLog,
+                    ownershipConfirmationService = noOpOwnershipConfirmation(),
+                    persistence = noOpReclassificationRepository(financial),
                 ),
                 clock = clock,
                 reviewQueueUpdater = updater,
+                appLogService = NoOpAppLog,
+                processingRecovery = noOpProcessingRecovery(),
             ),
             reparseStoredSms = {},
             appLocaleRepository = com.baraa.masroof.testsupport.FakeAppLocaleRepository("en"),

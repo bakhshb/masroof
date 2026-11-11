@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import java.util.zip.ZipInputStream
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /**
  * Export must publish a sidecar-free snapshot that survives WAL checkpoints racing the copy.
@@ -180,6 +181,7 @@ class ConsistentBackupSnapshotTest {
                         clockEpochMillis = { 1_700_000_000_000L },
                         restartProcess = { restartRequested.set(true) },
                         onlineBackupEnabled = useOnlineBackup,
+                        appLogService = NoOpAppLog,
                     )
                     val outcome = importer.importFrom(Uri.fromFile(zip), passphrase.copyOf())
                     assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
@@ -236,6 +238,7 @@ class ConsistentBackupSnapshotTest {
                         1_700_000_000_000L
                     },
                     restartProcess = { error("export must not restart the process") },
+                    appLogService = NoOpAppLog,
                 ).exportTo(
                     Uri.fromFile(File(context.cacheDir, "failed-export.masroof")),
                     passphrase.copyOf(),
@@ -314,6 +317,7 @@ class ConsistentBackupSnapshotTest {
         restartProcess = { error("export must not restart the process") },
         onlineBackupEnabled = useOnlineBackup,
         kdfIterations = TEST_KDF_ITERATIONS,
+        appLogService = NoOpAppLog,
     )
 
     private fun seedBatches(databasePath: String, ids: LongRange): Set<Long> {

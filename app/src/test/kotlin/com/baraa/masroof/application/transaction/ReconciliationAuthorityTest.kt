@@ -22,6 +22,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpReclassificationRepository
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -396,7 +401,6 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
         val correctionRepo = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())
         val withCorrections = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
@@ -405,6 +409,7 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
                 parsedRepo,
                 correctionRepo,
             ),
+            reviewRepository = EmptyReviewRepository(),
         )
         persistEvent(
             smsId = "sms-rr-merchant-only",
@@ -445,7 +450,6 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
         val effective = com.baraa.masroof.application.review.EffectiveParsedEventProvider(parsedRepo, correctionRepo)
         val resolver = OwnershipResolver(accounts, cards, loans)
         val withReviews = TransactionReconciliationService(
-            parsedEventRepository = parsedRepo,
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
             ownershipResolver = resolver,
@@ -485,8 +489,11 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
             reviewRepository = reviewRepo,
             financialTransactionRepository = ftRepo,
             reconciliation = withReviews,
-            reclassification = TransactionReclassificationService(ftRepo, effective, resolver, confirmation),
+            reclassification = TransactionReclassificationService(ftRepo, effective, resolver, confirmation, appLogService = NoOpAppLog, persistence = noOpReclassificationRepository(ftRepo)),
             clock = clock,
+            appLogService = NoOpAppLog,
+            processingRecovery = noOpProcessingRecovery(),
+            reviewQueueUpdater = noOpReviewQueueUpdater(),
         )
         val result = restore.restore("sms-rr-restore")
 

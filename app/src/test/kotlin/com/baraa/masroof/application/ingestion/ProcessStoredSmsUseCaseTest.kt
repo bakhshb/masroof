@@ -49,6 +49,15 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
+import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
+import com.baraa.masroof.testsupport.noOpOwnershipDiscovery
+import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
+import com.baraa.masroof.testsupport.noOpReconciliation
+import com.baraa.masroof.testsupport.noOpIngestionReviewService
+import com.baraa.masroof.testsupport.EmptyReviewRepository
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -83,7 +92,6 @@ class ProcessStoredSmsUseCaseTest {
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = registry,
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = parsedRepo,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = ftRepo,
                 ownershipResolver = OwnershipResolver(
@@ -96,11 +104,17 @@ class ProcessStoredSmsUseCaseTest {
                     RoomUserCorrectionRepository(db.userCorrectionDao()),
                 ),
                 reviewRepository = reviewRepo,
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
             ingestionReviewService = IngestionReviewService(reviewRepo, clock),
+            appLogService = NoOpAppLog,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            ownershipDiscovery = noOpOwnershipDiscovery(),
+            processingRecovery = noOpProcessingRecovery(),
+            reviewRepository = EmptyReviewRepository(),
         )
-        capture = CaptureBankSmsUseCase(rawRepo, registry)
+        capture = CaptureBankSmsUseCase(rawRepo, registry, appLogService = NoOpAppLog)
         Unit
     }
 
@@ -162,9 +176,16 @@ class ProcessStoredSmsUseCaseTest {
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = ambiguous,
             ingestionReviewService = IngestionReviewService(reviewRepo, clock),
+            appLogService = NoOpAppLog,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            ownershipDiscovery = noOpOwnershipDiscovery(),
+            processingRecovery = noOpProcessingRecovery(),
+            reconciliation = noOpReconciliation(),
+            reviewQueueUpdater = noOpReviewQueueUpdater(),
+            reviewRepository = EmptyReviewRepository(),
         )
         val raw = sms(PURCHASE_BODY)
-        assertTrue(CaptureBankSmsUseCase(rawRepo, ambiguous).capture(raw) is BankSmsCaptureResult.Captured)
+        assertTrue(CaptureBankSmsUseCase(rawRepo, ambiguous, appLogService = NoOpAppLog).capture(raw) is BankSmsCaptureResult.Captured)
 
         assertTrue(svc.process(raw.id) is SmsIngestionResult.ReviewRequired)
         assertTrue(svc.process(raw.id) is SmsIngestionResult.ReviewRequired)
@@ -220,6 +241,14 @@ class ProcessStoredSmsUseCaseTest {
             bankSmsRegistry = BankSmsRegistry(
                 listOf(engineFixtureAdapter(), engineFixtureAdapter()),
             ),
+            appLogService = NoOpAppLog,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            ingestionReviewService = noOpIngestionReviewService(),
+            ownershipDiscovery = noOpOwnershipDiscovery(),
+            processingRecovery = noOpProcessingRecovery(),
+            reconciliation = noOpReconciliation(),
+            reviewQueueUpdater = noOpReviewQueueUpdater(),
+            reviewRepository = EmptyReviewRepository(),
         )
 
         assertTrue(multiBank.process(raw.id) is SmsIngestionResult.NotRelevant)
@@ -236,7 +265,6 @@ class ProcessStoredSmsUseCaseTest {
             parsedEventRepository = countedParsed,
             bankSmsRegistry = registry,
             reconciliation = TransactionReconciliationService(
-                parsedEventRepository = countedParsed,
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = countedTransactions,
                 ownershipResolver = OwnershipResolver(
@@ -249,9 +277,15 @@ class ProcessStoredSmsUseCaseTest {
                     RoomUserCorrectionRepository(db.userCorrectionDao()),
                 ),
                 reviewRepository = reviewRepo,
+                ownershipConfirmationService = noOpOwnershipConfirmation(),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, countedTransactions, clock),
             ingestionReviewService = IngestionReviewService(reviewRepo, clock),
+            appLogService = NoOpAppLog,
+            exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
+            ownershipDiscovery = noOpOwnershipDiscovery(),
+            processingRecovery = noOpProcessingRecovery(),
+            reviewRepository = EmptyReviewRepository(),
         )
         repeat(12) { index ->
             rawRepo.insertIfAbsent(

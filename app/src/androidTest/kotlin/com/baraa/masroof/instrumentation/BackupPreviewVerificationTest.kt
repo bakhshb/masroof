@@ -15,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /** Read-only verification on actual Android SQLite, with an isolated synthetic database. */
 @RunWith(AndroidJUnit4::class)
@@ -32,7 +33,7 @@ class BackupPreviewVerificationTest {
             val sqlite = database.openHelper.writableDatabase
             sqlite.execSQL("CREATE TABLE verification_probe (marker TEXT NOT NULL)")
             sqlite.execSQL("INSERT INTO verification_probe VALUES ('synthetic-marker')")
-            val service = DatabaseBackupService(context, database, { closed.set(true) }, "test", restartProcess = { error("Verification must not restart") })
+            val service = DatabaseBackupService(context, database, { closed.set(true) }, "test", restartProcess = { error("Verification must not restart") }, appLogService = NoOpAppLog)
             assertTrue(service.exportTo(Uri.fromFile(file), "synthetic-test-password".toCharArray()).isSuccess)
             val password = "synthetic-test-password".toCharArray()
             assertEquals(BackupVerificationOutcome.VERIFIED, service.verify(Uri.fromFile(file), password))

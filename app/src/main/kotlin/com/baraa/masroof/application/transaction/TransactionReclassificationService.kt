@@ -2,7 +2,7 @@ package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -28,9 +28,9 @@ class TransactionReclassificationService(
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider,
     private val ownershipResolver: OwnershipResolver,
-    private val ownershipConfirmationService: OwnershipConfirmationService? = null,
-    private val appLogService: AppLogService? = null,
-    private val persistence: TransactionReclassificationRepository? = null,
+    private val ownershipConfirmationService: OwnershipConfirmationService,
+    private val appLogService: AppLog,
+    private val persistence: TransactionReclassificationRepository,
     private val clock: Clock = Clock.systemUTC(),
     private val afterDecisionCommitted: () -> Unit = {},
 ) {
@@ -131,8 +131,7 @@ class TransactionReclassificationService(
             sourceContainerId = sourceId,
             destinationContainerId = destId,
         )
-        val saved = try { persistence?.updateWithDecision(updated, rawSmsIds.single(), clock.instant())
-            ?: financialTransactionRepository.update(updated) }
+        val saved = try { persistence.updateWithDecision(updated, rawSmsIds.single(), clock.instant()) }
         catch(e: kotlinx.coroutines.CancellationException) { throw e }
         catch(_: Exception) { false }
         if (!saved) {
@@ -146,14 +145,14 @@ class TransactionReclassificationService(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                appLogService?.warn(
+                appLogService.warn(
                     AppLogCategories.TRANSACTION,
                     "Loan ownership confirmation failed after reclassify (${e::class.java.simpleName})",
                 )
             }
         }
         afterDecisionCommitted()
-        appLogService?.info(
+        appLogService.info(
             AppLogCategories.TRANSACTION,
             "Reclassified ${AppLogFormatting.maskId(transactionId)} to ${type.name.lowercase()}",
         )
@@ -162,7 +161,7 @@ class TransactionReclassificationService(
 
     private suspend fun maybeConfirmLoanOwned(reference: LoanReference) {
         if (ownershipResolver.resolveLoan(reference) != OwnershipStatus.UNKNOWN) return
-        ownershipConfirmationService?.confirmLoanOwned(reference)
+        ownershipConfirmationService.confirmLoanOwned(reference)
     }
 
     companion object {

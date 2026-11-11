@@ -29,11 +29,11 @@ class LiveSmsIntake(
     private val reviewRepository: ReviewRepository,
     private val processingRetryRepository: ProcessingRetryRepository,
     private val appLogService: AppLogService,
-    private val batchRecoveryScheduler: HistoricalBatchRecoveryScheduler? = null,
+    private val batchRecoveryScheduler: HistoricalBatchRecoveryScheduler,
     private val debugProcessHalt: DebugProcessHaltProbe = DebugProcessHaltProbe.NONE,
-    private val captureRecoveryScheduler: LiveCaptureRecoveryScheduler? = null,
+    private val captureRecoveryScheduler: LiveCaptureRecoveryScheduler,
     private val clock: InstantClock = InstantClock.System,
-    private val missedSmsScheduler: LiveCaptureRecoveryScheduler? = null,
+    private val missedSmsScheduler: LiveCaptureRecoveryScheduler,
 ) {
     /** Never throws except for cancellation (a retired database is a failed capture, not a cancellation): the receiver's scope has no handler, and a throw ends the process. */
     suspend fun ingest(rawSms: RawSms): BankSmsCaptureResult {
@@ -66,10 +66,9 @@ class LiveSmsIntake(
      * the service-center time and the device arrival time, which the provider query filters on.
      */
     private fun scheduleCaptureRecovery(rawSms: RawSms) {
-        val scheduler = captureRecoveryScheduler ?: return
         val receivedAfter = minOf(rawSms.receivedAt, clock.now()).minus(CAPTURE_RECOVERY_LOOKBACK)
         try {
-            scheduler.schedule(receivedAfter)
+            captureRecoveryScheduler.schedule(receivedAfter)
             appLogService.warn(AppLogCategories.SMS, "Live capture failed; scheduled an inbox re-read")
         } catch (e: CancellationException) {
             throw e
@@ -87,12 +86,11 @@ class LiveSmsIntake(
      * shortcut: with nothing stored yet there is no anchor and no catch-up; store an onboarding-completed time if that matters.
      */
     suspend fun scheduleMissedSmsCatchUp() {
-        val scheduler = missedSmsScheduler ?: return
         try {
             val now = clock.now()
             // A carrier clock can run ahead of the device; a receipt after now would hide everything missed before it.
             val anchor = rawSmsRepository.newestReceivedAt(notAfter = now) ?: return
-            scheduler.schedule(anchor.minus(MISSED_SMS_LOOKBACK))
+            missedSmsScheduler.schedule(anchor.minus(MISSED_SMS_LOOKBACK))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -143,10 +141,9 @@ class LiveSmsIntake(
     }
 
     private fun scheduleHistoricalBatchRecovery(pending: List<String>) {
-        val scheduler = batchRecoveryScheduler ?: return
         if (pending.isEmpty()) return
         try {
-            scheduler.schedule()
+            batchRecoveryScheduler.schedule()
             appLogService.info(
                 AppLogCategories.SMS,
                 "Scheduled one historical recovery for ${pending.size} SMS",

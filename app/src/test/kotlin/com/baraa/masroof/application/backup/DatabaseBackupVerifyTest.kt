@@ -14,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import com.baraa.masroof.testsupport.NoOpAppLog
 
 /** Verify and import must agree that a malformed but correctly encrypted package is invalid. */
 @RunWith(RobolectricTestRunner::class)
@@ -42,6 +43,7 @@ class DatabaseBackupVerifyTest {
                 appVersionName = "test",
                 clockEpochMillis = { 1_700_000_000_000L },
                 restartProcess = { error("unexpected restart") },
+                appLogService = NoOpAppLog,
             )
             val missingPreferences = encryptedPackage(
                 BackupPackageFormat.MANIFEST_ENTRY to byteArrayOf(1),

@@ -2,7 +2,7 @@ package com.baraa.masroof.application.sms
 
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogFormatting
-import com.baraa.masroof.application.logging.AppLogService
+import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
 import com.baraa.masroof.application.transaction.ReconciliationIncompleteException
@@ -27,29 +27,24 @@ import java.time.Instant
 class HistoricalDerivedRecovery(
     private val parsedEventRepository: ParsedEventRepository,
     private val processingRetryRepository: ProcessingRetryRepository,
-    private val ownershipDiscovery: OwnershipDiscoveryService? = null,
-    private val reconciliation: TransactionReconciliationService? = null,
-    private val reviewQueueUpdater: ReviewQueueUpdater? = null,
-    private val rawSmsRepository: RawSmsRepository? = null,
-    private val appLogService: AppLogService? = null,
+    private val ownershipDiscovery: OwnershipDiscoveryService,
+    private val reconciliation: TransactionReconciliationService,
+    private val reviewQueueUpdater: ReviewQueueUpdater,
+    private val rawSmsRepository: RawSmsRepository,
+    private val appLogService: AppLog,
 ) {
     suspend fun recoverPending() {
         val ids = processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH)
         if (ids.isEmpty()) return
-        val discovery = ownershipDiscovery
-        if (discovery != null) {
-            for (record in parsedEventRepository.listByRawSmsIds(ids)) {
-                if (record.event.parseStatus == ParseStatus.NON_FINANCIAL) continue
-                discovery.observe(record.event, record.details.loanType)
-            }
+        for (record in parsedEventRepository.listByRawSmsIds(ids)) {
+            if (record.event.parseStatus == ParseStatus.NON_FINANCIAL) continue
+            ownershipDiscovery.observe(record.event, record.details.loanType)
         }
-        val report = reconciliation?.reconcileAffectedRawSmsIds(idsInArrivalOrder(ids))
-        if (report != null && reviewQueueUpdater != null) {
-            reviewQueueUpdater.applyReport(report)
-        }
-        if (report != null && !ReconciliationCompletionPolicy.isComplete(report)) {
+        val report = reconciliation.reconcileAffectedRawSmsIds(idsInArrivalOrder(ids))
+        reviewQueueUpdater.applyReport(report)
+        if (!ReconciliationCompletionPolicy.isComplete(report)) {
             val masked = AppLogFormatting.maskId(report.failedRawSmsIds.firstOrNull() ?: ids.first())
-            appLogService?.error(
+            appLogService.error(
                 AppLogCategories.INGEST,
                 "Derived reconciliation incomplete failures=${report.summary.failed} id=$masked " +
                     "retry_state=retained (ReconciliationIncompleteException)",
@@ -66,7 +61,7 @@ class HistoricalDerivedRecovery(
     }
 
     private suspend fun idsInArrivalOrder(ids: List<String>): List<String> {
-        val receivedAt = rawSmsRepository?.getByIds(ids)?.associate { it.id to it.receivedAt } ?: return ids
+        val receivedAt = rawSmsRepository.getByIds(ids).associate { it.id to it.receivedAt }
         return ids.sortedWith(compareBy({ receivedAt[it] ?: Instant.MAX }, { it }))
     }
 }
