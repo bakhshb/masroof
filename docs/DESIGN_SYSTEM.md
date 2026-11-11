@@ -1,9 +1,9 @@
-# Approved Masroof design
+# Masroof design system
 
-This document describes the central implementation tokens. The visual approval source is
-`masroof-code-based-preview.html`, SHA256
-`d3f4f86f88edfbd99b42381f7f1782645c6a893d4278096f1215b4b961029d6d`.
-Human-approved later amendments override that prototype. Tokens live in
+This document describes the shared tokens and components screens are built from. It is
+reference for consistency, not an approval gate: `AGENTS.md` Priorities rank it below
+financial correctness, data safety, architecture and a working screen. The code is the
+source of truth; the original HTML prototype is not kept in the repository. Tokens live in
 `ui-kit/src/main/kotlin/com/baraa/masroof/ui/theme/`; `MasroofDesign.version` is `approved-2026-10-10`.
 
 ## One source of visual values
@@ -142,13 +142,10 @@ obsolete and must not be reintroduced.
 ## Visual verification
 
 `ApprovedFidelityMatrixTest` renders the production page functions with synthetic
-financial fixtures across 32 pages, Arabic/English and light/dark. Captures include
-the application content, excluding the Android status bar. Compare equal viewport
-sizes and the same selected day; distinguish data values from presentation defects.
-The English prototype counterpart is translated from the approved Arabic structure,
-not a separately approved source. Native functional tests do not prove pixel fidelity.
-Only reviewed screenshots support visual assertions. Do not modify the approved
-prototype to conceal implementation discrepancies.
+financial fixtures across 32 pages, Arabic/English and light/dark. It is a render smoke
+test: it asserts each page renders, uses Western digits and keeps the Home shortcut row
+layout, and saves captures for human review. It does not compare pixels against a
+reference image. Native functional tests do not prove pixel fidelity.
 
 Average-line raster assertions integrate foreground coverage across the physical
 stroke band and verify its weighted center and dash gaps. A thin antialiased
