@@ -1,6 +1,6 @@
 # Production architecture
 
-Masroof has one Android application, one financial database and one bank interpretation engine. The tested engine and advisory features are integrated into the existing app; the parallel Lab application and generated source replica are removed.
+Masroof has one Android application, one financial database and one bank interpretation engine. Planned structure changes are listed in [the sustainability plan](SUSTAINABILITY_PLAN.md); this document describes the code as it is. The tested engine and advisory features are integrated into the existing app; the parallel Lab application and generated source replica are removed.
 
 ## Modules
 
@@ -205,7 +205,7 @@ Message learning is "remember my decision", per bank, for every configured bank.
 
 ## Data and recovery
 
-`masroof.db` supports schema 18 only, with its fourteen tables and unchanged identity hash. Older database and backup schemas are rejected without migration or destructive fallback. Automatic schema-fact backfill is removed; already queued backfill work completes without parsing or writing. Existing preference files, Keystore alias, app id and worker names remain stable. `learning.db` stores labels/provenance; `analytics.db` stores advisory results and preferences. Old Lab files are neither imported nor deleted automatically.
+`masroof.db` supports schema 18 only, with its fourteen tables and unchanged identity hash. Older database and backup schemas are rejected without migration or destructive fallback until the migration path of plan piece 0.4 lands; after that, schema changes are additive, tested Room migrations only (see AGENTS.md). Automatic schema-fact backfill is removed; already queued backfill work completes without parsing or writing. Existing preference files, Keystore alias, app id and worker names remain stable. `learning.db` stores labels/provenance; `analytics.db` stores advisory results and preferences. Old Lab files are neither imported nor deleted automatically.
 
 The learning store is schema 2 and the analytics store is schema 4. Posted type edits atomically update the financial transaction and its latest `USER_FINANCIAL_TYPE` review decision in the unchanged financial schema. Message learning rebuilds from durable decisions before enabling personal assistance; no derived message-model cache is written or loaded. Exact template suppressions include bank and feature identity and revoke human-template assistance. Financial `EXPENSE`/`INCOME`, ownership decisions and field-only edits do not invent family labels. Unsupported or ambiguous decisions have an explicit feedback disposition.
 

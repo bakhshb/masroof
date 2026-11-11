@@ -1,7 +1,7 @@
 # Masroof agent notes
 
 Android app that turns Saudi bank SMS into a private ledger and dashboard. Arabic first (RTL), English second.
-Reference: `docs/ARCHITECTURE.md` (modules), `docs/ANALYTICS.md` (analysis), `docs/DESIGN_SYSTEM.md` (UI tokens and components).
+Reference: `docs/ARCHITECTURE.md` (modules), `docs/ANALYTICS.md` (analysis), `docs/DESIGN_SYSTEM.md` (UI tokens and components), `docs/SUSTAINABILITY_PLAN.md` (approved refactor plan, piece by piece).
 This file wins when older records disagree.
 
 ## Priorities
@@ -23,8 +23,15 @@ Run this for each plan phase:
 
 At the end of the PR: one review of the whole PR, then CI green including device tests, then report done.
 
+### Work under `docs/SUSTAINABILITY_PLAN.md`
+- One pull request per plan piece, to `main`, one piece at a time, each starting from the latest `main` (no rebases).
+- Each piece is built in its own git worktree by an implementer agent (`.claude/agents/implementer.md`: Sonnet; Opus for pieces marked High), then reviewed by the Opus reviewer agent (`.claude/agents/reviewer.md`); loop until the review finds no real bug.
+- Every piece deletes the code, tests, imports, fixtures and string resources it makes obsolete, and updates `AGENTS.md`, `CLAUDE.md` and `docs/` when a rule or module changes.
+- Owner gates (marked Gate) stop and ask before implementing. The derived ledger replaces the old reconciliation path only after the owner approves every difference in the shadow comparison.
+- No remote pattern download. Wiring stays manual; no DI library unless the owner asks.
+
 ## Never break
-- Database `masroof.db` stays schema v18 with the same identity hash; reject other database/backup schemas, no destructive fallback, no migrations or backfills. A schema change needs an explicit design and device verification.
+- Database `masroof.db`: until the migration path of plan piece 0.4 has landed, it stays schema v18 with the same identity hash and rejects other database/backup schemas. After that, the schema changes only through additive, tested Room migrations: a migration test from the committed v18 fixture, a device upgrade test, and v18 backup archives still import. Unknown or newer schemas are always rejected; never a destructive fallback; no backfill without an explicit design and owner approval.
 - Keep the application id, preference names, Keystore alias, worker identities and historical persisted keys.
 - No Lab UI, replica app or parallel intake; no `lab`/`beta` source paths. Engine/model refreshes never reparse posted evidence or override human decisions.
 - Never log SMS bodies, account numbers or secrets. Logs carry stage, failure count, masked id and retry state.
