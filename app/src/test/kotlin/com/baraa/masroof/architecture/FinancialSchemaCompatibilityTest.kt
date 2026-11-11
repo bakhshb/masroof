@@ -22,9 +22,17 @@ class FinancialSchemaCompatibilityTest {
     fun exportedVersionsAreContiguousFromTheBaselineToTheCurrentVersion() {
         val exported = schemas.listFiles()!!.map { it.nameWithoutExtension.toInt() }.sorted()
         assertEquals((MasroofDatabase.BASELINE_VERSION..MasroofDatabase.VERSION).toList(), exported)
-        val current = File(schemas, "${MasroofDatabase.VERSION}.json").readText()
-        assertEquals(MasroofDatabase.IDENTITY_HASH, Regex("\"identityHash\":\\s*\"(\\w+)\"").find(current)!!.groupValues[1])
+        assertEquals(MasroofDatabase.IDENTITY_HASH, exportedHash(MasroofDatabase.VERSION))
     }
+
+    @Test
+    fun knownIdentityHashesMatchEveryExportedSchema() {
+        val exported = schemas.listFiles()!!.map { it.nameWithoutExtension.toInt() }.associateWith(::exportedHash)
+        assertEquals(exported, MasroofDatabase.IDENTITY_HASHES)
+    }
+
+    private fun exportedHash(version: Int): String =
+        Regex("\"identityHash\":\\s*\"(\\w+)\"").find(File(schemas, "$version.json").readText())!!.groupValues[1]
 
     @Test
     fun everyStepHasExactlyOneSingleVersionMigration() {

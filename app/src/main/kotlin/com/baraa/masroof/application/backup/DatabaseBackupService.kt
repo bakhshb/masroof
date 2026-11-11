@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.database.sqlite.SQLiteDatabase
-import androidx.room.Room
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
@@ -46,6 +45,7 @@ class DatabaseBackupService(
     /** Production uses [BackupEnvelope.DEFAULT_ITERATIONS]. Tests inject a lower count. */
     private val kdfIterations: Int = BackupEnvelope.DEFAULT_ITERATIONS,
     private val databaseAccessGate: DatabaseAccessGate = DatabaseAccessGate(),
+    private val schema: BackupSchema = BackupSchema.PRODUCTION,
 ) : DatabaseBackupGateway {
     private val operationMutex = Mutex()
     init {
@@ -161,10 +161,7 @@ class DatabaseBackupService(
                     val manifest = runCatching {
                         BackupPackageCodec.decodeManifest(File(directory, BackupPackageFormat.MANIFEST_ENTRY).readText())
                     }.getOrElse { return@withLock BackupVerificationOutcome.INVALID_PACKAGE }
-                    if (!BackupPackageCodec.validateManifest(manifest, MasroofDatabase.VERSION, MasroofDatabase.IDENTITY_HASH)) {
-                        return@withLock BackupVerificationOutcome.INVALID_PACKAGE
-                    }
-                    if (readIdentityHash(File(directory, BackupPackageFormat.DATABASE_ENTRY)) != MasroofDatabase.IDENTITY_HASH) {
+                    if (!hasKnownSchema(manifest, File(directory, BackupPackageFormat.DATABASE_ENTRY))) {
                         return@withLock BackupVerificationOutcome.INVALID_PACKAGE
                     }
                     runCatching {
@@ -284,12 +281,15 @@ class DatabaseBackupService(
                 BackupPackageCodec.decodeManifest(manifestFile.readText())
             }.getOrElse { return BackupImportOutcome.InvalidPackage }
 
-            if (!BackupPackageCodec.validateManifest(manifest, MasroofDatabase.VERSION, MasroofDatabase.IDENTITY_HASH) ||
-                readIdentityHash(dbFile) != MasroofDatabase.IDENTITY_HASH) return BackupImportOutcome.InvalidPackage
+            if (!hasKnownSchema(manifest, dbFile)) return BackupImportOutcome.InvalidPackage
 
             val preferences = runCatching {
                 BackupPackageCodec.decodePreferences(prefsFile.readText())
             }.getOrElse { return BackupImportOutcome.InvalidPackage }
+
+            // An older schema migrates here, on the staged copy, while the live database is still open and untouched.
+            // A current-schema copy is only validated after close, as before.
+            if (manifest.roomVersion != schema.version) openAndValidate(dbFile)
 
             checkpointWal()
             databaseAccessGate.retire()
@@ -746,16 +746,17 @@ class DatabaseBackupService(
     }
 
     /**
-     * Checks a current-schema copy of the backup before the live file is replaced.
+     * Migrates a staged copy of the backup to [BackupSchema.version] and checks it before the live file is replaced.
      * The live database stays in place until the validated copy is renamed over it.
      */
     private fun openAndValidate(dbFile: File) {
-        val opened = Room.databaseBuilder(appContext, MasroofDatabase::class.java, dbFile.name)
+        val opened = MasroofDatabase.builder(appContext, schema.databaseClass, dbFile.path)
+            .addMigrations(*schema.extraMigrations.toTypedArray())
             .build()
         try {
             val db = opened.openHelper.writableDatabase
-            check(db.version == MasroofDatabase.VERSION) {
-                "Imported database is not schema ${MasroofDatabase.VERSION}"
+            check(db.version == schema.version) {
+                "Imported database is not schema ${schema.version}"
             }
             db.query("PRAGMA integrity_check").use { cursor ->
                 check(cursor.moveToFirst() && cursor.getString(0) == "ok" && !cursor.moveToNext()) {
@@ -779,14 +780,19 @@ class DatabaseBackupService(
         SensitiveFileCleanup.delete(dbFile)
     }
 
-    private fun readIdentityHash(dbFile: File): String? {
+    /** The manifest names a known pair and the database file really is that version with that hash. */
+    private fun hasKnownSchema(manifest: BackupManifest, dbFile: File): Boolean =
+        BackupPackageCodec.validateManifest(manifest, schema.identityHashes) &&
+            readIdentityHash(dbFile, manifest.roomVersion) == manifest.identityHash
+
+    private fun readIdentityHash(dbFile: File, version: Int): String? {
         return runCatching {
             SQLiteDatabase.openDatabase(
                 dbFile.path,
                 null,
                 SQLiteDatabase.OPEN_READONLY,
             ).use { db ->
-                if (db.version != MasroofDatabase.VERSION) return@use null
+                if (db.version != version) return@use null
                 db.rawQuery(
                     "SELECT identity_hash FROM room_master_table WHERE id = 42 LIMIT 1",
                     null,

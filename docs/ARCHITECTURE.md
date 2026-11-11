@@ -227,7 +227,7 @@ review updates using that same report. Settings reloads registries after a compl
 reparse or rescan; it does not start another financial pass. A failed report remains
 incomplete and durably retryable even if a second pass could succeed.
 
-Encrypted backups retain the existing envelope and accept the current financial schema only. Optional analysis is included in the durable restore journal for commit/rollback. Restoring an older backup clears stale analysis and rebuilds available results. Learning state is invalidated and reconstructed from retained human decisions.
+Encrypted backups retain the existing envelope. A restore accepts only a known financial (version, identity hash) pair from v18 up to the current version (`MasroofDatabase.IDENTITY_HASHES`, checked against the exported schemas); anything else is an invalid package and the live database is not touched. An older backup migrates on its staged copy through `MasroofDatabase.builder` with the preserving open helper, while the live database is still open, before the restore journal is written and the live file is replaced; a failed migration leaves the live files, preferences and journal unchanged (`BackupOlderSchemaImportTest`, `BackupMigrationDeviceTest`). Export always writes the current version and hash. Optional analysis is included in the durable restore journal for commit/rollback. Restoring an older backup clears stale analysis and rebuilds available results. Learning state is invalidated and reconstructed from retained human decisions.
 
 See [AGENTS.md](../AGENTS.md) for enforced boundaries and [ANALYTICS.md](ANALYTICS.md) for model and alert policy.
 

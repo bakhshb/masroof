@@ -57,8 +57,7 @@ class BackupPackageCodecTest {
         assertTrue(
             BackupPackageCodec.validateManifest(
                 manifest = manifest,
-                expectedRoomVersion = MasroofDatabase.VERSION,
-                expectedIdentityHash = MasroofDatabase.IDENTITY_HASH,
+                identityHashes = MasroofDatabase.IDENTITY_HASHES,
             ),
         )
     }
@@ -75,8 +74,7 @@ class BackupPackageCodecTest {
         assertFalse(
             BackupPackageCodec.validateManifest(
                 manifest = manifest,
-                expectedRoomVersion = MasroofDatabase.VERSION,
-                expectedIdentityHash = MasroofDatabase.IDENTITY_HASH,
+                identityHashes = MasroofDatabase.IDENTITY_HASHES,
             ),
         )
     }
@@ -94,8 +92,7 @@ class BackupPackageCodecTest {
         assertFalse(
             BackupPackageCodec.validateManifest(
                 manifest = manifest,
-                expectedRoomVersion = MasroofDatabase.VERSION,
-                expectedIdentityHash = MasroofDatabase.IDENTITY_HASH,
+                identityHashes = MasroofDatabase.IDENTITY_HASHES,
             ),
         )
     }

@@ -6,6 +6,7 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -66,6 +67,21 @@ abstract class NextVersionTestDatabase : RoomDatabase() {
         val MIGRATION_TO_NEXT = object : Migration(MasroofDatabase.VERSION, VERSION) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS migration_probe (id INTEGER NOT NULL, note TEXT, PRIMARY KEY(id))")
+            }
+        }
+
+        /** Room's identity hash for this class, read from a fresh file because the schema is never exported. */
+        fun identityHash(context: Context): String {
+            val name = "next-version-identity.db"
+            context.deleteDatabase(name)
+            val db = Room.databaseBuilder(context, NextVersionTestDatabase::class.java, name).build()
+            try {
+                return db.openHelper.readableDatabase.query("SELECT identity_hash FROM room_master_table").use {
+                    check(it.moveToFirst()); it.getString(0)
+                }
+            } finally {
+                db.close()
+                context.deleteDatabase(name)
             }
         }
     }
@@ -135,10 +151,11 @@ object MigrationOpenPathContract {
         return file
     }
 
-    private fun <T> readOnly(file: File, block: (SQLiteDatabase) -> T): T =
+    fun <T> readOnly(file: File, block: (SQLiteDatabase) -> T): T =
         SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use(block)
 
-    private fun rows(db: SQLiteDatabase): Map<String, List<String>> = db.rawQuery(
+    /** Every row of every app table, in rowid order. */
+    fun rows(db: SQLiteDatabase): Map<String, List<String>> = db.rawQuery(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'room_%' " +
             "AND name NOT LIKE 'android_%' AND name NOT LIKE 'sqlite_%' ORDER BY name", null,
     ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getString(0)) } }
