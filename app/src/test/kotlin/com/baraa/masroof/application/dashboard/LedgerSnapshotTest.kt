@@ -20,7 +20,7 @@ import java.util.TimeZone
  * Full ledger snapshot (plan 0.2): every transaction row and link, review item, commitment and ownership
  * over the whole synthetic corpus, committed as `testdata/ledger_snapshot/full_ledger.golden.txt`.
  * Any row change fails this test. To accept an intended change, rerun with
- * `MASROOF_UPDATE_LEDGER_FIXTURES=1 ./gradlew :app:testDebugUnitTest --tests '*LedgerSnapshotTest'`
+ * `MASROOF_UPDATE_LEDGER_SNAPSHOT=1 ./gradlew :app:testDebugUnitTest --tests '*LedgerSnapshotTest'`
  * and review the diff of the golden file; the variable is off by default.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -56,8 +56,8 @@ class LedgerSnapshotTest {
 
     /**
      * Scopes the reconcile to the unposted ids only. The stale single-leg SELF_TRANSFER (`legacy-stale-out`)
-     * is not in the scope: only the candidate windows can find it. FEE to LOAN_REPAYMENT and loan ownership
-     * becoming OWNED are full-pass-only upgrades by design, so those rows are left out of the comparison.
+     * is not in the scope: only the candidate windows can find it. The FEE to LOAN_REPAYMENT heal (and the loan
+     * becoming OWNED) happens only in a full pass by design, so just those fields of `legacy-fee-loan` are masked.
      */
     @Test
     fun scopedReconcileOverUnpostedLegacyIdsMatchesFullReconcile() = runBlocking {
@@ -73,7 +73,7 @@ class LedgerSnapshotTest {
             LedgerSnapshotSerializer.serialize(world)
         }
         assertTrue("legacy corpus must post transfers", full.contains("|SELF_TRANSFER|"))
-        assertEquals(withoutFullPassOnlyUpgrades(full), withoutFullPassOnlyUpgrades(scoped))
+        assertEquals(maskFullPassOnlyHeal(full), maskFullPassOnlyHeal(scoped))
     }
 
     /** Releases every posted transfer of the imported all-banks corpus, then reconciles it back two ways. */
@@ -81,6 +81,7 @@ class LedgerSnapshotTest {
     fun scopedReconcileOverAllBanksTransfersMatchesFullReconcile() = runBlocking {
         suspend fun run(scoped: Boolean): String = newAllBanksWorld().use { world ->
             LedgerSnapshotCorpus.populateAllBanks(world)
+            val before = LedgerSnapshotSerializer.serialize(world)
             val transferTypes = setOf(
                 FinancialTransactionType.SELF_TRANSFER,
                 FinancialTransactionType.EXTERNAL_TRANSFER_IN,
@@ -97,14 +98,24 @@ class LedgerSnapshotTest {
             } else {
                 world.reconciliation.reconcileStoredEventsDetailed()
             }
-            LedgerSnapshotSerializer.serialize(world)
+            LedgerSnapshotSerializer.serialize(world).also { assertEquals("restored ledger differs from before the release", before, it) }
         }
         assertEquals(run(scoped = false), run(scoped = true))
     }
 
-    private fun withoutFullPassOnlyUpgrades(snapshot: String): String = snapshot.lines()
-        .filterNot { it.startsWith("loan|") || (it.startsWith("tx|") && (it.contains("|FEE|") || it.contains("|LOAN_REPAYMENT|"))) }
-        .joinToString("\n")
+    /** Masks only what the full-pass-only FEE to LOAN_REPAYMENT heal of `legacy-fee-loan` changes; every other line stays. */
+    private fun maskFullPassOnlyHeal(snapshot: String): String = snapshot.lines().joinToString("\n") { line ->
+        val cells = line.split("|").toMutableList()
+        when {
+            line.startsWith("tx|") && cells.any { "android-sms:legacy-fee-loan" in it } -> {
+                cells[2] = "~type"
+                cells[8] = "~destination"
+                cells.joinToString("|")
+            }
+            line.startsWith("loan|BANK_ALJAZIRA|PERSONAL|") -> "loan|BANK_ALJAZIRA|PERSONAL|~ownership"
+            else -> line
+        }
+    }
 
     @Test
     fun legacySeedsKeepTodaysStates() = runBlocking {
@@ -153,6 +164,6 @@ class LedgerSnapshotTest {
         File(if (File("src/test").isDirectory) "." else "app", "src/test/resources/testdata/ledger_snapshot/full_ledger.golden.txt")
 
     private companion object {
-        const val UPDATE_ENV = "MASROOF_UPDATE_LEDGER_FIXTURES"
+        const val UPDATE_ENV = "MASROOF_UPDATE_LEDGER_SNAPSHOT"
     }
 }

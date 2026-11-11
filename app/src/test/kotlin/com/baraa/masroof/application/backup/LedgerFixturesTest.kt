@@ -30,8 +30,9 @@ import java.util.zip.ZipOutputStream
 
 /**
  * The committed v18 fixtures (plan 0.2): a `masroof.db` and a plaintext v1 backup archive holding it,
- * both synthetic. They stay at v18 forever; later migration tests open them. To rebuild them from the
- * snapshot corpus run with `MASROOF_UPDATE_LEDGER_FIXTURES=1` (off by default) and review the binary diff.
+ * both synthetic. They stay at v18 forever; later migration tests open them. Only
+ * `MASROOF_REBUILD_V18_FIXTURES=1` (off by default, separate from the golden snapshot's variable) rebuilds
+ * them, and only while the schema is still v18.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -45,7 +46,10 @@ class LedgerFixturesTest {
         MessagePatternStore(context).restoreRaw(null)
         context.deleteDatabase(MasroofDatabase.NAME)
         DatabaseRestoreRecovery.deleteRestoreArtifacts(context.getDatabasePath(MasroofDatabase.NAME))
-        if (System.getenv(UPDATE_ENV) == "1") regenerate()
+        if (System.getenv(REBUILD_ENV) == "1" && !rebuilt) {
+            rebuilt = true
+            rebuild()
+        }
     }
 
     @After
@@ -127,8 +131,9 @@ class LedgerFixturesTest {
         assertTrue("fixture needs a resolved review", RoomReviewRepository(db.reviewItemDao()).listAll().any { it.resolutionKind != null })
     }
 
-    private fun regenerate() = runBlocking {
-        val dir = fixtureDir().also { it.mkdirs() }
+    private fun rebuild() = runBlocking {
+        check(MasroofDatabase.VERSION == 18) { "the v18 fixtures must never be rebuilt from schema ${MasroofDatabase.VERSION}" }
+        val dir = File(context.cacheDir, "v18-rebuild").also { it.deleteRecursively(); it.mkdirs() }
         val db = File(dir, DB_FILE)
         LedgerSnapshotCorpus.newAllBanksWorld(context, MasroofDatabase.NAME).use { world ->
             LedgerSnapshotCorpus.populateAllBanks(world)
@@ -168,6 +173,12 @@ class LedgerFixturesTest {
                 zip.closeEntry()
             }
         }
+        // Equal database content means nothing changed: keep the committed files (the envelope is random per export).
+        val target = fixtureDir().also { it.mkdirs() }
+        if (!File(target, DB_FILE).let { it.isFile && it.readBytes().contentEquals(db.readBytes()) }) {
+            dir.listFiles()!!.forEach { it.copyTo(File(target, it.name), overwrite = true) }
+        }
+        dir.deleteRecursively()
     }
 
     private fun committedSchemaHash(): String {
@@ -182,7 +193,10 @@ class LedgerFixturesTest {
     private fun root() = File(if (File("src/test").isDirectory) "." else "app")
 
     private companion object {
-        const val UPDATE_ENV = "MASROOF_UPDATE_LEDGER_FIXTURES"
+        /** Rebuild at most once per JVM run, not once per test. */
+        var rebuilt = false
+
+        const val REBUILD_ENV = "MASROOF_REBUILD_V18_FIXTURES"
         const val DB_FILE = "masroof.db"
         const val ARCHIVE_FILE = "masroof-v18-backup.zip"
         const val ENCRYPTED_FILE = "masroof-v18-backup.masroof"
