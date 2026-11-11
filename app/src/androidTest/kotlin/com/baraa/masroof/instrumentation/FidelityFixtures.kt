@@ -18,7 +18,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** Synthetic facts from the approved prototype; never reads the installed ledger. */
+/** Synthetic financial facts for page captures; never reads the installed ledger. */
 internal object FidelityFixtures {
     private val bank = Bank.BANK_ALJAZIRA
     private val zone = ZoneId.of("Asia/Riyadh")

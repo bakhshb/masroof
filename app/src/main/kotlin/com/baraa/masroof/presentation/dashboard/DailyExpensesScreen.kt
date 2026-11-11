@@ -39,7 +39,7 @@ fun DailyExpensesScreen(state: DashboardUiState, onBack: () -> Unit, onOpenTrans
     val point = trend.points.firstOrNull { it.date.toString() == day } ?: trend.points.last()
     val names = state.ownedCards.associate { CardOwnershipKey.of(it.bank, it.last4) to
         (it.displayName ?: com.baraa.masroof.presentation.common.formatCardLast4(it.last4)) }
-    val allLabel = stringResource(R.string.approved_all_expenses)
+    val allLabel = stringResource(R.string.all_expenses)
     DashboardSummaryScaffold(stringResource(R.string.reference_daily_title), state, onBack) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MasroofReference.metricGap)) {
             val keys = listOf("all") + names.keys.toList()
@@ -55,7 +55,7 @@ fun DailyExpensesScreen(state: DashboardUiState, onBack: () -> Unit, onOpenTrans
             scopeLabel = names[scope] ?: allLabel,
             explanation = stringResource(if (scope == "all") R.string.dashboard_all_trend_basis
                 else if (state.creditFacilities?.debitCards?.any { CardOwnershipKey.of(it) == scope } == true)
-                    R.string.dashboard_mada_trend_basis else R.string.approved_card_expense_basis))
+                    R.string.dashboard_mada_trend_basis else R.string.card_expense_basis))
         com.baraa.masroof.presentation.common.MasroofMetricRow { tile ->
             MasroofMetric(stringResource(R.string.reference_before_refunds), formatLocalizedMoney(point.beforeRefunds),
                 MasroofThemeExtras.extendedColors.outflow, tile)

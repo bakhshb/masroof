@@ -3,9 +3,9 @@ package com.baraa.masroof.ui.theme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 
-/** Version of the approved design shown in the design catalog. */
+/** Design-system version label shown in the design catalog. */
 object MasroofDesign {
-    const val version = "approved-2026-10-10"
+    const val version = "2026-10-10"
 }
 
 /** One geometry and visual policy for all contextual explanations. */

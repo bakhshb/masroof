@@ -36,7 +36,7 @@ import org.junit.runner.RunWith
 
 /** Production screens with explicit test facts; no real financial records are read. */
 @RunWith(AndroidJUnit4::class)
-class ApprovedDesignScreenTest {
+class DashboardEntityScreenTest {
     @get:Rule val compose = createAndroidComposeRule<androidx.activity.ComponentActivity>()
 
     @Test
@@ -61,17 +61,17 @@ class ApprovedDesignScreenTest {
             }
         }
         compose.waitForIdle()
-        capture("approved-credit-summary-light")
+        capture("credit-summary-light")
         scrollTo(hasText("بطاقة السفر", substring = true))
-        capture("approved-credit-cards-light")
+        capture("credit-cards-light")
         compose.onNode(hasText("بطاقة السفر", substring = true) and hasClickAction()).performClick()
         compose.waitForIdle()
-        compose.onNodeWithText(ar(R.string.approved_due_amount)).assertIsDisplayed()
-        compose.onNodeWithText(ar(R.string.approved_due_date)).assertIsDisplayed()
-        capture("approved-credit-detail-light")
+        compose.onNodeWithText(ar(R.string.due_amount)).assertIsDisplayed()
+        compose.onNodeWithText(ar(R.string.due_date)).assertIsDisplayed()
+        capture("credit-detail-light")
         compose.runOnIdle { dark.value = true }
         compose.waitForIdle()
-        capture("approved-credit-detail-dark")
+        capture("credit-detail-dark")
         scrollTo(hasTestTag("daily-expenses-chart"))
         val chartBounds = compose.onNodeWithTag("daily-expenses-chart").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithTag("daily-expenses-chart").performTouchInput {
@@ -83,7 +83,7 @@ class ApprovedDesignScreenTest {
         val tapped = compose.onNodeWithTag("daily-expenses-chart").fetchSemanticsNode().config[SemanticsProperties.ContentDescription]
         val expectedAmount = MoneyUiFormatter.format(SignedMoneyAmount.of(Money.of("120", Currency.SAR)), "ar")
         assertTrue("Touching a point must expose its actual amount", tapped.any { it.contains(expectedAmount) })
-        capture("approved-credit-point-selected-dark")
+        capture("credit-point-selected-dark")
         compose.onNodeWithText(ar(R.string.chart_previous_point)).assertDoesNotExist()
         compose.onNodeWithText(ar(R.string.chart_next_point)).assertDoesNotExist()
         val previousDayAction = compose.onNodeWithTag("daily-expenses-chart").fetchSemanticsNode()
@@ -91,10 +91,10 @@ class ApprovedDesignScreenTest {
         compose.runOnIdle { assertTrue(previousDayAction.action()) }
         val after = compose.onNodeWithTag("daily-expenses-chart").fetchSemanticsNode().config[SemanticsProperties.ContentDescription]
         assertNotEquals(tapped, after)
-        capture("approved-credit-chart-dark")
+        capture("credit-chart-dark")
         compose.runOnIdle { selected.value = null }
         compose.waitForIdle()
-        capture("approved-credit-summary-dark")
+        capture("credit-summary-dark")
     }
 
     @Test
@@ -114,13 +114,13 @@ class ApprovedDesignScreenTest {
                 }
             }
         }
-        compose.onNodeWithText(ar(R.string.approved_last_installment)).assertIsDisplayed()
-        compose.onNodeWithText(ar(R.string.approved_installment_date)).assertIsDisplayed()
-        compose.onNodeWithText(ar(R.string.approved_due_amount)).assertDoesNotExist()
-        capture("approved-loan-detail-light")
+        compose.onNodeWithText(ar(R.string.last_installment)).assertIsDisplayed()
+        compose.onNodeWithText(ar(R.string.installment_date)).assertIsDisplayed()
+        compose.onNodeWithText(ar(R.string.due_amount)).assertDoesNotExist()
+        capture("loan-detail-light")
         compose.runOnIdle { dark.value = true }
         compose.waitForIdle()
-        capture("approved-loan-detail-dark")
+        capture("loan-detail-dark")
     }
 
     @Test
@@ -150,14 +150,14 @@ class ApprovedDesignScreenTest {
             }
         }
         compose.waitForIdle()
-        capture("approved-account-summary-light")
+        capture("account-summary-light")
         scrollTo(hasText("حساب الراتب", substring = true))
         compose.onNode(hasText("حساب الراتب", substring = true) and hasClickAction()).performClick()
         compose.waitForIdle()
-        capture("approved-account-detail-light")
+        capture("account-detail-light")
         compose.runOnIdle { dark.value = true }
         compose.waitForIdle()
-        capture("approved-account-detail-dark")
+        capture("account-detail-dark")
     }
 
     private fun scrollTo(matcher: SemanticsMatcher) {
@@ -180,7 +180,7 @@ class ApprovedDesignScreenTest {
         }
         compose.onNodeWithText(ar(R.string.dashboard_load_error)).assertIsDisplayed()
         compose.onNodeWithText(ar(R.string.dashboard_cards_summary_empty)).assertDoesNotExist()
-        capture("approved-load-error-light")
+        capture("load-error-light")
         compose.runOnIdle {
             state.value = fixture().copy(error = DashboardError.LOAD_FAILED, currentAccount = CurrentAccountSummary.zero(Currency.SAR))
         }
@@ -214,9 +214,9 @@ class ApprovedDesignScreenTest {
             }
         }
         compose.onNodeWithText(ar(R.string.dashboard_credit_card_aggregate_due)).assertDoesNotExist()
-        compose.onNodeWithText(ar(R.string.approved_credit_daily)).assertDoesNotExist()
+        compose.onNodeWithText(ar(R.string.credit_daily)).assertDoesNotExist()
         compose.onNodeWithText(ar(R.string.dashboard_debit_card_linked_account)).assertIsDisplayed()
-        capture("approved-debit-summary-light")
+        capture("debit-summary-light")
     }
 
     private fun ar(id: Int) = AppLocaleContext.wrap(InstrumentationRegistry.getInstrumentation().targetContext, "ar").getString(id)
@@ -270,7 +270,7 @@ class ApprovedDesignScreenTest {
         }
         compose.waitForIdle()
         assertTrue(compose.onAllNodes(hasText("2026", substring = true)).fetchSemanticsNodes().isNotEmpty())
-        capture("approved-ascii-calendar-light")
+        capture("ascii-calendar-light")
     }
 
     // updateConfiguration is deliberate: dialog windows read the host Activity resources, not LocalContext.
@@ -296,7 +296,7 @@ class ApprovedDesignScreenTest {
                 }
             }
             compose.waitForIdle()
-            capture("approved-ascii-account-input-light")
+            capture("ascii-account-input-light")
             compose.onNodeWithText(ar(R.string.settings_save)).performClick()
             compose.runOnIdle { org.junit.Assert.assertEquals("حساب ٣٠٠١", savedName.value) }
         } finally {

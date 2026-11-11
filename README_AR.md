@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="ui-kit/src/main/res/drawable-nodpi/masroof_approved_logo.webp" width="88" alt="شعار محفظة مصروف">
+  <img src="ui-kit/src/main/res/drawable-nodpi/masroof_logo.webp" width="88" alt="شعار محفظة مصروف">
 </p>
 
 <h1 align="center">مصروف · Masroof</h1>

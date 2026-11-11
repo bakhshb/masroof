@@ -26,8 +26,8 @@ fun LoanSummaryTile(loan: LoanOverview, modifier: Modifier = Modifier, onClick: 
     val unavailable = stringResource(R.string.dashboard_value_unavailable)
     EntitySummaryCard(loanName(loan), "", MasroofIcons.moneyMovement,
         MasroofThemeExtras.extendedColors.liability, modifier, onClick, actionLabel = stringResource(R.string.reference_loan_details), bankLabel = com.baraa.masroof.presentation.settings.settingsBankLabel(loan.bank)) {
-        MasroofDetailRow(stringResource(R.string.approved_loan_remaining), loan.remainingBalance?.let { formatLocalizedMoney(it) } ?: unavailable, dense = true)
-        MasroofDetailRow(stringResource(R.string.approved_last_installment), loan.latestInstallmentAmount?.let { amount ->
+        MasroofDetailRow(stringResource(R.string.loan_remaining), loan.remainingBalance?.let { formatLocalizedMoney(it) } ?: unavailable, dense = true)
+        MasroofDetailRow(stringResource(R.string.last_installment), loan.latestInstallmentAmount?.let { amount ->
             formatLocalizedMoney(amount) + (loan.latestInstallmentAsOf?.let { " · " + date.format(it.atZone(ZoneId.systemDefault())) } ?: "")
         } ?: unavailable, valueColor = MasroofThemeExtras.extendedColors.liability, dense = true)
     }
@@ -43,15 +43,15 @@ fun LoanDetailSummaryCard(
     val date = DateTimeFormatter.ofPattern("d MMM", locale)
     val unavailable = stringResource(R.string.dashboard_value_unavailable)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
-        MasroofHeroCard(loanName(loan) + " · " + stringResource(R.string.approved_loan_remaining),
+        MasroofHeroCard(loanName(loan) + " · " + stringResource(R.string.loan_remaining),
             loan.remainingBalance?.let { formatLocalizedMoney(it) } ?: unavailable,
             subtitle = com.baraa.masroof.presentation.settings.settingsBankLabel(loan.bank), role = MasroofHeroRole.Liability)
         MasroofCard {
             com.baraa.masroof.presentation.common.MasroofText(stringResource(R.string.reference_loan_data), style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
             MasroofDetailRow(stringResource(R.string.reference_loan_type), loanTypeLabel(loan.loanType))
-            MasroofDetailRow(stringResource(R.string.approved_last_installment), loan.latestInstallmentAmount?.let { formatLocalizedMoney(it) } ?: unavailable, valueColor = MasroofThemeExtras.extendedColors.liability)
-            MasroofDetailRow(stringResource(R.string.approved_installment_date), loan.latestInstallmentAsOf?.let { date.format(it.atZone(zoneId)) } ?: unavailable)
-            MasroofDetailRow(stringResource(R.string.approved_balance_date), loan.remainingBalanceAsOf?.let { date.format(it.atZone(zoneId)) } ?: unavailable)
+            MasroofDetailRow(stringResource(R.string.last_installment), loan.latestInstallmentAmount?.let { formatLocalizedMoney(it) } ?: unavailable, valueColor = MasroofThemeExtras.extendedColors.liability)
+            MasroofDetailRow(stringResource(R.string.installment_date), loan.latestInstallmentAsOf?.let { date.format(it.atZone(zoneId)) } ?: unavailable)
+            MasroofDetailRow(stringResource(R.string.balance_date), loan.remainingBalanceAsOf?.let { date.format(it.atZone(zoneId)) } ?: unavailable)
         }
     }
 }

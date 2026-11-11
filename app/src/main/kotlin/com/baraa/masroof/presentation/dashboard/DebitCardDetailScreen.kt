@@ -44,7 +44,7 @@ fun DebitCardDetailScreen(
         }
         val trend = state.spendingTrends?.byCard?.get(CardOwnershipKey.of(debit))
         trend?.let { CardReferenceAverage(it) }
-        SpendingTrendSection(trend, androidx.compose.ui.res.stringResource(com.baraa.masroof.R.string.approved_card_daily),
+        SpendingTrendSection(trend, androidx.compose.ui.res.stringResource(com.baraa.masroof.R.string.card_daily),
             role = com.baraa.masroof.ui.theme.MasroofHeroRole.Card,
             explanation = androidx.compose.ui.res.stringResource(com.baraa.masroof.R.string.dashboard_mada_trend_basis),
             chartKey = "card:${CardOwnershipKey.of(debit)}", scopeLabel = title)

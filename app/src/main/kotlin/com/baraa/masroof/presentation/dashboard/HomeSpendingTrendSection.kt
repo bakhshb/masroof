@@ -20,7 +20,7 @@ fun HomeSpendingTrendSection(trends: DashboardSpendingTrends) {
     val workflow = LocalChartDataWorkflow.current
     val preferences by workflow.preferences.collectAsState()
     val selected = if (preferences.homeScope == "overall") 1 else 0
-    val labels = listOf(stringResource(R.string.dashboard_daily_purchases), stringResource(R.string.approved_all_expenses))
+    val labels = listOf(stringResource(R.string.dashboard_daily_purchases), stringResource(R.string.all_expenses))
     SpendingTrendSection(
         trend = if (selected == 0) trends.purchases else trends.overall,
         title = stringResource(R.string.home_daily_spending_title),

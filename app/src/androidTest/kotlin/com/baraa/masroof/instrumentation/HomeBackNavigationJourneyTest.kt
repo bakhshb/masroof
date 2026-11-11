@@ -100,14 +100,14 @@ class HomeBackNavigationJourneyTest {
         awaitNode(patternsScreen)
 
         // 10: another bottom tab is history too; Back returns to patterns, not Home.
-        clickText(text(R.string.approved_nav_review))
+        clickText(text(R.string.nav_review))
         awaitNode(heading(text(R.string.review_title)))
         compose.onNode(patternsScreen).assertDoesNotExist()
         pressDeviceBack(compose)
         awaitNode(patternsScreen)
 
         // 11: re-tapping the current tab restarts it at the hub; Back then leaves that fresh visit.
-        clickText(text(R.string.approved_nav_settings))
+        clickText(text(R.string.nav_settings))
         awaitNode(hasText(text(R.string.settings_banks_title)) and hasClickAction())
         compose.onNode(patternsScreen).assertDoesNotExist()
         pressDeviceBack(compose)
@@ -115,7 +115,7 @@ class HomeBackNavigationJourneyTest {
 
         // 12: Home clears history, and Back on Home never closes the app.
         openNotifications()
-        clickText(text(R.string.approved_nav_home))
+        clickText(text(R.string.nav_home))
         awaitNode(dashboardScreen)
         pressDeviceBack(compose)
         // The shortcut can sit below the fold on some screens, so check the app stayed open rather than what is in view.
@@ -171,8 +171,8 @@ class HomeBackNavigationJourneyTest {
         awaitNode(dashboardScreen)
 
         // 4: a commitment opened from the Commitments screen returns there, not to Home.
-        clickText(text(R.string.approved_commitments))
-        val commitments = heading(text(R.string.approved_commitments))
+        clickText(text(R.string.commitments))
+        val commitments = heading(text(R.string.commitments))
         awaitNode(commitments)
         clickText("Back Nav Shop A")
         awaitNode(heading(text(R.string.settings_commitment_edit_title)))
@@ -190,13 +190,13 @@ class HomeBackNavigationJourneyTest {
         awaitNode(analytics)
 
         // 12: the Home tab always lands on the dashboard itself, never on a saved analytics page.
-        clickText(text(R.string.approved_nav_settings))
-        clickText(text(R.string.approved_nav_home))
+        clickText(text(R.string.nav_settings))
+        clickText(text(R.string.nav_home))
         awaitNode(dashboardScreen)
         compose.onNode(analytics).assertDoesNotExist()
         compose.onNodeWithTag("lab-forecast-entry").performScrollTo().performClick()
         awaitNode(analytics)
-        clickText(text(R.string.approved_nav_home))
+        clickText(text(R.string.nav_home))
         awaitNode(dashboardScreen)
         compose.onNode(analytics).assertDoesNotExist()
 
@@ -207,11 +207,11 @@ class HomeBackNavigationJourneyTest {
         awaitNode(hasText(text(R.string.lab_analysis_budget_section)))
         compose.onNode(heading(text(R.string.transaction_detail_title))).assertDoesNotExist()
         clickText(text(R.string.lab_analysis_cancel))
-        clickText(text(R.string.approved_nav_home))
+        clickText(text(R.string.nav_home))
         awaitNode(dashboardScreen)
 
         // 6: a review example opened from message learning returns to that same settings page.
-        clickText(text(R.string.approved_nav_settings))
+        clickText(text(R.string.nav_settings))
         clickText(text(R.string.analysis_learning_settings))
         clickText(text(R.string.personal_review_open, 1))
         clickText("Message 1 ·", substring = true)
@@ -231,16 +231,16 @@ class HomeBackNavigationJourneyTest {
         // A re-tapped tab restarts only itself; the dashboard's open detail stays behind it.
         clickText("Back Nav Shop B")
         awaitNode(transactionDetail)
-        clickText(text(R.string.approved_nav_transactions))
+        clickText(text(R.string.nav_transactions))
         awaitNode(transactionList)
-        clickText(text(R.string.approved_nav_transactions))
+        clickText(text(R.string.nav_transactions))
         awaitNode(transactionList)
         pressDeviceBack(compose)
         awaitNode(transactionDetail)
 
         // A change made while Settings covers the detail shows as soon as Back returns to it.
         // A plain write sends no maintenance signal, so only the reload on leaving Settings can show it.
-        clickText(text(R.string.approved_nav_settings))
+        clickText(text(R.string.nav_settings))
         awaitNode(settingsHub)
         runBlocking {
             val repository = TestRuntime.container(InstrumentationRegistry.getInstrumentation().targetContext).financialTransactionRepository
@@ -253,7 +253,7 @@ class HomeBackNavigationJourneyTest {
         awaitNode(dashboardScreen)
 
         // Teaching from Review keeps its step and bindings, and an older Review visit gets its message back.
-        clickText(text(R.string.approved_nav_review))
+        clickText(text(R.string.nav_review))
         clickText(text(R.string.reference_review_evidence))
         val reviewDetail = heading(text(R.string.review_detail_title))
         awaitNode(reviewDetail)
@@ -263,7 +263,7 @@ class HomeBackNavigationJourneyTest {
         val preview = hasText(text(R.string.pattern_preview)) and hasClickAction() and isEnabled()
         awaitNode(preview)
         openNotifications()
-        clickText(text(R.string.approved_nav_review))
+        clickText(text(R.string.nav_review))
         awaitNode(heading(text(R.string.review_title)))
         compose.onNode(reviewDetail).assertDoesNotExist()
         compose.onNode(hasTestTag("pattern-bind")).assertDoesNotExist()
@@ -283,7 +283,7 @@ class HomeBackNavigationJourneyTest {
         awaitNode(reviewDetail)
 
         // Recreating the activity with an alert's launch intent must not open the alert again over Settings.
-        clickText(text(R.string.approved_nav_settings))
+        clickText(text(R.string.nav_settings))
         awaitNode(settingsHub)
         compose.runOnUiThread { compose.activity.intent.putExtra("lab_analysis_alert", "settings") }
         repeat(2) {
@@ -297,7 +297,7 @@ class HomeBackNavigationJourneyTest {
     }
 
     private fun openPatterns() {
-        clickText(text(R.string.approved_nav_settings))
+        clickText(text(R.string.nav_settings))
         clickText(text(R.string.settings_banks_title))
         // The row shows the catalog display name, which stays Arabic in every locale.
         click((hasText("بنك الجزيرة") or hasText(text(R.string.bank_aljazira))) and hasClickAction())

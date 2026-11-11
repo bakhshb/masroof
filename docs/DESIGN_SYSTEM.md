@@ -1,10 +1,10 @@
-# Approved Masroof design
+# Masroof design system
 
-This document describes the central implementation tokens. The visual approval source is
-`masroof-code-based-preview.html`, SHA256
-`d3f4f86f88edfbd99b42381f7f1782645c6a893d4278096f1215b4b961029d6d`.
-Human-approved later amendments override that prototype. Tokens live in
-`ui-kit/src/main/kotlin/com/baraa/masroof/ui/theme/`; `MasroofDesign.version` is `approved-2026-10-10`.
+This document describes the shared tokens and components screens are built from. It is
+reference for consistency, not an approval gate: `AGENTS.md` Priorities rank it below
+financial correctness, data safety, architecture and a working screen. The code is the
+source of truth; the original HTML prototype is not kept in the repository. Tokens live in
+`ui-kit/src/main/kotlin/com/baraa/masroof/ui/theme/`; `MasroofDesign.version` is `2026-10-10`.
 
 ## One source of visual values
 
@@ -22,37 +22,21 @@ Human-approved later amendments override that prototype. Tokens live in
 | Localized terminology | `res/values/strings.xml`, `res/values-en/strings.xml` |
 
 Screens use these tokens through MaterialTheme and shared components. Do not add
-numeric dp/sp or color literals in feature screens. `ApprovedDesignBoundaryTest`
+numeric dp/sp or color literals in feature screens. `DesignTokenBoundaryTest`
 enforces this boundary. Cards use radius 20, controls 12, screen padding 16 and card padding 16 plus its 1-unit border inset,
 flat elevation, and IBM Plex Sans Arabic. Filled light-mode buttons use onPrimary
 white text. Account blue, card purple and liability amber each have paired
 readable foregrounds in both modes.
 
-## Shared screen behavior
+## Shared components
 
-The global header contains the brand and notifications. Home, financial
-transactions, review and settings are in the bottom navigation. Home has one
-interactive daily expenses chart. Account, credit aggregate, individual credit
-and debit scopes reuse the same chart interaction. Detail pages display their
-complete scoped transactions inline; tapping a transaction opens the existing
-correction, ignore and commitment actions.
-
-All entity summaries use the same neutral card shell, with type-specific facts:
-
-- Account: calculated inflow/outflow/net movement, with its calculation described.
-- Credit: recorded available balance, facility amount due and due date.
-  Supplementary cards explain shared facility due; it is counted once in totals.
-  The due amount and date come from the same statement. A missing latest date
-  is displayed as unavailable rather than filled from an older statement.
-- Debit: linked account and net purchases/refunds, without a fictional credit due.
-- Loan: recorded remaining balance, latest installment and its recorded date.
-
-Summary pages distinguish a failed load from an empty portfolio. A failed refresh
-keeps the previous same-period data with an error notice; a failed initial load
-does not display a misleading empty state.
-
-Arabic expenses terminology is «المصاريف», «متوسط المصاريف اليومية» and
-«المصاريف حسب التاجر». Merchant analysis requires at least two eligible purchases.
+Reuse a shared component before writing a new one; new shared visuals go in `ui-kit`.
+Dashboard summary and detail pages emit into the `ColumnScope` supplied by
+`DashboardSummaryScaffold`, which owns scrolling, the period display, loading/error gates
+and `MasroofSpacing.sectionGap`. Analysis cards prefer a chart, a large number or a badge;
+their shares, totals and countdowns come from `AnalysisPresentationBuilder`, and new chart
+geometry lives in `MasroofAnalyticsTokens`. The debug design catalog
+(`-PmasroofDesignCatalog=true`) previews shared components; adding to it is optional.
 
 ## Digits in every language
 
@@ -84,127 +68,37 @@ re-analysis, updates, privacy, logs and restore help. Essential status, errors,
 confirmation text and identifying data remain visible. The debug catalog includes
 the shared help component. `MasroofGuidanceBoundaryTest` prevents inline hint text.
 
-## Financial chart scope and direction
+## Chart interaction
 
-`application/dashboard/DashboardSpendingTrendsBuilder` computes every display
-scope from the existing persisted dashboard context. Compose does not sum money.
-Overall expenses include expenses, bills, fees, loan repayments, external outgoing
-transfers and withdrawals, less refunds. Self-transfers and card settlements are
-excluded to avoid double counting purchases. Home has one chart with two scopes:
-Daily purchases is the default and includes attributed credit/Mada purchases,
-cash withdrawals and external outgoing transfers, less card-attributed refunds;
-bills, repayments and standalone fees stay in All daily expenses only. Scope tabs
-share complete labels, equal columns and a high-contrast selected color pair.
-Credit charts retain purchases, bills and ordinary fees less refunds. Mada charts
-include only their confirmed card purchases, cash withdrawals and refunds;
-an account link alone never assigns an unidentified withdrawal to a card.
-FX requires a resolved local equivalent;
-unresolved foreign amounts are not silently added to SAR.
-Account charts and inline movements use the same registry-linked debit scope as
-account summaries, including Google Pay purchases without an account SMS field
-and verified debit refunds. Links remain qualified by bank and account identity.
+Which transactions each chart counts is a financial rule, documented in
+`docs/ARCHITECTURE.md` (Dashboard chart scopes). This section covers only interaction.
 
-Account chart titles keep their approved names. `AccountDailySpendingTrendsBuilder`
-uses confirmed single-account source attribution for purchases, bills, loan
-installments, card settlements, external outgoing transfers, withdrawals and
-fees, less verified account refunds. Credit charges/refunds are excluded even
-when their evidence also mentions an account; settlements remain account outflows.
-The aggregate excludes self-transfers. Per-account charts include only the outgoing
-self-transfer leg; receipts, salary and other inflows do not increase the expense line.
-Unknown sources and unresolved currency conversions stay out. These scopes affect
-charts, not the ledger or the deduplicated overall Home expense scope.
+`MasroofChartScopeTabs` and `MasroofChartAverageLegend` live in common components; their
+geometry is in `MasroofReference`. The selected date and amount are visible above the chart.
+Tap or scrub the line to choose a day; previous/next are screen-reader actions. Chronological
+points start on the right in Arabic and on the left in English, and date endpoints follow
+the same direction. Touch coordinates are mapped back to the logical date index before
+showing that date's amount. The dashed average line sits at the scope's precomputed mean,
+with a matching legend and accessible description.
 
-Aggregate credit and primary/supplementary detail charts enable the common
-horizontal average line and legend, using each chart's own precomputed mean.
-The account aggregate and detail scope explanations use separate contextual (!)
-messages in both languages. Colors, typography and the existing titles are unchanged.
+## Verification
 
-The daily mean uses all elapsed dates in the selected period including zero days;
-completed periods use their full duration. It is not a fixed fourteen-day mean.
-Future periods have no elapsed points or calculated mean. Home draws a dashed
-horizontal line at the selected scope's actual mean, with a matching legend and
-accessible description. The line is not positioned at a decorative midpoint.
-`MasroofChartScopeTabs` and `MasroofChartAverageLegend` live in common components;
-their geometry is in `MasroofReference`.
-The selected date and amount are visible above the chart. Tap or scrub the line
-to choose a day. Previous/next are available as screen-reader actions; no separate
-previous/next day buttons are displayed.
-Chronological points start on the right in Arabic and on the left in English;
-date endpoints below the chart follow that same direction. Touch coordinates are
-mapped back to the logical date index before showing that date's actual amount.
+`ProductionPageRenderSmokeTest` renders the production page functions with synthetic
+financial fixtures across 32 pages, Arabic/English and light/dark. It is a render smoke
+test: it asserts each page renders, uses Western digits and keeps the Home shortcut row
+layout, and saves captures for human review. It does not compare pixels against a
+reference image.
 
-The developer design catalog is enabled only by the debug build flag
-`-PmasroofDesignCatalog=true`; ordinary builds follow the approved Settings structure. Removed background gradients, raised-card shadows, entity
-carousels, salary/statement credit-detail blocks and previous brand assets are
-obsolete and must not be reintroduced.
-
-
-## Visual verification
-
-`ApprovedFidelityMatrixTest` renders the production page functions with synthetic
-financial fixtures across 32 pages, Arabic/English and light/dark. Captures include
-the application content, excluding the Android status bar. Compare equal viewport
-sizes and the same selected day; distinguish data values from presentation defects.
-The English prototype counterpart is translated from the approved Arabic structure,
-not a separately approved source. Native functional tests do not prove pixel fidelity.
-Only reviewed screenshots support visual assertions. Do not modify the approved
-prototype to conceal implementation discrepancies.
-
-Average-line raster assertions integrate foreground coverage across the physical
-stroke band and verify its weighted center and dash gaps. A thin antialiased
-stroke need not contain a fully opaque pixel in a single rounded row at 1x.
-`AverageLinePixelContractTest` checks subpixel phases in both themes at multiple
-densities and rejects missing, shifted, solid, wrong-color and wrong-width lines.
-The production Home interaction test uses this same pixel contract against the
-actual captured chart, with the expected mean independently computed from its data.
-
-Reference measurements use the final computed CSS cascade, including inherited
-button typography. Lucide outline icons and the original approved logo are reused
-through shared components. Contextual guidance and screen-reader chart navigation
-follow the later user approvals.
-
-Home shortcuts share one card with four columns and light separators in both languages. Full labels use the same body typography; narrow windows scroll the single row rather than wrapping words or switching to two rows.
-
-Home salary-period navigation uses `MasroofPeriodPill`: a visible salary heading
-and Customize action above previous-arrow, centered date range, next-arrow.
-The previous arrow is on the right in Arabic and left in English. Other pages
-keep the read-only period display. Commitment summary handles both screen Back
-and Android system Back through the same Home callback.
-
-Dashboard summary and detail pages emit into the `ColumnScope` supplied by
-`DashboardSummaryScaffold`. The scaffold owns scrolling, the period display,
-loading/error gates and `MasroofSpacing.sectionGap`; pages add a nested layout
-only for sections with their own grouping or spacing.
-
-## Analysis screens: visual first (approved 2026-11-04)
-
-A human-approved amendment for Spending, Forecasts, Commitments, data quality, forecast
-accuracy and message-correction insights: each card leads with a chart, a large number or
-a badge; explanations live behind `MasroofGuidance`, never as permanent paragraphs.
-
-- Spending: one hero card holds the actual amount, a direction badge and the equal-length
-  comparison bars. Composition is one `MasroofStackedBar` with clickable rows. History uses
-  `MasroofDailyBarChart` per period with a dashed average line: missing periods keep an empty
-  slot and partly covered periods are striped; no per-period text rows.
-- Forecasts: a liability badge appears only when every qualified horizon's bias says the
-  estimate ran low. Personal-model readiness is two `MasroofProgressRing`s. Horizon errors
-  are bars with tests and direction in the subtitle.
-- Commitments: the confirmed total leads, followed by a stacked bar, a `MasroofDueTimeline`
-  from today to period end, and due rows nearest first with a countdown badge.
-- Message corrections: a status badge, bars for the assistance flow, one stacked bar for used
-  versus excluded corrections and a validation-template progress bar.
-
-Shares, totals and countdowns come from `AnalysisPresentationBuilder`; Compose only
-displays them. New geometry lives in `MasroofAnalyticsTokens`; previews are in the debug
-catalog's shared charts section.
+`AverageLinePixelContractTest` checks the dashed average line at subpixel phases in both
+themes and several densities, integrating coverage across the stroke band rather than
+expecting one fully opaque pixel row. The Home interaction test applies the same contract
+to the real chart, with the mean computed independently from its data.
 
 ## Text fitting and documentation captures
 
-`MasroofFitText` scales explicit money spans together with the base font. Shared tab labels also
-use one common fit scale; below the minimum, money wraps instead of truncating. Retain the small
-measurement helper until native autosizing preserves these contracts and visual parity. The
-old Compose-version limitation no longer explains this choice.
+`MasroofFitText` scales explicit money spans together with the base font. Shared tab labels
+use one common fit scale; below the minimum, money wraps instead of truncating.
 
-The English and Arabic README screenshots in `docs/screenshots/` come from production fidelity
-fixtures with synthetic financial data. Capture both languages with the same fixture and theme;
-never substitute real account evidence or hand-edit financial values in screenshots.
+The README screenshots in `docs/screenshots/` come from the render smoke test's synthetic
+fixtures. Capture both languages with the same fixture and theme; never use real account
+evidence or hand-edit financial values in screenshots.

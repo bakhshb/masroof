@@ -261,3 +261,43 @@ renders the prepared projection and sends filter changes to the workflow through
 Settings uses one `StopTrackingTarget` (`Card`, `Account` or `Loan`) rather than three independently
 nullable confirmation targets. Existing card/account/loan displays derive from that one target;
 write actions, draft/discard behavior and financial decisions are unchanged.
+
+## Dashboard chart scopes and entity summaries
+
+`application/dashboard/DashboardSpendingTrendsBuilder` computes every display scope from the
+persisted dashboard context; Compose does not sum money. These scopes affect charts, not the
+ledger or the deduplicated overall Home expense scope.
+
+- Overall expenses: expenses, bills, fees, loan repayments, external outgoing transfers and
+  withdrawals, less refunds. Self-transfers and card settlements are excluded to avoid double
+  counting purchases.
+- Home has one chart with two scopes. Daily purchases (default): attributed credit/Mada
+  purchases, cash withdrawals and external outgoing transfers, less card-attributed refunds.
+  Bills, repayments and standalone fees appear only in All daily expenses.
+- Credit charts: purchases, bills and ordinary fees less refunds. Mada charts: only confirmed
+  card purchases, cash withdrawals and refunds; an account link alone never assigns an
+  unidentified withdrawal to a card.
+- Account charts (`AccountDailySpendingTrendsBuilder`) use confirmed single-account source
+  attribution for purchases, bills, loan installments, card settlements, external outgoing
+  transfers, withdrawals and fees, less verified account refunds, through the same
+  registry-linked debit scope as account summaries (including Google Pay purchases without an
+  account SMS field). Credit charges/refunds are excluded even when their evidence mentions an
+  account. The aggregate excludes self-transfers; per-account charts include only the outgoing
+  self-transfer leg. Inflows never raise the expense line. Links stay qualified by bank and
+  account identity.
+- FX needs a resolved local equivalent; unresolved foreign amounts and unknown sources stay out.
+- The daily mean uses every elapsed date in the selected period, zero days included; completed
+  periods use their full duration and future periods have no mean.
+
+Entity summaries share one card shell with type-specific facts:
+
+- Account: calculated inflow/outflow/net movement.
+- Credit: recorded available balance, facility amount due and due date from the same
+  statement; supplementary cards share the facility due, counted once in totals. A missing
+  latest date shows as unavailable, never filled from an older statement.
+- Debit: linked account and net purchases/refunds, with no credit due.
+- Loan: recorded remaining balance, latest installment and its recorded date.
+
+Summary pages distinguish a failed load from an empty portfolio: a failed refresh keeps the
+previous same-period data with an error notice, and a failed initial load never shows an
+empty state. Merchant analysis needs at least two eligible purchases.

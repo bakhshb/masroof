@@ -89,7 +89,7 @@ fun AccountsSummaryScreen(
             ),
         )
 
-        SpendingTrendSection(state.spendingTrends?.accounts, stringResource(R.string.approved_accounts_daily),
+        SpendingTrendSection(state.spendingTrends?.accounts, stringResource(R.string.accounts_daily),
             explanation = stringResource(R.string.reference_accounts_scope), role = com.baraa.masroof.ui.theme.MasroofHeroRole.Account, chartKey = "accounts")
         MasroofSectionHeader(title = stringResource(R.string.reference_followed_accounts))
 

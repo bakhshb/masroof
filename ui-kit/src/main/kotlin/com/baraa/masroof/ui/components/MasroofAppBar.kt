@@ -15,7 +15,7 @@ import com.baraa.masroof.ui.theme.*
 
 @Composable
 fun MasroofLogo(modifier: Modifier = Modifier, size: Dp = MasroofIconSizes.logo, contentDescription: String? = null) {
-    Image(painterResource(R.drawable.masroof_approved_logo), contentDescription,
+    Image(painterResource(R.drawable.masroof_logo), contentDescription,
         modifier.size(size).clip(MasroofLogoShape))
 }
 

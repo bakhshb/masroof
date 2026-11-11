@@ -19,7 +19,7 @@ class MasroofDesignTokensTest {
     }
 
     @Test
-    fun elevation_approvedCardsAreFlat() {
+    fun elevation_cardsAreFlat() {
         assertEquals(0, MasroofElevation.card.value.toInt())
         assertEquals(0, MasroofElevation.navCard.value.toInt())
     }

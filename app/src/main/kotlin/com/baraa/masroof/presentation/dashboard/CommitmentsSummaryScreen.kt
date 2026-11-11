@@ -39,7 +39,7 @@ fun CommitmentsSummaryScreen(state: DashboardUiState, onBack: () -> Unit,
     val overview = state.commitmentsOverview
     val colors = MasroofThemeExtras.extendedColors
     val today = java.time.LocalDate.now()
-    DashboardSummaryScaffold(stringResource(R.string.approved_commitments), state, onBack) {
+    DashboardSummaryScaffold(stringResource(R.string.commitments), state, onBack) {
         MasroofHeroCard(stringResource(R.string.dashboard_commitments_remaining), formatLocalizedMoney(overview.remaining),
             stringResource(R.string.dashboard_commitments_total) + " " + formatLocalizedMoney(overview.total) + " · " +
                 stringResource(R.string.dashboard_commitments_paid) + " " + formatLocalizedMoney(overview.paid), role = MasroofHeroRole.Liability)

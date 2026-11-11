@@ -40,7 +40,7 @@ fun MasroofAverageBand(value: String, periodHint: String, guidance: String?,
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionGap)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MasroofSpacing.inlineGap)) {
-                MasroofGuidanceLabel(androidx.compose.ui.res.stringResource(com.baraa.masroof.R.string.approved_daily_average),
+                MasroofGuidanceLabel(androidx.compose.ui.res.stringResource(com.baraa.masroof.R.string.daily_average),
                     guidance, style = MaterialTheme.typography.bodySmall.copy(fontWeight = MasroofFontWeights.semiBold),
                     contentColor = MaterialTheme.colorScheme.onSurface)
                 MasroofText(periodHint, style = MaterialTheme.typography.labelSmall,

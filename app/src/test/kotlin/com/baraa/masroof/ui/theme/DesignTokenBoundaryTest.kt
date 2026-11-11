@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Prevent future screens from silently forking the shared design system. */
-class ApprovedDesignBoundaryTest {
+class DesignTokenBoundaryTest {
     @Test
     fun screenGeometryTypographyAndColors_areDefinedInTheTheme() {
         val root = File("src/main/kotlin/com/baraa/masroof/presentation")

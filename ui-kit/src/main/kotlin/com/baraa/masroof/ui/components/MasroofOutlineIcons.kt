@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import com.baraa.masroof.ui.theme.MasroofIconSizes
 
-/** Lucide outline geometry used by the approved reference. See docs/licenses/lucide.txt. */
+/** Lucide outline geometry used by the design system. See docs/licenses/lucide.txt. */
 object MasroofOutlineIcons {
     val Eye: ImageVector by lazy { outline("Eye", listOf("M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12", "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0")) }
     val Pencil: ImageVector by lazy { outline("Pencil", listOf("m16 3 5 5", "M3 21l5-1L21 7a2.8 2.8 0 0 0-4-4L4 16z")) }

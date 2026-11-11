@@ -5,9 +5,9 @@ import androidx.compose.ui.graphics.Color
 
 enum class MasroofHeroRole { Brand, Account, Card, Liability, Inflow, Outflow }
 
-/** Paired surfaces and content colors keep the approved heroes readable in both modes. */
+/** Paired surfaces and content colors keep hero cards readable in both modes. */
 @Composable
-fun approvedHeroColors(role: MasroofHeroRole): Pair<Color, Color> {
+fun heroColors(role: MasroofHeroRole): Pair<Color, Color> {
     return heroColors(role, masroofIsDark())
 }
 

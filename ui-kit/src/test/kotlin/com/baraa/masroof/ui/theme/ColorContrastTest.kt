@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ApprovedColorContrastTest {
+class ColorContrastTest {
     @Test
     fun heroesHaveReadableText_inLightAndDarkModes() {
         listOf(false, true).forEach { dark ->

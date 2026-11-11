@@ -1,12 +1,22 @@
 # Masroof agent notes
 
 Android app that turns Saudi bank SMS into a private ledger and dashboard. Arabic first (RTL), English second.
-Reference: `docs/ARCHITECTURE.md` (modules), `docs/DESIGN_SYSTEM.md` (UI), `docs/ANALYTICS.md` (analysis).
+Reference: `docs/ARCHITECTURE.md` (modules), `docs/ANALYTICS.md` (analysis), `docs/DESIGN_SYSTEM.md` (UI tokens and components).
 This file wins when older records disagree.
+
+## Priorities
+When rules pull against each other, the earlier one wins:
+1. Correct money and no lost data: the financial, pipeline and completion rules below.
+2. Never break: schema, identities, privacy.
+3. Layer boundaries and tests.
+4. A working, accessible, bilingual screen.
+5. Visual consistency with the design system.
+
+Design serves the feature. A design rule never blocks a correctness fix, delays a feature or justifies rework of a screen that works; if one gets in the way, ship the fix and report the conflict.
 
 ## Workflow
 Run this for each plan phase:
-1. Plan: what changes and the tests that prove it is done. Any change to numbers or behavior the owner sees is asked before implementing. A screen design first gets an interactive design artifact the owner confirms.
+1. Plan: what changes and the tests that prove it is done. Any change to numbers or behavior the owner sees is asked before implementing. For a new screen, describe its layout in the plan using existing components; make a design mock-up only when the owner asks for one.
 2. Implement with its tests, and run them.
 3. Simplify the code and its tests once (`/simplify`), and rerun the tests.
 4. Review for bugs (`/code-review`), fix, rerun the tests; repeat until the review finds no real bug. Owner decisions are reported, not looped on.
@@ -70,9 +80,10 @@ At the end of the PR: one review of the whole PR, then CI green including device
 - Tests: run `app/src/test/.../application/dashboard/`; keep `DashboardFixtureCharacterizationTest` green; cover registry-linked Mada and Google Pay SMS without `خصمت من حساب`.
 
 ## UI and design
-- Use `MasroofTheme`/`MaterialTheme` and `MasroofThemeExtras.extendedColors`; only theme tokens in `ui-kit/.../ui/theme/` (`MasroofSpacing`, `MasroofIconSizes`, `MasroofShapes`, `MasroofElevation`, `MasroofAnalyticsTokens`); no `dp`/`sp`/color literals in screens (`ApprovedDesignBoundaryTest`). Add a token only when nothing fits.
-- Reuse shared components (`MasroofCard`, `MasroofSectionHeader`, `MasroofAmountText`, `MasroofBadge`, `MasroofValueBarRow`, `MasroofStackedBar`, `MasroofSecondaryScaffold`, ...). New shared visuals go in `ui-kit` and the debug catalog (Settings → About → Design catalog).
-- Explanations only through `MasroofGuidance` (help popup), never paragraphs. Analysis screens are visual first: chart, big number or badge per card.
+- These rules keep screens consistent and cheap to build; they rank below everything above (see Priorities).
+- Use `MasroofTheme`/`MaterialTheme` and `MasroofThemeExtras.extendedColors`; only theme tokens in `ui-kit/.../ui/theme/` (`MasroofSpacing`, `MasroofIconSizes`, `MasroofShapes`, `MasroofElevation`, `MasroofAnalyticsTokens`); no `dp`/`sp`/color literals in screens (`DesignTokenBoundaryTest`). Add a token only when nothing fits.
+- Reuse shared components (`MasroofCard`, `MasroofSectionHeader`, `MasroofAmountText`, `MasroofBadge`, `MasroofValueBarRow`, `MasroofStackedBar`, `MasroofSecondaryScaffold`, ...) before writing new ones; a new shared visual goes in `ui-kit`.
+- Contextual explanations use `MasroofGuidance` (help popup) rather than permanent paragraphs (`MasroofGuidanceBoundaryTest`). Status, errors and confirmations stay visible. Analysis cards prefer a chart, big number or badge.
 - Every label in `values/` (Arabic, no tashkeel) and `values-en/`; Western digits via `AppDigits`/`MasroofText`.
 - Sheets use `MasroofBottomSheet` (`MasroofSheetTokens`, fixed header, scrolling body, `MasroofSheetChoices`). Drafts apply only on Save/Apply; busy financial writes block dismissal.
 - Navigation in `presentation/navigation/` (`MasroofRoot`, `HomeDestination`, `SettingsDestination`); Home uses `HomeBackStack` `push`/`pop`, never a fixed return screen; screen-local state is `rememberSaveable`.

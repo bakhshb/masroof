@@ -33,7 +33,7 @@ class DailyPurchasesPeriodInteractionTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun approvedChanges_workInBothLanguagesAndThemes() {
+    fun purchasesScopeChanges_workInBothLanguagesAndThemes() {
         val language = mutableStateOf("ar")
         val dark = mutableStateOf(false)
         val commitments = mutableStateOf(false)
@@ -51,7 +51,7 @@ class DailyPurchasesPeriodInteractionTest {
                             if (commitments.value) CommitmentsSummaryScreen(financial, onBack = { commitments.value = false }, onOpenCommitment = {})
                             else Column(Modifier.fillMaxSize().testTag("purchases-home").verticalScroll(rememberScrollState())
                                 .padding(MasroofSpacing.screenHorizontal)) {
-                                MasroofText(androidx.compose.ui.res.stringResource(R.string.approved_nav_home), style = MaterialTheme.typography.headlineSmall)
+                                MasroofText(androidx.compose.ui.res.stringResource(R.string.nav_home), style = MaterialTheme.typography.headlineSmall)
                                 MasroofPeriodPill(FinancialPeriodUiFormatter.formatRange(localized, financial.period!!, compact = true),
                                     onPrevious = { previous++ }, onNext = { next++ }, onCustomize = { customizations++ },
                                     customizeLabel = localized.getString(R.string.dashboard_customize))

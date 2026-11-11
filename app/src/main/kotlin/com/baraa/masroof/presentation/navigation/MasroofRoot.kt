@@ -124,10 +124,10 @@ fun MasroofRoot(
         }
         if (onboarding.step == OnboardingStep.HOME) {
             val entries = listOf(
-                Triple(HomeDestination.Dashboard, R.string.approved_nav_home, MasroofIcons.dashboard),
-                Triple(HomeDestination.AllTransactions, R.string.approved_nav_transactions, MasroofIcons.recentTransactions),
-                Triple(HomeDestination.Review, R.string.approved_nav_review, MasroofIcons.reviewQueue),
-                Triple(HomeDestination.Settings, R.string.approved_nav_settings, MasroofIcons.settings),
+                Triple(HomeDestination.Dashboard, R.string.nav_home, MasroofIcons.dashboard),
+                Triple(HomeDestination.AllTransactions, R.string.nav_transactions, MasroofIcons.recentTransactions),
+                Triple(HomeDestination.Review, R.string.nav_review, MasroofIcons.reviewQueue),
+                Triple(HomeDestination.Settings, R.string.nav_settings, MasroofIcons.settings),
             )
             com.baraa.masroof.presentation.common.MasroofBottomNavigation(entries.map { (destination, label, icon) ->
                 com.baraa.masroof.presentation.common.MasroofNavigationItem(stringResource(label), icon,
