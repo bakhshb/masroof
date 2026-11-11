@@ -37,3 +37,6 @@ package-lock.json
 
 # Python CI helper bytecode
 __pycache__/
+
+# Claude Code agent worktrees (local only)
+.claude/worktrees/
