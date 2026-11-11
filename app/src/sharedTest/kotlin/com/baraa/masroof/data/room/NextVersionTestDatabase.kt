@@ -144,7 +144,7 @@ object MigrationOpenPathContract {
     private fun snapshot(file: File) =
         file.readBytes() to (File(file.path + "-wal").takeIf { it.isFile }?.readBytes() ?: ByteArray(0))
 
-    private fun copyFixture(context: Context, name: String, fixture: () -> InputStream): File {
+    fun copyFixture(context: Context, name: String, fixture: () -> InputStream): File {
         context.deleteDatabase(name)
         val file = context.getDatabasePath(name).also { it.parentFile?.mkdirs() }
         fixture().use { input -> file.outputStream().use { input.copyTo(it) } }

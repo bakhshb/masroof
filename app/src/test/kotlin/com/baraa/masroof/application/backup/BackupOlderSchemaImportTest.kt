@@ -16,9 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 
 /** A restore accepts only known (version, identity hash) pairs and migrates the staged copy; device twin `BackupMigrationDeviceTest`. */
 @RunWith(RobolectricTestRunner::class)
@@ -110,11 +108,7 @@ class BackupOlderSchemaImportTest {
             entries[BackupPackageFormat.DATABASE_ENTRY] = file.readBytes()
             file.delete()
         }
-        return ByteArrayOutputStream().also { out ->
-            ZipOutputStream(out).use { zip ->
-                entries.forEach { (name, bytes) -> zip.putNextEntry(ZipEntry(name)); zip.write(bytes); zip.closeEntry() }
-            }
-        }.toByteArray()
+        return ByteArrayOutputStream().also { writeZip(it, entries.toList()) }.toByteArray()
     }
 
     private fun entries(zip: ByteArray): Map<String, ByteArray> = ZipInputStream(zip.inputStream()).use { input ->

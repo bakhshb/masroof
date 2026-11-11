@@ -40,10 +40,9 @@ object BackupMigrationContract {
                 .importFrom(stage(context, archive), passphrase.toCharArray(), confirmLegacyPlaintext = true)
         }
         assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
-        val expected = File(context.cacheDir, "backup-migration-fixture.db").let { file ->
-            fixtureDb().use { input -> file.outputStream().use { input.copyTo(it) } }
-            MigrationOpenPathContract.readOnly(file, MigrationOpenPathContract::rows).also { file.delete() }
-        }
+        val expected = MigrationOpenPathContract.copyFixture(context, "backup-migration-fixture.db", fixtureDb)
+            .let { MigrationOpenPathContract.readOnly(it, MigrationOpenPathContract::rows) }
+            .also { context.deleteDatabase("backup-migration-fixture.db") }
         val restored = MigrationOpenPathContract.readOnly(context.getDatabasePath(MasroofDatabase.NAME)) {
             assertEquals(NextVersionTestDatabase.VERSION, it.version)
             MigrationOpenPathContract.rows(it)
