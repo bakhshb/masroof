@@ -1,6 +1,8 @@
 package com.baraa.masroof.application.dashboard
 
 import android.content.Context
+import com.baraa.masroof.application.commitment.CommitmentCreationResult
+import com.baraa.masroof.application.commitment.CommitmentFromTransactionService
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
 import com.baraa.masroof.domain.model.AccountReference
@@ -8,6 +10,7 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.engine.bank.patterns.PatternFactInterpreter
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
@@ -18,6 +21,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.math.BigDecimal
 import java.time.Instant
 
 /**
@@ -67,6 +71,37 @@ internal object LedgerSnapshotCorpus {
             world.accounts.setOwnership(AccountReference(bank, masked), OwnershipStatus.OWNED)
         }
         GoldenLedgerRunner.requireSuccessfulImport("all_banks", world.importProviderRows(allBankRows()), "import")
+    }
+
+    /**
+     * Fills what the plain import leaves empty: a persisted FX pair (USD purchase enriched through
+     * [com.baraa.masroof.application.transaction.ExchangeRateEnrichmentWorkflow]), a commitment created from a
+     * posted expense by [CommitmentFromTransactionService], and two resolved review items.
+     */
+    suspend fun populateExtras(world: DashboardLedgerWorld) {
+        GoldenLedgerRunner.seed(world, GoldenSeedRow(
+            providerMessageId = "extras-usd-purchase", sender = "AlJazira", body = "synthetic usd purchase",
+            receivedAt = "2026-09-05T10:00:00Z", bank = Bank.BANK_ALJAZIRA.id, family = "PURCHASE",
+            parseStatus = "SUCCESS", direction = "OUTGOING", amount = "20.00", currency = "USD",
+            cardLast4 = "7271", merchant = "TEST ONLINE", transactionType = "EXPENSE",
+            occurredAt = "2026-09-05T10:00:00Z",
+        ))
+        val enriched = world.exchangeRateEnrichmentWorkflow(ForeignSarMarketRateProvider { _, _ -> BigDecimal("3.75") })
+            .enrichPending()
+        require(enriched.persisted > 0) { "no exchange rate pair was persisted" }
+        val expense = requireNotNull(world.ftRepo.findByRawSmsId("android-sms:all-banks-snb-pos"))
+        val created = CommitmentFromTransactionService(world.commitments, world.ftRepo, world.zone, world.clock)
+            .createFromTransaction(expense.id)
+        require(created == CommitmentCreationResult.Success) { "commitment not created: $created" }
+        val resolvedAt = Instant.parse("2026-09-16T09:00:00Z")
+        mapOf(
+            "android-sms:all-banks-bank_snb-unknown" to (ReviewResolutionKind.USER_NON_FINANCIAL to null),
+            "android-sms:all-banks-bank_sab-unknown" to (ReviewResolutionKind.USER_FINANCIAL_TYPE to
+                world.ftRepo.findByRawSmsId("android-sms:all-banks-sab-pos")?.id),
+        ).forEach { (rawId, resolution) ->
+            val review = requireNotNull(world.reviewRepo.findByRawSmsId(rawId))
+            requireNotNull(world.reviewRepo.markResolved(review.id, resolution.first, resolvedAt, resolution.second))
+        }
     }
 
     /**

@@ -2,6 +2,7 @@ package com.baraa.masroof.application.dashboard
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -53,8 +54,14 @@ class LedgerSnapshotTest {
         }
     }
 
+    /**
+     * Scopes the reconcile to the unposted ids only. The stale single-leg SELF_TRANSFER (`legacy-stale-out`)
+     * is not in the scope: only the candidate windows can find it. FEE to LOAN_REPAYMENT and loan ownership
+     * becoming OWNED are full-pass-only upgrades by design, so those rows are left out of the comparison.
+     */
     @Test
-    fun scopedReconcileProducesTheSameLedgerAsFullReconcile() = runBlocking {
+    fun scopedReconcileOverUnpostedLegacyIdsMatchesFullReconcile() = runBlocking {
+        val scopeIds = listOf("stale-in", "pair-out", "pair-in", "external-out").map { "android-sms:legacy-$it" }
         val full = DashboardLedgerWorld(context()).use { world ->
             LedgerSnapshotCorpus.populateLegacy(world)
             world.reconciliation.reconcileStoredEventsDetailed()
@@ -62,12 +69,42 @@ class LedgerSnapshotTest {
         }
         val scoped = DashboardLedgerWorld(context()).use { world ->
             LedgerSnapshotCorpus.populateLegacy(world)
-            world.reconciliation.reconcileAffectedRawSmsIds(world.rawRepo.listIdsByReceivedAt())
+            world.reconciliation.reconcileAffectedRawSmsIds(scopeIds)
             LedgerSnapshotSerializer.serialize(world)
         }
-        assertTrue("legacy corpus must post rows", full.contains("tx|"))
-        assertEquals(full, scoped)
+        assertTrue("legacy corpus must post transfers", full.contains("|SELF_TRANSFER|"))
+        assertEquals(withoutFullPassOnlyUpgrades(full), withoutFullPassOnlyUpgrades(scoped))
     }
+
+    /** Releases every posted transfer of the imported all-banks corpus, then reconciles it back two ways. */
+    @Test
+    fun scopedReconcileOverAllBanksTransfersMatchesFullReconcile() = runBlocking {
+        suspend fun run(scoped: Boolean): String = newAllBanksWorld().use { world ->
+            LedgerSnapshotCorpus.populateAllBanks(world)
+            val transferTypes = setOf(
+                FinancialTransactionType.SELF_TRANSFER,
+                FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+                FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
+            )
+            val released = world.ftRepo.listAll().filter { it.type in transferTypes }
+                .flatMap { world.ftRepo.listRawSmsIds(it.id) }
+            assertTrue("expected posted transfers to release", released.size >= 3)
+            released.forEach { world.ftRepo.unlinkRawSms(it) }
+            if (scoped) {
+                world.reconciliation.reconcileAffectedRawSmsIds(
+                    world.rawRepo.listIdsByReceivedAt().filter { it in released },
+                )
+            } else {
+                world.reconciliation.reconcileStoredEventsDetailed()
+            }
+            LedgerSnapshotSerializer.serialize(world)
+        }
+        assertEquals(run(scoped = false), run(scoped = true))
+    }
+
+    private fun withoutFullPassOnlyUpgrades(snapshot: String): String = snapshot.lines()
+        .filterNot { it.startsWith("loan|") || (it.startsWith("tx|") && (it.contains("|FEE|") || it.contains("|LOAN_REPAYMENT|"))) }
+        .joinToString("\n")
 
     @Test
     fun legacySeedsKeepTodaysStates() = runBlocking {
@@ -92,6 +129,7 @@ class LedgerSnapshotTest {
         }
         newAllBanksWorld().use { world ->
             LedgerSnapshotCorpus.populateAllBanks(world)
+            LedgerSnapshotCorpus.populateExtras(world)
             section("all_banks", world)
         }
         DashboardLedgerWorld(context()).use { world ->

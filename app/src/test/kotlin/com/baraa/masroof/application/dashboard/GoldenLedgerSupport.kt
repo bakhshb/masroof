@@ -512,9 +512,10 @@ object LedgerSnapshotSerializer {
                 r.resolutionKind?.name, r.resolvedTransactionId,
             )
         }
-        world.commitments.listAll().sortedBy { it.id }.forEach { c ->
+        // Commitment ids are random; the source transaction identifies the row.
+        world.commitments.listAll().sortedBy { it.sourceTransactionId }.forEach { c ->
             lines += row(
-                "commitment", c.id, c.name, moneyText(c.amount), c.transactionDate.toString(),
+                "commitment", c.name, moneyText(c.amount), c.transactionDate.toString(),
                 c.recurrence?.name, c.dueDate?.toString(), c.active.toString(),
                 c.pauseIntervals.toString(), c.sourceTransactionId,
             )

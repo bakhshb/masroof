@@ -40,7 +40,7 @@ tx|transaction:ad15586be9fa705288b5deb46b9ea282168accf1efe465a524319687be140501|
 account|BANK_ALJAZIRA|3001|OWNED|CURRENT
 card|BANK_ALJAZIRA|2210|OWNED|DEBIT|-|-|-
 ## all_banks
-raw=40 parsed=40
+raw=41 parsed=41
 tx|transaction:08d7aa12f0715ac2882d485e3de2f7f8815dc3e680d1e98cc62c08a2e5ec5683|EXTERNAL_TRANSFER_OUT|100.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|account:BANK_SNB:1234|account:BANK_SNB:5678|-|TEST PERSON|-|-|-|android-sms:all-banks-snb-transfer|evt-android-sms:all-banks-snb-transfer
 tx|transaction:09ef54a0b899fbd9f288450e5c2786ef089d6dc0779870881bedfd08738b331f|SELF_TRANSFER|1800.55|SAR|2026-09-03T07:38:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:3001|account:BANK_ALJAZIRA:3002|-|TEST_PERSON|-|-|-|android-sms:all-banks-inbox-pair-in;android-sms:all-banks-inbox-pair-out|evt-android-sms:all-banks-inbox-pair-in;evt-android-sms:all-banks-inbox-pair-out
 tx|transaction:192baf12bc5c8b844b83170139ac13882267312a1a572baa60ef41440399c0a9|EXPENSE|25.50|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|card:BANK_SNB:4321|-|TEST SHOP|-|-|-|-|android-sms:all-banks-snb-pos|evt-android-sms:all-banks-snb-pos
@@ -51,6 +51,7 @@ tx|transaction:84948d0b7d16502a61ab061a4aa8a66fe85b92fbc87e2432a4497e96e5909c16|
 tx|transaction:9518a927b485a68d10889fe6c8441d5f8ea1c405da24907505687d51a7884578|FEE|25.00|SAR|2026-09-15T09:21:00Z|Asia/Riyadh|-|-|-|-|-|-|-|android-sms:all-banks-enbd-fee|evt-android-sms:all-banks-enbd-fee
 tx|transaction:a134579838737c60ccd0d6a384c9616c1c28bb03f2258b68113c7936a046f314|EXPENSE|35.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|card:BANK_SNB:4321|-|TEST SHOP|-|-|-|-|android-sms:all-banks-snb-online|evt-android-sms:all-banks-snb-online
 tx|transaction:b472d65ecb838a367e9c2e33590447eddd9e4d4e127a3a0624ddb78f7b01fd47|EXPENSE|35.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|card:BANK_SAB:4321|-|TEST SHOP|-|-|-|-|android-sms:all-banks-sab-online|evt-android-sms:all-banks-sab-online
+tx|transaction:b8258b78cf89e1e8c8cb459f3f10721c86bee07aaf7e9bcc2a2b69b9bbd36525|EXPENSE|20.00|USD|2026-09-05T10:00:00Z|Asia/Riyadh|card:BANK_ALJAZIRA:7271|-|TEST ONLINE|-|-|3.75|MARKET|android-sms:extras-usd-purchase|evt-android-sms:extras-usd-purchase
 tx|transaction:e36b302751860eed6d6cbaf4e7de54e7d488b56af1fbc7d79dad184ac067db87|EXPENSE|25.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|account:BANK_ALINMA:1234|-|TEST SHOP|-|-|-|-|android-sms:all-banks-alinma-google|evt-android-sms:all-banks-alinma-google
 review|android-sms:all-banks-alinma-transfer|PENDING_MATCH|REQUIRED|transfer_pending_match|-|-
 review|android-sms:all-banks-bank_alinma-declined|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
@@ -60,9 +61,9 @@ review|android-sms:all-banks-bank_barq-unknown|NEEDS_REVIEW|REQUIRED|unknown_mes
 review|android-sms:all-banks-bank_emirates_nbd-declined|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
 review|android-sms:all-banks-bank_emirates_nbd-unknown|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
 review|android-sms:all-banks-bank_sab-declined|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
-review|android-sms:all-banks-bank_sab-unknown|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+review|android-sms:all-banks-bank_sab-unknown|NEEDS_REVIEW|RESOLVED|unknown_message_family|USER_FINANCIAL_TYPE|transaction:42d1c5d8e1e2342913b1a8a5c04cd1a02fb34835c2604a18dec1798345f37931
 review|android-sms:all-banks-bank_snb-declined|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
-review|android-sms:all-banks-bank_snb-unknown|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+review|android-sms:all-banks-bank_snb-unknown|NEEDS_REVIEW|RESOLVED|unknown_message_family|USER_NON_FINANCIAL|-
 review|android-sms:all-banks-barq-no-local-account|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
 review|android-sms:all-banks-barq-purchase-no-card|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
 review|android-sms:all-banks-barq-transfer-in-no-destination|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
@@ -72,6 +73,7 @@ review|android-sms:all-banks-snb-payment|NEEDS_REVIEW|REQUIRED|card_payment_owne
 review|android-sms:all-banks-stc-in|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
 review|android-sms:all-banks-stc-out|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
 review|android-sms:all-banks-stc-top-up|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+commitment|TEST SHOP|25.50|2026-09-15|MONTHLY|-|true|[]|transaction:192baf12bc5c8b844b83170139ac13882267312a1a572baa60ef41440399c0a9
 account|BANK_ALINMA|1234|UNKNOWN|CURRENT
 account|BANK_ALJAZIRA|3001|OWNED|CURRENT
 account|BANK_ALJAZIRA|3002|OWNED|CURRENT
