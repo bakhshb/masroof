@@ -132,11 +132,9 @@ class LedgerFixturesTest {
     }
 
     private fun committedSchemaHash(): String {
-        val json = schemaFile().readText()
+        val json = File(root(), "schemas/com.baraa.masroof.data.room.MasroofDatabase/18.json").readText()
         return Regex("\"identityHash\":\\s*\"(\\w+)\"").find(json)!!.groupValues[1]
     }
-
-    private fun schemaFile() = File(root(), "schemas/com.baraa.masroof.data.room.MasroofDatabase/18.json")
 
     private fun fixture(name: String) = File(fixtureDir(), name).also { assertTrue("missing fixture $it", it.isFile) }
 

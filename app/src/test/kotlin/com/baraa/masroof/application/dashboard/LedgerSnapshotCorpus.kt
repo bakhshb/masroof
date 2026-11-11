@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.dashboard
 
+import android.content.Context
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
 import com.baraa.masroof.domain.model.AccountReference
@@ -13,6 +14,7 @@ import com.baraa.masroof.testsupport.DashboardLedgerWorld
 import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.testsupport.testdataFile
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -33,7 +35,7 @@ internal object LedgerSnapshotCorpus {
         MessagePatternSmsAdapter(config.banks.single(), PatternFactInterpreter(config))
     }
 
-    fun newAllBanksWorld(context: android.content.Context, databaseName: String? = null): DashboardLedgerWorld {
+    fun newAllBanksWorld(context: Context, databaseName: String? = null): DashboardLedgerWorld {
         val adapters = allBankAdapters()
         return DashboardLedgerWorld(context, adapters.first(), adapters.drop(1), databaseName)
     }
@@ -123,7 +125,7 @@ internal object LedgerSnapshotCorpus {
         bankNetworkType = network,
     )
 
-    private fun kotlinx.serialization.json.JsonObject.text(key: String) = getValue(key).jsonPrimitive.content
+    private fun JsonObject.text(key: String) = getValue(key).jsonPrimitive.content
 
     private val BASE: Instant = Instant.parse("2026-09-15T09:00:00Z")
 }
