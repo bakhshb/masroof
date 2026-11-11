@@ -25,13 +25,13 @@ At the end of the PR: one review of the whole PR, then CI green including device
 
 ### Work under `docs/SUSTAINABILITY_PLAN.md`
 - One pull request per plan piece, to `main`, one piece at a time, each starting from the latest `main` (no rebases).
-- Each piece is built in its own git worktree by an implementer agent (`.claude/agents/implementer.md`: Sonnet; Opus for pieces marked High), then reviewed by the Opus reviewer agent (`.claude/agents/reviewer.md`); loop until the review finds no real bug.
+- Each piece is built in its own git worktree by an implementer agent (`.claude/agents/implementer.md`), then reviewed by the Opus reviewer agent (`.claude/agents/reviewer.md`); loop until the review finds no real bug. The Model column of each piece names who implements it (Sonnet for routine pieces, Opus for high-risk or intricate ones). Opus reviews every piece. The orchestrator passes the model override when the column says Opus, because the implementer agent definition defaults to Sonnet.
 - Every piece deletes the code, tests, imports, fixtures and string resources it makes obsolete, and updates `AGENTS.md`, `CLAUDE.md` and `docs/` when a rule or module changes.
 - Owner gates (marked Gate) stop and ask before implementing. The derived ledger replaces the old reconciliation path only after the owner approves every difference in the shadow comparison.
 - No remote pattern download. Wiring stays manual; no DI library unless the owner asks.
 
 ## Never break
-- Database `masroof.db`: until the migration path of plan piece 0.4 has landed, it stays schema v18 with the same identity hash and rejects other database/backup schemas. After that, the schema changes only through additive, tested Room migrations: a migration test from the committed v18 fixture, a device upgrade test, and v18 backup archives still import. Unknown or newer schemas are always rejected; never a destructive fallback; no backfill without an explicit design and owner approval.
+- Database `masroof.db`: until plan pieces 0.4a and 0.4b have landed, it stays schema v18 with the same identity hash and rejects other database/backup schemas. After that, the schema changes only through additive, tested Room migrations: a migration test from the committed v18 fixture, a device upgrade test, and v18 backup archives still import. Only schemas from v18 up to the current version are accepted; older than v18, unknown and newer are rejected. Never a destructive fallback. A schema change needs an explicit design and device verification; no backfill without owner approval.
 - Keep the application id, preference names, Keystore alias, worker identities and historical persisted keys.
 - No Lab UI, replica app or parallel intake; no `lab`/`beta` source paths. Engine/model refreshes never reparse posted evidence or override human decisions.
 - Never log SMS bodies, account numbers or secrets. Logs carry stage, failure count, masked id and retry state.
