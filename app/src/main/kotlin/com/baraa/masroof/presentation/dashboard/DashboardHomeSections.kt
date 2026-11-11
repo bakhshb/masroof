@@ -37,11 +37,11 @@ fun DashboardQuickSummaryRow(
 ) {
     if (trend == null) return
     com.baraa.masroof.presentation.common.MasroofMetricRow(modifier, MasroofSpacing.cardInnerGap) { tile ->
-        if (showExpense) MasroofMetric(stringResource(R.string.approved_total_expenses), formatLocalizedMoney(trend.totalSpending),
+        if (showExpense) MasroofMetric(stringResource(R.string.total_expenses), formatLocalizedMoney(trend.totalSpending),
             resolveMetricToneColor(spendingMetricTone(trend.totalSpending)), modifier = tile)
         if (showIncome) MasroofMetric(stringResource(R.string.home_avg_daily_all_expenses), formatLocalizedMoney(trend.averageDailySpending),
             MaterialTheme.colorScheme.primary, modifier = tile,
-            guidance = stringResource(R.string.approved_average_basis, trend.points.size))
+            guidance = stringResource(R.string.average_basis, trend.points.size))
     }
 }
 
@@ -54,7 +54,7 @@ fun DashboardShortcuts(onAccounts: () -> Unit, onCards: () -> Unit, onLoans: () 
             MasroofIcons.cardPayment, com.baraa.masroof.presentation.common.MasroofCardAccent.Credit, onCards),
         com.baraa.masroof.presentation.common.MasroofShortcutItem(stringResource(R.string.reference_shortcut_loans),
             MasroofIcons.savings, com.baraa.masroof.presentation.common.MasroofCardAccent.Liability, onLoans),
-        com.baraa.masroof.presentation.common.MasroofShortcutItem(stringResource(R.string.approved_commitments),
+        com.baraa.masroof.presentation.common.MasroofShortcutItem(stringResource(R.string.commitments),
             MasroofIcons.calendar, com.baraa.masroof.presentation.common.MasroofCardAccent.Liability, onCommitments),
     ))
 }

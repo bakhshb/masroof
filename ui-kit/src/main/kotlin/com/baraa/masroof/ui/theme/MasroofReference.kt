@@ -7,7 +7,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Final computed geometry of the approved 411-wide reference, not Material defaults. */
+/** Final computed geometry of the original 411-wide reference, not Material defaults. */
 object MasroofReference {
     val headerTop = 22.dp
     val headerHorizontal = 20.dp

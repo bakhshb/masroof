@@ -98,10 +98,10 @@ class AccountCreditChartInteractionTest {
                     else -> trends.byCard.getValue(CardOwnershipKey.of(facility.supplementaries.first()))
                 }
                 val title = context.getString(when (id) {
-                    "accounts" -> R.string.approved_accounts_daily
-                    "accountDetail" -> R.string.approved_account_daily
-                    "credit" -> R.string.approved_credit_daily
-                    else -> R.string.approved_card_daily
+                    "accounts" -> R.string.accounts_daily
+                    "accountDetail" -> R.string.account_daily
+                    "credit" -> R.string.credit_daily
+                    else -> R.string.card_daily
                 })
                 compose.onNodeWithText(title).assertExists()
                 val chart = compose.onNodeWithTag("daily-expenses-chart").performScrollTo()

@@ -37,7 +37,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun SpendingTrendSection(trend: DailySpendingTrend?, title: String, modifier: Modifier = Modifier,
-    explanation: String = stringResource(R.string.approved_card_expense_basis),
+    explanation: String = stringResource(R.string.card_expense_basis),
     role: MasroofHeroRole = MasroofHeroRole.Brand, onDaySelected: ((java.time.LocalDate) -> Unit)? = null,
     selectedDate: java.time.LocalDate? = null, showAverage: Boolean = false,
     controls: (@Composable () -> Unit)? = null, chartKey: String = "home:overall", scopeLabel: String = title) {

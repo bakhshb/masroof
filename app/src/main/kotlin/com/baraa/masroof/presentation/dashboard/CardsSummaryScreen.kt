@@ -151,12 +151,12 @@ fun CardsSummaryScreen(
                     com.baraa.masroof.presentation.common.MasroofMetric(stringResource(R.string.reference_statement_spending),
                         formatLocalizedMoney(followedFacilities.aggregateCreditStatementSpending()), MaterialTheme.colorScheme.onSurface, tile)
                 }
-                SpendingTrendSection(state.spendingTrends?.creditCards, stringResource(R.string.approved_credit_daily), role = com.baraa.masroof.ui.theme.MasroofHeroRole.Card,
+                SpendingTrendSection(state.spendingTrends?.creditCards, stringResource(R.string.credit_daily), role = com.baraa.masroof.ui.theme.MasroofHeroRole.Card,
                     showAverage = true, chartKey = "credit")
             } else {
                 val debitTrend = state.spendingTrends?.debitCards
                 com.baraa.masroof.presentation.common.MasroofHeroCard(
-                    stringResource(R.string.approved_total_expenses),
+                    stringResource(R.string.total_expenses),
                     formatLocalizedMoney(followedFacilities.aggregateDebitSalaryPeriodSpending()),
                     subtitle = if (debitTrend?.spentWithoutRefunds == true) stringResource(R.string.entities_no_refunds) else null,
                     role = com.baraa.masroof.ui.theme.MasroofHeroRole.Account,

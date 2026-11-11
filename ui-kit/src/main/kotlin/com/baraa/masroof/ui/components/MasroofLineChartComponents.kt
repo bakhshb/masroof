@@ -44,7 +44,7 @@ object MasroofLineChart {
             get() = maximum.subtract(minimum)
     }
 
-    /** This is visual axis scaling only, matching the approved SVG headroom. */
+    /** This is visual axis scaling only, matching the original SVG headroom. */
     fun referenceRange(values: List<BigDecimal>): ValueRange {
         val min = (values + BigDecimal.ZERO).minOrNull() ?: BigDecimal.ZERO
         val max = (values + BigDecimal.ZERO).maxOrNull() ?: BigDecimal.ZERO

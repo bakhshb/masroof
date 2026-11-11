@@ -91,11 +91,11 @@ class ChartGuidanceInteractionTest {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         Column(Modifier.fillMaxSize().testTag("chart-demo-root").verticalScroll(rememberScrollState())
                             .padding(MasroofSpacing.screenHorizontal)) {
-                            MasroofText(stringResource(R.string.approved_nav_home), style = MaterialTheme.typography.headlineSmall)
-                            SpendingTrendSection(trend, stringResource(R.string.approved_all_expenses),
-                                explanation = stringResource(R.string.approved_expense_basis))
+                            MasroofText(stringResource(R.string.nav_home), style = MaterialTheme.typography.headlineSmall)
+                            SpendingTrendSection(trend, stringResource(R.string.all_expenses),
+                                explanation = stringResource(R.string.expense_basis))
                             com.baraa.masroof.presentation.common.MasroofAverageBand(MoneyUiFormatter.format(trend.averageDailySpending, language.value), "",
-                                stringResource(R.string.approved_average_basis, trend.points.size))
+                                stringResource(R.string.average_basis, trend.points.size))
                         }
                     }
                 }
@@ -124,8 +124,8 @@ class ChartGuidanceInteractionTest {
             val context = AppLocaleContext.wrap(compose.activity, tag)
             compose.onNodeWithText(context.getString(R.string.chart_previous_point)).assertDoesNotExist()
             compose.onNodeWithText(context.getString(R.string.chart_next_point)).assertDoesNotExist()
-            val message = context.getString(R.string.approved_expense_basis)
-            val label = context.getString(R.string.approved_all_expenses)
+            val message = context.getString(R.string.expense_basis)
+            val label = context.getString(R.string.all_expenses)
             val about = context.getString(R.string.guidance_about, label)
             compose.onNodeWithText(message).assertDoesNotExist()
             compose.onNodeWithContentDescription(about).performClick()
@@ -137,9 +137,9 @@ class ChartGuidanceInteractionTest {
             compose.onNodeWithContentDescription(about).performClick()
             pressOutsidePopup()
             compose.onNodeWithTag("guidance-popup").assertDoesNotExist()
-            val averageLabel = context.getString(R.string.approved_daily_average)
+            val averageLabel = context.getString(R.string.daily_average)
             compose.onNodeWithContentDescription(context.getString(R.string.guidance_about, averageLabel)).performClick()
-            compose.onNodeWithText(context.getString(R.string.approved_average_basis, 5)).assertIsDisplayed()
+            compose.onNodeWithText(context.getString(R.string.average_basis, 5)).assertIsDisplayed()
             pressDeviceBack(compose)
         }
     }

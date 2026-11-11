@@ -36,7 +36,7 @@ class MasroofExtendedColorsTest {
     }
 
     @Test
-    fun darkNavigationAndCards_shareTheApprovedSurface() {
+    fun darkNavigationAndCards_shareTheSameSurface() {
         val dark = darkExtendedColors()
         assertEquals(dark.cardSurface, dark.navCardSurface)
     }

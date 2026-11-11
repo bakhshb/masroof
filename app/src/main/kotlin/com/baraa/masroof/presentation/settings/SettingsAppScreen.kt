@@ -60,9 +60,9 @@ fun SettingsAppScreen(languageTag: String, themeMode: ThemeMode, onBack: () -> U
                 MasroofText(stringResource(R.string.reference_colour_meanings), style = MaterialTheme.typography.titleMedium)
                 val colors = com.baraa.masroof.ui.theme.MasroofThemeExtras.extendedColors
                 val legends = listOf(Triple(R.string.dashboard_total_inflow, MasroofIcons.externalIn, colors.inflow to colors.inflowSoft),
-                    Triple(R.string.approved_total_expenses, MasroofIcons.externalOut, colors.outflow to colors.outflowSoft),
+                    Triple(R.string.total_expenses, MasroofIcons.externalOut, colors.outflow to colors.outflowSoft),
                     Triple(R.string.reference_credit_tab, MasroofIcons.cardPayment, colors.card to colors.cardSoft),
-                    Triple(R.string.approved_commitments, MasroofIcons.clock, colors.liability to colors.liabilitySoft))
+                    Triple(R.string.commitments, MasroofIcons.clock, colors.liability to colors.liabilitySoft))
                 legends.forEach { (label, icon, palette) ->
                     Row(Modifier.padding(top = MasroofSpacing.sectionGap), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.sectionHeaderGap)) {

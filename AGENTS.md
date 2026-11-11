@@ -81,7 +81,7 @@ At the end of the PR: one review of the whole PR, then CI green including device
 
 ## UI and design
 - These rules keep screens consistent and cheap to build; they rank below everything above (see Priorities).
-- Use `MasroofTheme`/`MaterialTheme` and `MasroofThemeExtras.extendedColors`; only theme tokens in `ui-kit/.../ui/theme/` (`MasroofSpacing`, `MasroofIconSizes`, `MasroofShapes`, `MasroofElevation`, `MasroofAnalyticsTokens`); no `dp`/`sp`/color literals in screens (`ApprovedDesignBoundaryTest`). Add a token only when nothing fits.
+- Use `MasroofTheme`/`MaterialTheme` and `MasroofThemeExtras.extendedColors`; only theme tokens in `ui-kit/.../ui/theme/` (`MasroofSpacing`, `MasroofIconSizes`, `MasroofShapes`, `MasroofElevation`, `MasroofAnalyticsTokens`); no `dp`/`sp`/color literals in screens (`DesignTokenBoundaryTest`). Add a token only when nothing fits.
 - Reuse shared components (`MasroofCard`, `MasroofSectionHeader`, `MasroofAmountText`, `MasroofBadge`, `MasroofValueBarRow`, `MasroofStackedBar`, `MasroofSecondaryScaffold`, ...) before writing new ones; a new shared visual goes in `ui-kit`.
 - Contextual explanations use `MasroofGuidance` (help popup) rather than permanent paragraphs (`MasroofGuidanceBoundaryTest`). Status, errors and confirmations stay visible. Analysis cards prefer a chart, big number or badge.
 - Every label in `values/` (Arabic, no tashkeel) and `values-en/`; Western digits via `AppDigits`/`MasroofText`.

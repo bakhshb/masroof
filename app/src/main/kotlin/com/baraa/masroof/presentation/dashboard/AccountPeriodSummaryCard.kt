@@ -30,7 +30,7 @@ fun AccountPeriodSummaryCard(summary: CurrentAccountSummary, modifier: Modifier 
             MasroofMetric(stringResource(R.string.dashboard_total_spent), formatLocalizedMoney(movement.outflow),
                 colors.outflow, tile)
         }
-        SpendingTrendSection(trend, stringResource(R.string.approved_account_daily),
+        SpendingTrendSection(trend, stringResource(R.string.account_daily),
             explanation = stringResource(R.string.reference_account_detail_scope), role = MasroofHeroRole.Account,
             chartKey = chartKey, scopeLabel = title)
         AccountReferenceGroup(R.string.reference_inflow_external, accountInflowRows(summary), colors.inflow)

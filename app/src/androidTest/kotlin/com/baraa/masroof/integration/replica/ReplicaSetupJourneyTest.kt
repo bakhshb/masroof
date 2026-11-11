@@ -172,11 +172,11 @@ class ReplicaSetupJourneyTest {
             compose.onAllNodesWithText(text(R.string.notification_center_title)).onFirst().assertIsDisplayed()
             compose.onNodeWithTag("lab-analysis-budget").assertDoesNotExist()
             screenshot("03d-unified-center-after-settings-cancel")
-            click(R.string.approved_nav_transactions)
+            click(R.string.nav_transactions)
             screenshot("04-transactions")
-            click(R.string.approved_nav_review)
+            click(R.string.nav_review)
             screenshot("05-review")
-            click(R.string.approved_nav_settings)
+            click(R.string.nav_settings)
             screenshot("06-settings")
             click(R.string.settings_banks_title)
             val bankName = settings.uiState.value.bankCatalog!!.banks.single { it.bankId == com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA.id }.displayName ?: text(R.string.bank_aljazira)
@@ -187,11 +187,11 @@ class ReplicaSetupJourneyTest {
             assertTrue(settings.uiState.value.loans.toString(),settings.uiState.value.loans.any { it.loanType == LoanType.PERSONAL && it.ownership == OwnershipStatus.OWNED })
             compose.onNodeWithText(text(R.string.settings_loan_type_personal)).assertExists()
             screenshot("07-recognized-loan")
-            click(R.string.approved_nav_home)
+            click(R.string.nav_home)
             compose.waitUntil(20_000) { dashboard.uiState.value.loansOverview?.hasContent == true }
             assertEquals(0,runBlocking { container.reviewRepository.listRequired().size })
             screenshot("08-dashboard-with-loan")
-            click(R.string.approved_nav_review)
+            click(R.string.nav_review)
             screenshot("09-review-after-ownership")
             // A genuinely new title stays in the original review flow, not the cards settings.
             val body="سداد تمويل خاص\nمن: 3001\nالقسط: SAR 23\nالمبلغ المتبقي: SAR 298\nلـ: تمويل شخصي\nفي: "+java.time.LocalDateTime.now().minusMinutes(2).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
@@ -218,7 +218,7 @@ class ReplicaSetupJourneyTest {
                 val future = body.replace("SAR 23", "SAR 243.21")
                 container.processRawSmsUseCase.ingest(raw("ui-learned-loan",future))
             }
-            click(R.string.approved_nav_home)
+            click(R.string.nav_home)
             fun openAmount(amount: String) {
                 compose.runOnUiThread { dashboard.refresh() }
                 compose.waitUntil(20_000) { !dashboard.uiState.value.loading && dashboard.uiState.value.allTransactions.any { it.amount.amount.toPlainString() == amount } }
@@ -236,7 +236,7 @@ class ReplicaSetupJourneyTest {
                 java.time.LocalDateTime.now().minusMinutes(2).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
             runBlocking { container.processRawSmsUseCase.ingest(raw("ui-model-income",incoming)) }
             assertNull(runBlocking { container.financialTransactionRepository.findByRawSmsId("ui-model-income") })
-            click(R.string.approved_nav_review)
+            click(R.string.nav_review)
             compose.runOnUiThread { review.refresh() }
             compose.waitUntil(20_000) { review.uiState.value.items.size == 1 }
             compose.onNodeWithText(text(R.string.reference_review_evidence)).performScrollTo().performClick()

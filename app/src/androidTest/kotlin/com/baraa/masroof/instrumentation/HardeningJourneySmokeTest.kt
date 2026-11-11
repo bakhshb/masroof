@@ -125,10 +125,10 @@ class HardeningJourneySmokeTest {
     private fun awaitFinancialShell() {
         waitUntil("financial navigation is ready") {
             composeRule.contentDescriptionExists(text(R.string.dashboard_open_settings)) &&
-                composeRule.contentDescriptionExists(text(R.string.approved_nav_home))
+                composeRule.contentDescriptionExists(text(R.string.nav_home))
         }
         assertBlockedScreenAbsent()
-        composeRule.onNodeWithContentDescription(text(R.string.approved_nav_home))
+        composeRule.onNodeWithContentDescription(text(R.string.nav_home))
             .assertIsDisplayed().assertIsSelected()
         composeRule.onNodeWithContentDescription(text(R.string.dashboard_open_settings))
             .assertIsDisplayed()
@@ -142,7 +142,7 @@ class HardeningJourneySmokeTest {
             .getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
         val header = composeRule.onNode(hasText(text(R.string.app_name)), useUnmergedTree = true)
             .fetchSemanticsNode().boundsInWindow
-        val home = composeRule.onNodeWithContentDescription(text(R.string.approved_nav_home))
+        val home = composeRule.onNodeWithContentDescription(text(R.string.nav_home))
             .fetchSemanticsNode().boundsInWindow
         assertTrue("Header top ${header.top} is under the status bar (${bars.top})", header.top >= bars.top)
         assertTrue("Navigation bottom ${home.bottom} is under the navigation bar (${decor.height - bars.bottom})",
@@ -150,12 +150,12 @@ class HardeningJourneySmokeTest {
     }
 
     private fun openReviewQueue() {
-        clickText(text(R.string.approved_nav_review))
+        clickText(text(R.string.nav_review))
         awaitText(text(R.string.review_title), scroll = false)
     }
 
     private fun returnToDashboard() {
-        clickText(text(R.string.approved_nav_home))
+        clickText(text(R.string.nav_home))
         composeRule.waitForIdle()
     }
 

@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import com.baraa.masroof.ui.theme.MasroofCardShape
 import com.baraa.masroof.ui.theme.MasroofHeroRole
 import com.baraa.masroof.ui.theme.MasroofSpacing
-import com.baraa.masroof.ui.theme.approvedHeroColors
+import com.baraa.masroof.ui.theme.heroColors
 import com.baraa.masroof.ui.theme.MasroofReference
 import androidx.compose.ui.graphics.Color
 
@@ -40,7 +40,7 @@ fun MasroofHeroCard(
     titleContent: (@Composable (Modifier, Color) -> Unit)? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
-    val (background, foreground) = approvedHeroColors(role)
+    val (background, foreground) = heroColors(role)
     Surface(modifier.fillMaxWidth(), shape = MasroofCardShape, color = background, contentColor = foreground) {
         Column(Modifier.padding(MasroofReference.heroPadding)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,

@@ -37,9 +37,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Capture real production components with the approved synthetic financial facts. */
+/** Render every production page with synthetic facts, check basic layout and save captures for review. */
 @RunWith(AndroidJUnit4::class)
-class ApprovedFidelityMatrixTest {
+class ProductionPageRenderSmokeTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val pageIds = listOf("home", "transactions", "accounts", "accountDetail", "cards", "cardDetail", "loans", "loanDetail", "commitments", "merchants", "daily", "review", "settings", "preferences", "about", "updates", "logs", "backup", "exportBackup", "restoreBackup", "dataTools", "notifications", "flowIn", "flowOut", "commitmentEditor", "statement", "onboarding", "bankRegistry", "myAccounts", "myCards", "myLoans", "myCommitments")
 
@@ -69,7 +69,7 @@ class ApprovedFidelityMatrixTest {
                                         in settingsPages -> 3
                                         else -> -1
                                     }
-                                    val labels = listOf(R.string.approved_nav_home, R.string.approved_nav_transactions, R.string.approved_nav_review, R.string.approved_nav_settings)
+                                    val labels = listOf(R.string.nav_home, R.string.nav_transactions, R.string.nav_review, R.string.nav_settings)
                                     val icons = listOf(MasroofIcons.dashboard, MasroofIcons.recentTransactions, MasroofIcons.reviewQueue, MasroofIcons.settings)
                                     MasroofBottomNavigation(labels.mapIndexed { i, label -> MasroofNavigationItem(androidx.compose.ui.res.stringResource(label), icons[i], selected == i) }, {})
                                 }
@@ -101,7 +101,7 @@ class ApprovedFidelityMatrixTest {
                 assertTrue("Shortcuts form one row or two rows of two",
                     (1..3).all { sameRow(0, it) } || (sameRow(0, 1) && sameRow(2, 3) && cells[2].center.y > cells[0].center.y))
                 assertTrue("Shortcut order follows language", if (lang == "ar") cells.first().center.x > cells.last().center.x else cells.first().center.x < cells.last().center.x)
-                val label = AppLocaleContext.wrap(instrumentation.targetContext, lang).getString(R.string.approved_commitments)
+                val label = AppLocaleContext.wrap(instrumentation.targetContext, lang).getString(R.string.commitments)
                 val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                 compose.onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
                 assertTrue("Full commitment label fits on one line: $lang/$night ${layouts.single().size} ${layouts.single().layoutInput.constraints} width=${layouts.single().didOverflowWidth} height=${layouts.single().didOverflowHeight}", layouts.single().lineCount == 1 && !layouts.single().hasVisualOverflow)

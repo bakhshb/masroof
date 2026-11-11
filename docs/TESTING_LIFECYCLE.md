@@ -12,7 +12,7 @@ This is a map of existing production paths and executable coverage, not a claim 
 | Forecast coverage, published-vs-actual and baseline gate | `AnalysisLifecyclePolicyTest`, pure analytics policy tests and advisory SQLite migration tests; estimator algorithms are unchanged |
 | Commitment identity, changed amount, financial period | `CommitmentPaymentAttributionTest`, `CommitmentsOverviewBuilderTest`, `DashboardFixtureCharacterizationTest`, `DashboardViewModelTest`, `CommitmentPeriodLifecycleTest` |
 | Current period rolls forward while explicit history stays selected | Moving-clock ViewModel tests; application period workflow remains the only period authority |
-| UI draft/apply/discard and language/theme geometry | Four independent fidelity variants and four chart interaction variants, existing sheet/geometry tests; assertions and pages/scopes retained |
+| UI draft/apply/discard and language/theme geometry | Four independent render smoke variants and four chart interaction variants, existing sheet/geometry tests; assertions and pages/scopes retained |
 | First SQLite open -> application close | `StartupQueryShutdownTest` uses a real connection callback barrier; storage corruption recovery tests remain unchanged; startup unit teardown now closes the container normally |
 | Whole worker/database lease -> restore/close | Model refresh workflow/worker tests, database access/restore recovery tests and native backup/recovery cases |
 | CI output -> merge/release authority | `test_ci_device.py`, routing/script tests and `test_verify_ci_status.py`; incomplete/skipped/duplicate/missing case output and partial CI are rejected |

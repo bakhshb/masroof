@@ -188,7 +188,7 @@ class FoldModalWindowJourneyTest {
     private fun journey(kind: String) {
         awaitShell()
         if (kind == "filter" || kind == "reclassify") {
-            clickText(text(R.string.approved_nav_transactions))
+            clickText(text(R.string.nav_transactions))
             compose.waitUntil(20_000) {
                 compose.onAllNodesWithText(text(R.string.transaction_list_title)).fetchSemanticsNodes().isNotEmpty()
             }

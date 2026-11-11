@@ -539,11 +539,11 @@ class StatementReconciliationSmokeTest {
     private fun awaitFinancialShell() {
         waitUntil("financial navigation is ready") {
             composeRule.contentDescriptionExists(text(R.string.dashboard_open_settings)) &&
-                composeRule.contentDescriptionExists(text(R.string.approved_nav_home))
+                composeRule.contentDescriptionExists(text(R.string.nav_home))
         }
         val blocked = text(R.string.startup_maintenance_blocked)
         assertEquals(emulatorMessage("startup maintenance blocked the shell"), 0, composeRule.nodeCount(textMatcher(blocked)))
-        composeRule.onNodeWithContentDescription(text(R.string.approved_nav_home))
+        composeRule.onNodeWithContentDescription(text(R.string.nav_home))
             .assertIsDisplayed().assertIsSelected()
         composeRule.onNodeWithContentDescription(text(R.string.dashboard_open_settings)).assertIsDisplayed()
     }
