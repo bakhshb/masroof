@@ -66,7 +66,6 @@ class LedgerFixturesTest {
                 assertEquals(committedSchemaHash(), it.getString(0))
             }
         }
-        assertEquals(committedSchemaHash(), MasroofDatabase.IDENTITY_HASH)
         val db = Room.databaseBuilder(context, MasroofDatabase::class.java, "fixture-v18.db").allowMainThreadQueries().build()
         try {
             assertEquals(18, db.openHelper.writableDatabase.version)
@@ -179,10 +178,8 @@ class LedgerFixturesTest {
         dir.deleteRecursively()
     }
 
-    private fun committedSchemaHash(): String {
-        val json = File(root(), "schemas/com.baraa.masroof.data.room.MasroofDatabase/18.json").readText()
-        return Regex("\"identityHash\":\\s*\"(\\w+)\"").find(json)!!.groupValues[1]
-    }
+    /** The v18 hash, whatever the current version is; `FinancialSchemaCompatibilityTest` ties the map to 18.json. */
+    private fun committedSchemaHash() = MasroofDatabase.IDENTITY_HASHES.getValue(18)
 
     private fun fixture(name: String) = File(fixtureDir(), name).also { assertTrue("missing fixture $it", it.isFile) }
 
