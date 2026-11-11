@@ -1,7 +1,6 @@
 package com.baraa.masroof.application
 
 import android.content.Context
-import androidx.room.Room
 import androidx.room.withTransaction
 import androidx.work.DelegatingWorkerFactory
 import androidx.work.WorkManager
@@ -201,12 +200,7 @@ class AppContainer(
 
     internal val database: MasroofDatabase =
         databaseRestoreRecovered.let {
-            Room.databaseBuilder(
-                appContext,
-                MasroofDatabase::class.java,
-                MasroofDatabase.NAME,
-            )
-                .openHelperFactory(databaseOpenHelperFactory)
+            MasroofDatabase.builder(appContext, MasroofDatabase::class.java, MasroofDatabase.NAME, databaseOpenHelperFactory)
                 .build()
         }
 

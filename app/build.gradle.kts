@@ -144,6 +144,9 @@ dependencies {
 
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
+    // Test-only next-version schema (NextVersionTestDatabase, sharedTest) for migration tests.
+    kspTest(libs.androidx.room.compiler)
+    kspAndroidTest(libs.androidx.room.compiler)
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
