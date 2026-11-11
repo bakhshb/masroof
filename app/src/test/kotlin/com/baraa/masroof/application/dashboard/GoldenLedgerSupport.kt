@@ -6,11 +6,13 @@ import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
+import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.CardType
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.OwnershipStatus
@@ -81,6 +83,8 @@ data class GoldenSeedRow(
     val merchant: String? = null,
     val transactionType: String,
     val occurredAt: String,
+    val loanType: String? = null,
+    val bankNetworkType: String? = null,
 )
 
 @Serializable
@@ -363,7 +367,8 @@ object GoldenLedgerRunner {
 
 
 
-    private suspend fun seed(world: DashboardLedgerWorld, row: GoldenSeedRow) {
+    /** Stores the row as evidence; [post] false leaves it unposted so a later reconcile decides. */
+    internal suspend fun seed(world: DashboardLedgerWorld, row: GoldenSeedRow, post: Boolean = true) {
         val raw = AndroidSmsMapper.toRawSms(toProviderRow(row))
         world.rawRepo.insertIfAbsent(raw)
         val bank = Bank.fromId(row.bank)
@@ -385,12 +390,13 @@ object GoldenLedgerRunner {
                 merchant = row.merchant,
                 counterparty = null,
                 occurredAt = occurredAt,
-                bankNetworkType = null,
+                bankNetworkType = row.bankNetworkType?.let(BankNetworkType::valueOf),
                 confidence = Confidence(0.95, listOf("golden_seed")),
                 parseStatus = ParseStatus.valueOf(row.parseStatus),
             ),
-            ParsedEventDetails(occurredAtLocal = local),
+            ParsedEventDetails(occurredAtLocal = local, loanType = row.loanType?.let(LoanType::valueOf)),
         )
+        if (!post) return
         val source = row.sourceAccount?.let { FinancialContainerIdFactory.accountId(bank, it) }
             ?: row.cardLast4?.let { FinancialContainerIdFactory.cardId(bank, it) }
         val destination = row.destinationAccount?.let { FinancialContainerIdFactory.accountId(bank, it) }
@@ -481,3 +487,49 @@ private fun moneyText(money: Money): String =
 
 private fun signedText(amount: SignedMoneyAmount): String =
     amount.amount.setScale(Money.SCALE, RoundingMode.HALF_EVEN).toPlainString()
+
+/**
+ * Deterministic text dump of everything a ledger rewrite could change: every `financial_transaction`
+ * row with its links, review items, commitments and ownership. One line per row, sorted, no SMS bodies.
+ */
+object LedgerSnapshotSerializer {
+    suspend fun serialize(world: DashboardLedgerWorld): String {
+        val lines = mutableListOf<String>()
+        lines += "raw=${world.rawRepo.listIdsByReceivedAt().size} parsed=${world.parsedRepo.listAll().size}"
+        world.ftRepo.listAll().sortedBy { it.id }.forEach { tx ->
+            lines += row(
+                "tx", tx.id, tx.type.name, moneyText(tx.amount), tx.amount.currency.name,
+                tx.occurredAt.toString(), tx.occurredAtZone, tx.sourceContainerId, tx.destinationContainerId,
+                tx.merchant, tx.counterparty, tx.categoryId,
+                tx.appliedExchangeRate?.toPlainString(), tx.exchangeRateSource?.name,
+                world.ftRepo.listRawSmsIds(tx.id).sorted().joinToString(";"),
+                tx.linkedParsedEventIds.sorted().joinToString(";"),
+            )
+        }
+        world.reviewRepo.listAll().sortedBy { it.rawSmsId }.forEach { r ->
+            lines += row(
+                "review", r.rawSmsId, r.kind.name, r.status.name, r.reasons.joinToString(";"),
+                r.resolutionKind?.name, r.resolvedTransactionId,
+            )
+        }
+        world.commitments.listAll().sortedBy { it.id }.forEach { c ->
+            lines += row(
+                "commitment", c.id, c.name, moneyText(c.amount), c.transactionDate.toString(),
+                c.recurrence?.name, c.dueDate?.toString(), c.active.toString(),
+                c.pauseIntervals.toString(), c.sourceTransactionId,
+            )
+        }
+        world.accounts.listAll().sortedBy { "${it.bank.id}|${it.maskedNumber}" }.forEach { a ->
+            lines += row("account", a.bank.id, a.maskedNumber, a.ownership, a.accountType)
+        }
+        world.cards.listAll().sortedBy { "${it.bank.id}|${it.last4}" }.forEach { c ->
+            lines += row("card", c.bank.id, c.last4, c.ownership, c.cardType, c.cardNetwork, c.cardRole, c.creditFacilityId)
+        }
+        world.loans.listAll().sortedBy { "${it.bank.id}|${it.loanType}" }.forEach { l ->
+            lines += row("loan", l.bank.id, l.loanType, l.ownership)
+        }
+        return lines.joinToString("\n", postfix = "\n")
+    }
+
+    private fun row(vararg cells: Any?): String = cells.joinToString("|") { it?.toString() ?: "-" }
+}

@@ -1,0 +1,105 @@
+## golden:live_inbox_twin
+raw=1 parsed=1
+tx|transaction:27afb7a9f6a627c256d999de51c73c629054d8b6f7277e02452f49cb39c141f0|EXPENSE|15.50|SAR|2026-09-05T06:15:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:3001|-|TEST_BAKERY|-|-|-|-|android-sms-live:AlJazira|1788588900000|0b226a55c0589f535caffd531e390cc9b1428dfcab74f41d7e46579b54c19731|evt-android-sms-live:AlJazira|1788588900000|0b226a55c0589f535caffd531e390cc9b1428dfcab74f41d7e46579b54c19731
+account|BANK_ALJAZIRA|3001|OWNED|CURRENT
+card|BANK_ALJAZIRA|2210|OWNED|DEBIT|-|-|-
+## golden:m1_two_day_same_amount
+raw=4 parsed=4
+tx|transaction:c60034bedeb4709984c0ab5ee754a4a32364154d87c786215623961e3dc12dc7|SELF_TRANSFER|2000.00|SAR|2026-09-02T07:00:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:3001|account:BANK_ALJAZIRA:3002|-|TEST_PERSON|-|-|-|android-sms:inbox-m1-in-02;android-sms:inbox-m1-out-02|evt-android-sms:inbox-m1-in-02;evt-android-sms:inbox-m1-out-02
+tx|transaction:d5ec4451a56ef31aff2b6d6e9592a77a749691aebc1d4378b85c16ad05da2360|SELF_TRANSFER|2000.00|SAR|2026-09-09T07:00:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:3001|account:BANK_ALJAZIRA:3002|-|TEST_PERSON|-|-|-|android-sms:inbox-m1-in-09;android-sms:inbox-m1-out-09|evt-android-sms:inbox-m1-in-09;evt-android-sms:inbox-m1-out-09
+account|BANK_ALJAZIRA|3001|OWNED|CURRENT
+account|BANK_ALJAZIRA|3002|OWNED|CURRENT
+## golden:m5_cross_bank_suffix
+raw=2 parsed=2
+tx|transaction:52139b2878cfdd541b920625a310cab0ed55b664e538bdd5e08fe7105c1308d9|EXPENSE|250.00|SAR|2026-09-03T07:00:00Z|Asia/Riyadh|account:OTHER_BANK:3001|-|TEST_OTHER|-|-|-|-|android-sms:seed-other-3001|evt-android-sms:seed-other-3001
+tx|transaction:92d2beeaf2009f4672230fa490a17534aebdb14b396a311a181032ca1cbc2277|EXPENSE|100.00|SAR|2026-09-02T07:00:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:3001|-|TEST_GROCER|-|-|-|-|android-sms:seed-alj-3001|evt-android-sms:seed-alj-3001
+account|BANK_ALJAZIRA|3001|OWNED|CURRENT
+account|OTHER_BANK|3001|OWNED|CURRENT
+## golden:m6_account_refund
+raw=3 parsed=3
+tx|transaction:41b421b1d858e012e3c836b5e3a7aa9536e5b316a071ab255ef4d20905e3368a|REFUND|100.00|SAR|2026-09-06T10:10:00Z|Asia/Riyadh|-|account:BANK_ALJAZIRA:3001|TEST_SHOP|-|-|-|-|android-sms:inbox-m6-account-refund|evt-android-sms:inbox-m6-account-refund
+tx|transaction:a201a1a58a44ad538e0f8f1c39a6e87dd40790a927252e66ec643a7085e26dd6|REFUND|25.00|SAR|2026-09-07T10:10:00Z|Asia/Riyadh|-|card:BANK_ALJAZIRA:7271|TEST_SHOP_C|-|-|-|-|android-sms:inbox-m6-card-refund|evt-android-sms:inbox-m6-card-refund
+tx|transaction:e7322bd9c3c5d5a52f3c6a425388da3ed5d5a42c6fa99781c85f5d63e58c23bc|EXPENSE|100.00|SAR|2026-09-02T08:05:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:3001|-|TEST_GROCER|-|-|-|-|android-sms:inbox-m6-purchase|evt-android-sms:inbox-m6-purchase
+account|BANK_ALJAZIRA|3001|OWNED|CURRENT
+card|BANK_ALJAZIRA|2210|OWNED|DEBIT|-|-|-
+card|BANK_ALJAZIRA|7271|OWNED|CREDIT|-|-|-
+## golden:m8_asof_fx
+raw=2 parsed=2
+tx|transaction:55ecbc9399a990d94c764ca8fb8c77e61ad325f310d25d60dccc4d9277515d40|EXPENSE|10.00|USD|2026-10-07T07:00:00Z|Asia/Riyadh|card:BANK_ALJAZIRA:7271|-|TEST_FX_SHOP|-|-|-|-|android-sms:inbox-m8-oct7|evt-android-sms:inbox-m8-oct7
+tx|transaction:d61a206336be07ef77ad78203c3b9ea64d6cf639e6d4312533c87063eea19255|EXPENSE|10.00|USD|2026-10-01T07:00:00Z|Asia/Riyadh|card:BANK_ALJAZIRA:7271|-|TEST_FX_SHOP|-|-|-|-|android-sms:inbox-m8-oct1|evt-android-sms:inbox-m8-oct1
+card|BANK_ALJAZIRA|7271|OWNED|CREDIT|-|-|-
+## golden:one_intra_pair
+raw=2 parsed=2
+tx|transaction:60d82ebf72c4f6e4d5a214a6972426ea6b84d512274e982fc7199b7882b73b15|SELF_TRANSFER|1800.55|SAR|2026-09-03T07:38:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:3001|account:BANK_ALJAZIRA:3002|-|TEST_PERSON|-|-|-|android-sms:inbox-pair-in;android-sms:inbox-pair-out|evt-android-sms:inbox-pair-in;evt-android-sms:inbox-pair-out
+account|BANK_ALJAZIRA|3001|OWNED|CURRENT
+account|BANK_ALJAZIRA|3002|OWNED|CURRENT
+## golden:repeated_separate_notices
+raw=2 parsed=2
+tx|transaction:11405b744f43b771b6761751aded79c436449bd93d736ce659aa7b2d50d06903|EXPENSE|40.00|SAR|2026-09-04T08:05:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:3001|-|TEST_GROCER|-|-|-|-|android-sms:inbox-grocer-04|evt-android-sms:inbox-grocer-04
+tx|transaction:ad15586be9fa705288b5deb46b9ea282168accf1efe465a524319687be140501|EXPENSE|40.00|SAR|2026-09-02T08:05:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:3001|-|TEST_GROCER|-|-|-|-|android-sms:inbox-grocer-02|evt-android-sms:inbox-grocer-02
+account|BANK_ALJAZIRA|3001|OWNED|CURRENT
+card|BANK_ALJAZIRA|2210|OWNED|DEBIT|-|-|-
+## all_banks
+raw=40 parsed=40
+tx|transaction:08d7aa12f0715ac2882d485e3de2f7f8815dc3e680d1e98cc62c08a2e5ec5683|EXTERNAL_TRANSFER_OUT|100.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|account:BANK_SNB:1234|account:BANK_SNB:5678|-|TEST PERSON|-|-|-|android-sms:all-banks-snb-transfer|evt-android-sms:all-banks-snb-transfer
+tx|transaction:09ef54a0b899fbd9f288450e5c2786ef089d6dc0779870881bedfd08738b331f|SELF_TRANSFER|1800.55|SAR|2026-09-03T07:38:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:3001|account:BANK_ALJAZIRA:3002|-|TEST_PERSON|-|-|-|android-sms:all-banks-inbox-pair-in;android-sms:all-banks-inbox-pair-out|evt-android-sms:all-banks-inbox-pair-in;evt-android-sms:all-banks-inbox-pair-out
+tx|transaction:192baf12bc5c8b844b83170139ac13882267312a1a572baa60ef41440399c0a9|EXPENSE|25.50|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|card:BANK_SNB:4321|-|TEST SHOP|-|-|-|-|android-sms:all-banks-snb-pos|evt-android-sms:all-banks-snb-pos
+tx|transaction:26c9b666427fe3fe83229ab08092fb8ee0424ad8fc6ac86970db06054322b935|EXPENSE|25.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|card:BANK_SNB:4321|-|TEST SHOP|-|-|-|-|android-sms:all-banks-snb-debit|evt-android-sms:all-banks-snb-debit
+tx|transaction:42d1c5d8e1e2342913b1a8a5c04cd1a02fb34835c2604a18dec1798345f37931|EXPENSE|25.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|card:BANK_SAB:4321|-|TEST SHOP|-|-|-|-|android-sms:all-banks-sab-pos|evt-android-sms:all-banks-sab-pos
+tx|transaction:496a68fd1f001176bc2a09775e21960232e848152951a46355771f01b41c4f82|EXPENSE|25.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|card:BANK_ALINMA:4321|-|TEST SHOP|-|-|-|-|android-sms:all-banks-alinma-pos|evt-android-sms:all-banks-alinma-pos
+tx|transaction:84948d0b7d16502a61ab061a4aa8a66fe85b92fbc87e2432a4497e96e5909c16|EXPENSE|25.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|card:BANK_BARQ:4321|-|-|-|-|-|-|android-sms:all-banks-barq-pos|evt-android-sms:all-banks-barq-pos
+tx|transaction:9518a927b485a68d10889fe6c8441d5f8ea1c405da24907505687d51a7884578|FEE|25.00|SAR|2026-09-15T09:21:00Z|Asia/Riyadh|-|-|-|-|-|-|-|android-sms:all-banks-enbd-fee|evt-android-sms:all-banks-enbd-fee
+tx|transaction:a134579838737c60ccd0d6a384c9616c1c28bb03f2258b68113c7936a046f314|EXPENSE|35.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|card:BANK_SNB:4321|-|TEST SHOP|-|-|-|-|android-sms:all-banks-snb-online|evt-android-sms:all-banks-snb-online
+tx|transaction:b472d65ecb838a367e9c2e33590447eddd9e4d4e127a3a0624ddb78f7b01fd47|EXPENSE|35.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|card:BANK_SAB:4321|-|TEST SHOP|-|-|-|-|android-sms:all-banks-sab-online|evt-android-sms:all-banks-sab-online
+tx|transaction:e36b302751860eed6d6cbaf4e7de54e7d488b56af1fbc7d79dad184ac067db87|EXPENSE|25.00|SAR|2026-09-15T09:30:00Z|Asia/Riyadh|account:BANK_ALINMA:1234|-|TEST SHOP|-|-|-|-|android-sms:all-banks-alinma-google|evt-android-sms:all-banks-alinma-google
+review|android-sms:all-banks-alinma-transfer|PENDING_MATCH|REQUIRED|transfer_pending_match|-|-
+review|android-sms:all-banks-bank_alinma-declined|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
+review|android-sms:all-banks-bank_alinma-unknown|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+review|android-sms:all-banks-bank_barq-declined|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
+review|android-sms:all-banks-bank_barq-unknown|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+review|android-sms:all-banks-bank_emirates_nbd-declined|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
+review|android-sms:all-banks-bank_emirates_nbd-unknown|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+review|android-sms:all-banks-bank_sab-declined|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
+review|android-sms:all-banks-bank_sab-unknown|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+review|android-sms:all-banks-bank_snb-declined|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
+review|android-sms:all-banks-bank_snb-unknown|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+review|android-sms:all-banks-barq-no-local-account|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
+review|android-sms:all-banks-barq-purchase-no-card|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
+review|android-sms:all-banks-barq-transfer-in-no-destination|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
+review|android-sms:all-banks-enbd-installment-masked|NEEDS_REVIEW|REQUIRED|missing_amount;parse_review_required|-|-
+review|android-sms:all-banks-enbd-transfer-unresolved|NEEDS_REVIEW|REQUIRED|parse_review_required|-|-
+review|android-sms:all-banks-snb-payment|NEEDS_REVIEW|REQUIRED|card_payment_ownership_unresolved|-|-
+review|android-sms:all-banks-stc-in|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+review|android-sms:all-banks-stc-out|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+review|android-sms:all-banks-stc-top-up|NEEDS_REVIEW|REQUIRED|unknown_message_family|-|-
+account|BANK_ALINMA|1234|UNKNOWN|CURRENT
+account|BANK_ALJAZIRA|3001|OWNED|CURRENT
+account|BANK_ALJAZIRA|3002|OWNED|CURRENT
+account|BANK_EMIRATES_NBD|1234|UNKNOWN|CURRENT
+account|BANK_SNB|1234|OWNED|CURRENT
+card|BANK_ALINMA|4321|UNKNOWN|-|-|-|-
+card|BANK_BARQ|4321|UNKNOWN|-|-|-|-
+card|BANK_EMIRATES_NBD|4321|UNKNOWN|-|-|-|-
+card|BANK_SAB|4321|UNKNOWN|-|-|-|-
+card|BANK_SNB|4321|UNKNOWN|-|-|-|-
+loan|BANK_EMIRATES_NBD|PERSONAL|UNKNOWN
+## legacy:seeded
+raw=7 parsed=7
+tx|transaction:57c156916b6249a4d72b461daed26c8fedd3300ac86b5d4156ade430a78ce841|FEE|3036.11|SAR|2026-08-27T01:10:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:9003|-|-|-|-|-|-|android-sms:legacy-fee-loan|evt-android-sms:legacy-fee-loan
+tx|transaction:c9aeb4a4d58ebe56e3f7f42c070f18f8d2db85603dbc2de5b1b4e62239505a88|SELF_TRANSFER|4445.67|SAR|2026-08-07T09:00:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:9001|account:BANK_ALJAZIRA:9002|-|-|-|-|-|android-sms:legacy-stale-out|evt-android-sms:legacy-stale-out
+tx|transaction:efef394312d4f84fc870c6a49e39a0f4d002068e5c01309fa2620e3eb5117700|FEE|120.00|SAR|2026-08-28T01:10:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:9003|-|-|-|-|-|-|android-sms:legacy-fee-no-loan|evt-android-sms:legacy-fee-no-loan
+account|BANK_ALJAZIRA|9001|OWNED|CURRENT
+account|BANK_ALJAZIRA|9002|OWNED|CURRENT
+account|BANK_ALJAZIRA|9003|OWNED|CURRENT
+loan|BANK_ALJAZIRA|PERSONAL|UNKNOWN
+## legacy:after_repair_and_full_reconcile
+raw=7 parsed=7
+tx|transaction:0bbc575d8be64ddca1401024593d656be2de24804eead26431e462b3e997c45e|SELF_TRANSFER|4445.67|SAR|2026-08-07T09:00:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:9001|account:BANK_ALJAZIRA:9002|-|-|-|-|-|android-sms:legacy-stale-in;android-sms:legacy-stale-out|evt-android-sms:legacy-stale-in;evt-android-sms:legacy-stale-out
+tx|transaction:19b18e93ed6bbe244613c240747f792a42bcba5be078d96b734ab179629e6176|EXTERNAL_TRANSFER_OUT|80.00|SAR|2026-08-11T08:00:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:9001|account:BANK_ALJAZIRA:9999|-|-|-|-|-|android-sms:legacy-external-out|evt-android-sms:legacy-external-out
+tx|transaction:57c156916b6249a4d72b461daed26c8fedd3300ac86b5d4156ade430a78ce841|LOAN_REPAYMENT|3036.11|SAR|2026-08-27T01:10:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:9003|loan:BANK_ALJAZIRA:PERSONAL|-|-|-|-|-|android-sms:legacy-fee-loan|evt-android-sms:legacy-fee-loan
+tx|transaction:ae96fa305622a849c4a85957f7ccbde4381e32a4e1fd7355787c2096ac28cb95|SELF_TRANSFER|700.00|SAR|2026-08-10T08:00:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:9001|account:BANK_ALJAZIRA:9003|-|-|-|-|-|android-sms:legacy-pair-in;android-sms:legacy-pair-out|evt-android-sms:legacy-pair-in;evt-android-sms:legacy-pair-out
+tx|transaction:efef394312d4f84fc870c6a49e39a0f4d002068e5c01309fa2620e3eb5117700|FEE|120.00|SAR|2026-08-28T01:10:00Z|Asia/Riyadh|account:BANK_ALJAZIRA:9003|-|-|-|-|-|-|android-sms:legacy-fee-no-loan|evt-android-sms:legacy-fee-no-loan
+account|BANK_ALJAZIRA|9001|OWNED|CURRENT
+account|BANK_ALJAZIRA|9002|OWNED|CURRENT
+account|BANK_ALJAZIRA|9003|OWNED|CURRENT
+loan|BANK_ALJAZIRA|PERSONAL|OWNED

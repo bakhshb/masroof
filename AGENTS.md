@@ -85,6 +85,7 @@ At the end of the PR: one review of the whole PR, then CI green including device
 - `DashboardProjectionBuilder` only composes; logic goes in the matching section projection (`AnalysisDashboardProjection`, `AccountsDashboardProjection`, `CardsDashboardProjection`, `CommitmentsDashboardProjection`) with inputs from `DashboardProjectionContext`.
 - Chart choices never change balances, dues or full-scope totals; persist bank-qualified keys, never names or last4 alone.
 - Tests: run `app/src/test/.../application/dashboard/`; keep `DashboardFixtureCharacterizationTest` green; cover registry-linked Mada and Google Pay SMS without `خصمت من حساب`.
+- `LedgerSnapshotTest` compares every ledger row with `testdata/ledger_snapshot/full_ledger.golden.txt`; regenerate only for an approved change with `MASROOF_UPDATE_LEDGER_FIXTURES=1` (also rebuilds the v18 db/backup in `testdata/ledger_fixtures/v18/`).
 
 ## UI and design
 - These rules keep screens consistent and cheap to build; they rank below everything above (see Priorities).

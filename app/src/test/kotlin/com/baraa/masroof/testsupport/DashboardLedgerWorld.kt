@@ -86,12 +86,16 @@ import kotlin.random.Random
 class DashboardLedgerWorld(
     context: Context,
     adapter: com.baraa.masroof.bank.BankSmsAdapter = engineFixtureAdapter(),
+    extraAdapters: List<com.baraa.masroof.bank.BankSmsAdapter> = emptyList(),
+    /** A file database under this name (for fixture generation); null keeps the in-memory default. */
+    databaseName: String? = null,
 ) : AutoCloseable {
     val zone: ZoneId = ZoneId.of("Asia/Riyadh")
     val clock: Clock = Clock.fixed(Instant.parse("2026-09-15T09:00:00Z"), zone)
-    val db: MasroofDatabase = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java)
-        .allowMainThreadQueries()
-        .build()
+    val db: MasroofDatabase = (
+        if (databaseName == null) Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java)
+        else Room.databaseBuilder(context, MasroofDatabase::class.java, databaseName)
+        ).allowMainThreadQueries().build()
     val rawRepo = RoomRawSmsRepository(db.rawSmsDao())
     val parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
     val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
@@ -107,9 +111,9 @@ class DashboardLedgerWorld(
     val localeRepository: AppLocaleRepository = FakeAppLocaleRepository()
 
     private val importClock = InstantClock { Instant.parse("2026-09-01T00:00:00Z") }
-    private val registry = BankSmsRegistry(listOf(adapter))
+    private val registry = BankSmsRegistry(listOf(adapter) + extraAdapters)
     private val discovery = OwnershipDiscoveryService(accounts, cards, loans)
-    private val reconciliation = TransactionReconciliationService(
+    val reconciliation = TransactionReconciliationService(
         parsedEventRepository = parsedRepo,
         rawSmsRepository = rawRepo,
         financialTransactionRepository = ftRepo,
