@@ -31,7 +31,7 @@ At the end of the PR: one review of the whole PR, then CI green including device
 - No remote pattern download. Wiring stays manual; no DI library unless the owner asks.
 
 ## Never break
-- Database `masroof.db`: until plan pieces 0.4a and 0.4b have landed, it stays schema v18 with the same identity hash and rejects other database/backup schemas. After that, the schema changes only through additive, tested Room migrations: a migration test from the committed v18 fixture, a device upgrade test, and v18 backup archives still import. Only schemas from v18 up to the current version are accepted; older than v18, unknown and newer are rejected. Never a destructive fallback. A schema change needs an explicit design and device verification; no backfill without owner approval.
+- Database `masroof.db`: the schema changes only through additive, tested Room migrations: a migration test from the committed v18 fixture, a device upgrade test, and v18 backup archives still import. Only schemas from v18 up to the current version are accepted (`MasroofDatabase.IDENTITY_HASHES`); older than v18, unknown and newer are rejected. A backup of an older schema migrates on its staged copy before it replaces the live file. Never a destructive fallback. A schema change needs an explicit design and device verification; no backfill without owner approval.
 - Keep the application id, preference names, Keystore alias, worker identities and historical persisted keys.
 - No Lab UI, replica app or parallel intake; no `lab`/`beta` source paths. Engine/model refreshes never reparse posted evidence or override human decisions.
 - Never log SMS bodies, account numbers or secrets. Logs carry stage, failure count, masked id and retry state.

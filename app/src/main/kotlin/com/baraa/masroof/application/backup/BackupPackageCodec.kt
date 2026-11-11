@@ -28,10 +28,10 @@ object BackupPackageCodec {
             com.baraa.masroof.application.backup.MessagePatternBackup.validate(it.messagePatterns)
         }
 
+    /** Accepts only a known (version, identity hash) pair from [identityHashes]. */
     fun validateManifest(
         manifest: BackupManifest,
-        expectedRoomVersion: Int,
-        expectedIdentityHash: String,
+        identityHashes: Map<Int, String>,
     ): Boolean = manifest.formatVersion == BackupPackageFormat.FORMAT_VERSION &&
-        manifest.roomVersion == expectedRoomVersion && manifest.identityHash == expectedIdentityHash
+        identityHashes[manifest.roomVersion] == manifest.identityHash
 }

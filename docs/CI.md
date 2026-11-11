@@ -24,10 +24,11 @@ in the existing unit job. The existing root `detekt` task also checks finance-co
 with the shared Detekt 2 configuration and ktlint wrapper. Architecture test inputs
 include the relocated sources and financial schema, so a source-only boundary
 change cannot reuse an unrelated cached result. `FinancialSchemaCompatibilityTest`
-pins the byte-frozen v18 schema, contiguous exported versions and one migration per
-step; `MasroofMigrationOpenPathTest` (and its device twin) upgrades the committed v18
+pins the byte-frozen v18 schema, contiguous exported versions, one migration per
+step and the known identity hashes; `MasroofMigrationOpenPathTest` (and its device twin) upgrades the committed v18
 fixture through a test-only next version and proves rejected schemas leave the file
-untouched. Financial effect fixtures pin the extraction baseline. The backup/recovery device suites remain required.
+untouched. `BackupOlderSchemaImportTest` (and `BackupMigrationDeviceTest`) imports the committed v18
+archives under that next version and proves a failed migration leaves the live database byte-identical. Financial effect fixtures pin the extraction baseline. The backup/recovery device suites remain required.
 
 `build-test-apks` builds the app and instrumentation APK once. They use the same ephemeral debug signing key. `scripts/ci_device.py bundle` verifies package names and signing certificates, records commit SHA and APK SHA-256 hashes, and downloads the official AndroidX Orchestrator/test-services APKs. Device jobs consume that immutable artifact; they do not compile again. Java setup does not compete with setup-gradle for the Gradle cache.
 

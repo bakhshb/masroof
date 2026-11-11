@@ -96,6 +96,12 @@ abstract class MasroofDatabase : RoomDatabase() {
         /** Must match app/schemas/.../18.json identityHash. Filled after Room export. */
         const val IDENTITY_HASH: String = "71f1193767b3aa12bcb6cc6e7ce77147"
 
+        /**
+         * The identity hash of every schema from [BASELINE_VERSION] to [VERSION], the only pairs a backup may carry.
+         * A version bump keeps the old entry as a literal and adds the new one; the exported JSON files are checked against it.
+         */
+        val IDENTITY_HASHES: Map<Int, String> = mapOf(VERSION to IDENTITY_HASH)
+
         /** One additive step per version from [BASELINE_VERSION] to [VERSION], each tested from the v18 fixture. */
         val MIGRATIONS: List<Migration> = emptyList()
 

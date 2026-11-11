@@ -74,9 +74,10 @@ accounts known only by partial references remain separate capability work. The p
 generic role matcher is intentionally retained; this milestone does not rewrite those
 declarations as whole-message example templates.
 
-The financial database now supports v18 only, as requested by its sole user.
-Older-schema migrations, schema exports, import hashes and automatic fact backfills
-are removed. Older databases and backups are rejected without erasing live data.
+At this milestone the financial database supported v18 only: older-schema migrations,
+import hashes and automatic fact backfills were removed, and databases and backups older
+than v18 are still rejected without erasing live data. Since then, schema changes above
+v18 go through additive, tested migrations (see `docs/ARCHITECTURE.md`).
 The v18 schema/hash, encryption, restore/rollback and current-data integrity repair
 remain unchanged. A retired backfill worker completes already queued requests without
 opening or reparsing financial data; its persisted identity and old journal preference
