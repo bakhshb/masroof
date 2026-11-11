@@ -20,7 +20,7 @@ import java.util.TimeZone
  * Full ledger snapshot (plan 0.2): every transaction row and link, review item, commitment and ownership
  * over the whole synthetic corpus, committed as `testdata/ledger_snapshot/full_ledger.golden.txt`.
  * Any row change fails this test. To accept an intended change, rerun with
- * `MASROOF_UPDATE_LEDGER_SNAPSHOT=1 ./gradlew :app:testDebugUnitTest --tests '*LedgerSnapshotTest'`
+ * `MASROOF_UPDATE_LEDGER_SNAPSHOT=1 ./gradlew :app:testDebugUnitTest --tests '*LedgerSnapshotTest' --rerun`
  * and review the diff of the golden file; the variable is off by default.
  */
 @RunWith(RobolectricTestRunner::class)

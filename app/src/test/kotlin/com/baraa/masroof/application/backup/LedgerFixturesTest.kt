@@ -29,10 +29,10 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * The committed v18 fixtures (plan 0.2): a `masroof.db` and a plaintext v1 backup archive holding it,
- * both synthetic. They stay at v18 forever; later migration tests open them. Only
- * `MASROOF_REBUILD_V18_FIXTURES=1` (off by default, separate from the golden snapshot's variable) rebuilds
- * them, and only while the schema is still v18.
+ * The committed v18 fixtures (plan 0.2): a `masroof.db` plus a plaintext v1 archive and an encrypted
+ * envelope holding it, all synthetic. They stay at v18 forever; later migration tests open them. Only
+ * `MASROOF_REBUILD_V18_FIXTURES=1` with `--rerun` (off by default, separate from the golden snapshot's variable)
+ * rebuilds them, and only while the schema is still v18.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -173,11 +173,9 @@ class LedgerFixturesTest {
                 zip.closeEntry()
             }
         }
-        // Equal database content means nothing changed: keep the committed files (the envelope is random per export).
+        // Registry, review and commitment ids are random, so every rebuild rewrites all three files.
         val target = fixtureDir().also { it.mkdirs() }
-        if (!File(target, DB_FILE).let { it.isFile && it.readBytes().contentEquals(db.readBytes()) }) {
-            dir.listFiles()!!.forEach { it.copyTo(File(target, it.name), overwrite = true) }
-        }
+        dir.listFiles()!!.forEach { it.copyTo(File(target, it.name), overwrite = true) }
         dir.deleteRecursively()
     }
 
