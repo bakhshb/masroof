@@ -104,7 +104,9 @@ object MigrationOpenPathContract {
     private fun editedFixtureIsRejectedUntouched(context: Context, fixture: () -> InputStream, edit: String) {
         val name = "migration-reject.db"
         val file = copyFixture(context, name, fixture)
-        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { it.execSQL(edit) }
+        // WAL like the live file: a rollback-journal edit would flip the header's journal bytes, and Room flips them back.
+        val flags = SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING
+        SQLiteDatabase.openDatabase(file.path, null, flags).use { it.execSQL(edit) }
         rejectsUntouched(context, name)
         context.deleteDatabase(name)
     }
