@@ -25,23 +25,23 @@ class CommitmentPeriodLifecycleTest {
         TestRuntime.reset(host)
         var c = TestRuntime.container(host)
         try {
-            c.awaitPostStartupBackgroundWorkForTesting()
-            c.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+            c.maintenance.awaitPostStartupBackgroundWorkForTesting()
+            c.review.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
             suspend fun ingest(id: String, day: String, amount: String) {
                 val body = "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nمبلغ: SAR $amount\nلدى: SYNTHETIC_PROVIDER\nفي: $day 12:00"
-                c.processRawSmsUseCase.ingest(RawSms(id, "AlJazira", body, Instant.parse("${day}T09:01:00Z"), id, SmsBodyHasher.sha256Hex(body)))
+                c.sms.processRawSmsUseCase.ingest(RawSms(id, "AlJazira", body, Instant.parse("${day}T09:01:00Z"), id, SmsBodyHasher.sha256Hex(body)))
             }
             ingest("commitment-old", "2026-07-28", "100")
-            val source = c.financialTransactionRepository.listAll().single()
-            assertEquals(CommitmentCreationResult.Success, c.dashboardCommitmentsWorkflow.createFromTransaction(source.id))
-            val commitment = c.settingsCommitmentsWorkflow.listAll().single()
-            c.settingsCommitmentsWorkflow.update(commitment.id, CommitmentEditorDraft("فاتورة الهاتف", commitment.amount,
+            val source = c.storage.financialTransactionRepository.listAll().single()
+            assertEquals(CommitmentCreationResult.Success, c.dashboard.dashboardCommitmentsWorkflow.createFromTransaction(source.id))
+            val commitment = c.dashboard.settingsCommitmentsWorkflow.listAll().single()
+            c.dashboard.settingsCommitmentsWorkflow.update(commitment.id, CommitmentEditorDraft("فاتورة الهاتف", commitment.amount,
                 commitment.transactionDate, commitment.recurrence, commitment.dueDate))
             ingest("commitment-new", "2026-08-28", "130")
-            val ledger = c.financialTransactionRepository.listAll().sortedBy { it.id }
+            val ledger = c.storage.financialTransactionRepository.listAll().sortedBy { it.id }
             val payment = ledger.single { it.id != source.id }
             suspend fun checkPeriods(container: AppContainer) {
-                suspend fun row(start: String, end: String) = container.dashboardService.loadOverview(
+                suspend fun row(start: String, end: String) = container.dashboard.dashboardService.loadOverview(
                     FinancialPeriod(LocalDate.parse(start), LocalDate.parse(end))).commitmentsOverview.rows
                     .single { it.userCommitmentId == commitment.id }
                 val old = row("2026-07-27", "2026-08-27")
@@ -55,12 +55,12 @@ class CommitmentPeriodLifecycleTest {
                 assertEquals(CommitmentPaymentStatus.UNPAID, future.status)
                 assertNull(future.paymentTransactionId)
                 assertEquals(Money.of("100", Currency.SAR), future.amount)
-                assertEquals(ledger, container.financialTransactionRepository.listAll().sortedBy { it.id })
+                assertEquals(ledger, container.storage.financialTransactionRepository.listAll().sortedBy { it.id })
             }
             checkPeriods(c)
             TestRuntime.close()
             c = TestRuntime.container(host)
-            c.awaitPostStartupBackgroundWorkForTesting()
+            c.maintenance.awaitPostStartupBackgroundWorkForTesting()
             checkPeriods(c)
         } finally { TestRuntime.close() }
     }

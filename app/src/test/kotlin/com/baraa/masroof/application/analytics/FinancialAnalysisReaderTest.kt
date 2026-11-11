@@ -25,15 +25,15 @@ class FinancialAnalysisReaderTest {
         val container = (ApplicationProvider.getApplicationContext<Context>() as MasroofApplication).container
         try {
             val raw = LiveSmsProcessingHarness.liveSms()
-            container.rawSmsRepository.insertIfAbsent(raw)
+            container.storage.rawSmsRepository.insertIfAbsent(raw)
             val now = Instant.parse("2026-08-11T12:00:00Z")
-            container.processingRetryRepository.markRequired(raw.id, now, ProcessingRetryMode.LIVE)
+            container.storage.processingRetryRepository.markRequired(raw.id, now, ProcessingRetryMode.LIVE)
             val start = Instant.parse("2026-08-01T00:00:00Z")
             val end = Instant.parse("2026-09-01T00:00:00Z")
             assertTrue(FinancialAnalysisReader.capture(container, start, end, ZoneOffset.UTC).retry)
 
-            val review = container.reviewRepository.upsertRequired(raw.id, ReviewKind.NEEDS_REVIEW, listOf("processing_error"), now)
-            container.reviewRepository.markResolved(review.id, ReviewResolutionKind.USER_NON_FINANCIAL, now, null)
+            val review = container.storage.reviewRepository.upsertRequired(raw.id, ReviewKind.NEEDS_REVIEW, listOf("processing_error"), now)
+            container.storage.reviewRepository.markResolved(review.id, ReviewResolutionKind.USER_NON_FINANCIAL, now, null)
 
             assertFalse(FinancialAnalysisReader.capture(container, start, end, ZoneOffset.UTC).retry)
         } finally {

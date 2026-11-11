@@ -88,10 +88,6 @@ class PackageDependencyRulesTest {
         assertPackagesDoNotImport(
             packages = listOf("application"),
             forbiddenImports = listOf("import com.baraa.masroof.presentation."),
-            allowedFiles = setOf(
-                // Bootstrap exception — composition root may wire all layers.
-                "application/AppContainer.kt",
-            ),
         )
     }
 

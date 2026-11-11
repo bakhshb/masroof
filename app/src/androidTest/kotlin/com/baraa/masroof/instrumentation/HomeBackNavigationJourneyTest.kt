@@ -41,21 +41,21 @@ class HomeBackNavigationJourneyTest {
                     host.getSharedPreferences(AppLocalePreferences.PREFS_NAME, Context.MODE_PRIVATE).edit()
                         .putString(AppLocalePreferences.KEY_LANGUAGE_TAG, "en").commit()
                     val container = TestRuntime.container(host)
-                    container.awaitPostStartupBackgroundWorkForTesting()
-                    container.appLocaleRepository.setLanguageTag("en")
-                    container.onboardingPreferencesRepository.setOnboardingStarted(true)
-                    container.onboardingPreferencesRepository.setOnboardingCompleted(true)
-                    container.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
-                    container.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "2210"))
+                    container.maintenance.awaitPostStartupBackgroundWorkForTesting()
+                    container.storage.appLocaleRepository.setLanguageTag("en")
+                    container.storage.onboardingPreferencesRepository.setOnboardingStarted(true)
+                    container.storage.onboardingPreferencesRepository.setOnboardingCompleted(true)
+                    container.review.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+                    container.review.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "2210"))
                     repeat(3) { index ->
                         val body = "شراء من نقاط البيع\nبطاقة مدى: 2210\nخصمت من حساب: 3001\nلدى: Back Nav Shop ${'A' + index}\nبمبلغ: 12.00 SAR\nفي: ${minutesAgo(index + 1L)}"
                         ingest(container, "back-nav-$index", body)
                     }
                     // One unparsed message keeps a review item, which also yields a notification with a Review action.
                     ingest(container, "back-nav-review", "سداد تمويل خاص\nمن: 3001\nالقسط: SAR 23\nالمبلغ المتبقي: SAR 298\nلـ: تمويل شخصي\nفي: ${minutesAgo(5)}")
-                    assertEquals(1, container.reviewRepository.listRequired().size)
-                    val source = container.financialTransactionRepository.listAll().first { it.merchant == "Back Nav Shop A" }
-                    container.commitmentFromTransactionService.createFromTransaction(source.id)
+                    assertEquals(1, container.storage.reviewRepository.listRequired().size)
+                    val source = container.storage.financialTransactionRepository.listAll().first { it.merchant == "Back Nav Shop A" }
+                    container.dashboard.commitmentFromTransactionService.createFromTransaction(source.id)
                 }
                 try { base.evaluate() } finally { TestRuntime.close() }
             }
@@ -65,7 +65,7 @@ class HomeBackNavigationJourneyTest {
     private fun minutesAgo(minutes: Long) = LocalDateTime.now().minusMinutes(minutes).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
 
     private suspend fun ingest(container: com.baraa.masroof.application.AppContainer, id: String, body: String) {
-        container.processRawSmsUseCase.ingest(RawSms(id, "AlJazira", body, Instant.now(), id, SmsBodyHasher.sha256Hex(body)))
+        container.sms.processRawSmsUseCase.ingest(RawSms(id, "AlJazira", body, Instant.now(), id, SmsBodyHasher.sha256Hex(body)))
     }
 
     @get:Rule val rule: TestRule = RuleChain.outerRule(seed).around(compose)
@@ -243,7 +243,7 @@ class HomeBackNavigationJourneyTest {
         clickText(text(R.string.nav_settings))
         awaitNode(settingsHub)
         runBlocking {
-            val repository = TestRuntime.container(InstrumentationRegistry.getInstrumentation().targetContext).financialTransactionRepository
+            val repository = TestRuntime.container(InstrumentationRegistry.getInstrumentation().targetContext).storage.financialTransactionRepository
             repository.update(repository.listAll().first { it.merchant == "Back Nav Shop B" }.copy(merchant = "Renamed In Settings"))
         }
         pressDeviceBack(compose)

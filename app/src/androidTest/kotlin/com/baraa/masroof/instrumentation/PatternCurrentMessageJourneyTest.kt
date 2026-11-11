@@ -36,15 +36,15 @@ class PatternCurrentMessageJourneyTest {
         val context = TestStorageContext(compose.activity, "ui-current-${java.util.UUID.randomUUID()}")
         val c = AppContainer(context)
         try {
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             w.saveBank(w.load().generation, BankMessagePatterns("UI_BANK", listOf("UI Bank"), "بنك التجربة"))
             w.confirmPatternAccount("UI_BANK", "1234")
             val body = "Purchase\nAmount:10SAR\nAt:2026-10-15 12:30"
             for ((id, text) in listOf("ui-current" to body, "ui-other" to body.replace("10SAR", "20SAR"))) {
-                c.processRawSmsUseCase.ingest(RawSms(id, "UI Bank", text, Instant.parse("2026-10-15T10:00:00Z"), id, SmsBodyHasher.sha256Hex(text)))
+                c.sms.processRawSmsUseCase.ingest(RawSms(id, "UI Bank", text, Instant.parse("2026-10-15T10:00:00Z"), id, SmsBodyHasher.sha256Hex(text)))
             }
-            val current = c.reviewRepository.findByRawSmsId("ui-current")!!
-            val untouched = c.parsedEventRepository.findByRawSmsId("ui-other")
+            val current = c.storage.reviewRepository.findByRawSmsId("ui-current")!!
+            val untouched = c.storage.parsedEventRepository.findByRawSmsId("ui-other")
             var returnedToReview = false
             compose.setContent {
                 val localized = AppLocaleContext.wrap(LocalContext.current, "ar")
@@ -69,7 +69,7 @@ class PatternCurrentMessageJourneyTest {
             compose.clickAr(R.string.pattern_save)
             // From Review, saving opens the financial approval directly.
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("pattern-financial-save").fetchSemanticsNodes().isNotEmpty() }
-            assertTrue(c.financialTransactionRepository.listAll().isEmpty())
+            assertTrue(c.storage.financialTransactionRepository.listAll().isEmpty())
             compose.waitUntil(10_000) { runCatching { compose.onNodeWithTag("pattern-financial-save").assertIsEnabled() }.isSuccess }
             compose.onNodeWithTag("pattern-financial-save").performScrollTo().performClick()
             // A taught pattern starts off; financial approval is the gate that switches it on.
@@ -83,10 +83,10 @@ class PatternCurrentMessageJourneyTest {
             }
             compose.onNodeWithTag("pattern-apply-current").performScrollTo().performClick()
             compose.waitUntil(15_000) { compose.onAllNodesWithText(compose.ar(R.string.teaching_apply_posted)).fetchSemanticsNodes().isNotEmpty() }
-            assertEquals(ReviewStatus.RESOLVED, c.reviewRepository.getById(current.id)?.status)
-            assertEquals(1, c.financialTransactionRepository.listAll().size)
-            assertEquals(ReviewStatus.REQUIRED, c.reviewRepository.findByRawSmsId("ui-other")!!.status)
-            assertEquals(untouched, c.parsedEventRepository.findByRawSmsId("ui-other"))
+            assertEquals(ReviewStatus.RESOLVED, c.storage.reviewRepository.getById(current.id)?.status)
+            assertEquals(1, c.storage.financialTransactionRepository.listAll().size)
+            assertEquals(ReviewStatus.REQUIRED, c.storage.reviewRepository.findByRawSmsId("ui-other")!!.status)
+            assertEquals(untouched, c.storage.parsedEventRepository.findByRawSmsId("ui-other"))
             compose.onNodeWithText(compose.ar(R.string.teaching_apply_posted)).assertExists()
             // Back is ignored while the post-apply pending refresh is still busy, so retry until it lands.
             val returnToReview = compose.onNodeWithContentDescription(compose.ar(R.string.teaching_return_review))

@@ -69,8 +69,8 @@ class OnboardingBanksJourneyTest {
         }
         val container = AppContainer(context, smsDataSourceOverride = source)
         val store = ViewModelStore()
-        val vm = ViewModelProvider(store, onboardingViewModelFactory(container, container.onboardingPreferencesRepository) { permission })[OnboardingViewModel::class.java]
-        val settings = ViewModelProvider(store, settingsViewModelFactory(container, "test", { permission }))[SettingsViewModel::class.java]
+        val vm = ViewModelProvider(store, onboardingViewModelFactory(container.storage, container.backup, container.review, container.sms, container.patterns, container.storage.onboardingPreferencesRepository) { permission })[OnboardingViewModel::class.java]
+        val settings = ViewModelProvider(store, settingsViewModelFactory(container.storage, container.backup, container.dashboard, container.patterns, container.review, container.sms, container.update, "test", { permission }))[SettingsViewModel::class.java]
         try {
             compose.setContent {
                 val localized = AppLocaleContext.wrap(LocalContext.current, "ar")
@@ -106,7 +106,7 @@ class OnboardingBanksJourneyTest {
             compose.onNodeWithTag("bank-import-date-picker").assertExists()
             compose.onNodeWithTag("sheet-apply").performClick()
             capture("date-range")
-            assertEquals(setOf(bankId), container.onboardingPreferencesRepository.getSetupDraft()?.bankIds)
+            assertEquals(setOf(bankId), container.storage.onboardingPreferencesRepository.getSetupDraft()?.bankIds)
             click(R.string.onboarding_start_import)
             compose.waitUntil(10_000) { vm.uiState.value.step == OnboardingStep.OWNERSHIP && !settings.uiState.value.loading }
             assertEquals(1, queries.get())
@@ -119,7 +119,7 @@ class OnboardingBanksJourneyTest {
             input("manual-last4", "3001")
             click(R.string.pattern_financial_account_owned)
             compose.onNodeWithTag("sheet-cancel").performClick()
-            assertTrue(container.accountRegistryRepository.listAll().isEmpty())
+            assertTrue(container.storage.accountRegistryRepository.listAll().isEmpty())
             click(R.string.onboarding_add_manual)
             click(R.string.settings_add_account_manual)
             compose.onNodeWithTag("sheet-apply").performClick()
@@ -137,14 +137,14 @@ class OnboardingBanksJourneyTest {
             capture("shared-card-setup")
             compose.onNodeWithTag("sheet-apply").performClick()
             compose.waitUntil(10_000) { vm.uiState.value.ownedCardsCount == 1 && !settings.uiState.value.updating }
-            assertEquals(CardType.CREDIT, container.cardRegistryRepository.listAll().single().cardType)
+            assertEquals(CardType.CREDIT, container.storage.cardRegistryRepository.listAll().single().cardType)
             assertTrue(vm.uiState.value.accounts.all { !it.discoveredFromSms })
             assertTrue(vm.uiState.value.cards.all { !it.discoveredFromSms })
-            assertTrue(container.financialTransactionRepository.listAll().isEmpty())
+            assertTrue(container.storage.financialTransactionRepository.listAll().isEmpty())
             capture("review-confirmed")
             click(R.string.onboarding_finalize)
             compose.waitUntil(10_000) { vm.uiState.value.step == OnboardingStep.FINALIZE }
-            assertTrue(container.onboardingPreferencesRepository.isOnboardingCompleted())
+            assertTrue(container.storage.onboardingPreferencesRepository.isOnboardingCompleted())
             capture("complete")
             click(R.string.onboarding_enter_app)
             assertEquals(OnboardingStep.HOME, vm.uiState.value.step)

@@ -74,26 +74,47 @@ class MainActivity : ComponentActivity() {
 
     private val onboardingViewModel: OnboardingViewModel by viewModels {
         onboardingViewModelFactory(
-            container = container,
-            onboardingPreferencesRepository = container.onboardingPreferencesRepository,
+            storage = container.storage,
+            backup = container.backup,
+            review = container.review,
+            sms = container.sms,
+            patterns = container.patterns,
+            onboardingPreferencesRepository = container.storage.onboardingPreferencesRepository,
             permissionStateProvider = { hasSmsPermissions() },
         )
     }
 
     private val dashboardViewModel: DashboardViewModel by viewModels {
         dashboardViewModelFactory(
-            container = container,
+            storage = container.storage,
+            maintenance = container.maintenance,
+            dashboard = container.dashboard,
+            patterns = container.patterns,
+            review = container.review,
+            analytics = { container.analytics },
             permissionStateProvider = { hasSmsPermissions() },
         )
     }
 
     private val reviewViewModel: ReviewViewModel by viewModels {
-        reviewViewModelFactory(container = container)
+        reviewViewModelFactory(
+            storage = container.storage,
+            maintenance = container.maintenance,
+            review = container.review,
+            sms = container.sms,
+            patterns = container.patterns,
+        )
     }
 
     private val settingsViewModel: SettingsViewModel by viewModels {
         settingsViewModelFactory(
-            container = container,
+            storage = container.storage,
+            backup = container.backup,
+            dashboard = container.dashboard,
+            patterns = container.patterns,
+            review = container.review,
+            sms = container.sms,
+            update = container.update,
             appVersion = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
             permissionStateProvider = { hasSmsPermissions() },
             onRequestInstallPermission = {
@@ -103,12 +124,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private val statementReconciliationViewModel: StatementReconciliationViewModel by viewModels {
-        statementReconciliationViewModelFactory(container.statementReconciliationWorkflow)
+        statementReconciliationViewModelFactory(container.sms.statementReconciliationWorkflow)
     }
 
     private val notificationCenterViewModel: NotificationCenterViewModel by viewModels {
         notificationCenterViewModelFactory(
-            container = container,
+            storage = container.storage,
+            dashboard = container.dashboard,
             permissionStateProvider = { hasSmsPermissions() },
         )
     }
@@ -122,9 +144,9 @@ class MainActivity : ComponentActivity() {
             android.widget.Toast.makeText(this, R.string.settings_import_failed, android.widget.Toast.LENGTH_LONG).show()
         }
         setContent {
-            var startupOutcome by rememberStartupMaintenanceOutcome(container::awaitStartupMaintenance) { outcome ->
+            var startupOutcome by rememberStartupMaintenanceOutcome(container.maintenance::awaitStartupMaintenance) { outcome ->
                 startupFinancialReady = outcome == StartupMaintenanceOutcome.READY
-                if (startupFinancialReady) container.scheduleMissedSmsCatchUp()
+                if (startupFinancialReady) container.sms.scheduleMissedSmsCatchUp()
             }
             var startupRetrying by remember { mutableStateOf(false) }
             val startupScope = rememberCoroutineScope()
@@ -143,10 +165,10 @@ class MainActivity : ComponentActivity() {
                                 onRetry = {
                                     startupRetrying = true
                                     startupScope.launch {
-                                        startupOutcome = container.retryStartupMaintenance()
+                                        startupOutcome = container.maintenance.retryStartupMaintenance()
                                         startupFinancialReady =
                                             startupOutcome == StartupMaintenanceOutcome.READY
-                                        if (startupFinancialReady) container.scheduleMissedSmsCatchUp()
+                                        if (startupFinancialReady) container.sms.scheduleMissedSmsCatchUp()
                                         startupRetrying = false
                                     }
                                 },
@@ -193,7 +215,7 @@ class MainActivity : ComponentActivity() {
                         val granted = hasSmsPermissions()
                         onboardingViewModel.onPermissionResult(granted)
                         settingsViewModel.refreshSmsPermissionState()
-                        if (container.onboardingPreferencesRepository.isOnboardingCompleted()) {
+                        if (container.storage.onboardingPreferencesRepository.isOnboardingCompleted()) {
                             dashboardViewModel.refresh()
                         }
                     }
@@ -268,7 +290,7 @@ class MainActivity : ComponentActivity() {
                             importLauncher.launch(arrayOf("*/*"))
                         },
                         onRequestExportLogs = {
-                            val name = container.appLogService.exportFileName()
+                            val name = container.storage.appLogService.exportFileName()
                             logExportLauncher.launch(name)
                         },
                         onRequestRestoreBackup = {
@@ -287,7 +309,7 @@ class MainActivity : ComponentActivity() {
         settingsViewModel.retryInstallAfterPermissionGranted()
         settingsViewModel.refreshSmsPermissionState()
         if (startupFinancialReady &&
-            container.onboardingPreferencesRepository.isOnboardingCompleted()
+            container.storage.onboardingPreferencesRepository.isOnboardingCompleted()
         ) {
             dashboardViewModel.onAppResumed()
             reviewViewModel.refresh()

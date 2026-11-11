@@ -10,19 +10,32 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.*
 import com.baraa.masroof.R
-import com.baraa.masroof.MasroofApplication
 import com.baraa.masroof.MainActivity
 import com.baraa.masroof.data.analytics.*
 import kotlinx.coroutines.Dispatchers
 import java.util.concurrent.TimeUnit
 
-class AnalyticsWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+class AnalyticsWorker(
+    context: Context,
+    params: WorkerParameters,
+    private val awaitStartup: suspend () -> com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome,
+    private val analytics: () -> AnalyticsWorkflow,
+) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
-        val container = (applicationContext as MasroofApplication).container
-        if (container.awaitStartupMaintenance() != com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome.READY) Result.retry()
-        else { container.analytics.refresh(); Result.success() }
+        if (awaitStartup() != com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome.READY) Result.retry()
+        else { analytics().refresh(); Result.success() }
     } catch (e: kotlinx.coroutines.CancellationException) { throw e }
       catch (_: Exception) { Result.retry() }
+
+    /** Creates [AnalyticsWorker]; returns null for any other worker so WorkManager falls back to its default factory. */
+    class Factory(
+        private val awaitStartup: suspend () -> com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome,
+        private val analytics: () -> AnalyticsWorkflow,
+    ) : WorkerFactory() {
+        override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker? =
+            if (workerClassName == AnalyticsWorker::class.java.name) AnalyticsWorker(appContext, workerParameters, awaitStartup, analytics) else null
+    }
+
     companion object {
         const val NAME = "masroof:analytics"
         fun scheduleDaily(context: Context) {

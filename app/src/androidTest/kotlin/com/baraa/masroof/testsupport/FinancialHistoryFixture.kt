@@ -12,9 +12,9 @@ import org.junit.Assert.*
 object FinancialHistoryFixture {
     private val bank=Bank.BANK_ALJAZIRA
     suspend fun own(c: AppContainer) {
-        c.awaitPostStartupBackgroundWorkForTesting()
-        c.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(bank,"3001"))
-        c.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(bank,"7271"))
+        c.maintenance.awaitPostStartupBackgroundWorkForTesting()
+        c.review.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(bank,"3001"))
+        c.review.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(bank,"7271"))
     }
     fun message(id: String,amount: Int): RawSms {
         val at=LocalDateTime.now().minusMinutes(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
@@ -23,15 +23,15 @@ object FinancialHistoryFixture {
     }
     suspend fun seed(c: AppContainer,count: Int) {
         own(c)
-        repeat(count) {index->c.processRawSmsUseCase.ingest(message("replica-synthetic-$index",10+index))}
-        assertEquals(count,c.financialTransactionRepository.listAll().size)
-        assertTrue(c.reviewRepository.listRequired().isEmpty())
+        repeat(count) {index->c.sms.processRawSmsUseCase.ingest(message("replica-synthetic-$index",10+index))}
+        assertEquals(count,c.storage.financialTransactionRepository.listAll().size)
+        assertTrue(c.storage.reviewRepository.listRequired().isEmpty())
     }
     suspend fun fingerprint(c: AppContainer): String {
-        val rows=c.financialTransactionRepository.listAll().sortedBy {it.id}
-        val accounts=c.accountRegistryRepository.listAll().sortedBy {it.id}
-        val cards=c.cardRegistryRepository.listAll().sortedBy {it.id}
-        val rawIds=c.rawSmsRepository.listIdsByReceivedAt().toSet()
+        val rows=c.storage.financialTransactionRepository.listAll().sortedBy {it.id}
+        val accounts=c.storage.accountRegistryRepository.listAll().sortedBy {it.id}
+        val cards=c.storage.cardRegistryRepository.listAll().sortedBy {it.id}
+        val rawIds=c.storage.rawSmsRepository.listIdsByReceivedAt().toSet()
         (accounts.flatMap {listOfNotNull(it.firstSeenRawSmsId,it.lastSeenRawSmsId)}+
             cards.flatMap {listOfNotNull(it.firstSeenRawSmsId,it.lastSeenRawSmsId)}).forEach {assertTrue("Observation must reference retained evidence",it in rawIds)}
         // Original restore re-discovers in persisted id order. Observation pointers may move;

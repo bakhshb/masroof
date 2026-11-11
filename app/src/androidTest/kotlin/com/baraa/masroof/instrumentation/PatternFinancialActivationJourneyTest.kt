@@ -47,10 +47,10 @@ class PatternFinancialActivationJourneyTest {
         val context = TestStorageContext(compose.activity, "financial-pattern-${java.util.UUID.randomUUID()}")
         val c = AppContainer(context)
         try {
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             w.confirmPatternAccount("BANK_STC", "4321")
             val qattah = "دفع قطة\nمبلغ:37.50 ر.س\nإلى:TEST PERSON\nفي:13/10/26 12:30"
-            c.processRawSmsUseCase.ingest(RawSms("qattah", "STC Bank", qattah, Instant.parse("2026-10-15T10:00:00Z"), "qattah",
+            c.sms.processRawSmsUseCase.ingest(RawSms("qattah", "STC Bank", qattah, Instant.parse("2026-10-15T10:00:00Z"), "qattah",
                 SmsBodyHasher.sha256Hex(qattah)))
             compose.setContent {
                 val localized = AppLocaleContext.wrap(LocalContext.current, "ar")
@@ -77,13 +77,13 @@ class PatternFinancialActivationJourneyTest {
         val context = TestStorageContext(compose.activity, "financial-pattern-${java.util.UUID.randomUUID()}")
         val c = AppContainer(context)
         try {
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             w.confirmPatternAccount("BANK_STC", "4321")
             val approvedGeneration = w.load().generation + 1
-            c.processRawSmsUseCase.ingest(sms("pending", "10"))
-            c.processRawSmsUseCase.ingest(sms("pending-second", "20", "654"))
+            c.sms.processRawSmsUseCase.ingest(sms("pending", "10"))
+            c.sms.processRawSmsUseCase.ingest(sms("pending-second", "20", "654"))
             val outgoingBody = "Internal outward transfer\nAmount:5SAR\nTo:OTHER PERSON\nAcc:987\nAt:15/10/26 13:30"
-            c.processRawSmsUseCase.ingest(RawSms("other-pattern", "STC Bank", outgoingBody,
+            c.sms.processRawSmsUseCase.ingest(RawSms("other-pattern", "STC Bank", outgoingBody,
                 Instant.parse("2026-10-15T11:00:00Z"), "other-pattern", SmsBodyHasher.sha256Hex(outgoingBody)))
             val dark = mutableStateOf(false)
             compose.setContent {
@@ -113,29 +113,29 @@ class PatternFinancialActivationJourneyTest {
             compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
             compose.waitUntil(10_000) { compose.onAllNodesWithText(compose.ar(R.string.pattern_financial_approve)).fetchSemanticsNodes().isNotEmpty() }
             assertTrue(w.load().banks.single { it.bankId == "BANK_STC" }.currentPatterns.all { it.factContract == null })
-            assertTrue(c.financialTransactionRepository.listAll().isEmpty())
+            assertTrue(c.storage.financialTransactionRepository.listAll().isEmpty())
             openApproval()
             compose.onNodeWithTag("pattern-financial-save").performScrollTo().performClick()
             compose.waitUntil(10_000) { runBlocking { w.load().generation == approvedGeneration } }
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("pattern-apply-matching").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(compose.ar(R.string.pattern_approval_ready)).assertExists()
-            assertEquals(3, c.reviewRepository.listRequired().size)
-            assertTrue(c.financialTransactionRepository.listAll().isEmpty())
+            assertEquals(3, c.storage.reviewRepository.listRequired().size)
+            assertTrue(c.storage.financialTransactionRepository.listAll().isEmpty())
             compose.onNodeWithTag("pattern-apply-matching").performScrollTo().performClick()
             compose.waitUntil(15_000) { compose.onAllNodesWithTag("pattern-review-change").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("pattern-review-change").assertTextEquals(
                 com.baraa.masroof.application.locale.AppDigits.display(AppLocaleContext.wrap(compose.activity, "ar")
                     .getString(R.string.pattern_approval_review_change, 3, 1)))
             compose.onNodeWithTag("pattern-apply-matching").assertDoesNotExist()
-            assertEquals(1, c.reviewRepository.listRequired().size)
-            assertEquals(ReviewStatus.REQUIRED, c.reviewRepository.findByRawSmsId("other-pattern")!!.status)
-            assertEquals(2, c.financialTransactionRepository.listAll().size)
+            assertEquals(1, c.storage.reviewRepository.listRequired().size)
+            assertEquals(ReviewStatus.REQUIRED, c.storage.reviewRepository.findByRawSmsId("other-pattern")!!.status)
+            assertEquals(2, c.storage.financialTransactionRepository.listAll().size)
             val period = FinancialPeriod(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 1))
-            val account = c.dashboardService.loadOverview(period).accountsFleet!!.accounts.single { it.maskedNumber == "4321" }
+            val account = c.dashboard.dashboardService.loadOverview(period).accountsFleet!!.accounts.single { it.maskedNumber == "4321" }
             assertEquals("30.00", account.totalIn.amount.toPlainString())
-            val evidence = c.parsedEventRepository.findByRawSmsId("pending")
-            c.processRawSmsUseCase.ingest(sms("future", "40", "999"))
-            assertEquals(3, c.financialTransactionRepository.listAll().size)
+            val evidence = c.storage.parsedEventRepository.findByRawSmsId("pending")
+            c.sms.processRawSmsUseCase.ingest(sms("future", "40", "999"))
+            assertEquals(3, c.storage.financialTransactionRepository.listAll().size)
             compose.onNodeWithTag("pattern-advanced").performScrollTo().performClick()
             compose.onNodeWithTag("pattern-restore-BANK_STC-stc-internal-in-1").performScrollTo().performClick()
             compose.waitUntil(10_000) { runBlocking { w.load().generation > approvedGeneration } }
@@ -147,10 +147,10 @@ class PatternFinancialActivationJourneyTest {
             compose.onNodeWithText(compose.ar(R.string.pattern_approval_saved)).assertDoesNotExist()
             compose.onNodeWithText(compose.ar(R.string.pattern_approval_waiting)).assertExists()
             w.setEnabled(w.load().generation, "BANK_STC", "stc-internal-in", false)
-            c.processRawSmsUseCase.ingest(sms("disabled", "50"))
-            c.processStoredSmsUseCase.process("pending")
-            assertEquals(evidence, c.parsedEventRepository.findByRawSmsId("pending"))
-            assertEquals(3, c.financialTransactionRepository.listAll().size)
+            c.sms.processRawSmsUseCase.ingest(sms("disabled", "50"))
+            c.sms.processStoredSmsUseCase.process("pending")
+            assertEquals(evidence, c.storage.parsedEventRepository.findByRawSmsId("pending"))
+            assertEquals(3, c.storage.financialTransactionRepository.listAll().size)
         } finally { c.close(); context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
     }
 }

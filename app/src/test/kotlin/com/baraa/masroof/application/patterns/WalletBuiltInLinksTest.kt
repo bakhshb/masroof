@@ -23,7 +23,7 @@ class WalletBuiltInLinksTest {
 
     @Test fun approvingOneStcPatternLinksTheOtherStcBuiltInsThatNameNoAccount() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             val account = w.confirmPatternAccount("BANK_STC", "4321")
             w.saveFinancial(w.previewFinancial(w.load().generation, "BANK_STC", "stc-qattah", PatternOperation.TRANSFER_OUT,
                 account.id, qattah, null, emptySet()))
@@ -45,7 +45,7 @@ class WalletBuiltInLinksTest {
 
     @Test fun aBuiltInSwitchedOnLaterTakesTheLinkButARemovedLinkIsNotAddedBack() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             w.setEnabled(w.load().generation, "BANK_STC", "stc-qattah-ar", false)
             val account = w.confirmPatternAccount("BANK_STC", "4321")
             w.saveFinancial(w.previewFinancial(w.load().generation, "BANK_STC", "stc-qattah", PatternOperation.TRANSFER_OUT,
@@ -66,7 +66,7 @@ class WalletBuiltInLinksTest {
 
     @Test fun ownApprovedCopyOfAStcLayoutKeepsThatBuiltInUnlinkedAndKeepsPosting() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             val body = "دفع قطة\nمبلغ:37.50 ر.س\nإلى:TEST PERSON A\nفي:13/10/26 12:30"
             val taught = w.saveTeaching(w.teach(w.load().generation, "BANK_STC", "STC Bank", PatternOperation.TRANSFER_OUT, body,
                 listOf(binding(body, "amount", "37.50 ر.س"), binding(body, "counterparty", "TEST PERSON A"), binding(body, "occurred_at", "13/10/26 12:30"))))
@@ -86,7 +86,7 @@ class WalletBuiltInLinksTest {
 
     @Test fun twoOwnedAccountsOrAMessageKeyedLinkLinkNothing() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             val account = w.confirmPatternAccount("BANK_STC", "4321")
             w.confirmPatternAccount("BANK_STC", "8765")
             w.saveFinancial(w.previewFinancial(w.load().generation, "BANK_STC", "stc-qattah", PatternOperation.TRANSFER_OUT,
@@ -94,7 +94,7 @@ class WalletBuiltInLinksTest {
             assertEquals(1, w.load().banks.single { it.bankId == "BANK_STC" }.currentPatterns.count { it.factContract != null })
         }
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             val account = w.confirmPatternAccount("BANK_STC", "4321")
             // "Acc:321 is my account": the message number tells accounts apart, so no account is assumed for other layouts.
             val incoming = "Internal incoming transfer\nAmount:10SAR\nFrom:TEST PERSON\nAcc:321\nAt:15/10/26 12:30"
@@ -106,7 +106,7 @@ class WalletBuiltInLinksTest {
 
     @Test fun noConfirmedLinkLeavesBuiltInsWaitingForApproval() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             w.confirmPatternAccount("BANK_STC", "4321")
             w.linkWalletBuiltIns()
             assertTrue(w.load().banks.single { it.bankId == "BANK_STC" }.currentPatterns.all { it.factContract == null })
@@ -116,7 +116,7 @@ class WalletBuiltInLinksTest {
     @Test fun ownBarqPatternKeepsPostingBesideALinkedBuiltInRule() = runBlocking {
         val body = "حوالة واردة داخلية\n100.00 SAR\nحساب المرسل: **5555\n2026-10-02 22:01"
         for (builtInOn in listOf(true, false)) fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             val account = w.confirmPatternAccount("BANK_BARQ", "1482")
             if (!builtInOn) w.setEnabled(w.load().generation, "BANK_BARQ", "barq.transfer-in", false)
             val taught = w.saveTeaching(w.teach(w.load().generation, "BANK_BARQ", "barq app", PatternOperation.TRANSFER_IN, body,
@@ -149,8 +149,8 @@ class WalletBuiltInLinksTest {
 
     private suspend fun assertPosted(c: AppContainer, id: String, sender: String, body: String,
         sourceLast4: String? = null, destinationLast4: String? = null) {
-        c.processRawSmsUseCase.ingest(RawSms(id, sender, body, Instant.parse("2026-10-15T10:00:00Z"), id, SmsBodyHasher.sha256Hex(body)))
-        val event = c.parsedEventRepository.findByRawSmsId(id)!!.event
+        c.sms.processRawSmsUseCase.ingest(RawSms(id, sender, body, Instant.parse("2026-10-15T10:00:00Z"), id, SmsBodyHasher.sha256Hex(body)))
+        val event = c.storage.parsedEventRepository.findByRawSmsId(id)!!.event
         assertEquals(body, ParseStatus.SUCCESS, event.parseStatus)
         sourceLast4?.let { assertEquals(it, event.sourceAccountRef?.maskedNumber) }
         destinationLast4?.let { assertEquals(it, event.destinationAccountRef?.maskedNumber) }

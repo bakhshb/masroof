@@ -79,21 +79,21 @@ class ProcessDeathJourneyTest {
         assertEquals(
             evidence("startup maintenance succeeded before the journey"),
             com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome.READY,
-            app().container.awaitStartupMaintenance(),
+            app().container.maintenance.awaitStartupMaintenance(),
         )
-        app().container.awaitPostStartupBackgroundWorkForTesting()
+        app().container.maintenance.awaitPostStartupBackgroundWorkForTesting()
     }
 
     @Test(timeout = 120_000)
     fun armAfterCapture() = runBlocking {
         armFinancial(DebugProcessHalt.CAPTURE)
         val rawSmsId = singleRawSmsId()
-        assertNull(evidence("parse has not finished"), app().container.parsedEventRepository.findByRawSmsId(rawSmsId))
-        assertNull(evidence("nothing posted at capture"), app().container.financialTransactionRepository.findByRawSmsId(rawSmsId))
+        assertNull(evidence("parse has not finished"), app().container.storage.parsedEventRepository.findByRawSmsId(rawSmsId))
+        assertNull(evidence("nothing posted at capture"), app().container.storage.financialTransactionRepository.findByRawSmsId(rawSmsId))
         assertEquals(
             evidence("captured RawSms is awaiting processing"),
             listOf(rawSmsId),
-            app().container.rawSmsRepository.listIdsAwaitingProcessing(),
+            app().container.storage.rawSmsRepository.listIdsAwaitingProcessing(),
         )
         JourneyNote.write(filesDir(), rawSmsId)
         DebugProcessHalt.scheduleResume(filesDir())
@@ -110,11 +110,11 @@ class ProcessDeathJourneyTest {
     fun armAfterParsed() = runBlocking {
         armFinancial(DebugProcessHalt.PARSED)
         val rawSmsId = singleRawSmsId()
-        val parsed = app().container.parsedEventRepository.findByRawSmsId(rawSmsId)
+        val parsed = app().container.storage.parsedEventRepository.findByRawSmsId(rawSmsId)
         assertNotNull(evidence("ParsedEvent is durable"), parsed)
         assertEquals(evidence("purchase parsed"), MessageFamily.PURCHASE, parsed!!.event.messageFamily)
         assertEquals(evidence("parse succeeded"), ParseStatus.SUCCESS, parsed.event.parseStatus)
-        assertNull(evidence("reconcile has not posted"), app().container.financialTransactionRepository.findByRawSmsId(rawSmsId))
+        assertNull(evidence("reconcile has not posted"), app().container.storage.financialTransactionRepository.findByRawSmsId(rawSmsId))
         JourneyNote.write(filesDir(), rawSmsId)
         DebugProcessHalt.scheduleResume(filesDir())
     }
@@ -175,7 +175,7 @@ class ProcessDeathJourneyTest {
         awaitStartup()
         waitUntilLiveWorkSettled(note.rawSmsId)
         assertEquals(evidence("same required review row"), note.reviewId, assertRequiredReview(note.rawSmsId))
-        assertEquals(evidence("unknown notice posts nothing"), 0, app().container.financialTransactionRepository.listAll().size)
+        assertEquals(evidence("unknown notice posts nothing"), 0, app().container.storage.financialTransactionRepository.listAll().size)
     }
 
     @Test(timeout = 120_000)
@@ -186,13 +186,13 @@ class ProcessDeathJourneyTest {
         val rawSmsId = waitForSingleRawSms()
         waitForPurchase(rawSmsId)
         waitUntilLiveWorkSettled(rawSmsId)
-        val ignored = app().container.transactionIgnoreService.ignore(postedId(rawSmsId))
+        val ignored = app().container.review.transactionIgnoreService.ignore(postedId(rawSmsId))
         assertTrue(evidence("user ignore succeeded"), ignored is IgnoreResult.Success)
-        val review = app().container.reviewRepository.findByRawSmsId(rawSmsId)
+        val review = app().container.storage.reviewRepository.findByRawSmsId(rawSmsId)
         assertNotNull(evidence("USER_NON_FINANCIAL review"), review)
         assertEquals(evidence("resolved non-financial"), ReviewStatus.RESOLVED, review!!.status)
         assertEquals(evidence("USER_NON_FINANCIAL"), ReviewResolutionKind.USER_NON_FINANCIAL, review.resolutionKind)
-        assertNull(evidence("ignore removes the transaction"), app().container.financialTransactionRepository.findByRawSmsId(rawSmsId))
+        assertNull(evidence("ignore removes the transaction"), app().container.storage.financialTransactionRepository.findByRawSmsId(rawSmsId))
         JourneyNote.write(filesDir(), rawSmsId, reviewId = review.id)
         DebugProcessHalt.scheduleResume(filesDir())
     }
@@ -202,16 +202,16 @@ class ProcessDeathJourneyTest {
         val note = JourneyNote.read(filesDir())
         awaitStartup()
         waitUntilLiveWorkSettled(note.rawSmsId)
-        val review = app().container.reviewRepository.findByRawSmsId(note.rawSmsId)
+        val review = app().container.storage.reviewRepository.findByRawSmsId(note.rawSmsId)
         assertNotNull(evidence("USER_NON_FINANCIAL survived process death"), review)
         assertEquals(evidence("same review row"), note.reviewId, review!!.id)
         assertEquals(evidence("still resolved"), ReviewStatus.RESOLVED, review.status)
         assertEquals(evidence("still USER_NON_FINANCIAL"), ReviewResolutionKind.USER_NON_FINANCIAL, review.resolutionKind)
-        assertNull(evidence("startup did not repost"), app().container.financialTransactionRepository.findByRawSmsId(note.rawSmsId))
-        assertEquals(evidence("no posted transaction"), 0, app().container.financialTransactionRepository.listAll().size)
+        assertNull(evidence("startup did not repost"), app().container.storage.financialTransactionRepository.findByRawSmsId(note.rawSmsId))
+        assertEquals(evidence("no posted transaction"), 0, app().container.storage.financialTransactionRepository.listAll().size)
         assertTrue(
             evidence("USER_NON_FINANCIAL is not a live retry"),
-            app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty(),
+            app().container.storage.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty(),
         )
     }
 
@@ -223,13 +223,13 @@ class ProcessDeathJourneyTest {
         sendBankSms(PURCHASE_BODY)
         awaitHalt(DebugProcessHalt.CAPTURE)
         val rawSmsId = singleRawSmsId()
-        app().container.processingRecovery.markExhausted(rawSmsId)
+        app().container.review.processingRecovery.markExhausted(rawSmsId)
         assertEquals(
             evidence("LIVE processing_retry row"),
             listOf(rawSmsId),
-            app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE),
+            app().container.storage.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE),
         )
-        assertNull(evidence("exhausted retry has not posted"), app().container.financialTransactionRepository.findByRawSmsId(rawSmsId))
+        assertNull(evidence("exhausted retry has not posted"), app().container.storage.financialTransactionRepository.findByRawSmsId(rawSmsId))
         JourneyNote.write(filesDir(), rawSmsId)
         DebugProcessHalt.scheduleResume(filesDir())
     }
@@ -241,18 +241,18 @@ class ProcessDeathJourneyTest {
         awaitFile(File(filesDir(), DebugProcessHalt.RECONCILE_HELD_MARKER_FILE_NAME))
         assertNotNull(
             evidence("resume reached reconcile"),
-            app().container.parsedEventRepository.findByRawSmsId(rawSmsId),
+            app().container.storage.parsedEventRepository.findByRawSmsId(rawSmsId),
         )
         assertEquals(
             evidence("LIVE processing_retry survives incomplete reconcile"),
             listOf(rawSmsId),
-            app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE),
+            app().container.storage.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE),
         )
         assertNull(
             evidence("incomplete reconcile does not post"),
-            app().container.financialTransactionRepository.findByRawSmsId(rawSmsId),
+            app().container.storage.financialTransactionRepository.findByRawSmsId(rawSmsId),
         )
-        assertEquals(evidence("no posted transaction"), 0, app().container.financialTransactionRepository.listAll().size)
+        assertEquals(evidence("no posted transaction"), 0, app().container.storage.financialTransactionRepository.listAll().size)
     }
 
     @Test(timeout = 120_000)
@@ -264,16 +264,16 @@ class ProcessDeathJourneyTest {
                 "historical-process-death", "AlJazira", PURCHASE_BODY, Instant.parse("2026-08-03T14:32:00Z"),
             ),
         )
-        app().container.applicationScope.launch {
-            val batch = app().container.historicalSmsBatchProcessor.startBatch()
+        app().container.storage.applicationScope.launch {
+            val batch = app().container.sms.historicalSmsBatchProcessor.startBatch()
             batch.ingest(raw)
             batch.finish()
         }
         awaitHalt(DebugProcessHalt.PARSED)
-        assertNotNull(app().container.parsedEventRepository.findByRawSmsId(raw.id))
-        assertNull(app().container.financialTransactionRepository.findByRawSmsId(raw.id))
-        assertEquals(listOf(raw.id), app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH))
-        assertTrue(app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty())
+        assertNotNull(app().container.storage.parsedEventRepository.findByRawSmsId(raw.id))
+        assertNull(app().container.storage.financialTransactionRepository.findByRawSmsId(raw.id))
+        assertEquals(listOf(raw.id), app().container.storage.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH))
+        assertTrue(app().container.storage.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.LIVE).isEmpty())
         JourneyNote.write(filesDir(), raw.id)
         DebugProcessHalt.scheduleResume(filesDir())
     }
@@ -289,7 +289,7 @@ class ProcessDeathJourneyTest {
         }
         assertTrue(completed.all { it.state == WorkInfo.State.SUCCEEDED })
         assertPostedOnce(rawSmsId)
-        assertTrue(app().container.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).isEmpty())
+        assertTrue(app().container.storage.processingRetryRepository.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).isEmpty())
         assertTrue(WorkManager.getInstance(targetContext()).getWorkInfosForUniqueWork(
             WorkManagerLiveSmsWorkScheduler.uniqueWorkName(rawSmsId),
         ).get().isEmpty())
@@ -304,7 +304,7 @@ class ProcessDeathJourneyTest {
         waitUntilLiveWorkSettled(rawSmsId)
         val transactionId = postedId(rawSmsId)
         arm(DebugProcessHalt.IGNORE_PENDING)
-        app().container.applicationScope.launch { app().container.transactionIgnoreService.ignore(transactionId) }
+        app().container.storage.applicationScope.launch { app().container.review.transactionIgnoreService.ignore(transactionId) }
         awaitHalt(DebugProcessHalt.IGNORE_PENDING)
         JourneyNote.write(filesDir(), rawSmsId, transactionId = transactionId)
         DebugProcessHalt.scheduleResume(filesDir())
@@ -315,11 +315,11 @@ class ProcessDeathJourneyTest {
         val note = JourneyNote.read(filesDir())
         awaitStartup()
         assertPostedOnce(note.rawSmsId, note.transactionId)
-        assertFalse(app().container.reviewRepository.findByRawSmsId(note.rawSmsId)?.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL)
-        assertTrue(app().container.transactionIgnoreService.ignore(note.transactionId!!) is IgnoreResult.Success)
-        app().container.reconcileStoredEvents()
-        assertNull(app().container.financialTransactionRepository.findByRawSmsId(note.rawSmsId))
-        assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, app().container.reviewRepository.findByRawSmsId(note.rawSmsId)!!.resolutionKind)
+        assertFalse(app().container.storage.reviewRepository.findByRawSmsId(note.rawSmsId)?.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL)
+        assertTrue(app().container.review.transactionIgnoreService.ignore(note.transactionId!!) is IgnoreResult.Success)
+        app().container.review.transactionReconciliationService.reconcileStoredEvents()
+        assertNull(app().container.storage.financialTransactionRepository.findByRawSmsId(note.rawSmsId))
+        assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, app().container.storage.reviewRepository.findByRawSmsId(note.rawSmsId)!!.resolutionKind)
     }
 
     private suspend fun armFinancial(stage: String) {
@@ -335,14 +335,14 @@ class ProcessDeathJourneyTest {
     }
 
     private suspend fun ownAlJaziraCard() {
-        app().container.cardRegistryRepository.setOwnership(
+        app().container.storage.cardRegistryRepository.setOwnership(
             CardReference(Bank.BANK_ALJAZIRA, "7271"),
             OwnershipStatus.OWNED,
         )
     }
 
     private suspend fun awaitStartup() {
-        app().container.awaitStartupMaintenance()
+        app().container.maintenance.awaitStartupMaintenance()
     }
 
     private suspend fun assertPostedOnce(rawSmsId: String, expectedTransactionId: String? = null) {
@@ -353,16 +353,16 @@ class ProcessDeathJourneyTest {
         if (expectedTransactionId != null) {
             assertEquals(evidence("same posted transaction"), expectedTransactionId, transactionId)
         }
-        assertEquals(evidence("exactly one posted transaction"), 1, app().container.financialTransactionRepository.listAll().size)
+        assertEquals(evidence("exactly one posted transaction"), 1, app().container.storage.financialTransactionRepository.listAll().size)
         assertEquals(
             evidence("one RawSms link"),
             listOf(rawSmsId),
-            app().container.financialTransactionRepository.listRawSmsIds(transactionId),
+            app().container.storage.financialTransactionRepository.listRawSmsIds(transactionId),
         )
     }
 
     private suspend fun assertPurchase(rawSmsId: String) {
-        val transaction = app().container.financialTransactionRepository.findByRawSmsId(rawSmsId)
+        val transaction = app().container.storage.financialTransactionRepository.findByRawSmsId(rawSmsId)
         assertNotNull(evidence("financial SMS posted"), transaction)
         assertEquals(evidence("purchase expense"), FinancialTransactionType.EXPENSE, transaction!!.type)
         assertEquals(evidence("merchant"), "Keeta", transaction.merchant)
@@ -370,25 +370,25 @@ class ProcessDeathJourneyTest {
     }
 
     private suspend fun postedId(rawSmsId: String): String =
-        app().container.financialTransactionRepository.findByRawSmsId(rawSmsId)!!.id
+        app().container.storage.financialTransactionRepository.findByRawSmsId(rawSmsId)!!.id
 
     private suspend fun assertRequiredReview(rawSmsId: String): String {
-        val parsed = app().container.parsedEventRepository.findByRawSmsId(rawSmsId)
+        val parsed = app().container.storage.parsedEventRepository.findByRawSmsId(rawSmsId)
         assertNotNull(evidence("notice was parsed"), parsed)
         assertEquals(evidence("unknown family"), MessageFamily.UNKNOWN, parsed!!.event.messageFamily)
         assertEquals(evidence("review required"), ParseStatus.REVIEW_REQUIRED, parsed.event.parseStatus)
-        val review = app().container.reviewRepository.findByRawSmsId(rawSmsId)
+        val review = app().container.storage.reviewRepository.findByRawSmsId(rawSmsId)
         assertNotNull(evidence("REQUIRED review"), review)
         assertEquals(evidence("review still required"), ReviewStatus.REQUIRED, review!!.status)
         assertNull(evidence("not resolved"), review.resolutionKind)
         assertTrue(evidence("reason unknown_message_family"), review.reasons.contains("unknown_message_family"))
         assertFalse(evidence("reason is not parse_review_required"), review.reasons.contains("parse_review_required"))
-        assertNull(evidence("notice is not posted"), app().container.financialTransactionRepository.findByRawSmsId(rawSmsId))
+        assertNull(evidence("notice is not posted"), app().container.storage.financialTransactionRepository.findByRawSmsId(rawSmsId))
         return review.id
     }
 
     private suspend fun singleRawSmsId(): String {
-        val ids = app().container.rawSmsRepository.listIdsByReceivedAt()
+        val ids = app().container.storage.rawSmsRepository.listIdsByReceivedAt()
         assertEquals(evidence("one RawSms row"), 1, ids.size)
         return ids.single()
     }
@@ -396,7 +396,7 @@ class ProcessDeathJourneyTest {
     private suspend fun waitForSingleRawSms(): String {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
         while (System.nanoTime() < deadline) {
-            val ids = app().container.rawSmsRepository.listIdsByReceivedAt()
+            val ids = app().container.storage.rawSmsRepository.listIdsByReceivedAt()
             if (ids.size == 1) return ids.single()
             delay(50)
         }
@@ -406,7 +406,7 @@ class ProcessDeathJourneyTest {
     private suspend fun waitForPurchase(rawSmsId: String) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
         while (System.nanoTime() < deadline) {
-            if (app().container.financialTransactionRepository.findByRawSmsId(rawSmsId) != null) return
+            if (app().container.storage.financialTransactionRepository.findByRawSmsId(rawSmsId) != null) return
             delay(50)
         }
         error(evidence("posted transaction did not appear"))

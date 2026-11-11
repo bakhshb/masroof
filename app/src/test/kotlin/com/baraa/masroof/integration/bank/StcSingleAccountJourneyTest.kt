@@ -53,18 +53,18 @@ class StcSingleAccountJourneyTest {
         val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "stc-single-account-${UUID.randomUUID()}")
         val container = AppContainer(context, smsDataSourceOverride = source)
         try {
-            val workflow = container.messagePatternsWorkflow
-            val imported = container.bankSmsImportWorkflow.import(setOf(bankId), period.startDate, LocalDate.of(2026, 10, 26))
+            val workflow = container.patterns.messagePatternsWorkflow
+            val imported = container.sms.bankSmsImportWorkflow.import(setOf(bankId), period.startDate, LocalDate.of(2026, 10, 26))
             assertEquals(3, imported.inserted)
             assertEquals(3, imported.reviewRequired)
-            assertEquals(3, container.reviewRepository.listRequired().size)
-            assertTrue(container.financialTransactionRepository.listAll().isEmpty())
+            assertEquals(3, container.storage.reviewRepository.listRequired().size)
+            assertTrue(container.storage.financialTransactionRepository.listAll().isEmpty())
 
             // Registering an account cannot itself turn preview matches into financial authority.
-            val ownAccount = container.settingsRegistryWorkflow.addAccount(bankId, "4321", "My STC account")
+            val ownAccount = container.dashboard.settingsRegistryWorkflow.addAccount(bankId, "4321", "My STC account")
             val account = workflow.patternAccounts(bankId).single()
             assertEquals("4321", account.last4)
-            assertTrue(container.dashboardService.loadOverview(period).transactions.isEmpty())
+            assertTrue(container.dashboard.dashboardService.loadOverview(period).transactions.isEmpty())
             assertEquals(PatternApprovalStatus.PREVIEW_ONLY,
                 workflow.catalog().banks.single { it.bankId == bankId }.currentPatterns.single { it.id == "stc-internal-in" }.status)
 
@@ -73,7 +73,7 @@ class StcSingleAccountJourneyTest {
             assertEquals(setOf(incoming, rows[1].body), examples.map { it.body }.toSet())
             assertEquals(setOf("321", "654"), examples.map { it.fields.getValue("account_reference").text }.toSet())
             assertEquals(rows.take(2).map { row ->
-                container.reviewRepository.findByRawSmsId(AndroidSmsMapper.toRawSms(row).id)!!.id
+                container.storage.reviewRepository.findByRawSmsId(AndroidSmsMapper.toRawSms(row).id)!!.id
             }.toSet(), examples.map { it.reviewId }.toSet())
             assertEquals(3, workflow.previewPending(bankId, generation).requiredReviewCount)
 
@@ -92,7 +92,7 @@ class StcSingleAccountJourneyTest {
 
             val beforeApproval = rows.associate { row ->
                 val id = AndroidSmsMapper.toRawSms(row).id
-                id to container.parsedEventRepository.findByRawSmsId(id)
+                id to container.storage.parsedEventRepository.findByRawSmsId(id)
             }
             for ((patternId, operation, example) in listOf(
                 Triple("stc-internal-in", PatternOperation.TRANSFER_IN, incoming),
@@ -102,12 +102,12 @@ class StcSingleAccountJourneyTest {
                     account.id, example, null, setOf("account_reference"))
                 workflow.saveFinancial(preview)
             }
-            assertTrue(container.financialTransactionRepository.listAll().isEmpty())
+            assertTrue(container.storage.financialTransactionRepository.listAll().isEmpty())
             // An approved pattern posts to this account, so it cannot be deleted even before anything is posted.
             val deleteOwn = com.baraa.masroof.application.settings.RegistryDeleteTarget.Account(ownAccount)
             assertEquals(com.baraa.masroof.application.settings.DeleteBlocker.MESSAGE_PATTERN,
-                container.settingsRegistryWorkflow.deletionPreview(deleteOwn).blocker)
-            beforeApproval.forEach { (id, evidence) -> assertEquals(evidence, container.parsedEventRepository.findByRawSmsId(id)) }
+                container.dashboard.settingsRegistryWorkflow.deletionPreview(deleteOwn).blocker)
+            beforeApproval.forEach { (id, evidence) -> assertEquals(evidence, container.storage.parsedEventRepository.findByRawSmsId(id)) }
 
             val approved = workflow.catalog()
             val applied = workflow.applyPending(bankId, approved.generation, patternId = "stc-internal-in")
@@ -119,9 +119,9 @@ class StcSingleAccountJourneyTest {
             assertEquals(1, workflow.previewPending(bankId, approved.generation).requiredReviewCount)
             assertTrue(workflow.approvalExamples(bankId, approved.generation, "stc-internal-in").isEmpty())
             val outgoingId = AndroidSmsMapper.toRawSms(rows.last()).id
-            assertEquals(beforeApproval.getValue(outgoingId), container.parsedEventRepository.findByRawSmsId(outgoingId))
-            assertEquals(ReviewStatus.REQUIRED, container.reviewRepository.findByRawSmsId(outgoingId)!!.status)
-            val inboundOnly = container.dashboardService.loadOverview(period).accountsFleet!!.accounts.single { it.bank == Bank(bankId) }
+            assertEquals(beforeApproval.getValue(outgoingId), container.storage.parsedEventRepository.findByRawSmsId(outgoingId))
+            assertEquals(ReviewStatus.REQUIRED, container.storage.reviewRepository.findByRawSmsId(outgoingId)!!.status)
+            val inboundOnly = container.dashboard.dashboardService.loadOverview(period).accountsFleet!!.accounts.single { it.bank == Bank(bankId) }
             assertEquals("150.00", inboundOnly.totalIn.amount.toPlainString())
             assertEquals("0.00", inboundOnly.totalOut.amount.toPlainString())
 
@@ -131,39 +131,39 @@ class StcSingleAccountJourneyTest {
             assertEquals(1, appliedOutgoing.reviewsBefore)
             assertEquals(0, appliedOutgoing.reviewsAfter)
             assertFalse(appliedOutgoing.incomplete)
-            assertTrue(container.reviewRepository.listRequired().isEmpty())
-            assertEquals(listOf(ownAccount), container.accountRegistryRepository.listAll().map { AccountReference(it.bank, it.maskedNumber) })
+            assertTrue(container.storage.reviewRepository.listRequired().isEmpty())
+            assertEquals(listOf(ownAccount), container.storage.accountRegistryRepository.listAll().map { AccountReference(it.bank, it.maskedNumber) })
 
             rows.forEach { row ->
                 val id = AndroidSmsMapper.toRawSms(row).id
-                assertEquals(ParseStatus.SUCCESS, container.parsedEventRepository.findByRawSmsId(id)!!.event.parseStatus)
-                assertEquals(ReviewStatus.RESOLVED, container.reviewRepository.findByRawSmsId(id)!!.status)
-                assertTrue(container.financialTransactionRepository.isRawSmsLinked(id))
+                assertEquals(ParseStatus.SUCCESS, container.storage.parsedEventRepository.findByRawSmsId(id)!!.event.parseStatus)
+                assertEquals(ReviewStatus.RESOLVED, container.storage.reviewRepository.findByRawSmsId(id)!!.status)
+                assertTrue(container.storage.financialTransactionRepository.isRawSmsLinked(id))
             }
-            val posted = container.financialTransactionRepository.listAll()
+            val posted = container.storage.financialTransactionRepository.listAll()
             assertEquals(2, posted.count { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN })
             assertEquals(1, posted.count { it.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT })
             assertTrue(posted.all { it.sourceContainerId == "account:$bankId:4321" || it.destinationContainerId == "account:$bankId:4321" })
 
-            val dashboard = container.dashboardService.loadOverview(period)
+            val dashboard = container.dashboard.dashboardService.loadOverview(period)
             val stc = requireNotNull(dashboard.accountsFleet).accounts.single { it.bank == Bank(bankId) }
             assertEquals("150.00", stc.totalIn.amount.toPlainString())
             assertEquals("25.00", stc.totalOut.amount.toPlainString())
             assertEquals("125.00", stc.remaining.amount.toPlainString())
             assertEquals(3, dashboard.transactions.size)
             assertEquals(0, workflow.applyPending(bankId, workflow.catalog().generation).processed)
-            assertEquals(posted, container.financialTransactionRepository.listAll())
-            val linked = container.settingsRegistryWorkflow.deletionPreview(deleteOwn)
+            assertEquals(posted, container.storage.financialTransactionRepository.listAll())
+            val linked = container.dashboard.settingsRegistryWorkflow.deletionPreview(deleteOwn)
             assertEquals(com.baraa.masroof.application.settings.DeleteBlocker.LINKED_TRANSACTIONS, linked.blocker)
             assertEquals(3, linked.linkedCount)
-            assertTrue(runCatching { container.settingsRegistryWorkflow.delete(deleteOwn) }.isFailure)
-            assertEquals(listOf(ownAccount), container.accountRegistryRepository.listAll().map { AccountReference(it.bank, it.maskedNumber) })
+            assertTrue(runCatching { container.dashboard.settingsRegistryWorkflow.delete(deleteOwn) }.isFailure)
+            assertEquals(listOf(ownAccount), container.storage.accountRegistryRepository.listAll().map { AccountReference(it.bank, it.maskedNumber) })
 
             // A later counterparty suffix must use the same approved own-account constant.
             val future = row("stc-future", incoming.replace("100SAR", "20SAR").replace("Acc:321", "Acc:999"), "2026-10-17T10:00:00Z")
-            container.processRawSmsUseCase.ingest(AndroidSmsMapper.toRawSms(future))
-            assertEquals(4, container.financialTransactionRepository.listAll().size)
-            val refreshed = container.dashboardService.loadOverview(period).accountsFleet!!.accounts.single { it.bank == Bank(bankId) }
+            container.sms.processRawSmsUseCase.ingest(AndroidSmsMapper.toRawSms(future))
+            assertEquals(4, container.storage.financialTransactionRepository.listAll().size)
+            val refreshed = container.dashboard.dashboardService.loadOverview(period).accountsFleet!!.accounts.single { it.bank == Bank(bankId) }
             assertEquals("170.00", refreshed.totalIn.amount.toPlainString())
             assertEquals("145.00", refreshed.remaining.amount.toPlainString())
         } finally {
@@ -179,23 +179,23 @@ class StcSingleAccountJourneyTest {
             val rows = (1..3).map { index ->
                 AndroidSmsMapper.toRawSms(row("stc-example-$index", incoming.replace("100SAR", "${index}0SAR"), "2026-10-15T10:00:00Z"))
             }
-            rows.forEach { container.processRawSmsUseCase.ingest(it) }
-            val dismissed = container.reviewRepository.findByRawSmsId(rows[1].id)!!
-            container.reviewRepository.markResolved(dismissed.id, ReviewResolutionKind.USER_NON_FINANCIAL, Instant.now(), null)
-            container.userCorrectionRepository.save(UserCorrection("counterparty-edit", rows[2].id,
+            rows.forEach { container.sms.processRawSmsUseCase.ingest(it) }
+            val dismissed = container.storage.reviewRepository.findByRawSmsId(rows[1].id)!!
+            container.storage.reviewRepository.markResolved(dismissed.id, ReviewResolutionKind.USER_NON_FINANCIAL, Instant.now(), null)
+            container.storage.userCorrectionRepository.save(UserCorrection("counterparty-edit", rows[2].id,
                 null, null, null, "Manually corrected person", Instant.now()))
 
-            val workflow = container.messagePatternsWorkflow
+            val workflow = container.patterns.messagePatternsWorkflow
             val snapshot = workflow.load()
             val examples = workflow.approvalExamples(bankId, snapshot.generation, "stc-internal-in")
             assertEquals(listOf(rows[0].body), examples.map { it.body })
-            assertEquals(container.reviewRepository.findByRawSmsId(rows[0].id)!!.id, examples.single().reviewId)
+            assertEquals(container.storage.reviewRepository.findByRawSmsId(rows[0].id)!!.id, examples.single().reviewId)
 
             val bank = snapshot.banks.single { it.bankId == bankId }
             val conflicting = bank.currentPatterns.single { it.id == "stc-internal-in" }.copy(id = "competing-incoming")
             workflow.saveBank(snapshot.generation, bank.copy(patterns = listOf(conflicting)))
             assertTrue(workflow.approvalExamples(bankId, workflow.catalog().generation, "stc-internal-in").isEmpty())
-            assertTrue(container.financialTransactionRepository.listAll().isEmpty())
+            assertTrue(container.storage.financialTransactionRepository.listAll().isEmpty())
         } finally {
             container.close()
             context.getDatabasePath("masroof.db").parentFile?.deleteRecursively()

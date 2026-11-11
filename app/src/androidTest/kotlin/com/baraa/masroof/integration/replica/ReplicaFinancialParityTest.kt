@@ -39,16 +39,16 @@ class ReplicaFinancialParityTest {
         try {
             for (c in listOf(reference,actual)) {
                 // Existing confirmed ownership, including the same suffix in a different bank.
-                for (suffix in listOf("3001","3002","5001")) c.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA,suffix))
-                c.onboardingOwnershipWorkflow.markAccountExternal(AccountReference(Bank.BANK_ALJAZIRA,"5002"))
-                val result = c.historicalSmsScanner.scan(Instant.EPOCH)
+                for (suffix in listOf("3001","3002","5001")) c.review.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA,suffix))
+                c.review.onboardingOwnershipWorkflow.markAccountExternal(AccountReference(Bank.BANK_ALJAZIRA,"5002"))
+                val result = c.sms.historicalSmsScanner.scan(Instant.EPOCH)
                 assertEquals(result.toString(),0,result.failed)
-                assertTrue("The import pass itself must post every supported message", c.financialTransactionRepository.listAll().size == names.size)
-                assertTrue("No additional classification or model refresh",c.reviewRepository.listRequired().isEmpty())
-                assertTrue(c.parsedEventRepository.listAll().all { it.event.confidence.reasons.none { reason -> reason.startsWith("family_origin:") } })
+                assertTrue("The import pass itself must post every supported message", c.storage.financialTransactionRepository.listAll().size == names.size)
+                assertTrue("No additional classification or model refresh",c.storage.reviewRepository.listRequired().isEmpty())
+                assertTrue(c.storage.parsedEventRepository.listAll().all { it.event.confidence.reasons.none { reason -> reason.startsWith("family_origin:") } })
             }
-            val rows = actual.financialTransactionRepository.listAll().sortedBy { it.id }
-            val referenceRows = reference.financialTransactionRepository.listAll().sortedBy { it.id }
+            val rows = actual.storage.financialTransactionRepository.listAll().sortedBy { it.id }
+            val referenceRows = reference.storage.financialTransactionRepository.listAll().sortedBy { it.id }
             // Reviewed engine improvement: explicit external bank identity, never local suffix ownership.
             val external = rows.single { it.amount.amount.toPlainString() == "64.00" }
             assertEquals("account:BANK_D360:5001", external.destinationContainerId)
@@ -57,15 +57,15 @@ class ReplicaFinancialParityTest {
                 "63.00" to FinancialTransactionType.SELF_TRANSFER,"64.00" to FinancialTransactionType.EXTERNAL_TRANSFER_OUT)
             expectedTypes.forEach { (amount,type) -> assertEquals(type,rows.single { it.amount.amount.toPlainString()==amount }.type) }
             assertEquals(6,rows.count { it.type == FinancialTransactionType.LOAN_REPAYMENT })
-            val overview = reference.dashboardService.loadOverview(ReferenceHistory.period())
-            assertOverview(overview,actual.dashboardService.loadOverview(ReferenceHistory.period()))
-            val replay = actual.historicalSmsScanner.scan(Instant.EPOCH)
+            val overview = reference.dashboard.dashboardService.loadOverview(ReferenceHistory.period())
+            assertOverview(overview,actual.dashboard.dashboardService.loadOverview(ReferenceHistory.period()))
+            val replay = actual.sms.historicalSmsScanner.scan(Instant.EPOCH)
             assertEquals(names.size,replay.duplicates)
-            assertEquals(rows,actual.financialTransactionRepository.listAll().sortedBy { it.id })
+            assertEquals(rows,actual.storage.financialTransactionRepository.listAll().sortedBy { it.id })
             actual.close()
             actual = AppContainer(TestStorageContext(host),smsDataSourceOverride = source)
-            assertEquals(rows,actual.financialTransactionRepository.listAll().sortedBy { it.id })
-            assertOverview(overview,actual.dashboardService.loadOverview(ReferenceHistory.period()))
+            assertEquals(rows,actual.storage.financialTransactionRepository.listAll().sortedBy { it.id })
+            assertOverview(overview,actual.dashboard.dashboardService.loadOverview(ReferenceHistory.period()))
         } finally { reference.close(); actual.close(); TestRuntime.reset(host) }
     }
     private suspend fun exercise(names: List<String>) {
@@ -77,43 +77,43 @@ class ReplicaFinancialParityTest {
         var actual = AppContainer(TestStorageContext(host),smsDataSourceOverride = source)
         try {
             for (container in listOf(expected,actual)) {
-                val scan = container.historicalSmsScanner.scan(Instant.EPOCH)
+                val scan = container.sms.historicalSmsScanner.scan(Instant.EPOCH)
                 assertEquals(scan.toString(),0,scan.failed)
                 assertEquals(names.size,scan.scanned)
                 confirmOwnership(container)
             }
-            val expectedRows = expected.financialTransactionRepository.listAll().sortedBy { it.id }
-            val actualRows = actual.financialTransactionRepository.listAll().sortedBy { it.id }
+            val expectedRows = expected.storage.financialTransactionRepository.listAll().sortedBy { it.id }
+            val actualRows = actual.storage.financialTransactionRepository.listAll().sortedBy { it.id }
             assertEquals("Ledger rows",expectedRows,actualRows)
             assertTrue("Financial data must be posted",actualRows.size == names.size)
             val period = ReferenceHistory.period()
-            val baseline = expected.dashboardService.loadOverview(period)
-            assertOverview(baseline,actual.dashboardService.loadOverview(period))
-            assertTrue(actual.dashboardService.loadOverview(period).creditFacilities.hasContent)
-            assertFalse(actual.loanRegistryRepository.listAll().isEmpty())
-            val reviews = actual.reviewRepository.listRequired()
+            val baseline = expected.dashboard.dashboardService.loadOverview(period)
+            assertOverview(baseline,actual.dashboard.dashboardService.loadOverview(period))
+            assertTrue(actual.dashboard.dashboardService.loadOverview(period).creditFacilities.hasContent)
+            assertFalse(actual.storage.loanRegistryRepository.listAll().isEmpty())
+            val reviews = actual.storage.reviewRepository.listRequired()
             assertEquals("All known fixture messages should be automatic after ownership",0,reviews.size)
-            val replay = actual.historicalSmsScanner.scan(Instant.EPOCH)
+            val replay = actual.sms.historicalSmsScanner.scan(Instant.EPOCH)
             assertEquals(0,replay.inserted)
             assertEquals(names.size,replay.duplicates)
-            assertEquals(actualRows,actual.financialTransactionRepository.listAll().sortedBy { it.id })
+            assertEquals(actualRows,actual.storage.financialTransactionRepository.listAll().sortedBy { it.id })
             actual.close()
             actual = AppContainer(TestStorageContext(host),smsDataSourceOverride = source)
-            assertEquals(actualRows,actual.financialTransactionRepository.listAll().sortedBy { it.id })
-            assertOverview(baseline,actual.dashboardService.loadOverview(period))
+            assertEquals(actualRows,actual.storage.financialTransactionRepository.listAll().sortedBy { it.id })
+            assertOverview(baseline,actual.dashboard.dashboardService.loadOverview(period))
             val report = java.io.File(host.getExternalFilesDir(null),"replica-financial-parity-${names.size}.txt")
             report.writeText("Same input: ${names.size} messages\nLedger rows: ${actualRows.size}\nReviews after ownership: ${reviews.size}\nSummary: ${baseline.summary}\nReplay duplicates: ${replay.duplicates}\nReopen preserved ledger and dashboard.\n")
         } finally { expected.close(); actual.close() }
     }
     private suspend fun confirmOwnership(container: AppContainer) {
-        container.accountRegistryRepository.listAll().forEach {
+        container.storage.accountRegistryRepository.listAll().forEach {
             val ref = AccountReference(it.bank,it.maskedNumber)
-            if (it.bank == Bank.BANK_ALJAZIRA) container.onboardingOwnershipWorkflow.confirmAccountOwned(ref)
-            else container.onboardingOwnershipWorkflow.markAccountExternal(ref)
+            if (it.bank == Bank.BANK_ALJAZIRA) container.review.onboardingOwnershipWorkflow.confirmAccountOwned(ref)
+            else container.review.onboardingOwnershipWorkflow.markAccountExternal(ref)
         }
-        container.cardRegistryRepository.listAll().forEach { container.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(it.bank,it.last4)) }
-        container.reconcileStoredEvents()
-        container.refreshReviewQueue()
+        container.storage.cardRegistryRepository.listAll().forEach { container.review.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(it.bank,it.last4)) }
+        container.review.transactionReconciliationService.reconcileStoredEvents()
+        container.review.reviewWorkflowService.refreshReviewQueue()
     }
     private fun assertOverview(expected: DashboardOverview, actual: DashboardOverview) {
         assertEquals("Summary",expected.summary,actual.summary)

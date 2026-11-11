@@ -4,36 +4,46 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.baraa.masroof.application.dashboard.TransactionSmsEvidenceLoader
-import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.container.DashboardContainer
+import com.baraa.masroof.application.container.MaintenanceContainer
+import com.baraa.masroof.application.container.PatternsContainer
+import com.baraa.masroof.application.container.ReviewContainer
+import com.baraa.masroof.application.container.StorageContainer
+import com.baraa.masroof.application.analytics.AnalyticsWorkflow
 import java.time.ZoneId
 
 fun dashboardViewModelFactory(
-    container: AppContainer,
+    storage: StorageContainer,
+    maintenance: MaintenanceContainer,
+    dashboard: DashboardContainer,
+    patterns: PatternsContainer,
+    review: ReviewContainer,
+    analytics: () -> AnalyticsWorkflow,
     permissionStateProvider: () -> Boolean,
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         DashboardViewModel(
-            overviewLoader = container.dashboardService,
-            analytics = container.analytics,
-            dashboardRegistryWorkflow = container.dashboardRegistryWorkflow,
-            dashboardPeriodWorkflow = container.dashboardPeriodWorkflow,
-            layoutPreferencesRepository = container.dashboardLayoutPreferencesRepository,
-            chartDataWorkflow = container.chartDataWorkflow,
-            reclassificationService = container.transactionReclassificationService,
-            ignoreService = container.transactionIgnoreService,
-            dashboardCommitmentsWorkflow = container.dashboardCommitmentsWorkflow,
+            overviewLoader = dashboard.dashboardService,
+            analytics = analytics(),
+            dashboardRegistryWorkflow = dashboard.dashboardRegistryWorkflow,
+            dashboardPeriodWorkflow = dashboard.dashboardPeriodWorkflow,
+            layoutPreferencesRepository = dashboard.dashboardLayoutPreferencesRepository,
+            chartDataWorkflow = dashboard.chartDataWorkflow,
+            reclassificationService = review.transactionReclassificationService,
+            ignoreService = review.transactionIgnoreService,
+            dashboardCommitmentsWorkflow = dashboard.dashboardCommitmentsWorkflow,
             smsEvidenceLoader = TransactionSmsEvidenceLoader(
-                financialTransactionRepository = container.financialTransactionRepository,
-                rawSmsRepository = container.rawSmsRepository,
-                provenance = container.interpretationProvenanceWorkflow::load,
+                financialTransactionRepository = storage.financialTransactionRepository,
+                rawSmsRepository = storage.rawSmsRepository,
+                provenance = patterns.interpretationProvenanceWorkflow::load,
             ),
             permissionStateProvider = permissionStateProvider,
-            appContext = container.applicationContext,
-            appLocaleRepository = container.appLocaleRepository,
-            appLogService = container.appLogService,
+            appContext = storage.appContext,
+            appLocaleRepository = storage.appLocaleRepository,
+            appLogService = storage.appLogService,
             zoneId = zoneId,
-            maintenanceCompletions = container.maintenanceCompletionSignal.completions,
+            maintenanceCompletions = maintenance.completionSignal.completions,
         )
     }
 }

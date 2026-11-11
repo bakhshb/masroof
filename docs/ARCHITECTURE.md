@@ -4,7 +4,7 @@ Masroof has one Android application, one financial database and one bank interpr
 
 ## Modules
 
-- `app`: presentation → application workflows → domain/parsing/data/SMS/bank ports and the pure financial core. `AppContainer` wires the only production runtime.
+- `app`: presentation → application workflows → domain/parsing/data/SMS/bank ports and the pure financial core. `AppContainer` is the manual composition root of the only production runtime (see "Wiring" below).
 - `bank-engine`: pure Kotlin message-pattern matching, literal-role interpretation and extraction evidence, depending only on `finance-core` value contracts. `MessagePatternSmsAdapter` maps its output through `InterpretationDraftMapper` and the production `ParseFinalizer`.
 - `finance-core`: production money/value models, salary and statement periods, bank transaction time, deterministic container/transaction identities, financial classification/impact, transfer matching and assembly, and statement matching. Policies consume supplied facts and return decisions or transactions in memory; there is no ledger, repository, Android dependency or I/O. Existing engine value contracts remain available separately.
 - `ml-assist`: exact human-template family memory, cleaned templates, forecasting and recurring-pattern detection. The engine consumes an injected assistance contract rather than depending on ML implementation.
@@ -15,6 +15,31 @@ Source namespaces use `com.baraa.masroof.engine.bank`, `com.baraa.masroof.financ
 tests use `com.baraa.masroof.integration`. Historical `lab`/`beta` source paths and
 source file prefixes have been removed. Existing serialized backup keys and retired
 work identifiers keep their original spelling for upgrade compatibility.
+
+## Wiring
+
+`AppContainer` is a thin root that builds one plain feature container per area (`application/container/`). There is no DI library.
+Each container takes the objects it needs from the ones built before it, so every shared object (database, access gate, repositories,
+completion signal, schedulers, app log, stores) exists once. A dependency that would form a cycle is read lazily through a lambda.
+
+| Order | Container | Owns |
+|---|---|---|
+| 1 | `StorageContainer` | restore recovery, pattern store, Room database and access gate, repositories, preferences, app log, application scope |
+| 2 | `MaintenanceContainer` | startup integrity repair and its outcome, `MaintenanceCompletionSignal` |
+| 3 | `UpdateContainer` | release checks, pending update, token, APK installer, the shared HTTP client |
+| 4 | `LearningContainer` | `BankInterpretationService` (absent when a test supplies its own bank adapter) |
+| 5 | `ReviewContainer` | ownership, reconciliation, review queue, restore, reclassify and ignore |
+| 6 | `DashboardContainer` | dashboard reads, layout and notification preferences, registries, commitments, exchange-rate writers |
+| 7 | `SmsContainer` | bank routing, capture, processing, historical scan, live intake, reprocessing, statements |
+| 8 | `PatternsContainer` | message-pattern workflows and the learning workflows that read stored evidence |
+| 9 | `BackupContainer` | backup export and restore |
+
+The root also holds `analytics`, `close()` and the shutdown stage. `appWorkerFactory` creates all seven workers
+(`LiveSmsProcessingWorker`, `ExchangeRateEnrichmentWorker`, `HistoricalDerivedRecoveryWorker`, `LiveCaptureRecoveryWorker`,
+`ModelRefreshWorker`, `UpdateCheckWorker`, `AnalyticsWorker`); no worker reads the application. Unknown classes fall back to WorkManager's
+default factory. `DatabaseRestoreRecovery.recover` runs first, inside `StorageContainer`, before the pattern store and Room are created.
+ViewModel factories take the feature containers they read from. Test seams: `bankAdapterOverride`, `smsDataSourceOverride`,
+`databaseOpenHelperFactory`, `restartAfterRestore`.
 
 ## Message-pattern ownership
 
@@ -34,7 +59,7 @@ Keep the existing five modules. Organize by responsibility; a filename containin
 | `app: presentation.patterns` | Render application models and collect user input |
 | `finance-core` | Financial classification, matching and assembly from supplied facts |
 
-`AppContainer` loads `app/src/main/assets/bank-patterns/*.patterns.json`, installs
+`StorageContainer` loads `app/src/main/assets/bank-patterns/*.patterns.json`, installs
 missing bundled definitions before admitting work, and wires the store into
 `ConfiguredPatternAdapters`. Each routing attempt receives a complete immutable
 snapshot. `BankSmsRegistry` evaluates every adapter; only a resolved bank reaches

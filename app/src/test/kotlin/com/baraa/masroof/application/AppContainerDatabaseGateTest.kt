@@ -19,18 +19,18 @@ class AppContainerDatabaseGateTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val container = (context as MasroofApplication).container
         val reads: List<suspend () -> Unit> = listOf(
-            { container.rawSmsRepository.listIdsByReceivedAt() },
-            { container.parsedEventRepository.listAll() },
-            { container.accountRegistryRepository.listAll() },
-            { container.cardRegistryRepository.listAll() },
-            { container.loanRegistryRepository.listAll() },
-            { container.commitmentRepository.listAll() },
-            { container.financialTransactionRepository.listAll() },
-            { container.reviewRepository.listAll() },
-            { container.processingRetryRepository.listRetryableRawSmsIds() },
-            { container.userCorrectionRepository.listForRawSmsId("irrelevant") },
+            { container.storage.rawSmsRepository.listIdsByReceivedAt() },
+            { container.storage.parsedEventRepository.listAll() },
+            { container.storage.accountRegistryRepository.listAll() },
+            { container.storage.cardRegistryRepository.listAll() },
+            { container.storage.loanRegistryRepository.listAll() },
+            { container.storage.commitmentRepository.listAll() },
+            { container.storage.financialTransactionRepository.listAll() },
+            { container.storage.reviewRepository.listAll() },
+            { container.storage.processingRetryRepository.listRetryableRawSmsIds() },
+            { container.storage.userCorrectionRepository.listForRawSmsId("irrelevant") },
         )
-        container.databaseAccessGate.retire()
+        container.storage.databaseAccessGate.retire()
         reads.forEachIndexed { index, read ->
             try {
                 read()

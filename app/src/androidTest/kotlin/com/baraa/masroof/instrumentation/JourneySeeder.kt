@@ -49,21 +49,21 @@ internal object JourneySeeder {
     fun prepare(methodName: String) {
         runBlocking(Dispatchers.IO) {
             val container = application().container
-            container.onboardingPreferencesRepository.setOnboardingStarted(true)
-            container.onboardingPreferencesRepository.setOnboardingCompleted(true)
+            container.storage.onboardingPreferencesRepository.setOnboardingStarted(true)
+            container.storage.onboardingPreferencesRepository.setOnboardingCompleted(true)
             when {
                 methodName.matchesJourney("startup_reachesFinancialUiWhenMaintenanceIsReady") -> Unit
                 methodName.matchesJourney("dashboard_showsPersistedTransactionAfterReload") -> {
                     awaitReadyForFixtures(container)
-                    container.withDatabaseTransaction { seedDashboardTransaction() }
+                    container.storage.withDatabaseTransaction { seedDashboardTransaction() }
                 }
                 methodName.matchesJourney("reviewCorrection_persistsChosenTypeAndReloads") -> {
                     awaitReadyForFixtures(container)
-                    container.withDatabaseTransaction { seedCorrectionReview() }
+                    container.storage.withDatabaseTransaction { seedCorrectionReview() }
                 }
                 methodName.matchesJourney("reviewRestore_persistsRestoredPurchaseAndReloads") -> {
                     awaitReadyForFixtures(container)
-                    container.withDatabaseTransaction { seedIgnoredPurchase() }
+                    container.storage.withDatabaseTransaction { seedIgnoredPurchase() }
                 }
                 else -> error("No device seed for $methodName")
             }
@@ -71,7 +71,7 @@ internal object JourneySeeder {
     }
 
     private suspend fun awaitReadyForFixtures(container: AppContainer) {
-        val outcome = container.awaitStartupMaintenance()
+        val outcome = container.maintenance.awaitStartupMaintenance()
         check(outcome == StartupMaintenanceOutcome.READY) {
             "Device fixtures require startup maintenance READY, was $outcome"
         }
@@ -91,7 +91,7 @@ internal object JourneySeeder {
             parseStatus = ParseStatus.SUCCESS,
             at = now,
         )
-        val saved = container.financialTransactionRepository.save(
+        val saved = container.storage.financialTransactionRepository.save(
             transaction = FinancialTransaction(
                 id = TransactionIdFactory.fromRawSmsIds(listOf(rawSmsId)),
                 type = FinancialTransactionType.EXPENSE,
@@ -114,7 +114,7 @@ internal object JourneySeeder {
         val container = application().container
         // Use durable evidence and the real engine. A rule refresh must read the same
         // amount/merchant and event identity that the manual-resolution UI reads.
-        container.processRawSmsUseCase.ingest(RawSms(
+        container.sms.processRawSmsUseCase.ingest(RawSms(
             id = JourneyFixtures.CORRECTION_SMS,
             sender = "AlJazira",
             body = JourneyFixtures.CORRECTION_BODY,
@@ -122,11 +122,11 @@ internal object JourneySeeder {
             deviceMessageId = JourneyFixtures.CORRECTION_SMS,
             bodyHash = SmsBodyHasher.sha256Hex(JourneyFixtures.CORRECTION_BODY),
         ))
-        val parsed = checkNotNull(container.parsedEventRepository.findByRawSmsId(JourneyFixtures.CORRECTION_SMS))
+        val parsed = checkNotNull(container.storage.parsedEventRepository.findByRawSmsId(JourneyFixtures.CORRECTION_SMS))
         check(parsed.event.amount == Money.of("18.00", Currency.SAR))
         check(parsed.event.merchant == JourneyFixtures.CORRECTION_MERCHANT)
-        check(container.reviewRepository.listRequired().any { it.rawSmsId == JourneyFixtures.CORRECTION_SMS })
-        check(container.financialTransactionRepository.findByRawSmsId(JourneyFixtures.CORRECTION_SMS) == null)
+        check(container.storage.reviewRepository.listRequired().any { it.rawSmsId == JourneyFixtures.CORRECTION_SMS })
+        check(container.storage.financialTransactionRepository.findByRawSmsId(JourneyFixtures.CORRECTION_SMS) == null)
     }
 
     private suspend fun seedIgnoredPurchase() {
@@ -140,13 +140,13 @@ internal object JourneySeeder {
             at = Instant.now(),
         )
         val container = application().container
-        val review = container.reviewRepository.upsertRequired(
+        val review = container.storage.reviewRepository.upsertRequired(
             rawSmsId = JourneyFixtures.RESTORE_SMS,
             kind = ReviewKind.NEEDS_REVIEW,
             reasons = listOf("purchase_without_resolved_owned_instrument"),
             now = Instant.now(),
         )
-        val ignored = container.reviewRepository.markResolved(
+        val ignored = container.storage.reviewRepository.markResolved(
             id = review.id,
             resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
             resolvedAt = Instant.now(),
@@ -165,7 +165,7 @@ internal object JourneySeeder {
         at: Instant,
     ) {
         val container = application().container
-        container.rawSmsRepository.insertIfAbsent(
+        container.storage.rawSmsRepository.insertIfAbsent(
             RawSms(
                 id = rawSmsId,
                 sender = "AlJazira",
@@ -175,7 +175,7 @@ internal object JourneySeeder {
                 bodyHash = SmsBodyHasher.sha256Hex(body),
             ),
         )
-        container.parsedEventRepository.save(
+        container.storage.parsedEventRepository.save(
             ParsedEvent(
                 id = eventId,
                 rawSmsId = rawSmsId,

@@ -48,14 +48,14 @@ class StartupQueryShutdownTest {
         val context = TestStorageContext(host, "retired-restore-close")
         val c = AppContainer(context)
         try {
-            c.runStartupMaintenance()
-            c.awaitPostStartupBackgroundWorkForTesting()
-            c.databaseAccessGate.withRestore {
-                val queued = c.applicationScope.launch(start = CoroutineStart.UNDISPATCHED) {
-                    c.databaseAccessGate.withAccess { error("A queued reader cannot enter retired Room") }
+            c.maintenance.runStartupMaintenance()
+            c.maintenance.awaitPostStartupBackgroundWorkForTesting()
+            c.storage.databaseAccessGate.withRestore {
+                val queued = c.storage.applicationScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    c.storage.databaseAccessGate.withAccess { error("A queued reader cannot enter retired Room") }
                 }
                 assertFalse("Reader is parked behind exclusive restore", queued.isCompleted)
-                c.databaseAccessGate.retire()
+                c.storage.databaseAccessGate.retire()
                 c.close()
                 assertTrue(queued.isCancelled)
             }
@@ -95,8 +95,8 @@ class StartupQueryShutdownTest {
         val closed = CountDownLatch(1)
         val closing = Thread { try { c.close() } finally { closed.countDown() } }.apply { isDaemon = true }
         try {
-            val query = if (startup) { c.runStartupMaintenance(); null }
-                else c.applicationScope.launch { c.rawSmsRepository.listIdsByReceivedAt() }
+            val query = if (startup) { c.maintenance.runStartupMaintenance(); null }
+                else c.storage.applicationScope.launch { c.storage.rawSmsRepository.listIdsByReceivedAt() }
             assertTrue("First connection reached the barrier", entered.await(10, TimeUnit.SECONDS))
             closing.start()
             val drainingStage = if (startup) "STARTUP_DRAINING" else "APPLICATION_DRAINING"
@@ -105,7 +105,7 @@ class StartupQueryShutdownTest {
                 c.shutdownStage !in setOf("DATABASE_CLOSING", "CLOSED") && System.nanoTime() < deadline) {
                 Thread.yield()
             }
-            if (c.startupCancelled) {
+            if (c.maintenance.startupCancelled) {
                 // On the unsafe implementation, let close take Room's write lock while
                 // SQLiteOpenHelper still owns the connection callback monitor.
                 val closingDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
@@ -114,7 +114,7 @@ class StartupQueryShutdownTest {
             assertEquals("Admitted connection must drain before any database close",
                 drainingStage, c.shutdownStage)
             assertFalse("Application queries must also finish normally", query?.isCancelled == true)
-            assertFalse("Cancelling a Room continuation does not stop the connection it is opening", c.startupCancelled)
+            assertFalse("Cancelling a Room continuation does not stop the connection it is opening", c.maintenance.startupCancelled)
             assertEquals(1L, closed.count)
         } finally {
             release.countDown()

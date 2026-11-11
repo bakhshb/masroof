@@ -3,12 +3,20 @@ package com.baraa.masroof.presentation.onboarding
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.container.BackupContainer
+import com.baraa.masroof.application.container.PatternsContainer
+import com.baraa.masroof.application.container.ReviewContainer
+import com.baraa.masroof.application.container.SmsContainer
+import com.baraa.masroof.application.container.StorageContainer
 import com.baraa.masroof.application.onboarding.HistoricalImportGateway
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 
 fun onboardingViewModelFactory(
-    container: AppContainer,
+    storage: StorageContainer,
+    backup: BackupContainer,
+    review: ReviewContainer,
+    sms: SmsContainer,
+    patterns: PatternsContainer,
     onboardingPreferencesRepository: OnboardingPreferencesRepository,
     permissionStateProvider: () -> Boolean,
 ): ViewModelProvider.Factory = viewModelFactory {
@@ -16,17 +24,17 @@ fun onboardingViewModelFactory(
         OnboardingViewModel(
             onboardingPrefs = onboardingPreferencesRepository,
             historicalImportGateway = HistoricalImportGateway { request ->
-                container.bankSmsImportWorkflow.import(request.bankIds, request.from, request.through, request.onProgress)
+                sms.bankSmsImportWorkflow.import(request.bankIds, request.from, request.through, request.onProgress)
             },
-            messagePatternsWorkflow = container.messagePatternsWorkflow,
-            onboardingOwnershipWorkflow = container.onboardingOwnershipWorkflow,
-            refreshReviewQueue = { container.refreshReviewQueue() },
+            messagePatternsWorkflow = patterns.messagePatternsWorkflow,
+            onboardingOwnershipWorkflow = review.onboardingOwnershipWorkflow,
+            refreshReviewQueue = { review.reviewWorkflowService.refreshReviewQueue() },
             reconcileOwnershipChange = { change ->
-                container.reviewWorkflowService.reconcileOwnershipChange(change)
+                review.reviewWorkflowService.reconcileOwnershipChange(change)
             },
-            databaseBackupService = container.databaseBackupService,
+            databaseBackupService = backup.databaseBackupService,
             permissionStateProvider = permissionStateProvider,
-            appLogService = container.appLogService,
+            appLogService = storage.appLogService,
         )
     }
 }

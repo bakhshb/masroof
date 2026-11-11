@@ -21,19 +21,19 @@ internal object FinancialAnalysisReader {
     suspend fun capture(c: AppContainer, start: Instant, end: Instant, zone: ZoneId, clock: Clock = Clock.system(zone)): FinancialAnalysisRead =
         // One transaction: rows and evidence must come from the same commit, or a stored snapshot and its
         // phone alert could mix two states (invalidations reach the generation check asynchronously).
-        c.databaseAccessGate.withAccess { c.database.withTransaction {
-            val accounts = c.accountRegistryRepository.listAll()
-            val cards = c.cardRegistryRepository.listAll()
-            val loans = c.loanRegistryRepository.listAll()
-            val commitments = c.commitmentRepository.listAll()
-            val reviews = c.reviewRepository.listRequired()
-            val scope = DashboardEvidenceScope(c.financialTransactionRepository, c.parsedEventRepository, c.rawSmsRepository)
-            val periodRows = c.financialTransactionRepository.listOccurredBetween(start, end)
+        c.storage.databaseAccessGate.withAccess { c.storage.database.withTransaction {
+            val accounts = c.storage.accountRegistryRepository.listAll()
+            val cards = c.storage.cardRegistryRepository.listAll()
+            val loans = c.storage.loanRegistryRepository.listAll()
+            val commitments = c.storage.commitmentRepository.listAll()
+            val reviews = c.storage.reviewRepository.listRequired()
+            val scope = DashboardEvidenceScope(c.storage.financialTransactionRepository, c.storage.parsedEventRepository, c.storage.rawSmsRepository)
+            val periodRows = c.storage.financialTransactionRepository.listOccurredBetween(start, end)
             var evidence = scope.load(periodRows, cards, end)
             val statementStart = CreditCardOverviewBuilder.resolveStatementSpendingStart(evidence.parsedRecords, evidence.rawSmsById, zone, end)
-            val cardRows = if (statementStart < start) c.financialTransactionRepository.listOccurredBetween(statementStart, end) else emptyList()
-            val sources = c.financialTransactionRepository.getByIds(commitments.map { it.sourceTransactionId })
-            val payments = c.financialTransactionRepository.listByTypes(listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT))
+            val cardRows = if (statementStart < start) c.storage.financialTransactionRepository.listOccurredBetween(statementStart, end) else emptyList()
+            val sources = c.storage.financialTransactionRepository.getByIds(commitments.map { it.sourceTransactionId })
+            val payments = c.storage.financialTransactionRepository.listByTypes(listOf(FinancialTransactionType.CREDIT_CARD_PAYMENT))
             val rows = (periodRows + cardRows + sources + payments).distinctBy { it.id }.sortedWith(compareBy({ it.occurredAt }, { it.id }))
             evidence = scope.extend(evidence, rows)
             val copiedEvidence = evidence
@@ -42,7 +42,7 @@ internal object FinancialAnalysisReader {
                 override suspend fun extend(evidence: DashboardEvidence, transactions: Collection<FinancialTransaction>) = copiedEvidence
             }
             val rowsById = rows.associateBy { it.id }
-            val financial = object : FinancialTransactionRepository by c.financialTransactionRepository {
+            val financial = object : FinancialTransactionRepository by c.storage.financialTransactionRepository {
                 override suspend fun getById(id: String) = rowsById[id]
                 override suspend fun getByIds(ids: Collection<String>) = ids.distinct().mapNotNull(rowsById::get)
                 override suspend fun listAll() = rows
@@ -52,24 +52,24 @@ internal object FinancialAnalysisReader {
                 override suspend fun listByTypesOccurredBetween(types: Collection<FinancialTransactionType>, startInclusive: Instant, endExclusive: Instant) = rows.filter { it.type in types && it.occurredAt >= startInclusive && it.occurredAt < endExclusive }
             }
             val service = DashboardService(financial,
-                object : ReviewRepository by c.reviewRepository {
+                object : ReviewRepository by c.storage.reviewRepository {
                     // Detached reads must never reach the live database, which a restore may already have retired.
                     override suspend fun listRequired() = reviews
                     override suspend fun countRequired() = reviews.size
                 },
-                c.parsedEventRepository, c.rawSmsRepository, c.appLocaleRepository,
-                object : AccountRegistryRepository by c.accountRegistryRepository { override suspend fun listAll() = accounts },
-                object : CardRegistryRepository by c.cardRegistryRepository { override suspend fun listAll() = cards },
-                object : LoanRegistryRepository by c.loanRegistryRepository { override suspend fun listAll() = loans },
-                object : CommitmentRepository by c.commitmentRepository { override suspend fun listAll() = commitments },
+                c.storage.parsedEventRepository, c.storage.rawSmsRepository, c.storage.appLocaleRepository,
+                object : AccountRegistryRepository by c.storage.accountRegistryRepository { override suspend fun listAll() = accounts },
+                object : CardRegistryRepository by c.storage.cardRegistryRepository { override suspend fun listAll() = cards },
+                object : LoanRegistryRepository by c.storage.loanRegistryRepository { override suspend fun listAll() = loans },
+                object : CommitmentRepository by c.storage.commitmentRepository { override suspend fun listAll() = commitments },
                 // Analytics never requests a new rate. Enrichment remains the financial authority.
                 TransactionSarEquivalentResolver(ForeignSarMarketRateProvider { _, _ -> null }), zoneId = zone, clock = clock, evidenceSource = detachedEvidence)
             // A non-financial resolution keeps its retry row but must not block analysis.
-            val retryIds = c.processingRetryRepository.listRetryableRawSmsIds()
+            val retryIds = c.storage.processingRetryRepository.listRetryableRawSmsIds()
             val retry = retryIds.isNotEmpty()
             val incompleteIds = (reviews.map { it.rawSmsId } + retryIds).toSet()
-            val incompleteRaw = c.rawSmsRepository.getByIds(incompleteIds).associateBy { it.id }
-            val incompleteEvents = c.parsedEventRepository.listByRawSmsIds(incompleteIds).associateBy { it.event.rawSmsId }
+            val incompleteRaw = c.storage.rawSmsRepository.getByIds(incompleteIds).associateBy { it.id }
+            val incompleteEvents = c.storage.parsedEventRepository.listByRawSmsIds(incompleteIds).associateBy { it.event.rawSmsId }
             val incompleteDays = incompleteIds.flatMap { id ->
                 val rawSms = incompleteRaw[id] ?: return@flatMap emptyList()
                 val record = incompleteEvents[id]
