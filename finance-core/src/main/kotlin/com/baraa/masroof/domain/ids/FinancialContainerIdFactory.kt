@@ -10,7 +10,7 @@ import java.security.MessageDigest
  *
  * Account and card namespaces are separate so account 7271 and card 7271 never collide.
  *
- * [Bank.UNKNOWN] is not a durable financial-container identity (P7/P8): direct factory
+ * [Bank.UNKNOWN] is not a durable financial-container identity: direct factory
  * methods reject it; reference helpers return null.
  */
 object FinancialContainerIdFactory {

@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.time.Instant
 
-class M8StatementAuthorityTest {
+class StatementAuthorityTest {
     private fun parse(body: String) = RuleInterpreter(RuleLibrary.current()).interpretRouted(MessageInput("m8", "Sender", body, Instant.EPOCH), BankId("TEST"))
     @Test fun colonStatementTitleHasOriginalStatementProofAndPartyTextCannotSupplyIt() {
         val body = "بطاقة إئتمانية: إصدار كشف حساب\nبطاقة: 7271 بطاقة إئتمانية\nإجمالي المبلغ المستحق: SAR 1250.00\nتاريخ الاستحقاق: 2026-08-25"

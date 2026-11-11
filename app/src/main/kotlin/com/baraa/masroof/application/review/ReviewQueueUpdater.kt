@@ -8,7 +8,7 @@ import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.sms.time.InstantClock
 
 /**
- * Applies a P8 [ReconciliationReport] to durable review_item rows.
+ * Applies a [ReconciliationReport] to durable review_item rows.
  *
  * Idempotent: one review per RawSms; createdAt preserved; reasons/kind refreshed.
  */

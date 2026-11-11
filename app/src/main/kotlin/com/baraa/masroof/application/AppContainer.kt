@@ -135,7 +135,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /**
- * Minimal manual composition root for P6–P9.
+ * Minimal manual composition root.
  *
  * No DI framework. Application-scoped database and repositories.
  * Does not use fallbackToDestructiveMigration.

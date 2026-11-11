@@ -35,6 +35,7 @@ import com.baraa.masroof.application.ingestion.ProcessRawSmsUseCase
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.sms.time.InstantClock
 import com.baraa.masroof.testsupport.ingest
+import com.baraa.masroof.testsupport.processRawSmsUseCaseOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -113,7 +114,7 @@ class IntraBankSelfTransferIngestionTest {
       financialTransactionRepository = ftRepo,
       clock = InstantClock.System,
     )
-    ingestion = ProcessRawSmsUseCase(
+    ingestion = processRawSmsUseCaseOf(
       rawSmsRepository = rawRepo,
       parsedEventRepository = parsedRepo,
       bankSmsRegistry = BankSmsRegistry(listOf(engineFixtureAdapter())),

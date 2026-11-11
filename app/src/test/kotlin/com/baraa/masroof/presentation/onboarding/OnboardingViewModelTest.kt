@@ -431,7 +431,7 @@ AccountRegistryEntry.forTest(
     }
 
     @Test
-    fun ownershipActions_callP7AndCanRevise() = runTest {
+    fun ownershipActions_callOwnershipWorkflowAndCanRevise() = runTest {
         val fixture = Fixture(
             permissionGranted = true,
             accounts = mutableListOf(

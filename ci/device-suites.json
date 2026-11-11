@@ -5,40 +5,40 @@
   "shards": 4,
   "processDeath": [
     [
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#armAfterCapture",
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#resumeAfterCapture"
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#armAfterCapture",
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#resumeAfterCapture"
     ],
     [
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#armAfterParsed",
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#resumeAfterParsed"
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#armAfterParsed",
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#resumeAfterParsed"
     ],
     [
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#armAfterReconciled",
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#resumeAfterReconciled"
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#armAfterReconciled",
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#resumeAfterReconciled"
     ],
     [
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#armAfterReview",
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#resumeAfterReview"
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#armAfterReview",
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#resumeAfterReview"
     ],
     [
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#armRequiredReview",
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#resumeRequiredReview"
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#armRequiredReview",
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#resumeRequiredReview"
     ],
     [
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#armUserNonFinancial",
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#resumeUserNonFinancial"
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#armUserNonFinancial",
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#resumeUserNonFinancial"
     ],
     [
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#armLiveRetry",
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#resumeLiveRetry"
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#armLiveRetry",
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#resumeLiveRetry"
     ],
     [
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#armHistoricalAfterParsed",
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#resumeHistoricalAfterParsed"
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#armHistoricalAfterParsed",
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#resumeHistoricalAfterParsed"
     ],
     [
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#armInsideIgnoreTransaction",
-      "com.baraa.masroof.instrumentation.processdeath.M13ProcessDeathJourneyTest#resumeInsideIgnoreTransaction"
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#armInsideIgnoreTransaction",
+      "com.baraa.masroof.instrumentation.processdeath.ProcessDeathJourneyTest#resumeInsideIgnoreTransaction"
     ],
     [
       "com.baraa.masroof.instrumentation.processdeath.LearningProcessDeathJourneyTest#armAfterFinancialCorrectionBeforeLearning",

@@ -43,7 +43,7 @@ import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
-import com.baraa.masroof.parsing.parser.SmsParseGateway
+import com.baraa.masroof.testsupport.SmsParseGateway
 import com.baraa.masroof.sms.datasource.InboxRow
 import com.baraa.masroof.sms.datasource.SmsDataSource
 import com.baraa.masroof.sms.datasource.SmsPermissionException
@@ -577,7 +577,7 @@ class HistoricalSmsScannerTest {
         fun scanner(rows: List<ProviderSmsRecord>): HistoricalSmsScanner =
             HistoricalSmsScanner(FakeSmsDataSource(rows.map { InboxRow.Valid(it) }), batchProcessor())
 
-        /** Pre-M3.3 behavior: per-message derived processing, then two full passes at scan end. */
+        /** Per-message behavior: per-message derived processing, then two full passes at scan end. */
         suspend fun legacyImport(rows: List<ProviderSmsRecord>): SmsScanResult {
             val facade = ProcessRawSmsUseCase(capture, processStored)
             var result = SmsScanResult()

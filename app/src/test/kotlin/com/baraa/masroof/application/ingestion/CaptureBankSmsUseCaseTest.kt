@@ -20,7 +20,7 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.RawSmsInsertResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.parsing.model.BankDetectionResult
-import com.baraa.masroof.parsing.parser.SmsParseGateway
+import com.baraa.masroof.testsupport.SmsParseGateway
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import com.baraa.masroof.sms.receiver.LiveReceiptTimestamp

@@ -39,7 +39,7 @@ class DatabaseBackupService(
      */
     private val onlineBackupEnabled: Boolean = true,
     /**
-     * Uncompressed ZIP caps from M4, applied before the live database is closed.
+     * Uncompressed ZIP caps, applied before the live database is closed.
      * Tests inject a smaller [BackupArchiveLimits] to prove a zip bomb stops.
      */
     private val archiveLimits: BackupArchiveLimits = BackupArchiveLimits.PRODUCTION,
@@ -256,7 +256,7 @@ class DatabaseBackupService(
                         }
                     }
                     else -> {
-                        // Plaintext ZIPs and unrecognized bytes share M4's validator.
+                        // Plaintext ZIPs and unrecognized bytes share the archive validator.
                         // A ZIP that passes validation still needs explicit legacy
                         // confirmation before the live database is closed.
                         legacyPlaintext = BackupPackageFormat.looksLikeZip(peek, read)

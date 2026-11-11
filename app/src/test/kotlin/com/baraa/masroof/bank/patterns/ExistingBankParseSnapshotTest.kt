@@ -3,7 +3,6 @@ package com.baraa.masroof.bank.patterns
 import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.bank.MessagePatternSmsAdapter
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.integration.bank.NewEngineFixtureTest
 import com.baraa.masroof.parsing.model.BankDetectionResult
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.engine.bank.MoneyDirection
@@ -82,11 +81,18 @@ class ExistingBankParseSnapshotTest {
 
     @Test fun everyEngineFixtureIsDetectedAsAlJazira() {
         val adapter = bundledAlJaziraPatternAdapter()
-        val fixtures = NewEngineFixtureTest.cases().map { Json.parseToJsonElement(it.single().readText()).jsonObject }
-        assertTrue(fixtures.isNotEmpty())
-        for (row in fixtures) {
-            val detection = adapter.detect(row.getValue("sender").jsonPrimitive.content, row.getValue("body").jsonPrimitive.content)
-            assertEquals(row.getValue("id").jsonPrimitive.content, Bank.BANK_ALJAZIRA, (detection as? BankDetectionResult.Detected)?.bank)
+        val canonical = listOf(File("src/test/resources/testdata/bank_aljazira"), File("src/test/resources/testdata/engine"))
+            .flatMap { it.walkTopDown().toList() }.filter { it.extension == "json" && it.name != "jazira_sms_bodies.json" }
+            .map { Json.parseToJsonElement(it.readText()).jsonObject }
+            .map { Triple(it.getValue("id").jsonPrimitive.content, it.getValue("sender").jsonPrimitive.content, it.getValue("body").jsonPrimitive.content) }
+        val reference = Json.parseToJsonElement(File("src/test/resources/testdata/bank_aljazira/reference/jazira_sms_bodies.json").readText())
+            .jsonObject.getValue("messages").jsonArray
+            .map { Triple(it.jsonObject.getValue("id").jsonPrimitive.content, "AlJazira", it.jsonObject.getValue("body").jsonPrimitive.content) }
+        val fixtures = canonical + reference
+        assertTrue(fixtures.size >= 55)
+        for ((id, sender, body) in fixtures) {
+            val detection = adapter.detect(sender, body)
+            assertEquals(id, Bank.BANK_ALJAZIRA, (detection as? BankDetectionResult.Detected)?.bank)
         }
     }
 }

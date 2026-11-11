@@ -387,7 +387,7 @@ class DatabaseBackupEncryptionTest {
                 val closed = AtomicBoolean(false)
                 val logs = AppLogService(context).also { it.clear() }
                 // The decrypted ZIP stays under the streaming cap. The uncompressed
-                // entry exceeds M4's per-entry limit, so the archive validator rejects it.
+                // entry exceeds the per-entry limit, so the archive validator rejects it.
                 val importer = service(
                     live,
                     logs = logs,

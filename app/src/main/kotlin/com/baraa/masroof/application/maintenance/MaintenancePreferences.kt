@@ -9,7 +9,7 @@ object MaintenancePreferences {
     /**
      * Last completed transfer-integrity repair pass.
      *
-     * Pre-M1 ledgers may store one self-transfer per SMS leg. After upgrade this
+     * Older ledgers may store one self-transfer per SMS leg. After upgrade this
      * pass unlinks irreducibly ambiguous legs into PENDING_MATCH review and
      * heals uniquely pairable legs, once, before financial screens are shown.
      */

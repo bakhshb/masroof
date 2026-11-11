@@ -41,13 +41,14 @@ import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
-import com.baraa.masroof.parsing.parser.SmsParseGateway
+import com.baraa.masroof.testsupport.SmsParseGateway
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.sms.mapper.AndroidSmsMapper
 import com.baraa.masroof.sms.model.ProviderSmsRecord
 import com.baraa.masroof.sms.time.InstantClock
 import com.baraa.masroof.testsupport.ingest
+import com.baraa.masroof.testsupport.processRawSmsUseCaseOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -517,7 +518,7 @@ class ProcessRawSmsUseCaseTest {
         parsed: ParsedEventRepository = parsedRepo,
         ledger: FinancialTransactionRepository? = null,
         reviews: ReviewRepository? = null,
-    ) = ProcessRawSmsUseCase(
+    ) = processRawSmsUseCaseOf(
         rawSmsRepository = rawRepo,
         parsedEventRepository = parsed,
         bankSmsRegistry = alJaziraSmsRegistry(pipeline = pipeline),
@@ -539,7 +540,7 @@ class ProcessRawSmsUseCaseTest {
     private fun reviewingUseCase(
         pipeline: SmsParseGateway,
         reviewRepo: com.baraa.masroof.data.repository.RoomReviewRepository,
-    ) = ProcessRawSmsUseCase(
+    ) = processRawSmsUseCaseOf(
         rawSmsRepository = rawRepo,
         parsedEventRepository = parsedRepo,
         bankSmsRegistry = alJaziraSmsRegistry(pipeline = pipeline),
@@ -860,7 +861,7 @@ class ProcessRawSmsUseCaseTest {
     @Test
     fun secondBankRegistered_alJaziraSenderStillRoutesToAlJazira() = runBlocking {
         val stub = com.baraa.masroof.bank.contract.StubBankSmsAdapter()
-        val svc = ProcessRawSmsUseCase(
+        val svc = processRawSmsUseCaseOf(
             rawSmsRepository = rawRepo,
             parsedEventRepository = parsedRepo,
             bankSmsRegistry = BankSmsRegistry(listOf(stub, engineFixtureAdapter())),

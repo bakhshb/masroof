@@ -6,7 +6,7 @@ import androidx.test.runner.AndroidJUnitRunner
 import com.baraa.masroof.application.sms.DebugProcessHalt
 
 /**
- * Removes the M13 halt request before [com.baraa.masroof.MasroofApplication.onCreate]
+ * Removes the process-death halt request before [com.baraa.masroof.MasroofApplication.onCreate]
  * when the instrumentation argument `m13Resume` is true.
  *
  * `onCreate` receives the bundle before [callApplicationOnCreate] runs
