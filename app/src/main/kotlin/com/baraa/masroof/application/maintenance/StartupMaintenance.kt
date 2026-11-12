@@ -5,10 +5,10 @@ enum class StartupMaintenanceOutcome {
     BLOCKED,
 }
 
-/** Financial screens stay blocked until current-data integrity repair succeeds. */
-class StartupMaintenance(private val transferIntegrityRepair: TransferIntegrityRepairCoordinator? = null) {
-    suspend fun runBlockingPhase(): StartupMaintenanceOutcome = when (transferIntegrityRepair?.runIfNeeded()) {
-        BackfillOutcome.INCOMPLETE -> StartupMaintenanceOutcome.BLOCKED
-        else -> StartupMaintenanceOutcome.READY
+/** Financial screens stay blocked until the financial store opens; a store that cannot open throws (fails closed). */
+class StartupMaintenance(private val openFinancialStore: suspend () -> Unit) {
+    suspend fun runBlockingPhase(): StartupMaintenanceOutcome {
+        openFinancialStore()
+        return StartupMaintenanceOutcome.READY
     }
 }

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application
 
+import com.baraa.masroof.application.container.MaintenanceContainer
 import com.baraa.masroof.application.container.appWorkerFactory
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -87,15 +88,33 @@ class AppContainerStartupMaintenanceTest {
     }
 
     @Test
-    fun successfulRetry_updatesTheAuthorityReadByRecreatedActivities() = runBlocking {
-        recordLastReparsedVersion(MasroofDatabase.VERSION)
-        prefs().edit().putString(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, "invalid-type").commit()
+    fun aFinancialStoreThatCannotOpen_blocksStartup_andIsPreserved() = runBlocking {
+        val file = context.getDatabasePath(MasroofDatabase.NAME).apply { parentFile!!.mkdirs() }
+        val bytes = ("SQLite format 3\u0000" + "damaged-sqlite-test-file".repeat(100)).toByteArray()
+        file.writeBytes(bytes)
         container.maintenance.runStartupMaintenance()
-        assertEquals(StartupMaintenanceOutcome.BLOCKED, container.maintenance.awaitStartupMaintenance())
-        prefs().edit().remove(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION).commit()
-        assertEquals(StartupMaintenanceOutcome.READY, container.maintenance.retryStartupMaintenance())
-        assertEquals(StartupMaintenanceOutcome.READY, container.maintenance.awaitStartupMaintenance())
-        assertEquals(StartupMaintenanceOutcome.READY, container.maintenance.awaitStartupMaintenance())
+        assertEquals(
+            StartupMaintenanceOutcome.BLOCKED,
+            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.maintenance.awaitStartupMaintenance() },
+        )
+        assertTrue(bytes.contentEquals(file.readBytes()))
+    }
+
+    @Test
+    fun successfulRetry_updatesTheAuthorityReadByRecreatedActivities() = runBlocking {
+        var storeOpens = false
+        val maintenance = MaintenanceContainer(
+            container.storage,
+            openFinancialStore = { check(storeOpens) { "file is not a database" } },
+            runPostStartupBackgroundWork = {},
+            isOpen = { true },
+        )
+        maintenance.runStartupMaintenance()
+        assertEquals(StartupMaintenanceOutcome.BLOCKED, maintenance.awaitStartupMaintenance())
+        storeOpens = true
+        assertEquals(StartupMaintenanceOutcome.READY, maintenance.retryStartupMaintenance())
+        assertEquals(StartupMaintenanceOutcome.READY, maintenance.awaitStartupMaintenance())
+        assertEquals(StartupMaintenanceOutcome.READY, maintenance.awaitStartupMaintenance())
     }
 
     private fun backfillWork(): List<WorkInfo> =

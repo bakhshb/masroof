@@ -7,11 +7,9 @@ object MaintenancePreferences {
     const val KEY_LAST_REPARSED_SCHEMA_VERSION: String = "last_reparsed_schema_version"
 
     /**
-     * Last completed transfer-integrity repair pass.
-     *
-     * Older ledgers may store one self-transfer per SMS leg. After upgrade this
-     * pass unlinks irreducibly ambiguous legs into PENDING_MATCH review and
-     * heals uniquely pairable legs, once, before financial screens are shown.
+     * Retired marker of the one-time transfer-integrity repair (deleted in plan 3.3c; `LedgerProjector` now releases
+     * double-posted single-leg self-transfers in every pass). Kept only for restore-journal compatibility; never
+     * schedules work. The name stays reserved: never reuse it.
      */
     const val KEY_TRANSFER_INTEGRITY_REPAIR_VERSION: String = "transfer_integrity_repair_version"
 }

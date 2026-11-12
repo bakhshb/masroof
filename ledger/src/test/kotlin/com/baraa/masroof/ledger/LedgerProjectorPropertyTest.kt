@@ -1,5 +1,10 @@
 package com.baraa.masroof.ledger
 
+import com.baraa.masroof.domain.assembly.TransactionAssembler
+import com.baraa.masroof.domain.assembly.TransactionTiming
+import com.baraa.masroof.domain.matching.TransactionMatcher
+import com.baraa.masroof.domain.matching.TransferMatchCandidate
+import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.EffectiveUserDecisions
@@ -82,17 +87,32 @@ class LedgerProjectorPropertyTest {
     /**
      * The keep invariant: every stored row is in the projection verbatim, or replaced by (a) one derived row on its
      * raw SMS set with the same type and amount (FEE→LOAN_REPAYMENT allowed), (b) a self-transfer pair joining a stored
-     * external or single-leg self-transfer leg, or (c) dropped as a lone, unprotected informational row. A protected
-     * row is always verbatim.
+     * external or single-leg self-transfer leg, (c) dropped as a lone, unprotected informational row, or (d) released
+     * as a double-posted single-leg self-transfer ([doublePosted], an independent reading of the rule): replaced by a
+     * self-transfer pair containing it, or by a lone row of its own leg, or by no row and a PENDING_MATCH candidate.
+     * A protected row is always verbatim.
      */
     @Test
     fun everyStoredRowIsKeptVerbatimOrReplacedByAnAllowedRule() {
         var replaced = 0
+        var doubles = 0
         for (seed in seeds) {
             val corpus = corpus(Random(seed))
             val result = corpus.project()
             val events = corpus.events.associateBy { it.event.rawSmsId }
+            val doublePosted = doublePosted(corpus)
             for (row in corpus.stored.rows) {
+                if (row.rawSmsIds.singleOrNull() in doublePosted) {
+                    val id = row.rawSmsIds.single()
+                    val over = result.rows.filter { id in it.rawSmsIds }
+                    val pending = result.reviewCandidates.any { it.rawSmsId == id && it.kind == ReviewKind.PENDING_MATCH }
+                    val replacement = over.singleOrNull()
+                    val pairOrOwn = replacement != null && replacement != row && (replacement.rawSmsIds == listOf(id) ||
+                        replacement.rawSmsIds.size == 2 && replacement.transaction.type == FinancialTransactionType.SELF_TRANSFER)
+                    assertTrue(pairOrOwn || over.isEmpty() && pending, "seed $seed: double-posted $row became $over")
+                    doubles++
+                    continue
+                }
                 if (row in result.rows) continue
                 val sameId = result.rows.singleOrNull { it.transaction.id == row.transaction.id }
                 if (row.rawSmsIds.isEmpty()) {
@@ -120,7 +140,7 @@ class LedgerProjectorPropertyTest {
                     (derived.transaction.type == row.transaction.type ||
                         row.transaction.type == FinancialTransactionType.FEE && derived.transaction.type == FinancialTransactionType.LOAN_REPAYMENT)
                 val joinable = row.transaction.type in setOf(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, FinancialTransactionType.EXTERNAL_TRANSFER_IN) ||
-                    row.transaction.type == FinancialTransactionType.SELF_TRANSFER && row.transaction.linkedParsedEventIds.size == 1
+                    row.isSingleLegSelf()
                 val joined = single != null && joinable && derived != null && derived.transaction.type == FinancialTransactionType.SELF_TRANSFER &&
                     derived.rawSmsIds.size == 2 && single in derived.rawSmsIds
                 assertTrue(informational || sameSet || joined, "seed $seed: $row replaced by $over")
@@ -128,6 +148,7 @@ class LedgerProjectorPropertyTest {
             }
         }
         assertTrue(replaced > 100, "corpora must replace some stored rows: $replaced")
+        assertTrue(doubles > 10, "corpora must release double-posted legs: $doubles")
     }
 
     @Test
@@ -236,10 +257,15 @@ class LedgerProjectorPropertyTest {
 
     /**
      * Stored rows link one, two or three raw SMS, never one SMS twice; some link raw SMS without evidence, a few link
-     * none. A quarter of the corpora store a consistent earlier ledger instead: the projection with nothing stored.
+     * none. A quarter of the corpora store a consistent earlier ledger instead: the projection with nothing stored;
+     * an eighth store the old per-leg ledger: every transfer leg as its own single-leg self-transfer.
      */
     private fun storedRows(random: Random, events: List<LedgerEvidence>, registry: OwnershipFacts): List<LedgerRow> {
-        if (random.nextInt(4) == 0) return LedgerProjector.project(events, emptyMap(), registry, StoredFacts(), ZoneOffset.ofHours(2)).rows
+        when (random.nextInt(8)) {
+            0, 1 -> return LedgerProjector.project(events, emptyMap(), registry, StoredFacts(), ZoneOffset.ofHours(2)).rows
+            2 -> return events.filter { it.event.messageFamily.isTransfer() }
+                .map { storedRow(it.event.rawSmsId, type = FinancialTransactionType.SELF_TRANSFER) }
+        }
         val ids = events.map { it.event.rawSmsId }
         val storedIds = (ids.filter { random.nextInt(3) == 0 } + listOf("ghost1", "ghost2").filter { random.nextInt(3) == 0 }).shuffled(random)
         val sets = mutableListOf<List<String>>()
@@ -260,6 +286,40 @@ class LedgerProjectorPropertyTest {
         }
         return sets.map { row(*it.toTypedArray()) } + linkless
     }
+
+    /**
+     * The double-posted rule read from the inputs alone: unprotected stored single-leg self-transfers of one raw SMS,
+     * not in a mutually unique pair among the eligible transfer legs, each with another such row as its pending
+     * intra-bank counterpart.
+     */
+    private fun doublePosted(corpus: Corpus): Set<String> {
+        val zone = ZoneOffset.ofHours(2)
+        val storedZone = corpus.stored.rows.flatMap { row -> row.rawSmsIds.map { it to row.transaction.occurredAtZone } }.toMap()
+        val eligible = corpus.events.filter { record ->
+            val decided = corpus.decisions[record.event.rawSmsId] ?: EffectiveUserDecisions.NONE
+            (record.event.messageFamily == MessageFamily.TRANSFER_IN || record.event.messageFamily == MessageFamily.TRANSFER_OUT) &&
+                !decided.isNonFinancial &&
+                TransactionAssembler.isAutomationEligible(record.event, record.automationConfirmed || decided.confirmsFinancial)
+        }.associate { record ->
+            val event = record.event
+            event.rawSmsId to TransferMatchCandidate(
+                event, record.transactionReference, record.occurredAtLocal, record.receivedAt,
+                corpus.registry.account(event.sourceAccountRef), corpus.registry.account(event.destinationAccountRef),
+                TransactionTiming.effectiveOccurredAt(event, record.occurredAtLocal, record.receivedAt, zone, storedZone[event.rawSmsId]),
+            )
+        }
+        val paired = TransactionMatcher.findMutuallyUniquePairs(eligible.values.toList())
+            .flatMap { listOf(it.outgoing.event.rawSmsId, it.incoming.event.rawSmsId) }.toSet()
+        val singles = corpus.stored.rows.filter { it.isSingleLegSelf() }.map { it.rawSmsIds.single() }.filter { id ->
+            corpus.decisions[id]?.outcome == null && id !in corpus.stored.correctionClosedRawSmsIds && id in eligible && id !in paired
+        }
+        return singles.filterTo(mutableSetOf()) { id ->
+            singles.any { other -> other != id && TransactionMatcher.hasPendingIntraBankCounterpart(eligible.getValue(id), listOf(eligible.getValue(other))) }
+        }
+    }
+
+    private fun LedgerRow.isSingleLegSelf() =
+        rawSmsIds.size == 1 && transaction.type == FinancialTransactionType.SELF_TRANSFER && transaction.linkedParsedEventIds.size == 1
 
     private fun decisionRows(random: Random, ids: List<String>) = (0 until random.nextInt(0, 4)).map {
         val subject = ids.random(random)

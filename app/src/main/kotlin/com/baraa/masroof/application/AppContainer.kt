@@ -50,7 +50,7 @@ class AppContainer(
 
     val maintenance: MaintenanceContainer = MaintenanceContainer(
         storage,
-        repairStoredTransfers = { review.repairLegacyTransfers() },
+        openFinancialStore = storage::openDatabase,
         runPostStartupBackgroundWork = { runPostStartupBackgroundWork() },
         isOpen = { shutdownStage == "OPEN" },
     )

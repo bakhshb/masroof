@@ -350,7 +350,7 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         appLogService = NoOpAppLog,
     )
 
-    /** Reparse, reconcile, and legacy transfer repair on the unwrapped production path. */
+    /** Reparse and reconcile on the unwrapped production path. */
     suspend fun replayProduction() {
         val results = world.reprocessStoredEvidence()
         val blocked = results.filter {
@@ -362,11 +362,6 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
             "replay reconcile failed=${reconciled.summary.failed}"
         }
         productionReviewQueue.applyReport(reconciled)
-        val repaired = productionReconciliation.repairLegacyTransfersDetailed()
-        check(ReconciliationCompletionPolicy.isComplete(repaired)) {
-            "repair failed=${repaired.summary.failed}"
-        }
-        productionReviewQueue.applyReport(repaired)
     }
 }
 

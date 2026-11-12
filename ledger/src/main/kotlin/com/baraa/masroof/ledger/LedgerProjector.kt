@@ -46,7 +46,43 @@ object LedgerProjector {
         require(storedFacts.rows.flatMap { it.rawSmsIds }.let { it.distinct().size == it.size }) { "one stored row per raw SMS" }
         // Stored rows in id order with sorted links, so neither the caller's order nor sorting changes the result.
         val stored = storedFacts.copy(rows = storedFacts.rows.map { it.copy(rawSmsIds = it.rawSmsIds.sorted()) }.sortedBy { it.transaction.id })
-        return Projection(events.sortedBy { it.event.id }, decisions, registry, stored, zone).run()
+        val sorted = events.sortedBy { it.event.id }
+        val doublePosted = doublePostedLegs(sorted, decisions, registry, stored, zone)
+        val kept = if (doublePosted.isEmpty()) stored else stored.copy(rows = stored.rows - doublePosted)
+        return Projection(sorted, decisions, registry, kept, zone).run()
+    }
+
+    /**
+     * Two rows for one movement, which only the old per-leg assembler wrote: unprotected stored single-leg
+     * self-transfers of one raw SMS, none in a mutually unique pair among the eligible transfer legs, each with an
+     * intra-bank counterpart ([TransactionMatcher.hasPendingIntraBankCounterpart]) that is another of them. They are
+     * released before the pass, as the old one-time release deleted them, so their legs pair or wait as a pending match.
+     */
+    private fun doublePostedLegs(
+        events: List<LedgerEvidence>,
+        decisions: Map<String, EffectiveUserDecisions>,
+        registry: OwnershipFacts,
+        stored: StoredFacts,
+        zone: ZoneId,
+    ): Set<LedgerRow> {
+        val rows = stored.rows.filter { row ->
+            row.rawSmsIds.size == 1 && row.transaction.isSingleLegSelfTransfer() && !stored.protects(row.rawSmsIds.single(), decisions)
+        }
+        if (rows.size < 2) return emptySet() // A release needs a second such row.
+        val zones = stored.rows.flatMap { row -> row.rawSmsIds.map { it to row.transaction.occurredAtZone } }.toMap()
+        val candidates = events.mapNotNull { record ->
+            val event = record.event
+            val decided = decisions[event.rawSmsId] ?: EffectiveUserDecisions.NONE
+            val eligible = event.messageFamily.isTransfer() && !decided.isNonFinancial &&
+                TransactionAssembler.isAutomationEligible(event, record.automationConfirmed || decided.confirmsFinancial)
+            if (eligible) event.rawSmsId to record.transferCandidate(registry, zone, zones[event.rawSmsId]) else null
+        }.toMap()
+        val paired = TransactionMatcher.findMutuallyUniquePairs(candidates.values.toList())
+            .flatMap { listOf(it.outgoing.event.rawSmsId, it.incoming.event.rawSmsId) }.toSet()
+        val singles = rows.mapNotNull { row -> row.rawSmsIds.single().takeIf { it !in paired }?.let(candidates::get)?.let { row to it } }
+        val pool = singles.map { it.second } // The matcher skips the leg itself.
+        return singles.filter { (_, candidate) -> TransactionMatcher.hasPendingIntraBankCounterpart(candidate, pool) }
+            .mapTo(mutableSetOf()) { it.first }
     }
 
     /**
@@ -159,6 +195,19 @@ object LedgerProjector {
     private val MAX_OFFSET: Duration = Duration.ofHours(18)
 }
 
+/** Keep rule (i): an outcome decision, or a correction closure (`ReviewCorrectionClosure.protects`), protects [rawSmsId]. */
+private fun StoredFacts.protects(rawSmsId: String, decisions: Map<String, EffectiveUserDecisions>) =
+    decisions[rawSmsId]?.outcome != null || rawSmsId in correctionClosedRawSmsIds
+
+private fun FinancialTransaction.isSingleLegSelfTransfer() =
+    type == FinancialTransactionType.SELF_TRANSFER && linkedParsedEventIds.size == 1
+
+/** This leg as a matching candidate, owned per [facts], its time read in [persistedZone] (else [zone]). */
+private fun LedgerEvidence.transferCandidate(facts: OwnershipFacts, zone: ZoneId, persistedZone: String?) = TransferMatchCandidate(
+    event, transactionReference, occurredAtLocal, receivedAt, facts.account(event.sourceAccountRef), facts.account(event.destinationAccountRef),
+    TransactionTiming.effectiveOccurredAt(event, occurredAtLocal, receivedAt, zone, persistedZone),
+)
+
 /** A transfer leg the projector may pair. */
 fun MessageFamily.isTransfer(): Boolean = this == MessageFamily.TRANSFER_IN || this == MessageFamily.TRANSFER_OUT
 
@@ -259,8 +308,7 @@ private class Projection(
     private fun decisionsOf(rawSmsId: String) = decisions[rawSmsId] ?: EffectiveUserDecisions.NONE
 
     /** Any outcome decision, or a correction closure (`ReviewCorrectionClosure.protects`). */
-    private fun preserved(rawSmsId: String) =
-        decisionsOf(rawSmsId).outcome != null || rawSmsId in stored.correctionClosedRawSmsIds
+    private fun preserved(rawSmsId: String) = stored.protects(rawSmsId, decisions)
 
     private fun userConfirmed(record: LedgerEvidence) =
         record.automationConfirmed || decisionsOf(record.event.rawSmsId).confirmsFinancial
@@ -435,11 +483,7 @@ private class Projection(
             decided.outcome?.kind == UserDecisionKind.EXTERNAL_TRANSFER ||
             !TransactionAssembler.isAutomationEligible(event, userConfirmed(record))
         ) return@mapNotNull null
-        TransferMatchCandidate(
-            event, record.transactionReference, record.occurredAtLocal, record.receivedAt,
-            ownership.account(event.sourceAccountRef), ownership.account(event.destinationAccountRef),
-            TransactionTiming.effectiveOccurredAt(event, record.occurredAtLocal, record.receivedAt, zone, row.transaction.occurredAtZone),
-        )
+        record.transferCandidate(ownership, zone, row.transaction.occurredAtZone)
     }
 
     /**
@@ -478,16 +522,7 @@ private class Projection(
                 .forEach { add(Leg(null, it)) }
         }
         val byEvent = legs.associateBy { it.record.event.id }
-        val candidates = legs.map { leg ->
-            val event = leg.record.event
-            TransferMatchCandidate(
-                event, leg.record.transactionReference, leg.record.occurredAtLocal, leg.record.receivedAt,
-                ownership.account(event.sourceAccountRef), ownership.account(event.destinationAccountRef),
-                TransactionTiming.effectiveOccurredAt(
-                    event, leg.record.occurredAtLocal, leg.record.receivedAt, zone, leg.posted?.occurredAtZone,
-                ),
-            )
-        }
+        val candidates = legs.map { leg -> leg.record.transferCandidate(ownership, zone, leg.posted?.occurredAtZone) }
         for (pair in TransactionMatcher.findMutuallyUniquePairs(candidates)) {
             val outLeg = byEvent.getValue(pair.outgoing.event.id)
             val inLeg = byEvent.getValue(pair.incoming.event.id)
@@ -598,9 +633,6 @@ private class Projection(
     private fun drop(transactionId: String) {
         rows.remove(transactionId)?.rawSmsIds?.forEach(links::remove)
     }
-
-    private fun FinancialTransaction.isSingleLegSelfTransfer() =
-        type == FinancialTransactionType.SELF_TRANSFER && linkedParsedEventIds.size == 1
 
     private fun pendingMatch(rawSmsId: String) {
         reviews += LedgerReviewCandidate(rawSmsId, ReviewKind.PENDING_MATCH, listOf("transfer_pending_match"))

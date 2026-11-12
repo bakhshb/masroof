@@ -127,6 +127,46 @@ class LedgerProjectorTest {
         assertTrue("out" in ambiguous.settledRawSmsIds)
     }
 
+    private val sameMinuteLegs = listOf(
+        intraBank("out1", MessageFamily.TRANSFER_OUT),
+        intraBank("out2", MessageFamily.TRANSFER_OUT, T0.plusSeconds(1)),
+        intraBank("in1", MessageFamily.TRANSFER_IN, T0.plusSeconds(2)),
+        intraBank("in2", MessageFamily.TRANSFER_IN, T0.plusSeconds(3)),
+    )
+
+    private fun singleLegSelf(vararg ids: String) =
+        StoredFacts(rows = ids.map { storedRow(it, type = FinancialTransactionType.SELF_TRANSFER) })
+
+    @Test
+    fun doublePostedAmbiguousLegsAreReleasedToPendingMatch_inAFullAndAScopedProjection() {
+        val stored = singleLegSelf("out1", "out2", "in1", "in2")
+        val result = project(sameMinuteLegs, registry = owned, stored = stored)
+        assertEquals(emptyList<LedgerRow>(), result.rows)
+        assertEquals(listOf("in1", "in2", "out1", "out2"), result.reviewCandidates.map { it.rawSmsId })
+        assertTrue(result.reviewCandidates.all { it.kind == ReviewKind.PENDING_MATCH })
+        // The scope of one leg reaches every row the rule reads.
+        assertEquals(setOf("out1", "out2", "in1", "in2"), LedgerProjector.scope(listOf("out1"), sameMinuteLegs, emptyMap(), stored))
+    }
+
+    @Test
+    fun lonePostedLegsWhoseCounterpartIsUnlinkedAreKept() {
+        // Two transfers posted alone as they arrived, then one ambiguous in-leg: today's own ledger, never released.
+        val stored = singleLegSelf("out1", "out2")
+        val result = project(sameMinuteLegs.take(3), registry = owned, stored = stored)
+        assertEquals(stored.rows, result.rows)
+        assertEquals(listOf("in1"), result.reviewCandidates.map { it.rawSmsId })
+    }
+
+    @Test
+    fun aProtectedDoublePostedLegIsKept_andTheUnprotectedOnesAreReleased() {
+        val stored = singleLegSelf("out1", "out2", "in1", "in2")
+        val decisions = fold(listOf(UserDecision("out1", UserDecisionKind.FINANCIAL_TYPE, T0)))
+        val result = project(sameMinuteLegs, decisions, owned, stored)
+        assertEquals(listOf(listOf("out1")), result.rows.map { it.rawSmsIds })
+        assertEquals(listOf("in1", "in2", "out2"), result.reviewCandidates.map { it.rawSmsId })
+        assertTrue(result.reviewCandidates.all { it.kind == ReviewKind.PENDING_MATCH })
+    }
+
     @Test
     fun aLoneOwnedLegPostsAlone_butAnUnpairableCounterpartKeepsBothPending() {
         val lone = project(listOf(intraBank("out", MessageFamily.TRANSFER_OUT)), registry = owned)

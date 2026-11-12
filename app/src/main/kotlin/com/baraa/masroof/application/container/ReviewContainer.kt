@@ -3,7 +3,6 @@ package com.baraa.masroof.application.container
 import com.baraa.masroof.application.ingestion.ProcessingRecovery
 import com.baraa.masroof.application.interpretation.AutomaticInterpretationWriteGuard
 import com.baraa.masroof.application.interpretation.PatternInterpretationWritePolicy
-import com.baraa.masroof.application.maintenance.TransferIntegrityRepairResult
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.IngestionReviewService
@@ -197,12 +196,5 @@ class ReviewContainer(
             count++
         }
         return count
-    }
-
-    /** The blocking startup repair of legacy transfers. */
-    suspend fun repairLegacyTransfers(): TransferIntegrityRepairResult {
-        val report = transactionReconciliationService.repairLegacyTransfersDetailed()
-        reviewQueueUpdater.applyReport(report)
-        return TransferIntegrityRepairResult(failedCount = report.summary.failed)
     }
 }

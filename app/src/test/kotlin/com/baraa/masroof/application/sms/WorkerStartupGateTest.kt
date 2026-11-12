@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.atomic.AtomicInteger
 import com.baraa.masroof.testsupport.NoOpAppLog
 
-/** Background financial work waits for integrity repair, survives a restore, and refreshes open screens. */
+/** Background financial work waits for a READY startup, survives a restore, and refreshes open screens. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class WorkerStartupGateTest {
@@ -38,7 +38,7 @@ class WorkerStartupGateTest {
     fun tearDown() = harness.close()
 
     @Test
-    fun liveWorker_beforeIntegrityRepairSucceeds_retriesWithoutProcessing() = runBlocking {
+    fun liveWorker_beforeStartupIsReady_retriesWithoutProcessing() = runBlocking {
         val raw = captured()
 
         val result = liveWorker(raw.id, ready = false).doWork()

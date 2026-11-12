@@ -54,7 +54,7 @@ class LedgerRebuildCorpusTest {
         }
         DashboardLedgerWorld(context).use { world ->
             LedgerSnapshotCorpus.populateLegacy(world)
-            world.reconciliation.repairLegacyTransfersDetailed()
+            world.reconciliation.reconcileStoredEventsDetailed()
             // A FEE for an installment without a loan type cannot become a repayment: the keep rule holds it, and
             // nothing rebuilds it from nothing (docs/ARCHITECTURE.md, "Ledger writer").
             rows += assertRebuilds("legacy", world, storedOnly = setOf("android-sms:legacy-fee-no-loan"))

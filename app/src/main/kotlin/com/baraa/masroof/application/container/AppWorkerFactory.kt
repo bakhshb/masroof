@@ -35,7 +35,7 @@ internal fun appWorkerFactory(app: AppContainer, current: () -> AppContainer = {
         addFactory(
             ExchangeRateEnrichmentWorker.Factory {
                 PendingExchangeRateEnricher {
-                    // A thrown error makes the worker retry once integrity repair has succeeded.
+                    // A thrown error makes the worker retry once startup is READY.
                     check(app.maintenance.startupFinancialReady()) { "Startup maintenance is not ready" }
                     if (app.dashboard.exchangeRateEnrichmentWorkflow.enrichPending().persisted > 0) app.maintenance.completionSignal.notifyCompleted()
                 }

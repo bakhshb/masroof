@@ -78,8 +78,8 @@ At this milestone the financial database supported v18 only: older-schema migrat
 import hashes and automatic fact backfills were removed, and databases and backups older
 than v18 are still rejected without erasing live data. Since then, schema changes above
 v18 go through additive, tested migrations (see `docs/ARCHITECTURE.md`).
-The v18 schema/hash, encryption, restore/rollback and current-data integrity repair
-remain unchanged. A retired backfill worker completes already queued requests without
+The v18 schema/hash, encryption and restore/rollback remain unchanged (the one-time
+transfer-integrity repair was deleted in plan 3.3c; see `docs/ARCHITECTURE.md`). A retired backfill worker completes already queued requests without
 opening or reparsing financial data; its persisted identity and old journal preference
 key remain solely for safe retirement and interrupted v18 restore recovery.
 

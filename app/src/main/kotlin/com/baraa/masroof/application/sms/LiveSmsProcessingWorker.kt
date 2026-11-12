@@ -31,7 +31,7 @@ class LiveSmsProcessingWorker(
     private val appLogService: AppLog,
     /** Lets an open dashboard reload after any pass, since a failed pass may still have written rows. */
     private val onProcessed: () -> Unit = {},
-    /** False while startup integrity repair has not succeeded; processing then waits for a retry. */
+    /** False until startup is READY (the financial store opened); processing then waits for a retry. */
     private val startupReady: suspend () -> Boolean = { true },
     /** True for the cancellation a restore uses to retire the database. */
     private val isRestartRequired: (CancellationException) -> Boolean = { false },

@@ -7,7 +7,6 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.locale.AppLocale
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
-import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
 import com.baraa.masroof.application.theme.ThemeMode
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.room.MasroofDatabase
@@ -109,7 +108,7 @@ class DatabaseBackupImportTest {
     }
 
     @Test
-    fun importCurrentBackup_resetsTransferIntegrityMarkers() {
+    fun importCurrentBackup_resetsRetiredMaintenanceMarkers() {
         runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         MessagePatternStore(context).restoreRaw(patternArchive("STC"))
@@ -118,7 +117,7 @@ class DatabaseBackupImportTest {
             .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, MasroofDatabase.VERSION)
             .putInt(
                 MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION,
-                TransferIntegrityRepairCoordinator.CURRENT_VERSION,
+                RETIRED_REPAIR_VERSION,
             )
             .commit()
 
@@ -171,7 +170,7 @@ class DatabaseBackupImportTest {
                 .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, MasroofDatabase.VERSION)
                 .putInt(
                     MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION,
-                    TransferIntegrityRepairCoordinator.CURRENT_VERSION,
+                    RETIRED_REPAIR_VERSION,
                 )
                 .commit()
 
@@ -201,7 +200,7 @@ class DatabaseBackupImportTest {
                 prefs.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0),
             )
             assertEquals(
-                TransferIntegrityRepairCoordinator.CURRENT_VERSION,
+                RETIRED_REPAIR_VERSION,
                 prefs.getInt(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, 0),
             )
             backupZip.delete()
@@ -537,3 +536,6 @@ class DatabaseBackupImportTest {
         override fun commit(): Boolean = false
     }
 }
+
+/** The value the retired transfer-integrity marker held once its repair ran (the repair was deleted in plan 3.3c). */
+private const val RETIRED_REPAIR_VERSION = 1

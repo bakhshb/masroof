@@ -48,32 +48,12 @@ class TransactionReconciliationService(
         ),
         financialTransactionRepository, ownershipConfirmationService, automaticWrite, inTransaction,
     )
-    private val legacyRelease = LegacySelfTransferRelease(
-        rawSmsRepository, financialTransactionRepository, ownershipResolver, effectiveParsedEventProvider,
-        reviewRepository, userDecisionRepository, zoneId,
-    )
 
     suspend fun reconcileStoredEvents(): ReconciliationSummary =
         reconcileStoredEventsDetailed().summary
 
     /** Full-history reconciliation for explicit maintenance and recovery; incremental callers use [reconcileAffectedRawSmsIds]. */
     suspend fun reconcileStoredEventsDetailed(): ReconciliationReport = writer.reconcile(null)
-
-    /**
-     * One-time upgrade entrypoint. Unlinks irreducibly ambiguous posted single-leg self-transfers (the keep rule
-     * would keep their double-counted money, [LegacySelfTransferRelease]), then runs a full reconcile so unique legs
-     * can heal. Ordinary scoped and full reconciliation do not call this. Plan 3.3c deletes it.
-     */
-    suspend fun repairLegacyTransfersDetailed(): ReconciliationReport {
-        val release = legacyRelease.release()
-        val reconciled = writer.reconcile(null)
-        return reconciled.copy(
-            summary = reconciled.summary.copy(
-                failed = reconciled.summary.failed + release.failedCount,
-            ),
-            failedRawSmsIds = reconciled.failedRawSmsIds + release.failedRawSmsIds,
-        )
-    }
 
     /**
      * Reconcile [rawSmsIds]: the projection of [LedgerProjector.scope] around them, so the rows written equal a full

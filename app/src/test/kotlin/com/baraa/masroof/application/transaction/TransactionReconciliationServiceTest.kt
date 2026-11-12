@@ -782,10 +782,8 @@ class TransactionReconciliationServiceTest : ReconciliationTestFixture() {
         )
         ftRepo.save(staleFee, listOf("sms-loan"))
 
-        val repair = reconciliation.repairLegacyTransfersDetailed()
         val full = reconciliation.reconcileStoredEventsDetailed()
 
-        assertEquals(0, repair.summary.failed)
         assertEquals(0, full.summary.failed)
         assertEquals(FinancialTransactionType.FEE, ftRepo.listAll().single().type)
     }
