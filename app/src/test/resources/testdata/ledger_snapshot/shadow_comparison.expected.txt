@@ -8,6 +8,7 @@ row differences: 0  review differences: 0  projection retries: 0
 ## Row differences
 
 ## Review differences (open review kind, old -> new)
+candidates on a resolved review, kept resolved by the store (not a difference): 0
 
 ## Projection retries
 ======== golden:m1_two_day_same_amount
@@ -20,6 +21,7 @@ row differences: 0  review differences: 0  projection retries: 0
 ## Row differences
 
 ## Review differences (open review kind, old -> new)
+candidates on a resolved review, kept resolved by the store (not a difference): 0
 
 ## Projection retries
 ======== golden:m5_cross_bank_suffix
@@ -32,6 +34,7 @@ row differences: 0  review differences: 0  projection retries: 0
 ## Row differences
 
 ## Review differences (open review kind, old -> new)
+candidates on a resolved review, kept resolved by the store (not a difference): 0
 
 ## Projection retries
 ======== golden:m6_account_refund
@@ -44,6 +47,7 @@ row differences: 0  review differences: 0  projection retries: 0
 ## Row differences
 
 ## Review differences (open review kind, old -> new)
+candidates on a resolved review, kept resolved by the store (not a difference): 0
 
 ## Projection retries
 ======== golden:m8_asof_fx
@@ -56,6 +60,7 @@ row differences: 0  review differences: 0  projection retries: 0
 ## Row differences
 
 ## Review differences (open review kind, old -> new)
+candidates on a resolved review, kept resolved by the store (not a difference): 0
 
 ## Projection retries
 ======== golden:one_intra_pair
@@ -68,6 +73,7 @@ row differences: 0  review differences: 0  projection retries: 0
 ## Row differences
 
 ## Review differences (open review kind, old -> new)
+candidates on a resolved review, kept resolved by the store (not a difference): 0
 
 ## Projection retries
 ======== golden:repeated_separate_notices
@@ -80,36 +86,32 @@ row differences: 0  review differences: 0  projection retries: 0
 ## Row differences
 
 ## Review differences (open review kind, old -> new)
+candidates on a resolved review, kept resolved by the store (not a difference): 0
 
 ## Projection retries
 ======== all_banks
 # Ledger shadow comparison (plan 3.2)
 old rows: 12  new rows: 12
-row differences: 0  review differences: 1  projection retries: 0
+row differences: 0  review differences: 0  projection retries: 0
 
 ## Summary by reason
 
 ## Row differences
 
 ## Review differences (open review kind, old -> new)
-…nown#bcbf22: none -> NEEDS_REVIEW  stored=RESOLVED decision=FINANCIAL_TYPE
+candidates on a resolved review, kept resolved by the store (not a difference): 1
 
 ## Projection retries
 ======== legacy:after_repair_and_full_reconcile
 # Ledger shadow comparison (plan 3.2)
-old rows: 5  new rows: 4
-row differences: 1  review differences: 1  projection retries: 0
+old rows: 5  new rows: 5
+row differences: 0  review differences: 0  projection retries: 0
 
 ## Summary by reason
-INSTALLMENT_FEE: 1  old 120.00 SAR  new -  (a stored FEE for a financing installment the projector does not post)
 
 ## Row differences
 
-### 1 ONLY_OLD reason=INSTALLMENT_FEE
-raw sms: …loan#efef39
-old: id=…7700#06c170 type=FEE amount=120.00 SAR at=2026-08-28T01:10:00Z zone=Asia/Riyadh source=account:BANK_ALJAZIRA:9003 destination=- merchant=- counterparty=- category=- fx=-/- raw=…loan#efef39 events=…loan#8aea99
-
 ## Review differences (open review kind, old -> new)
-…loan#efef39: none -> NEEDS_REVIEW  stored=- decision=-
+candidates on a resolved review, kept resolved by the store (not a difference): 0
 
 ## Projection retries

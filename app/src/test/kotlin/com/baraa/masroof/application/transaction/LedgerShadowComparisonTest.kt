@@ -64,8 +64,8 @@ class LedgerShadowComparisonTest {
         registry: OwnershipFacts = OwnershipFacts(),
     ) = LedgerInputs(
         events = events.map { LedgerEvidence(it, t0, null, null, null, automationConfirmed = false) },
-        decisions = decisions, registry = registry, storedFacts = StoredFacts(), zone = ZoneOffset.UTC,
-        storedRows = old, reviews = reviews,
+        decisions = decisions, registry = registry, storedFacts = StoredFacts(rows = old), zone = ZoneOffset.UTC,
+        reviews = reviews,
     )
 
     private fun projection(rows: List<LedgerRow>, reviews: List<LedgerReviewCandidate> = emptyList()) =
@@ -160,6 +160,18 @@ class LedgerShadowComparisonTest {
         val report = LedgerShadowComparison.report(result)
         assertTrue(report.contains("time shift: 10800 s"))
         assertTrue(report.contains("STORED_ROW_WITHOUT_LINKS: 1  old 100.00 SAR  new -"))
+    }
+
+    @Test
+    fun aCandidateOnAResolvedReviewIsCountedNotReported() {
+        val resolved = ReviewItem("r", "a", ReviewKind.NEEDS_REVIEW, ReviewStatus.RESOLVED, emptyList(), t0, t0, t0, null, null)
+        val result = LedgerShadowComparison.compare(
+            inputs(emptyList(), listOf(event("a")), reviews = listOf(resolved)),
+            projection(emptyList(), listOf(LedgerReviewCandidate("a", ReviewKind.NEEDS_REVIEW, listOf("unknown_message_family")))),
+        )
+        assertTrue(result.reviews.isEmpty())
+        assertEquals(1, result.resolvedNotReopened)
+        assertTrue(LedgerShadowComparison.report(result).contains("kept resolved by the store (not a difference): 1"))
     }
 
     @Test

@@ -72,12 +72,14 @@ object LedgerShadowComparison {
         val newRowCount: Int,
         val rows: List<RowDifference>,
         val reviews: List<ReviewDifference>,
+        /** Projected review candidates on a RESOLVED stored review, which the store keeps resolved. */
+        val resolvedNotReopened: Int,
         val retryRawSmsIds: List<String>,
     )
 
     fun compare(inputs: LedgerInputs, projection: LedgerProjection = inputs.project()): Result {
         val evidence = inputs.events.associateBy { it.event.rawSmsId }
-        val rows = groups(inputs.storedRows, projection.rows).mapNotNull { (old, new) ->
+        val rows = groups(inputs.storedFacts.rows, projection.rows).mapNotNull { (old, new) ->
             val rawSmsIds = (old + new).flatMap { it.rawSmsIds }.distinct().sorted()
             val kind = when {
                 new.isEmpty() -> Kind.ONLY_OLD
@@ -91,10 +93,13 @@ object LedgerShadowComparison {
         }.sortedBy { it.rawSmsIds.firstOrNull() ?: it.oldRows.first().transaction.id }
         val storedReviews = inputs.reviews.associateBy { it.rawSmsId }
         val newReviews = projection.reviewCandidates.associate { it.rawSmsId to it.kind }
+        // The store never reopens a RESOLVED review (`ReviewItemDao.upsertRequiredMerged`), so a candidate on one
+        // is compared as the store applies it: no open review. Those are counted, not reported as differences.
+        val resolvedNotReopened = evidence.keys.filter { storedReviews[it]?.status == ReviewStatus.RESOLVED && it in newReviews }
         val reviews = evidence.keys.sorted().mapNotNull { rawSmsId ->
             val stored = storedReviews[rawSmsId]
             val old = stored?.kind?.takeIf { stored.status == ReviewStatus.REQUIRED }
-            val new = newReviews[rawSmsId]
+            val new = newReviews[rawSmsId]?.takeIf { stored?.status != ReviewStatus.RESOLVED }
             if (old == new) return@mapNotNull null
             ReviewDifference(
                 rawSmsId, old, new,
@@ -102,7 +107,10 @@ object LedgerShadowComparison {
                 decision = inputs.decisions[rawSmsId]?.outcome?.kind,
             )
         }
-        return Result(inputs.storedRows.size, projection.rows.size, rows, reviews, projection.retryRawSmsIds.sorted())
+        return Result(
+            inputs.storedFacts.rows.size, projection.rows.size, rows, reviews, resolvedNotReopened.size,
+            projection.retryRawSmsIds.sorted(),
+        )
     }
 
     /** Old and new rows joined into the groups that share a raw SMS. */
@@ -235,6 +243,7 @@ object LedgerShadowComparison {
         }
         appendLine()
         appendLine("## Review differences (open review kind, old -> new)")
+        appendLine("candidates on a resolved review, kept resolved by the store (not a difference): ${result.resolvedNotReopened}")
         result.reviews.forEach {
             appendLine("${mask(it.rawSmsId)}: ${it.old ?: "none"} -> ${it.new ?: "none"}  stored=${it.storedReview ?: "-"} decision=${it.decision ?: "-"}")
         }

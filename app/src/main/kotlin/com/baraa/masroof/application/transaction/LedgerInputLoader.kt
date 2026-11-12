@@ -16,7 +16,6 @@ import com.baraa.masroof.ledger.LedgerProjector
 import com.baraa.masroof.ledger.LedgerRow
 import com.baraa.masroof.ledger.OwnershipFacts
 import com.baraa.masroof.ledger.StoredFacts
-import com.baraa.masroof.ledger.StoredLedgerRow
 import java.time.ZoneId
 
 /**
@@ -29,8 +28,6 @@ data class LedgerInputs(
     val registry: OwnershipFacts,
     val storedFacts: StoredFacts,
     val zone: ZoneId,
-    /** The stored `financial_transaction` rows with their linked raw SMS, sorted by id. */
-    val storedRows: List<LedgerRow>,
     val reviews: List<ReviewItem>,
 ) {
     fun project(): LedgerProjection = LedgerProjector.project(events, decisions, registry, storedFacts, zone)
@@ -67,24 +64,16 @@ class LedgerInputLoader(
         val reviews = reviewRepository.listAll()
         val transactions = financialTransactionRepository.listAll().sortedBy { it.id }
         val links = financialTransactionRepository.listRawSmsIdsByTransaction(transactions.map { it.id })
-        val storedRows = transactions.map { LedgerRow(it, links[it.id].orEmpty().sorted()) }
         return LedgerInputs(
             events = events,
             decisions = userDecisionRepository.effectiveFor(rawSmsIds),
             registry = ownershipFacts(events),
             storedFacts = StoredFacts(
-                rows = storedRows.map { row ->
-                    StoredLedgerRow(
-                        rawSmsIds = row.rawSmsIds.toSet(),
-                        occurredAtZone = row.transaction.occurredAtZone,
-                        appliedExchangeRate = row.transaction.appliedExchangeRate,
-                        exchangeRateSource = row.transaction.exchangeRateSource,
-                    )
-                },
+                // The stored `financial_transaction` rows with their linked raw SMS, sorted by id.
+                rows = transactions.map { LedgerRow(it, links[it.id].orEmpty().sorted()) },
                 correctionClosedRawSmsIds = reviews.filter(ReviewCorrectionClosure::isClosed).map { it.rawSmsId }.toSet(),
             ),
             zone = zoneId,
-            storedRows = storedRows,
             reviews = reviews,
         )
     }

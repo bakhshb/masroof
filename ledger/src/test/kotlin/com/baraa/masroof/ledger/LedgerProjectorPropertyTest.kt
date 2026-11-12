@@ -56,7 +56,7 @@ class LedgerProjectorPropertyTest {
             val corpus = corpus(random)
             val full = corpus.project()
             val affected = corpus.events.shuffled(random).take(random.nextInt(1, 4)).map { it.event.rawSmsId }.toSet()
-            val scope = LedgerProjector.scope(affected, corpus.events, corpus.decisions)
+            val scope = LedgerProjector.scope(affected, corpus.events, corpus.decisions, corpus.stored)
             if (scope.size < corpus.events.size) narrower++
             val scoped = corpus.project(
                 events = corpus.events.filter { it.event.rawSmsId in scope },
@@ -137,12 +137,17 @@ class LedgerProjectorPropertyTest {
             evidence.copy(event = evidence.event.copy(id = "e-$id", rawSmsId = id))
         }
         val ids = events.map { it.event.rawSmsId }
-        val storedIds = ids.filter { random.nextInt(3) == 0 }
+        // Stored rows link one or two raw SMS each, never one SMS twice; some are kept verbatim by the keep rule.
+        val storedIds = ids.filter { random.nextInt(3) == 0 }.shuffled(random)
+        val storedSets = storedIds.fold(mutableListOf<MutableList<String>>()) { sets, id ->
+            sets.apply { if (isNotEmpty() && last().size == 1 && random.nextInt(3) == 0) last() += id else add(mutableListOf(id)) }
+        }
+        val types = listOf(FinancialTransactionType.EXPENSE, FinancialTransactionType.SELF_TRANSFER, FinancialTransactionType.FEE)
         val stored = StoredFacts(
-            rows = storedIds.map { id ->
-                StoredLedgerRow(
-                    setOf(id), listOf("Asia/Dubai", "Asia/Riyadh", null).random(random),
-                    BigDecimal("3.75").takeIf { random.nextBoolean() }, ExchangeRateSource.SMS,
+            rows = storedSets.map { set ->
+                storedRow(
+                    *set.toTypedArray(), zone = listOf("Asia/Dubai", "Asia/Riyadh", null).random(random), type = types.random(random),
+                    rate = BigDecimal("3.75").takeIf { random.nextBoolean() }, rateSource = ExchangeRateSource.SMS,
                 )
             },
             correctionClosedRawSmsIds = ids.filter { random.nextInt(6) == 0 }.toSet(),

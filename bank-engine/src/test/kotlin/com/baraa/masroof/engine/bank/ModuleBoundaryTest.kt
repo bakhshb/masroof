@@ -38,6 +38,7 @@ class ModuleBoundaryTest {
                 "com.baraa.masroof.domain.ids.",
                 "com.baraa.masroof.domain.assembly.",
                 "com.baraa.masroof.domain.matching.",
+                "com.baraa.masroof.domain.rules.",
             ),
         ).forEach { (module, allowed) ->
             val sources = File(root, "$module/src/main/kotlin").walkTopDown().filter { it.extension == "kt" }.toList()
