@@ -12,7 +12,6 @@
     <ID>LargeClass:ProcessRawSmsUseCaseTest.kt:ProcessRawSmsUseCaseTest</ID>
     <ID>LargeClass:ReviewWorkflowServiceTest.kt:ReviewWorkflowServiceTest</ID>
     <ID>LargeClass:ScopedReconciliationTest.kt:ScopedReconciliationTest</ID>
-    <ID>LargeClass:SettingsViewModel.kt:SettingsViewModel : ViewModel</ID>
     <ID>LargeClass:SettingsViewModelTest.kt:SettingsViewModelTest</ID>
     <ID>LargeClass:StatementReconciliationServiceTest.kt:StatementReconciliationServiceTest</ID>
     <ID>LargeClass:TransactionReconciliationServiceTest.kt:TransactionReconciliationServiceTest : ReconciliationTestFixture</ID>
