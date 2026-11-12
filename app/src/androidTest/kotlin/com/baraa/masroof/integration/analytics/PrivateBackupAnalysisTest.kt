@@ -42,7 +42,7 @@ class PrivateBackupAnalysisTest {
             finally { password.fill('\u0000') }
             BackupArchiveValidator().extractInto(ByteArrayInputStream(plaintext.toByteArray()), staging)
             val manifest = BackupPackageCodec.decodeManifest(File(staging, "manifest.json").readText())
-            assertEquals(18, manifest.roomVersion)
+            assertTrue(manifest.roomVersion in com.baraa.masroof.data.room.MasroofDatabase.IDENTITY_HASHES)
             val preferences = BackupPackageCodec.decodePreferences(File(staging, "preferences.json").readText())
             context.getDatabasePath("masroof.db").parentFile!!.mkdirs()
             File(staging, "masroof.db").copyTo(context.getDatabasePath("masroof.db"), overwrite = true)

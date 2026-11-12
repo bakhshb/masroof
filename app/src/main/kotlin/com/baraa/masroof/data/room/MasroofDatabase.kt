@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import com.baraa.masroof.data.room.dao.AccountRegistryDao
 import com.baraa.masroof.data.room.dao.BankRegistryDao
@@ -17,6 +18,7 @@ import com.baraa.masroof.data.room.dao.ProcessingRetryDao
 import com.baraa.masroof.data.room.dao.RawSmsDao
 import com.baraa.masroof.data.room.dao.ReviewItemDao
 import com.baraa.masroof.data.room.dao.UserCorrectionDao
+import com.baraa.masroof.data.room.dao.UserDecisionDao
 import com.baraa.masroof.data.room.entity.AccountRegistryEntity
 import com.baraa.masroof.data.room.entity.BankRegistryEntity
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
@@ -31,6 +33,7 @@ import com.baraa.masroof.data.room.entity.RawSmsEntity
 import com.baraa.masroof.data.room.entity.RawSmsProviderAliasEntity
 import com.baraa.masroof.data.room.entity.ReviewItemEntity
 import com.baraa.masroof.data.room.entity.UserCorrectionEntity
+import com.baraa.masroof.data.room.entity.UserDecisionEntity
 
 /**
  * Masroof Room persistence schema (current version [VERSION]).
@@ -54,8 +57,9 @@ import com.baraa.masroof.data.room.entity.UserCorrectionEntity
         ReviewItemEntity::class,
         UserCorrectionEntity::class,
         ProcessingRetryEntity::class,
+        UserDecisionEntity::class,
     ],
-    version = 18,
+    version = MasroofDatabase.VERSION,
     exportSchema = true,
 )
 abstract class MasroofDatabase : RoomDatabase() {
@@ -82,28 +86,55 @@ abstract class MasroofDatabase : RoomDatabase() {
 
     abstract fun userCorrectionDao(): UserCorrectionDao
 
+    abstract fun userDecisionDao(): UserDecisionDao
+
     companion object {
         /**
          * Live database file. [com.baraa.masroof.application.backup.DatabaseRestoreRecovery]
          * must finish before Room opens this name.
          */
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 18
+        const val VERSION: Int = 19
 
         /** Oldest schema that opens; anything older has no migration and is rejected. */
         const val BASELINE_VERSION: Int = 18
 
-        /** Must match app/schemas/.../18.json identityHash. Filled after Room export. */
-        const val IDENTITY_HASH: String = "71f1193767b3aa12bcb6cc6e7ce77147"
+        /** Must match app/schemas/.../19.json identityHash. */
+        const val IDENTITY_HASH: String = "ae0c7cc4860648762a79c62a0d1ac542"
 
         /**
          * The identity hash of every schema from [BASELINE_VERSION] to [VERSION], the only pairs a backup may carry.
          * A version bump keeps the old entry as a literal and adds the new one; the exported JSON files are checked against it.
          */
-        val IDENTITY_HASHES: Map<Int, String> = mapOf(VERSION to IDENTITY_HASH)
+        val IDENTITY_HASHES: Map<Int, String> = mapOf(
+            18 to "71f1193767b3aa12bcb6cc6e7ce77147",
+            VERSION to IDENTITY_HASH,
+        )
+
+        /** Adds the append-only `user_decision` table (plan 2.1); no existing row changes and nothing is backfilled. */
+        val MIGRATION_18_19: Migration = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Copied from 19.json; Room validates the result on open.
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `user_decision` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`rawSmsId` TEXT NOT NULL, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, " +
+                        "`decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, " +
+                        "`destinationContainerId` TEXT, `messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, " +
+                        "`merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, " +
+                        "FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , " +
+                        "FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_user_decision_rawSmsId_sequence` ON `user_decision` (`rawSmsId`, `sequence`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_user_decision_pairedRawSmsId` ON `user_decision` (`pairedRawSmsId`)",
+                )
+            }
+        }
 
         /** One additive step per version from [BASELINE_VERSION] to [VERSION], each tested from the v18 fixture. */
-        val MIGRATIONS: List<Migration> = emptyList()
+        val MIGRATIONS: List<Migration> = listOf(MIGRATION_18_19)
 
         /**
          * The builder for the live financial file. [databaseClass] fixes the target version; tests pass a

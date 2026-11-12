@@ -81,7 +81,7 @@ class BackupPackageCodecTest {
 
     @Test
     fun validateManifest_rejectsEveryOlderSchemaAndFutureSchemas() {
-        for (version in (1..17) + listOf(19, 99)) {
+        for (version in (1..17) + listOf(MasroofDatabase.VERSION + 1, 99)) {
         val manifest = BackupManifest(
             formatVersion = BackupPackageFormat.FORMAT_VERSION,
             appVersionName = "0.2.0",

@@ -252,6 +252,7 @@ class ProcessingCompletionFailureMatrixTest {
         harness.nonthrowingSaveConflicts.set(Int.MAX_VALUE)
         val restore = TransactionRestoreService(
             reviewRepository = harness.reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(harness.db),
             financialTransactionRepository = harness.ledgerUnderTest,
             reconciliation = com.baraa.masroof.application.transaction.TransactionReconciliationService(
                 rawSmsRepository = harness.rawRepo,
@@ -486,6 +487,7 @@ class ProcessingCompletionFailureMatrixTest {
         )
         return com.baraa.masroof.application.review.ReviewWorkflowService(
             reviewRepository = harness.reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(harness.db),
             userCorrectionRepository = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(
                 harness.db.userCorrectionDao(),
             ),

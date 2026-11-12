@@ -88,7 +88,7 @@ to selected banks, and owned cards need a configured type before setup completes
 Unconfigured bank patterns remain visible and can be taught/approved after setup.
 The optional `bank_setup_draft` preference preserves bank identities and both dates
 across restarts and backup/restore rollback. Existing preference names and completed
-setups remain compatible; the financial schema stays v18.
+setups remain compatible; they add nothing to the financial schema.
 
 Settings and dashboard historical-import actions open the common bank/date picker. `BankSmsImportWorkflow`
 converts inclusive local calendar dates to an exclusive end instant and runs one
@@ -108,7 +108,7 @@ and the configuration generation before saving. A built-in role rule keeps its f
 readings; approval may only add an owned account link (or a card link for purchases, refunds
 and card payments). A link fills only a role the message leaves empty, never replaces a value
 the message names, and never funds a purchase, refund or card-named movement from an account.
-Editing a built-in teaches a new pattern and turns the built-in off once the replacement is approved. Financial schema v18 and the existing
+Editing a built-in teaches a new pattern and turns the built-in off once the replacement is approved. The financial schema and the existing
 ingestion, validation and posting guards are unchanged.
 
 The bank catalog groups definitions by operation and opens each bank-qualified
@@ -157,8 +157,8 @@ generation again, atomically removes every revision and retains only the deleted
 to suppress bundled reinstallation. Pattern configuration schema 4 persists those
 bank-qualified deletion markers through backup/restore; schemas 1–3 remain readable
 and retain their existing encoding until a deletion is saved. Deletion changes no
-RawSms, parsed evidence, corrections or posted financial rows. Financial Room schema
-v18 is unchanged; deleted patterns cannot be recovered through revision restore.
+RawSms, parsed evidence, corrections or posted financial rows. The financial Room schema
+is unchanged; deleted patterns cannot be recovered through revision restore.
 
 Keep integration fixtures on the bundled production definitions. Kotlin rule
 profiles live only in `bank-engine/src/testFixtures/`, shared through Gradle's built-in test-fixtures support. The offline CLI is an explicit test tool. Neither
@@ -213,7 +213,7 @@ still authorize the operation and choose its type, endpoints and timing; the
 factory does not classify, resolve ownership or write to storage. Manual and
 automatic endpoint precedence remain separate.
 
-This extraction preserves schema v18 and the existing write paths. It introduces
+This extraction preserves the financial schema and the existing write paths. It introduces
 no backfill, history reparse, new database, worker, backup format or UI behavior.
 Policy tests run directly on JVM in `finance-core`; app integration tests cover
 the unchanged persistence, orchestration and dashboard paths. Architecture checks
@@ -230,9 +230,42 @@ Message learning is "remember my decision", per bank, for every configured bank.
 
 ## Data and recovery
 
-`masroof.db` opens schemas from the frozen v18 baseline (`MasroofDatabase.BASELINE_VERSION`, fourteen tables, unchanged identity hash) up to the current `MasroofDatabase.VERSION` (still 18) through `MasroofDatabase.MIGRATIONS`, one additive, tested Room migration per step (see AGENTS.md). `MasroofDatabase.builder` is the only builder for the live file. Older, unknown and newer schemas are rejected by Room and the file stays byte-identical (`MasroofMigrationOpenPathTest`, `MigrationOpenPathDeviceTest`). Never a destructive fallback. Automatic schema-fact backfill is removed; already queued backfill work completes without parsing or writing. Existing preference files, Keystore alias, app id and worker names remain stable. `learning.db` stores labels/provenance; `analytics.db` stores advisory results and preferences. Old Lab files are neither imported nor deleted automatically.
+`masroof.db` opens schemas from the frozen v18 baseline (`MasroofDatabase.BASELINE_VERSION`, fourteen tables, unchanged identity hash) up to the current `MasroofDatabase.VERSION` (19) through `MasroofDatabase.MIGRATIONS`, one additive, tested Room migration per step (see AGENTS.md). `MasroofDatabase.builder` is the only builder for the live file. Older, unknown and newer schemas are rejected by Room and the file stays byte-identical (`MasroofMigrationOpenPathTest`, `MigrationOpenPathDeviceTest`): Room compares the identity hash of a file at the current version and validates every table after a migration. Never a destructive fallback. Automatic schema-fact backfill is removed; already queued backfill work completes without parsing or writing. Existing preference files, Keystore alias, app id and worker names remain stable. `learning.db` stores labels/provenance; `analytics.db` stores advisory results and preferences. Old Lab files are neither imported nor deleted automatically.
 
-The learning store is schema 2 and the analytics store is schema 4. Posted type edits atomically update the financial transaction and its latest `USER_FINANCIAL_TYPE` review decision in the unchanged financial schema. Message learning rebuilds from durable decisions before enabling personal assistance; no derived message-model cache is written or loaded. Exact template suppressions include bank and feature identity and revoke human-template assistance. Financial `EXPENSE`/`INCOME`, ownership decisions and field-only edits do not invent family labels. Unsupported or ambiguous decisions have an explicit feedback disposition.
+### User decisions (`user_decision`, schema v19)
+
+`MIGRATION_18_19` adds one append-only table, `user_decision`, and nothing else (CREATE TABLE and indices only; no backfill, plan piece 2.2 is an owner gate). Every explicit user decision is appended there in the same database transaction as the existing write it describes; the existing stores (`review_item`, `user_correction`, the `user_selected_bank:` reason prefix, `financial_transaction`) are written exactly as before. Nothing reads the table yet: plan piece 2.3 moves the readers onto it, so each row carries what 2.3 needs without `financial_transaction.type` or reason prefixes. `UserDecisionDao` only inserts and lists; it has no UPDATE or DELETE. A later row for the same subject supersedes an earlier one by `sequence`.
+
+| Column | Meaning |
+|---|---|
+| `sequence` | `INTEGER PRIMARY KEY AUTOINCREMENT`: the append order, never reused. The latest decision for a subject is the one with the highest `sequence`, not the latest clock time. |
+| `rawSmsId` | The subject: the raw SMS the decision is about (the outgoing leg for a pair). Raw SMS ids are stable; transaction ids are not, because reconciliation may recreate a row. Foreign key to `raw_sms` (`RESTRICT`/`CASCADE` like `user_correction`). |
+| `pairedRawSmsId` | The incoming leg of a self-transfer pair, else null. Same foreign key. |
+| `kind` | A `UserDecisionKind` name (below). |
+| `decidedAtEpochMillis` | The injected clock's instant at the decision (the same instant the existing write stores). |
+| `transactionType` | The `FinancialTransactionType` the user chose (or that the chosen action posts), for `FINANCIAL_TYPE`, `EXTERNAL_TRANSFER`, `SELF_TRANSFER_PAIR`, `RECLASSIFY`. |
+| `sourceContainerId`, `destinationContainerId` | The endpoints the decision posted with, for the same kinds. They are derived from evidence and ownership at decision time, so 2.3 can reproduce the user's row without reading it back. |
+| `messageFamily`, `amountDecimal`, `amountCurrency`, `merchant`, `counterparty` | A `CORRECTION`'s fields, encoded like `user_correction` (family name, `BigDecimal.toPlainString()`, currency name). The user's own text, never SMS body text. |
+| `bankId` | The bank of a `BANK_SELECTION`. |
+
+Unused columns are null. Indices: `(rawSmsId, sequence)` for "latest decision for this SMS", `(pairedRawSmsId)` for the second leg of a pair.
+
+| Kind | Writer and call site | Existing write it joins |
+|---|---|---|
+| `FINANCIAL_TYPE` | `ReviewWorkflowService.resolveAsFinancialType` → `RoomManualReviewResolutionRepository.persistSingleResolution` | posted row + review `USER_FINANCIAL_TYPE` |
+| `EXTERNAL_TRANSFER` | `ReviewWorkflowService.resolveTransferAsExternal` → `RoomManualReviewResolutionRepository.persistSingleResolution` | posted row + review `USER_EXTERNAL_TRANSFER` |
+| `SELF_TRANSFER_PAIR` | `ReviewWorkflowService.resolveSelfTransferPair` → `RoomManualReviewResolutionRepository.persistPairResolution` | posted row + both reviews `USER_SELF_TRANSFER_PAIR` |
+| `NON_FINANCIAL` | `ReviewWorkflowService.resolveAsNonFinancial` | review `USER_NON_FINANCIAL` |
+| `CORRECTION` | `ReviewWorkflowService.applyCorrection` | `user_correction` row (the later `USER_CORRECTION` review closure is its consequence, not a second decision) |
+| `RECLASSIFY` | `TransactionReclassificationService.reclassify` → `RoomTransactionReclassificationRepository.updateWithDecision` | row type/endpoints + review `USER_FINANCIAL_TYPE` |
+| `IGNORE` | `TransactionIgnoreService` → `RoomTransactionIgnoreRepository.ignoreSingle` | row deleted + review `USER_NON_FINANCIAL` |
+| `RESTORE` | `TransactionRestoreService.restore` | review `USER_FINANCIAL_TYPE` (a chosen type adds its own `RECLASSIFY` row) |
+| `RESTORE_REVERTED` | `TransactionRestoreService.restore` when nothing could post and the restore is undone | review back to `USER_NON_FINANCIAL` |
+| `BANK_SELECTION` | `ExplicitBankSelectionWorkflow.selectAndReparse` | review reasons with the `user_selected_bank:` prefix |
+
+Application services join through `UserDecisionRepository.recordWith(decision) { write }`, which runs the write and the append in one Room transaction under the access gate and appends only when the write returns a result; the Room repositories append through `UserDecisionDao` inside their own transaction. A failure after the append rolls both back.
+
+The learning store is schema 2 and the analytics store is schema 4. Posted type edits atomically update the financial transaction, its latest `USER_FINANCIAL_TYPE` review decision and its `user_decision` row. Message learning rebuilds from durable decisions before enabling personal assistance; no derived message-model cache is written or loaded. Exact template suppressions include bank and feature identity and revoke human-template assistance. Financial `EXPENSE`/`INCOME`, ownership decisions and field-only edits do not invent family labels. Unsupported or ambiguous decisions have an explicit feedback disposition.
 
 `USER_EXTERNAL_TRANSFER` now teaches an incoming/outgoing family from the external type committed with the resolved review, including compatible retained decisions. The UI sends the direction explicitly displayed by its action. A changed direction is rejected before assembly; a changed effective evidence snapshot is rejected inside the financial write transaction. The refreshed detail explains the rejection. Missing decision evidence remains pending; later contradictory edits supersede the label and can suppress the template. Broad financial types still do not count as learned family corrections.
 
@@ -267,7 +300,7 @@ schema 4 stores recurring feedback, including an intent recorded before the fina
 save; a later pass completes it only when the saved commitment's source and cadence
 agree. Feedback failure never undoes a saved commitment. Legacy rejection stays a
 dismissal; explicit "not recurring" decisions stay until undone. Archive 4 reads
-archives 1-3 and financial schema 18.
+archives 1-3 and financial schemas 18 and later.
 
 The forecast baseline is a capped weekday mean (stored key `WEEKDAY_MEDIAN` for
 compatibility); the personal Huber model must beat it to be used. `ForecastReplay`

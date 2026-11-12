@@ -487,6 +487,7 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
 
         val restore = TransactionRestoreService(
             reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             financialTransactionRepository = ftRepo,
             reconciliation = withReviews,
             reclassification = TransactionReclassificationService(ftRepo, effective, resolver, confirmation, appLogService = NoOpAppLog, persistence = noOpReclassificationRepository(ftRepo)),

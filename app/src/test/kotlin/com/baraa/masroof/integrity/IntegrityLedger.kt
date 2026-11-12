@@ -288,6 +288,7 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
 
     val workflow = ReviewWorkflowService(
         reviewRepository = world.reviewRepo,
+        userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(world.db),
         userCorrectionRepository = corrections,
         financialTransactionRepository = world.ftRepo,
         rawSmsRepository = world.rawRepo,

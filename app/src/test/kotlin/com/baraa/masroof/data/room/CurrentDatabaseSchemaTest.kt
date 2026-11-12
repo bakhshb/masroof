@@ -21,7 +21,7 @@ class CurrentDatabaseSchemaTest {
     private val raw = RawSms("retained", "TEST", "Synthetic evidence", Instant.parse("2026-10-15T10:00:00Z"),
         "retained", SmsBodyHasher.sha256Hex("Synthetic evidence"))
 
-    @Test fun currentV18ReopensWithoutChangingStoredEvidence() = runBlocking {
+    @Test fun currentVersionReopensWithoutChangingStoredEvidence() = runBlocking {
         val context = context()
         try {
             var c = AppContainer(context)
@@ -29,7 +29,7 @@ class CurrentDatabaseSchemaTest {
             c = AppContainer(context)
             try {
                 assertEquals(raw, c.storage.rawSmsRepository.getById(raw.id))
-                assertEquals(18, c.storage.database.openHelper.readableDatabase.version)
+                assertEquals(MasroofDatabase.VERSION, c.storage.database.openHelper.readableDatabase.version)
             } finally { c.close() }
         } finally { context.getDatabasePath(MasroofDatabase.NAME).parentFile?.deleteRecursively() }
     }

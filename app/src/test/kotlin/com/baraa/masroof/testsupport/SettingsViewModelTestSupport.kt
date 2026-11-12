@@ -52,6 +52,7 @@ internal object SettingsViewModelTestSupport {
         )
         return TransactionRestoreService(
             reviewRepository = reviewRepository,
+            userDecisionRepository = NoOpUserDecisionRepository,
             financialTransactionRepository = financialTransactionRepository,
             reconciliation = TransactionReconciliationService(
                 rawSmsRepository = emptyRawSmsRepository(),

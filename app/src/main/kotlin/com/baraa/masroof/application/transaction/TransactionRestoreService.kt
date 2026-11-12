@@ -9,9 +9,13 @@ import kotlinx.coroutines.CancellationException
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.ReviewResolutionKind
+import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.UserDecision
+import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.sms.time.InstantClock
 
 sealed interface RestoreResult {
@@ -31,6 +35,7 @@ sealed interface RestoreResult {
  */
 class TransactionRestoreService(
     private val reviewRepository: ReviewRepository,
+    private val userDecisionRepository: UserDecisionRepository,
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val reconciliation: TransactionReconciliationService,
     private val reclassification: TransactionReclassificationService,
@@ -52,12 +57,8 @@ class TransactionRestoreService(
             return RestoreResult.Rejected("not_ignored")
         }
 
-        reviewRepository.markResolved(
-            id = review.id,
-            resolutionKind = ReviewResolutionKind.USER_FINANCIAL_TYPE,
-            resolvedAt = clock.now(),
-            resolvedTransactionId = null,
-        ) ?: return RestoreResult.Rejected("review_clear_failed")
+        markResolvedWithDecision(review.id, rawSmsId, ReviewResolutionKind.USER_FINANCIAL_TYPE, UserDecisionKind.RESTORE)
+            ?: return RestoreResult.Rejected("review_clear_failed")
 
         val report = try {
             reconciliation.reconcileAffectedRawSmsIds(listOf(rawSmsId))
@@ -129,13 +130,22 @@ class TransactionRestoreService(
         ) {
             return "rollback_delete_failed"
         }
-        reviewRepository.markResolved(
-            id = reviewId,
-            resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
-            resolvedAt = clock.now(),
-            resolvedTransactionId = null,
-        ) ?: return "rollback_review_failed"
+        markResolvedWithDecision(reviewId, rawSmsId, ReviewResolutionKind.USER_NON_FINANCIAL, UserDecisionKind.RESTORE_REVERTED)
+            ?: return "rollback_review_failed"
         return null
+    }
+
+    /** The review resolution and its `user_decision` row commit together. */
+    private suspend fun markResolvedWithDecision(
+        reviewId: String,
+        rawSmsId: String,
+        resolutionKind: ReviewResolutionKind,
+        decisionKind: UserDecisionKind,
+    ): ReviewItem? {
+        val now = clock.now()
+        return userDecisionRepository.recordWith(UserDecision(rawSmsId, decisionKind, now)) {
+            reviewRepository.markResolved(id = reviewId, resolutionKind = resolutionKind, resolvedAt = now, resolvedTransactionId = null)
+        }
     }
 
     private fun logRestore(

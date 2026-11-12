@@ -8,6 +8,8 @@ import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.UserDecision
+import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.ManualReviewResolutionRepository
@@ -16,7 +18,7 @@ import java.time.Instant
 
 /**
  * Room-backed atomic FT + review resolution. Uses [MasroofDatabase.withTransaction]
- * so FinancialTransaction persistence and ReviewItem updates commit together.
+ * so FinancialTransaction persistence, ReviewItem updates and the `user_decision` row commit together.
  */
 class RoomManualReviewResolutionRepository(
     private val database: MasroofDatabase,
@@ -71,17 +73,26 @@ class RoomManualReviewResolutionRepository(
 
                     FinancialTransactionSaveResult.Saved,
                     FinancialTransactionSaveResult.AlreadyExists,
-                    -> ManualReviewResolutionResult.Success(
-                        transaction = transaction,
-                        reviews = reviewIds.map { reviewId ->
+                    -> {
+                        val reviews = reviewIds.map { reviewId ->
                             resolveRequiredOrRollback(
                                 reviewId = reviewId,
                                 resolutionKind = resolutionKind,
                                 resolvedAt = resolvedAt,
                                 transactionId = transaction.id,
                             )
-                        },
-                    )
+                        }
+                        database.appendDecision(
+                            UserDecision.posting(
+                                kind = decisionKind(resolutionKind),
+                                rawSmsId = reviews.first().rawSmsId,
+                                transaction = transaction,
+                                decidedAt = resolvedAt,
+                                pairedRawSmsId = reviews.getOrNull(1)?.rawSmsId,
+                            ),
+                        )
+                        ManualReviewResolutionResult.Success(transaction = transaction, reviews = reviews)
+                    }
                 }
             }
         } catch (e: ReviewResolutionRollback) {
@@ -125,6 +136,13 @@ class RoomManualReviewResolutionRepository(
             throw ReviewResolutionRollback("review_resolution_verify_failed")
         }
         return ReviewItemMapper.toDomain(after)
+    }
+
+    private fun decisionKind(resolutionKind: ReviewResolutionKind): UserDecisionKind = when (resolutionKind) {
+        ReviewResolutionKind.USER_FINANCIAL_TYPE -> UserDecisionKind.FINANCIAL_TYPE
+        ReviewResolutionKind.USER_EXTERNAL_TRANSFER -> UserDecisionKind.EXTERNAL_TRANSFER
+        ReviewResolutionKind.USER_SELF_TRANSFER_PAIR -> UserDecisionKind.SELF_TRANSFER_PAIR
+        else -> throw ReviewResolutionRollback("resolution_kind_not_posting")
     }
 
     private class ReviewResolutionRollback(val reason: String) : Exception(reason)

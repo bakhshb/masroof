@@ -10,6 +10,7 @@ import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.domain.model.UserDecision
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
@@ -18,6 +19,7 @@ import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.TransactionReclassificationRepository
 import com.baraa.masroof.domain.repository.UserCorrectionRepository
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 import java.time.Instant
@@ -51,6 +53,11 @@ internal object EmptyUserCorrectionRepository : UserCorrectionRepository {
     override suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrection> = emptyList()
     override suspend fun listForRawSmsIds(rawSmsIds: Collection<String>): List<UserCorrection> = emptyList()
     override suspend fun listAll(): List<UserCorrection> = emptyList()
+}
+
+/** Runs the write and keeps no decision row. */
+internal object NoOpUserDecisionRepository : UserDecisionRepository {
+    override suspend fun <R : Any> recordWith(decision: UserDecision, write: suspend () -> R?): R? = write()
 }
 
 internal fun noOpOwnershipDiscovery() =

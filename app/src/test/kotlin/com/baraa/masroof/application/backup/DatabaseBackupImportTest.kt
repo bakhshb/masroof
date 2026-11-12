@@ -50,7 +50,7 @@ class DatabaseBackupImportTest {
                 val imported = createCurrentDatabaseFile(context)
                 if (disguised) android.database.sqlite.SQLiteDatabase.openDatabase(imported.path, null,
                     android.database.sqlite.SQLiteDatabase.OPEN_READWRITE).use { it.version = 17 }
-                val zip = createBackupZip(imported, roomVersion = if (disguised) 18 else 17)
+                val zip = createBackupZip(imported, roomVersion = if (disguised) MasroofDatabase.VERSION else 17)
                 var closed = false
                 try {
                     val service = DatabaseBackupService(context, live, { closed = true; live.close() }, "test", restartProcess = {}, appLogService = NoOpAppLog)

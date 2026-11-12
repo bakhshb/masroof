@@ -117,6 +117,7 @@ class ReviewContainer(
             reconciliationService = transactionReconciliationService,
             reviewQueueUpdater = reviewQueueUpdater,
             manualReviewResolutionRepository = manualReviewResolutionRepository,
+            userDecisionRepository = storage.userDecisionRepository,
             clock = storage.clock,
             appLogService = storage.appLogService,
             processingRecovery = processingRecovery,
@@ -161,6 +162,7 @@ class ReviewContainer(
     val transactionRestoreService: TransactionRestoreService =
         TransactionRestoreService(
             reviewRepository = storage.reviewRepository,
+            userDecisionRepository = storage.userDecisionRepository,
             financialTransactionRepository = storage.financialTransactionRepository,
             reconciliation = transactionReconciliationService,
             reclassification = transactionReclassificationService,

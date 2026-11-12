@@ -5,8 +5,11 @@ import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.ExplicitBankSelection
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.UserDecision
+import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 
@@ -17,6 +20,7 @@ import com.baraa.masroof.sms.time.InstantClock
  */
 class ExplicitBankSelectionWorkflow(
     private val reviewRepository: ReviewRepository,
+    private val userDecisionRepository: UserDecisionRepository,
     private val rawSmsRepository: RawSmsRepository,
     private val parsedEventRepository: ParsedEventRepository,
     private val bankSmsRegistry: BankSmsRegistry,
@@ -37,12 +41,15 @@ class ExplicitBankSelectionWorkflow(
         val existing = reviewRepository.findByRawSmsId(rawSmsId) ?: return
         if (existing.status != ReviewStatus.REQUIRED) return
         val routeReason = existing.reasons.firstOrNull { it in ExplicitBankSelection.ROUTE_REASONS_OFFERING_CHOICE }
-        reviewRepository.upsertRequired(
-            rawSmsId = rawSmsId,
-            kind = existing.kind,
-            reasons = ExplicitBankSelection.withSelection(existing.reasons, bank),
-            now = clock.now(),
-        )
+        val now = clock.now()
+        userDecisionRepository.recordWith(UserDecision(rawSmsId, UserDecisionKind.BANK_SELECTION, now, bankId = bank.id)) {
+            reviewRepository.upsertRequired(
+                rawSmsId = rawSmsId,
+                kind = existing.kind,
+                reasons = ExplicitBankSelection.withSelection(existing.reasons, bank),
+                now = now,
+            )
+        }
         val rawSms = rawSmsRepository.getById(rawSmsId) ?: return
         processStored.reparseStored(rawSms)
         val parsed = parsedEventRepository.findByRawSmsId(rawSmsId) != null

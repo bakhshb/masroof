@@ -72,7 +72,7 @@ class BackupOlderSchemaImportTest {
             rewritten(manifestVersion = NextVersionTestDatabase.VERSION, manifestHash = next.identityHashes.getValue(NextVersionTestDatabase.VERSION)),
         )
         for (archive in cases) BackupMigrationContract.assertRejectedUntouched(context, { archive.inputStream() }, next)
-        // Production knows no next version: the v18 archive relabelled as v19 is refused too.
+        // Production knows no next version: the v18 archive relabelled as the test-only next version is refused too.
         BackupMigrationContract.assertRejectedUntouched(context, { cases.last().inputStream() }, BackupSchema.PRODUCTION)
     }
 

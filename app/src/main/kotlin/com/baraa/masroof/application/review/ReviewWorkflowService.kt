@@ -31,6 +31,8 @@ import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.domain.model.UserDecision
+import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
@@ -39,6 +41,7 @@ import com.baraa.masroof.domain.repository.ManualReviewResolutionResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.UserCorrectionRepository
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 import java.time.Instant
@@ -67,6 +70,7 @@ class ReviewWorkflowService(
     private val reconciliationService: TransactionReconciliationService,
     private val reviewQueueUpdater: ReviewQueueUpdater,
     private val manualReviewResolutionRepository: ManualReviewResolutionRepository,
+    private val userDecisionRepository: UserDecisionRepository,
     private val clock: InstantClock,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val appLogService: AppLog,
@@ -214,7 +218,16 @@ class ReviewWorkflowService(
             correctedCounterparty = correctedCounterparty,
             createdAt = now,
         )
-        userCorrectionRepository.save(correction)
+        val decision = UserDecision(
+            rawSmsId = review.rawSmsId,
+            kind = UserDecisionKind.CORRECTION,
+            decidedAt = now,
+            messageFamily = correctedType,
+            amount = correctedAmount,
+            merchant = correctedMerchant,
+            counterparty = correctedCounterparty,
+        )
+        userDecisionRepository.recordWith(decision) { userCorrectionRepository.save(correction) }
 
         val incomplete = reconcileAffectedAndUpdateReviews(listOf(review.rawSmsId))
         if (incomplete != null) {
@@ -472,12 +485,15 @@ class ReviewWorkflowService(
         if (financialTransactionRepository.isRawSmsLinked(review.rawSmsId)) {
             return ReviewWorkflowResult.Rejected("raw_sms_already_finalized")
         }
-        val marked = reviewRepository.markResolved(
-            id = review.id,
-            resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
-            resolvedAt = clock.now(),
-            resolvedTransactionId = null,
-        ) ?: return ReviewWorkflowResult.Rejected("review_resolution_failed")
+        val now = clock.now()
+        val marked = userDecisionRepository.recordWith(UserDecision(review.rawSmsId, UserDecisionKind.NON_FINANCIAL, now)) {
+            reviewRepository.markResolved(
+                id = review.id,
+                resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
+                resolvedAt = now,
+                resolvedTransactionId = null,
+            )
+        } ?: return ReviewWorkflowResult.Rejected("review_resolution_failed")
         logReviewAction("Dismissed as non-financial", reviewId)
         return ReviewWorkflowResult.Success(review = marked, transaction = null)
     }

@@ -49,8 +49,7 @@ object BackupMigrationContract {
             MigrationOpenPathContract.rows(it)
         }
         assertTrue("fixture has rows", expected.values.sumOf { it.size } > 0)
-        assertEquals(expected, restored - "migration_probe")
-        assertEquals(emptyList<String>(), restored["migration_probe"])
+        MigrationOpenPathContract.assertKeepsEveryRow(expected, restored, MigrationOpenPathContract.NEXT_VERSION_TABLES)
         reset(context)
     }
 
