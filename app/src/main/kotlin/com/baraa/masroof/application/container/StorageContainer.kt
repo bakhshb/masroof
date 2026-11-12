@@ -103,7 +103,7 @@ class StorageContainer(
                 .build()
         }
 
-    val messagePatternStore = MessagePatternStore(database)
+    val messagePatternStore = MessagePatternStore(database, databaseAccessGate)
 
     val rawSmsRepository: RawSmsRepository =
         RoomRawSmsRepository(database.rawSmsDao(), accessGate = databaseAccessGate)

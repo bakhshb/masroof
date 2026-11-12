@@ -2,6 +2,7 @@ package com.baraa.masroof.data.patterns
 
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.entity.PatternConfigurationEntity
 import com.baraa.masroof.engine.bank.patterns.BankMessagePatterns
 import com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration
@@ -13,11 +14,18 @@ import java.io.File
  * Durable user definitions, never a rebuildable learning cache: the whole document is the one
  * `pattern_configuration` row of `masroof.db` (schema v21). Each write reads, checks and replaces the row in one
  * database transaction, so the generation check holds across threads; no lock is held around database access, so
- * a read from inside a financial transaction joins it and never waits on a writer. The decoded document is
+ * a read from inside a financial transaction joins it and never waits on a writer. Each touch holds a blocking
+ * admission of the access gate (immediate inside a lease), so a read during a restore can never reopen the file. The decoded document is
  * reused only while the stored row is unchanged, so any writer, restore or other database is seen.
  */
-class MessagePatternStore(private val database: () -> SupportSQLiteDatabase, private val beforeCommit: () -> Unit = {}) {
-    constructor(database: RoomDatabase, beforeCommit: () -> Unit = {}) : this({ database.openHelper.writableDatabase }, beforeCommit)
+class MessagePatternStore(
+    private val database: () -> SupportSQLiteDatabase,
+    private val accessGate: DatabaseAccessGate = DatabaseAccessGate(),
+    private val beforeCommit: () -> Unit = {},
+) {
+    /** Every touch of [database] holds an [accessGate] admission: after the gate retires nothing reopens Room. */
+    constructor(database: RoomDatabase, accessGate: DatabaseAccessGate = DatabaseAccessGate(), beforeCommit: () -> Unit = {}) :
+        this({ database.openHelper.writableDatabase }, accessGate, beforeCommit)
 
     fun load(): MessagePatternConfiguration {
         val (generation, raw) = readRow() ?: return MessagePatternConfiguration()
@@ -98,9 +106,10 @@ class MessagePatternStore(private val database: () -> SupportSQLiteDatabase, pri
         LegacyMessagePatternFile.delete(file)
     }
 
-    private fun readRow(): Pair<Long, String>? =
+    private fun readRow(): Pair<Long, String>? = accessGate.withBlockingAccess {
         database().query("SELECT generation, document FROM pattern_configuration WHERE id = ${PatternConfigurationEntity.ROW_ID}")
             .use { if (it.moveToFirst()) it.getLong(0) to it.getString(1) else null }
+    }
 
     private fun put(generation: Long, raw: String) = database().execSQL(
         "INSERT OR REPLACE INTO pattern_configuration (id, generation, document) VALUES (?, ?, ?)",
@@ -108,11 +117,11 @@ class MessagePatternStore(private val database: () -> SupportSQLiteDatabase, pri
     )
 
     /** Nests inside a caller's transaction on the same connection; a throw, also from [beforeCommit], rolls back. */
-    private fun <T> transaction(block: () -> T): T {
+    private fun <T> transaction(block: () -> T): T = accessGate.withBlockingAccess {
         val db = database()
         db.beginTransaction()
         try {
-            return block().also { beforeCommit(); db.setTransactionSuccessful() }
+            block().also { beforeCommit(); db.setTransactionSuccessful() }
         } finally {
             db.endTransaction()
         }

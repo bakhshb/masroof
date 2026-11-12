@@ -613,7 +613,7 @@ class DatabaseBackupService(
         val current = DatabaseRestoreRecovery.capturePreferences(appContext)
         // The patterns travel inside the database; a document that cannot decode fails the export as before.
         // A codec error can quote the document, so only this message is logged.
-        check(runCatching { MessagePatternStore(database).load() }.isSuccess) { "Stored pattern configuration is invalid" }
+        check(runCatching { MessagePatternStore(database, databaseAccessGate).load() }.isSuccess) { "Stored pattern configuration is invalid" }
         return BackupPreferencesSnapshot(
             labAnalysis = current.labAnalysis,
             messagePatterns = null,

@@ -5,6 +5,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -19,6 +20,8 @@ class DatabaseAccessGate {
     private var drained: CompletableDeferred<Unit>? = null
     private val retirement = CompletableDeferred<Unit>()
     @Volatile private var retired = false
+    private val blockingMonitor = Object()
+    private var blockingActive = 0
 
     suspend fun <T> withAccess(block: suspend () -> T): T {
         if (coroutineContext[Lease]?.gate === this) return block()
@@ -84,30 +87,70 @@ class DatabaseAccessGate {
         return exclusiveEdits.withLock { withRestore { withContext(Lease(this)) { block() } } }
     }
 
+    /**
+     * The blocking twin of [withAccess], for synchronous callers (the pattern store). Inside a lease of this gate
+     * (also on a Room transaction thread) or nested, it runs [block] directly; otherwise it is admitted unless the
+     * gate retired, and retirement waits for it, so no blocking call can touch Room after it closes.
+     */
+    fun <T> withBlockingAccess(block: () -> T): T {
+        if (held.get() === this) return block()
+        synchronized(blockingMonitor) {
+            checkAvailable()
+            blockingActive++
+        }
+        val previous = held.get()
+        held.set(this)
+        try {
+            return block()
+        } finally {
+            held.set(previous)
+            synchronized(blockingMonitor) { if (--blockingActive == 0) blockingMonitor.notifyAll() }
+        }
+    }
+
     /** Called under exclusive restore immediately before closing the live Room instance. */
     fun retire() {
-        retired = true
+        markRetired()
+        awaitBlockingAccess()
+    }
+
+    private fun markRetired() {
+        synchronized(blockingMonitor) { retired = true }
         retirement.complete(Unit)
+    }
+
+    /** Never under [state]: a blocking caller may wait for a leased transaction that must take [state] to end. */
+    private fun awaitBlockingAccess() = synchronized(blockingMonitor) {
+        while (blockingActive > 0) blockingMonitor.wait()
     }
 
     /** Reject new work, but let an admitted multi-stage operation finish before Room closes. */
     suspend fun retireAndDrain() {
         check(coroutineContext[Lease]?.gate !== this) { "Close cannot run inside repository access" }
         val idle = state.withLock {
-            retire()
+            markRetired()
             (drained ?: CompletableDeferred<Unit>().also { drained = it }).also {
                 if (active == 0) it.complete(Unit)
             }
         }
         idle.await()
+        awaitBlockingAccess()
     }
 
     private fun checkAvailable() {
         if (retired) throw DatabaseRestartRequiredException()
     }
 
-    private class Lease(val gate: DatabaseAccessGate) : AbstractCoroutineContextElement(Key) {
+    /** Also marks its thread while the leased coroutine runs there, so blocking calls inside it see the lease. */
+    private class Lease(val gate: DatabaseAccessGate) : AbstractCoroutineContextElement(Key), ThreadContextElement<DatabaseAccessGate?> {
+        override fun updateThreadContext(context: CoroutineContext): DatabaseAccessGate? = held.get().also { held.set(gate) }
+        override fun restoreThreadContext(context: CoroutineContext, oldState: DatabaseAccessGate?) = held.set(oldState)
         companion object Key : CoroutineContext.Key<Lease>
+    }
+
+    private companion object {
+        /** The gate whose lease or blocking access the current thread runs under. */
+        val held = ThreadLocal<DatabaseAccessGate?>()
     }
 }
 

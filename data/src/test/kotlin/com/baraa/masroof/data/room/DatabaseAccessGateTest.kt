@@ -23,6 +23,35 @@ class DatabaseAccessGateTest {
         assertTrue(coroutineContext[kotlinx.coroutines.Job]!!.isActive)
     }
 
+    /** Blocking access (the pattern store): refused once retired, waited for by retirement, direct inside a lease. */
+    @Test
+    fun blockingAccess_isRefusedAfterRetirementWhichWaitsForAdmittedCalls() = runTest {
+        val gate = DatabaseAccessGate()
+        val inside = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val reader = Thread { gate.withBlockingAccess { inside.countDown(); release.await() } }.apply { start() }
+        inside.await()
+        val retired = java.util.concurrent.atomic.AtomicBoolean(false)
+        val retiring = Thread { gate.retire(); retired.set(true) }.apply { start() }
+        Thread.sleep(100)
+        assertFalse("retirement waits for the admitted blocking call", retired.get())
+        release.countDown()
+        reader.join(); retiring.join()
+        assertTrue(retired.get())
+        assertTrue(runCatching { gate.withBlockingAccess { error("must not reach old Room") } }.exceptionOrNull() is DatabaseRestartRequiredException)
+    }
+
+    @Test
+    fun blockingAccess_insideALeaseRunsEvenWhileAShutdownRetires() = runTest {
+        val gate = DatabaseAccessGate()
+        assertEquals(2, gate.withAccess {
+            gate.retire()
+            gate.withBlockingAccess { gate.withBlockingAccess { 2 } }
+        })
+        val editing = DatabaseAccessGate()
+        assertEquals(3, editing.withExclusiveAccess { editing.withBlockingAccess { 3 } })
+    }
+
     @Test
     fun exclusiveEditsQueue_whileARealRestoreStillFailsFast() = runTest {
         val gate = DatabaseAccessGate()
