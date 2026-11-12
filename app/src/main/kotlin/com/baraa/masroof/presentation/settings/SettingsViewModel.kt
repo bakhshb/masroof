@@ -112,13 +112,12 @@ class SettingsViewModel(
                 val catalog = messagePatternsWorkflow?.catalog()
                 _uiState.update { it.copy(bankCatalog = catalog) }
                 val snapshot = settingsRegistryWorkflow.loadSnapshot()
-                val commitments = settingsCommitmentsWorkflow.listAll()
                 applyRegistries(
                     _uiState,
                     cards = snapshot.cards,
                     accounts = snapshot.accounts,
                     loans = snapshot.loans,
-                    commitments = commitments,
+                    commitments = settingsCommitmentsWorkflow.listAll(),
                 )
             } catch (ce: CancellationException) {
                 throw ce
