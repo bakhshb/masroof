@@ -220,6 +220,8 @@ class LedgerWriterDifferentialTest {
          * release" (found). The exclusion holds only while the writer's row is exactly that line (see [compare]).
          */
         private val frozen = mutableMapOf<String, String?>()
+        /** Stored and installment amount of each fee under "Fee with another amount". */
+        private val feeAmounts = mutableMapOf<String, Pair<String, String>>()
         /** The raw SMS set of the row each commitment was created on (exclusion "Re-keyed commitment"). */
         private val commitmentSets = mutableMapOf<String, List<String>>()
 
@@ -299,10 +301,21 @@ class LedgerWriterDifferentialTest {
                     ids(line).none { it in out } && names.none { line.startsWith("commitment $it ->") }
                 }
             }
+            // "Fee with another amount", after a user decision changed the row: the writer's row may differ from the
+            // other world's only in the amount, the stored fee's against the installment's; every other line agrees.
+            fun Set<String>.feeAmountsAs(other: Set<String>): Set<String> = mapTo(mutableSetOf()) { line ->
+                val id = ids(line).singleOrNull()?.takeIf { line.startsWith("row [") } ?: return@mapTo line
+                val (stored, evidence) = feeAmounts[id] ?: return@mapTo line
+                val cells = line.split(" ").toMutableList()
+                val amountCell = cells.indexOfFirst { it.endsWith("]") } + 2
+                if (cells.getOrNull(amountCell) != stored) return@mapTo line
+                cells[amountCell] = evidence
+                cells.joinToString(" ").takeIf { it in other }?.also { count("rows under: Fee with another amount, after a decision") } ?: line
+            }
             val a = oldState.visible(oldState)
-            val b = newState.visible(oldState)
+            val b = newState.visible(oldState).feeAmountsAs(a)
             val full = fullState.visible(fullState)
-            val bFull = newState.visible(fullState)
+            val bFull = newState.visible(fullState).feeAmountsAs(full)
             // Inside the judged set each raw SMS must have exactly the old scoped lines or exactly the old full-pass
             // lines (a scoped report leaves an unwritten neighbour's review as the old scoped pass did); outside it
             // every line must be the old scoped one.
@@ -493,6 +506,7 @@ class LedgerWriterDifferentialTest {
                 if (other) {
                     // Exclusion "Fee with another amount": the old heal takes the derived amount; the keep rule keeps the fee.
                     frozen[fee.first.rawSmsId] = worlds[2].state().first { it.startsWith("row [${fee.first.rawSmsId}]") }
+                    feeAmounts[fee.first.rawSmsId] = amount to fee.first.amount!!.amount.toPlainString()
                     count("raw SMS under: Fee with another amount")
                 }
                 shapesSeeded += "stored FEE for an installment"
