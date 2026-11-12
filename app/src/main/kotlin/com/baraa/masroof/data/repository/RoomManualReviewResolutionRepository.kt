@@ -75,10 +75,12 @@ class RoomManualReviewResolutionRepository(
                     FinancialTransactionSaveResult.Saved,
                     FinancialTransactionSaveResult.AlreadyExists,
                     -> {
-                        // A repeated submit finds its own row and every review already resolved to it: no new decision.
+                        // A repeated submit finds its own row and every review already resolved to it by the same
+                        // user choice: no new decision. An automatic resolution to the same id is not a repeat.
                         val repeat = save == FinancialTransactionSaveResult.AlreadyExists && reviewIds.all { id ->
                             reviewDao.getById(id)?.let {
-                                it.status == ReviewStatus.RESOLVED.name && it.resolvedTransactionId == transaction.id
+                                it.status == ReviewStatus.RESOLVED.name && it.resolvedTransactionId == transaction.id &&
+                                    it.resolutionKind == resolutionKind.name
                             } == true
                         }
                         val reviews = reviewIds.map { reviewId ->
