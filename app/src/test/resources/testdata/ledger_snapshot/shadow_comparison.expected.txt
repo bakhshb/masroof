@@ -101,7 +101,7 @@ old rows: 5  new rows: 4
 row differences: 1  review differences: 1  projection retries: 0
 
 ## Summary by reason
-INSTALLMENT_FEE: 1  (Stored rows: a stored FEE for an installment that cannot become a repayment)
+INSTALLMENT_FEE: 1  old 120.00 SAR  new -  (a stored FEE for a financing installment the projector does not post)
 
 ## Row differences
 

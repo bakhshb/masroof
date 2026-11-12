@@ -2,17 +2,20 @@ package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.domain.assembly.TransactionAssembler
-import com.baraa.masroof.domain.model.EffectiveUserDecisions
+import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.UserDecision
 import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.ledger.LedgerEvidence
 import com.baraa.masroof.ledger.LedgerProjection
 import com.baraa.masroof.ledger.LedgerRow
 import java.security.MessageDigest
+import java.time.Duration
 
 /**
  * Plan 3.2 shadow comparison: the stored ledger (what `TransactionReconciliationService` wrote) against
@@ -22,18 +25,25 @@ import java.security.MessageDigest
 object LedgerShadowComparison {
     enum class Kind { ONLY_OLD, ONLY_NEW, CHANGED, GROUPING }
 
-    /** Where a difference can be told, the Known differences entry it belongs to. */
-    enum class Reason(val knownDifference: String) {
-        ID_ONLY("Ids: the old fee-to-financing upgrade keeps the stored id"),
-        EXCHANGE_RATE("Exchange rate: only a complete stored pair on the same raw SMS set is carried"),
-        LOAN_PRE_PASS("Loan pre-pass: the projector confirms the loan before any installment"),
-        INSTALLMENT_FEE("Stored rows: a stored FEE for an installment that cannot become a repayment"),
-        DECIDED_WITHOUT_POSTING_COLUMNS("Stored rows: a decided row whose decision lacks its type, time or zone"),
-        DECIDED_NOT_STORED("Write guard: a decided posting the old pass did not write"),
-        STALE_EVIDENCE("Stored rows: an automatic row whose evidence changed since it was posted"),
-        ROW_TYPE_OR_OWNERSHIP("Stored rows: a type edited only on the row, or ownership changed since posting"),
-        MISSING_RAW_SMS("Missing raw SMS: a stored row links a raw SMS without evidence"),
-        UNEXPLAINED("none"),
+    /**
+     * A reason is given only when its condition is checked on the inputs; [description] says what was checked, not
+     * the cause behind it. Anything else is [UNEXPLAINED].
+     */
+    enum class Reason(val description: String) {
+        STORED_ROW_WITHOUT_LINKS("a stored row that links no raw SMS"),
+        RAW_SMS_WITHOUT_EVIDENCE("every stored row of the group links a raw SMS with no effective parsed event"),
+        ID_ONLY("only the transaction id differs (Known differences: Ids)"),
+        EXCHANGE_RATE("only the exchange-rate pair differs (Known differences: Exchange rate)"),
+        ZONE_FILLED("only the zone differs, and the stored zone is empty"),
+        TIME_REDERIVED("only the time differs (the stored zone empty or equal): the stored time is not what the evidence gives today"),
+        DECIDED_WITHOUT_POSTING_COLUMNS("a stored row whose posting outcome decision lacks its type, time or zone"),
+        DECIDED_NON_FINANCIAL_BUT_STORED("a stored row whose outcome decision says not financial"),
+        DECIDED_ROW_NOT_STORED("a decided row the projector posts and the stored ledger lacks; cause not determined"),
+        INSTALLMENT_FEE("a stored FEE for a financing installment the projector does not post"),
+        OWNERSHIP_NOT_OWNED("a stored row the projector drops, none of whose registry containers is OWNED now"),
+        STALE_EVIDENCE("an undecided stored row whose evidence now differs (amount, merchant, or no longer automation-eligible)"),
+        ROW_TYPE_WITHOUT_DECISION("the type differs and the SMS has no outcome decision (a row-only edit and an ownership change are not told apart)"),
+        UNEXPLAINED("none of the checked conditions holds"),
     }
 
     data class RowDifference(
@@ -77,8 +87,8 @@ object LedgerShadowComparison {
             }
             val fields = if (kind == Kind.CHANGED) changedFields(old[0].transaction, new[0].transaction) else emptyList()
             if (kind == Kind.CHANGED && fields.isEmpty()) return@mapNotNull null
-            RowDifference(kind, rawSmsIds, old, new, fields, reason(kind, fields, rawSmsIds, old, new, inputs.decisions, evidence))
-        }.sortedBy { it.rawSmsIds.first() }
+            RowDifference(kind, rawSmsIds, old, new, fields, reason(kind, fields, rawSmsIds, old, new, inputs, evidence))
+        }.sortedBy { it.rawSmsIds.firstOrNull() ?: it.oldRows.first().transaction.id }
         val storedReviews = inputs.reviews.associateBy { it.rawSmsId }
         val newReviews = projection.reviewCandidates.associate { it.rawSmsId to it.kind }
         val reviews = evidence.keys.sorted().mapNotNull { rawSmsId ->
@@ -127,52 +137,71 @@ object LedgerShadowComparison {
         "exchangeRateSource" to { it.exchangeRateSource },
     )
 
-    private val POSTING_FIELDS = setOf("type", "source", "destination")
+    private val TIME_FIELDS = setOf("occurredAt", "occurredAtZone")
+    private val POSTING_OUTCOMES = setOf(
+        UserDecisionKind.EXTERNAL_TRANSFER, UserDecisionKind.FINANCIAL_TYPE, UserDecisionKind.RECLASSIFY,
+        UserDecisionKind.RESTORE, UserDecisionKind.SELF_TRANSFER_PAIR,
+    )
 
     private fun changedFields(old: FinancialTransaction, new: FinancialTransaction): List<String> =
         FIELDS.filter { (_, read) -> read(old) != read(new) }.map { it.first }
 
+    @Suppress("CyclomaticComplexMethod")
     private fun reason(
         kind: Kind,
         fields: List<String>,
         rawSmsIds: List<String>,
         old: List<LedgerRow>,
         new: List<LedgerRow>,
-        decisions: Map<String, EffectiveUserDecisions>,
+        inputs: LedgerInputs,
         evidence: Map<String, LedgerEvidence>,
     ): Reason {
-        val legs = rawSmsIds.mapNotNull(evidence::get)
-        val outcomes = rawSmsIds.mapNotNull { decisions[it]?.outcome }
-        val oldTypes = old.map { it.transaction.type }
-        val newTypes = new.map { it.transaction.type }
-        val installment = legs.any { it.event.messageFamily == MessageFamily.FINANCING_INSTALLMENT }
+        val outcomes = rawSmsIds.mapNotNull { inputs.decisions[it]?.outcome }
+        val oldRow = old.singleOrNull()?.transaction
+        val installment = rawSmsIds.any { evidence[it]?.event?.messageFamily == MessageFamily.FINANCING_INSTALLMENT }
         return when {
-            old.any { row -> row.rawSmsIds.any { it !in evidence } } -> Reason.MISSING_RAW_SMS
+            old.any { it.rawSmsIds.isEmpty() } -> Reason.STORED_ROW_WITHOUT_LINKS
+            new.isEmpty() && old.all { row -> row.rawSmsIds.any { it !in evidence } } -> Reason.RAW_SMS_WITHOUT_EVIDENCE
             kind == Kind.CHANGED && fields == listOf("id") -> Reason.ID_ONLY
             kind == Kind.CHANGED && fields.all { it.startsWith("exchangeRate") } -> Reason.EXCHANGE_RATE
+            kind == Kind.CHANGED && fields == listOf("occurredAtZone") && oldRow?.occurredAtZone == null -> Reason.ZONE_FILLED
+            kind == Kind.CHANGED && "occurredAt" in fields && TIME_FIELDS.containsAll(fields) &&
+                ("occurredAtZone" !in fields || oldRow?.occurredAtZone == null) -> Reason.TIME_REDERIVED
             outcomes.isNotEmpty() -> when {
-                old.isNotEmpty() && outcomes.any { it.transactionType == null || it.occurredAt == null || it.occurredAtZone == null } ->
+                old.isNotEmpty() && outcomes.any { it.kind in NON_FINANCIAL_OUTCOMES } -> Reason.DECIDED_NON_FINANCIAL_BUT_STORED
+                old.isNotEmpty() && outcomes.any { it.kind in POSTING_OUTCOMES && !it.hasPostingColumns() } ->
                     Reason.DECIDED_WITHOUT_POSTING_COLUMNS
-                kind == Kind.ONLY_NEW -> Reason.DECIDED_NOT_STORED
+                kind == Kind.ONLY_NEW -> Reason.DECIDED_ROW_NOT_STORED
                 else -> Reason.UNEXPLAINED
             }
-            installment && FinancialTransactionType.LOAN_REPAYMENT in newTypes &&
-                FinancialTransactionType.LOAN_REPAYMENT !in oldTypes -> Reason.LOAN_PRE_PASS
-            installment && kind == Kind.ONLY_OLD && oldTypes == listOf(FinancialTransactionType.FEE) -> Reason.INSTALLMENT_FEE
+            installment && kind == Kind.ONLY_OLD && oldRow?.type == FinancialTransactionType.FEE -> Reason.INSTALLMENT_FEE
+            kind == Kind.ONLY_OLD && old.all { noOwnedContainer(it.transaction, inputs) } -> Reason.OWNERSHIP_NOT_OWNED
             old.any { !matchesEvidence(it, evidence) } -> Reason.STALE_EVIDENCE
-            kind == Kind.CHANGED && fields.any { it in POSTING_FIELDS } -> Reason.ROW_TYPE_OR_OWNERSHIP
+            kind == Kind.CHANGED && "type" in fields -> Reason.ROW_TYPE_WITHOUT_DECISION
             else -> Reason.UNEXPLAINED
         }
     }
 
-    /** True when [row] still reads its evidence as posted: the same parse rows, all eligible, and a lone leg's amount and merchant. */
+    private val NON_FINANCIAL_OUTCOMES =
+        setOf(UserDecisionKind.NON_FINANCIAL, UserDecisionKind.IGNORE, UserDecisionKind.RESTORE_REVERTED)
+
+    private fun UserDecision.hasPostingColumns() = transactionType != null && occurredAt != null && occurredAtZone != null
+
+    /** True when at least one of the row's containers is in the registry inputs and none of them is OWNED. */
+    private fun noOwnedContainer(transaction: FinancialTransaction, inputs: LedgerInputs): Boolean {
+        val registry = inputs.registry
+        val statuses = registry.accounts.mapKeys { FinancialContainerIdFactory.accountId(it.key) } +
+            registry.cards.mapKeys { FinancialContainerIdFactory.cardId(it.key) }
+        val found = listOfNotNull(transaction.sourceContainerId, transaction.destinationContainerId).mapNotNull(statuses::get)
+        return found.isNotEmpty() && OwnershipStatus.OWNED !in found
+    }
+
+    /** True when [row]'s evidence is still automation-eligible and a lone leg's amount and merchant are as posted. */
     private fun matchesEvidence(row: LedgerRow, evidence: Map<String, LedgerEvidence>): Boolean {
         val legs = row.rawSmsIds.mapNotNull(evidence::get)
-        val transaction = row.transaction
-        if (legs.map { it.event.id }.sorted() != transaction.linkedParsedEventIds.sorted()) return false
         if (legs.any { !TransactionAssembler.isAutomationEligible(it.event, it.automationConfirmed) }) return false
         val single = legs.singleOrNull()?.event ?: return true
-        return single.amount == transaction.amount && single.merchant == transaction.merchant
+        return single.amount == row.transaction.amount && single.merchant == row.transaction.merchant
     }
 
     fun report(inputs: LedgerInputs): String = report(compare(inputs))
@@ -184,8 +213,12 @@ object LedgerShadowComparison {
         appendLine("row differences: ${result.rows.size}  review differences: ${result.reviews.size}  projection retries: ${result.retryRawSmsIds.size}")
         appendLine()
         appendLine("## Summary by reason")
-        val counts = result.rows.groupingBy { it.reason }.eachCount()
-        Reason.entries.filter { it in counts }.forEach { appendLine("${it.name}: ${counts.getValue(it)}  (${it.knownDifference})") }
+        val byReason = result.rows.groupBy { it.reason }
+        Reason.entries.filter { it in byReason }.forEach { reason ->
+            val differences = byReason.getValue(reason)
+            appendLine("${reason.name}: ${differences.size}  old ${totals(differences.flatMap { it.oldRows })}" +
+                "  new ${totals(differences.flatMap { it.newRows })}  (${reason.description})")
+        }
         appendLine()
         appendLine("## Row differences")
         result.rows.forEachIndexed { index, difference ->
@@ -193,6 +226,10 @@ object LedgerShadowComparison {
             appendLine("### ${index + 1} ${difference.kind} reason=${difference.reason}")
             appendLine("raw sms: ${difference.rawSmsIds.joinToString(", ", transform = ::mask)}")
             if (difference.changedFields.isNotEmpty()) appendLine("changed: ${difference.changedFields.joinToString(", ")}")
+            if ("occurredAt" in difference.changedFields) {
+                val shift = Duration.between(difference.oldRows[0].transaction.occurredAt, difference.newRows[0].transaction.occurredAt)
+                appendLine("time shift: ${shift.seconds} s")
+            }
             difference.oldRows.forEach { appendLine("old: ${describe(it)}") }
             difference.newRows.forEach { appendLine("new: ${describe(it)}") }
         }
@@ -205,6 +242,13 @@ object LedgerShadowComparison {
         appendLine("## Projection retries")
         result.retryRawSmsIds.forEach { appendLine(mask(it)) }
     }
+
+    /** Summed amounts per currency, e.g. `120.00 SAR + 10.00 USD`; `-` for none. */
+    private fun totals(rows: List<LedgerRow>): String =
+        rows.groupBy { it.transaction.amount.currency }.entries.sortedBy { it.key.name }
+            .joinToString(" + ") { (currency, group) ->
+                "${group.sumOf { it.transaction.amount.amount }.toPlainString()} $currency"
+            }.ifEmpty { "-" }
 
     private fun describe(row: LedgerRow): String {
         val t = row.transaction
@@ -226,8 +270,9 @@ object LedgerShadowComparison {
         return AppLogFormatting.maskId(id) + "#" + digest.toHexString(endIndex = 3)
     }
 
-    // A run of five or more digits could be a full account or card number: keep only its last four.
-    private val LONG_DIGITS = Regex("\\d{5,}")
+    // Five or more digits, possibly grouped by single spaces or dashes, could be a full account or card number.
+    private val LONG_DIGITS = Regex("\\d(?:[ -]?\\d){4,}")
 
-    private fun maskDigits(text: String?): String = text?.replace(LONG_DIGITS) { "…" + it.value.takeLast(4) } ?: "-"
+    private fun maskDigits(text: String?): String =
+        text?.replace(LONG_DIGITS) { "…" + it.value.filter(Char::isDigit).takeLast(4) } ?: "-"
 }
