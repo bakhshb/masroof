@@ -45,7 +45,7 @@ class AppContainer(
     @Volatile internal var shutdownStage: String = "OPEN"
         private set
 
-    private val enqueueHistoricalRecovery = HistoricalBatchRecoveryScheduler {
+    private val historicalRecoveryScheduler = HistoricalBatchRecoveryScheduler {
         HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(storage.appContext))
     }
 
@@ -64,13 +64,13 @@ class AppContainer(
         onFeedbackChanged = { maintenance.completionSignal.notifyCompleted(); if (analyticsDelegate.isInitialized()) analytics.request() },
     )
 
-    val review: ReviewContainer = ReviewContainer(storage, learning, enqueueHistoricalRecovery)
+    val review: ReviewContainer = ReviewContainer(storage, learning, historicalRecoveryScheduler)
 
     val dashboard: DashboardContainer = DashboardContainer(storage, maintenance, review, update.httpClient)
 
     val sms: SmsContainer = SmsContainer(
         storage, maintenance, learning, review, dashboard,
-        bankAdapterOverride, smsDataSourceOverride, enqueueHistoricalRecovery,
+        bankAdapterOverride, smsDataSourceOverride, historicalRecoveryScheduler,
     )
 
     val patterns: PatternsContainer = PatternsContainer(storage, learning, review, sms, maintenance)

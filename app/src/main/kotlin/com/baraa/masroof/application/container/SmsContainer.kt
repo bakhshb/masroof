@@ -46,7 +46,7 @@ class SmsContainer(
     private val dashboard: DashboardContainer,
     bankAdapterOverride: BankSmsAdapter?,
     smsDataSourceOverride: SmsDataSource?,
-    private val enqueueHistoricalRecovery: HistoricalBatchRecoveryScheduler,
+    private val historicalRecoveryScheduler: HistoricalBatchRecoveryScheduler,
 ) {
     private val appContext = storage.appContext
 
@@ -153,7 +153,7 @@ class SmsContainer(
             reviewRepository = storage.reviewRepository,
             processingRetryRepository = storage.processingRetryRepository,
             appLogService = storage.appLogService,
-            batchRecoveryScheduler = enqueueHistoricalRecovery,
+            batchRecoveryScheduler = historicalRecoveryScheduler,
             debugProcessHalt = storage.debugProcessHaltProbe,
             missedSmsScheduler = { receivedAfter ->
                 LiveCaptureRecoveryWorker.enqueue(WorkManager.getInstance(appContext), receivedAfter, delaySeconds = 0)

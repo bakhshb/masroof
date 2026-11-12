@@ -1,7 +1,6 @@
 package com.baraa.masroof.application.container
 
 import com.baraa.masroof.application.ingestion.ProcessingRecovery
-import com.baraa.masroof.application.sms.HistoricalBatchRecoveryScheduler
 import com.baraa.masroof.application.interpretation.AutomaticInterpretationWriteGuard
 import com.baraa.masroof.application.interpretation.PatternInterpretationWritePolicy
 import com.baraa.masroof.application.onboarding.OnboardingOwnershipWorkflow
@@ -10,6 +9,7 @@ import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewOwnershipWorkflow
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
+import com.baraa.masroof.application.sms.HistoricalBatchRecoveryScheduler
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.transaction.LedgerInputLoader

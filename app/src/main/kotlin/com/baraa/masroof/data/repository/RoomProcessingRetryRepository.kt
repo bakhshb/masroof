@@ -25,8 +25,12 @@ class RoomProcessingRetryRepository(
     }
 
     override suspend fun clear(rawSmsIds: List<String>): Unit = accessGate.withAccess<Unit> {
-        if (rawSmsIds.isEmpty()) return@withAccess
-        dao.deleteAllAtomic(rawSmsIds)
+        when (rawSmsIds.size) {
+            0 -> Unit
+            // A complete live pass clears its one id; a single delete is already atomic.
+            1 -> dao.delete(rawSmsIds.single())
+            else -> dao.deleteAllAtomic(rawSmsIds)
+        }
     }
 
     override suspend fun listRetryableRawSmsIds(): List<String> = accessGate.withAccess {

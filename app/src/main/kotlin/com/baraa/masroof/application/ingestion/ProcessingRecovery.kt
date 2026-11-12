@@ -11,7 +11,8 @@ import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CancellationException
 
 /**
- * The one writer of "these raw SMS ids still need projecting" (`processing_retry`).
+ * Records a pass that did not finish in `processing_retry`, the raw SMS ids still to project.
+ * (Parse paths also write `HISTORICAL_BATCH` intent in their parse transaction; the recovery pass clears it.)
  *
  * A pass that did not finish leaves the ledger as it was for its ids, so recovery only has to
  * run the pass again for them: [markExhausted] hands one SMS back to the live worker at startup,
