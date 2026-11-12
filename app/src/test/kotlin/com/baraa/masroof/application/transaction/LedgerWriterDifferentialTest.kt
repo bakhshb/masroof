@@ -215,12 +215,13 @@ class LedgerWriterDifferentialTest {
         /** The writer's scope for this step's raw SMS, read before the step writes. */
         private var stepScope = emptySet<String>()
         /**
-         * Raw SMS left out of the comparison, each by a Known-differences entry: "Fee with another amount" (the old heal
-         * took the derived amount; the keep rule keeps the fee) and "Stale self-transfer release" (see [compare]).
+         * Raw SMS whose writer row is a stored row the keep rule holds where the old pass changed it, with that row's
+         * line frozen when the exclusion first applied: "Fee with another amount" (seeded) and "Stale self-transfer
+         * release" (found). The exclusion holds only while the writer's row is exactly that line (see [compare]).
          */
-        private val feeKept = mutableSetOf<String>()
-        /** Commitments the old pass left dangling (exclusion "Re-keyed commitment", see [compare]). */
-        private val rekeyed = mutableSetOf<String>()
+        private val frozen = mutableMapOf<String, String?>()
+        /** The raw SMS set of the row each commitment was created on (exclusion "Re-keyed commitment"). */
+        private val commitmentSets = mutableMapOf<String, List<String>>()
 
         private fun count(shape: String) { shapes.merge(shape, 1, Int::plus) }
 
@@ -255,44 +256,70 @@ class LedgerWriterDifferentialTest {
          */
         private suspend fun compare(old: World, oldFull: World, new: World, failed: List<String>, affected: List<String>?): String? {
             fun ids(line: String) = ID.findAll(line).map { it.value }.toSet()
-            // Exclusion "Stale self-transfer release" (Known differences): the old pass unlinks a leg left alone in a
-            // merged self-transfer once its time no longer matches, and nothing posts it again; the keep rule keeps it.
             val newState = new.state()
-            fun linesOf(state: Set<String>, id: String) = state.filterTo(mutableSetOf()) { id in ids(it) }
             val oldState = old.state()
             val fullState = oldFull.state()
-            new.remnantSingleLegs().filter {
-                it !in feeKept && (linesOf(oldState, it) != linesOf(newState, it) || linesOf(fullState, it) != linesOf(newState, it))
-            }.forEach {
-                feeKept += it
-                log += "  ($it: remnant single leg the old pass released: excluded, Stale self-transfer release)"
-                count("raw SMS excluded: Stale self-transfer release")
+            fun rowOf(state: Set<String>, id: String) = state.firstOrNull { it.startsWith("row ") && id in ids(it) }
+            fun typeOf(line: String) = line.substringAfter("] ").substringBefore(" ")
+            // Exclusion "Stale self-transfer release" (Known differences): the old pass unlinks the leg left alone in a
+            // merged self-transfer once its time no longer matches, and its row disappears or is re-derived with
+            // another type; the keep rule keeps the stored remnant.
+            for (id in new.remnantSingleLegs()) {
+                if (id in frozen) continue
+                val differs = rowOf(oldState, id) != rowOf(newState, id) || rowOf(fullState, id) != rowOf(newState, id)
+                if (!differs) continue
+                frozen[id] = rowOf(newState, id)
+                log += "  ($id: remnant single leg the old pass released: Stale self-transfer release)"
+                count("raw SMS under: Stale self-transfer release")
             }
-            // Exclusion "Re-keyed commitment" (3.3a acceptance: `commitment.sourceTransactionId` resolves): the old pass
-            // left a commitment naming a row it deleted; the writer moves it to the row that replaced it.
-            (oldState + fullState).filter { it.startsWith("commitment ") && it.endsWith("-> dangling") }
-                .map { it.removePrefix("commitment ").substringBefore(" ->") }
-                .filter { name -> rekeyed.add(name) }
-                .forEach { name ->
-                    log += "  (commitment $name left dangling by the old pass: excluded, Re-keyed commitment)"
-                    count("commitments excluded: Re-keyed commitment")
+            // A frozen raw SMS is excluded only while the writer's row is still exactly the stored one and the old
+            // world has no row for it, or one of another type; then its row and review lines are left out.
+            fun excluded(state: Set<String>): Set<String> = frozen.filterTo(mutableMapOf()) { (id, line) ->
+                val ownRow = rowOf(newState, id)
+                val otherRow = rowOf(state, id)
+                line != null && ownRow == line && (otherRow == null || typeOf(otherRow) != typeOf(line))
+            }.keys
+            // Exclusion "Re-keyed commitment" (Known differences): the old pass left a commitment naming a row it
+            // deleted; the writer moves it to the row that replaced it, on a raw SMS set sharing the original's SMS.
+            fun commitmentLine(state: Set<String>, name: String) = state.firstOrNull { it.startsWith("commitment $name ->") }
+            fun rekeyed(state: Set<String>): Set<String> = commitmentSets.filterTo(mutableMapOf()) { (name, original) ->
+                commitmentLine(state, name)?.endsWith("-> dangling") == true &&
+                    commitmentLine(newState, name)?.let { line -> ids(line).any { it in original } } == true
+            }.keys.also { names -> names.forEach { count("commitment comparisons under: Re-keyed commitment") } }
+            // The writer's commitments resolve wherever the old pass resolves them.
+            for (name in commitmentSets.keys) {
+                if (commitmentLine(newState, name)?.endsWith("-> dangling") == true &&
+                    commitmentLine(oldState, name)?.endsWith("-> dangling") != true
+                ) return "commitment $name dangles in the writer only"
+            }
+            fun Set<String>.visible(other: Set<String>): Set<String> {
+                val out = excluded(other)
+                val names = rekeyed(other)
+                return filterTo(mutableSetOf()) { line ->
+                    ids(line).none { it in out } && names.none { line.startsWith("commitment $it ->") }
                 }
-            fun Set<String>.visible() = filterTo(mutableSetOf()) { line ->
-                ids(line).none { it in feeKept } && rekeyed.none { line.startsWith("commitment $it ->") }
             }
-            val a = oldState.visible()
-            val b = newState.visible()
-            val full = fullState.visible()
+            val a = oldState.visible(oldState)
+            val b = newState.visible(oldState)
+            val full = fullState.visible(fullState)
+            val bFull = newState.visible(fullState)
+            // Inside the judged set each raw SMS must have exactly the old scoped lines or exactly the old full-pass
+            // lines (a scoped report leaves an unwritten neighbour's review as the old scoped pass did); outside it
+            // every line must be the old scoped one.
             fun agrees(judged: Set<String>): Boolean {
                 fun inScope(line: String) = ids(line).let { it.isNotEmpty() && judged.containsAll(it) }
-                return b.filter(::inScope).toSet() == full.filter(::inScope).toSet() &&
-                    b.filterNot(::inScope).toSet() == a.filterNot(::inScope).toSet()
+                fun linesOf(state: Set<String>, id: String) = state.filterTo(mutableSetOf()) { inScope(it) && id in ids(it) }
+                return b.filterNot(::inScope).toSet() == a.filterNot(::inScope).toSet() && judged.all { id ->
+                    linesOf(b, id) == linesOf(a, id) || linesOf(bFull, id) == linesOf(full, id)
+                }
             }
-            val failedAgrees = failed[2] == failed[0] || (judgedByFullPasses.isNotEmpty() && failed[2] == failed[1])
+            // Against the full-pass world only for failures inside the judged set.
+            fun failedInside(judged: Set<String>) = failed[2] == failed[1] && judged.containsAll(ids(failed[2]))
+            val failedAgrees = failed[2] == failed[0] || (judgedByFullPasses.isNotEmpty() && failedInside(judgedByFullPasses))
             if ((a == b || agrees(judgedByFullPasses)) && failedAgrees) return null
             if (affected != null) {
                 val widened = judgedByFullPasses + stepScope
-                if (agrees(widened) && (failed[2] == failed[0] || failed[2] == failed[1])) {
+                if (agrees(widened) && (failed[2] == failed[0] || failedInside(widened))) {
                     log += "  (differs from the old scoped path only inside the step's scope, where it equals the old full-pass path: Scope)"
                     count("steps allowed under Scope")
                     judgedByFullPasses = widened
@@ -410,6 +437,7 @@ class LedgerWriterDifferentialTest {
             val tx = candidates.randomOrNull(random) ?: return null to worlds.map { it.reconcile(null) }
             val name = "c${next++}"
             log += "commitment $name on ${tx.id.takeLast(6)}"
+            commitmentSets[name] = worlds[2].ledger.listRawSmsIds(tx.id)
             count("commitment")
             worlds.forEach {
                 runCatching {
@@ -458,11 +486,15 @@ class LedgerWriterDifferentialTest {
             }
             if (random.nextBoolean()) {
                 val fee = installment()
-                val amount = if (random.nextBoolean()) fee.first.amount!!.amount.toPlainString() else "9.00".also {
-                    feeKept += fee.first.rawSmsId
-                    count("raw SMS excluded: Fee with another amount")
+                val other = random.nextBoolean()
+                val amount = if (other) "9.00" else fee.first.amount!!.amount.toPlainString()
+                val stored = row(FinancialTransactionType.FEE, amount, fee.third, listOf(fee.first.rawSmsId)).copy(destinationContainerId = null)
+                store(stored, listOf(fee))
+                if (other) {
+                    // Exclusion "Fee with another amount": the old heal takes the derived amount; the keep rule keeps the fee.
+                    frozen[fee.first.rawSmsId] = worlds[2].state().first { it.startsWith("row [${fee.first.rawSmsId}]") }
+                    count("raw SMS under: Fee with another amount")
                 }
-                store(row(FinancialTransactionType.FEE, amount, fee.third, listOf(fee.first.rawSmsId)).copy(destinationContainerId = null), listOf(fee))
                 shapesSeeded += "stored FEE for an installment"
             }
             if (random.nextBoolean()) {

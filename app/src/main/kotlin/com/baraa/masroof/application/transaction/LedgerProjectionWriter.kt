@@ -95,8 +95,9 @@ internal class LedgerProjectionWriter(
                 when {
                     now == unit.projected.normalized() -> Unit // Another pass wrote the same rows.
                     now != unit.stored.normalized() -> throw ConcurrentChange()
-                    // A blocked refinement stays as stored, as the old pass never rewrote a posted row. (A protected
-                    // stored row never reaches here: the projector keeps it verbatim, so it is in no unit.)
+                    // A blocked refinement stays as stored, as the old pass never rewrote a posted row. A row of one or
+                    // two raw SMS a decision protects is kept verbatim by the projector, so it is in no unit; a row of
+                    // three or more with a protected leg can still lose its unprotected stale legs, guarded here.
                     !guardAccepts(unit, records) -> if (unit.refinesOnly()) written.kept += unit else written.failed += unit
                     else -> admitted += unit
                 }
