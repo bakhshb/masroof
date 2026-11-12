@@ -139,9 +139,7 @@ class LedgerProjectorPropertyTest {
         val ids = events.map { it.event.rawSmsId }
         // Stored rows link one or two raw SMS each, never one SMS twice; some are kept verbatim by the keep rule.
         val storedIds = ids.filter { random.nextInt(3) == 0 }.shuffled(random)
-        val storedSets = storedIds.fold(mutableListOf<MutableList<String>>()) { sets, id ->
-            sets.apply { if (isNotEmpty() && last().size == 1 && random.nextInt(3) == 0) last() += id else add(mutableListOf(id)) }
-        }
+        val storedSets = storedIds.chunked(2).flatMap { if (it.size == 2 && random.nextInt(3) == 0) listOf(it) else it.map(::listOf) }
         val types = listOf(FinancialTransactionType.EXPENSE, FinancialTransactionType.SELF_TRANSFER, FinancialTransactionType.FEE)
         val stored = StoredFacts(
             rows = storedSets.map { set ->

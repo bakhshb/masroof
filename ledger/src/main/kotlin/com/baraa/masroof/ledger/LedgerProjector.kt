@@ -110,12 +110,6 @@ object LedgerProjector {
     private val MAX_OFFSET: Duration = Duration.ofHours(18)
 }
 
-/** Latest outcomes that post a row the user chose; the keep rule carries their stored row verbatim. */
-private val POSTING_OUTCOMES = setOf(
-    UserDecisionKind.EXTERNAL_TRANSFER, UserDecisionKind.FINANCIAL_TYPE, UserDecisionKind.RECLASSIFY,
-    UserDecisionKind.RESTORE, UserDecisionKind.SELF_TRANSFER_PAIR,
-)
-
 private fun MessageFamily.isTransfer(): Boolean = this == MessageFamily.TRANSFER_IN || this == MessageFamily.TRANSFER_OUT
 
 private fun LedgerEvidence.loanReference(): LoanReference? =
@@ -134,12 +128,15 @@ private class Projection(
     private val storedByRawSmsId = stored.rows.flatMap { row -> row.rawSmsIds.map { it to row } }.toMap()
     private val storedRates = stored.rows
         .filter { it.transaction.appliedExchangeRate != null && it.transaction.exchangeRateSource != null }
-        .associateBy { it.rawSmsIds.toSet() }
+        .associateBy { it.rawSmsIds }
     private val rows = mutableMapOf<String, LedgerRow>()
     private val links = mutableMapOf<String, String>()
     private val settled = mutableSetOf<String>()
     private val retry = mutableSetOf<String>()
     private val reviews = mutableListOf<LedgerReviewCandidate>()
+    /** Keep rule (i): stored rows any of whose raw SMS has a posting outcome as its latest decision. */
+    private val keptDecided = stored.rows.filter { row -> !removed(row) && row.rawSmsIds.any { decisionsOf(it).postsRow } }
+        .flatMap { row -> row.rawSmsIds.map { it to row } }.toMap()
     // Decided rows settle first, so the pre-pass sees only the evidence left to automatic assembly.
     private val automatic = records.filter(::settleDecided)
     private val confirmedLoans = confirmLoans(automatic)
@@ -177,13 +174,13 @@ private class Projection(
         val rawSmsId = record.event.rawSmsId
         val decided = decisionsOf(rawSmsId)
         val posting = decidedPosting(decided)
-        val keptDecided = storedByRawSmsId[rawSmsId]?.takeIf { decided.outcome?.kind in POSTING_OUTCOMES && !removed(it) }
+        val kept = keptDecided[rawSmsId]
         when {
             decided.isNonFinancial -> settled += rawSmsId
             // A decided pair, or a kept stored row, links a second SMS; it stays with the row.
             rawSmsId in links -> settled += rawSmsId
             // Keep rule (i): the user's stored row stays verbatim, even when its decision lacks posting columns.
-            keptDecided != null -> if (!save(keptDecided.transaction, keptDecided.rawSmsIds)) retry += rawSmsId
+            kept != null -> if (!save(kept.transaction, kept.rawSmsIds)) retry += rawSmsId
             posting != null -> if (!save(posting.transaction, posting.rawSmsIds)) retry += rawSmsId
             decided.outcome?.kind == UserDecisionKind.EXTERNAL_TRANSFER -> settled += rawSmsId
             else -> return true
@@ -352,14 +349,15 @@ private class Projection(
      * reaches outside the set, or a derived grouping that covers it, wins. Its raw SMS are settled.
      */
     private fun keepStoredRowsWithoutDerivation() {
-        val kept = stored.rows.filter { row ->
-            val derived = row.rawSmsIds.mapNotNull(links::get).toSet().map(rows::getValue)
-            !removed(row) && row.rawSmsIds.none { decisionsOf(it).outcome != null } &&
-                derived.all { row.rawSmsIds.containsAll(it.rawSmsIds) } &&
-                derived.flatMap { it.rawSmsIds }.toSet() != row.rawSmsIds.toSet()
+        val kept = stored.rows.mapNotNull { row ->
+            if (removed(row) || row.rawSmsIds.any { decisionsOf(it).outcome != null }) return@mapNotNull null
+            val derivedIds = row.rawSmsIds.mapNotNull(links::get).toSet()
+            // Derived rows inside the set that leave one of its SMS without a row.
+            val inside = derivedIds.all { row.rawSmsIds.containsAll(rows.getValue(it).rawSmsIds) }
+            (row to derivedIds).takeIf { inside && row.rawSmsIds.any { it !in links } }
         }
-        for (row in kept) {
-            row.rawSmsIds.mapNotNull(links::get).toSet().forEach { id -> rows.remove(id)?.rawSmsIds?.forEach(links::remove) }
+        for ((row, derivedIds) in kept) {
+            derivedIds.forEach(::drop)
             check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" }
         }
     }
@@ -373,6 +371,10 @@ private class Projection(
             row.rawSmsIds.singleOrNull()?.let { id ->
                 !preserved(id) && byRawSmsId[id]?.event?.let(InformationalMessagePolicy::shouldAutoIgnore) == true
             } == true
+
+    private fun drop(transactionId: String) {
+        rows.remove(transactionId)?.rawSmsIds?.forEach(links::remove)
+    }
 
     private fun FinancialTransaction.isSingleLegSelfTransfer() =
         type == FinancialTransactionType.SELF_TRANSFER && linkedParsedEventIds.size == 1
@@ -395,7 +397,7 @@ private class Projection(
         val conflict = stale.any { rows.getValue(it).rawSmsIds.size != 1 } ||
             rawSmsIds.any { links[it].let { id -> id != null && id != transaction.id && id !in stale } }
         if (conflict) return false
-        stale.forEach { id -> rows.remove(id)?.rawSmsIds?.forEach(links::remove) }
+        stale.forEach(::drop)
         rows[transaction.id] = LedgerRow(transaction, rawSmsIds.sorted())
         rawSmsIds.forEach { links[it] = transaction.id }
         settled += rawSmsIds
@@ -404,7 +406,7 @@ private class Projection(
 
     /** A complete stored exchange-rate pair stays on a row that links the same raw SMS. */
     private fun withStoredExchangeRate(row: LedgerRow): LedgerRow {
-        val match = storedRates[row.rawSmsIds.toSet()]?.transaction ?: return row
+        val match = storedRates[row.rawSmsIds]?.transaction ?: return row
         return row.copy(
             transaction = row.transaction.copy(
                 appliedExchangeRate = match.appliedExchangeRate,

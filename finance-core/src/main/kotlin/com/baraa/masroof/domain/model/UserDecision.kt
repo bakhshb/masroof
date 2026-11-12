@@ -78,6 +78,9 @@ data class EffectiveUserDecisions(
     /** "This SMS is financial": what a `USER_FINANCIAL_TYPE` review meant (chosen type, reclassify or restore). */
     val confirmsFinancial: Boolean get() = outcome?.kind in FINANCIAL_OUTCOMES
 
+    /** The latest outcome posts a row the user chose (financial, external transfer or self-transfer pair). */
+    val postsRow: Boolean get() = outcome?.kind in POSTING_OUTCOMES
+
     companion object {
         val NONE = EffectiveUserDecisions()
 
@@ -85,6 +88,8 @@ data class EffectiveUserDecisions(
             setOf(UserDecisionKind.NON_FINANCIAL, UserDecisionKind.IGNORE, UserDecisionKind.RESTORE_REVERTED)
         private val FINANCIAL_OUTCOMES =
             setOf(UserDecisionKind.FINANCIAL_TYPE, UserDecisionKind.RECLASSIFY, UserDecisionKind.RESTORE)
+        private val POSTING_OUTCOMES =
+            FINANCIAL_OUTCOMES + UserDecisionKind.EXTERNAL_TRANSFER + UserDecisionKind.SELF_TRANSFER_PAIR
 
         /** Folds [decisions], the rows naming [rawSmsId] in `sequence` order. */
         fun of(rawSmsId: String, decisions: List<UserDecision>): EffectiveUserDecisions {

@@ -95,7 +95,7 @@ object LedgerShadowComparison {
         val newReviews = projection.reviewCandidates.associate { it.rawSmsId to it.kind }
         // The store never reopens a RESOLVED review (`ReviewItemDao.upsertRequiredMerged`), so a candidate on one
         // is compared as the store applies it: no open review. Those are counted, not reported as differences.
-        val resolvedNotReopened = evidence.keys.filter { storedReviews[it]?.status == ReviewStatus.RESOLVED && it in newReviews }
+        val resolvedNotReopened = evidence.keys.count { storedReviews[it]?.status == ReviewStatus.RESOLVED && it in newReviews }
         val reviews = evidence.keys.sorted().mapNotNull { rawSmsId ->
             val stored = storedReviews[rawSmsId]
             val old = stored?.kind?.takeIf { stored.status == ReviewStatus.REQUIRED }
@@ -108,7 +108,7 @@ object LedgerShadowComparison {
             )
         }
         return Result(
-            inputs.storedFacts.rows.size, projection.rows.size, rows, reviews, resolvedNotReopened.size,
+            inputs.storedFacts.rows.size, projection.rows.size, rows, reviews, resolvedNotReopened,
             projection.retryRawSmsIds.sorted(),
         )
     }
@@ -146,10 +146,6 @@ object LedgerShadowComparison {
     )
 
     private val TIME_FIELDS = setOf("occurredAt", "occurredAtZone")
-    private val POSTING_OUTCOMES = setOf(
-        UserDecisionKind.EXTERNAL_TRANSFER, UserDecisionKind.FINANCIAL_TYPE, UserDecisionKind.RECLASSIFY,
-        UserDecisionKind.RESTORE, UserDecisionKind.SELF_TRANSFER_PAIR,
-    )
 
     private fun changedFields(old: FinancialTransaction, new: FinancialTransaction): List<String> =
         FIELDS.filter { (_, read) -> read(old) != read(new) }.map { it.first }
@@ -164,7 +160,7 @@ object LedgerShadowComparison {
         inputs: LedgerInputs,
         evidence: Map<String, LedgerEvidence>,
     ): Reason {
-        val outcomes = rawSmsIds.mapNotNull { inputs.decisions[it]?.outcome }
+        val decided = rawSmsIds.mapNotNull { inputs.decisions[it] }.filter { it.outcome != null }
         val oldRow = old.singleOrNull()?.transaction
         val installment = rawSmsIds.any { evidence[it]?.event?.messageFamily == MessageFamily.FINANCING_INSTALLMENT }
         return when {
@@ -175,9 +171,9 @@ object LedgerShadowComparison {
             kind == Kind.CHANGED && fields == listOf("occurredAtZone") && oldRow?.occurredAtZone == null -> Reason.ZONE_FILLED
             kind == Kind.CHANGED && "occurredAt" in fields && TIME_FIELDS.containsAll(fields) &&
                 ("occurredAtZone" !in fields || oldRow?.occurredAtZone == null) -> Reason.TIME_REDERIVED
-            outcomes.isNotEmpty() -> when {
-                old.isNotEmpty() && outcomes.any { it.kind in NON_FINANCIAL_OUTCOMES } -> Reason.DECIDED_NON_FINANCIAL_BUT_STORED
-                old.isNotEmpty() && outcomes.any { it.kind in POSTING_OUTCOMES && !it.hasPostingColumns() } ->
+            decided.isNotEmpty() -> when {
+                old.isNotEmpty() && decided.any { it.isNonFinancial } -> Reason.DECIDED_NON_FINANCIAL_BUT_STORED
+                old.isNotEmpty() && decided.any { it.postsRow && !it.outcome!!.hasPostingColumns() } ->
                     Reason.DECIDED_WITHOUT_POSTING_COLUMNS
                 kind == Kind.ONLY_NEW -> Reason.DECIDED_ROW_NOT_STORED
                 else -> Reason.UNEXPLAINED
@@ -189,9 +185,6 @@ object LedgerShadowComparison {
             else -> Reason.UNEXPLAINED
         }
     }
-
-    private val NON_FINANCIAL_OUTCOMES =
-        setOf(UserDecisionKind.NON_FINANCIAL, UserDecisionKind.IGNORE, UserDecisionKind.RESTORE_REVERTED)
 
     private fun UserDecision.hasPostingColumns() = transactionType != null && occurredAt != null && occurredAtZone != null
 

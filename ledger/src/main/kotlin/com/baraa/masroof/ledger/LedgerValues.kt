@@ -48,7 +48,7 @@ data class StoredFacts(
     val correctionClosedRawSmsIds: Set<String> = emptySet(),
 )
 
-/** One derived ledger row and the raw SMS it links, sorted. */
+/** One ledger row (derived or stored) and the raw SMS it links, sorted. */
 data class LedgerRow(
     val transaction: FinancialTransaction,
     val rawSmsIds: List<String>,

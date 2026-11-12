@@ -60,6 +60,17 @@ class LedgerProjectorKeepStoredTest {
     }
 
     @Test
+    fun aStoredPairIsKeptWhicheverLegCarriesTheDecision() {
+        val pair = storedRow("a", "b", type = FinancialTransactionType.SELF_TRANSFER)
+        for (decided in listOf("a", "b")) {
+            val decisions = fold(listOf(UserDecision(decided, UserDecisionKind.FINANCIAL_TYPE, T0)))
+            val result = project(listOf(purchase("a"), purchase("b")), decisions, owned, StoredFacts(rows = listOf(pair)))
+            assertKept(result, pair)
+            assertEquals(emptySet<String>(), result.retryRawSmsIds)
+        }
+    }
+
+    @Test
     fun aRowThatNoLongerDerivesStaysAsStored_staleEvidenceOrOwnership() {
         val stale = storedRow("stale")
         val disowned = storedRow("disowned", source = "card:BANK_ALJAZIRA:7271")
