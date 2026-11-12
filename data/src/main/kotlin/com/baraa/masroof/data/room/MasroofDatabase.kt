@@ -39,8 +39,8 @@ import com.baraa.masroof.data.room.entity.UserDecisionEntity
 /**
  * Masroof Room persistence schema (current version [VERSION]).
  *
- * Opens [BASELINE_VERSION] up to [VERSION] through additive [MIGRATIONS]. Older, newer and unknown
- * schemas are rejected by Room with the file untouched; there is never a destructive fallback.
+ * Opens [BASELINE_VERSION] and [VERSION] only, the baseline through the one additive [MIGRATION_18_22]. Older, newer,
+ * intermediate and unknown schemas are rejected by Room with the file untouched; there is never a destructive fallback.
  */
 @Database(
     entities = [
@@ -96,78 +96,60 @@ abstract class MasroofDatabase : RoomDatabase() {
          * must finish before Room opens this name.
          */
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 21
+        const val VERSION: Int = 22
 
         /** Oldest schema that opens; anything older has no migration and is rejected. */
         const val BASELINE_VERSION: Int = 18
 
-        /** Must match data/schemas/.../21.json identityHash. */
-        const val IDENTITY_HASH: String = "e95d7b7c49b64fae9ff76f795a439ade"
+        /** Must match data/schemas/.../22.json identityHash. */
+        const val IDENTITY_HASH: String = "5349c1b666aed8239c225512f4498078"
 
         /**
-         * The identity hash of every schema from [BASELINE_VERSION] to [VERSION], the only pairs a backup may carry.
-         * A version bump keeps the old entry as a literal and adds the new one; the exported JSON files are checked against it.
+         * The only (version, identity hash) pairs that open or that a backup may carry: the v18 baseline and [VERSION].
+         * v19 to v21 existed only in development builds and are refused like any unknown schema (owner, 2026-11-12).
          */
         val IDENTITY_HASHES: Map<Int, String> = mapOf(
-            18 to "71f1193767b3aa12bcb6cc6e7ce77147",
-            19 to "358f8daabc18a4cc065c8b8e51261442",
-            // v20 is v19's structure, so it has the same hash.
-            20 to "358f8daabc18a4cc065c8b8e51261442",
+            BASELINE_VERSION to "71f1193767b3aa12bcb6cc6e7ce77147",
             VERSION to IDENTITY_HASH,
         )
 
-        /** Adds the append-only `user_decision` table (plan 2.1); no existing row changes and nothing is backfilled. */
-        val MIGRATION_18_19: Migration = checkedStep(18) { db ->
-            // Copied from 19.json; Room validates the result on open.
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `user_decision` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                    "`rawSmsId` TEXT NOT NULL, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, " +
-                    "`decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, " +
-                    "`destinationContainerId` TEXT, `occurredAtEpochMillis` INTEGER, `occurredAtZone` TEXT, " +
-                    "`messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, " +
-                    "`merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, " +
-                    "FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , " +
-                    "FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_user_decision_rawSmsId_sequence` ON `user_decision` (`rawSmsId`, `sequence`)",
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_user_decision_pairedRawSmsId` ON `user_decision` (`pairedRawSmsId`)",
-            )
-        }
-
-        /** No structural change: backfills `user_decision` from the legacy stores (plan 2.2, [UserDecisionBackfill]). */
-        val MIGRATION_19_20: Migration = checkedStep(19, UserDecisionBackfill::run)
-
         /**
-         * Adds the one-row `pattern_configuration` table (plan 5.1); empty after the step. The message-pattern file is
-         * copied into it when the live database opens, never here (`MessagePatternStore.importLegacyFile`).
+         * The single step from the v18 baseline (owner, 2026-11-12), additive only: creates the append-only `user_decision`
+         * table in its final shape and backfills it from the legacy stores (plan 2.2, [UserDecisionBackfill]), and creates
+         * the empty one-row `pattern_configuration` table (plan 5.1). The message-pattern file and the analytics
+         * recurring answers are copied in when the live database opens, never here. Room checks only the tables after a
+         * migration, so the step first refuses an unknown v18 hash, inside the upgrade transaction (the file stays untouched).
          */
-        val MIGRATION_20_21: Migration = checkedStep(20) { db ->
-            // Copied from 21.json; Room validates the result on open.
-            db.execSQL(
-                "CREATE TABLE IF NOT EXISTS `pattern_configuration` (`id` INTEGER NOT NULL, `generation` INTEGER NOT NULL, " +
-                    "`document` TEXT NOT NULL, PRIMARY KEY(`id`))",
-            )
-        }
-
-        /** One additive step per version from [BASELINE_VERSION] to [VERSION], each tested from the v18 fixture. */
-        val MIGRATIONS: List<Migration> = listOf(MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
-
-        /**
-         * The step from [from] to the next version. Room checks only the tables after a migration, so the step first
-         * refuses an unknown hash of [from], inside the upgrade transaction (the file is left untouched). Room writes
-         * the hash only after the last step of a chained upgrade, so the step then stamps its own for the next check.
-         */
-        private fun checkedStep(from: Int, body: (SupportSQLiteDatabase) -> Unit): Migration = object : Migration(from, from + 1) {
+        val MIGRATION_18_22: Migration = object : Migration(BASELINE_VERSION, VERSION) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 val hash = db.query("SELECT identity_hash FROM room_master_table").use { if (it.moveToFirst()) it.getString(0) else null }
-                check(hash == IDENTITY_HASHES.getValue(from)) { "Unknown schema $from identity hash" }
-                body(db)
-                db.execSQL("UPDATE room_master_table SET identity_hash = '${IDENTITY_HASHES.getValue(from + 1)}'")
+                check(hash == IDENTITY_HASHES.getValue(BASELINE_VERSION)) { "Unknown schema $BASELINE_VERSION identity hash" }
+                // Copied from 22.json; Room validates the result on open.
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `user_decision` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`rawSmsId` TEXT, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, " +
+                        "`decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, " +
+                        "`destinationContainerId` TEXT, `occurredAtEpochMillis` INTEGER, `occurredAtZone` TEXT, " +
+                        "`messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, " +
+                        "`merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, `subjectKey` TEXT, `answer` TEXT, `payload` TEXT, " +
+                        "FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , " +
+                        "FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_user_decision_rawSmsId_sequence` ON `user_decision` (`rawSmsId`, `sequence`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_user_decision_pairedRawSmsId` ON `user_decision` (`pairedRawSmsId`)",
+                )
+                UserDecisionBackfill.run(db)
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `pattern_configuration` (`id` INTEGER NOT NULL, `generation` INTEGER NOT NULL, " +
+                        "`document` TEXT NOT NULL, PRIMARY KEY(`id`))",
+                )
             }
         }
+
+        val MIGRATIONS: List<Migration> = listOf(MIGRATION_18_22)
 
         /**
          * The builder for the live financial file. [databaseClass] fixes the target version; tests pass a

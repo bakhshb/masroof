@@ -94,7 +94,7 @@ class DecisionReadBoundaryTest {
             "data/room/entity/ReviewItemEntity.kt" to STORE,
             "data/room/entity/UserCorrectionEntity.kt" to STORE,
             "data/room/mapper/ReviewItemMapper.kt" to STORE,
-            "data/room/UserDecisionBackfill.kt" to "the 2.2 backfill reads the legacy traces once, at the v20 upgrade",
+            "data/room/UserDecisionBackfill.kt" to "the 2.2 backfill reads the legacy traces once, in the single v18 upgrade",
             "application/container/StorageContainer.kt" to WIRING,
             "application/container/LearningContainer.kt" to WIRING,
             "application/container/ReviewContainer.kt" to WIRING,

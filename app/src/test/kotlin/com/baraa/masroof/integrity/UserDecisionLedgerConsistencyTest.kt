@@ -27,7 +27,7 @@ import org.robolectric.annotation.Config
 
 /**
  * Plan 2.2: after the backfill, the decision store and the ledger agree on the snapshot corpus (golden worlds,
- * all banks, legacy states), the committed v18 fixture and the every-trace v19 file, both upgraded to v20.
+ * all banks, legacy states), the committed v18 fixture and the every-trace v18 file, both upgraded to the current version.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -45,7 +45,7 @@ class UserDecisionLedgerConsistencyTest {
     @Test
     fun decisionStoreAndLedgerAgreeOnTheCorpus() = runBlocking {
         val kinds = mutableListOf<String>()
-        // The corpus worlds hold v19-style legacy traces; the backfill runs on them as MIGRATION_19_20 would.
+        // The corpus worlds hold legacy traces; the backfill runs on them as MIGRATION_18_22 does.
         GoldenLedgerCorpus.loadAll().forEach { scenario ->
             DashboardLedgerWorld(context).use { world ->
                 GoldenLedgerRunner.prepare(world, scenario)
@@ -66,10 +66,10 @@ class UserDecisionLedgerConsistencyTest {
     }
 
     @Test
-    fun decisionStoreAndLedgerAgreeOnTheUpgradedV18FixtureAndV19File() {
+    fun decisionStoreAndLedgerAgreeOnTheUpgradedV18FixtureAndEveryTraceFile() {
         val v18 = MigrationOpenPathContract.copyFixture(context, "consistency-v18.db", fixture)
-        val v19 = UserDecisionBackfillContract.v19File(context, "consistency-v19.db", fixture)
-        val kinds = listOf(v18, v19).flatMap { file ->
+        val traces = UserDecisionBackfillContract.legacyTracesFile(context, "consistency-traces.db", fixture)
+        val kinds = listOf(v18, traces).flatMap { file ->
             val db = MasroofDatabase.builder(context, MasroofDatabase::class.java, file.name).allowMainThreadQueries().build()
             try {
                 assertAgrees(db.openHelper.writableDatabase)
@@ -79,7 +79,7 @@ class UserDecisionLedgerConsistencyTest {
             }
         }
         val all = setOf("FINANCIAL_TYPE", "EXTERNAL_TRANSFER", "SELF_TRANSFER_PAIR", "NON_FINANCIAL", "RESTORE", "CORRECTION",
-            "BANK_SELECTION", "RECLASSIFY")
+            "BANK_SELECTION")
         assertEquals(all, kinds.toSet())
     }
 

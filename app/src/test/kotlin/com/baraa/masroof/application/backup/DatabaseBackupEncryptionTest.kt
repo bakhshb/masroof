@@ -159,7 +159,7 @@ class DatabaseBackupEncryptionTest {
                 ).importFrom(Uri.fromFile(destination), passphrase.copyOf())
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
                 assertTrue(restartRequested.get())
-                // A v21 backup carries its patterns inside its database.
+                // A v22 backup carries its patterns inside its database.
                 assertEquals(patternArchive("STC"), storedPatterns(context.getDatabasePath(MasroofDatabase.NAME)))
             } finally {
                 if (live.isOpen) live.close()

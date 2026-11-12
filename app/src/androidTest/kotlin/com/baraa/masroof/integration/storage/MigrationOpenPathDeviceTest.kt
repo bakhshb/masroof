@@ -24,8 +24,12 @@ class MigrationOpenPathDeviceTest {
         MigrationOpenPathContract.upgradeKeepsEveryRow(context, fixture)
 
     @Test
-    fun v20File_upgradesAddingOnlyTheEmptyPatternTable() =
-        MigrationOpenPathContract.v20UpgradeAddsOnlyThePatternTable(context, fixture)
+    fun v18Fixture_upgradesToTheSchemaRoomCreatesForAFreshFile() =
+        MigrationOpenPathContract.upgradeCreatesTheExportedSchema(context, fixture)
+
+    @Test
+    fun retiredDevelopmentVersions_areRejectedAndTheFileIsUntouched() =
+        MigrationOpenPathContract.retiredVersionsAreRejectedUntouched(context, fixture)
 
     @Test
     fun olderSchema_isRejectedAndTheFileIsUntouched() =
@@ -44,13 +48,5 @@ class MigrationOpenPathDeviceTest {
         MigrationOpenPathContract.unknownBaselineStructureIsRejectedUntouched(context, fixture)
 
     @Test
-    fun v19File_backfillsEveryDecisionKindOnUpgrade() = UserDecisionBackfillContract.everyKindIsBackfilled(context, fixture)
-
-    @Test
-    fun v19File_keepsDualWriteRowsLatestWithoutDuplicates() =
-        UserDecisionBackfillContract.dualWriteRowsStayLatestAndAreNotDuplicated(context, fixture)
-
-    @Test
-    fun unknownV19IdentityHash_isRejectedAndTheFileIsUntouched() =
-        UserDecisionBackfillContract.unknownV19IdentityHashIsRejectedUntouched(context, fixture)
+    fun v18FileWithEveryLegacyTrace_backfillsEveryDecisionKindOnUpgrade() = UserDecisionBackfillContract.everyKindIsBackfilled(context, fixture)
 }

@@ -201,11 +201,14 @@ class AnalyticsJourneyTest {
             compose.onNodeWithText(text(R.string.lab_analysis_review_candidate, "en")).performScrollTo().performClick()
             compose.onNodeWithText(text(R.string.settings_commitment_save, "en")).performScrollTo().performClick()
             compose.waitUntil(30_000) { runBlocking { container.storage.commitmentRepository.listAll().size == originalCommitments.size + 1 } }
-            // The Save click's coroutine runs on the v2 test dispatcher; let it finish and release the workflow lock.
-            compose.waitForIdle()
+            // The Save click's coroutine runs on the v2 test dispatcher and holds the workflow lock until its last write.
+            // Blocking this thread before it ends would stop that dispatcher, so the repeat waits while the rule keeps pumping.
+            // Repeating a Save after a crash cannot insert a second financial commitment.
+            @OptIn(DelicateCoroutinesApi::class)
+            val repeated = GlobalScope.async(Dispatchers.IO) { workflow.acceptCandidate(candidate.key, workflow.editorDraft(candidate)) }
+            compose.waitUntil(30_000) { repeated.isCompleted }
             runBlocking {
-                // Repeating a Save after a crash cannot insert a second financial commitment.
-                workflow.acceptCandidate(candidate.key, workflow.editorDraft(candidate))
+                assertTrue(repeated.await())
                 assertEquals(originalCommitments.size + 1, container.storage.commitmentRepository.listAll().size)
                 val archive = AnalyticsBackup.capture(TestStorageContext(host))!!
                 AnalyticsBackup.validate(archive)
@@ -545,6 +548,10 @@ class AnalyticsJourneyTest {
             awaitAnalysis(c.analytics) { state -> state.recurringCorrections.any {
                 it.seriesKey == candidate.seriesKey && it.kind == "DISMISSED"
             } }
+            // Plan 5.2: each answer, the undo included, is one appended row of user_decision.
+            assertEquals(listOf("NOT_RECURRING", "UNDONE", "DISMISSED"), runBlocking {
+                c.storage.database.userDecisionDao().listRecurring().filter { it.subjectKey == candidate.seriesKey }.map { it.answer }
+            })
             assertEquals(before, runBlocking { c.storage.financialTransactionRepository.listAll() })
             screen("recurring-explicit-feedback")
         } finally {

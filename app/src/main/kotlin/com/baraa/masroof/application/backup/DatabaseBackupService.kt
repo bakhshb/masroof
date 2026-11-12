@@ -291,7 +291,7 @@ class DatabaseBackupService(
 
             // An older schema migrates here, on the staged copy, while the live database is still open and untouched.
             // A current-schema copy is only validated after close, as before.
-            // An archive before v21 carries its patterns in preferences.json; they become the staged database's row.
+            // A v18 archive carries its patterns in preferences.json; they become the staged database's row.
             if (manifest.roomVersion != schema.version) {
                 openAndValidate(dbFile, preferences.messagePatterns.takeIf { manifest.roomVersion < MessagePatternBackup.DATABASE_VERSION })
             }

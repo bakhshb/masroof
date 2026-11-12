@@ -9,6 +9,7 @@ import com.baraa.masroof.domain.model.*
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.data.learning.LearningDatabase
 import com.baraa.masroof.data.learning.LearningLabelRow
+import com.baraa.masroof.data.learning.LearningStore
 import com.baraa.masroof.ml.family.FamilyInputCleaner
 import com.baraa.masroof.application.interpretation.InterpretationOrigin
 import androidx.room.Room
@@ -231,6 +232,11 @@ class ReplicaMachineLearningTest {
             val before=c.storage.financialTransactionRepository.listAll()
             TestRuntime.close()
             writeLegacyModelCache("{corrupt")
+            // A corrupt learning file too (plan 5.2): the open keeps it, the store logs and rebuilds it.
+            TestStorageContext(host).getDatabasePath(LearningStore.NAME).apply {
+                listOf("-wal", "-shm").forEach { File(path + it).delete() }
+                writeBytes(ByteArray(8192) { 7 })
+            }
             c=TestRuntime.container(host)
             c.maintenance.awaitPostStartupBackgroundWorkForTesting()
             assertEquals(before,c.storage.financialTransactionRepository.listAll())

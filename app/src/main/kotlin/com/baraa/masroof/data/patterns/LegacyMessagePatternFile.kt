@@ -9,7 +9,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 /**
- * Where the pattern document lived before schema v21. [MessagePatternStore.importLegacyFile] copies it into the
+ * Where the pattern document lived before schema v22. [MessagePatternStore.importLegacyFile] copies it into the
  * database once. Restore snapshots still carry it, so a restore journal written by an older app version finishes
  * with its patterns, which the next open then copies.
  */

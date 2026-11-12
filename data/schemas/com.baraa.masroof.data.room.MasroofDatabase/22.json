@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 20,
-    "identityHash": "358f8daabc18a4cc065c8b8e51261442",
+    "version": 22,
+    "identityHash": "5349c1b666aed8239c225512f4498078",
     "entities": [
       {
         "tableName": "raw_sms",
@@ -1252,7 +1252,7 @@
       },
       {
         "tableName": "user_decision",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `rawSmsId` TEXT NOT NULL, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, `decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, `destinationContainerId` TEXT, `occurredAtEpochMillis` INTEGER, `occurredAtZone` TEXT, `messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, `merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `rawSmsId` TEXT, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, `decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, `destinationContainerId` TEXT, `occurredAtEpochMillis` INTEGER, `occurredAtZone` TEXT, `messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, `merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, `subjectKey` TEXT, `answer` TEXT, `payload` TEXT, FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "sequence",
@@ -1263,8 +1263,7 @@
           {
             "fieldPath": "rawSmsId",
             "columnName": "rawSmsId",
-            "affinity": "TEXT",
-            "notNull": true
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "pairedRawSmsId",
@@ -1337,6 +1336,21 @@
             "fieldPath": "bankId",
             "columnName": "bankId",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "subjectKey",
+            "columnName": "subjectKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "answer",
+            "columnName": "answer",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -1390,11 +1404,41 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "pattern_configuration",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `generation` INTEGER NOT NULL, `document` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "generation",
+            "columnName": "generation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "document",
+            "columnName": "document",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '358f8daabc18a4cc065c8b8e51261442')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5349c1b666aed8239c225512f4498078')"
     ]
   }
 }

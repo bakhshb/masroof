@@ -53,6 +53,10 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     private val storeDelegate = lazy { AnalyticsDatabase.open(context) }
     private val store by storeDelegate
     private val json = AnalyticsJson.format
+    /** The recurring answers the corrections list shows and undo withdraws. */
+    private val undoableAnswers = setOf("NOT_RECURRING", "DISMISSED")
+    /** The user's recurring answers live in `masroof.db` (`user_decision`, plan 5.2), not in [store]. */
+    private val answers get() = container.storage.recurringAnswerStore
     private val mutable = MutableStateFlow(AnalysisUiState())
     val state: StateFlow<AnalysisUiState> = mutable.asStateFlow()
     private var started = false
@@ -137,7 +141,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             catch(_: Exception) { com.baraa.masroof.application.interpretation.LearningInsights(pending = true) }
         refreshStage = "LOAD_CACHED_REST"
         val candidates = dao.candidates().mapNotNull { runCatching { json.decodeFromString<AnalysisCandidate>(it.payload) }.getOrNull() }
-        val corrections = dao.feedback().filter { it.kind in setOf("NOT_RECURRING", "DISMISSED") }.sortedByDescending { it.decidedAt }.mapNotNull { row ->
+        val corrections = answers.effective().filter { it.kind in undoableAnswers }.sortedByDescending { it.decidedAt }.mapNotNull { row ->
             candidates.firstOrNull { it.seriesKey == row.seriesKey }?.let { AnalysisRecurringCorrection(row.seriesKey, it.name, row.kind) }
         }
         mutable.value = AnalysisUiState(cached, true, false, dao.alerts().filterNot { it.resolved }, prefs, history,
@@ -248,7 +252,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             }
             val committed = read.committed
             val decisions = store.analytics().candidates().filter { it.status != "SUGGESTED" }.sortedBy { it.id }.map { it.id to it.status }
-            val feedback = store.analytics().feedback().joinToString { "${it.seriesKey}:${it.kind}:${it.decidedAt}:${hash(it.payload)}" }
+            val feedback = answers.effective().joinToString { "${it.seriesKey}:${it.kind}:${it.decidedAt}:${hash(it.payload)}" }
             val canonical = "continuous-learning-v1|${RecurringDecisionWorkflow.version}|${ForecastPerformancePolicy.VERSION}|${AnalyticsVersion.EVALUATION}|${AnalyticsVersion.MODEL}|${AnalyticsVersion.FEATURES}|${clean.fingerprint}|$dues|${committed.sorted()}|$blocked|${current.summary.reviewRequiredCount}|${period.startDate}|$prefs|$decisions|$feedback|${read.committedCadences}|${clock.millis() / SIX_HOURS_MS}"
             return Source(clean, period.startDate.toEpochDay(), period.endDateExclusive.toEpochDay(), todayDay, completed,
                 dues, committed, current.summary.reviewRequiredCount, blocked, hash(canonical), reasons, insights, read.committedCadences)
@@ -271,14 +275,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         val previous = dao.models().filterNot { it.id.startsWith("baseline:") }.mapNotNull { runCatching { json.decodeFromString<StoredHuber>(it.payload).takeIf { it.modelVersion == AnalyticsVersion.MODEL && it.cleaningVersion == AnalyticsVersion.CLEANING && it.evaluationVersion == AnalyticsVersion.EVALUATION }?.model() }.getOrNull() }.maxByOrNull { it.trainedThrough }
         val result = PurchaseForecaster.forecast(input.clean, input.start, input.end, input.today, input.completed,
             ::periodOffset, previous, { before -> completedAnalysisPeriods(input.clean, before) }, allowPersonal = performance.allowPersonal)
-        val feedback = dao.feedback().map { row ->
-            if (row.kind != "CONFIRM_PENDING") row else {
-                val payload = json.decodeFromString<RecurringFeedbackPayload>(row.payload)
-                if (payload.label != null && input.committedCadences[payload.sourceIds.last()] == payload.label) {
-                    row.copy(kind = "CONFIRMED").also { dao.feedback(it) }
-                } else row
-            }
-        }
+        val feedback = RecurringDecisionWorkflow.promotePending(answers, input.committedCadences)
         val patterns = RecurringDecisionWorkflow.build(input.clean.recurring, feedback, input.today, input.committedCadences)
         val priorCandidates = dao.candidates().associateBy { it.id }
         val legacy = priorCandidates.values.filter { it.status != "SUGGESTED" }.mapNotNull { row ->
@@ -404,10 +401,9 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         mutex.withLock { if (closed) return
             container.storage.databaseAccessGate.withAccess {
             val row = store.analytics().candidates().firstOrNull { it.id == key } ?: return@withAccess
-            store.withTransaction {
-                val candidate = json.decodeFromString<AnalysisCandidate>(row.payload)
-                recordRecurringFeedback(candidate, if (notRecurring) "NOT_RECURRING" else "DISMISSED",
-                    if (notRecurring) RecurringLabel.NONE.name else null)
+            val candidate = json.decodeFromString<AnalysisCandidate>(row.payload)
+            recordRecurringFeedback(candidate, if (notRecurring) "NOT_RECURRING" else "DISMISSED",
+                if (notRecurring) RecurringLabel.NONE.name else null) {
                 store.analytics().candidates(listOf(row.copy(status = "REJECTED")))
             }
         } }; request()
@@ -430,27 +426,29 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val row = store.analytics().candidates().firstOrNull { it.id == key }
             val saved = container.storage.commitmentRepository.getBySourceTransactionId(c.sourceIds.last())
             val learnedCadence = draft.recurrence?.name?.takeIf { it in setOf("WEEKLY", "MONTHLY", "YEARLY") && saved?.recurrence?.name == it }
-            store.withTransaction {
-                recordRecurringFeedback(c, "CONFIRMED", learnedCadence)
+            recordRecurringFeedback(c, "CONFIRMED", learnedCadence) {
                 if (row != null) store.analytics().candidates(listOf(row.copy(status = "ACCEPTED")))
             }
         } }
         request(); return true
     }
 
-    private suspend fun recordRecurringFeedback(candidate: AnalysisCandidate, kind: String, label: String?) {
-        val seriesKey = candidate.seriesKey ?: return
+    /**
+     * Appends the answer, then runs [alongside] (the candidate's advisory status in [store]): the answer is committed
+     * first, so a status never exists without the answer behind it. A candidate without a series records none.
+     */
+    private suspend fun recordRecurringFeedback(candidate: AnalysisCandidate, kind: String, label: String?,
+        alongside: suspend () -> Unit = {}) {
+        val seriesKey = candidate.seriesKey ?: return alongside()
         val payload = RecurringFeedbackPayload(seriesKey, candidate.sourceIds, label).also { it.validate() }
-        store.analytics().feedback(RecurringFeedbackRow(seriesKey, kind, json.encodeToString(payload), clock.millis()))
+        answers.record(RecurringFeedbackRow(seriesKey, kind, json.encodeToString(payload), clock.millis()), alongside)
     }
 
     suspend fun undoRecurringCorrection(seriesKey: String) = mutex.withLock {
         if (closed) return@withLock
         container.storage.databaseAccessGate.withAccess {
-            store.withTransaction {
+            answers.undo(seriesKey, undoableAnswers, clock.millis()) {
                 val dao = store.analytics()
-                val row = dao.feedback().firstOrNull { it.seriesKey == seriesKey && it.kind in setOf("NOT_RECURRING", "DISMISSED") } ?: return@withTransaction
-                dao.deleteFeedback(row.seriesKey)
                 val candidates = dao.candidates().filter { it.status == "REJECTED" }.filter {
                     runCatching { json.decodeFromString<AnalysisCandidate>(it.payload).seriesKey == seriesKey }.getOrDefault(false)
                 }

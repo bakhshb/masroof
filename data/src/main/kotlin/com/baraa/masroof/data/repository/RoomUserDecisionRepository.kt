@@ -38,7 +38,7 @@ class RoomUserDecisionRepository(
         }
 
     private fun toDomain(row: UserDecisionEntity) = UserDecision(
-        rawSmsId = row.rawSmsId,
+        rawSmsId = requireNotNull(row.rawSmsId),
         kind = UserDecisionKind.valueOf(row.kind),
         decidedAt = Instant.ofEpochMilli(row.decidedAtEpochMillis),
         pairedRawSmsId = row.pairedRawSmsId,
