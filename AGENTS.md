@@ -42,7 +42,8 @@ At the end of the PR: one review of the whole PR, then CI green including device
 - ViewModels call `application` workflows/services only. Presentation never imports `domain.ids|rules|repository|ownership|assembly|matching` or `domain.period`.
 - `finance-core` owns `core.money`, value models, period/time policies, identities, classification/impact, transfer and statement matching (packages kept as `com.baraa.masroof.core.money` / `domain.*`). It gets facts and returns decisions; repositories, ownership, reconciliation writes, CSV and dashboard aggregation stay in `app`. Do not copy these into `app`. Both Money contracts stay distinct.
 - `application` constructors take every service, repository, workflow and scheduler non-null; no `X? = null` collaborator. Tests pass a `NoOp*`/`Empty*` double from `testsupport/` (`NoOptionalCollaboratorsTest` lists the few exceptions; add none).
-- `bank-engine` may import only `finance.value` contracts. Pure modules use `engine.bank`, `finance.value`, `ml`, `analytics`; app integration tests live under `integration`.
+- `bank-engine` may import only `finance.value` contracts. Pure modules use `engine.bank`, `finance.value`, `ml`, `analytics`, `ledger`; app integration tests live under `integration`.
+- `ledger` (depends only on `finance-core`) holds `LedgerProjector`, the pure derived ledger of plan 3.1. It is not wired into the app; it mirrors `TransactionReconciliationService` on an empty ledger, and every rule it cannot reproduce is listed under "Known differences" in `docs/ARCHITECTURE.md`, never changed in the projector.
 
 ## SMS pipeline
 - Live: `IncomingSmsReceiver` → `LiveSmsIntake` → `CaptureBankSmsUseCase` (durable `RawSms`) → `LiveSmsWorkScheduler` → `LiveSmsProcessingWorker` → `ProcessStoredSmsUseCase`. Work input is the rawSmsId only.

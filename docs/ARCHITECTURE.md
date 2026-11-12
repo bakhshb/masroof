@@ -7,11 +7,12 @@ Masroof has one Android application, one financial database and one bank interpr
 - `app`: presentation → application workflows → domain/parsing/data/SMS/bank ports and the pure financial core. `AppContainer` is the manual composition root of the only production runtime (see "Wiring" below).
 - `bank-engine`: pure Kotlin message-pattern matching, literal-role interpretation and extraction evidence, depending only on `finance-core` value contracts. `MessagePatternSmsAdapter` maps its output through `InterpretationDraftMapper` and the production `ParseFinalizer`.
 - `finance-core`: production money/value models, salary and statement periods, bank transaction time, deterministic container/transaction identities, financial classification/impact, transfer matching and assembly, and statement matching. Policies consume supplied facts and return decisions or transactions in memory; there is no ledger, repository, Android dependency or I/O. Existing engine value contracts remain available separately.
+- `ledger`: the pure derived-ledger projector (plan 3.1), depending only on `finance-core`. Not wired into the app yet; see "Derived ledger" below.
 - `ml-assist`: exact human-template family memory, cleaned templates, forecasting and recurring-pattern detection. The engine consumes an injected assistance contract rather than depending on ML implementation.
 - `ui-kit`: shared theme, typography, fonts, cards and charts. It cannot access financial storage.
 
 Source namespaces use `com.baraa.masroof.engine.bank`, `com.baraa.masroof.finance.value`,
-`com.baraa.masroof.ml` and `com.baraa.masroof.analytics`. Application integration
+`com.baraa.masroof.ml`, `com.baraa.masroof.analytics` and `com.baraa.masroof.ledger`. Application integration
 tests use `com.baraa.masroof.integration`. Historical `lab`/`beta` source paths and
 source file prefixes have been removed. Existing serialized backup keys and retired
 work identifiers keep their original spelling for upgrade compatibility.
@@ -58,6 +59,7 @@ Keep the existing five modules. Organize by responsibility; a filename containin
 | `app: application.backup` | Pattern capture, restore and rollback integration |
 | `app: presentation.patterns` | Render application models and collect user input |
 | `finance-core` | Financial classification, matching and assembly from supplied facts |
+| `ledger` | Derived ledger from evidence, decisions and ownership (not wired yet) |
 
 `StorageContainer` loads `app/src/main/assets/bank-patterns/*.patterns.json`, installs
 missing bundled definitions before admitting work, and wires the store into
@@ -219,6 +221,40 @@ Policy tests run directly on JVM in `finance-core`; app integration tests cover
 the unchanged persistence, orchestration and dashboard paths. Architecture checks
 scan both source roots, require the moved policies to exist in core, reject
 app-side copies and reject fully qualified calls that bypass module import rules.
+
+## Derived ledger (plan 3.1)
+
+`:ledger` holds `LedgerProjector`, a pure function from facts to the ledger. Nothing in the app calls it yet: `TransactionReconciliationService` still writes the ledger, and piece 3.2 compares the two on real data.
+
+`LedgerProjector.project(events, decisions, registry, storedFacts, zone)` takes:
+
+| Input | Meaning |
+|---|---|
+| `events: List<LedgerEvidence>` | One per raw SMS: the effective `ParsedEvent` (corrections applied), the raw SMS receipt time, and the parse details the ledger reads (reference, SMS-local time, loan type, `automationConfirmed`) |
+| `decisions: Map<String, EffectiveUserDecisions>` | The 2.3 read model by raw SMS id; `EffectiveUserDecisions` and `UserDecision` now live in `finance-core` (same package) |
+| `registry: OwnershipFacts` | Ownership already resolved for each referenced account, card and loan (the app keeps the registry's suffix fallback); a missing one is UNKNOWN |
+| `storedFacts: StoredFacts` | Per stored row, its raw SMS set, zone and exchange-rate pair; and the raw SMS whose review is closed as `USER_CORRECTION` (`ReviewCorrectionClosure`) |
+| `zone` | The fallback zone for a bank with neither a fixed nor a stored zone |
+
+It returns `LedgerProjection`: the rows (transaction plus its sorted raw SMS ids), review candidates (`ReviewKind`, now in `finance-core`), the settled ids, the retry ids (a decision or upgrade that could not be saved), and `confirmedLoans`. Loan auto-confirm is a pre-pass: an eligible installment paid from an owned account confirms an unknown loan for every installment of the run, and the caller records the emitted facts in the registry.
+
+The rules are those of `TransactionReconciliationService` applied to an empty ledger, in event-id order: a non-financial decision settles; a posting decision rebuilds the user's row (`decidedPosting`); an external-transfer decision without one settles; a financial decision lifts the posting gate; then single assembly with the stored zone, mutually unique pairing, the lone-owned-leg fallback, and the upgrade of posted external or single-leg self-transfer legs. A row keeps its stored zone through `TransactionTiming`, and keeps a complete stored exchange-rate pair when it links the same raw SMS set. Ids are `TransactionIdFactory.fromRawSmsIds`.
+
+`LedgerProjector.scope(affected, events, decisions)` returns the raw SMS a projection of `affected` must include so its rows for them equal the full projection's: the legs of every decision naming one, every installment of the same loan, and every transfer leg reachable through legs whose times may fall within one match window (receipt, SMS-local, or any-zone effective time). `LedgerProjectorPropertyTest` checks determinism, input-order independence and scoped = full on random corpora; `LedgerProjectorTest` covers each rule.
+
+### Known differences
+
+Each one goes to the 3.2 difference report; none is fixed in the projector.
+
+- **Stored rows.** The projector derives every automatic row from current evidence. The old pass keeps an automatic posted row whose evidence or ownership changed, repairing it only through the auto-ignore, stale self-transfer release, external-pair and fee→financing upgrades. That includes a type edited only on the row (2.3 limit), a stored `FEE` for an installment that cannot become a repayment (the projector returns the assembler's review instead), and a decided row whose decision lacks its type, time or zone (the projector posts nothing for an external-transfer decision, and assembles automatically for a financial one).
+- **Write guard.** The projector has no `AutomaticInterpretationWriteGuard`. A rebuilt decided external transfer or pair with stale pattern or inference evidence is rejected by the app on every pass; the projector posts it.
+- **Loan pre-pass.** The old pass confirms a loan while visiting an installment, so an earlier installment of the same loan in that pass still sees UNKNOWN until the next pass; the projector confirms first.
+- **Order.** Conflicting decisions (a superseded pair decision naming an SMS another decision posts) are resolved in event-id order; the old scoped pass visits the caller's order.
+- **Ids.** The old fee→financing upgrade keeps the stored row id; the projector always derives the id from the raw SMS set.
+- **Exchange rate.** Only a complete stored pair on the same raw SMS set is carried. A changed pairing or a half pair has none until enrichment runs (piece 3.3a re-keys).
+- **Scope.** The old scoped pass loads two match windows around the affected legs; the projector scope is the whole chain of reachable legs, so a scoped result never differs from the full one.
+- **Missing raw SMS.** Evidence without a raw SMS cannot be expressed (the caller leaves it out); the old pass skips it except for a posting decision.
+- **Counts.** No `ReconciliationSummary` is produced.
 
 ## Processing and authority
 

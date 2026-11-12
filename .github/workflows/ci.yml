@@ -65,7 +65,7 @@ jobs:
       - run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
       - run: sudo install -d -m 0777 /opt/cursor/artifacts
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest :bank-engine:test :finance-core:test :ml-assist:test --stacktrace
+        run: ./gradlew testDebugUnitTest :bank-engine:test :finance-core:test :ml-assist:test :ledger:test --stacktrace
       - name: Preserve complete unit-test reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -77,6 +77,7 @@ jobs:
             bank-engine/build/reports/tests/
             finance-core/build/reports/tests/
             ml-assist/build/reports/tests/
+            ledger/build/reports/tests/
           if-no-files-found: error
 
   static-analysis:

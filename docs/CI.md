@@ -4,7 +4,7 @@ Every PR to main and every main push runs the full required suite. The stable me
 
 ## Toolchains
 
-Gradle runs on Temurin 27; JVM compilation and Android/Robolectric tests use the installed JDK 21 toolchain. Pure JVM modules (`finance-core`, `bank-engine`, `ml-assist`) run JUnit Jupiter 6.1.3 through JUnit Platform. App and instrumentation tests keep JUnit 4 and their Android runners. Python scripts run on 3.15.2. SDK Command-line Tools 23.0 (build 16111833) are pinned explicitly. Emulator jobs align the `latest` tools path with that selected version because the emulator action prepends that path; prelaunch checks require the AVD target to match the pinned SDK package. Actions are pinned by commit with the release version beside each pin. Gradle cache ownership belongs to setup-gradle.
+Gradle runs on Temurin 27; JVM compilation and Android/Robolectric tests use the installed JDK 21 toolchain. Pure JVM modules (`finance-core`, `bank-engine`, `ml-assist`, `ledger`) run JUnit Jupiter 6.1.3 through JUnit Platform. App and instrumentation tests keep JUnit 4 and their Android runners. Python scripts run on 3.15.2. SDK Command-line Tools 23.0 (build 16111833) are pinned explicitly. Emulator jobs align the `latest` tools path with that selected version because the emulator action prepends that path; prelaunch checks require the AVD target to match the pinned SDK package. Actions are pinned by commit with the release version beside each pin. Gradle cache ownership belongs to setup-gradle.
 
 Dependency versions are pinned in `gradle/libs.versions.toml`; the wrapper pins
 Gradle. Pure JVM dependency boundaries are enforced by
@@ -20,7 +20,7 @@ features. minSdk 26, compileSdk 37, targetSdk 36 and JVM 21 bytecode stay fixed.
 Unit tests (including pure modules), lint/detekt and the shared APK build run independently.
 
 Financial policy tests live in `finance-core` and run through `:finance-core:test`
-in the existing unit job. The existing root `detekt` task also checks finance-core
+in the existing unit job, as do the derived-ledger tests (`:ledger:test`). The existing root `detekt` task also checks finance-core
 with the shared Detekt 2 configuration and ktlint wrapper. Architecture test inputs
 include the relocated sources and financial schema, so a source-only boundary
 change cannot reuse an unrelated cached result. `FinancialSchemaCompatibilityTest`
