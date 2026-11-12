@@ -79,7 +79,7 @@ class RecurringAnswerStore(
             if (legacy.isEmpty()) return 0
             db.beginTransaction()
             val copied = try {
-                val present = seriesWithRows(db)
+                val present = latest(db).keys
                 legacy.filter { it.seriesKey !in present }.onEach {
                     db.execSQL(
                         "INSERT INTO user_decision (rawSmsId, kind, decidedAtEpochMillis, subjectKey, answer, payload) " +
@@ -90,10 +90,7 @@ class RecurringAnswerStore(
             } finally {
                 db.endTransaction()
             }
-            // Each series' latest row, read back after the commit.
-            val latest = db.query(
-                "SELECT subjectKey, answer, payload, decidedAtEpochMillis FROM user_decision WHERE kind = 'RECURRING' ORDER BY sequence",
-            ).use { buildMap { while (it.moveToNext()) put(it.getString(0), listOf(it.getString(1), it.getString(2), it.getLong(3))) } }
+            val latest = latest(db)
             for (row in legacy) {
                 val kept = checkNotNull(latest[row.seriesKey]) { "A recurring answer did not reach user_decision" }
                 check(row !in copied || kept == listOf(row.kind, row.payload, row.decidedAt)) { "A copied recurring answer reads back differently" }
@@ -109,9 +106,9 @@ class RecurringAnswerStore(
             )
         }
 
-        private fun seriesWithRows(db: SupportSQLiteDatabase): Set<String> =
-            db.query("SELECT DISTINCT subjectKey FROM user_decision WHERE kind = 'RECURRING'").use {
-                buildSet { while (it.moveToNext()) add(it.getString(0)) }
-            }
+        /** Each series' latest `RECURRING` row (an `UNDONE` one included) as (answer, payload, decidedAt). */
+        private fun latest(db: SupportSQLiteDatabase): Map<String, List<Any?>> = db.query(
+            "SELECT subjectKey, answer, payload, decidedAtEpochMillis FROM user_decision WHERE kind = 'RECURRING' ORDER BY sequence",
+        ).use { buildMap { while (it.moveToNext()) put(it.getString(0), listOf(it.getString(1), it.getString(2), it.getLong(3))) } }
     }
 }

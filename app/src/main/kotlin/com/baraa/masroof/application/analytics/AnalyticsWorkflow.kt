@@ -53,6 +53,8 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     private val storeDelegate = lazy { AnalyticsDatabase.open(context) }
     private val store by storeDelegate
     private val json = AnalyticsJson.format
+    /** The recurring answers the corrections list shows and undo withdraws. */
+    private val undoableAnswers = setOf("NOT_RECURRING", "DISMISSED")
     /** The user's recurring answers live in `masroof.db` (`user_decision`, plan 5.2), not in [store]. */
     private val answers get() = container.storage.recurringAnswerStore
     private val mutable = MutableStateFlow(AnalysisUiState())
@@ -139,7 +141,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             catch(_: Exception) { com.baraa.masroof.application.interpretation.LearningInsights(pending = true) }
         refreshStage = "LOAD_CACHED_REST"
         val candidates = dao.candidates().mapNotNull { runCatching { json.decodeFromString<AnalysisCandidate>(it.payload) }.getOrNull() }
-        val corrections = answers.effective().filter { it.kind in setOf("NOT_RECURRING", "DISMISSED") }.sortedByDescending { it.decidedAt }.mapNotNull { row ->
+        val corrections = answers.effective().filter { it.kind in undoableAnswers }.sortedByDescending { it.decidedAt }.mapNotNull { row ->
             candidates.firstOrNull { it.seriesKey == row.seriesKey }?.let { AnalysisRecurringCorrection(row.seriesKey, it.name, row.kind) }
         }
         mutable.value = AnalysisUiState(cached, true, false, dao.alerts().filterNot { it.resolved }, prefs, history,
@@ -445,7 +447,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     suspend fun undoRecurringCorrection(seriesKey: String) = mutex.withLock {
         if (closed) return@withLock
         container.storage.databaseAccessGate.withAccess {
-            answers.undo(seriesKey, setOf("NOT_RECURRING", "DISMISSED"), clock.millis()) {
+            answers.undo(seriesKey, undoableAnswers, clock.millis()) {
                 val dao = store.analytics()
                 val candidates = dao.candidates().filter { it.status == "REJECTED" }.filter {
                     runCatching { json.decodeFromString<AnalysisCandidate>(it.payload).seriesKey == seriesKey }.getOrDefault(false)

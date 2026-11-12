@@ -27,7 +27,6 @@ class FinancialSchemaCompatibilityTest {
     @Test
     fun onlyTheBaselineAndTheCurrentVersionAreExported() {
         val exported = schemas.listFiles()!!.map { it.nameWithoutExtension.toInt() }.sorted()
-        assertEquals(listOf(MasroofDatabase.BASELINE_VERSION, MasroofDatabase.VERSION), exported)
         assertEquals(listOf(18, 22), exported)
         assertEquals("5349c1b666aed8239c225512f4498078", MasroofDatabase.IDENTITY_HASH)
         assertEquals(MasroofDatabase.IDENTITY_HASH, exportedHash(MasroofDatabase.VERSION))

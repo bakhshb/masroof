@@ -119,7 +119,8 @@ class RecurringAnswerStoreTest {
 
     @Test
     fun theCopyAppendsEachLegacyAnswerOnce_andARerunAfterACrashBeforeTheClearIsANoOp() = runBlocking {
-        val analytics = legacyAnalytics(answers)
+        RecurringAnswerUpgradeContract.writeAnalytics(context, answers)
+        val analytics = AnalyticsDatabase.open(context)
         val sql = db.openHelper.writableDatabase
         try {
             val read = RecurringAnswerStore.readLegacy(analytics.openHelper.writableDatabase)
@@ -155,7 +156,4 @@ class RecurringAnswerStoreTest {
         assertEquals(2, RecurringAnswerStore.copyLegacy(db.openHelper.writableDatabase, answers))
         assertEquals(listOf(dismissed.copy(seriesKey = confirmed.seriesKey, decidedAt = 99_000), notRecurring, dismissed), store.effective())
     }
-
-    private suspend fun legacyAnalytics(rows: List<RecurringFeedbackRow>): AnalyticsDatabase =
-        AnalyticsDatabase.open(context).also { database -> rows.forEach { database.analytics().feedback(it) } }
 }

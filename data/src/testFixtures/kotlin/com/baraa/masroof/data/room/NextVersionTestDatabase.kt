@@ -10,8 +10,6 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import androidx.sqlite.db.SupportSQLiteOpenHelper
-import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import com.baraa.masroof.data.room.entity.AccountRegistryEntity
 import com.baraa.masroof.data.room.entity.BankRegistryEntity
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
@@ -168,12 +166,8 @@ object MigrationOpenPathContract {
     /** A file labelled v19, v20 or v21 with that version's former hash has no migration: it is refused untouched. */
     fun retiredVersionsAreRejectedUntouched(context: Context, fixture: () -> InputStream) {
         for ((version, hash) in RETIRED_IDENTITY_HASHES) editedFixtureIsRejectedUntouched(context, fixture,
-            "UPDATE room_master_table SET identity_hash = '$hash'", before = { relabel(context, it, version) })
+            "PRAGMA user_version = $version", "UPDATE room_master_table SET identity_hash = '$hash'")
     }
-
-    private fun relabel(context: Context, name: String, version: Int) =
-        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING)
-            .use { it.version = version }
 
     /** The upgraded v18 fixture holds exactly the tables, indices and SQL Room creates for a fresh current-version file. */
     fun upgradeCreatesTheExportedSchema(context: Context, fixture: () -> InputStream) {
@@ -196,20 +190,19 @@ object MigrationOpenPathContract {
     fun unknownBaselineStructureIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
         editedFixtureIsRejectedUntouched(context, fixture, "ALTER TABLE raw_sms ADD COLUMN stray TEXT")
 
-    /** A fixture (or the file [copy] makes from it) changed by [edit] is refused and its bytes stay the same. */
+    /** A fixture changed by [edit] (after [before] ran on it) is refused and its bytes stay the same. */
     fun editedFixtureIsRejectedUntouched(
         context: Context,
         fixture: () -> InputStream,
-        edit: String,
-        copy: (name: String) -> File = { copyFixture(context, it, fixture) },
+        vararg edit: String,
         before: (name: String) -> Unit = {},
     ) {
         val name = "migration-reject.db"
-        val file = copy(name)
+        val file = copyFixture(context, name, fixture)
         before(name)
         // WAL like the live file: a rollback-journal edit would flip the header's journal bytes, and Room flips them back.
         val flags = SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING
-        SQLiteDatabase.openDatabase(file.path, null, flags).use { it.execSQL(edit) }
+        SQLiteDatabase.openDatabase(file.path, null, flags).use { db -> edit.forEach(db::execSQL) }
         rejectsUntouched(context, name)
         context.deleteDatabase(name)
     }
