@@ -147,9 +147,12 @@ class LedgerWriterScopeTest {
                     in 0..7 -> arrive(worlds, listOf(1, 1, 1, 2, 3).random(random))
                     8 -> changeOwnership(worlds)
                     9 -> commit(worlds)
-                    10 -> if (batched || random.nextInt(5) != 0) worlds.forEach { it.reconcile(null) } else {
+                    // At most one historical batch of more than 200 SMS, which the loader reads whole.
+                    10 -> if (!batched && random.nextInt(5) == 0) {
                         batched = true
                         arrive(worlds, 205)
+                    } else {
+                        worlds.forEach { it.reconcile(null) }
                     }
                     else -> worlds.forEach { it.reconcile(null) }
                 }

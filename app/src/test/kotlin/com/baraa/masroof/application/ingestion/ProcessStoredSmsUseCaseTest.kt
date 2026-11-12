@@ -25,9 +25,7 @@ import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.testsupport.SmsParseGateway
@@ -47,6 +45,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
+import com.baraa.masroof.testsupport.CountingFinancialTransactionRepository
+import com.baraa.masroof.testsupport.CountingParsedEventRepository
 import com.baraa.masroof.testsupport.NoOpAppLog
 import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
 import com.baraa.masroof.testsupport.noOpOwnershipConfirmation
@@ -256,11 +256,12 @@ class ProcessStoredSmsUseCaseTest {
 
     @Test
     fun liveProcess_doesNotScanGlobalTransferLists() = runBlocking {
-        val countedTransactions = CountingTransactions(ftRepo)
+        val countedParsed = CountingParsedEventRepository(parsedRepo)
+        val countedTransactions = CountingFinancialTransactionRepository(ftRepo)
         val cards = RoomCardRegistryRepository.from(db)
         val live = ProcessStoredSmsUseCase(
             rawSmsRepository = rawRepo,
-            parsedEventRepository = parsedRepo,
+            parsedEventRepository = countedParsed,
             bankSmsRegistry = registry,
             reconciliation = TransactionReconciliationService(
                 rawSmsRepository = rawRepo,
@@ -271,7 +272,7 @@ class ProcessStoredSmsUseCaseTest {
                     NoOpLoanRegistryRepository,
                 ),
                 effectiveParsedEventProvider = EffectiveParsedEventProvider(
-                    parsedRepo,
+                    countedParsed,
                     com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ),
                 reviewRepository = reviewRepo,
@@ -293,30 +294,17 @@ class ProcessStoredSmsUseCaseTest {
         }
         val raw = sms(PURCHASE_BODY)
         assertTrue(capture.capture(raw) is BankSmsCaptureResult.Captured)
+        countedParsed.reset()
         countedTransactions.reset()
 
         val result = live.process(raw.id)
 
         assertTrue(result is SmsIngestionResult.Parsed)
         assertEquals(FinancialTransactionType.EXPENSE, ftRepo.findByRawSmsId(raw.id)!!.type)
+        assertEquals(0, countedParsed.listAllCalls)
+        assertEquals(0, countedParsed.transferCandidateCalls)
+        assertEquals(0, countedTransactions.listAllCalls)
         assertEquals(0, countedTransactions.listByTypesCalls)
-    }
-
-    private class CountingTransactions(
-        private val delegate: FinancialTransactionRepository,
-    ) : FinancialTransactionRepository by delegate {
-        var listByTypesCalls: Int = 0
-
-        fun reset() {
-            listByTypesCalls = 0
-        }
-
-        override suspend fun listByTypes(
-            types: Collection<FinancialTransactionType>,
-        ): List<FinancialTransaction> {
-            listByTypesCalls += 1
-            return delegate.listByTypes(types)
-        }
     }
 
     private fun countingGateway() = SmsParseGateway { input ->

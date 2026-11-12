@@ -20,7 +20,6 @@ import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
