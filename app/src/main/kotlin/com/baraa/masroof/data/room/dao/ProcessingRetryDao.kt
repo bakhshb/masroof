@@ -62,5 +62,4 @@ interface ProcessingRetryDao {
 
 /** `p.rawSmsId` is not an SMS whose latest outcome decision posts nothing (`EffectiveUserDecisions.isNonFinancial`). */
 private const val RETRY_NOT_DECIDED_NON_FINANCIAL = "COALESCE((" + LATEST_OUTCOME_KIND_SQL +
-    "(d.rawSmsId = p.rawSmsId OR d.pairedRawSmsId = p.rawSmsId) ORDER BY d.sequence DESC LIMIT 1), '') NOT IN " +
-    NON_FINANCIAL_KINDS_SQL
+    "(d.rawSmsId = p.rawSmsId OR d.pairedRawSmsId = p.rawSmsId)" + NOT_NON_FINANCIAL_SQL

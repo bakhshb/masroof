@@ -352,8 +352,9 @@ class BankInterpretationService(
     }
     /** Do not re-interpret posted evidence or human decisions on engine/model upgrades; an automatic settlement is not one. */
     suspend fun mayRefresh(rawSmsId: String): Boolean =
-        !transactions.isRawSmsLinked(rawSmsId) && decisions.effectiveFor(rawSmsId).let { it.outcome == null && it.corrections.isEmpty() } &&
-            !ReviewCorrectionClosure.isClosed(reviews.findByRawSmsId(rawSmsId))
+        !transactions.isRawSmsLinked(rawSmsId) && decisions.effectiveFor(rawSmsId).let {
+            it.corrections.isEmpty() && !ReviewCorrectionClosure.protects(it, reviews.findByRawSmsId(rawSmsId))
+        }
 
     private data class Decision(val id: String,val rawId: String,val family: MessageFamily?,val at: Long,
         val provenance: String,val type: FinancialTransactionType? = null,val reason: String? = null)

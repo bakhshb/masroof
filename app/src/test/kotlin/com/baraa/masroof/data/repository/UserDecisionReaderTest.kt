@@ -128,6 +128,22 @@ class UserDecisionReaderTest {
             retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).sorted())
     }
 
+    /** The SQL copy of the rule (`UserDecisionDao` constants) agrees with `EffectiveUserDecisions` for every kind. */
+    @Test
+    fun retrySql_andReader_agreeForEveryKind() = runBlocking {
+        val retries = RoomProcessingRetryRepository(db.processingRetryDao())
+        for (kind in UserDecisionKind.entries) {
+            sms(kind.name)
+            decide(UserDecision(kind.name, UserDecisionKind.FINANCIAL_TYPE, at(1)))
+            decide(UserDecision(kind.name, kind, at(2)))
+            retries.markRequired(kind.name, at(1), ProcessingRetryMode.HISTORICAL_BATCH)
+        }
+        val retryable = retries.listRetryableRawSmsIds().toSet()
+        for (kind in UserDecisionKind.entries) {
+            assertEquals(kind.name, !reader.effectiveFor(kind.name).isNonFinancial, kind.name in retryable)
+        }
+    }
+
     private suspend fun decide(decision: UserDecision) = db.recordDecision(decision)
 
     private suspend fun sms(id: String) {

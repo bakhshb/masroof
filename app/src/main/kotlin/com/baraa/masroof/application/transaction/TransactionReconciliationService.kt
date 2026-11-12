@@ -337,15 +337,16 @@ class TransactionReconciliationService(
             }
             val receivedAtBefore = receivedAtByRawSmsId[event.rawSmsId]
             if (linkedBefore != null) {
+                val preserved = preservesExplicitUserDecision(decisions, review)
                 if (
-                    !preservesExplicitUserDecision(decisions, review) &&
+                    !preserved &&
                     InformationalMessagePolicy.shouldAutoIgnore(event) &&
                     financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
                 ) {
                     // Stale transaction from a prior misclassification (e.g. OTP stored as a purchase).
                     // Family comes from the parsed event; the raw body is not reclassified, and
                     // financial and UNKNOWN families are never dropped because of SMS wording.
-                } else if (shouldReleaseStaleSelfTransferLink(record, preservesExplicitUserDecision(decisions, review), linkedBefore, receivedAtBefore)) {
+                } else if (shouldReleaseStaleSelfTransferLink(record, preserved, linkedBefore, receivedAtBefore)) {
                     financialTransactionRepository.unlinkRawSms(event.rawSmsId)
                     touchedTransactionIds += linkedBefore.id
                 } else {
@@ -1091,7 +1092,7 @@ class TransactionReconciliationService(
      * whether its pass posted (docs/ARCHITECTURE.md, "Reading decisions").
      */
     private fun preservesExplicitUserDecision(decisions: EffectiveUserDecisions, review: ReviewItem?): Boolean =
-        decisions.outcome != null || ReviewCorrectionClosure.isClosed(review)
+        ReviewCorrectionClosure.protects(decisions, review)
 
     /**
      * The user's own row for a posting decision ([UserDecision.posting] columns), or null when [decisions] holds
@@ -1105,19 +1106,20 @@ class TransactionReconciliationService(
         val type = decision.transactionType ?: return null
         val occurredAt = decision.occurredAt ?: return null
         val zone = decision.occurredAtZone ?: return null
-        val ids = listOfNotNull(decision.rawSmsId, decision.pairedRawSmsId)
-        val legs = ids.map { evidence[it] ?: effectiveParsedEventProvider.findEffectiveByRawSmsId(it) ?: return null }
+        val legs = listOfNotNull(decision.rawSmsId, decision.pairedRawSmsId)
+            .map { evidence[it] ?: effectiveParsedEventProvider.findEffectiveByRawSmsId(it) ?: return null }
+        val ids = legs.map { it.event.rawSmsId }.sorted()
         val amount = legs.first().event.amount?.takeIf { it.amount.signum() > 0 } ?: return null
         val single = FinancialTransaction.fromSingleEvent(legs.first().event, type, occurredAt,
             decision.sourceContainerId, decision.destinationContainerId, zone)
         val transaction = if (legs.size == 1) single else single.copy(
-            id = TransactionIdFactory.fromRawSmsIds(ids.sorted()),
+            id = TransactionIdFactory.fromRawSmsIds(ids),
             amount = amount,
             merchant = null,
             counterparty = legs[0].event.counterparty ?: legs[1].event.counterparty,
             linkedParsedEventIds = legs.map { it.event.id }.sorted(),
         )
-        return DecidedPosting(transaction, ids.sorted(), legs.associateBy { it.event.rawSmsId })
+        return DecidedPosting(transaction, ids, legs.associateBy { it.event.rawSmsId })
     }
 
     private class DecidedPosting(

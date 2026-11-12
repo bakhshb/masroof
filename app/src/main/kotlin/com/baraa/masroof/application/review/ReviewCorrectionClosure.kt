@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.domain.model.EffectiveUserDecisions
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
@@ -15,4 +16,8 @@ import com.baraa.masroof.domain.model.ReviewStatus
 object ReviewCorrectionClosure {
     fun isClosed(review: ReviewItem?): Boolean =
         review?.status == ReviewStatus.RESOLVED && review.resolutionKind == ReviewResolutionKind.USER_CORRECTION
+
+    /** A human decision protects this SMS from automatic rewrites: any outcome, or this closure. */
+    fun protects(decisions: EffectiveUserDecisions, review: ReviewItem?): Boolean =
+        decisions.outcome != null || isClosed(review)
 }

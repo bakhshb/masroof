@@ -26,7 +26,7 @@ class AutomaticInterpretationWriteGuard(
             val decided=decisions.effectiveFor(id)
             val current=events.findEffectiveByRawSmsId(id)
             val linked=transactions.isRawSmsLinked(id)
-            val protected=(decided.outcome != null || ReviewCorrectionClosure.isClosed(reviews.findByRawSmsId(id))) && linked
+            val protected=ReviewCorrectionClosure.protects(decided, reviews.findByRawSmsId(id)) && linked
             if (protected || current != prior) true
             else if (current.automationConfirmed || decided.confirmsFinancial) false
             else if (!patternsCurrent(current, linked)) { reason = "stale_pattern_definition"; true }

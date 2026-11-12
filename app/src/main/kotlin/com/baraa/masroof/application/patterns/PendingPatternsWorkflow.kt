@@ -84,9 +84,9 @@ class PendingPatternsWorkflow(
             for (row in report.rows.filter { it.status == PendingPatternStatus.MATCHED && it.matches.single().patternId in approved &&
                     (patternId == null || it.matches.single().patternId == patternId) }) {
                 requireNotNull(inTransaction).invoke {
-                    val review = reviews.getById(row.reviewId)
-                    val decided = review?.let { decisions.effectiveFor(it.rawSmsId) }
-                    if (review == null || decided == null || review.status != ReviewStatus.REQUIRED || review.resolutionKind != null ||
+                    val review = reviews.getById(row.reviewId) ?: return@invoke SmsIngestionResult.Duplicate
+                    val decided = decisions.effectiveFor(review.rawSmsId)
+                    if (review.status != ReviewStatus.REQUIRED || review.resolutionKind != null ||
                         decided.corrections.isNotEmpty() || transactions.isRawSmsLinked(review.rawSmsId)) {
                         return@invoke SmsIngestionResult.Duplicate
                     }

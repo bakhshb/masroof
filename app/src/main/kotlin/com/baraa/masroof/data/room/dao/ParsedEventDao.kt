@@ -325,5 +325,4 @@ data class ParsedEventIdByRawSms(val rawSmsId: String, val id: String)
 
 /** `:rawSmsId` is not an SMS whose latest outcome decision posts nothing (`EffectiveUserDecisions.isNonFinancial`). */
 private const val HISTORICAL_NOT_DECIDED_NON_FINANCIAL = "COALESCE((" + LATEST_OUTCOME_KIND_SQL +
-    "(d.rawSmsId = :rawSmsId OR d.pairedRawSmsId = :rawSmsId) ORDER BY d.sequence DESC LIMIT 1), '') NOT IN " +
-    NON_FINANCIAL_KINDS_SQL
+    "(d.rawSmsId = :rawSmsId OR d.pairedRawSmsId = :rawSmsId)" + NOT_NON_FINANCIAL_SQL

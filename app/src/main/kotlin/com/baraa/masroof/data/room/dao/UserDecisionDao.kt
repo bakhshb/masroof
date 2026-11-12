@@ -29,3 +29,6 @@ interface UserDecisionDao {
 internal const val LATEST_OUTCOME_KIND_SQL =
     "SELECT d.kind FROM user_decision d WHERE d.kind NOT IN ('CORRECTION', 'BANK_SELECTION') AND "
 internal const val NON_FINANCIAL_KINDS_SQL = "('NON_FINANCIAL', 'IGNORE', 'RESTORE_REVERTED')"
+
+/** Closes a `COALESCE((LATEST_OUTCOME_KIND_SQL (row names X)` clause: "X's latest outcome is not non-financial". */
+internal const val NOT_NON_FINANCIAL_SQL = " ORDER BY d.sequence DESC LIMIT 1), '') NOT IN " + NON_FINANCIAL_KINDS_SQL

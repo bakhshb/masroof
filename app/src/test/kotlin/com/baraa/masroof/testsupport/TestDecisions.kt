@@ -20,7 +20,7 @@ internal fun MasroofDatabase.backfillDecisions() = UserDecisionBackfill.run(open
 internal suspend fun MasroofDatabase.recordDecision(decision: UserDecision) = withTransaction { appendDecision(decision) }
 
 /** The `CORRECTION` decision `ReviewWorkflowService.applyCorrection` appends with [correction]. */
-internal fun correctionDecision(correction: UserCorrection) = UserDecision(
+private fun correctionDecision(correction: UserCorrection) = UserDecision(
     rawSmsId = correction.targetRawSmsId,
     kind = UserDecisionKind.CORRECTION,
     decidedAt = correction.createdAt,
