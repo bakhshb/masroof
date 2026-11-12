@@ -103,7 +103,8 @@ class TransactionReconciliationService(
 
     /**
      * Reconcile [rawSmsIds]: the projection of [LedgerProjector.scope] around them, so the rows written equal a full
-     * pass's. The report covers that whole scope.
+     * pass's. The report covers [rawSmsIds] and the units written; a neighbour that fails or is not written is left
+     * to its own pass (docs/ARCHITECTURE.md, "Ledger writer", Report).
      */
     suspend fun reconcileAffectedRawSmsIds(rawSmsIds: Collection<String>): ReconciliationReport {
         val ids = rawSmsIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct()

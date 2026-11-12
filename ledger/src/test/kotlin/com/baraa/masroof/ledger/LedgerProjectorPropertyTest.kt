@@ -37,6 +37,11 @@ class LedgerProjectorPropertyTest {
 
     private val seeds = 0 until 2000
 
+    private val storedTypes = listOf(
+        FinancialTransactionType.EXPENSE, FinancialTransactionType.SELF_TRANSFER, FinancialTransactionType.FEE,
+        FinancialTransactionType.EXTERNAL_TRANSFER_OUT, FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+    )
+
     @Test
     fun theProjectionIsDeterministicAndIgnoresInputOrder() {
         var rows = 0
@@ -72,6 +77,42 @@ class LedgerProjectorPropertyTest {
             assertEquals(full.restrictedTo(scope, corpus.events), scoped.restrictedTo(scope, corpus.events), "seed $seed")
         }
         assertTrue(narrower > seeds.count() / 2, "most scopes must leave evidence out")
+    }
+
+    /**
+     * The keep invariant: every stored row is in the projection verbatim, or replaced by (a) one derived row on its
+     * raw SMS set with the same type and amount (FEE→LOAN_REPAYMENT allowed), (b) a self-transfer pair joining a stored
+     * external or single-leg self-transfer leg, or (c) dropped as a lone, unprotected informational row. A protected
+     * row is always verbatim.
+     */
+    @Test
+    fun everyStoredRowIsKeptVerbatimOrReplacedByAnAllowedRule() {
+        var replaced = 0
+        for (seed in seeds) {
+            val corpus = corpus(Random(seed))
+            val result = corpus.project()
+            val events = corpus.events.associateBy { it.event.rawSmsId }
+            for (row in corpus.stored.rows) {
+                if (row in result.rows) continue
+                val protected = row.rawSmsIds.any { corpus.decisions[it]?.outcome != null || it in corpus.stored.correctionClosedRawSmsIds }
+                assertTrue(!protected, "seed $seed: protected $row changed")
+                val over = result.rows.filter { derived -> derived.rawSmsIds.any { it in row.rawSmsIds } }
+                val single = row.rawSmsIds.singleOrNull()
+                val informational = single != null && over.isEmpty() &&
+                    events[single]?.event?.let(com.baraa.masroof.domain.rules.InformationalMessagePolicy::shouldAutoIgnore) == true
+                val derived = over.singleOrNull()
+                val sameSet = derived != null && derived.rawSmsIds == row.rawSmsIds && derived.transaction.amount == row.transaction.amount &&
+                    (derived.transaction.type == row.transaction.type ||
+                        row.transaction.type == FinancialTransactionType.FEE && derived.transaction.type == FinancialTransactionType.LOAN_REPAYMENT)
+                val joinable = row.transaction.type in setOf(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, FinancialTransactionType.EXTERNAL_TRANSFER_IN) ||
+                    row.transaction.type == FinancialTransactionType.SELF_TRANSFER && row.transaction.linkedParsedEventIds.size == 1
+                val joined = single != null && joinable && derived != null && derived.transaction.type == FinancialTransactionType.SELF_TRANSFER &&
+                    derived.rawSmsIds.size == 2 && single in derived.rawSmsIds
+                assertTrue(informational || sameSet || joined, "seed $seed: $row replaced by $over")
+                replaced++
+            }
+        }
+        assertTrue(replaced > 100, "corpora must replace some stored rows: $replaced")
     }
 
     @Test
@@ -167,11 +208,10 @@ class LedgerProjectorPropertyTest {
         // Some stored rows link raw SMS without evidence.
         val storedIds = (ids.filter { random.nextInt(3) == 0 } + listOf("ghost1", "ghost2").filter { random.nextInt(3) == 0 }).shuffled(random)
         val storedSets = storedIds.chunked(2).flatMap { if (it.size == 2 && random.nextInt(3) == 0) listOf(it) else it.map(::listOf) }
-        val types = listOf(FinancialTransactionType.EXPENSE, FinancialTransactionType.SELF_TRANSFER, FinancialTransactionType.FEE)
         val stored = StoredFacts(
             rows = storedSets.map { set ->
                 storedRow(
-                    *set.toTypedArray(), zone = listOf("Asia/Dubai", "Asia/Riyadh", null).random(random), type = types.random(random),
+                    *set.toTypedArray(), zone = listOf("Asia/Dubai", "Asia/Riyadh", null).random(random), type = storedTypes.random(random),
                     rate = BigDecimal("3.75").takeIf { random.nextBoolean() }, rateSource = ExchangeRateSource.SMS,
                 )
             },

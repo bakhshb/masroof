@@ -216,4 +216,80 @@ class LedgerProjectorKeepStoredTest {
         val result = project(listOf(installment), registry = owned.copy(loans = mapOf(loan to OwnershipStatus.OWNED)), stored = StoredFacts(rows = listOf(fee)))
         assertKept(result, fee)
     }
+
+    private fun leg(id: String, family: MessageFamily, network: BankNetworkType, reference: String? = null) =
+        evidence(event(id, family, source = ownedA, destination = ownedB, network = network), T0, transactionReference = reference)
+
+    private fun LedgerProjection.sets() = rows.map { it.rawSmsIds to it.transaction.type }.toSet()
+
+    /**
+     * A transfer split in two by a daily limit: the stored pair [a1,b] is never broken up. A second out-leg a2 is
+     * posted on its own as a single-leg self-transfer, as the old pass posted it (b was linked, so never in its
+     * matching pool), and joins its own in-leg b2 when that arrives (the old upgrade of a posted single leg).
+     * [reference] null: inter-bank legs without a reference never match, so a2 and b2 stay single, as before.
+     */
+    private fun splitTransfer(reference: (String) -> String?, expectedSecond: Set<Pair<List<String>, FinancialTransactionType>>) {
+        val net = BankNetworkType.INTER_BANK
+        fun legs(vararg ids: String) = ids.map { id ->
+            leg(id, if (id.startsWith("a")) MessageFamily.TRANSFER_OUT else MessageFamily.TRANSFER_IN, net, reference(id))
+        }
+        val pair = storedRow("a1", "b", type = FinancialTransactionType.SELF_TRANSFER)
+        val first = project(legs("a1", "b", "a2"), registry = owned, stored = StoredFacts(rows = listOf(pair)))
+        assertEquals(
+            setOf(listOf("a1", "b") to FinancialTransactionType.SELF_TRANSFER, listOf("a2") to FinancialTransactionType.SELF_TRANSFER),
+            first.sets(),
+        )
+        val second = project(legs("a1", "b", "a2", "b2"), registry = owned, stored = StoredFacts(rows = first.rows))
+        assertEquals(expectedSecond, second.sets())
+        // Scoped = full for the new leg.
+        val scope = LedgerProjector.scope(listOf("b2"), legs("a1", "b", "a2", "b2"), emptyMap(), StoredFacts(rows = first.rows))
+        val scoped = project(legs("a1", "b", "a2", "b2").filter { it.event.rawSmsId in scope }, registry = owned,
+            stored = StoredFacts(rows = first.rows.filter { row -> row.rawSmsIds.any { it in scope } }))
+        assertEquals(second.rows.filter { row -> row.rawSmsIds.any { it in scope } }, scoped.rows)
+    }
+
+    @Test
+    fun aStoredPairIsNeverSplitByALaterLeg_interBankWithReferences() = splitTransfer(
+        reference = { if (it.endsWith("2")) "R2" else "R1" },
+        expectedSecond = setOf(
+            listOf("a1", "b") to FinancialTransactionType.SELF_TRANSFER, listOf("a2", "b2") to FinancialTransactionType.SELF_TRANSFER,
+        ),
+    )
+
+    @Test
+    fun aStoredPairIsNeverSplitByALaterLeg_interBankWithoutReferences() = splitTransfer(
+        reference = { null },
+        expectedSecond = setOf(
+            listOf("a1", "b") to FinancialTransactionType.SELF_TRANSFER, listOf("a2") to FinancialTransactionType.SELF_TRANSFER,
+            listOf("b2") to FinancialTransactionType.SELF_TRANSFER,
+        ),
+    )
+
+    /** Intra-bank: the third leg cannot pair with the stored pair's legs either; the stored pair stays. */
+    @Test
+    fun aStoredPairIsNeverSplitByALaterLeg_intraBank() {
+        val net = BankNetworkType.INTRA_BANK
+        val pair = storedRow("a1", "b", type = FinancialTransactionType.SELF_TRANSFER)
+        val result = project(
+            listOf(leg("a1", MessageFamily.TRANSFER_OUT, net), leg("b", MessageFamily.TRANSFER_IN, net), leg("a2", MessageFamily.TRANSFER_OUT, net)),
+            registry = owned, stored = StoredFacts(rows = listOf(pair)),
+        )
+        assertTrue(listOf("a1", "b") to FinancialTransactionType.SELF_TRANSFER in result.sets())
+        assertTrue(result.rows.none { "a2" in it.rawSmsIds && it.rawSmsIds.size > 1 })
+    }
+
+    /** A stored pair that re-derives as itself with the same type and amount still takes today's detail. */
+    @Test
+    fun aStoredPairThatReDerivesAsItselfTakesTodaysDetail() {
+        val net = BankNetworkType.INTER_BANK
+        val pair = storedRow("a1", "b", zone = null, type = FinancialTransactionType.SELF_TRANSFER)
+        val result = project(
+            listOf(leg("a1", MessageFamily.TRANSFER_OUT, net, "R1"), leg("b", MessageFamily.TRANSFER_IN, net, "R1")),
+            registry = owned, stored = StoredFacts(rows = listOf(pair)),
+        )
+        val row = result.rows.single()
+        assertEquals(listOf("a1", "b"), row.rawSmsIds)
+        assertEquals(null, row.transaction.merchant)
+        assertTrue(row.transaction.occurredAtZone != null)
+    }
 }

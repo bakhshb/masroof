@@ -37,10 +37,6 @@ data class LedgerInputs(
     val records: Map<String, ParsedEventRecord> = emptyMap(),
 ) {
     fun project(): LedgerProjection = LedgerProjector.project(events, decisions, registry, storedFacts, zone)
-
-    /** Raw SMS an outcome decision or a correction closure protects (`ReviewCorrectionClosure.protects`). */
-    fun protectedRawSmsIds(): Set<String> =
-        decisions.filterValues { it.outcome != null }.keys + storedFacts.correctionClosedRawSmsIds
 }
 
 /**
@@ -86,6 +82,8 @@ class LedgerInputLoader(
      * rows for that scope as a full [load] (scoped = full).
      */
     suspend fun loadScope(affected: Collection<String>): LedgerInputs {
+        // shortcut: a large batch (a historical scan) reads the whole history once rather than one query per transfer.
+        if (affected.size > FULL_READ_AFFECTED) return restrictedTo(load(), affected)
         val records = mutableMapOf<String, ParsedEventRecord>()
         val receivedAt = mutableMapOf<String, java.time.Instant>()
         val decisions = mutableMapOf<String, EffectiveUserDecisions>()
@@ -184,6 +182,9 @@ class LedgerInputLoader(
     private companion object {
         /** Scope rounds before a full read: each round follows one more hop of decisions, rows, loans or transfers. */
         const val MAX_ROUNDS = 12
+
+        /** Affected raw SMS above which one full read is cheaper than growing the scope query by query. */
+        const val FULL_READ_AFFECTED = 200
     }
 }
 

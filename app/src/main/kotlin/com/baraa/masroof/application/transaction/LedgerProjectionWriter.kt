@@ -38,7 +38,7 @@ internal class LedgerProjectionWriter(
             projection.confirmedLoans.forEach { ownershipConfirmation.confirmLoanOwned(it) }
             val units = units(stored, projection.rows)
             val written = try {
-                write(units, inputs.records, inputs.protectedRawSmsIds())
+                write(units, inputs.records)
             } catch (_: ConcurrentChange) {
                 // Another writer changed these rows before this one wrote: project again from what it wrote, once.
                 if (attempt++ < ATTEMPTS) continue
@@ -61,7 +61,8 @@ internal class LedgerProjectionWriter(
 
     /** Stored and projected rows grouped by shared raw SMS or id; only groups that differ. */
     private fun units(stored: List<LedgerRow>, projected: List<LedgerRow>): List<Change> {
-        val storedBySet = stored.associateBy { it.rawSmsIds }
+        // A link-less row has no raw SMS set to match: it is kept byte for byte and never takes another's pair.
+        val storedBySet = stored.filter { it.rawSmsIds.isNotEmpty() }.associateBy { it.rawSmsIds }
         // A stored exchange-rate pair, complete or half, follows its raw SMS set; enrichment repairs a half pair.
         val carried = projected.map { row ->
             val match = storedBySet[row.rawSmsIds]?.transaction ?: return@map row
@@ -83,11 +84,7 @@ internal class LedgerProjectionWriter(
         }.filter { it.stored.normalized() != it.projected.normalized() }
     }
 
-    /**
-     * [protected] are the raw SMS a human decision or a correction closure protected when the inputs were read: a
-     * blocked unit that touches one of their stored rows is a change the old pass never made, so it stays as stored.
-     */
-    private suspend fun write(units: List<Change>, records: Map<String, ParsedEventRecord>, protected: Set<String>): Written {
+    private suspend fun write(units: List<Change>, records: Map<String, ParsedEventRecord>): Written {
         if (units.isEmpty()) return Written()
         val written = Written()
         inTransaction {
@@ -98,14 +95,9 @@ internal class LedgerProjectionWriter(
                 when {
                     now == unit.projected.normalized() -> Unit // Another pass wrote the same rows.
                     now != unit.stored.normalized() -> throw ConcurrentChange()
-                    // A blocked refinement, or a change to a row the user protected, stays as stored and settled: the
-                    // old pass never rewrote a posted row or touched a protected one.
-                    !guardAccepts(unit, records) ->
-                        if (unit.refinesOnly() || unit.stored.any { row -> row.rawSmsIds.any { it in protected } }) {
-                            written.kept += unit
-                        } else {
-                            written.failed += unit
-                        }
+                    // A blocked refinement stays as stored, as the old pass never rewrote a posted row. (A protected
+                    // stored row never reaches here: the projector keeps it verbatim, so it is in no unit.)
+                    !guardAccepts(unit, records) -> if (unit.refinesOnly()) written.kept += unit else written.failed += unit
                     else -> admitted += unit
                 }
             }
@@ -259,7 +251,7 @@ internal class LedgerProjectionWriter(
     private class Written(
         val applied: MutableList<Change> = mutableListOf(),
         val failed: MutableList<Change> = mutableListOf(),
-        /** Units left as stored on purpose (a blocked refinement or protected row, a commitment clash): not retried. */
+        /** Units left as stored on purpose (a blocked refinement, a commitment clash): not retried. */
         val kept: MutableList<Change> = mutableListOf(),
     ) {
         /** A save lost to another writer (only without a write transaction). */

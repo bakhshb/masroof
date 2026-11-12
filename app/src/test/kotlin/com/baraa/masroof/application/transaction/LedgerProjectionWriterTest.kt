@@ -199,6 +199,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         ftRepo.save(legacy, listOf(OUT, IN))
         commit(legacy.id)
         persistPurchases()
+        val linkless = linklessRows()
         writing().reconcileStoredEventsDetailed()
         var writes = 0
         val counting = object : FinancialTransactionRepository by ftRepo {
@@ -221,6 +222,60 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         assertEquals(0 to 0, writes to transactions)
         assertEquals(0 to 0, report.summary.assembledSingle to report.summary.matchedPairs)
         assertEquals(pairId, RoomCommitmentRepository.from(db).listAll().single().sourceTransactionId)
+        assertEquals(linkless, ftRepo.getByIds(linkless.map { it.id }))
+    }
+
+    /**
+     * A transfer split by a daily limit, inter-bank without a reference: the stored pair [a1,b] stays through a later
+     * out-leg a2 (posted on its own, as the old pass did) and its in-leg b2 (also on its own: these legs never match).
+     * The scoped pass for each new leg writes what a full pass writes.
+     */
+    @Test
+    fun aStoredPairIsNeverSplitByLaterLegs() = runBlocking {
+        confirmation.confirmAccountOwned(source)
+        confirmation.confirmAccountOwned(destination)
+        fun transfer(id: String, family: MessageFamily) = event("pe-$id", id, family, money("700.00"), source = source,
+            destination = destination, network = BankNetworkType.INTER_BANK)
+        persistEvent(OUT, transfer(OUT, MessageFamily.TRANSFER_OUT), at = Instant.parse("2026-08-10T09:00:00Z"))
+        persistEvent(IN, transfer(IN, MessageFamily.TRANSFER_IN), at = Instant.parse("2026-08-10T09:01:00Z"))
+        val pair = singleLeg(OUT, FinancialTransactionType.SELF_TRANSFER).copy(id = pairId, linkedParsedEventIds = listOf("pe-$IN", "pe-$OUT").sorted())
+        ftRepo.save(pair, listOf(OUT, IN))
+        suspend fun sets() = ftRepo.listAll().map { ftRepo.listRawSmsIds(it.id).toSet() }.toSet()
+
+        persistEvent(P1, transfer(P1, MessageFamily.TRANSFER_OUT), at = Instant.parse("2026-08-10T09:02:00Z"))
+        assertTrue(ReconciliationCompletionPolicy.isComplete(writing().reconcileAffectedRawSmsIds(listOf(P1))))
+        assertEquals(setOf(setOf(OUT, IN), setOf(P1)), sets())
+        assertEquals(pair, ftRepo.getById(pairId))
+        writing().reconcileStoredEventsDetailed()
+        assertEquals(setOf(setOf(OUT, IN), setOf(P1)), sets())
+
+        persistEvent(P2, transfer(P2, MessageFamily.TRANSFER_IN), at = Instant.parse("2026-08-10T09:03:00Z"))
+        writing().reconcileAffectedRawSmsIds(listOf(P2))
+        val scoped = sets()
+        writing().reconcileStoredEventsDetailed()
+        assertEquals(scoped, sets())
+        assertTrue(setOf(OUT, IN) in scoped)
+    }
+
+    /** Link-less stored rows share no raw SMS set: each keeps its own exchange-rate pair (or none), byte for byte. */
+    @Test
+    fun linklessRows_keepTheirOwnExchangeRatePair() = runBlocking {
+        val linkless = linklessRows()
+
+        writing().reconcileStoredEventsDetailed()
+
+        assertEquals(linkless, ftRepo.getByIds(linkless.map { it.id }))
+    }
+
+    /** Two rows that link no raw SMS (left by older versions), one with a complete exchange-rate pair, sorted by id. */
+    private suspend fun linklessRows(): List<FinancialTransaction> {
+        val rows = listOf(
+            singleLeg(OUT, FinancialTransactionType.EXPENSE).copy(id = "transaction:linkless-a", linkedParsedEventIds = emptyList(),
+                appliedExchangeRate = BigDecimal("3.75"), exchangeRateSource = ExchangeRateSource.SMS),
+            singleLeg(OUT, FinancialTransactionType.EXPENSE).copy(id = "transaction:linkless-b", linkedParsedEventIds = emptyList()),
+        )
+        rows.forEach { db.financialTransactionDao().insertTransactionIfAbsent(com.baraa.masroof.data.room.mapper.FinancialTransactionMapper.toEntity(it)) }
+        return rows
     }
 
     /**
