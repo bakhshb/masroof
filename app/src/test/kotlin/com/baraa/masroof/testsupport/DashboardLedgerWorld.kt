@@ -635,12 +635,6 @@ class WriteRejectingFinancialTransactionRepository(
         rawSmsIds: Collection<String>,
     ): FinancialTransactionSaveResult = rejected("save")
 
-    override suspend fun replaceExclusiveStaleLinks(
-        transaction: FinancialTransaction,
-        rawSmsIds: Collection<String>,
-        staleRawSmsIds: Collection<String>,
-    ): FinancialTransactionSaveResult = rejected("replaceExclusiveStaleLinks")
-
     override suspend fun update(transaction: FinancialTransaction): Boolean = rejected("update")
 
     override suspend fun updateAppliedExchangeRate(

@@ -26,22 +26,6 @@ class EffectiveParsedEventProvider(
     suspend fun listEffectiveByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> =
         withCorrections(parsedEventRepository.listByRawSmsIds(rawSmsIds))
 
-    suspend fun listUnlinkedTransfersEffectiveReceivedBetween(
-        startInclusive: java.time.Instant,
-        endExclusive: java.time.Instant,
-    ): List<ParsedEventRecord> =
-        withCorrections(
-            parsedEventRepository.listUnlinkedTransfersReceivedBetween(startInclusive, endExclusive),
-        )
-
-    suspend fun listUnlinkedTransfersEffectiveOccurredLocalBetween(
-        startInclusive: java.time.LocalDateTime,
-        endExclusive: java.time.LocalDateTime,
-    ): List<ParsedEventRecord> =
-        withCorrections(
-            parsedEventRepository.listUnlinkedTransfersOccurredLocalBetween(startInclusive, endExclusive),
-        )
-
     /** [ParsedEventRepository.listTransferCandidates] with corrections applied. */
     suspend fun listTransferCandidatesEffective(
         receivedAt: ClosedRange<java.time.Instant>,

@@ -40,8 +40,8 @@ data class LedgerInputs(
 }
 
 /**
- * Loads [LedgerInputs] for the whole history. Read-only. Evidence whose raw SMS is missing is left out (Known
- * differences, "Missing raw SMS"); ownership is resolved through [OwnershipResolver], so the registry's suffix
+ * Loads [LedgerInputs] for the whole history. Read-only. Evidence whose raw SMS is missing is left out (Rules of the
+ * derived ledger, "Missing raw SMS"); ownership is resolved through [OwnershipResolver], so the registry's suffix
  * fallback applies as in reconciliation.
  */
 class LedgerInputLoader(

@@ -171,7 +171,7 @@ class LedgerProjectorKeepStoredTest {
             listOf(purchase("nf"), purchase("ig"), purchase("rv"), evidence(event("otp", MessageFamily.OTP, card = card), T0)),
             decisions, owned, stored,
         )
-        // The old pass skipped a decided SMS and left its row; only the decision's own writer deletes it.
+        // A decided SMS is settled and its row kept; only the decision's own writer deletes it.
         assertEquals(kept.sortedBy { it.transaction.id }, result.rows)
         assertEquals(setOf("nf", "ig", "rv", "otp"), result.settledRawSmsIds)
         assertEquals(emptyList<LedgerReviewCandidate>(), result.reviewCandidates)
@@ -193,8 +193,8 @@ class LedgerProjectorKeepStoredTest {
 
     /**
      * A correction-closed leg posted as a single-leg self-transfer is not re-opened when its counterpart arrives: the
-     * stored row stays, and the counterpart stays a pending match (the old pass counted the posted leg as a pending
-     * counterpart and never upgraded a protected leg).
+     * stored row stays, and the counterpart stays a pending match (a kept single leg counts as a pending counterpart,
+     * and a protected leg is never upgraded).
      */
     @Test
     fun aProtectedSingleLegIsNotReopened_andItsCounterpartStaysPending() {
@@ -225,9 +225,9 @@ class LedgerProjectorKeepStoredTest {
 
     /**
      * A transfer split in two by a daily limit: the stored pair [a1,b] is never broken up. A second out-leg a2 is
-     * posted on its own as a single-leg self-transfer, as the old pass posted it (b was linked, so never in its
-     * matching pool), and joins its own in-leg b2 when that arrives (the old upgrade of a posted single leg).
-     * [reference] null: inter-bank legs without a reference never match, so a2 and b2 stay single, as before.
+     * posted on its own as a single-leg self-transfer (b is linked, so never in the matching pool), and joins its own
+     * in-leg b2 when that arrives (the upgrade of a posted single leg).
+     * [reference] null: inter-bank legs without a reference never match, so a2 and b2 stay single.
      */
     private fun splitTransfer(reference: (String) -> String?, expectedSecond: Set<Pair<List<String>, FinancialTransactionType>>) {
         val net = BankNetworkType.INTER_BANK
@@ -314,7 +314,7 @@ class LedgerProjectorKeepStoredTest {
         assertKept(result, row)
     }
 
-    /** The old stale-link release: legs of a stored self-transfer whose time no longer matches it leave the row. */
+    /** The stale-link release: legs of a stored self-transfer whose time no longer matches it leave the row. */
     @Test
     fun aWronglyMergedSelfTransferReleasesOnlyItsStaleLegs() {
         val net = BankNetworkType.INTRA_BANK
@@ -331,7 +331,7 @@ class LedgerProjectorKeepStoredTest {
     }
 
     /**
-     * The old upgrade joins a stored external leg only when the pair is mutually unique among the posted and unlinked
+     * The upgrade joins a stored external leg only when the pair is mutually unique among the posted and unlinked
      * legs: d, a stored external in-leg with the same reference, makes a ambiguous, so b is posted on its own.
      */
     @Test
@@ -353,8 +353,8 @@ class LedgerProjectorKeepStoredTest {
     }
 
     /**
-     * A leg whose counterpart is linked to a stored row that cannot be joined is assembled on its own, as the old pass
-     * did (the counterpart was never in its pool): an owned out-leg to an unknown account posts as an external transfer.
+     * A leg whose counterpart is linked to a stored row that cannot be joined is assembled on its own (the counterpart
+     * is not in the matching pool): an owned out-leg to an unknown account posts as an external transfer.
      */
     @Test
     fun aLegWhoseCounterpartStaysStoredIsPostedOnItsOwn() {
@@ -373,8 +373,8 @@ class LedgerProjectorKeepStoredTest {
     }
 
     /**
-     * A transfer leg its own stored row links (here a type edited only on the row) stays out of the matching pool, as
-     * the old pass left a linked leg alone: it does not make a later pair of other legs ambiguous.
+     * A transfer leg its own stored row links (here a type edited only on the row) stays out of the matching pool, so
+     * it does not make a later pair of other legs ambiguous.
      */
     @Test
     fun aLegLinkedByItsOwnStoredRowDoesNotCompeteForALaterPair() {
@@ -390,7 +390,7 @@ class LedgerProjectorKeepStoredTest {
     }
 
     /**
-     * A stale leg released from a stored self-transfer of three SMS is unlinked, as the old `unlinkRawSms` left it, so the
+     * A stale leg released from a stored self-transfer of three SMS is unlinked (it has no row of its own), so the
      * upgrade can join it with a posted external leg: [a,c] stays, [b,d] becomes a self-transfer.
      */
     @Test
@@ -434,8 +434,8 @@ class LedgerProjectorKeepStoredTest {
     }
 
     /**
-     * A merged self-transfer the old release leaves with one leg is a posted single-leg self-transfer, and the old
-     * upgrade joins it with its released counterpart.
+     * A merged self-transfer the release leaves with one leg is a posted single-leg self-transfer, and the upgrade
+     * joins it with its released counterpart.
      */
     @Test
     fun aMergedRowReducedToOneLegJoinsItsReleasedCounterpart() {

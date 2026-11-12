@@ -280,11 +280,6 @@ class DashboardServiceTest {
         private val records: List<ParsedEventRecord> = emptyList(),
     ) : EmptyParsedEventRepository() {
         override suspend fun listAll(): List<ParsedEventRecord> = records
-
-        override suspend fun listReceivedBetween(
-            startInclusive: java.time.Instant,
-            endExclusive: java.time.Instant,
-        ): List<ParsedEventRecord> = records
     }
 
     private class FakeRawRepo(

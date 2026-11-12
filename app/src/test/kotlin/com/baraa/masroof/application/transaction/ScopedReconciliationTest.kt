@@ -20,7 +20,6 @@ import com.baraa.masroof.domain.matching.TransactionMatcher
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
-import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
@@ -105,112 +104,6 @@ class ScopedReconciliationTest {
     }
 
     @Test
-    fun boundedQueries_keepOnlyUnlinkedTransfersAndTypedRowsInsideTheRange() = runBlocking {
-        val inside = Instant.parse("2026-08-04T09:00:00Z")
-        persistTransfer("sms-in-range", "pe-in-range", inside, MessageFamily.TRANSFER_OUT)
-        persistTransfer("sms-out-range", "pe-out-range", inside.plus(Duration.ofDays(30)), MessageFamily.TRANSFER_IN)
-        persistTransfer("sms-linked", "pe-linked", inside.plusSeconds(30), MessageFamily.TRANSFER_IN)
-        persistPurchase("sms-purchase", "pe-purchase", inside.plusSeconds(10))
-        ftDelegate.save(
-            tx(
-                id = "tx-linked",
-                type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
-                occurredAt = inside.plusSeconds(30),
-                linked = listOf("pe-linked"),
-                occurredAtZone = zoneId.id,
-            ),
-            listOf("sms-linked"),
-        )
-        ftDelegate.save(
-            tx(
-                id = "tx-old-expense",
-                type = FinancialTransactionType.EXPENSE,
-                occurredAt = inside,
-                linked = listOf("pe-purchase"),
-                occurredAtZone = zoneId.id,
-            ),
-            listOf("sms-purchase"),
-        )
-        ftDelegate.save(
-            tx(
-                id = "tx-later-external",
-                type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
-                occurredAt = inside.plus(Duration.ofDays(30)),
-                linked = listOf("pe-out-range"),
-                occurredAtZone = zoneId.id,
-            ),
-            listOf("sms-out-range"),
-        )
-
-        val start = inside.minusSeconds(1)
-        val end = inside.plus(Duration.ofMinutes(5))
-        assertEquals(
-            listOf("pe-in-range"),
-            parsedDelegate.listUnlinkedTransfersReceivedBetween(start, end).map { it.event.id },
-        )
-        assertEquals(
-            listOf("tx-linked"),
-            ftDelegate.listByTypesOccurredBetween(
-                types = listOf(
-                    FinancialTransactionType.EXTERNAL_TRANSFER_IN,
-                    FinancialTransactionType.EXTERNAL_TRANSFER_OUT,
-                ),
-                startInclusive = start,
-                endExclusive = end,
-            ).map { it.id },
-        )
-        assertEquals(
-            emptyList<FinancialTransaction>(),
-            ftDelegate.listByTypesOccurredBetween(
-                types = emptyList(),
-                startInclusive = start,
-                endExclusive = end,
-            ),
-        )
-
-        val localInside = LocalDateTime.parse("2026-08-04T12:05:00")
-        val localOutside = localInside.plusHours(3)
-        persistTransfer(
-            smsId = "sms-local-in",
-            eventId = "pe-local-in",
-            at = inside.plus(Duration.ofDays(4)),
-            family = MessageFamily.TRANSFER_OUT,
-            details = ParsedEventDetails(occurredAtLocal = localInside),
-        )
-        persistTransfer(
-            smsId = "sms-local-out",
-            eventId = "pe-local-out",
-            at = inside,
-            family = MessageFamily.TRANSFER_IN,
-            details = ParsedEventDetails(occurredAtLocal = localOutside),
-        )
-        persistTransfer(
-            smsId = "sms-local-linked",
-            eventId = "pe-local-linked",
-            at = inside.plus(Duration.ofDays(4)),
-            family = MessageFamily.TRANSFER_IN,
-            details = ParsedEventDetails(occurredAtLocal = localInside.plusMinutes(1)),
-        )
-        ftDelegate.save(
-            tx(
-                id = "tx-local-linked",
-                type = FinancialTransactionType.EXTERNAL_TRANSFER_IN,
-                occurredAt = inside.plus(Duration.ofDays(4)),
-                linked = listOf("pe-local-linked"),
-                occurredAtZone = zoneId.id,
-            ),
-            listOf("sms-local-linked"),
-        )
-        assertEquals(
-            listOf("pe-local-in"),
-            parsedDelegate.listUnlinkedTransfersOccurredLocalBetween(
-                startInclusive = localInside.minusMinutes(30),
-                endExclusive = localInside.plusMinutes(30),
-            ).map { it.event.id },
-        )
-    }
-
-    @Test
     fun oneSmsNonTransfer_doesNotLoadAllParsedEvents() = runBlocking {
         persistPurchase("sms-purchase", "pe-purchase", Instant.parse("2026-08-04T09:00:00Z"))
         persistTransfer(
@@ -227,8 +120,7 @@ class ScopedReconciliationTest {
         assertEquals(FinancialTransactionType.EXPENSE, ftDelegate.findByRawSmsId("sms-purchase")?.type)
         assertEquals(null, ftDelegate.findByRawSmsId("sms-old-transfer"))
         assertNoGlobalScan()
-        assertEquals(0, parsed.boundedUnlinkedCalls)
-        assertEquals(0, transactions.boundedTypeCalls)
+        assertEquals(0, parsed.transferCandidateCalls)
         assertTrue(parsed.listByRawSmsIdsCalls > 0)
     }
 
@@ -250,10 +142,7 @@ class ScopedReconciliationTest {
         reconciliation.reconcileAffectedRawSmsIds(listOf("sms-live"))
 
         assertNoGlobalScan()
-        assertTrue(parsed.boundedUnlinkedCalls in 1..4)
-        assertTrue(parsed.boundedLocalCalls in 0..4)
-        assertTrue(transactions.boundedTypeCalls in 0..4)
-        assertTrue(parsed.boundedUnlinkedCalls < 40)
+        assertTrue(parsed.transferCandidateCalls in 1..4)
     }
 
     @Test
@@ -296,7 +185,7 @@ class ScopedReconciliationTest {
         assertEquals(FinancialTransactionType.EXPENSE, posted?.type)
         assertEquals(Money.of("42.00", Currency.SAR), posted?.amount)
         assertNoGlobalScan()
-        assertEquals(0, parsed.boundedUnlinkedCalls)
+        assertEquals(0, parsed.transferCandidateCalls)
     }
 
     @Test
@@ -356,7 +245,6 @@ class ScopedReconciliationTest {
         assertEquals(setOf("sms-stale-in", "sms-stale-out"), ftDelegate.listRawSmsIds(healed.id).toSet())
         assertEquals("tx-ancient", ftDelegate.findByRawSmsId("sms-ancient")?.id)
         assertNoGlobalScan()
-        assertTrue(parsed.boundedUnlinkedCalls > 0)
         assertTrue(parsed.transferCandidateCalls > 0)
         assertTrue(parsed.boundedWindows.all { (start, _) -> start.isAfter(Instant.parse("2026-08-01T00:00:00Z")) })
         assertTrue(
@@ -446,9 +334,8 @@ class ScopedReconciliationTest {
         assertEquals(0, full.multiEvidenceTransfers)
         assertEquals(0, scoped.multiEvidenceTransfers)
         assertEquals(0, scoped.listAllCalls)
-        assertEquals(0, scoped.globalUnlinkedCalls)
         assertEquals(0, scoped.listByTypesCalls)
-        assertTrue(scoped.boundedLocalCalls > 0)
+        assertTrue(scoped.transferCandidateCalls > 0)
     }
 
     @Test
@@ -603,7 +490,6 @@ class ScopedReconciliationTest {
 
         assertEquals(FinancialTransactionType.LOAN_REPAYMENT, ftDelegate.findByRawSmsId("sms-loan")?.type)
         assertNoGlobalScan()
-        assertEquals(0, transactions.boundedTypeCalls)
         assertEquals(FinancialTransactionType.EXPENSE, ftDelegate.findByRawSmsId("sms-other")?.type)
     }
 
@@ -698,9 +584,8 @@ class ScopedReconciliationTest {
                 },
                 multiEvidenceTransfers = multiEvidence,
                 listAllCalls = countedParsed.listAllCalls,
-                globalUnlinkedCalls = countedParsed.globalUnlinkedCalls,
                 listByTypesCalls = countedFinancial.listByTypesCalls,
-                boundedLocalCalls = countedParsed.boundedLocalCalls,
+                transferCandidateCalls = countedParsed.transferCandidateCalls,
             )
         } finally {
             database.close()
@@ -709,7 +594,6 @@ class ScopedReconciliationTest {
 
     private fun assertNoGlobalScan() {
         assertEquals(0, parsed.listAllCalls)
-        assertEquals(0, parsed.globalUnlinkedCalls)
         assertEquals(0, transactions.listAllCalls)
         assertEquals(0, transactions.listByTypesCalls)
     }
@@ -807,8 +691,7 @@ class ScopedReconciliationTest {
         val affected: AffectedPosting?,
         val multiEvidenceTransfers: Int,
         val listAllCalls: Int,
-        val globalUnlinkedCalls: Int,
         val listByTypesCalls: Int,
-        val boundedLocalCalls: Int,
+        val transferCandidateCalls: Int,
     )
 }

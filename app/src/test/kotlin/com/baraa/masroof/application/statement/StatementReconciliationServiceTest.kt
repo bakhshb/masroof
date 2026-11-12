@@ -763,12 +763,6 @@ private class RecordingLedger(
         rawSmsIds: Collection<String>,
     ): FinancialTransactionSaveResult = mutate()
 
-    override suspend fun replaceExclusiveStaleLinks(
-        transaction: FinancialTransaction,
-        rawSmsIds: Collection<String>,
-        staleRawSmsIds: Collection<String>,
-    ): FinancialTransactionSaveResult = mutate()
-
     override suspend fun getById(id: String): FinancialTransaction? = rows.find { it.id == id }
 
     override suspend fun findByRawSmsId(rawSmsId: String): FinancialTransaction? = null

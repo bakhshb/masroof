@@ -225,7 +225,6 @@ class PackageDependencyRulesTest {
             ".update(",
             ".updateAppliedExchangeRate(",
             ".replaceConfirmedHistoricalMerchantRate(",
-            ".replaceExclusiveStaleLinks(",
             ".deleteIfExclusiveRawSmsLink(",
             ".unlinkRawSms(",
         )
@@ -262,7 +261,6 @@ class PackageDependencyRulesTest {
             ".updateAppliedExchangeRate(",
             ".deleteIfExclusiveRawSmsLink(",
             ".unlinkRawSms(",
-            ".replaceExclusiveStaleLinks(",
         )
         files.forEach { file ->
             assertTrue("${file.path} must exist", file.isFile)

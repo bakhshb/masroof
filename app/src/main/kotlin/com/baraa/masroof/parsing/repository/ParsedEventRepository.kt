@@ -109,60 +109,6 @@ interface ParsedEventRepository {
             .map { it.event.rawSmsId }
 
     /**
-     * Parse results whose [com.baraa.masroof.domain.model.RawSms.receivedAt] falls in
-     * `[startInclusive, endExclusive)` — used for incremental reconciliation windows.
-     */
-    suspend fun listReceivedBetween(
-        startInclusive: Instant,
-        endExclusive: Instant,
-    ): List<ParsedEventRecord>
-
-    /**
-     * Transfer parse rows with no financial-transaction link yet — used to bound
-     * incremental reconciliation without scanning the full backlog.
-     */
-    suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> =
-        listAll().filter { record ->
-            record.event.messageFamily == MessageFamily.TRANSFER_IN ||
-                record.event.messageFamily == MessageFamily.TRANSFER_OUT
-        }
-
-    /**
-     * Transfer rows whose RawSms was received in `[startInclusive, endExclusive)`,
-     * ordered by event id. Room also requires that the row has no financial-transaction
-     * link. In-memory defaults may return every transfer in that range.
-     */
-    suspend fun listUnlinkedTransfersReceivedBetween(
-        startInclusive: Instant,
-        endExclusive: Instant,
-    ): List<ParsedEventRecord> {
-        if (!startInclusive.isBefore(endExclusive)) return emptyList()
-        return listReceivedBetween(startInclusive, endExclusive).filter { record ->
-            record.event.messageFamily == MessageFamily.TRANSFER_IN ||
-                record.event.messageFamily == MessageFamily.TRANSFER_OUT
-        }
-    }
-
-    /**
-     * Unlinked transfer rows whose SMS-local [ParsedEventDetails.occurredAtLocal]
-     * falls in `[startInclusive, endExclusive)`, ordered by event id.
-     *
-     * This is candidate discovery for [com.baraa.masroof.domain.matching.TransactionMatcher],
-     * which compares local times when both legs have them. Room keeps the lookup
-     * bounded to that range. In-memory defaults may scan.
-     */
-    suspend fun listUnlinkedTransfersOccurredLocalBetween(
-        startInclusive: LocalDateTime,
-        endExclusive: LocalDateTime,
-    ): List<ParsedEventRecord> {
-        if (!startInclusive.isBefore(endExclusive)) return emptyList()
-        return listUnlinkedTransfers().filter { record ->
-            val local = record.details.occurredAtLocal ?: return@filter false
-            !local.isBefore(startInclusive) && local.isBefore(endExclusive)
-        }
-    }
-
-    /**
      * Transfer rows, by parsed family or by a corrected one, whose raw SMS receipt time, event time or SMS-local
      * time lies in the given inclusive range, ordered by event id: the superset the ledger scope narrows. In-memory
      * defaults return every row.

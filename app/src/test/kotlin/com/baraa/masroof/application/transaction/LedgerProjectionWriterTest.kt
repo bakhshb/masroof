@@ -26,9 +26,7 @@ import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.testsupport.EmptyReviewRepository
 import com.baraa.masroof.testsupport.NoOpUserDecisionRepository
 import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
-import java.io.File
 import java.math.BigDecimal
-import java.nio.file.Files
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -43,7 +41,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The plan 3.3a writer: what it writes, what follows a re-keyed row, atomicity, the guard and the debug switch. */
+/** The plan 3.3a writer: what it writes, what follows a re-keyed row, atomicity and the guard. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class LedgerProjectionWriterTest : ReconciliationTestFixture() {
@@ -71,6 +69,19 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         assertEquals(BigDecimal("3.75") to ExchangeRateSource.HISTORICAL_MERCHANT, row.appliedExchangeRate to row.exchangeRateSource)
         assertEquals(pairId, RoomCommitmentRepository.from(db).listAll().single().sourceTransactionId)
         assertEquals(pairId, reviews.findByRawSmsId(OUT)?.resolvedTransactionId)
+    }
+
+    @Test
+    fun reDerivedPairId_carriesAHalfExchangeRatePairForEnrichmentToRepair() = runBlocking {
+        persistLegs()
+        val legacy = pair().copy(id = "transaction:legacy-pair", appliedExchangeRate = BigDecimal("3.75"), exchangeRateSource = null)
+        assertEquals(FinancialTransactionSaveResult.Saved, ftRepo.save(legacy, listOf(OUT, IN)))
+
+        assertTrue(ReconciliationCompletionPolicy.isComplete(writing().reconcileStoredEventsDetailed()))
+
+        val row = ftRepo.listAll().single()
+        assertEquals(pairId, row.id)
+        assertEquals(BigDecimal("3.75") to null, row.appliedExchangeRate to row.exchangeRateSource)
     }
 
     @Test
@@ -227,7 +238,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
 
     /**
      * A transfer split by a daily limit, inter-bank without a reference: the stored pair [a1,b] stays through a later
-     * out-leg a2 (posted on its own, as the old pass did) and its in-leg b2 (also on its own: these legs never match).
+     * out-leg a2 (posted on its own: b is linked) and its in-leg b2 (also on its own: these legs never match).
      * The scoped pass for each new leg writes what a full pass writes.
      */
     @Test
@@ -307,8 +318,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
      */
     @Test
     fun aProtectedPostedLeg_leavesItsCounterpartReviewOpen() = runBlocking {
-        // Intra-bank, so the old pass counted the posted leg as a pending counterpart (an inter-bank counterpart is
-        // posted on its own, as the old pass did).
+        // Intra-bank, so the posted leg counts as a pending counterpart (an inter-bank counterpart is posted on its own).
         persistLegs(BankNetworkType.INTRA_BANK)
         val leg = singleLeg(OUT, FinancialTransactionType.SELF_TRANSFER)
         ftRepo.save(leg, listOf(OUT))
@@ -401,7 +411,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         listOf(if (rawSmsId == OUT) "pe-out" else "pe-in"), occurredAtZone = "Asia/Riyadh",
     )
 
-    /** A lone owned leg the guard refuses is failed and, as in the old pass, a pending match again. */
+    /** A lone owned leg the guard refuses is failed and a pending match again. */
     @Test
     fun aLoneLegTheGuardRefuses_isFailedAndPending() = runBlocking {
         confirmation.confirmAccountOwned(source)
@@ -433,28 +443,9 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         assertEquals(2, report.summary.alreadyLinked)
     }
 
-    @Test
-    fun theDebugSwitch_selectsTheOldPathOnlyWhileItsFileExists() = runBlocking {
-        val dir = Files.createTempDirectory("legacy-switch").toFile()
-        assertFalse(DebugLegacyReconciliation.enabled(dir))
-        File(dir, DebugLegacyReconciliation.FILE_NAME).writeText("")
-        assertTrue(DebugLegacyReconciliation.enabled(dir))
-
-        persistPurchases()
-        writing().reconcileStoredEventsDetailed()
-        ftRepo.update(ftRepo.findByRawSmsId(P1)!!.copy(occurredAtZone = null))
-        // The old path never rewrites a posted row; the writer fills its zone.
-        writing(legacy = { DebugLegacyReconciliation.enabled(dir) }).reconcileStoredEventsDetailed()
-        assertEquals(null, ftRepo.findByRawSmsId(P1)?.occurredAtZone)
-        File(dir, DebugLegacyReconciliation.FILE_NAME).delete()
-        writing(legacy = { DebugLegacyReconciliation.enabled(dir) }).reconcileStoredEventsDetailed()
-        assertEquals("Asia/Riyadh", ftRepo.findByRawSmsId(P1)?.occurredAtZone)
-    }
-
     private fun writing(
         ledger: FinancialTransactionRepository = ftRepo,
         guard: AutomaticWrite? = null,
-        legacy: () -> Boolean = { false },
         reviews: ReviewRepository = EmptyReviewRepository(),
         onTransaction: () -> Unit = {},
         parsed: com.baraa.masroof.parsing.repository.ParsedEventRepository = parsedRepo,
@@ -469,7 +460,6 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         zoneId = ZoneId.of("Asia/Riyadh"),
         automaticWrite = guard,
         inTransaction = { write -> onTransaction(); db.withTransaction { write() } },
-        useLegacyPath = legacy,
     )
 
     /** A guard that rejects every automatic write, as stale evidence would. */

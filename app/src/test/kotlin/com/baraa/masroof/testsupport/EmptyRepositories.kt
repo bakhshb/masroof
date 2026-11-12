@@ -88,8 +88,4 @@ internal open class EmptyParsedEventRepository : ParsedEventRepository {
     override suspend fun findByRawSmsId(rawSmsId: String): ParsedEventRecord? = null
     override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
     override suspend fun listAll(): List<ParsedEventRecord> = emptyList()
-    override suspend fun listReceivedBetween(
-        startInclusive: Instant,
-        endExclusive: Instant,
-    ): List<ParsedEventRecord> = emptyList()
 }

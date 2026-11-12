@@ -13,9 +13,6 @@ class CountingParsedEventRepository(
     private val delegate: ParsedEventRepository,
 ) : ParsedEventRepository by delegate {
     var listAllCalls: Int = 0
-    var globalUnlinkedCalls: Int = 0
-    var boundedUnlinkedCalls: Int = 0
-    var boundedLocalCalls: Int = 0
     var listByRawSmsIdsCalls: Int = 0
     var transferCandidateCalls: Int = 0
     val boundedWindows: MutableList<Pair<Instant, Instant>> = mutableListOf()
@@ -23,9 +20,6 @@ class CountingParsedEventRepository(
 
     fun reset() {
         listAllCalls = 0
-        globalUnlinkedCalls = 0
-        boundedUnlinkedCalls = 0
-        boundedLocalCalls = 0
         listByRawSmsIdsCalls = 0
         transferCandidateCalls = 0
         boundedWindows.clear()
@@ -37,37 +31,13 @@ class CountingParsedEventRepository(
         return delegate.listAll()
     }
 
-    override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> {
-        globalUnlinkedCalls += 1
-        return delegate.listUnlinkedTransfers()
-    }
-
-    override suspend fun listUnlinkedTransfersReceivedBetween(
-        startInclusive: Instant,
-        endExclusive: Instant,
-    ): List<ParsedEventRecord> {
-        boundedUnlinkedCalls += 1
-        boundedWindows += startInclusive to endExclusive
-        return delegate.listUnlinkedTransfersReceivedBetween(startInclusive, endExclusive)
-    }
-
-    override suspend fun listUnlinkedTransfersOccurredLocalBetween(
-        startInclusive: LocalDateTime,
-        endExclusive: LocalDateTime,
-    ): List<ParsedEventRecord> {
-        boundedLocalCalls += 1
-        return delegate.listUnlinkedTransfersOccurredLocalBetween(startInclusive, endExclusive)
-    }
-
-    /** The ledger writer's one bounded transfer-candidate query counts as both bounded queries above. */
+    /** The ledger writer's one bounded transfer-candidate query, with its receipt window. */
     override suspend fun listTransferCandidates(
         receivedAt: ClosedRange<Instant>,
         occurredAt: ClosedRange<Instant>,
         occurredAtLocal: ClosedRange<LocalDateTime>,
     ): List<ParsedEventRecord> {
         transferCandidateCalls += 1
-        boundedUnlinkedCalls += 1
-        boundedLocalCalls += 1
         boundedWindows += receivedAt.start to receivedAt.endInclusive
         return delegate.listTransferCandidates(receivedAt, occurredAt, occurredAtLocal)
     }
@@ -85,14 +55,10 @@ class CountingFinancialTransactionRepository(
 ) : FinancialTransactionRepository by delegate {
     var listAllCalls: Int = 0
     var listByTypesCalls: Int = 0
-    var boundedTypeCalls: Int = 0
-    val boundedWindows: MutableList<Pair<Instant, Instant>> = mutableListOf()
 
     fun reset() {
         listAllCalls = 0
         listByTypesCalls = 0
-        boundedTypeCalls = 0
-        boundedWindows.clear()
     }
 
     override suspend fun listAll(): List<FinancialTransaction> {
@@ -105,15 +71,5 @@ class CountingFinancialTransactionRepository(
     ): List<FinancialTransaction> {
         listByTypesCalls += 1
         return delegate.listByTypes(types)
-    }
-
-    override suspend fun listByTypesOccurredBetween(
-        types: Collection<FinancialTransactionType>,
-        startInclusive: Instant,
-        endExclusive: Instant,
-    ): List<FinancialTransaction> {
-        boundedTypeCalls += 1
-        boundedWindows += startInclusive to endExclusive
-        return delegate.listByTypesOccurredBetween(types, startInclusive, endExclusive)
     }
 }

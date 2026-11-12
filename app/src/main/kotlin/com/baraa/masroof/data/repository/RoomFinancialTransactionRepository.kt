@@ -25,42 +25,13 @@ class RoomFinancialTransactionRepository(
         transaction: FinancialTransaction,
         rawSmsIds: Collection<String>,
     ): FinancialTransactionSaveResult = accessGate.withAccess {
-        persist(transaction, rawSmsIds, dao::saveAtomic)
-    }
-
-    override suspend fun replaceExclusiveStaleLinks(
-        transaction: FinancialTransaction,
-        rawSmsIds: Collection<String>,
-        staleRawSmsIds: Collection<String>,
-    ): FinancialTransactionSaveResult = accessGate.withAccess {
-        persist(
-            transaction = transaction,
-            rawSmsIds = rawSmsIds,
-            save = { entity, links ->
-                dao.replaceExclusiveStaleLinksAtomic(
-                    entity = entity,
-                    links = links,
-                    staleRawSmsIds = staleRawSmsIds.map { it.trim() }.filter { it.isNotEmpty() },
-                )
-            },
-        )
-    }
-
-    private suspend fun persist(
-        transaction: FinancialTransaction,
-        rawSmsIds: Collection<String>,
-        save: suspend (
-            entity: com.baraa.masroof.data.room.entity.FinancialTransactionEntity,
-            links: List<FinancialTransactionRawSmsLinkEntity>,
-        ) -> FinancialTransactionDao.SaveAtomicOutcome,
-    ): FinancialTransactionSaveResult {
         val ids = rawSmsIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct().sorted()
         require(ids.isNotEmpty()) { "rawSmsIds required" }
 
         val entity = FinancialTransactionMapper.toEntity(transaction)
         val links = ids.map { FinancialTransactionRawSmsLinkEntity(it, transaction.id) }
 
-        return when (val outcome = save(entity, links)) {
+        return@withAccess when (val outcome = dao.saveAtomic(entity, links)) {
             FinancialTransactionDao.SaveAtomicOutcome.Saved ->
                 FinancialTransactionSaveResult.Saved
 
@@ -103,21 +74,6 @@ class RoomFinancialTransactionRepository(
             dao.listByTypesOccurredSince(
                 types = types.map { it.name },
                 startInclusiveEpochMillis = startInclusive.toEpochMilli(),
-            ),
-        )
-    }
-
-    override suspend fun listByTypesOccurredBetween(
-        types: Collection<FinancialTransactionType>,
-        startInclusive: Instant,
-        endExclusive: Instant,
-    ): List<FinancialTransaction> = accessGate.withAccess {
-        if (types.isEmpty() || !startInclusive.isBefore(endExclusive)) return@withAccess emptyList()
-        return@withAccess reconstructBatch(
-            dao.listByTypesOccurredBetween(
-                types = types.map { it.name },
-                startInclusiveEpochMillis = startInclusive.toEpochMilli(),
-                endExclusiveEpochMillis = endExclusive.toEpochMilli(),
             ),
         )
     }
