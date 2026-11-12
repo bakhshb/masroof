@@ -2,6 +2,7 @@ package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.application.logging.AppLogFormatting
 import com.baraa.masroof.domain.assembly.TransactionAssembler
+import com.baraa.masroof.domain.model.EffectiveUserDecisions
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
@@ -76,7 +77,7 @@ object LedgerShadowComparison {
             }
             val fields = if (kind == Kind.CHANGED) changedFields(old[0].transaction, new[0].transaction) else emptyList()
             if (kind == Kind.CHANGED && fields.isEmpty()) return@mapNotNull null
-            RowDifference(kind, rawSmsIds, old, new, fields, reason(kind, fields, rawSmsIds, old, new, inputs, evidence))
+            RowDifference(kind, rawSmsIds, old, new, fields, reason(kind, fields, rawSmsIds, old, new, inputs.decisions, evidence))
         }.sortedBy { it.rawSmsIds.first() }
         val storedReviews = inputs.reviews.associateBy { it.rawSmsId }
         val newReviews = projection.reviewCandidates.associate { it.rawSmsId to it.kind }
@@ -96,25 +97,24 @@ object LedgerShadowComparison {
 
     /** Old and new rows joined into the groups that share a raw SMS. */
     private fun groups(old: List<LedgerRow>, new: List<LedgerRow>): List<Pair<List<LedgerRow>, List<LedgerRow>>> {
-        val all = old.map { true to it } + new.map { false to it }
+        val all = old + new
         val parent = IntArray(all.size) { it }
         fun find(i: Int): Int = if (parent[i] == i) i else find(parent[i]).also { parent[i] = it }
         val firstByRawSmsId = mutableMapOf<String, Int>()
-        all.forEachIndexed { index, (_, row) ->
+        all.forEachIndexed { index, row ->
             row.rawSmsIds.forEach { rawSmsId ->
                 firstByRawSmsId[rawSmsId]?.let { parent[find(index)] = find(it) } ?: firstByRawSmsId.put(rawSmsId, index)
             }
         }
         return all.indices.groupBy(::find).values.map { members ->
-            val rows = members.map { all[it] }
-            rows.filter { it.first }.map { it.second } to rows.filterNot { it.first }.map { it.second }
+            members.partition { it < old.size }.let { (o, n) -> o.map(all::get) to n.map(all::get) }
         }
     }
 
     private val FIELDS: List<Pair<String, (FinancialTransaction) -> Any?>> = listOf(
         "id" to { it.id },
         "type" to { it.type },
-        "amount" to { "${it.amount.amount.stripTrailingZeros().toPlainString()} ${it.amount.currency}" },
+        "amount" to { it.amount },
         "occurredAt" to { it.occurredAt },
         "occurredAtZone" to { it.occurredAtZone },
         "source" to { it.sourceContainerId },
@@ -127,6 +127,8 @@ object LedgerShadowComparison {
         "exchangeRateSource" to { it.exchangeRateSource },
     )
 
+    private val POSTING_FIELDS = setOf("type", "source", "destination")
+
     private fun changedFields(old: FinancialTransaction, new: FinancialTransaction): List<String> =
         FIELDS.filter { (_, read) -> read(old) != read(new) }.map { it.first }
 
@@ -136,11 +138,11 @@ object LedgerShadowComparison {
         rawSmsIds: List<String>,
         old: List<LedgerRow>,
         new: List<LedgerRow>,
-        inputs: LedgerInputs,
+        decisions: Map<String, EffectiveUserDecisions>,
         evidence: Map<String, LedgerEvidence>,
     ): Reason {
         val legs = rawSmsIds.mapNotNull(evidence::get)
-        val outcomes = rawSmsIds.mapNotNull { inputs.decisions[it]?.outcome }
+        val outcomes = rawSmsIds.mapNotNull { decisions[it]?.outcome }
         val oldTypes = old.map { it.transaction.type }
         val newTypes = new.map { it.transaction.type }
         val installment = legs.any { it.event.messageFamily == MessageFamily.FINANCING_INSTALLMENT }
@@ -158,7 +160,7 @@ object LedgerShadowComparison {
                 FinancialTransactionType.LOAN_REPAYMENT !in oldTypes -> Reason.LOAN_PRE_PASS
             installment && kind == Kind.ONLY_OLD && oldTypes == listOf(FinancialTransactionType.FEE) -> Reason.INSTALLMENT_FEE
             old.any { !matchesEvidence(it, evidence) } -> Reason.STALE_EVIDENCE
-            kind == Kind.CHANGED && fields.any { it in setOf("type", "source", "destination") } -> Reason.ROW_TYPE_OR_OWNERSHIP
+            kind == Kind.CHANGED && fields.any { it in POSTING_FIELDS } -> Reason.ROW_TYPE_OR_OWNERSHIP
             else -> Reason.UNEXPLAINED
         }
     }
@@ -221,7 +223,7 @@ object LedgerShadowComparison {
     /** The log mask plus a short digest, so two ids with the same last four stay apart in one report. */
     private fun mask(id: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(id.toByteArray(Charsets.UTF_8))
-        return AppLogFormatting.maskId(id) + "#" + digest.take(3).joinToString("") { "%02x".format(it) }
+        return AppLogFormatting.maskId(id) + "#" + digest.toHexString(endIndex = 3)
     }
 
     // A run of five or more digits could be a full account or card number: keep only its last four.

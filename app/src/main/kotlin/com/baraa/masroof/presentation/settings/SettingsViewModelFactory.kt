@@ -50,9 +50,7 @@ fun settingsViewModelFactory(
             onRequestInstallPermission = onRequestInstallPermission,
             historicalMerchantRateCorrectionWorkflow = dashboard.historicalMerchantRateCorrectionWorkflow,
             ledgerShadowExport = if (BuildConfig.DEBUG) { uri ->
-                val report = LedgerShadowComparison.report(review.ledgerInputLoader.load())
-                storage.appContext.contentResolver.openOutputStream(uri)?.use { it.write(report.toByteArray(Charsets.UTF_8)) }
-                    ?: error("Could not open export destination")
+                storage.appLogService.writeTextTo(uri, LedgerShadowComparison.report(review.ledgerInputLoader.load())).getOrThrow()
             } else null,
         )
     }

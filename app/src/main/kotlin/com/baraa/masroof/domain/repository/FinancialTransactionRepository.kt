@@ -126,6 +126,10 @@ interface FinancialTransactionRepository {
     suspend fun listRawSmsIdsForTransactions(transactionIds: Collection<String>): Set<String> =
         transactionIds.distinct().flatMapTo(linkedSetOf()) { listRawSmsIds(it) }
 
+    /** The raw SMS each of [transactionIds] links, by transaction id; a transaction without links is absent. */
+    suspend fun listRawSmsIdsByTransaction(transactionIds: Collection<String>): Map<String, List<String>> =
+        transactionIds.distinct().associateWith { listRawSmsIds(it) }.filterValues { it.isNotEmpty() }
+
     /**
      * Updates posting fields. A complete stored exchange-rate pair is left unchanged.
      * When either half is missing, [FinancialTransaction.appliedExchangeRate] and

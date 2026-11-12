@@ -65,11 +65,9 @@ class LedgerInputLoader(
         }
         val rawSmsIds = events.map { it.event.rawSmsId }
         val reviews = reviewRepository.listAll()
-        val linked = financialTransactionRepository.findByRawSmsIds(rawSmsRepository.listIdsByReceivedAt())
-        val linksByTransaction = linked.entries.groupBy({ it.value.id }, { it.key })
-        val storedRows = financialTransactionRepository.listAll().sortedBy { it.id }.map { transaction ->
-            LedgerRow(transaction, linksByTransaction[transaction.id].orEmpty().sorted())
-        }
+        val transactions = financialTransactionRepository.listAll().sortedBy { it.id }
+        val links = financialTransactionRepository.listRawSmsIdsByTransaction(transactions.map { it.id })
+        val storedRows = transactions.map { LedgerRow(it, links[it.id].orEmpty().sorted()) }
         return LedgerInputs(
             events = events,
             decisions = userDecisionRepository.effectiveFor(rawSmsIds),

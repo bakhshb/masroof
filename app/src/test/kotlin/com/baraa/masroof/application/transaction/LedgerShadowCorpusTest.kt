@@ -7,6 +7,7 @@ import com.baraa.masroof.application.dashboard.GoldenLedgerRunner
 import com.baraa.masroof.application.dashboard.LedgerSnapshotCorpus
 import com.baraa.masroof.data.room.UserDecisionBackfill
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
+import com.baraa.masroof.testsupport.testdataFile
 import java.io.File
 import java.util.TimeZone
 import kotlinx.coroutines.runBlocking
@@ -62,7 +63,7 @@ class LedgerShadowCorpusTest {
             }
         }
         File(moduleDir(), "build/reports/shadow-ledger/shadow_comparison.txt").apply { parentFile.mkdirs() }.writeText(actual)
-        val expected = File(moduleDir(), "src/test/resources/testdata/ledger_snapshot/shadow_comparison.expected.txt")
+        val expected = testdataFile("ledger_snapshot/shadow_comparison.expected.txt")
         if (System.getenv(UPDATE_ENV) == "1") expected.writeText(actual)
         assertEquals("shadow comparison changed; see build/reports/shadow-ledger", expected.readText(), actual)
     }

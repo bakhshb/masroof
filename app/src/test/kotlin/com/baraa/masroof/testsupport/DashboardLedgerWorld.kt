@@ -113,18 +113,19 @@ class DashboardLedgerWorld(
     private val importClock = InstantClock { Instant.parse("2026-09-01T00:00:00Z") }
     private val registry = BankSmsRegistry(listOf(adapter) + extraAdapters)
     private val discovery = OwnershipDiscoveryService(accounts, cards, loans)
+    private val effectiveEvents = EffectiveParsedEventProvider(parsedRepo, decisionRepo)
+    private val ownershipResolver = OwnershipResolver(accounts, cards, loans)
     val reconciliation = TransactionReconciliationService(
         rawSmsRepository = rawRepo,
         financialTransactionRepository = ftRepo,
-        ownershipResolver = OwnershipResolver(accounts, cards, loans),
+        ownershipResolver = ownershipResolver,
         ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
-        effectiveParsedEventProvider = EffectiveParsedEventProvider(parsedRepo, decisionRepo),
+        effectiveParsedEventProvider = effectiveEvents,
         reviewRepository = reviewRepo,
         userDecisionRepository = decisionRepo,
     )
     val ledgerInputLoader = com.baraa.masroof.application.transaction.LedgerInputLoader(
-        rawRepo, ftRepo, reviewRepo, decisionRepo, EffectiveParsedEventProvider(parsedRepo, decisionRepo),
-        OwnershipResolver(accounts, cards, loans), zone,
+        rawRepo, ftRepo, reviewRepo, decisionRepo, effectiveEvents, ownershipResolver, zone,
     )
     private val reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, importClock)
 
