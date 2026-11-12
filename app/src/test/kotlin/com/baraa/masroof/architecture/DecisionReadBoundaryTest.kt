@@ -10,7 +10,8 @@ import org.junit.Test
  * (`resolutionKind`, [LEGACY_TOKENS]), the `user_selected_bank:` reason prefix and `user_correction`, are still
  * written in the same transaction as each decision, so only the files in [ALLOWED] may name them: their writers,
  * the stores and mappers themselves, wiring, the 2.2 backfill, screens that display a review, and the decision
- * reads kept on purpose (docs/ARCHITECTURE.md, "Reading decisions"). Fix a new read by going through
+ * reads kept on purpose (docs/ARCHITECTURE.md, "Reading decisions"). The allowlist is per file: an allowed file may name
+ * any legacy token anywhere in it, so keep each entry's reason exact. Fix a new read by going through
  * `UserDecisionRepository.effectiveFor`; never add an entry without the owner's reason.
  */
 class DecisionReadBoundaryTest {
@@ -37,10 +38,13 @@ class DecisionReadBoundaryTest {
             "data/Sample4.kt" to "SELECT * FROM user_correction",
             "application/Sample5.kt" to "reasons.any { it.startsWith(\"user_selected_bank:\") }",
             "application/Sample6.kt" to "kind == ReviewResolutionKind.USER_NON_FINANCIAL",
-            "application/Sample7.kt" to "val bank = decisions.effectiveFor(id).selectedBankId",
+            "application/Sample7.kt" to "review.reasons.any(ExplicitBankSelection::isSelection)",
+            "application/Sample8.kt" to "reasons.filter { ExplicitBankSelection.isSelection(it) }",
+            "application/Sample9.kt" to "it.removePrefix(ExplicitBankSelection.REASON_PREFIX)",
+            "application/Sample10.kt" to "val bank = decisions.effectiveFor(id).selectedBankId",
             ALLOWED.keys.first() to "review.resolutionKind",
         )
-        assertEquals(samples.take(6).map { it.first }, violations(samples))
+        assertEquals(samples.take(9).map { it.first }, violations(samples))
     }
 
     private fun violations(files: List<Pair<String, String>>): List<String> =
@@ -54,6 +58,8 @@ class DecisionReadBoundaryTest {
             Regex("""\bresolutionKind\b"""),
             Regex("""\bReviewResolutionKind\b"""),
             Regex("""ExplicitBankSelection\.selectedBankId\b"""),
+            Regex("""ExplicitBankSelection(\.|::)isSelection\b"""),
+            Regex("""\bREASON_PREFIX\b"""),
             Regex("""user_selected_bank"""),
             Regex("""\b[Uu]serCorrectionRepository\b"""),
             Regex("""\buser_correction\b"""),
