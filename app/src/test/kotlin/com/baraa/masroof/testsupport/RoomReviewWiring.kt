@@ -51,7 +51,8 @@ internal class RoomReviewWiring(
     private val cards = RoomCardRegistryRepository.from(db)
     val confirmation = OwnershipConfirmationService(accounts, cards, loans)
     val resolver = OwnershipResolver(accounts, cards, loans)
-    val effective = EffectiveParsedEventProvider(parsed, corrections)
+    val decisions = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)
+    val effective = EffectiveParsedEventProvider(parsed, decisions)
     val reconciliation = TransactionReconciliationService(
         rawSmsRepository = raw,
         financialTransactionRepository = ledger,
@@ -59,12 +60,13 @@ internal class RoomReviewWiring(
         ownershipConfirmationService = if (reconcileWithConfirmation) confirmation else noOpOwnershipConfirmation(),
         effectiveParsedEventProvider = effective,
         reviewRepository = if (reconcileWithReviews) reviews else EmptyReviewRepository(),
+        userDecisionRepository = if (reconcileWithReviews) decisions else NoOpUserDecisionRepository,
         zoneId = zoneId,
     )
     val updater = ReviewQueueUpdater(reviewQueueReviews, ledger, clock)
     val workflow = ReviewWorkflowService(
         reviewRepository = reviews,
-        userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
+        userDecisionRepository = decisions,
         userCorrectionRepository = corrections,
         financialTransactionRepository = ledger,
         rawSmsRepository = raw,

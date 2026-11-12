@@ -37,7 +37,7 @@ class PatternsContainer(
                 storage.accountRegistryRepository, review.ownershipConfirmationService, storage.cardRegistryRepository),
             pendingPreview = PendingPatternsWorkflow(
                 storage.messagePatternStore, storage.databaseAccessGate,
-                storage.reviewRepository, storage.rawSmsRepository, storage.parsedEventRepository, storage.userCorrectionRepository,
+                storage.reviewRepository, storage.rawSmsRepository, storage.parsedEventRepository, storage.userDecisionRepository,
                 storage.financialTransactionRepository, sms.bankSmsRegistry, sms.historicalSmsBatchProcessor,
                 inTransaction = { work -> storage.withDatabaseTransaction(work) },
                 markParseFailed = sms.processStoredSmsUseCase::recordExhaustedDerivedProcessing,

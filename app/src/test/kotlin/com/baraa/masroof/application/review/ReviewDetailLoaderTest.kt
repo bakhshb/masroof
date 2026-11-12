@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.testsupport.recordDecision
+import com.baraa.masroof.testsupport.saveCorrection
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -7,7 +9,6 @@ import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.sms.hash.SmsBodyHasher
@@ -142,10 +143,14 @@ class ReviewDetailLoaderTest {
                 rawRepo.insertIfAbsent(RawSms(id, "STC Bank", text, clock.now(), id, SmsBodyHasher.sha256Hex(text)))
                 val review = ingestionReviews.requireReview(id, IngestionReviewService.REASON_UNSUPPORTED_FORMAT)
                 if (id == "resolved") reviewRepo.markResolved(review.id, com.baraa.masroof.domain.model.ReviewResolutionKind.USER_NON_FINANCIAL, clock.now(), null)
-                if (id == "other-bank") reviewRepo.upsertRequired(id, review.kind, review.reasons + "user_selected_bank:OTHER", clock.now())
+                if (id == "other-bank") {
+                    reviewRepo.upsertRequired(id, review.kind, review.reasons + "user_selected_bank:OTHER", clock.now())
+                    db.recordDecision(com.baraa.masroof.domain.model.UserDecision(id,
+                        com.baraa.masroof.domain.model.UserDecisionKind.BANK_SELECTION, clock.now(), bankId = "OTHER"))
+                }
             }
-            val corrections = RoomUserCorrectionRepository(db.userCorrectionDao())
-            corrections.save(com.baraa.masroof.domain.model.UserCorrection("correction", "corrected", null, null, "USER", null, clock.now()))
+            db.saveCorrection(com.baraa.masroof.domain.model.UserCorrection("correction", "corrected", null, null, "USER", null, clock.now()))
+            val corrections = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)
             val transactions = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
             val guardedTransactions = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository by transactions {
                 override suspend fun isRawSmsLinked(rawSmsId: String) = rawSmsId == "posted"

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.testsupport.saveCorrection
 import com.baraa.masroof.testsupport.RoomReviewWiring
 import android.content.Context
 import androidx.room.Room
@@ -299,7 +300,7 @@ class ReviewWorkflowServiceTest {
             ),
             ParsedEventDetails(),
         )
-        val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
+        val effective = EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db))
             .findEffectiveByRawSmsId("sms-r")!!
         assertEquals("e2", effective.event.id)
         assertEquals(money("51.99"), effective.event.amount)
@@ -319,7 +320,7 @@ class ReviewWorkflowServiceTest {
                 card = CardReference(Bank.BANK_ALJAZIRA, "7271"),
             ),
         )
-        correctionRepo.save(
+        db.saveCorrection(
             UserCorrection(
                 id = "corr-a",
                 targetRawSmsId = "sms-c",
@@ -330,7 +331,7 @@ class ReviewWorkflowServiceTest {
                 createdAt = Instant.parse("2026-08-11T10:00:00Z"),
             ),
         )
-        correctionRepo.save(
+        db.saveCorrection(
             UserCorrection(
                 id = "corr-b",
                 targetRawSmsId = "sms-c",
@@ -341,7 +342,7 @@ class ReviewWorkflowServiceTest {
                 createdAt = Instant.parse("2026-08-11T11:00:00Z"),
             ),
         )
-        val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
+        val effective = EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db))
             .findEffectiveByRawSmsId("sms-c")!!.event
         // Fold chronologically: amount from earlier correction, merchant from later.
         assertEquals(money("120.00"), effective.amount)
@@ -771,8 +772,8 @@ class ReviewWorkflowServiceTest {
             correctedCounterparty = null,
             createdAt = createdAt,
         )
-        correctionRepo.save(a)
-        correctionRepo.save(b)
+        db.saveCorrection(a)
+        db.saveCorrection(b)
         val listed = correctionRepo.listForRawSmsId("sms-c2")
         assertEquals(2, listed.size)
         assertNotEquals(listed[0].id, listed[1].id)
@@ -780,7 +781,7 @@ class ReviewWorkflowServiceTest {
         // Ascending createdAt then id
         assertEquals(a.id, listed[0].id)
         assertEquals(b.id, listed[1].id)
-        val effective = EffectiveParsedEventProvider(parsedRepo, correctionRepo)
+        val effective = EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db))
             .findEffectiveByRawSmsId("sms-c2")!!.event
         assertEquals(money("120.00"), effective.amount)
         assertEquals("Y", effective.merchant)
@@ -1146,6 +1147,7 @@ class ReviewWorkflowServiceTest {
     private fun historicalRecovery(retries: RoomProcessingRetryRepository) = ProcessingRecovery(
         processingRetryRepository = retries,
         reviewRepository = reviewRepo,
+        userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
         ingestionReviewService = IngestionReviewService(reviewRepo, clock),
         clock = clock,
     )

@@ -12,7 +12,6 @@ import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.matching.TransactionMatcher
@@ -52,7 +51,6 @@ class ReconciliationCharacterizationFixture private constructor(
     private val accounts = RoomAccountRegistryRepository.from(db)
     private val cards = RoomCardRegistryRepository.from(db)
     private val loans = RoomLoanRegistryRepository.from(db)
-    private val corrections = RoomUserCorrectionRepository(db.userCorrectionDao())
     private val confirmation = OwnershipConfirmationService(accounts, cards, loans)
 
     fun reconciliation(): TransactionReconciliationService = service(withCorrections = false)
@@ -191,7 +189,7 @@ class ReconciliationCharacterizationFixture private constructor(
     }
 
     suspend fun saveAmountCorrection() {
-        corrections.save(
+        db.saveCorrection(
             UserCorrection(
                 id = CORRECTION_ID,
                 targetRawSmsId = CORRECTION_SMS,
@@ -228,12 +226,13 @@ class ReconciliationCharacterizationFixture private constructor(
         ownershipResolver = OwnershipResolver(accounts, cards, loans),
         ownershipConfirmationService = confirmation,
         effectiveParsedEventProvider = if (withCorrections) {
-            EffectiveParsedEventProvider(parsedRepo, corrections)
+            EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db))
         } else {
             noOpEffectiveParsedEventProvider(parsedRepo)
         },
         zoneId = ZONE,
         reviewRepository = EmptyReviewRepository(),
+        userDecisionRepository = NoOpUserDecisionRepository,
     )
 
     private suspend fun persist(

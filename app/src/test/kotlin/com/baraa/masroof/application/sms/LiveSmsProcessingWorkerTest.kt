@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.backfillDecisions
 import com.baraa.masroof.testsupport.TestSmsBodies.OTP_BODY
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -310,6 +311,7 @@ class LiveSmsProcessingWorkerTest {
             resolvedAt = Instant.parse("2026-08-11T12:05:00Z"),
             resolvedTransactionId = null,
         )
+        harness.db.backfillDecisions()
 
         harness.processStored().recordExhaustedDerivedProcessing(raw.id)
 

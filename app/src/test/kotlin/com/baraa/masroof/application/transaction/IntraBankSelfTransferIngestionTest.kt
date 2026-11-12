@@ -110,6 +110,7 @@ class IntraBankSelfTransferIngestionTest {
       financialTransactionRepository = ftRepo,
       ownershipResolver = ownershipResolver,
       reviewRepository = reviewRepo,
+      userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
       zoneId = zoneId,
       effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
       ownershipConfirmationService = noOpOwnershipConfirmation(),
@@ -137,7 +138,7 @@ class IntraBankSelfTransferIngestionTest {
       ownershipConfirmationService = confirmation,
       effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
         parsedEventRepository = parsedRepo,
-        userCorrectionRepository = RoomUserCorrectionRepository(db.userCorrectionDao()),
+        userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
       ),
       parsedEventRepository = parsedRepo,
       reconciliationService = reconciliation,

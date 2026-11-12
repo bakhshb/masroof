@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.interpretation
 
+import com.baraa.masroof.testsupport.saveCorrection
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.AppContainer
@@ -36,7 +37,7 @@ class ProductionEnginePreservationTest {
 
             c.sms.processRawSmsUseCase.ingest(raw("undecided", "تنبيه جديد غير معروف\nمبلغ: SAR 5"))
             assertTrue(service.mayRefresh("undecided"))
-            c.storage.userCorrectionRepository.save(UserCorrection("merchant-only", "undecided", null, null,
+            c.storage.database.saveCorrection(UserCorrection("merchant-only", "undecided", null, null,
                 "My merchant", null, Instant.now()))
             assertFalse(service.mayRefresh("undecided"))
             service.synchronizeFeedback()

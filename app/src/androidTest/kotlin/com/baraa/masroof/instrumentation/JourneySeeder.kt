@@ -146,12 +146,18 @@ internal object JourneySeeder {
             reasons = listOf("purchase_without_resolved_owned_instrument"),
             now = Instant.now(),
         )
-        val ignored = container.storage.reviewRepository.markResolved(
-            id = review.id,
-            resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
-            resolvedAt = Instant.now(),
-            resolvedTransactionId = null,
-        )
+        val now = Instant.now()
+        // As the app ignores it: the review resolution and its decision together.
+        val decision = com.baraa.masroof.domain.model.UserDecision(
+            JourneyFixtures.RESTORE_SMS, com.baraa.masroof.domain.model.UserDecisionKind.NON_FINANCIAL, now)
+        val ignored = container.storage.userDecisionRepository.recordWith(decision, before = { null }) {
+            container.storage.reviewRepository.markResolved(
+                id = review.id,
+                resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,
+                resolvedAt = now,
+                resolvedTransactionId = null,
+            )
+        }
         check(ignored != null) { "Ignored smoke review was not stored" }
     }
 

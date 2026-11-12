@@ -59,7 +59,7 @@ import com.baraa.masroof.testsupport.noOpOwnershipDiscovery
 import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
 import com.baraa.masroof.testsupport.noOpReconciliation
 import com.baraa.masroof.testsupport.noOpEffectiveParsedEventProvider
-import com.baraa.masroof.testsupport.EmptyReviewRepository
+import com.baraa.masroof.testsupport.NoOpUserDecisionRepository
 
 /**
  * Fixed seeds for M18 sequences. Every failing assertion names the seed that produced it.
@@ -225,6 +225,7 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         ownershipResolver = ownership,
         ownershipConfirmationService = confirmation,
         reviewRepository = reviews,
+        userDecisionRepository = world.decisionRepo,
         zoneId = world.zone,
         effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
     )
@@ -234,8 +235,9 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         financialTransactionRepository = world.ftRepo,
         ownershipResolver = ownership,
         ownershipConfirmationService = confirmation,
-        effectiveParsedEventProvider = EffectiveParsedEventProvider(world.parsedRepo, corrections),
+        effectiveParsedEventProvider = EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo),
         reviewRepository = world.reviewRepo,
+        userDecisionRepository = world.decisionRepo,
         zoneId = world.zone,
     )
 
@@ -244,6 +246,7 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
     private val recovery = com.baraa.masroof.application.ingestion.ProcessingRecovery(
         processingRetryRepository = retryWrites,
         reviewRepository = reviews,
+        userDecisionRepository = world.decisionRepo,
         ingestionReviewService = IngestionReviewService(reviews, clock),
         clock = clock,
     )
@@ -261,7 +264,7 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
             processingRecovery = noOpProcessingRecovery(),
             reconciliation = noOpReconciliation(),
             reviewQueueUpdater = noOpReviewQueueUpdater(),
-            reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = NoOpUserDecisionRepository,
         ),
         ownershipDiscovery = discovery,
         reconciliation = reconciliation,
@@ -283,18 +286,18 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         processingRecovery = recovery,
         appLogService = NoOpAppLog,
         exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
-        reviewRepository = EmptyReviewRepository(),
+        userDecisionRepository = NoOpUserDecisionRepository,
     )
 
     val workflow = ReviewWorkflowService(
         reviewRepository = world.reviewRepo,
-        userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(world.db),
+        userDecisionRepository = world.decisionRepo,
         userCorrectionRepository = corrections,
         financialTransactionRepository = world.ftRepo,
         rawSmsRepository = world.rawRepo,
         ownershipResolver = ownership,
         ownershipConfirmationService = confirmation,
-        effectiveParsedEventProvider = EffectiveParsedEventProvider(world.parsedRepo, corrections),
+        effectiveParsedEventProvider = EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo),
         parsedEventRepository = world.parsedRepo,
         reconciliationService = productionReconciliation,
         reviewQueueUpdater = productionReviewQueue,
@@ -307,6 +310,32 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
     )
 
     private var correctionSequence = 1
+
+    val reclassification = com.baraa.masroof.application.transaction.TransactionReclassificationService(
+        financialTransactionRepository = world.ftRepo,
+        effectiveParsedEventProvider = EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo),
+        ownershipResolver = OwnershipResolver(world.accounts, world.cards, world.loans),
+        ownershipConfirmationService = OwnershipConfirmationService(world.accounts, world.cards, world.loans),
+        appLogService = NoOpAppLog,
+        persistence = com.baraa.masroof.data.repository.RoomTransactionReclassificationRepository(
+            world.db, world.ftRepo, com.baraa.masroof.data.room.DatabaseAccessGate()),
+        clock = world.clock,
+    )
+
+    val ignore = com.baraa.masroof.application.transaction.TransactionIgnoreService(
+        com.baraa.masroof.data.repository.RoomTransactionIgnoreRepository(world.db), clock, NoOpAppLog)
+
+    val restore = com.baraa.masroof.application.transaction.TransactionRestoreService(
+        reviewRepository = world.reviewRepo,
+        userDecisionRepository = world.decisionRepo,
+        financialTransactionRepository = world.ftRepo,
+        reconciliation = productionReconciliation,
+        reclassification = reclassification,
+        clock = clock,
+        appLogService = NoOpAppLog,
+        reviewQueueUpdater = ReviewQueueUpdater(world.reviewRepo, world.ftRepo, clock),
+        processingRecovery = noOpProcessingRecovery(),
+    )
 
     fun openBatch(): HistoricalSmsBatchProcessor.Batch = processor.startBatch()
 

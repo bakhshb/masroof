@@ -16,13 +16,12 @@ import com.baraa.masroof.bank.BankRoutingResult
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.ExplicitBankSelection
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.repository.RawSmsRepository
-import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.model.ParseResult
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.parsing.model.SmsParseInput
@@ -63,7 +62,7 @@ class ProcessStoredSmsUseCase(
     private val appLogService: AppLog,
     private val exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler,
     private val processingRecovery: ProcessingRecovery,
-    private val reviewRepository: ReviewRepository,
+    private val userDecisionRepository: UserDecisionRepository,
     private val debugProcessHalt: DebugProcessHaltProbe = DebugProcessHaltProbe.NONE,
     private val patternProcessing: (suspend (String, suspend () -> SmsIngestionResult, suspend () -> SmsIngestionResult) -> SmsIngestionResult)? = null,
     /** Enqueues the one historical recovery pass after an interactive retry row is written. */
@@ -188,13 +187,11 @@ class ProcessStoredSmsUseCase(
     }
 
     /**
-     * The review choice names one registered adapter. A missing review, a blank
-     * or unknown bank id, or two stored selections falls through to the usual
-     * adapter selection instead of guessing.
+     * The latest `BANK_SELECTION` decision names one registered adapter. No selection or an unknown
+     * bank id falls through to the usual adapter selection instead of guessing.
      */
     private suspend fun explicitSelectionAdapter(rawSms: RawSms): BankSmsAdapter? {
-        val reasons = reviewRepository.findByRawSmsId(rawSms.id)?.reasons ?: return null
-        val bankId = ExplicitBankSelection.selectedBankId(reasons) ?: return null
+        val bankId = userDecisionRepository.effectiveFor(rawSms.id).selectedBankId ?: return null
         return bankSmsRegistry.adapterFor(Bank.fromId(bankId))
     }
 

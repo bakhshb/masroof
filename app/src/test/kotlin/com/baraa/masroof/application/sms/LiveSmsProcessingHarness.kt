@@ -25,7 +25,7 @@ import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
+import com.baraa.masroof.testsupport.NoOpUserDecisionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.domain.model.Bank
@@ -191,6 +191,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
         val recovery = ProcessingRecovery(
             processingRetryRepository = processingRetryRepo,
             reviewRepository = reviewForRecovery,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             ingestionReviewService = ingestionReview,
             clock = clock,
         )
@@ -234,11 +235,9 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                     cards,
                     NoOpLoanRegistryRepository,
                 ),
-                effectiveParsedEventProvider = EffectiveParsedEventProvider(
-                    parsedForReconcile,
-                    RoomUserCorrectionRepository(db.userCorrectionDao()),
-                ),
+                effectiveParsedEventProvider = EffectiveParsedEventProvider(parsedForReconcile, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)),
                 reviewRepository = reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ownershipConfirmationService = noOpOwnershipConfirmation(),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewForUpdate, ftRepo, clock),
@@ -258,7 +257,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                     ).enrichPending()
                 },
             ),
-            reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = NoOpUserDecisionRepository,
         )
     }
 
@@ -286,13 +285,14 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 processingRecovery = noOpProcessingRecovery(),
                 reconciliation = noOpReconciliation(),
                 reviewQueueUpdater = noOpReviewQueueUpdater(),
-                reviewRepository = EmptyReviewRepository(),
+                userDecisionRepository = NoOpUserDecisionRepository,
             ),
             reconciliation = batchReconciliation(reconciliationFails),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepository, ftRepo, clock),
             processingRecovery = ProcessingRecovery(
                 processingRetryRepository = processingRetryRepository,
                 reviewRepository = reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ingestionReviewService = ingestionReview,
                 clock = clock,
             ),
@@ -327,6 +327,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedForBatch),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
             reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = NoOpUserDecisionRepository,
         )
     }
 

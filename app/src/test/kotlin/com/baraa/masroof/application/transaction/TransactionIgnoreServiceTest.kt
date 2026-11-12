@@ -79,6 +79,7 @@ class TransactionIgnoreServiceTest {
                 com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository,
             ),
             reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
         )

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.saveCorrection
 import com.baraa.masroof.testsupport.ingest
 import com.baraa.masroof.testsupport.uniqueStorageContext
 import com.baraa.masroof.testsupport.withAppContainer
@@ -78,7 +79,7 @@ class AlJaziraSharedPatternsTest {
             c.storage.rawSmsRepository.insertIfAbsent(raw)
             val correction = UserCorrection("early", raw.id, MessageFamily.PURCHASE,
                 com.baraa.masroof.core.money.Money.of("15", com.baraa.masroof.core.money.Currency.SAR), null, null, Instant.parse("2026-10-15T10:00:00Z"))
-            c.storage.userCorrectionRepository.save(correction)
+            c.storage.database.saveCorrection(correction)
             assertTrue(c.sms.processStoredSmsUseCase.process(raw.id) is SmsIngestionResult.Parsed)
             assertEquals(correction, c.storage.userCorrectionRepository.latestForRawSmsId(raw.id))
             assertEquals("10.00", c.storage.parsedEventRepository.findByRawSmsId(raw.id)!!.event.amount!!.amount.toPlainString())

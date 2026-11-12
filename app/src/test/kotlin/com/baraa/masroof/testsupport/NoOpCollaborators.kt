@@ -9,7 +9,7 @@ import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewStatus
-import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.domain.model.EffectiveUserDecisions
 import com.baraa.masroof.domain.model.UserDecision
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
@@ -18,7 +18,6 @@ import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.TransactionReclassificationRepository
-import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
@@ -47,18 +46,12 @@ internal object NoOpProcessingRetryRepository : ProcessingRetryRepository {
     override suspend fun clear(rawSmsIds: List<String>) = Unit
 }
 
-internal object EmptyUserCorrectionRepository : UserCorrectionRepository {
-    override suspend fun save(correction: UserCorrection) = Unit
-    override suspend fun latestForRawSmsId(rawSmsId: String): UserCorrection? = null
-    override suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrection> = emptyList()
-    override suspend fun listForRawSmsIds(rawSmsIds: Collection<String>): List<UserCorrection> = emptyList()
-    override suspend fun listAll(): List<UserCorrection> = emptyList()
-}
-
-/** Runs the write and keeps no decision row. */
+/** Runs the write and keeps no decision row, so every SMS reads as undecided. */
 internal object NoOpUserDecisionRepository : UserDecisionRepository {
     override suspend fun <R : Any> recordWith(decision: UserDecision, before: suspend () -> R?, write: suspend () -> R?): R? =
         write()
+
+    override suspend fun effectiveFor(rawSmsIds: Collection<String>) = rawSmsIds.associateWith { EffectiveUserDecisions.NONE }
 }
 
 internal fun noOpOwnershipDiscovery() =
@@ -73,11 +66,11 @@ internal fun noOpReviewQueueUpdater() =
 internal fun noOpIngestionReviewService() = IngestionReviewService(NoOpReviewRepository(), noOpClock)
 
 internal fun noOpProcessingRecovery() =
-    ProcessingRecovery(NoOpProcessingRetryRepository, EmptyReviewRepository(), noOpIngestionReviewService(), noOpClock)
+    ProcessingRecovery(NoOpProcessingRetryRepository, EmptyReviewRepository(), NoOpUserDecisionRepository, noOpIngestionReviewService(), noOpClock)
 
 /** Reads corrections from nowhere, so the projection is the stored event. */
 internal fun noOpEffectiveParsedEventProvider(parsedEventRepository: ParsedEventRepository) =
-    EffectiveParsedEventProvider(parsedEventRepository, EmptyUserCorrectionRepository)
+    EffectiveParsedEventProvider(parsedEventRepository, NoOpUserDecisionRepository)
 
 /** Saves the transaction update on [financialTransactionRepository], with no separate decision write. */
 internal fun noOpReclassificationRepository(financialTransactionRepository: FinancialTransactionRepository) =
@@ -92,5 +85,6 @@ internal fun noOpReconciliation(): TransactionReconciliationService {
         ownershipConfirmationService = noOpOwnershipConfirmation(),
         effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
         reviewRepository = EmptyReviewRepository(),
+        userDecisionRepository = NoOpUserDecisionRepository,
     )
 }

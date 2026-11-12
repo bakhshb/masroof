@@ -389,7 +389,7 @@ class HistoricalSmsBatchProcessorTest {
                 processingRecovery = noOpProcessingRecovery(),
                 reconciliation = noOpReconciliation(),
                 reviewQueueUpdater = noOpReviewQueueUpdater(),
-                reviewRepository = EmptyReviewRepository(),
+                userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
             ),
             ownershipDiscovery = OwnershipDiscoveryService(accounts, cards, NoOpLoanRegistryRepository),
             reconciliation = TransactionReconciliationService(
@@ -399,6 +399,7 @@ class HistoricalSmsBatchProcessorTest {
                 effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
                 ownershipConfirmationService = noOpOwnershipConfirmation(),
                 reviewRepository = EmptyReviewRepository(),
+                userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviews, transactions, clock),
             exchangeRateEnrichmentScheduler = ImmediateExchangeRateEnrichmentScheduler(
@@ -407,6 +408,7 @@ class HistoricalSmsBatchProcessorTest {
             processingRecovery = ProcessingRecovery(
                 processingRetryRepository = retries,
                 reviewRepository = reviews,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ingestionReviewService = IngestionReviewService(reviews, clock),
                 clock = clock,
             ),

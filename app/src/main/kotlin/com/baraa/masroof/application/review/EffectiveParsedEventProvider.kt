@@ -1,28 +1,26 @@
 package com.baraa.masroof.application.review
 
 import com.baraa.masroof.domain.model.ParsedEvent
-import com.baraa.masroof.domain.model.UserCorrection
-import com.baraa.masroof.domain.repository.UserCorrectionRepository
+import com.baraa.masroof.domain.model.UserDecision
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 
 /**
- * Application projection: current [ParsedEvent] + user corrections.
+ * Application projection: current [ParsedEvent] + the user's `CORRECTION` decisions.
  *
- * Corrections are applied in ascending `(createdAt, id)` order; each non-null
- * corrected field overlays the previous projection (later wins per field).
- * List reads load those corrections once per bind-sized chunk. Single-record
- * reads stay on [UserCorrectionRepository.listForRawSmsId].
+ * Corrections are applied in [com.baraa.masroof.domain.model.EffectiveUserDecisions.corrections] order (oldest
+ * first); each non-null corrected field overlays the previous projection (later wins per field). List reads load
+ * those decisions once per bind-sized chunk.
  * Does not mutate RawSms or stored ParsedEvent rows.
  */
 class EffectiveParsedEventProvider(
     private val parsedEventRepository: ParsedEventRepository,
-    private val userCorrectionRepository: UserCorrectionRepository,
+    private val userDecisionRepository: UserDecisionRepository,
 ) {
     suspend fun findEffectiveByRawSmsId(rawSmsId: String): ParsedEventRecord? {
         val stored = parsedEventRepository.findByRawSmsId(rawSmsId) ?: return null
-        val corrections = userCorrectionRepository.listForRawSmsId(rawSmsId)
-        return applyCorrections(stored, corrections)
+        return applyCorrections(stored, userDecisionRepository.effectiveFor(rawSmsId).corrections)
     }
 
     suspend fun listEffectiveByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> =
@@ -49,28 +47,24 @@ class EffectiveParsedEventProvider(
 
     private suspend fun withCorrections(records: List<ParsedEventRecord>): List<ParsedEventRecord> {
         if (records.isEmpty()) return emptyList()
-        val correctionsByRawSmsId = userCorrectionRepository
-            .listForRawSmsIds(records.map { it.event.rawSmsId })
-            .groupBy { it.targetRawSmsId }
+        val decisions = userDecisionRepository.effectiveFor(records.map { it.event.rawSmsId })
         return records.map { record ->
-            applyCorrections(record, correctionsByRawSmsId[record.event.rawSmsId].orEmpty())
+            applyCorrections(record, decisions[record.event.rawSmsId]?.corrections.orEmpty())
         }
     }
 
+    /** [corrections] are `CORRECTION` decisions, oldest first. */
     fun applyCorrections(
         record: ParsedEventRecord,
-        corrections: List<UserCorrection>,
+        corrections: List<UserDecision>,
     ): ParsedEventRecord {
         if (corrections.isEmpty()) return record
-        val ordered = corrections.sortedWith(
-            compareBy<UserCorrection> { it.createdAt }.thenBy { it.id },
-        )
         var event = record.event
-        for (correction in ordered) {
+        for (correction in corrections) {
             event = overlay(event, correction)
         }
-        val automationConfirmed = ordered.any { correction ->
-            correction.correctedType != null || correction.correctedAmount != null
+        val automationConfirmed = corrections.any { correction ->
+            correction.messageFamily != null || correction.amount != null
         }
         return ParsedEventRecord(
             event = event,
@@ -80,11 +74,11 @@ class EffectiveParsedEventProvider(
         )
     }
 
-    private fun overlay(event: ParsedEvent, correction: UserCorrection): ParsedEvent =
+    private fun overlay(event: ParsedEvent, correction: UserDecision): ParsedEvent =
         event.copy(
-            messageFamily = correction.correctedType ?: event.messageFamily,
-            amount = correction.correctedAmount ?: event.amount,
-            merchant = correction.correctedMerchant ?: event.merchant,
-            counterparty = correction.correctedCounterparty ?: event.counterparty,
+            messageFamily = correction.messageFamily ?: event.messageFamily,
+            amount = correction.amount ?: event.amount,
+            merchant = correction.merchant ?: event.merchant,
+            counterparty = correction.counterparty ?: event.counterparty,
         )
 }

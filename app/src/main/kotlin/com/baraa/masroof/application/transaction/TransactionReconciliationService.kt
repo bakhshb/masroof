@@ -16,8 +16,12 @@ import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
-import com.baraa.masroof.domain.model.ReviewResolutionKind
-import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.UserDecisionKind
+import com.baraa.masroof.domain.model.EffectiveUserDecisions
+import com.baraa.masroof.domain.model.UserDecision
+import com.baraa.masroof.domain.ids.TransactionIdFactory
+import com.baraa.masroof.application.review.ReviewCorrectionClosure
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.rules.InformationalMessagePolicy
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
@@ -60,6 +64,7 @@ class TransactionReconciliationService(
     private val ownershipConfirmationService: OwnershipConfirmationService,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider,
     private val reviewRepository: ReviewRepository,
+    private val userDecisionRepository: UserDecisionRepository,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val automaticWrite: (suspend (List<ParsedEventRecord>, suspend () -> FinancialTransactionSaveResult) -> FinancialTransactionSaveResult)? = null,
 ) {
@@ -284,6 +289,7 @@ class TransactionReconciliationService(
         // Batch reads for the loop. Unlinking one leg also changes its pair's transaction, so the other
         // leg reads that transaction fresh.
         val inScopeIds = records.map { it.event.rawSmsId }.filter { scope == null || it in scope.rawSmsIds }
+        val decisionsByRawSmsId = userDecisionRepository.effectiveFor(inScopeIds)
         val reviewsByRawSmsId = reviewRepository.findByRawSmsIds(inScopeIds)
         val linkedByRawSmsId = financialTransactionRepository.findByRawSmsIds(inScopeIds)
         val receivedAtByRawSmsId = rawSmsRepository.receivedAtByIds(inScopeIds)
@@ -296,39 +302,50 @@ class TransactionReconciliationService(
                 continue
             }
             var userConfirmed = record.automationConfirmed
+            val decisions = decisionsByRawSmsId.getValue(event.rawSmsId)
             val review = reviewsByRawSmsId[event.rawSmsId]
-            if (review?.status == ReviewStatus.RESOLVED &&
-                review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
-            ) {
+            if (decisions.isNonFinancial) {
                 ignored++
                 settledRawSmsIds += event.rawSmsId
                 continue
             }
-            if (review?.status == ReviewStatus.RESOLVED &&
-                review.resolutionKind == ReviewResolutionKind.USER_EXTERNAL_TRANSFER
-            ) {
+            val linkedBefore = linkedByRawSmsId[event.rawSmsId]?.let {
+                if (it.id in touchedTransactionIds) financialTransactionRepository.findByRawSmsId(event.rawSmsId) else it
+            }
+            // A posting decision whose row is gone (an emptied ledger) posts the user's row again, never a guess.
+            val decided = if (linkedBefore == null) decidedPosting(decisions, evidence) else null
+            if (decided != null) {
+                when (persist(decided.transaction, decided.rawSmsIds, evidence + decided.evidence)) {
+                    PersistOutcome.Saved -> if (decided.rawSmsIds.size == 2) matchedPairs++ else assembledSingle++
+                    PersistOutcome.Already -> alreadyLinked++
+                    PersistOutcome.Failed -> {
+                        failed++
+                        failedRawSmsIds += event.rawSmsId
+                    }
+                }
+                if (event.rawSmsId !in failedRawSmsIds) settledRawSmsIds += event.rawSmsId
+                continue
+            }
+            if (decisions.outcome?.kind == UserDecisionKind.EXTERNAL_TRANSFER) {
                 alreadyLinked++
                 settledRawSmsIds += event.rawSmsId
                 continue
             }
             // Explicit "this SMS is financial" decision (e.g. restore from ignored).
-            if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) {
+            if (decisions.confirmsFinancial) {
                 userConfirmed = true
-            }
-            val linkedBefore = linkedByRawSmsId[event.rawSmsId]?.let {
-                if (it.id in touchedTransactionIds) financialTransactionRepository.findByRawSmsId(event.rawSmsId) else it
             }
             val receivedAtBefore = receivedAtByRawSmsId[event.rawSmsId]
             if (linkedBefore != null) {
                 if (
-                    !preservesExplicitUserDecision(review) &&
+                    !preservesExplicitUserDecision(decisions, review) &&
                     InformationalMessagePolicy.shouldAutoIgnore(event) &&
                     financialTransactionRepository.deleteIfExclusiveRawSmsLink(event.rawSmsId)
                 ) {
                     // Stale transaction from a prior misclassification (e.g. OTP stored as a purchase).
                     // Family comes from the parsed event; the raw body is not reclassified, and
                     // financial and UNKNOWN families are never dropped because of SMS wording.
-                } else if (shouldReleaseStaleSelfTransferLink(record, review, linkedBefore, receivedAtBefore)) {
+                } else if (shouldReleaseStaleSelfTransferLink(record, preservesExplicitUserDecision(decisions, review), linkedBefore, receivedAtBefore)) {
                     financialTransactionRepository.unlinkRawSms(event.rawSmsId)
                     touchedTransactionIds += linkedBefore.id
                 } else {
@@ -1066,20 +1083,48 @@ class TransactionReconciliationService(
      * repair must not delete, unlink, re-pair, or replace that SMS.
      */
     private suspend fun preservesExplicitUserDecision(rawSmsId: String): Boolean =
-        preservesExplicitUserDecision(reviewRepository.findByRawSmsId(rawSmsId))
+        preservesExplicitUserDecision(userDecisionRepository.effectiveFor(rawSmsId), reviewRepository.findByRawSmsId(rawSmsId))
 
-    private fun preservesExplicitUserDecision(review: ReviewItem?): Boolean {
-        if (review == null || review.status != ReviewStatus.RESOLVED) return false
-        return when (review.resolutionKind) {
-            ReviewResolutionKind.USER_NON_FINANCIAL,
-            ReviewResolutionKind.USER_EXTERNAL_TRANSFER,
-            ReviewResolutionKind.USER_FINANCIAL_TYPE,
-            ReviewResolutionKind.USER_SELF_TRANSFER_PAIR,
-            ReviewResolutionKind.USER_CORRECTION,
-            -> true
-            else -> false
-        }
+    /**
+     * Any outcome decision, or a correction whose own pass posted the SMS. That closure is the review's
+     * `USER_CORRECTION`, the one decision read kept on the review: the store holds the correction but not
+     * whether its pass posted (docs/ARCHITECTURE.md, "Reading decisions").
+     */
+    private fun preservesExplicitUserDecision(decisions: EffectiveUserDecisions, review: ReviewItem?): Boolean =
+        decisions.outcome != null || ReviewCorrectionClosure.isClosed(review)
+
+    /**
+     * The user's own row for a posting decision ([UserDecision.posting] columns), or null when [decisions] holds
+     * none or its evidence is incomplete. A pair needs both legs' evidence; the other leg is read when out of scope.
+     */
+    private suspend fun decidedPosting(
+        decisions: EffectiveUserDecisions,
+        evidence: Map<String, ParsedEventRecord>,
+    ): DecidedPosting? {
+        val decision = decisions.outcome ?: return null
+        val type = decision.transactionType ?: return null
+        val occurredAt = decision.occurredAt ?: return null
+        val zone = decision.occurredAtZone ?: return null
+        val ids = listOfNotNull(decision.rawSmsId, decision.pairedRawSmsId)
+        val legs = ids.map { evidence[it] ?: effectiveParsedEventProvider.findEffectiveByRawSmsId(it) ?: return null }
+        val amount = legs.first().event.amount?.takeIf { it.amount.signum() > 0 } ?: return null
+        val single = FinancialTransaction.fromSingleEvent(legs.first().event, type, occurredAt,
+            decision.sourceContainerId, decision.destinationContainerId, zone)
+        val transaction = if (legs.size == 1) single else single.copy(
+            id = TransactionIdFactory.fromRawSmsIds(ids.sorted()),
+            amount = amount,
+            merchant = null,
+            counterparty = legs[0].event.counterparty ?: legs[1].event.counterparty,
+            linkedParsedEventIds = legs.map { it.event.id }.sorted(),
+        )
+        return DecidedPosting(transaction, ids.sorted(), legs.associateBy { it.event.rawSmsId })
     }
+
+    private class DecidedPosting(
+        val transaction: FinancialTransaction,
+        val rawSmsIds: List<String>,
+        val evidence: Map<String, ParsedEventRecord>,
+    )
 
     private suspend fun observeUnlinkedTransfer(record: ParsedEventRecord): TransferMatchCandidate? {
         if (financialTransactionRepository.isRawSmsLinked(record.event.rawSmsId)) return null
@@ -1092,16 +1137,9 @@ class TransactionReconciliationService(
     ): TransferMatchCandidate? {
         val event = record.event
         if (!event.messageFamily.isTransferFamily()) return null
-        var userConfirmed = record.automationConfirmed
-        val review = reviewRepository.findByRawSmsId(event.rawSmsId)
-        if (review?.status == ReviewStatus.RESOLVED &&
-            review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
-        ) {
-            return null
-        }
-        if (review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) {
-            userConfirmed = true
-        }
+        val decisions = userDecisionRepository.effectiveFor(event.rawSmsId)
+        if (decisions.isNonFinancial) return null
+        val userConfirmed = record.automationConfirmed || decisions.confirmsFinancial
         if (!TransactionAssembler.isAutomationEligible(event, userConfirmed)) return null
         val receivedAt = rawSmsRepository.getById(event.rawSmsId)?.receivedAt ?: return null
         val sourceOwn = accountOwnership(event.sourceAccountRef)
@@ -1125,13 +1163,13 @@ class TransactionReconciliationService(
 
     private fun shouldReleaseStaleSelfTransferLink(
         record: ParsedEventRecord,
-        review: ReviewItem?,
+        preserved: Boolean,
         linked: FinancialTransaction,
         receivedAt: Instant?,
     ): Boolean {
         val event = record.event
         if (!event.messageFamily.isTransferFamily()) return false
-        if (preservesExplicitUserDecision(review)) return false
+        if (preserved) return false
         if (linked.type != FinancialTransactionType.SELF_TRANSFER) return false
         if (receivedAt == null) return false
         val expectedAt = TransactionTiming.effectiveOccurredAt(

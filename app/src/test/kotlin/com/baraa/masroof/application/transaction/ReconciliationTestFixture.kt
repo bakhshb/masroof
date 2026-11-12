@@ -66,6 +66,7 @@ abstract class ReconciliationTestFixture {
             ownershipConfirmationService = confirmation,
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
             reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
     }
 
@@ -82,6 +83,7 @@ abstract class ReconciliationTestFixture {
         zoneId = zone,
         effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
         reviewRepository = EmptyReviewRepository(),
+        userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
     )
 
     protected suspend fun persistEvent(

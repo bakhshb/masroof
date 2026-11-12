@@ -1,16 +1,18 @@
 package com.baraa.masroof.application.interpretation
 
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
-import com.baraa.masroof.domain.model.ReviewResolutionKind
+import com.baraa.masroof.application.review.ReviewCorrectionClosure
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /** Compare the evidence actually assembled against current decisions in the SAME write transaction. */
 class AutomaticInterpretationWriteGuard(
     private val events: EffectiveParsedEventProvider,
     private val reviews: ReviewRepository,
+    private val decisions: UserDecisionRepository,
     private val transactions: FinancialTransactionRepository,
     private val inferenceCurrent: suspend (ParsedEventRecord) -> Boolean,
     private val inTransaction: suspend (suspend () -> FinancialTransactionSaveResult) -> FinancialTransactionSaveResult,
@@ -21,12 +23,12 @@ class AutomaticInterpretationWriteGuard(
         var reason = "stale_family_inference"
         val stale = expected.firstOrNull { prior ->
             val id=prior.event.rawSmsId
-            val review=reviews.findByRawSmsId(id)
+            val decided=decisions.effectiveFor(id)
             val current=events.findEffectiveByRawSmsId(id)
             val linked=transactions.isRawSmsLinked(id)
-            val protected=review?.resolutionKind?.name?.startsWith("USER_") == true && linked
+            val protected=(decided.outcome != null || ReviewCorrectionClosure.isClosed(reviews.findByRawSmsId(id))) && linked
             if (protected || current != prior) true
-            else if (current.automationConfirmed || review?.resolutionKind == ReviewResolutionKind.USER_FINANCIAL_TYPE) false
+            else if (current.automationConfirmed || decided.confirmsFinancial) false
             else if (!patternsCurrent(current, linked)) { reason = "stale_pattern_definition"; true }
             // Posted evidence is never re-read, so a newer model must not stop it from pairing with its other leg.
             else !linked && !inferenceCurrent(current)

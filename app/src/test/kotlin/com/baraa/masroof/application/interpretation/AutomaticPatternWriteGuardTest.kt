@@ -73,7 +73,7 @@ class AutomaticPatternWriteGuardTest {
         listOf(FieldChoice("amount", 16, 21))).copy(factContract = PatternFactContract(MessageFamily.PURCHASE, MoneyDirection.OUTGOING))
 
     private suspend fun withFixture(block: suspend (MessagePatternStore, DatabaseAccessGate, ParsedEventRecord,
-        AutomaticInterpretationWriteGuard, EffectiveParsedEventProvider, RoomUserCorrectionRepository) -> Unit) {
+        AutomaticInterpretationWriteGuard, EffectiveParsedEventProvider, com.baraa.masroof.testsupport.DecidedCorrectionRepository) -> Unit) {
         val directory = Files.createTempDirectory("pattern-guard-").toFile()
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java).allowMainThreadQueries().build()
@@ -87,10 +87,11 @@ class AutomaticPatternWriteGuardTest {
                 bodyHash = SmsBodyHasher.sha256Hex(body), receivedAt = input.receivedAt, deviceMessageId = null))
             val result = InterpretationDraftMapper().map(input, PatternFactInterpreter(store.load()).interpretRouted(input, bank), Bank(bank.value)) as ParseResult.Success
             parsed.save(result.event, result.details)
-            val corrections = RoomUserCorrectionRepository(db.userCorrectionDao())
-            val effective = EffectiveParsedEventProvider(parsed, corrections)
+            val corrections = com.baraa.masroof.testsupport.DecidedCorrectionRepository(db)
+            val decisions = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)
+            val effective = EffectiveParsedEventProvider(parsed, decisions)
             val policy = PatternInterpretationWritePolicy(store, accounts = StubAccountRegistryRepository(), cards = NoOpCardRegistryRepository())
-            val guard = AutomaticInterpretationWriteGuard(effective, RoomReviewRepository(db.reviewItemDao()),
+            val guard = AutomaticInterpretationWriteGuard(effective, RoomReviewRepository(db.reviewItemDao()), decisions,
                 RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao()), { true },
                 { work -> gate.withAccess { db.withTransaction { work() } } },
                 patternsCurrent = { record, posted -> check(db.inTransaction()); policy.isCurrent(record, posted) })

@@ -234,7 +234,7 @@ Message learning is "remember my decision", per bank, for every configured bank.
 
 ### User decisions (`user_decision`, schema v19, backfilled at v20)
 
-`MIGRATION_18_19` adds one append-only table, `user_decision`, and nothing else (CREATE TABLE and indices only). `MIGRATION_19_20` backfills it from the legacy stores (below). Every explicit user decision is appended there in the same database transaction as the existing write it describes; the existing stores (`review_item`, `user_correction`, the `user_selected_bank:` reason prefix, `financial_transaction`) are written exactly as before. Nothing reads the table yet: plan piece 2.3 moves the readers onto it, so each row carries what 2.3 needs without `financial_transaction.type` or reason prefixes. `UserDecisionDao` only inserts and lists; it has no UPDATE or DELETE. A later row for the same subject supersedes an earlier one by `sequence`.
+`MIGRATION_18_19` adds one append-only table, `user_decision`, and nothing else (CREATE TABLE and indices only). `MIGRATION_19_20` backfills it from the legacy stores (below). Every explicit user decision is appended there in the same database transaction as the existing write it describes; the existing stores (`review_item`, `user_correction`, the `user_selected_bank:` reason prefix, `financial_transaction`) are written exactly as before. Since plan piece 2.3, processing reads decisions from this table only ("Reading decisions" below); the legacy stores are still written so screens and the kept reads keep working. `UserDecisionDao` only inserts and reads; it has no UPDATE or DELETE. A later row for the same subject supersedes an earlier one by `sequence`.
 
 | Column | Meaning |
 |---|---|
@@ -293,9 +293,42 @@ Review rows take `decidedAtEpochMillis` from `resolvedAtEpochMillis`, or from `u
 - A review resolution is skipped when an existing row of an outcome kind (`FINANCIAL_TYPE`, `EXTERNAL_TRANSFER`, `SELF_TRANSFER_PAIR`, `NON_FINANCIAL`, `RECLASSIFY`, `IGNORE`, `RESTORE`, `RESTORE_REVERTED`) names its SMS (as `rawSmsId` or `pairedRawSmsId`): the review then holds that row's decision, or a later one. Timestamps are not compared, because a reclassification keeps the review's time monotonic and may store one millisecond more than its row.
 - A bank selection is skipped when an existing `BANK_SELECTION` row names its SMS.
 - A correction is skipped when an existing `CORRECTION` row has the same SMS, `decidedAtEpochMillis` and fields.
-- The backfill rows are inserted in `(decidedAtEpochMillis, BANK_SELECTION before CORRECTION before outcome, rawSmsId, legacy row id)` order, then the existing rows are re-appended after them in their own order and their old copies deleted. Every backfilled row therefore has a lower `sequence` than every dual-write row, whatever the clocks said: an old decision can never supersede a newer one. Sequences are never reused (`AUTOINCREMENT`); the existing rows get new, higher numbers, which nothing reads yet.
+- The backfill rows are inserted in `(decidedAtEpochMillis, BANK_SELECTION before CORRECTION before outcome, rawSmsId, legacy row id)` order, then the existing rows are re-appended after them in their own order and their old copies deleted. Every backfilled row therefore has a lower `sequence` than every dual-write row, whatever the clocks said: an old decision can never supersede a newer one. Sequences are never reused (`AUTOINCREMENT`); the existing rows get new, higher numbers, keeping their order.
 
 Running the backfill on a table that already holds the dual write of every legacy trace adds nothing. `UserDecisionBackfillContract`, run by `MasroofMigrationOpenPathTest` and `MigrationOpenPathDeviceTest`, proves every kind and the order on a v19 file built through `MIGRATION_18_19`, and `BackupOlderSchemaImportTest` the same for a v19 backup; `UserDecisionDualWriteTest` proves for each kind that the backfill of the legacy trace equals the dual-write row (mapped as above) and that it adds nothing when the dual-write row exists; `UserDecisionLedgerConsistencyTest` proves the store and the ledger agree on the corpus and the v18 fixture.
+
+#### Reading decisions (plan 2.3)
+
+Processing reads user decisions through `UserDecisionRepository.effectiveFor(rawSmsIds)` (`RoomUserDecisionRepository`, `UserDecisionDao.listNaming`, chunked under the bind limit). It folds the rows that name each raw SMS, in `sequence` order, into `EffectiveUserDecisions`, three independent layers:
+
+| Layer | Rows | Value |
+|---|---|---|
+| `outcome` | `FINANCIAL_TYPE`, `EXTERNAL_TRANSFER`, `SELF_TRANSFER_PAIR`, `NON_FINANCIAL`, `RECLASSIFY`, `IGNORE`, `RESTORE`, `RESTORE_REVERTED` naming the SMS as `rawSmsId` or `pairedRawSmsId` | the latest one; outcomes supersede one another |
+| `corrections` | every `CORRECTION` of the SMS | all of them, oldest `decidedAtEpochMillis` first, equal times in `sequence` order; `EffectiveParsedEventProvider` overlays them field by field (later wins) |
+| `selectedBankId` | `BANK_SELECTION` | the bank of the latest one |
+
+`isNonFinancial` (latest outcome `NON_FINANCIAL`, `IGNORE` or `RESTORE_REVERTED`) means what a resolved `USER_NON_FINANCIAL` review meant: post nothing. `confirmsFinancial` (latest outcome `FINANCIAL_TYPE`, `RECLASSIFY` or `RESTORE`) means what a `USER_FINANCIAL_TYPE` review meant: the SMS is financial, so the posting gate is lifted. `outcome?.kind == EXTERNAL_TRANSFER` is `USER_EXTERNAL_TRANSFER`, and any outcome is a decision reconciliation must not undo. A correction never changes the outcome: a correction needs a `REQUIRED` review, so an ignored SMS cannot be corrected and stays non-financial (`ManualDecisionReplayTest.correctionOfAnIgnoredSms_isRejected_andItStaysNonFinancial`). SQL that filters in the query (`ProcessingRetryDao` retry sets, `ParsedEventDao.markHistoricalIntent`) uses the same "latest outcome posts nothing" rule (`LATEST_OUTCOME_KIND_SQL`).
+
+Why the store equals the old reads: every writer that sets a review's user resolution appends the matching row in the same transaction (dual write, 2.1), every review state of an older install was backfilled (2.2), and nothing else changes a user resolution (`ReviewQueueUpdater` and `reopenAutomatic` only touch automatic settlements; `markResolvedAtomic` only lets an ignore override, or a restore leave, a resolved review). The one known difference is a race: a manual resolution whose row an automatic pass posted with the same id between the screen's check and the write keeps the review `AUTO_NO_LONGER_REQUIRED` while the store has the decision; the store then protects the row the user saw.
+
+| Read | Decision source now |
+|---|---|
+| `TransactionReconciliationService`: skip a non-financial SMS, keep an external transfer, lift the gate for a financial decision, `preservesExplicitUserDecision`, transfer candidates | `outcome` |
+| `TransactionReconciliationService`: an SMS with a posting decision (`UserDecision.posting` columns) and no posted row | rebuilds the user's row from the decision and the effective evidence (`decidedPosting`); a pair rebuilds one movement for both legs. Only an emptied ledger reaches it: every path that removes a decided row appends a superseding outcome |
+| `AutomaticInterpretationWriteGuard` (protected posted SMS, financial decision) | `outcome` |
+| `ProcessingRecovery`, `ProcessingRetryDao`, `ParsedEventDao.markHistoricalIntent`, `PatternEvidenceProtection` (non-financial) | `isNonFinancial` |
+| `ProcessStoredSmsUseCase` reprocessing order, `PendingPatternsWorkflow` bank | `selectedBankId` |
+| `EffectiveParsedEventProvider`, `PatternEvidenceProtection`, `PendingPatternsWorkflow`, `BankInterpretationService.mayRefresh` (corrections) | `corrections` |
+
+Reads kept on the legacy stores, each allowed by name in `DecisionReadBoundaryTest`:
+
+- `ReviewCorrectionClosure`: a correction whose own pass posted the SMS closes its review as `USER_CORRECTION`, and that closure protects the posted row (reconciliation, the write guard, `mayRefresh`). The store holds the correction but not whether that pass posted; protecting every posted corrected SMS would change what reconciliation keeps for a correction posted only by a later pass. That difference belongs to the plan 3.2 shadow comparison.
+- `TransactionRestoreService` checks that the review is ignored before it rewrites that same review (`markResolvedAtomic` lets only an ignored review be restored); it is a legacy-store writer.
+- `BankInterpretationService` learning feedback keys its decisions by review and correction ids and reads the resolved row's current type; switching would change the learned decisions and their fingerprint.
+- `PatternEvidenceProtection` treats any settled review, automatic included, as evidence to keep, and `PendingPatternsWorkflow` skips a `REQUIRED` review with a resolution: queue state, not a user decision.
+- Screens (`ReviewViewModel`, `ReviewReasonLabels`, `ReviewDetailLoader`, `InterpretationProvenanceWorkflow`) display the review.
+
+Known limits, for plan 3.2: a posted type or endpoint edited without a review or correction has no decision (owner rule of 2.2). Reconciliation keeps it only because the row stays posted; an emptied ledger rebuilds it from the evidence (`ManualDecisionReplayTest.typeEditedOnlyOnTheRow_isKeptWhilePosted_andAutomaticOnceTheLedgerIsEmptied`). A rebuilt row has no exchange-rate pair until enrichment runs again, and a backfilled pair whose outgoing leg was unknown takes the counterparty of its subject leg first. `ManualDecisionReplayTest` empties the ledger and replays for every outcome kind and a correction; a bank selection is a reparse input and does not depend on the ledger.
 
 The learning store is schema 2 and the analytics store is schema 4. Posted type edits atomically update the financial transaction and its latest `USER_FINANCIAL_TYPE` review decision, and append a `RECLASSIFY` row to `user_decision`. Message learning rebuilds from durable decisions before enabling personal assistance; no derived message-model cache is written or loaded. Exact template suppressions include bank and feature identity and revoke human-template assistance. Financial `EXPENSE`/`INCOME`, ownership decisions and field-only edits do not invent family labels. Unsupported or ambiguous decisions have an explicit feedback disposition.
 

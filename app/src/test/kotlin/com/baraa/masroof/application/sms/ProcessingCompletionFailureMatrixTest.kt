@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.backfillDecisions
 import com.baraa.masroof.testsupport.TestSmsBodies.OTP_BODY
 import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
@@ -263,6 +264,7 @@ class ProcessingCompletionFailureMatrixTest {
                     NoOpLoanRegistryRepository,
                 ),
                 reviewRepository = harness.reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(harness.db),
                 effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(harness.parsedRepo),
                 ownershipConfirmationService = noOpOwnershipConfirmation(),
             ),
@@ -270,7 +272,7 @@ class ProcessingCompletionFailureMatrixTest {
                 financialTransactionRepository = harness.ftRepo,
                 effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
                     harness.parsedRepo,
-                    com.baraa.masroof.data.repository.RoomUserCorrectionRepository(harness.db.userCorrectionDao()),
+                    com.baraa.masroof.data.repository.RoomUserDecisionRepository(harness.db),
                 ),
                 ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
                     RoomAccountRegistryRepository.from(harness.db),
@@ -290,6 +292,7 @@ class ProcessingCompletionFailureMatrixTest {
             processingRecovery = com.baraa.masroof.application.ingestion.ProcessingRecovery(
                 processingRetryRepository = harness.processingRetryRepo,
                 reviewRepository = harness.reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(harness.db),
                 ingestionReviewService = IngestionReviewService(
                     harness.reviewRepo,
                     com.baraa.masroof.sms.time.InstantClock { Instant.parse("2026-08-14T12:00:00Z") },
@@ -382,6 +385,7 @@ class ProcessingCompletionFailureMatrixTest {
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(harness.parsedRepo),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
             reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         ).reconcileStoredEventsDetailed()
         assertEquals(1, report.summary.failed)
 
@@ -457,6 +461,7 @@ class ProcessingCompletionFailureMatrixTest {
             resolvedAt = Instant.parse("2026-08-13T09:05:00Z"),
             resolvedTransactionId = null,
         )
+        harness.db.backfillDecisions()
     }
 
     private suspend fun resolutionOf(rawSmsId: String): ReviewResolutionKind? =
@@ -483,7 +488,7 @@ class ProcessingCompletionFailureMatrixTest {
         }
         val effective = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
             parsed,
-            com.baraa.masroof.data.repository.RoomUserCorrectionRepository(harness.db.userCorrectionDao()),
+            com.baraa.masroof.data.repository.RoomUserDecisionRepository(harness.db),
         )
         return com.baraa.masroof.application.review.ReviewWorkflowService(
             reviewRepository = harness.reviewRepo,
@@ -503,6 +508,7 @@ class ProcessingCompletionFailureMatrixTest {
                 ownershipResolver = resolver,
                 effectiveParsedEventProvider = effective,
                 reviewRepository = harness.reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(harness.db),
                 ownershipConfirmationService = noOpOwnershipConfirmation(),
             ),
             reviewQueueUpdater = com.baraa.masroof.application.review.ReviewQueueUpdater(
@@ -518,6 +524,7 @@ class ProcessingCompletionFailureMatrixTest {
             processingRecovery = com.baraa.masroof.application.ingestion.ProcessingRecovery(
                 processingRetryRepository = harness.processingRetryRepo,
                 reviewRepository = harness.reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(harness.db),
                 ingestionReviewService = IngestionReviewService(harness.reviewRepo, clock),
                 clock = clock,
             ),

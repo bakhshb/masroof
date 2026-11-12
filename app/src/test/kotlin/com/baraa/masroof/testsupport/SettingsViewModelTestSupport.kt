@@ -13,7 +13,6 @@ import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 
@@ -61,12 +60,13 @@ internal object SettingsViewModelTestSupport {
                 effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(emptyParsedEventRepository()),
                 ownershipConfirmationService = noOpOwnershipConfirmation(),
                 reviewRepository = EmptyReviewRepository(),
+                userDecisionRepository = NoOpUserDecisionRepository,
             ),
             reclassification = TransactionReclassificationService(
                 financialTransactionRepository = financialTransactionRepository,
                 effectiveParsedEventProvider = EffectiveParsedEventProvider(
                     parsedEventRepository = reclassificationEvents,
-                    userCorrectionRepository = emptyUserCorrectionRepository(),
+                    userDecisionRepository = NoOpUserDecisionRepository,
                 ),
                 ownershipResolver = ownershipResolver,
                 appLogService = NoOpAppLog,
@@ -79,8 +79,6 @@ internal object SettingsViewModelTestSupport {
             processingRecovery = noOpProcessingRecovery(),
         )
     }
-
-    fun emptyUserCorrectionRepository(): UserCorrectionRepository = EmptyUserCorrectionRepository
 
     fun emptyRawSmsRepository(): RawSmsRepository = EmptyRawSmsRepository()
 

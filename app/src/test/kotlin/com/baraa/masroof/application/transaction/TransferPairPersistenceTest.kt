@@ -133,6 +133,7 @@ class TransferPairPersistenceTest : ReconciliationTestFixture() {
         ownershipConfirmationService = confirmation,
         effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
         reviewRepository = EmptyReviewRepository(),
+        userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
     )
 
     private companion object {
