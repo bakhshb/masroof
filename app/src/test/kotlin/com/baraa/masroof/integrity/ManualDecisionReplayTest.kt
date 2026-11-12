@@ -1,5 +1,15 @@
 package com.baraa.masroof.integrity
 
+import org.junit.Assert.assertFalse
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
+import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
+import com.baraa.masroof.application.transaction.TransactionReconciliationService
+import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.interpretation.AutomaticInterpretationWriteGuard
+import androidx.room.withTransaction
 import com.baraa.masroof.testsupport.latestFor
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -379,6 +389,51 @@ class ManualDecisionReplayTest {
         }
     }
 
+    /**
+     * A decided external transfer whose leg now carries an out-of-date model inference, on an emptied ledger: the
+     * write guard rejects the rebuild as `stale_family_inference`, the pass is incomplete with the leg to retry, and
+     * nothing is posted for it.
+     */
+    @Test
+    fun emptiedLedger_decidedTransferWithAStaleInference_isRejectedAndStaysRetryable() = runBlocking {
+        DashboardLedgerWorld(context()).use { world ->
+            val ledger = transferLedger(world)
+            val batch = ledger.openBatch()
+            val parsed = batch.ingestProvider(providerRow("stale-ext", intraOut("2026-09-03 10:38"), "2026-09-03T07:38:00Z")) as SmsIngestionResult.Parsed
+            val resolved = ledger.workflow.resolveTransferAsExternal(requireReview(world, parsed.rawSmsId).id, ExternalTransferDirection.OUTGOING)
+            assertTrue("resolve: $resolved", resolved is ReviewWorkflowResult.Success)
+            assertTrue(batch.finish() is HistoricalBatchDerivedResult.Succeeded)
+            val stored = world.parsedRepo.findByRawSmsId(parsed.rawSmsId)!!
+            val inferred = stored.event.confidence.copy(reasons = stored.event.confidence.reasons + "family_origin:ML" + "model:old")
+            world.parsedRepo.save(stored.event.copy(confidence = inferred), stored.details)
+            val decisions = world.db.userDecisionDao().listAll()
+            emptyLedger(world)
+
+            val guard = writeGuard(world) { record -> record.event.confidence.reasons.none { it.startsWith("family_origin:") } }
+            var conflict: FinancialTransactionSaveResult? = null
+            val reconciliation = TransactionReconciliationService(
+                rawSmsRepository = world.rawRepo,
+                financialTransactionRepository = world.ftRepo,
+                ownershipResolver = OwnershipResolver(world.accounts, world.cards, world.loans),
+                ownershipConfirmationService = OwnershipConfirmationService(world.accounts, world.cards, world.loans),
+                effectiveParsedEventProvider = EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo),
+                reviewRepository = world.reviewRepo,
+                userDecisionRepository = world.decisionRepo,
+                zoneId = world.zone,
+                automaticWrite = { expected, write -> guard.write(expected, write).also { if (it is FinancialTransactionSaveResult.Conflict) conflict = it } },
+            )
+            val report = reconciliation.reconcileStoredEventsDetailed()
+
+            assertEquals(FinancialTransactionSaveResult.Conflict(parsed.rawSmsId, "stale_family_inference"), conflict)
+            assertFalse("a stale rebuild looked complete", ReconciliationCompletionPolicy.isComplete(report))
+            assertTrue(parsed.rawSmsId in report.failedRawSmsIds)
+            assertNull(world.ftRepo.findByRawSmsId(parsed.rawSmsId))
+            assertTrue(world.ftRepo.listAll().isEmpty())
+            assertEquals(decisions, world.db.userDecisionDao().listAll())
+            assertResolution(world, IntegritySeeds.MANUAL, parsed.rawSmsId, ReviewResolutionKind.USER_EXTERNAL_TRANSFER, posted = false)
+        }
+    }
+
     /** Runs [decide], empties the ledger, replays, and requires the same decisions, reviews and rows for its subjects. */
     private fun emptiedLedgerCase(
         ledgerOf: suspend (DashboardLedgerWorld) -> IntegrityLedger,
@@ -396,9 +451,26 @@ class ManualDecisionReplayTest {
             ledger.replayProduction()
             assertEquals("seed=$seed replay changed a decision", decisions, world.db.userDecisionDao().listAll())
             assertEquals("seed=$seed rows not rebuilt as decided", before, decidedState(world, subjects))
+            // Every posted decided subject, the paired leg of a pair included, is still protected from automatic writes.
+            val guard = writeGuard(world) { true }
+            for (id in subjects.filter { world.ftRepo.findByRawSmsId(it) != null }) {
+                val record = requireNotNull(EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo).findEffectiveByRawSmsId(id))
+                var wrote = false
+                val result = guard.write(listOf(record)) { wrote = true; FinancialTransactionSaveResult.Saved }
+                assertTrue("seed=$seed $id lost its protection: $result", result is FinancialTransactionSaveResult.Conflict && !wrote)
+            }
             assertFinancialInvariants(world, seed, "emptied_ledger")
         }
     }
+
+    private fun writeGuard(world: DashboardLedgerWorld, inferenceCurrent: suspend (ParsedEventRecord) -> Boolean) =
+        AutomaticInterpretationWriteGuard(
+            EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo), world.reviewRepo, world.decisionRepo, world.ftRepo,
+            inferenceCurrent = inferenceCurrent,
+            inTransaction = { mutation -> world.db.withTransaction { mutation() } },
+            // The pattern definitions are current here; only the family inference is under test.
+            patternsCurrent = { _, _ -> true },
+        )
 
     private suspend fun decidedState(world: DashboardLedgerWorld, subjects: List<String>) = subjects.associateWith { id ->
         val review = world.reviewRepo.findByRawSmsId(id)

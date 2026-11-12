@@ -128,19 +128,43 @@ class UserDecisionReaderTest {
             retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).sorted())
     }
 
-    /** The SQL copy of the rule (`UserDecisionDao` constants) agrees with `EffectiveUserDecisions` for every kind. */
+    /**
+     * The SQL copy of the rule (`UserDecisionDao` constants: the retry sets and `ParsedEventDao.markHistoricalIntent`)
+     * agrees with `EffectiveUserDecisions` for every kind and for both legs of a pair.
+     */
     @Test
-    fun retrySql_andReader_agreeForEveryKind() = runBlocking {
-        val retries = RoomProcessingRetryRepository(db.processingRetryDao())
+    fun retrySql_andReader_agreeForEveryKindAndPairedLeg() = runBlocking {
+        val ids = mutableListOf<String>()
         for (kind in UserDecisionKind.entries) {
             sms(kind.name)
             decide(UserDecision(kind.name, UserDecisionKind.FINANCIAL_TYPE, at(1)))
             decide(UserDecision(kind.name, kind, at(2)))
-            retries.markRequired(kind.name, at(1), ProcessingRetryMode.HISTORICAL_BATCH)
+            ids += kind.name
         }
+        listOf("pair-out", "pair-in", "later-out", "later-in").forEach { sms(it); ids += it }
+        // The paired leg's latest outcome is the pair, which only the pairedRawSmsId branch finds.
+        decide(UserDecision("pair-in", UserDecisionKind.IGNORE, at(1)))
+        decide(UserDecision("pair-out", UserDecisionKind.SELF_TRANSFER_PAIR, at(2), pairedRawSmsId = "pair-in"))
+        // A paired leg that later gets its own outcome follows that outcome.
+        decide(UserDecision("later-out", UserDecisionKind.SELF_TRANSFER_PAIR, at(1), pairedRawSmsId = "later-in"))
+        decide(UserDecision("later-in", UserDecisionKind.IGNORE, at(2)))
+        assertFalse(reader.effectiveFor("pair-in").isNonFinancial)
+        assertTrue(reader.effectiveFor("later-in").isNonFinancial)
+
+        val retries = RoomProcessingRetryRepository(db.processingRetryDao())
+        retries.markRequired(ids, at(1), ProcessingRetryMode.HISTORICAL_BATCH)
         val retryable = retries.listRetryableRawSmsIds().toSet()
-        for (kind in UserDecisionKind.entries) {
-            assertEquals(kind.name, !reader.effectiveFor(kind.name).isNonFinancial, kind.name in retryable)
+        val retryableBatch = retries.listRetryableRawSmsIds(ProcessingRetryMode.HISTORICAL_BATCH).toSet()
+        retries.clear(ids)
+        ids.forEach { db.parsedEventDao().markHistoricalIntent(it, 1) }
+        val marked = db.openHelper.readableDatabase.query("SELECT rawSmsId FROM processing_retry").use { cursor ->
+            buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) }
+        }
+        for (id in ids) {
+            val expected = !reader.effectiveFor(id).isNonFinancial
+            assertEquals("$id retry set", expected, id in retryable)
+            assertEquals("$id retry set of a mode", expected, id in retryableBatch)
+            assertEquals("$id historical intent", expected, id in marked)
         }
     }
 
