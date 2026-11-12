@@ -3,8 +3,6 @@
   <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>LargeClass:AlJaziraParserRegressionTest.kt:AlJaziraParserRegressionTest</ID>
-    <ID>LargeClass:CommitmentsOverviewBuilderTest.kt:CommitmentsOverviewBuilderTest</ID>
-    <ID>LargeClass:CurrentAccountSummaryCalculatorTest.kt:CurrentAccountSummaryCalculatorTest</ID>
     <ID>LargeClass:DashboardViewModelTest.kt:DashboardViewModelTest</ID>
     <ID>LargeClass:DatabaseBackupService.kt:DatabaseBackupService : DatabaseBackupGateway</ID>
     <ID>LargeClass:DatabaseRestoreRecovery.kt:DatabaseRestoreRecovery</ID>
@@ -18,7 +16,6 @@
     <ID>LargeClass:SettingsViewModelTest.kt:SettingsViewModelTest</ID>
     <ID>LargeClass:StatementReconciliationServiceTest.kt:StatementReconciliationServiceTest</ID>
     <ID>LargeClass:TransactionReconciliationServiceTest.kt:TransactionReconciliationServiceTest : ReconciliationTestFixture</ID>
-    <ID>LongMethod:AccountFlowClassifier.kt:AccountFlowClassifier$internal fun classifyWithAmount: List&lt;FlowAssignment&gt;</ID>
     <ID>LongMethod:AnalysisExplanationViews.kt:@Composable internal fun AnalysisDataQuality</ID>
     <ID>LongMethod:AnalyticsScreen.kt:@Composable fun AnalyticsRoute</ID>
     <ID>LongMethod:AnalyticsWorkflow.kt:AnalyticsWorkflow$private suspend fun refreshOnWorker</ID>
@@ -27,9 +24,6 @@
     <ID>LongMethod:BankInterpretationService.kt:BankInterpretationService$suspend fun synchronizeFeedback: String?</ID>
     <ID>LongMethod:CanonicalCsvStatementParser.kt:CanonicalCsvStatementParser$private fun parseText: ParsedBankStatement</ID>
     <ID>LongMethod:ConsistentBackupSnapshotTest.kt:ConsistentBackupSnapshotTest$private suspend fun assertConcurrentExport</ID>
-    <ID>LongMethod:CreditCardOverviewBuilder.kt:CreditCardOverviewBuilder$fun build: CreditCardsOverview</ID>
-    <ID>LongMethod:CreditCardOverviewBuilderTest.kt:CreditCardOverviewBuilderTest$@Test fun cardDueFromStatementOnly_notPurchaseOutstanding</ID>
-    <ID>LongMethod:CreditFacilityOverview.kt:CreditFacilityOverviewBuilder$fun build: CreditFacilitiesOverview</ID>
     <ID>LongMethod:DashboardEvidenceQueriesTest.kt:DashboardEvidenceQueriesTest$@Test fun chronologicalFacts_ignoreLexicalIds_andDoNotBorrowFactsAfterAsOf</ID>
     <ID>LongMethod:DashboardEvidenceQueriesTest.kt:DashboardEvidenceQueriesTest$@Test fun creditAndDebitEvidenceQueries_useExistingCardIndex</ID>
     <ID>LongMethod:DashboardScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DashboardScreen</ID>
@@ -69,6 +63,5 @@
     <ID>LongMethod:TransactionDetailScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun TransactionDetailScreen</ID>
     <ID>LongMethod:TransactionListScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun TransactionListScreen</ID>
     <ID>LongMethod:TransactionReclassificationService.kt:TransactionReclassificationService$suspend fun reclassify: ReclassificationResult</ID>
-    <ID>LongMethod:TransactionSarEquivalentResolver.kt:TransactionSarEquivalentResolver$suspend fun resolve: Map&lt;String, SarEquivalentResolution&gt;</ID>
   </CurrentIssues>
 </SmellBaseline>

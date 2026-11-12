@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    `java-test-fixtures`
     alias(libs.plugins.detekt)
 }
 apply(from = "../build-logic/pure-jvm-boundaries.gradle.kts")

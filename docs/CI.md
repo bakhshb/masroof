@@ -4,7 +4,7 @@ Every PR to main and every main push runs the full required suite. The stable me
 
 ## Toolchains
 
-Gradle runs on Temurin 27; JVM compilation and Android/Robolectric tests use the installed JDK 21 toolchain. Pure JVM modules (`finance-core`, `bank-engine`, `ml-assist`, `ledger`) run JUnit Jupiter 6.1.3 through JUnit Platform. App and instrumentation tests keep JUnit 4 and their Android runners. Python scripts run on 3.15.2. SDK Command-line Tools 23.0 (build 16111833) are pinned explicitly. Emulator jobs align the `latest` tools path with that selected version because the emulator action prepends that path; prelaunch checks require the AVD target to match the pinned SDK package. Actions are pinned by commit with the release version beside each pin. Gradle cache ownership belongs to setup-gradle.
+Gradle runs on Temurin 27; JVM compilation and Android/Robolectric tests use the installed JDK 21 toolchain. Pure JVM modules (`finance-core`, `bank-engine`, `ml-assist`, `ledger`, `dashboard-core`) run JUnit Jupiter 6.1.3 through JUnit Platform. App and instrumentation tests keep JUnit 4 and their Android runners. Python scripts run on 3.15.2. SDK Command-line Tools 23.0 (build 16111833) are pinned explicitly. Emulator jobs align the `latest` tools path with that selected version because the emulator action prepends that path; prelaunch checks require the AVD target to match the pinned SDK package. Actions are pinned by commit with the release version beside each pin. Gradle cache ownership belongs to setup-gradle.
 
 Dependency versions are pinned in `gradle/libs.versions.toml`; the wrapper pins
 Gradle. Pure JVM dependency boundaries are enforced by

@@ -5,12 +5,6 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.repository.CommitmentRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 
-data class CommitmentsDashboardSection(
-    val loansOverview: LoansOverview,
-    val transactionLoanInvolvement: Map<String, Set<String>>,
-    val commitmentsOverview: CommitmentsOverview,
-)
-
 /**
  * Loans and recurring commitments (subscriptions, loan installments, statement dues).
  *

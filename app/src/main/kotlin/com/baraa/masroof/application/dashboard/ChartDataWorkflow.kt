@@ -8,13 +8,6 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 
 @Serializable
-enum class ChartDataCategory {
-    CREDIT_PURCHASES, MADA_PURCHASES, ACCOUNT_PURCHASES, OTHER_EXPENSES, CASH_WITHDRAWALS,
-    EXTERNAL_TRANSFERS, BILLS, LOAN_REPAYMENTS, CREDIT_SETTLEMENTS, FEES,
-    INTERNAL_TRANSFERS, UNATTRIBUTED_REFUNDS,
-}
-
-@Serializable
 data class ChartDataPreferences(
     val selections: Map<String, List<ChartDataCategory>> = emptyMap(),
     val homeScope: String = "purchases",

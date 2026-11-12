@@ -219,7 +219,7 @@ class PackageDependencyRulesTest {
             "AccountsDashboardProjection.kt",
             "CardsDashboardProjection.kt",
             "CommitmentsDashboardProjection.kt",
-        ).map { File(sourceRoot, "application/dashboard/$it") }
+        ).map { sourceFile("application/dashboard/$it") }
         val writeCalls = listOf(
             ".save(",
             ".update(",
@@ -288,7 +288,7 @@ class PackageDependencyRulesTest {
         val files = listOf(
             "application/dashboard/CurrentAccountTransactionScope.kt",
             "application/dashboard/DebitCardSpendClassifier.kt",
-        ).map { File(sourceRoot, it) }
+        ).map(::sourceFile)
         val forbidden = listOf(
             ".body",
             "comparisonBody",
@@ -360,13 +360,21 @@ class PackageDependencyRulesTest {
         File(source, packageName).walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
     }
 
+    // The file in whichever source root holds it; a missing file resolves under app so its "must exist" check fails.
+    private fun sourceFile(path: String): File =
+        sourceRoots.map { File(it, path) }.firstOrNull { it.isFile } ?: File(sourceRoot, path)
+
     private fun sourceRelativePath(file: File): String =
         file.canonicalFile.relativeTo(sourceRoots.first { file.canonicalFile.startsWith(it.canonicalFile) }.canonicalFile)
             .invariantSeparatorsPath
 
     private companion object {
         val sourceRoot = File("src/main/kotlin/com/baraa/masroof")
-        val sourceRoots = listOf(sourceRoot, File("../finance-core/src/main/kotlin/com/baraa/masroof"))
+        val sourceRoots = listOf(
+            sourceRoot,
+            File("../finance-core/src/main/kotlin/com/baraa/masroof"),
+            File("../dashboard-core/src/main/kotlin/com/baraa/masroof"),
+        )
 
         val presentationBannedPackages = listOf(
             "com.baraa.masroof.data.",
