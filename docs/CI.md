@@ -20,9 +20,9 @@ features. minSdk 26, compileSdk 37, targetSdk 36 and JVM 21 bytecode stay fixed.
 Unit tests (including pure modules), lint/detekt and the shared APK build run independently.
 
 Financial policy tests live in `finance-core` and run through `:finance-core:test`
-in the existing unit job, as do the derived-ledger tests (`:ledger:test`). The existing root `detekt` task also checks finance-core
+in the existing unit job, as do the derived-ledger tests (`:ledger:test`). The `:data` module (Room, DAOs, repositories, preference stores; Android library, Robolectric) runs through the root `testDebugUnitTest` and uploads `data/build/reports/tests/`. The existing root `detekt` task also checks finance-core
 with the shared Detekt 2 configuration and ktlint wrapper. Architecture test inputs
-include the relocated sources and financial schema, so a source-only boundary
+include the relocated sources and the financial schema exported by `:data` (`data/schemas`), so a source-only boundary
 change cannot reuse an unrelated cached result. `FinancialSchemaCompatibilityTest`
 pins the byte-frozen v18 schema, contiguous exported versions, one migration per
 step and the known identity hashes; `MasroofMigrationOpenPathTest` (and its device twin) upgrades the committed v18

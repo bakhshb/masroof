@@ -80,6 +80,7 @@ Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Andro
 | `finance-core` | Money, periods, identities, financial classification, matching, and assembly |
 | `ledger` | Pure derived-ledger projector (not wired into the app yet) |
 | `dashboard-core` | Pure dashboard builders, calculators and projections |
+| `data` | Room database, DAOs, repositories, preference stores and the exported schemas |
 | `ml-assist` | Local family assistance, forecasting, and recurrence detection |
 | `ui-kit` | Shared theme, fonts, components, and charts |
 

@@ -5,7 +5,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.ksp)
     alias(libs.plugins.detekt)
 }
 
@@ -108,7 +107,8 @@ android {
                 fileTree("src/main/kotlin") { include("**/*.kt") },
                 rootProject.fileTree("finance-core/src/main/kotlin") { include("**/*.kt") },
                 rootProject.fileTree("dashboard-core/src/main/kotlin") { include("**/*.kt") },
-                fileTree("schemas/com.baraa.masroof.data.room.MasroofDatabase") { include("*.json") },
+                rootProject.fileTree("data/src/main/kotlin") { include("**/*.kt") },
+                rootProject.fileTree("data/schemas/com.baraa.masroof.data.room.MasroofDatabase") { include("*.json") },
             ).withPathSensitivity(PathSensitivity.RELATIVE)
             if (it.name == "testDebugUnitTest") {
                 it.outputs.file(layout.buildDirectory.file("model-training/features.json"))
@@ -118,16 +118,12 @@ android {
 
     // Canonical Room schema exports used by device verification.
     sourceSets {
-        getByName("androidTest").assets.directories += "$projectDir/schemas"
+        getByName("androidTest").assets.directories += "${rootProject.projectDir}/data/schemas"
         getByName("androidTest").assets.directories += "src/test/resources/testdata"
         // Test helpers used by both JVM and device tests.
         getByName("test").kotlin.directories += "src/sharedTest/kotlin"
         getByName("androidTest").kotlin.directories += "src/sharedTest/kotlin"
     }
-}
-
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -145,11 +141,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
 
-    implementation(libs.androidx.room.runtime)
-    ksp(libs.androidx.room.compiler)
-    // Test-only next-version schema (NextVersionTestDatabase, sharedTest) for migration tests.
-    kspTest(libs.androidx.room.compiler)
-    kspAndroidTest(libs.androidx.room.compiler)
+    // Room, the DAOs, repositories and preference stores; its test fixtures hold the next-version test schema.
+    implementation(project(":data"))
 
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
@@ -169,6 +162,8 @@ dependencies {
     testImplementation(testFixtures(project(":bank-engine")))
     testImplementation(testFixtures(project(":finance-core")))
     androidTestImplementation(testFixtures(project(":bank-engine")))
+    testImplementation(testFixtures(project(":data")))
+    androidTestImplementation(testFixtures(project(":data")))
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

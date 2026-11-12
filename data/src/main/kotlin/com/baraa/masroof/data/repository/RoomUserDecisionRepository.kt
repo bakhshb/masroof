@@ -56,7 +56,7 @@ class RoomUserDecisionRepository(
 }
 
 /** Appends [decision]; the caller is already inside a database transaction. */
-internal suspend fun MasroofDatabase.appendDecision(decision: UserDecision) {
+suspend fun MasroofDatabase.appendDecision(decision: UserDecision) {
     val (amountDecimal, amountCurrency) = MoneyPersistence.toColumns(decision.amount)
     userDecisionDao().insert(
         UserDecisionEntity(

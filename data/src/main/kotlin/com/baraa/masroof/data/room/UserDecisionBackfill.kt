@@ -8,7 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * come first, then the rows already in the table are re-appended in their own order, so a backfilled (older)
  * decision never outranks one the dual write recorded. A trace an existing row already records is skipped.
  */
-internal object UserDecisionBackfill {
+object UserDecisionBackfill {
     fun run(db: SupportSQLiteDatabase) {
         val existing = db.query("SELECT COALESCE(MAX(sequence), 0) FROM user_decision").use { it.moveToFirst(); it.getLong(0) }
         db.execSQL(INSERT_BACKFILL, arrayOf(existing))
