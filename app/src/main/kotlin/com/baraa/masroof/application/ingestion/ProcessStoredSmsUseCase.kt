@@ -65,8 +65,6 @@ class ProcessStoredSmsUseCase(
     private val userDecisionRepository: UserDecisionRepository,
     private val debugProcessHalt: DebugProcessHaltProbe = DebugProcessHaltProbe.NONE,
     private val patternProcessing: (suspend (String, suspend () -> SmsIngestionResult, suspend () -> SmsIngestionResult) -> SmsIngestionResult)? = null,
-    /** Enqueues the one historical recovery pass after an interactive retry row is written. */
-    private val onHistoricalRetry: (() -> Unit)? = null,
 ) {
     /** Processes evidence captured in this same attempt, reusing the capture's [route]. */
     suspend fun process(
@@ -136,8 +134,7 @@ class ProcessStoredSmsUseCase(
 
     private suspend fun retainHistoricalRetry(rawSmsId: String) {
         try {
-            // A failed schedule is logged here (the other callers ignore it), so keep the inline call.
-            if (processingRecovery.markExhaustedBatch(listOf(rawSmsId))) onHistoricalRetry?.invoke()
+            processingRecovery.retryLater(listOf(rawSmsId))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -436,7 +433,7 @@ class ProcessStoredSmsUseCase(
     ): SmsIngestionResult.DerivedIncomplete? {
         debugProcessHalt.afterDurableWrite(DebugProcessHalt.PARSED)
         val incomplete = if (deriveImmediately) afterParsedEvent(event, details, logOutcome) else null
-        if (incomplete == null && deriveImmediately) processingRecovery.clear(event.rawSmsId)
+        if (incomplete == null && deriveImmediately) processingRecovery.clear(listOf(event.rawSmsId))
         // A reader seeing this marker must observe the retained processing-retry row.
         debugProcessHalt.markIfReconcileHeld()
         return incomplete
@@ -552,24 +549,17 @@ class ProcessStoredSmsUseCase(
             )
         }
         debugProcessHalt.afterDurableWrite(DebugProcessHalt.RECONCILED)
-        val incomplete = ReconciliationCompletionPolicy.incompleteOrNull(
-            report = report,
-            maskedRawSmsId = AppLogFormatting.maskId(report.failedRawSmsIds.firstOrNull() ?: event.rawSmsId),
-        )
-        if (incomplete != null) {
-            // Partial posts and review rows from this pass stay. The worker retries.
+        if (!ReconciliationCompletionPolicy.isComplete(report)) {
+            // Units this pass wrote and its review rows stay. The worker retries.
             refreshReviewQueue(event, details, report, logOutcome)?.let { reviewIncomplete ->
                 return ReconcileDerivedResult.Incomplete(reviewIncomplete)
             }
+            val incomplete = ReconciliationIncompleteException(
+                failureCount = report.summary.failed,
+                maskedRawSmsId = AppLogFormatting.maskId(report.failedRawSmsIds.firstOrNull() ?: event.rawSmsId),
+            )
             return ReconcileDerivedResult.Incomplete(
-                derivedIncomplete(
-                    event = event,
-                    details = details,
-                    stage = DerivedProcessingStage.RECONCILIATION,
-                    cause = incomplete,
-                    logOutcome = logOutcome,
-                    failureCount = incomplete.failureCount,
-                ),
+                derivedIncomplete(event, details, DerivedProcessingStage.RECONCILIATION, incomplete, logOutcome),
             )
         }
         return ReconcileDerivedResult.Ready(report)

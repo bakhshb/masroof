@@ -1018,6 +1018,7 @@ private class DeviceSmsSession(
                 userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(database),
                 ingestionReviewService = ingestionReview,
                 clock = clock,
+                historicalRecoveryScheduler = com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler,
             ),
             userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(database),
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,

@@ -13,24 +13,6 @@ package com.baraa.masroof.application.transaction
 object ReconciliationCompletionPolicy {
     fun isComplete(report: ReconciliationReport): Boolean = report.summary.failed == 0
 
-    /**
-     * Nonthrowing incomplete result for [report], or null when the pass is complete.
-     * [maskedRawSmsId] must already be masked; this type never stores a raw identifier
-     * or message text.
-     */
-    fun incompleteOrNull(
-        report: ReconciliationReport,
-        maskedRawSmsId: String,
-        stage: String = STAGE_RECONCILIATION,
-    ): ReconciliationIncompleteException? {
-        if (isComplete(report)) return null
-        return ReconciliationIncompleteException(
-            failureCount = report.summary.failed,
-            maskedRawSmsId = maskedRawSmsId,
-            stage = stage,
-        )
-    }
-
     const val STAGE_RECONCILIATION = "reconciliation"
     const val STAGE_REVIEW_UPDATE = "review_update"
 }

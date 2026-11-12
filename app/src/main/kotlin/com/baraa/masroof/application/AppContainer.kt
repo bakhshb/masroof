@@ -14,6 +14,7 @@ import com.baraa.masroof.application.container.ReviewContainer
 import com.baraa.masroof.application.container.SmsContainer
 import com.baraa.masroof.application.container.StorageContainer
 import com.baraa.masroof.application.container.UpdateContainer
+import com.baraa.masroof.application.sms.HistoricalBatchRecoveryScheduler
 import com.baraa.masroof.application.sms.HistoricalDerivedRecoveryWorker
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.data.room.PreservingOpenHelperFactory
@@ -44,7 +45,7 @@ class AppContainer(
     @Volatile internal var shutdownStage: String = "OPEN"
         private set
 
-    private val enqueueHistoricalRecovery: () -> Unit = {
+    private val enqueueHistoricalRecovery = HistoricalBatchRecoveryScheduler {
         HistoricalDerivedRecoveryWorker.enqueue(WorkManager.getInstance(storage.appContext))
     }
 

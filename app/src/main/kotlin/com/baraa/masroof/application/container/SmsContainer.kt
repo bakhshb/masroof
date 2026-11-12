@@ -10,6 +10,7 @@ import com.baraa.masroof.application.maintenance.ReparseAllStoredEventsResult
 import com.baraa.masroof.application.maintenance.StoredSmsReprocessor
 import com.baraa.masroof.application.review.ExplicitBankSelectionWorkflow
 import com.baraa.masroof.application.sms.BankSmsImportWorkflow
+import com.baraa.masroof.application.sms.HistoricalBatchRecoveryScheduler
 import com.baraa.masroof.application.sms.HistoricalDerivedRecovery
 import com.baraa.masroof.application.sms.HistoricalSmsBatchProcessor
 import com.baraa.masroof.application.sms.HistoricalSmsScanner
@@ -45,7 +46,7 @@ class SmsContainer(
     private val dashboard: DashboardContainer,
     bankAdapterOverride: BankSmsAdapter?,
     smsDataSourceOverride: SmsDataSource?,
-    private val enqueueHistoricalRecovery: () -> Unit,
+    private val enqueueHistoricalRecovery: HistoricalBatchRecoveryScheduler,
 ) {
     private val appContext = storage.appContext
 
@@ -114,7 +115,6 @@ class SmsContainer(
                 storage.reviewRepository, storage.userDecisionRepository, storage.financialTransactionRepository,
                 storage.parsedEventRepository,
                 inTransaction = { work -> storage.withDatabaseTransaction(work) })::run,
-            onHistoricalRetry = enqueueHistoricalRecovery,
         )
 
     val explicitBankSelectionWorkflow: ExplicitBankSelectionWorkflow =
@@ -153,9 +153,7 @@ class SmsContainer(
             reviewRepository = storage.reviewRepository,
             processingRetryRepository = storage.processingRetryRepository,
             appLogService = storage.appLogService,
-            batchRecoveryScheduler = {
-                enqueueHistoricalRecovery()
-            },
+            batchRecoveryScheduler = enqueueHistoricalRecovery,
             debugProcessHalt = storage.debugProcessHaltProbe,
             missedSmsScheduler = { receivedAfter ->
                 LiveCaptureRecoveryWorker.enqueue(WorkManager.getInstance(appContext), receivedAfter, delaySeconds = 0)
@@ -177,9 +175,6 @@ class SmsContainer(
         reviewQueueUpdater = review.reviewQueueUpdater,
         exchangeRateEnrichmentScheduler = exchangeRateEnrichmentScheduler,
         processingRecovery = review.processingRecovery,
-        batchRecoveryScheduler = {
-            enqueueHistoricalRecovery()
-        },
         appLogService = storage.appLogService,
     )
 

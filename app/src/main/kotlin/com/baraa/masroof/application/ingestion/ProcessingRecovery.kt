@@ -1,6 +1,7 @@
 package com.baraa.masroof.application.ingestion
 
 import com.baraa.masroof.application.review.IngestionReviewService
+import com.baraa.masroof.application.sms.HistoricalBatchRecoveryScheduler
 import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
@@ -10,12 +11,14 @@ import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CancellationException
 
 /**
- * Persists the retry marker for evidence whose derived processing did not finish.
+ * The one writer of "these raw SMS ids still need projecting" (`processing_retry`).
  *
+ * A pass that did not finish leaves the ledger as it was for its ids, so recovery only has to
+ * run the pass again for them: [markExhausted] hands one SMS back to the live worker at startup,
+ * [retryLater] hands a set to the one historical recovery pass ([com.baraa.masroof.application.sms.HistoricalDerivedRecovery]).
  * An SMS the user decided posts nothing ([com.baraa.masroof.domain.model.EffectiveUserDecisions.isNonFinancial])
- * stays closed.
- * Other resolved reviews stay resolved; recoverability is the processing-retry row.
- * Writing the marker throws when persistence fails so callers can retry.
+ * stays closed. Other resolved reviews stay resolved; recoverability is the retry row.
+ * Writing a row throws when persistence fails so callers can retry.
  */
 class ProcessingRecovery(
     private val processingRetryRepository: ProcessingRetryRepository,
@@ -23,7 +26,9 @@ class ProcessingRecovery(
     private val userDecisionRepository: UserDecisionRepository,
     private val ingestionReviewService: IngestionReviewService,
     private val clock: InstantClock,
+    private val historicalRecoveryScheduler: HistoricalBatchRecoveryScheduler,
 ) {
+    /** Live retries ran out: a `LIVE` row for startup and a `processing_error` review unless the review is resolved. */
     suspend fun markExhausted(rawSmsId: String) {
         if (userDecisionRepository.effectiveFor(rawSmsId).isNonFinancial) return
         val review = reviewRepository.findByRawSmsId(rawSmsId)
@@ -37,33 +42,19 @@ class ProcessingRecovery(
     }
 
     /**
-     * Writes the historical retry set in one transaction.
-     * Returns false when every id is already closed as non-financial.
-     * Throws when the transaction fails, without accepting a prefix of the set.
+     * Writes [rawSmsIds] as one `HISTORICAL_BATCH` set in one transaction, then enqueues the one
+     * recovery pass. A failed write throws without accepting a prefix of the set; a failed enqueue
+     * is ignored because the set is durable and startup enqueues the pass.
      */
-    suspend fun markExhaustedBatch(rawSmsIds: List<String>): Boolean {
-        if (rawSmsIds.isEmpty()) return false
+    suspend fun retryLater(rawSmsIds: Collection<String>) {
         val ids = rawSmsIds.distinct()
+        if (ids.isEmpty()) return
         val decisions = userDecisionRepository.effectiveFor(ids)
         val affected = ids.filterNot { decisions.getValue(it).isNonFinancial }
-        if (affected.isEmpty()) return false
-        processingRetryRepository.markRequired(
-            affected,
-            clock.now(),
-            ProcessingRetryMode.HISTORICAL_BATCH,
-        )
-        return true
-    }
-
-    /**
-     * Writes the historical retry set, then asks [schedule] to enqueue the batch worker.
-     * A failed write throws; a failed schedule is ignored because the set is durable
-     * and startup enqueues the one batch worker.
-     */
-    suspend fun markForHistoricalRetry(rawSmsIds: List<String>, schedule: (() -> Unit)?) {
-        if (!markExhaustedBatch(rawSmsIds)) return
+        if (affected.isEmpty()) return
+        processingRetryRepository.markRequired(affected, clock.now(), ProcessingRetryMode.HISTORICAL_BATCH)
         try {
-            schedule?.invoke()
+            historicalRecoveryScheduler.schedule()
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -71,11 +62,7 @@ class ProcessingRecovery(
         }
     }
 
-    suspend fun clear(rawSmsId: String) {
-        processingRetryRepository.clear(rawSmsId)
-    }
-
-    suspend fun clearAll(rawSmsIds: List<String>) {
+    suspend fun clear(rawSmsIds: List<String>) {
         processingRetryRepository.clear(rawSmsIds)
     }
 }

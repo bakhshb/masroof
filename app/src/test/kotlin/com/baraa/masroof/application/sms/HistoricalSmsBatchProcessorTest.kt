@@ -409,8 +409,8 @@ class HistoricalSmsBatchProcessorTest {
                 userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ingestionReviewService = IngestionReviewService(reviews, clock),
                 clock = clock,
+                historicalRecoveryScheduler = { recoverySchedules += 1 },
             ),
-            batchRecoveryScheduler = { recoverySchedules += 1 },
             appLogService = NoOpAppLog,
         )
     }

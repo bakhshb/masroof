@@ -24,10 +24,6 @@ class RoomProcessingRetryRepository(
         dao.upsertAllAtomic(rawSmsIds.distinct().map { entity(it, createdAt, mode) })
     }
 
-    override suspend fun clear(rawSmsId: String): Unit = accessGate.withAccess<Unit> {
-        dao.delete(rawSmsId)
-    }
-
     override suspend fun clear(rawSmsIds: List<String>): Unit = accessGate.withAccess<Unit> {
         if (rawSmsIds.isEmpty()) return@withAccess
         dao.deleteAllAtomic(rawSmsIds)

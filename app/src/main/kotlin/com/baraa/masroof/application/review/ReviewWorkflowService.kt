@@ -75,7 +75,6 @@ class ReviewWorkflowService(
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val appLogService: AppLog,
     private val processingRecovery: ProcessingRecovery,
-    private val onHistoricalRetry: (() -> Unit)? = null,
     private val newCorrectionId: () -> String = {
         UserCorrectionIdFactory.create(UUID.randomUUID().toString())
     },
@@ -647,7 +646,7 @@ class ReviewWorkflowService(
             rawSmsIds = rawSmsIds,
             retryState = "historical_batch",
         )
-        processingRecovery.markForHistoricalRetry(rawSmsIds.toList(), onHistoricalRetry)
+        processingRecovery.retryLater(rawSmsIds)
     }
 
     private fun incomplete(

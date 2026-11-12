@@ -202,14 +202,6 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
     }
 
     private val retryWrites = object : ProcessingRetryRepository by retries {
-        override suspend fun clear(rawSmsId: String) {
-            if (faults.clearBeforeFailures > 0) {
-                faults.clearBeforeFailures -= 1
-                throw IOException("before clearing recovery state")
-            }
-            retries.clear(rawSmsId)
-        }
-
         override suspend fun clear(rawSmsIds: List<String>) {
             if (faults.clearBeforeFailures > 0) {
                 faults.clearBeforeFailures -= 1
@@ -250,6 +242,7 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         userDecisionRepository = world.decisionRepo,
         ingestionReviewService = IngestionReviewService(reviews, clock),
         clock = clock,
+        historicalRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
     )
 
     private val processor = HistoricalSmsBatchProcessor(
@@ -272,7 +265,6 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         reviewQueueUpdater = reviewQueue,
         processingRecovery = recovery,
         appLogService = NoOpAppLog,
-        batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
         exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
     )
 

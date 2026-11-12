@@ -131,7 +131,7 @@ class DashboardLedgerWorld(
 
     private val processingRecovery = com.baraa.masroof.application.ingestion.ProcessingRecovery(
         com.baraa.masroof.data.repository.RoomProcessingRetryRepository(db.processingRetryDao()),
-        reviewRepo, decisionRepo, IngestionReviewService(reviewRepo, importClock), importClock,
+        reviewRepo, decisionRepo, IngestionReviewService(reviewRepo, importClock), importClock, NoOpHistoricalBatchRecoveryScheduler,
     )
 
     val captureBankSms = CaptureBankSmsUseCase(rawRepo, registry, appLogService = NoOpAppLog)
@@ -185,7 +185,6 @@ class DashboardLedgerWorld(
                 )
             } ?: NoOpExchangeRateEnrichmentScheduler,
             appLogService = NoOpAppLog,
-            batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
         ).startBatch()
         rows.forEach { batch.ingest(AndroidSmsMapper.toRawSms(it)) }
         batch.finish()
@@ -204,7 +203,6 @@ class DashboardLedgerWorld(
             reviewQueueUpdater = reviewQueueUpdater,
             processingRecovery = processingRecovery,
             appLogService = NoOpAppLog,
-            batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
         ).startBatch()
         val ingest = rows.map { batch.ingest(AndroidSmsMapper.toRawSms(it)) }

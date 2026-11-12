@@ -186,6 +186,7 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
             userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             ingestionReviewService = ingestionReview,
             clock = clock,
+            historicalRecoveryScheduler = com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler,
         )
         val reviewForUpdate = object : ReviewRepository by reviewRepo {
             override suspend fun markResolved(
@@ -287,8 +288,8 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ingestionReviewService = ingestionReview,
                 clock = clock,
+                historicalRecoveryScheduler = batchRecoveryScheduler,
             ),
-            batchRecoveryScheduler = batchRecoveryScheduler,
             appLogService = NoOpAppLog,
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
             ownershipDiscovery = noOpOwnershipDiscovery(),
