@@ -242,8 +242,8 @@ class ReconciliationTimingTest : ReconciliationTestFixture() {
         )
         val report = serviceIn(java.time.ZoneOffset.UTC).reconcileStoredEventsDetailed()
 
-        // Read in UTC the posted leg sits 9h away, so the counterpart was posted alone first (pendingMatch 0).
-        assertEquals(1, report.summary.pendingMatch)
+        // The counterpart joins the posted leg in this pass, so no pending candidate is left.
+        assertEquals(0, report.summary.pendingMatch)
         val healed = ftRepo.listAll().single()
         assertEquals(FinancialTransactionType.SELF_TRANSFER, healed.type)
         assertEquals(setOf("pe-out-posted-leg", "pe-in-posted-leg"), healed.linkedParsedEventIds.toSet())

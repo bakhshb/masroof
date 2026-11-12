@@ -187,10 +187,12 @@ private class Projection(
     private val retry = mutableSetOf<String>()
     private val reviews = mutableListOf<LedgerReviewCandidate>()
     /**
-     * Keep rule (i): stored rows any of whose raw SMS has a posting outcome as its latest decision. They are saved
-     * before any decided posting, so another SMS's posting that names one of their SMS conflicts and is retried.
+     * Keep rule (i): stored rows any of whose raw SMS has an outcome as its latest decision. A posting outcome keeps
+     * the user's row; a not-financial one keeps a row that still links it, as the old pass skipped such an SMS and only
+     * the decision's own writer deletes the row. They are saved before any decided posting, so another SMS's posting
+     * that names one of their SMS conflicts and is retried.
      */
-    private val keptDecided = stored.rows.filter { row -> !removed(row) && row.rawSmsIds.any { decisionsOf(it).postsRow } }
+    private val keptDecided = stored.rows.filter { row -> row.rawSmsIds.any { decisionsOf(it).outcome != null } }
         .onEach { row -> check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" } }
         .flatMap { it.rawSmsIds }.toSet()
     // Decided rows settle first, so the pre-pass sees only the evidence left to automatic assembly.
@@ -423,14 +425,13 @@ private class Projection(
     }
 
     /**
-     * A stored row the old pass removes: a raw SMS decided not financial, or a lone informational SMS without a
-     * human decision (`InformationalMessagePolicy`, the old stale-link cleanup).
+     * A stored row the old pass removes: a lone informational SMS without a human decision
+     * (`InformationalMessagePolicy`, the old stale-link cleanup).
      */
     private fun removed(row: LedgerRow): Boolean =
-        row.rawSmsIds.any { decisionsOf(it).isNonFinancial } ||
-            row.rawSmsIds.singleOrNull()?.let { id ->
-                !preserved(id) && byRawSmsId[id]?.event?.let(InformationalMessagePolicy::shouldAutoIgnore) == true
-            } == true
+        row.rawSmsIds.singleOrNull()?.let { id ->
+            !preserved(id) && byRawSmsId[id]?.event?.let(InformationalMessagePolicy::shouldAutoIgnore) == true
+        } == true
 
     private fun drop(transactionId: String) {
         rows.remove(transactionId)?.rawSmsIds?.forEach(links::remove)

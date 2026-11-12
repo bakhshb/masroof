@@ -357,7 +357,7 @@ class ScopedReconciliationTest {
         assertEquals("tx-ancient", ftDelegate.findByRawSmsId("sms-ancient")?.id)
         assertNoGlobalScan()
         assertTrue(parsed.boundedUnlinkedCalls > 0)
-        assertTrue(transactions.boundedTypeCalls > 0)
+        assertTrue(parsed.transferCandidateCalls > 0)
         assertTrue(parsed.boundedWindows.all { (start, _) -> start.isAfter(Instant.parse("2026-08-01T00:00:00Z")) })
         assertTrue(
             transactions.boundedWindows.all { (start, end) ->
@@ -452,7 +452,7 @@ class ScopedReconciliationTest {
     }
 
     @Test
-    fun inWindowUnrelatedTransfer_isNotPostedOnItsOwn() = runBlocking {
+    fun inWindowNeighbourTransfer_getsWhatAFullPassGivesIt() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "4101"))
         val at = Instant.parse("2026-08-05T09:00:00Z")
         persistTransfer(
@@ -479,7 +479,12 @@ class ScopedReconciliationTest {
         reconciliation.reconcileAffectedRawSmsIds(listOf("sms-affected"))
 
         assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, ftDelegate.findByRawSmsId("sms-affected")?.type)
-        assertEquals(null, ftDelegate.findByRawSmsId("sms-neighbor"))
+        val scoped = ftDelegate.findByRawSmsId("sms-neighbor")
+        db.openHelper.writableDatabase.execSQL("DELETE FROM financial_transaction_raw_sms_link")
+        db.openHelper.writableDatabase.execSQL("DELETE FROM financial_transaction")
+        reconciliation.reconcileStoredEvents()
+        // The neighbour is in the affected leg's scope, so the scoped pass gives it what a full pass gives it.
+        assertEquals(ftDelegate.findByRawSmsId("sms-neighbor"), scoped)
     }
 
     @Test
@@ -582,6 +587,7 @@ class ScopedReconciliationTest {
             tx(
                 id = TransactionIdFactory.fromRawSmsIds(listOf("sms-loan")),
                 type = FinancialTransactionType.FEE,
+                amount = "3036.11",
                 occurredAt = Instant.parse("2026-08-27T01:10:00Z"),
                 linked = listOf("evt-loan"),
                 source = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, "3001"),

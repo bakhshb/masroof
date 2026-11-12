@@ -187,6 +187,62 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         assertEquals(ids.toSet(), covered.filter { it in ids }.toSet())
     }
 
+    /** A second full pass right after one writes nothing: no save, unlink, update or reference move, no transaction. */
+    @Test
+    fun aSecondFullPass_writesNothing() = runBlocking {
+        persistLegs()
+        val legacy = pair().copy(id = "transaction:legacy-pair", appliedExchangeRate = BigDecimal("3.75"),
+            exchangeRateSource = ExchangeRateSource.HISTORICAL_MERCHANT)
+        ftRepo.save(legacy, listOf(OUT, IN))
+        commit(legacy.id)
+        persistPurchases()
+        writing().reconcileStoredEventsDetailed()
+        var writes = 0
+        val counting = object : FinancialTransactionRepository by ftRepo {
+            override suspend fun save(transaction: FinancialTransaction, rawSmsIds: Collection<String>) =
+                ftRepo.save(transaction, rawSmsIds).also { writes++ }
+
+            override suspend fun unlinkRawSms(rawSmsId: String) = ftRepo.unlinkRawSms(rawSmsId).also { writes++ }
+
+            override suspend fun update(transaction: FinancialTransaction) = ftRepo.update(transaction).also { writes++ }
+
+            override suspend fun moveTransactionReferences(oldId: String, newId: String, newIdByRawSmsId: Map<String, String>) {
+                writes++
+                ftRepo.moveTransactionReferences(oldId, newId, newIdByRawSmsId)
+            }
+        }
+        var transactions = 0
+
+        val report = writing(counting, onTransaction = { transactions++ }).reconcileStoredEventsDetailed()
+
+        assertEquals(0 to 0, writes to transactions)
+        assertEquals(0 to 0, report.summary.assembledSingle to report.summary.matchedPairs)
+        assertEquals(pairId, RoomCommitmentRepository.from(db).listAll().single().sourceTransactionId)
+    }
+
+    /**
+     * The first pass over an old-path ledger: every changed row is written in one transaction, and a unit the guard
+     * blocks does not stop the others.
+     */
+    @Test
+    fun theFirstPass_writesEveryUnitInOneTransaction_andABlockedUnitDoesNotStopTheOthers() = runBlocking {
+        persistPurchases()
+        writing().reconcileStoredEventsDetailed()
+        listOf(P1, P2).forEach { ftRepo.update(ftRepo.findByRawSmsId(it)!!.copy(occurredAtZone = null)) }
+        persistEvent(P3, event("pe-$P3", P3, MessageFamily.PURCHASE, money("10.00"), card = card, merchant = "Shop 3"),
+            at = AT.plusSeconds(600))
+        var transactions = 0
+
+        val report = writing(guard = { expected, write ->
+            if (expected.any { it.event.rawSmsId == P3 }) FinancialTransactionSaveResult.Conflict(P3, "stale_pattern_definition") else write()
+        }, onTransaction = { transactions++ }).reconcileStoredEventsDetailed()
+
+        assertEquals(1, transactions)
+        assertEquals(setOf(P3), report.failedRawSmsIds)
+        assertEquals(listOf("Asia/Riyadh", "Asia/Riyadh"), listOf(P1, P2).map { ftRepo.findByRawSmsId(it)?.occurredAtZone })
+        assertEquals(null, ftRepo.findByRawSmsId(P3))
+    }
+
     @Test
     fun unchangedRows_areNotRewritten() = runBlocking {
         persistPurchases()
@@ -228,6 +284,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         guard: AutomaticWrite? = null,
         legacy: () -> Boolean = { false },
         reviews: ReviewRepository = EmptyReviewRepository(),
+        onTransaction: () -> Unit = {},
     ) = TransactionReconciliationService(
         rawSmsRepository = rawRepo,
         financialTransactionRepository = ledger,
@@ -238,7 +295,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         userDecisionRepository = NoOpUserDecisionRepository,
         zoneId = ZoneId.of("Asia/Riyadh"),
         automaticWrite = guard,
-        inTransaction = { write -> db.withTransaction { write() } },
+        inTransaction = { write -> onTransaction(); db.withTransaction { write() } },
         useLegacyPath = legacy,
     )
 
@@ -284,6 +341,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         const val IN = "sms-writer-in"
         const val P1 = "sms-writer-p1"
         const val P2 = "sms-writer-p2"
+        const val P3 = "sms-writer-p3"
         const val LOAN = "sms-writer-loan"
         val AT: Instant = Instant.parse("2026-08-01T12:00:00Z")
     }

@@ -154,17 +154,31 @@ class LedgerProjectorKeepStoredTest {
     }
 
     @Test
-    fun aNonFinancialDecisionOrAnInformationalFamilyStillRemovesTheRow() {
+    fun aNonFinancialDecisionKeepsTheStoredRow_andAnInformationalFamilyRemovesIt() {
         val decisions = fold(
-            listOf(UserDecision("nf", UserDecisionKind.NON_FINANCIAL, T0), UserDecision("ig", UserDecisionKind.IGNORE, T0)),
+            listOf(
+                UserDecision("nf", UserDecisionKind.NON_FINANCIAL, T0), UserDecision("ig", UserDecisionKind.IGNORE, T0),
+                UserDecision("rv", UserDecisionKind.RESTORE_REVERTED, T0),
+            ),
         )
-        val stored = StoredFacts(rows = listOf(storedRow("nf"), storedRow("ig"), storedRow("otp")))
+        val kept = listOf(storedRow("nf"), storedRow("ig"), storedRow("rv"))
+        val stored = StoredFacts(rows = kept + storedRow("otp"))
         val result = project(
-            listOf(purchase("nf"), purchase("ig"), evidence(event("otp", MessageFamily.OTP, card = card), T0)),
+            listOf(purchase("nf"), purchase("ig"), purchase("rv"), evidence(event("otp", MessageFamily.OTP, card = card), T0)),
             decisions, owned, stored,
         )
+        // The old pass skipped a decided SMS and left its row; only the decision's own writer deletes it.
+        assertEquals(kept.sortedBy { it.transaction.id }, result.rows)
+        assertEquals(setOf("nf", "ig", "rv", "otp"), result.settledRawSmsIds)
+        assertEquals(emptyList<LedgerReviewCandidate>(), result.reviewCandidates)
+    }
+
+    @Test
+    fun aNonFinancialDecisionWithoutAStoredRowDerivesNothing() {
+        val decisions = fold(listOf(UserDecision("nf", UserDecisionKind.NON_FINANCIAL, T0)))
+        val result = project(listOf(purchase("nf")), decisions, owned)
         assertEquals(emptyList<LedgerRow>(), result.rows)
-        assertEquals(setOf("nf", "ig", "otp"), result.settledRawSmsIds)
+        assertEquals(setOf("nf"), result.settledRawSmsIds)
     }
 
     @Test

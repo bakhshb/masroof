@@ -17,6 +17,7 @@ class CountingParsedEventRepository(
     var boundedUnlinkedCalls: Int = 0
     var boundedLocalCalls: Int = 0
     var listByRawSmsIdsCalls: Int = 0
+    var transferCandidateCalls: Int = 0
     val boundedWindows: MutableList<Pair<Instant, Instant>> = mutableListOf()
     val loadedRawSmsIdSets: MutableList<Collection<String>> = mutableListOf()
 
@@ -26,6 +27,7 @@ class CountingParsedEventRepository(
         boundedUnlinkedCalls = 0
         boundedLocalCalls = 0
         listByRawSmsIdsCalls = 0
+        transferCandidateCalls = 0
         boundedWindows.clear()
         loadedRawSmsIdSets.clear()
     }
@@ -63,6 +65,7 @@ class CountingParsedEventRepository(
         occurredAt: ClosedRange<Instant>,
         occurredAtLocal: ClosedRange<LocalDateTime>,
     ): List<ParsedEventRecord> {
+        transferCandidateCalls += 1
         boundedUnlinkedCalls += 1
         boundedLocalCalls += 1
         boundedWindows += receivedAt.start to receivedAt.endInclusive
