@@ -88,6 +88,19 @@ class AppContainerStartupMaintenanceTest {
     }
 
     @Test
+    fun aFinancialStoreThatCannotOpen_blocksStartup_andIsPreserved() = runBlocking {
+        val file = context.getDatabasePath(MasroofDatabase.NAME).apply { parentFile!!.mkdirs() }
+        val bytes = ("SQLite format 3\u0000" + "damaged-sqlite-test-file".repeat(100)).toByteArray()
+        file.writeBytes(bytes)
+        container.maintenance.runStartupMaintenance()
+        assertEquals(
+            StartupMaintenanceOutcome.BLOCKED,
+            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.maintenance.awaitStartupMaintenance() },
+        )
+        assertTrue(bytes.contentEquals(file.readBytes()))
+    }
+
+    @Test
     fun successfulRetry_updatesTheAuthorityReadByRecreatedActivities() = runBlocking {
         var storeOpens = false
         val maintenance = MaintenanceContainer(

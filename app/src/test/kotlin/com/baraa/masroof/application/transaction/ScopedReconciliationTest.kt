@@ -375,7 +375,7 @@ class ScopedReconciliationTest {
     }
 
     @Test
-    fun scopedReconcile_releasesNearbyDoublePostedSelfTransfers() = runBlocking {
+    fun scopedReconcile_onAnUnrelatedMessageNearInTime_releasesDoublePostedSelfTransfers() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
         val at = Instant.parse("2026-09-02T07:00:00Z")
@@ -426,7 +426,8 @@ class ScopedReconciliationTest {
 
         val report = reconciliation.reconcileAffectedRawSmsIds(listOf("sms-new-unrelated"))
 
-        // The new message's scope reaches the double-posted legs, so the scoped pass releases them as a full pass would.
+        // The new message shares only the time (other amount, account and network), but the scope is time-based: it
+        // reaches the double-posted legs, so the scoped pass releases them as a full pass would.
         assertEquals(0, parsed.listAllCalls)
         assertEquals(0, report.summary.failed)
         assertTrue(legacySms.all { ftDelegate.findByRawSmsId(it) == null })

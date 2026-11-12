@@ -38,7 +38,7 @@ class WorkerStartupGateTest {
     fun tearDown() = harness.close()
 
     @Test
-    fun liveWorker_beforeIntegrityRepairSucceeds_retriesWithoutProcessing() = runBlocking {
+    fun liveWorker_beforeStartupIsReady_retriesWithoutProcessing() = runBlocking {
         val raw = captured()
 
         val result = liveWorker(raw.id, ready = false).doWork()
