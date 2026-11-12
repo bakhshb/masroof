@@ -7,12 +7,17 @@ import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.Confidence
+import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.model.EffectiveUserDecisions
+import com.baraa.masroof.domain.model.ExchangeRateSource
+import com.baraa.masroof.domain.model.FinancialTransaction
+import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.UserDecision
 import com.baraa.masroof.domain.model.LoanType
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -65,6 +70,25 @@ fun evidence(
     occurredAtLocal: LocalDateTime? = null,
     loanType: LoanType? = null,
 ) = LedgerEvidence(event, receivedAt, transactionReference, occurredAtLocal, loanType, automationConfirmed = false)
+
+/** A stored ledger row linking [rawSmsIds]: an expense of 100 SAR at [T0] unless told otherwise. */
+@Suppress("LongParameterList")
+fun storedRow(
+    vararg rawSmsIds: String,
+    zone: String? = "Asia/Riyadh",
+    type: FinancialTransactionType = FinancialTransactionType.EXPENSE,
+    rate: BigDecimal? = null,
+    rateSource: ExchangeRateSource? = null,
+    source: String? = null,
+) = LedgerRow(
+    FinancialTransaction(
+        id = TransactionIdFactory.fromRawSmsIds(rawSmsIds.toList()), type = type, amount = sar("100"), occurredAt = T0,
+        sourceContainerId = source, destinationContainerId = null, merchant = "stored", counterparty = null,
+        categoryId = null, linkedParsedEventIds = rawSmsIds.map { "e-$it" }.sorted(), appliedExchangeRate = rate,
+        exchangeRateSource = rateSource, occurredAtZone = zone,
+    ),
+    rawSmsIds.sorted(),
+)
 
 /** Folds [rows] (in append order) into the decisions in force for every raw SMS they name. */
 fun fold(rows: List<UserDecision>): Map<String, EffectiveUserDecisions> =

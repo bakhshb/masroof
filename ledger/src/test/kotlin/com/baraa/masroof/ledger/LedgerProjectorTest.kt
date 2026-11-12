@@ -91,7 +91,7 @@ class LedgerProjectorTest {
                 evidence(event("unknown", MessageFamily.UNKNOWN), T0),
             ),
             registry = owned,
-            stored = StoredFacts(rows = listOf(StoredLedgerRow(setOf("otp"), "Asia/Riyadh"))),
+            stored = StoredFacts(rows = listOf(storedRow("otp"))),
         )
 
         assertEquals(emptyList<LedgerRow>(), result.rows)
@@ -103,8 +103,8 @@ class LedgerProjectorTest {
     }
 
     @Test
-    fun aStoredSingleLegSelfTransferGivesWayToItsPair_andAnAmbiguousOneIsReleased() {
-        val stored = StoredFacts(rows = listOf(StoredLedgerRow(setOf("out"), "Asia/Riyadh")))
+    fun aStoredSingleLegSelfTransferGivesWayToItsPair_andAnAmbiguousOneIsKept() {
+        val stored = StoredFacts(rows = listOf(storedRow("out", type = FinancialTransactionType.SELF_TRANSFER)))
         val paired = project(
             listOf(intraBank("out", MessageFamily.TRANSFER_OUT), intraBank("in", MessageFamily.TRANSFER_IN, T0.plusSeconds(60))),
             registry = owned, stored = stored,
@@ -120,9 +120,11 @@ class LedgerProjectorTest {
             ),
             registry = owned, stored = stored,
         )
-        assertEquals(emptyList<LedgerRow>(), ambiguous.rows)
-        assertEquals(listOf("in1", "in2", "out"), ambiguous.reviewCandidates.map { it.rawSmsId })
+        // Keep rule (ii): the projection derives no row for "out", so its stored row stays (the old pass released it).
+        assertEquals(stored.rows, ambiguous.rows)
+        assertEquals(listOf("in1", "in2"), ambiguous.reviewCandidates.map { it.rawSmsId })
         assertTrue(ambiguous.reviewCandidates.all { it.kind == ReviewKind.PENDING_MATCH })
+        assertTrue("out" in ambiguous.settledRawSmsIds)
     }
 
     @Test
@@ -191,7 +193,7 @@ class LedgerProjectorTest {
             installment("i3", ownedA, null),
         )
         // i2 was stored as FEE by an older assembler.
-        val stored = StoredFacts(rows = listOf(StoredLedgerRow(setOf("i2"), "Asia/Riyadh")))
+        val stored = StoredFacts(rows = listOf(storedRow("i2", type = FinancialTransactionType.FEE)))
 
         val result = project(events, registry = owned, stored = stored)
         assertEquals(setOf(loan), result.confirmedLoans)
@@ -220,7 +222,7 @@ class LedgerProjectorTest {
         )
         val registry = OwnershipFacts(cards = mapOf(d360Card to OwnershipStatus.OWNED))
         val stored = StoredFacts(
-            rows = listOf(StoredLedgerRow(setOf("fx"), "Asia/Dubai", BigDecimal("3.75"), ExchangeRateSource.SMS)),
+            rows = listOf(storedRow("fx", zone = "Asia/Dubai", rate = BigDecimal("3.75"), rateSource = ExchangeRateSource.SMS)),
         )
 
         val row = project(listOf(evidence), registry = registry, stored = stored).rows.single().transaction
@@ -233,7 +235,7 @@ class LedgerProjectorTest {
         assertEquals(Instant.parse("2026-08-01T10:00:00Z"), fresh.occurredAt)
         assertEquals(null, fresh.appliedExchangeRate)
 
-        val half = StoredFacts(rows = listOf(StoredLedgerRow(setOf("fx"), "Asia/Dubai", BigDecimal("3.75"), null)))
+        val half = StoredFacts(rows = listOf(storedRow("fx", zone = "Asia/Dubai", rate = BigDecimal("3.75"))))
         assertEquals(null, project(listOf(evidence), registry = registry, stored = half).rows.single().transaction.appliedExchangeRate)
     }
 

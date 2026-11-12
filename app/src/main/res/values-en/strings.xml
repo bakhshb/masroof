@@ -245,6 +245,7 @@
     <string name="settings_log_category_update">Update</string>
     <string name="settings_log_category_logs">Log</string>
     <string name="settings_logs_export">Export log</string>
+    <string name="settings_logs_export_ledger_comparison">Export ledger comparison (debug)</string>
     <string name="settings_logs_share">Share log</string>
     <string name="settings_show_guide_title">Show the guide again</string>
     <string name="settings_show_guide_subtitle">The getting-started guide appears once above Home.</string>

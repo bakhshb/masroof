@@ -14,6 +14,7 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.UserDecisionKind
+import com.baraa.masroof.domain.rules.InformationalMessagePolicy
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -22,9 +23,10 @@ import java.time.ZoneOffset
 /**
  * Derives the ledger from evidence, decisions and ownership, with no I/O (docs/ARCHITECTURE.md, "Derived ledger").
  *
- * It applies the rules of the app's `TransactionReconciliationService` to an empty ledger: the result is the ledger
- * that service leaves behind, minus what it keeps only because a row is already stored ("Known differences").
- * Evidence is visited in event-id order, so the input order never changes the result.
+ * It applies the rules of the app's `TransactionReconciliationService` to an empty ledger, then the keep rule the
+ * owner decided at gate 3.2: a stored row the user decided, or one the projection no longer derives, is carried
+ * verbatim ("Known differences" lists what still differs). Evidence and stored rows are visited in id order, so the
+ * input order never changes the result.
  */
 object LedgerProjector {
     /**
@@ -39,18 +41,23 @@ object LedgerProjector {
         zone: ZoneId,
     ): LedgerProjection {
         require(events.distinctBy { it.event.rawSmsId }.size == events.size) { "one evidence per raw SMS" }
-        return Projection(events.sortedBy { it.event.id }, decisions, registry, storedFacts, zone).run()
+        require(storedFacts.rows.flatMap { it.rawSmsIds }.let { it.distinct().size == it.size }) { "one stored row per raw SMS" }
+        // Stored rows in id order with sorted links, so neither the caller's order nor sorting changes the result.
+        val stored = storedFacts.copy(rows = storedFacts.rows.map { it.copy(rawSmsIds = it.rawSmsIds.sorted()) }.sortedBy { it.transaction.id })
+        return Projection(events.sortedBy { it.event.id }, decisions, registry, stored, zone).run()
     }
 
     /**
      * The raw SMS a projection of [affected] must include so its rows for [affected] equal the full projection's:
      * the legs of every decision naming one, every installment of the same loan, and every transfer leg reachable
-     * through legs whose times may fall inside one [TransactionMatcher.TRANSFER_MATCH_WINDOW] of each other.
+     * through legs whose times may fall inside one [TransactionMatcher.TRANSFER_MATCH_WINDOW] of each other, and
+     * every raw SMS of a stored row that links one.
      */
     fun scope(
         affected: Collection<String>,
         events: List<LedgerEvidence>,
         decisions: Map<String, EffectiveUserDecisions>,
+        storedFacts: StoredFacts = StoredFacts(),
     ): Set<String> {
         val byRawSmsId = events.associateBy { it.event.rawSmsId }
         val transfers = events.filter { it.event.messageFamily.isTransfer() }
@@ -62,6 +69,7 @@ object LedgerProjector {
             val ids = setOfNotNull(subject, outcome.rawSmsId, outcome.pairedRawSmsId)
             ids.forEach { named.getOrPut(it, ::mutableSetOf) += ids }
         }
+        for (row in storedFacts.rows) row.rawSmsIds.forEach { named.getOrPut(it, ::mutableSetOf) += row.rawSmsIds }
         val scope = mutableSetOf<String>()
         val queue = ArrayDeque(affected)
         while (queue.isNotEmpty()) {
@@ -119,15 +127,22 @@ private class Projection(
 ) {
     private val byRawSmsId = records.associateBy { it.event.rawSmsId }
     private val byEventId = records.associateBy { it.event.id }
-    private val storedZone = stored.rows.flatMap { row -> row.rawSmsIds.map { it to row.occurredAtZone } }.toMap()
+    private val storedByRawSmsId = stored.rows.flatMap { row -> row.rawSmsIds.map { it to row } }.toMap()
     private val storedRates = stored.rows
-        .filter { it.appliedExchangeRate != null && it.exchangeRateSource != null }
+        .filter { it.transaction.appliedExchangeRate != null && it.transaction.exchangeRateSource != null }
         .associateBy { it.rawSmsIds }
     private val rows = mutableMapOf<String, LedgerRow>()
     private val links = mutableMapOf<String, String>()
     private val settled = mutableSetOf<String>()
     private val retry = mutableSetOf<String>()
     private val reviews = mutableListOf<LedgerReviewCandidate>()
+    /**
+     * Keep rule (i): stored rows any of whose raw SMS has a posting outcome as its latest decision. They are saved
+     * before any decided posting, so another SMS's posting that names one of their SMS conflicts and is retried.
+     */
+    private val keptDecided = stored.rows.filter { row -> !removed(row) && row.rawSmsIds.any { decisionsOf(it).postsRow } }
+        .onEach { row -> check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" } }
+        .flatMap { it.rawSmsIds }.toSet()
     // Decided rows settle first, so the pre-pass sees only the evidence left to automatic assembly.
     private val automatic = records.filter(::settleDecided)
     private val confirmedLoans = confirmLoans(automatic)
@@ -138,6 +153,7 @@ private class Projection(
         automatic.forEach { assemble(it, open) }
         postOpenTransfers(open)
         upgradePostedTransferPairs()
+        keepStoredRowsWithoutDerivation()
         return LedgerProjection(
             rows = rows.values.map(::withStoredExchangeRate).sortedBy { it.transaction.id },
             reviewCandidates = reviews.filter { it.rawSmsId !in settled }.groupBy { it.rawSmsId }
@@ -166,7 +182,7 @@ private class Projection(
         val posting = decidedPosting(decided)
         when {
             decided.isNonFinancial -> settled += rawSmsId
-            // Only a decided pair links a second SMS, and that SMS's own decisions name the pair, so it is kept.
+            // A kept stored row (rule i), or a decided pair, links this SMS; it stays with the row.
             rawSmsId in links -> settled += rawSmsId
             posting != null -> if (!save(posting.transaction, posting.rawSmsIds)) retry += rawSmsId
             decided.outcome?.kind == UserDecisionKind.EXTERNAL_TRANSFER -> settled += rawSmsId
@@ -212,7 +228,7 @@ private class Projection(
 
     private fun assemble(record: LedgerEvidence, open: MutableList<TransferMatchCandidate>) {
         val event = record.event
-        val persistedZone = storedZone[event.rawSmsId]
+        val persistedZone = storedByRawSmsId[event.rawSmsId]?.transaction?.occurredAtZone
         val occurredAt = TransactionTiming.effectiveOccurredAt(
             event, record.occurredAtLocal, record.receivedAt, zone, persistedZone,
         )
@@ -279,7 +295,7 @@ private class Projection(
     private fun upgradePostedTransferPairs() {
         fun eligible(record: LedgerEvidence) =
             TransactionAssembler.isAutomationEligible(record.event, record.automationConfirmed) &&
-                !preserved(record.event.rawSmsId)
+                !preserved(record.event.rawSmsId) && record.event.rawSmsId !in keptDecided
         val legs = buildList {
             for (row in rows.values) {
                 val posted = row.transaction
@@ -330,6 +346,53 @@ private class Projection(
         }
     }
 
+    /**
+     * Keep rule (ii), for undecided stored rows: a stored row stays verbatim when it links no raw SMS, when the
+     * projection derived no row for its raw SMS or only rows inside its set that do not cover it (a stored pair one of
+     * whose legs no longer derives), or when it derived one row on exactly its set with another type or amount (a
+     * type edited only on the row), except the old fee→financing heal. A derived row that reaches outside the set, or
+     * one that covers it with the stored type and amount, wins. Its raw SMS are settled and not retried.
+     */
+    private fun keepStoredRowsWithoutDerivation() {
+        val kept = stored.rows.mapNotNull { row ->
+            if (removed(row) || row.rawSmsIds.any { decisionsOf(it).outcome != null }) return@mapNotNull null
+            val derivedIds = row.rawSmsIds.mapNotNull(links::get).toSet()
+            val derived = derivedIds.map(rows::getValue)
+            val keep = when {
+                row.rawSmsIds.isEmpty() -> row.transaction.id !in rows
+                derived.any { !row.rawSmsIds.containsAll(it.rawSmsIds) } -> false
+                row.rawSmsIds.any { it !in links } -> true
+                else -> derived.singleOrNull()?.transaction?.let { changesTypeOrAmount(row.transaction, it) } == true
+            }
+            (row to derivedIds).takeIf { keep }
+        }
+        for ((row, derivedIds) in kept) {
+            derivedIds.forEach(::drop)
+            check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" }
+            retry -= row.rawSmsIds.toSet()
+        }
+    }
+
+    /** The derivation changes the stored type or amount, other than the old pass's own fee→financing heal. */
+    private fun changesTypeOrAmount(stored: FinancialTransaction, derived: FinancialTransaction): Boolean {
+        val feeHeal = stored.type == FinancialTransactionType.FEE && derived.type == FinancialTransactionType.LOAN_REPAYMENT
+        return (stored.type != derived.type && !feeHeal) || stored.amount != derived.amount
+    }
+
+    /**
+     * A stored row the old pass removes: a raw SMS decided not financial, or a lone informational SMS without a
+     * human decision (`InformationalMessagePolicy`, the old stale-link cleanup).
+     */
+    private fun removed(row: LedgerRow): Boolean =
+        row.rawSmsIds.any { decisionsOf(it).isNonFinancial } ||
+            row.rawSmsIds.singleOrNull()?.let { id ->
+                !preserved(id) && byRawSmsId[id]?.event?.let(InformationalMessagePolicy::shouldAutoIgnore) == true
+            } == true
+
+    private fun drop(transactionId: String) {
+        rows.remove(transactionId)?.rawSmsIds?.forEach(links::remove)
+    }
+
     private fun FinancialTransaction.isSingleLegSelfTransfer() =
         type == FinancialTransactionType.SELF_TRANSFER && linkedParsedEventIds.size == 1
 
@@ -351,7 +414,7 @@ private class Projection(
         val conflict = stale.any { rows.getValue(it).rawSmsIds.size != 1 } ||
             rawSmsIds.any { links[it].let { id -> id != null && id != transaction.id && id !in stale } }
         if (conflict) return false
-        stale.forEach { id -> rows.remove(id)?.rawSmsIds?.forEach(links::remove) }
+        stale.forEach(::drop)
         rows[transaction.id] = LedgerRow(transaction, rawSmsIds.sorted())
         rawSmsIds.forEach { links[it] = transaction.id }
         settled += rawSmsIds
@@ -360,7 +423,7 @@ private class Projection(
 
     /** A complete stored exchange-rate pair stays on a row that links the same raw SMS. */
     private fun withStoredExchangeRate(row: LedgerRow): LedgerRow {
-        val match = storedRates[row.rawSmsIds.toSet()] ?: return row
+        val match = storedRates[row.rawSmsIds]?.transaction ?: return row
         return row.copy(
             transaction = row.transaction.copy(
                 appliedExchangeRate = match.appliedExchangeRate,

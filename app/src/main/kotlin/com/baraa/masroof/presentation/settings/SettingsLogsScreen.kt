@@ -60,13 +60,20 @@ fun SettingsLogsScreen(
     LaunchedEffect(Unit) { viewModel.refreshLogs() }
     val context = androidx.compose.ui.platform.LocalContext.current
     val shareTitle = stringResource(R.string.settings_logs_share)
+    val ledgerShadowLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri -> if (uri != null) viewModel.exportLedgerShadow(uri) }
     SettingsLogsContent(state, entries, onBack, onRequestExport, viewModel::clearLogs, viewModel::clearLogMessage,
-        onShare = { com.baraa.masroof.presentation.dashboard.SharePlainText.share(context, viewModel.logExportText(), shareTitle, shareTitle) })
+        onShare = { com.baraa.masroof.presentation.dashboard.SharePlainText.share(context, viewModel.logExportText(), shareTitle, shareTitle) },
+        onExportLedgerShadow = if (viewModel.canExportLedgerShadow) {
+            { ledgerShadowLauncher.launch("masroof-ledger-comparison.txt") }
+        } else null)
 }
 
 @Composable
 internal fun SettingsLogsContent(state: SettingsUiState, entries: List<AppLogEntry>, onBack: () -> Unit,
-    onRequestExport: () -> Unit, onClearLogs: () -> Unit, onClearMessage: () -> Unit, onShare: (() -> Unit)? = null) {
+    onRequestExport: () -> Unit, onClearLogs: () -> Unit, onClearMessage: () -> Unit, onShare: (() -> Unit)? = null,
+    onExportLedgerShadow: (() -> Unit)? = null) {
     val snackbarHostState = remember { SnackbarHostState() }
     val messageText = state.logMessage?.let { resolveLogMessage(it) }
     var selectedFilter by rememberSaveable { mutableStateOf(SettingsLogFilter.ALL) }
@@ -192,6 +199,14 @@ internal fun SettingsLogsContent(state: SettingsUiState, entries: List<AppLogEnt
                     ) {
                         Text(stringResource(R.string.settings_logs_clear))
                     }
+                }
+
+                if (onExportLedgerShadow != null) OutlinedButton(
+                    onClick = onExportLedgerShadow,
+                    enabled = !state.exportingLogs,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.settings_logs_export_ledger_comparison))
                 }
 
                 if (state.exportingLogs) {

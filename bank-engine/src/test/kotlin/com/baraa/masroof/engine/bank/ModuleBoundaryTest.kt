@@ -38,6 +38,7 @@ class ModuleBoundaryTest {
                 "com.baraa.masroof.domain.ids.",
                 "com.baraa.masroof.domain.assembly.",
                 "com.baraa.masroof.domain.matching.",
+                "com.baraa.masroof.domain.rules.",
             ),
         ).forEach { (module, allowed) ->
             val sources = File(root, "$module/src/main/kotlin").walkTopDown().filter { it.extension == "kt" }.toList()
@@ -74,7 +75,7 @@ class ModuleBoundaryTest {
         assertEquals(emptySet<String>(), graph[":finance-core"])
         assertEquals(setOf(":finance-core"), graph[":bank-engine"])
         assertEquals(setOf(":finance-core"), graph[":ledger"])
-        assertEquals(setOf(":ui-kit", ":finance-core", ":bank-engine", ":ml-assist"), graph[":app"])
+        assertEquals(setOf(":ui-kit", ":finance-core", ":bank-engine", ":ml-assist", ":ledger"), graph[":app"])
         fun visit(module: String, ancestors: Set<String>) {
             assertFalse(module in ancestors, "Dependency cycle: $ancestors -> $module")
             graph[module].orEmpty().forEach { visit(it, ancestors + module) }

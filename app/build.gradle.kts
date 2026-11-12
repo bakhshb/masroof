@@ -134,6 +134,7 @@ dependencies {
     implementation(project(":bank-engine"))
     implementation(project(":finance-core"))
     implementation(project(":ml-assist"))
+    implementation(project(":ledger"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.viewmodel)

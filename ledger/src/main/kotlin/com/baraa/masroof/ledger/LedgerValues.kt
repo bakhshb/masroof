@@ -2,14 +2,12 @@ package com.baraa.masroof.ledger
 
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.CardReference
-import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.ReviewKind
-import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDateTime
 
@@ -38,25 +36,19 @@ data class OwnershipFacts(
     fun loan(reference: LoanReference): OwnershipStatus = loans[reference] ?: OwnershipStatus.UNKNOWN
 }
 
-/** One row of the stored ledger, named by the raw SMS it links. Only its zone and exchange-rate pair are read. */
-data class StoredLedgerRow(
-    val rawSmsIds: Set<String>,
-    val occurredAtZone: String?,
-    val appliedExchangeRate: BigDecimal? = null,
-    val exchangeRateSource: ExchangeRateSource? = null,
-)
-
 /**
- * Stored state the projection takes as input. [correctionClosedRawSmsIds] are the raw SMS whose review a
+ * Stored state the projection takes as input. [rows] are the stored ledger rows with the raw SMS they link: their
+ * zone and exchange-rate pair are inputs to derived rows, and a row the keep rule names is carried verbatim
+ * (docs/ARCHITECTURE.md, "Derived ledger"). [correctionClosedRawSmsIds] are the raw SMS whose review a
  * correction's own pass closed as `USER_CORRECTION` (the app's `ReviewCorrectionClosure`), which protects them
  * like an outcome decision.
  */
 data class StoredFacts(
-    val rows: List<StoredLedgerRow> = emptyList(),
+    val rows: List<LedgerRow> = emptyList(),
     val correctionClosedRawSmsIds: Set<String> = emptySet(),
 )
 
-/** One derived ledger row and the raw SMS it links, sorted. */
+/** One ledger row (derived or stored) and the raw SMS it links, sorted. */
 data class LedgerRow(
     val transaction: FinancialTransaction,
     val rawSmsIds: List<String>,

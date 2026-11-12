@@ -11,6 +11,8 @@ import com.baraa.masroof.application.container.SmsContainer
 import com.baraa.masroof.application.container.StorageContainer
 import com.baraa.masroof.application.container.UpdateContainer
 import com.baraa.masroof.application.update.InstallPermissionHelper
+import com.baraa.masroof.application.transaction.LedgerShadowComparison
+import com.baraa.masroof.BuildConfig
 fun settingsViewModelFactory(
     storage: StorageContainer,
     backup: BackupContainer,
@@ -47,6 +49,9 @@ fun settingsViewModelFactory(
             },
             onRequestInstallPermission = onRequestInstallPermission,
             historicalMerchantRateCorrectionWorkflow = dashboard.historicalMerchantRateCorrectionWorkflow,
+            ledgerShadowExport = if (BuildConfig.DEBUG) { uri ->
+                storage.appLogService.writeTextTo(uri, LedgerShadowComparison.report(review.ledgerInputLoader.load())).getOrThrow()
+            } else null,
         )
     }
 }

@@ -66,6 +66,8 @@ class SettingsViewModel(
     val messagePatternsWorkflow: com.baraa.masroof.application.patterns.MessagePatternsWorkflow? = null,
     private val historicalMerchantRateCorrectionWorkflow: HistoricalMerchantRateCorrectionWorkflow? = null,
     private val bankSmsImportWorkflow: com.baraa.masroof.application.sms.BankSmsImportWorkflow? = null,
+    /** Debug builds only: writes the plan 3.2 ledger shadow comparison to a document; null hides the action. */
+    private val ledgerShadowExport: (suspend (Uri) -> Unit)? = null,
 ) : ViewModel() {
     private var updatableCorrectionIds: List<String> = emptyList()
     private val _uiState = MutableStateFlow(
@@ -438,19 +440,22 @@ class SettingsViewModel(
     fun checkForUpdatesIfStale(silent: Boolean = true) = updates.checkForUpdatesIfStale(silent)
     fun logExportText(): String = appLogService.exportText()
 
-    fun exportLogs(uri: Uri) {
-        launchLogged(appLogService, AppLogCategories.LOGS, "Log export", onError = {
-            _uiState.update {
-                it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_FAILED)
-            }
+    fun exportLogs(uri: Uri) = runExport("Log export") { appLogService.exportTo(uri).getOrThrow() }
+
+    val canExportLedgerShadow: Boolean get() = ledgerShadowExport != null
+
+    fun exportLedgerShadow(uri: Uri) {
+        val export = ledgerShadowExport ?: return
+        runExport("Ledger comparison export") { export(uri) }
+    }
+
+    private fun runExport(action: String, write: suspend () -> Unit) {
+        launchLogged(appLogService, AppLogCategories.LOGS, action, onError = {
+            _uiState.update { it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_FAILED) }
         }) {
             _uiState.update { it.copy(exportingLogs = true, logMessage = null) }
-            withContext(Dispatchers.IO) {
-                appLogService.exportTo(uri).getOrThrow()
-            }
-            _uiState.update {
-                it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_SUCCESS)
-            }
+            withContext(Dispatchers.IO) { write() }
+            _uiState.update { it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_SUCCESS) }
         }
     }
 

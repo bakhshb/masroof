@@ -250,6 +250,7 @@
     <string name="settings_log_category_update">تحديث</string>
     <string name="settings_log_category_logs">سجل</string>
     <string name="settings_logs_export">تصدير السجل</string>
+    <string name="settings_logs_export_ledger_comparison">تصدير مقارنة الدفتر (نسخة التطوير)</string>
     <string name="settings_logs_share">مشاركة السجل</string>
     <string name="settings_show_guide_title">عرض الإرشاد مرة أخرى</string>
     <string name="settings_show_guide_subtitle">يظهر دليل البداية فوق الصفحة الرئيسية مرة واحدة.</string>

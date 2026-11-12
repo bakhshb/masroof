@@ -58,9 +58,11 @@ class AppLogService(
     /** The same text the export writes, for sharing from the log screen. */
     fun exportText(): String = buildExportText(readAll())
 
-    fun exportTo(uri: Uri): Result<Unit> =
+    fun exportTo(uri: Uri): Result<Unit> = writeTextTo(uri, exportText())
+
+    /** Writes [text] as UTF-8 to a document the user picked (also the debug ledger comparison export). */
+    fun writeTextTo(uri: Uri, text: String): Result<Unit> =
         runCatching {
-            val text = exportText()
             context.contentResolver.openOutputStream(uri)?.use { output ->
                 output.write(text.toByteArray(Charsets.UTF_8))
             } ?: error("Could not open export destination")

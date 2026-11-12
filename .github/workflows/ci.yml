@@ -74,6 +74,7 @@ jobs:
           path: |
             ui-kit/build/reports/tests/
             app/build/reports/tests/
+            app/build/reports/shadow-ledger/
             bank-engine/build/reports/tests/
             finance-core/build/reports/tests/
             ml-assist/build/reports/tests/

@@ -12,6 +12,7 @@ import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
+import com.baraa.masroof.application.transaction.LedgerInputLoader
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionRestoreService
 import com.baraa.masroof.application.sms.DebugProcessHalt
@@ -76,6 +77,17 @@ class ReviewContainer(
             reviewRepository = storage.reviewRepository,
             userDecisionRepository = storage.userDecisionRepository,
             automaticWrite = { expected, write -> automaticInterpretationWriteGuard.write(expected, write) },
+        )
+
+    /** The derived ledger's inputs (plan 3.2 shadow comparison; the seam the 3.3a writer reuses). */
+    val ledgerInputLoader: LedgerInputLoader =
+        LedgerInputLoader(
+            rawSmsRepository = storage.rawSmsRepository,
+            financialTransactionRepository = storage.financialTransactionRepository,
+            reviewRepository = storage.reviewRepository,
+            userDecisionRepository = storage.userDecisionRepository,
+            effectiveParsedEventProvider = effectiveParsedEventProvider,
+            ownershipResolver = ownershipResolver,
         )
 
     val reviewQueueUpdater: ReviewQueueUpdater =
