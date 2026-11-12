@@ -84,11 +84,11 @@ class AnalyticsJourneyTest {
         val workflow = AnalyticsWorkflow(container, TestStorageContext(host), fixtureClock)
         var showing by mutableStateOf(true)
         try {
-            runBlocking { container.awaitStartupMaintenance(); container.awaitPostStartupBackgroundWorkForTesting(); container.stopAnalytics(); seed(container, fixtureToday); workflow.start() }
+            runBlocking { container.maintenance.awaitStartupMaintenance(); container.maintenance.awaitPostStartupBackgroundWorkForTesting(); container.stopAnalytics(); seed(container, fixtureToday); workflow.start() }
             runBlocking { workflow.refresh() }
             awaitAnalysis(workflow) { it.snapshot?.status == "READY" }
             runBlocking {
-                val overview = container.dashboardService.loadOverview(com.baraa.masroof.domain.period.FinancialPeriodPolicy.periodContaining(fixtureToday))
+                val overview = container.dashboard.dashboardService.loadOverview(com.baraa.masroof.domain.period.FinancialPeriodPolicy.periodContaining(fixtureToday))
                 val expected = overview.spendingTrends!!.purchases.totalSpending.amount.movePointRight(2).longValueExact()
                 assertEquals("Purchase scope exactly matches the current graph", expected, workflow.state.value.snapshot!!.actual)
                 val snapshot = workflow.state.value.snapshot!!
@@ -98,25 +98,25 @@ class AnalyticsJourneyTest {
                 assertEquals(com.baraa.masroof.analytics.AnalyticsVersion.EVALUATION, snapshot.evaluationVersion)
                 for (past in workflow.state.value.purchasePeriods.filter { it.actual != null }) {
                     val period = com.baraa.masroof.domain.period.FinancialPeriod(LocalDate.ofEpochDay(past.start), LocalDate.ofEpochDay(past.end))
-                    val actual = container.dashboardService.loadOverview(period).spendingTrends!!.purchases.totalSpending.amount.movePointRight(2).longValueExact()
+                    val actual = container.dashboard.dashboardService.loadOverview(period).spendingTrends!!.purchases.totalSpending.amount.movePointRight(2).longValueExact()
                     assertEquals("Historical periods use the existing purchases scope", actual, past.actual)
                 }
                 assertEquals(workflow.state.value.snapshot!!.total, workflow.state.value.snapshot!!.chart().sumOf { it.amount }.movePointRight(2).longValueExact())
-                val rows = container.financialTransactionRepository.listAll()
+                val rows = container.storage.financialTransactionRepository.listAll()
                 val changed = rows.first { it.id == "cash" }
                 val priorHash = workflow.state.value.snapshot!!.sourceHash
-                container.financialTransactionRepository.update(changed.copy(amount = com.baraa.masroof.core.money.Money.of(java.math.BigDecimal("70.00"), changed.amount.currency)))
+                container.storage.financialTransactionRepository.update(changed.copy(amount = com.baraa.masroof.core.money.Money.of(java.math.BigDecimal("70.00"), changed.amount.currency)))
                 workflow.request()
                 withTimeout(90_000) { while (workflow.state.value.updating || workflow.state.value.snapshot?.sourceHash == priorHash) delay(100) }
                 assertEquals(expected + 2000, workflow.state.value.snapshot!!.actual)
                 assertEquals(expected + 2000, workflow.state.value.snapshot!!.insights!!.components.sumOf { it.amount })
                 val afterCorrection = workflow.state.value.snapshot!!.sourceHash
-                container.database.openHelper.writableDatabase.execSQL("DELETE FROM financial_transaction WHERE id='cash'")
+                container.storage.database.openHelper.writableDatabase.execSQL("DELETE FROM financial_transaction WHERE id='cash'")
                 workflow.request()
                 withTimeout(90_000) { while (workflow.state.value.updating || workflow.state.value.snapshot?.sourceHash == afterCorrection) delay(100) }
                 assertEquals(expected - 5000, workflow.state.value.snapshot!!.actual)
                 assertEquals(expected - 5000, workflow.state.value.snapshot!!.insights!!.components.sumOf { it.amount })
-                assertEquals(rows.size - 1, container.financialTransactionRepository.listAll().size)
+                assertEquals(rows.size - 1, container.storage.financialTransactionRepository.listAll().size)
             }
             var locale by mutableStateOf("ar")
             var dark by mutableStateOf(false)
@@ -192,26 +192,26 @@ class AnalyticsJourneyTest {
             compose.onNodeWithText(text(R.string.lab_analysis_save, "en")).performScrollTo().performClick()
             awaitAnalysis(workflow) { it.preferences.budget == 120000L }
             val candidate = workflow.state.value.snapshot!!.candidates.first()
-            val originalCommitments = runBlocking { container.commitmentRepository.listAll() }
+            val originalCommitments = runBlocking { container.storage.commitmentRepository.listAll() }
             compose.onNodeWithText(text(R.string.lab_analysis_commitments, "en"), useUnmergedTree = true).performClick()
             compose.onNodeWithText(text(R.string.lab_analysis_review_candidate, "en")).performScrollTo().performClick()
             screen("en-light-commitment-editor")
             compose.onNodeWithContentDescription(text(R.string.lab_analysis_back, "en")).performClick()
-            assertEquals(originalCommitments, runBlocking { container.commitmentRepository.listAll() })
+            assertEquals(originalCommitments, runBlocking { container.storage.commitmentRepository.listAll() })
             compose.onNodeWithText(text(R.string.lab_analysis_review_candidate, "en")).performScrollTo().performClick()
             compose.onNodeWithText(text(R.string.settings_commitment_save, "en")).performScrollTo().performClick()
-            compose.waitUntil(30_000) { runBlocking { container.commitmentRepository.listAll().size == originalCommitments.size + 1 } }
+            compose.waitUntil(30_000) { runBlocking { container.storage.commitmentRepository.listAll().size == originalCommitments.size + 1 } }
             // The Save click's coroutine runs on the v2 test dispatcher; let it finish and release the workflow lock.
             compose.waitForIdle()
             runBlocking {
                 // Repeating a Save after a crash cannot insert a second financial commitment.
                 workflow.acceptCandidate(candidate.key, workflow.editorDraft(candidate))
-                assertEquals(originalCommitments.size + 1, container.commitmentRepository.listAll().size)
+                assertEquals(originalCommitments.size + 1, container.storage.commitmentRepository.listAll().size)
                 val archive = AnalyticsBackup.capture(TestStorageContext(host))!!
                 AnalyticsBackup.validate(archive)
-                val ledger = container.financialTransactionRepository.listAll()
-                assertEquals(ledger.size, container.database.financialTransactionDao().listAll().size)
-                container.database.openHelper.readableDatabase.query("PRAGMA user_version").use { it.moveToFirst(); assertEquals(18, it.getInt(0)) }
+                val ledger = container.storage.financialTransactionRepository.listAll()
+                assertEquals(ledger.size, container.storage.database.financialTransactionDao().listAll().size)
+                container.storage.database.openHelper.readableDatabase.query("PRAGMA user_version").use { it.moveToFirst(); assertEquals(18, it.getInt(0)) }
                 if (android.os.Build.VERSION.SDK_INT >= 33) {
                     assertEquals(android.content.pm.PackageManager.PERMISSION_DENIED, host.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS))
                     workflow.updatePreferences(workflow.state.value.preferences.copy(budget = 1, phone = true))
@@ -229,7 +229,7 @@ class AnalyticsJourneyTest {
                 }
             }
             runBlocking {
-                container.database.financialTransactionDao().insertTransactionIfAbsent(FinancialTransactionEntity(
+                container.storage.database.financialTransactionDao().insertTransactionIfAbsent(FinancialTransactionEntity(
                     "large-refund", "REFUND", "5000.00", "SAR", fixtureClock.millis(),
                     "card:BANK_ALJAZIRA:1234", null, "استرداد اختبار", null, null))
                 workflow.request(); workflow.refresh()
@@ -237,7 +237,7 @@ class AnalyticsJourneyTest {
             awaitAnalysis(workflow) { (it.snapshot?.actual ?: 0) < 0 }
             screen("en-light-negative-net")
             compose.runOnUiThread { showing = false }; compose.waitForIdle()
-            val beforeReopen = runBlocking { container.financialTransactionRepository.listAll() }
+            val beforeReopen = runBlocking { container.storage.financialTransactionRepository.listAll() }
             val period = com.baraa.masroof.domain.period.FinancialPeriodPolicy.periodContaining(fixtureToday)
             val detached = runBlocking { FinancialAnalysisReader.capture(container, fixtureToday.minusYears(1).atStartOfDay(ZoneId.systemDefault()).toInstant(), period.endDateExclusive.atStartOfDay(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()) }
             workflow.close()
@@ -245,8 +245,8 @@ class AnalyticsJourneyTest {
             runBlocking { assertTrue(detached.service.loadOverview(period).spendingTrends!!.purchases.points.isNotEmpty()) }
             val reopened = TestRuntime.container(host)
             runBlocking {
-                reopened.awaitStartupMaintenance(); reopened.awaitPostStartupBackgroundWorkForTesting()
-                assertEquals(beforeReopen, reopened.financialTransactionRepository.listAll())
+                reopened.maintenance.awaitStartupMaintenance(); reopened.maintenance.awaitPostStartupBackgroundWorkForTesting()
+                assertEquals(beforeReopen, reopened.storage.financialTransactionRepository.listAll())
                 reopened.analytics.refresh()
                 assertEquals(120000L, reopened.analytics.state.value.preferences.budget)
                 assertTrue(reopened.analytics.state.value.history.isNotEmpty())
@@ -267,7 +267,7 @@ class AnalyticsJourneyTest {
         var dark by mutableStateOf(false)
         var openedTransaction: String? = null
         try {
-            runBlocking { c.awaitStartupMaintenance(); c.awaitPostStartupBackgroundWorkForTesting(); seed(c); c.analytics.refresh() }
+            runBlocking { c.maintenance.awaitStartupMaintenance(); c.maintenance.awaitPostStartupBackgroundWorkForTesting(); seed(c); c.analytics.refresh() }
             val workflow = c.analytics
             awaitAnalysis(workflow) { it.snapshot != null }
             compose.setContent { if (showing) {
@@ -340,9 +340,9 @@ class AnalyticsJourneyTest {
         var showing by mutableStateOf(true)
         var opened: String? = null
         try {
-            runBlocking { c.awaitStartupMaintenance(); c.awaitPostStartupBackgroundWorkForTesting(); c.stopAnalytics(); seed(c, fixtureToday); workflow.start(); workflow.refresh() }
+            runBlocking { c.maintenance.awaitStartupMaintenance(); c.maintenance.awaitPostStartupBackgroundWorkForTesting(); c.stopAnalytics(); seed(c, fixtureToday); workflow.start(); workflow.refresh() }
             awaitAnalysis(workflow) { it.snapshot != null }
-            val before = runBlocking { c.financialTransactionRepository.listAll() }
+            val before = runBlocking { c.storage.financialTransactionRepository.listAll() }
             val snapshot = requireNotNull(workflow.state.value.snapshot)
             val insights = requireNotNull(snapshot.insights)
             val config = Configuration(host.resources.configuration).apply { setLocale(Locale.forLanguageTag("en")); fontScale = 1.3f }
@@ -413,7 +413,7 @@ class AnalyticsJourneyTest {
             }
             compose.onNodeWithText(text(R.string.analysis_forecasts_tab, "en")).performClick()
             compose.onNodeWithTag("analysis-quality-entry").performScrollTo().assertIsDisplayed()
-            assertEquals(before, runBlocking { c.financialTransactionRepository.listAll() })
+            assertEquals(before, runBlocking { c.storage.financialTransactionRepository.listAll() })
         } finally {
             compose.runOnUiThread { showing = false }; compose.waitForIdle()
             workflow.close()
@@ -430,10 +430,10 @@ class AnalyticsJourneyTest {
         var opened: String? = null
         var review = false; var permission = false; var rescan = false
         try {
-            runBlocking { c.awaitStartupMaintenance(); c.awaitPostStartupBackgroundWorkForTesting(); seed(c); c.analytics.refresh() }
+            runBlocking { c.maintenance.awaitStartupMaintenance(); c.maintenance.awaitPostStartupBackgroundWorkForTesting(); seed(c); c.analytics.refresh() }
             val workflow = c.analytics
             awaitAnalysis(workflow) { it.snapshot != null }
-            val original = runBlocking { c.financialTransactionRepository.listAll() }
+            val original = runBlocking { c.storage.financialTransactionRepository.listAll() }
             val snapshot = requireNotNull(workflow.state.value.snapshot).let { it.copy(quality = it.quality.copy(
                 pendingReviews = 1, blocked = true, reasons = listOf("SMS_PERMISSION", "PROCESSING_RETRY"))) }
             val config = Configuration(host.resources.configuration).apply { setLocale(Locale.forLanguageTag("en")) }
@@ -465,7 +465,7 @@ class AnalyticsJourneyTest {
             compose.onNodeWithText(text(R.string.lab_analysis_quality_permission_action, "en")).performScrollTo().performClick()
             compose.onNodeWithText(text(R.string.lab_analysis_quality_retry_action, "en")).performScrollTo().performClick()
             assertTrue(review); assertTrue(permission); assertTrue(rescan)
-            assertEquals(original, runBlocking { c.financialTransactionRepository.listAll() })
+            assertEquals(original, runBlocking { c.storage.financialTransactionRepository.listAll() })
             screen("en-light-quality-actions")
         } finally {
             compose.runOnUiThread { showing = false }; compose.waitForIdle()
@@ -479,9 +479,9 @@ class AnalyticsJourneyTest {
         var mode by mutableIntStateOf(0)
         var showing by mutableStateOf(true)
         try {
-            runBlocking { c.awaitStartupMaintenance(); c.awaitPostStartupBackgroundWorkForTesting(); seed(c); c.analytics.refresh() }
+            runBlocking { c.maintenance.awaitStartupMaintenance(); c.maintenance.awaitPostStartupBackgroundWorkForTesting(); seed(c); c.analytics.refresh() }
             awaitAnalysis(c.analytics) { true }
-            val before = runBlocking { c.financialTransactionRepository.listAll() }
+            val before = runBlocking { c.storage.financialTransactionRepository.listAll() }
             val config = Configuration(host.resources.configuration).apply { setLocale(Locale.forLanguageTag("en")); fontScale = 1.3f }
             compose.setContent { if (showing) {
                 CompositionLocalProvider(LocalContext provides host.createConfigurationContext(config), LocalConfiguration provides config, LocalAnalyticsWorkflow provides c.analytics) {
@@ -511,7 +511,7 @@ class AnalyticsJourneyTest {
             compose.onNodeWithText(text(R.string.analysis_shared_charts, "en")).performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("Published forecast").performScrollTo().assertIsDisplayed()
             screen("en-shared-analytics-catalog-large-font")
-            assertEquals(before, runBlocking { c.financialTransactionRepository.listAll() })
+            assertEquals(before, runBlocking { c.storage.financialTransactionRepository.listAll() })
         } finally {
             compose.runOnUiThread { showing = false }; compose.waitForIdle()
             runBlocking { TestRuntime.reset(host) }
@@ -525,9 +525,9 @@ class AnalyticsJourneyTest {
         val c = TestRuntime.container(host)
         var showing by mutableStateOf(true)
         try {
-            runBlocking { c.awaitPostStartupBackgroundWorkForTesting(); seed(c) }
+            runBlocking { c.maintenance.awaitPostStartupBackgroundWorkForTesting(); seed(c) }
             val candidate = awaitAnalysis(c.analytics) { it.snapshot?.candidates?.isNotEmpty() == true }.snapshot!!.candidates.first()
-            val before = runBlocking { c.financialTransactionRepository.listAll() }
+            val before = runBlocking { c.storage.financialTransactionRepository.listAll() }
             compose.setContent { if (showing) {
                 CompositionLocalProvider(LocalAnalyticsWorkflow provides c.analytics) {
                     MasroofTheme { MasroofScreenBackground { AnalyticsRoute({}, {}) } }
@@ -545,7 +545,7 @@ class AnalyticsJourneyTest {
             awaitAnalysis(c.analytics) { state -> state.recurringCorrections.any {
                 it.seriesKey == candidate.seriesKey && it.kind == "DISMISSED"
             } }
-            assertEquals(before, runBlocking { c.financialTransactionRepository.listAll() })
+            assertEquals(before, runBlocking { c.storage.financialTransactionRepository.listAll() })
             screen("recurring-explicit-feedback")
         } finally {
             compose.runOnUiThread { showing = false }; compose.waitForIdle()
@@ -564,9 +564,9 @@ class AnalyticsJourneyTest {
         var opened: String? = null
         try {
             runBlocking {
-                c.awaitStartupMaintenance(); c.awaitPostStartupBackgroundWorkForTesting(); seed(c)
+                c.maintenance.awaitStartupMaintenance(); c.maintenance.awaitPostStartupBackgroundWorkForTesting(); seed(c)
                 val today = LocalDate.now()
-                for (index in 0..6) c.database.financialTransactionDao().insertTransactionIfAbsent(FinancialTransactionEntity(
+                for (index in 0..6) c.storage.database.financialTransactionDao().insertTransactionIfAbsent(FinancialTransactionEntity(
                     "observed-$index", "EXPENSE", if (index == 0) "90.00" else "40.00", "SAR",
                     today.minusDays(index * 7L).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
                     "card:BANK_ALJAZIRA:1234", null, "Observation merchant", null, null))
@@ -576,7 +576,7 @@ class AnalyticsJourneyTest {
             awaitAnalysis(workflow) { it.observations.any { row -> row.id == "observed-0" } }
             val observation = workflow.state.value.observations.first { it.id == "observed-0" }
             assertEquals((1..6).map { "observed-$it" }.reversed(), observation.referenceIds)
-            val before = runBlocking { c.financialTransactionRepository.listAll() }
+            val before = runBlocking { c.storage.financialTransactionRepository.listAll() }
             compose.setContent { if (showing) {
                 val config = Configuration(host.resources.configuration).apply { setLocale(Locale.forLanguageTag(language)); fontScale = 1.3f }
                 CompositionLocalProvider(LocalContext provides host.createConfigurationContext(config), LocalConfiguration provides config,
@@ -636,10 +636,10 @@ class AnalyticsJourneyTest {
                 compose.onNodeWithTag("guidance-popup").assertDoesNotExist()
                 compose.onNodeWithTag("analysis-daily-bars").performScrollTo().assertIsDisplayed()
             }
-            assertEquals(before, runBlocking { c.financialTransactionRepository.listAll() })
+            assertEquals(before, runBlocking { c.storage.financialTransactionRepository.listAll() })
             runBlocking {
-                val transaction = c.financialTransactionRepository.getById("observed-0")!!
-                c.financialTransactionRepository.update(transaction.copy(amount = com.baraa.masroof.core.money.Money.of(
+                val transaction = c.storage.financialTransactionRepository.getById("observed-0")!!
+                c.storage.financialTransactionRepository.update(transaction.copy(amount = com.baraa.masroof.core.money.Money.of(
                     java.math.BigDecimal("40.00"), transaction.amount.currency)))
                 workflow.request(); workflow.refresh()
             }
@@ -659,17 +659,17 @@ class AnalyticsJourneyTest {
         var opened: String? = null
         try {
             runBlocking {
-                c.awaitStartupMaintenance(); c.awaitPostStartupBackgroundWorkForTesting()
+                c.maintenance.awaitStartupMaintenance(); c.maintenance.awaitPostStartupBackgroundWorkForTesting()
                 val loan = "سداد تمويل خاص\nمن: 3001\nالقسط: SAR 20\nالمبلغ المتبقي: SAR 300\nلـ: تمويل شخصي\nفي: 2026-10-06 09:00"
                 listOf(loan, loan.replace("SAR 20", "SAR 21"), "صيغة اختبار جديدة\nمبلغ: SAR 20", "صيغة اختبار أخرى\nمبلغ: SAR 30").forEachIndexed { index, body ->
-                    c.processRawSmsUseCase.ingest(com.baraa.masroof.domain.model.RawSms("review-pattern-$index", "AlJazira", body,
+                    c.sms.processRawSmsUseCase.ingest(com.baraa.masroof.domain.model.RawSms("review-pattern-$index", "AlJazira", body,
                         Instant.now(), "review-pattern-$index", com.baraa.masroof.sms.hash.SmsBodyHasher.sha256Hex(body)))
                 }
             }
-            val examples = runBlocking { c.messageReviewWorkflow.load() }
+            val examples = runBlocking { c.patterns.messageReviewWorkflow.load() }
             assertEquals(3, examples.size)
-            val before = runBlocking { c.reviewWorkflowService.listRequiredReviews() }
-            val financial = runBlocking { c.financialTransactionRepository.listAll() }
+            val before = runBlocking { c.review.reviewWorkflowService.listRequiredReviews() }
+            val financial = runBlocking { c.storage.financialTransactionRepository.listAll() }
             compose.setContent { if (showing) {
                 CompositionLocalProvider(LocalAnalyticsWorkflow provides c.analytics) {
                     MasroofTheme { MasroofScreenBackground { MessageLearningSettingsScreen(onBack = {}, onOpenExample = { opened = it }) } }
@@ -691,8 +691,8 @@ class AnalyticsJourneyTest {
             compose.onNodeWithTag("learning-example-${examples.first().reviewId}", useUnmergedTree = true).assertIsDisplayed()
             compose.onNodeWithTag("sheet-cancel").performClick()
             assertNull(opened)
-            assertEquals(before, runBlocking { c.reviewWorkflowService.listRequiredReviews() })
-            assertEquals(financial, runBlocking { c.financialTransactionRepository.listAll() })
+            assertEquals(before, runBlocking { c.review.reviewWorkflowService.listRequiredReviews() })
+            assertEquals(financial, runBlocking { c.storage.financialTransactionRepository.listAll() })
             openReviewSession()
             compose.onNodeWithTag("learning-example-${examples.first().reviewId}", useUnmergedTree = true).assertHasClickAction().assertIsEnabled().performClick()
             assertEquals(examples.first().reviewId, opened)
@@ -705,17 +705,17 @@ class AnalyticsJourneyTest {
     }
 
     private suspend fun seed(c: AppContainer, today: LocalDate = LocalDate.now()) {
-        c.onboardingPreferencesRepository.setOnboardingStarted(true)
-        c.onboardingPreferencesRepository.setOnboardingCompleted(true)
-        c.onboardingPreferencesRepository.setHistoricalImportStartEpochMillis(today.minusDays(150).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli())
-        c.onboardingPreferencesRepository.setHistoricalImportCompleted(true)
-        c.database.withTransaction {
-            c.database.cardRegistryDao().insertFacilityIfAbsent("test-facility", "BANK_ALJAZIRA", "1234")
-            c.database.cardRegistryDao().insertIfAbsent(CardRegistryEntity("test-card", "BANK_ALJAZIRA", "1234", "OWNED", cardType = "CREDIT", cardRole = "PRIMARY", creditFacilityId = "test-facility", firstSeenRawSmsId = null, lastSeenRawSmsId = null))
+        c.storage.onboardingPreferencesRepository.setOnboardingStarted(true)
+        c.storage.onboardingPreferencesRepository.setOnboardingCompleted(true)
+        c.storage.onboardingPreferencesRepository.setHistoricalImportStartEpochMillis(today.minusDays(150).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli())
+        c.storage.onboardingPreferencesRepository.setHistoricalImportCompleted(true)
+        c.storage.database.withTransaction {
+            c.storage.database.cardRegistryDao().insertFacilityIfAbsent("test-facility", "BANK_ALJAZIRA", "1234")
+            c.storage.database.cardRegistryDao().insertIfAbsent(CardRegistryEntity("test-card", "BANK_ALJAZIRA", "1234", "OWNED", cardType = "CREDIT", cardRole = "PRIMARY", creditFacilityId = "test-facility", firstSeenRawSmsId = null, lastSeenRawSmsId = null))
             fun entity(id: String, type: String, amount: String, date: LocalDate, merchant: String = "متجر الاختبار", currency: String = "SAR", rate: String? = null) =
                 FinancialTransactionEntity(id, type, amount, currency, date.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
                     "card:BANK_ALJAZIRA:1234", null, merchant, null, null, rate, if (rate != null) "SMS" else null)
-            val dao = c.database.financialTransactionDao()
+            val dao = c.storage.database.financialTransactionDao()
             for (ago in 1..150) dao.insertTransactionIfAbsent(entity("daily-$ago", "EXPENSE", "${20 + today.minusDays(ago.toLong()).dayOfWeek.value * 5}.00", today.minusDays(ago.toLong())))
             for (month in 0..3) dao.insertTransactionIfAbsent(entity("utility-$month", "BILL_PAYMENT", "${if (month == 0) 150 else 100}.00", today.minusMonths(month.toLong()).minusDays(2), "شركة الخدمات"))
             // Keep today net-positive so budget alerts are exercised even on salary-period day one.

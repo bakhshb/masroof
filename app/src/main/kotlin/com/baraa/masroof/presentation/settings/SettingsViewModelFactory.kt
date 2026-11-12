@@ -3,38 +3,50 @@ package com.baraa.masroof.presentation.settings
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.container.BackupContainer
+import com.baraa.masroof.application.container.DashboardContainer
+import com.baraa.masroof.application.container.PatternsContainer
+import com.baraa.masroof.application.container.ReviewContainer
+import com.baraa.masroof.application.container.SmsContainer
+import com.baraa.masroof.application.container.StorageContainer
+import com.baraa.masroof.application.container.UpdateContainer
 import com.baraa.masroof.application.update.InstallPermissionHelper
 fun settingsViewModelFactory(
-    container: AppContainer,
+    storage: StorageContainer,
+    backup: BackupContainer,
+    dashboard: DashboardContainer,
+    patterns: PatternsContainer,
+    review: ReviewContainer,
+    sms: SmsContainer,
+    update: UpdateContainer,
     appVersion: String,
     permissionStateProvider: () -> Boolean,
     onRequestInstallPermission: () -> Unit = {},
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         SettingsViewModel(
-            messagePatternsWorkflow = container.messagePatternsWorkflow,
-            bankSmsImportWorkflow = container.bankSmsImportWorkflow,
-            settingsRegistryWorkflow = container.settingsRegistryWorkflow,
-            settingsCommitmentsWorkflow = container.settingsCommitmentsWorkflow,
-            appLocaleRepository = container.appLocaleRepository,
-            themePreferencesRepository = container.themePreferencesRepository,
-            databaseBackupService = container.databaseBackupService,
+            messagePatternsWorkflow = patterns.messagePatternsWorkflow,
+            bankSmsImportWorkflow = sms.bankSmsImportWorkflow,
+            settingsRegistryWorkflow = dashboard.settingsRegistryWorkflow,
+            settingsCommitmentsWorkflow = dashboard.settingsCommitmentsWorkflow,
+            appLocaleRepository = storage.appLocaleRepository,
+            themePreferencesRepository = storage.themePreferencesRepository,
+            databaseBackupService = backup.databaseBackupService,
             reconcileOwnershipChange = { change ->
-                container.reviewWorkflowService.reconcileOwnershipChange(change)
+                review.reviewWorkflowService.reconcileOwnershipChange(change)
             },
-            reparseStoredEvents = { container.reparseAllStoredEvents() },
+            reparseStoredEvents = { sms.reparseAllStoredEvents() },
             permissionStateProvider = permissionStateProvider,
             appVersion = appVersion,
-            appUpdateService = container.appUpdateService,
-            updateCheckCoordinator = container.updateCheckCoordinator,
-            appLogService = container.appLogService,
-            apkInstaller = container.apkInstaller,
+            appUpdateService = update.appUpdateService,
+            updateCheckCoordinator = update.updateCheckCoordinator,
+            appLogService = storage.appLogService,
+            apkInstaller = update.apkInstaller,
             canInstallPackages = {
-                InstallPermissionHelper.canInstallPackages(container.applicationContext)
+                InstallPermissionHelper.canInstallPackages(storage.appContext)
             },
             onRequestInstallPermission = onRequestInstallPermission,
-            historicalMerchantRateCorrectionWorkflow = container.historicalMerchantRateCorrectionWorkflow,
+            historicalMerchantRateCorrectionWorkflow = dashboard.historicalMerchantRateCorrectionWorkflow,
         )
     }
 }

@@ -38,7 +38,7 @@ class ForecastLifecycleDeviceTest {
         android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand("pm grant ${host.packageName} android.permission.READ_SMS")).use { it.readBytes() }
         TestRuntime.reset(host)
         val c=TestRuntime.container(host)
-        c.awaitPostStartupBackgroundWorkForTesting()
+        c.maintenance.awaitPostStartupBackgroundWorkForTesting()
         c.stopAnalytics()
         val zone=ZoneId.systemDefault()
         val period=FinancialPeriodPolicy.periodContaining(LocalDate.now(zone))
@@ -48,23 +48,23 @@ class ForecastLifecycleDeviceTest {
         val workflow=AnalyticsWorkflow(c,context,clock)
         val sidecar=AnalyticsDatabase.open(context)
         val first=origin.minusDays(300)
-        suspend fun seed(from: LocalDate,through: LocalDate) = c.database.withTransaction {
+        suspend fun seed(from: LocalDate,through: LocalDate) = c.storage.database.withTransaction {
             var day=from
             while(!day.isAfter(through)) {
                 val index=day.toEpochDay()-first.toEpochDay()
                 val amount=java.math.BigDecimal.valueOf(1000+index*50,2).toPlainString()
-                c.database.financialTransactionDao().insertTransactionIfAbsent(FinancialTransactionEntity("trend:$day","EXPENSE",amount,"SAR",
+                c.storage.database.financialTransactionDao().insertTransactionIfAbsent(FinancialTransactionEntity("trend:$day","EXPENSE",amount,"SAR",
                     day.atTime(10,0).atZone(zone).toInstant().toEpochMilli(),"card:BANK_ALJAZIRA:1234",null,"Test",null,null))
                 day=day.plusDays(1)
             }
         }
         try {
-            c.onboardingPreferencesRepository.setOnboardingStarted(true)
-            c.onboardingPreferencesRepository.setOnboardingCompleted(true)
-            c.onboardingPreferencesRepository.setHistoricalImportStartEpochMillis(first.atStartOfDay(zone).toInstant().toEpochMilli())
-            c.onboardingPreferencesRepository.setHistoricalImportCompleted(true)
-            c.database.cardRegistryDao().insertFacilityIfAbsent("forecast-facility","BANK_ALJAZIRA","1234")
-            c.database.cardRegistryDao().insertIfAbsent(CardRegistryEntity("forecast-card","BANK_ALJAZIRA","1234","OWNED",cardType="CREDIT",
+            c.storage.onboardingPreferencesRepository.setOnboardingStarted(true)
+            c.storage.onboardingPreferencesRepository.setOnboardingCompleted(true)
+            c.storage.onboardingPreferencesRepository.setHistoricalImportStartEpochMillis(first.atStartOfDay(zone).toInstant().toEpochMilli())
+            c.storage.onboardingPreferencesRepository.setHistoricalImportCompleted(true)
+            c.storage.database.cardRegistryDao().insertFacilityIfAbsent("forecast-facility","BANK_ALJAZIRA","1234")
+            c.storage.database.cardRegistryDao().insertIfAbsent(CardRegistryEntity("forecast-card","BANK_ALJAZIRA","1234","OWNED",cardType="CREDIT",
                 cardRole="PRIMARY",creditFacilityId="forecast-facility",firstSeenRawSmsId=null,lastSeenRawSmsId=null))
             if (deferForGap) {
                 clock.day=period.startDate.plusDays(6)
@@ -122,14 +122,14 @@ class ForecastLifecycleDeviceTest {
             assertEquals(original.personalTotal,settled.personalTotal)
             assertEquals(original.baselineTotal,settled.baselineTotal)
             val id="trend:${origin.plusDays(1)}"
-            val tx=c.financialTransactionRepository.getById(id)!!
-            c.financialTransactionRepository.update(tx.copy(amount=com.baraa.masroof.core.money.Money.of(tx.amount.amount.add(java.math.BigDecimal.TEN),tx.amount.currency)))
+            val tx=c.storage.financialTransactionRepository.getById(id)!!
+            c.storage.financialTransactionRepository.update(tx.copy(amount=com.baraa.masroof.core.money.Money.of(tx.amount.amount.add(java.math.BigDecimal.TEN),tx.amount.currency)))
             workflow.refresh()
             val corrected=sidecar.analytics().comparisons().single()
             assertEquals(settled.actual!!+1000,corrected.actual)
             assertEquals(original.personalTotal,corrected.personalTotal)
             assertEquals(original.baselineTotal,corrected.baselineTotal)
-            c.database.openHelper.readableDatabase.query("PRAGMA user_version").use { it.moveToFirst();assertEquals(18,it.getInt(0)) }
+            c.storage.database.openHelper.readableDatabase.query("PRAGMA user_version").use { it.moveToFirst();assertEquals(18,it.getInt(0)) }
         } finally { workflow.close();sidecar.close();TestRuntime.reset(host) }
     }
 }

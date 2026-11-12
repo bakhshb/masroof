@@ -3,7 +3,6 @@
   <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>LargeClass:AlJaziraParserRegressionTest.kt:AlJaziraParserRegressionTest</ID>
-    <ID>LargeClass:AppContainer.kt:AppContainer</ID>
     <ID>LargeClass:CommitmentsOverviewBuilderTest.kt:CommitmentsOverviewBuilderTest</ID>
     <ID>LargeClass:CurrentAccountSummaryCalculatorTest.kt:CurrentAccountSummaryCalculatorTest</ID>
     <ID>LargeClass:DashboardViewModelTest.kt:DashboardViewModelTest</ID>

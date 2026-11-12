@@ -27,9 +27,9 @@ class BundledPatternApprovalTest {
 
     @Test fun linkedIncomingTransferPostsPendingAndNewMessagesToTheChosenAccount() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
-            c.processRawSmsUseCase.ingest(sms("pending", incoming))
-            assertTrue(c.financialTransactionRepository.listAll().isEmpty())
+            val w = c.patterns.messagePatternsWorkflow
+            c.sms.processRawSmsUseCase.ingest(sms("pending", incoming))
+            assertTrue(c.storage.financialTransactionRepository.listAll().isEmpty())
             assertTrue(w.catalog().banks.single { it.bankId == BARQ }.currentPatterns.single { it.id == "barq.transfer-in" }.canApprove)
             val account = w.confirmPatternAccount(BARQ, "1234")
             w.saveFinancial(w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_IN,
@@ -39,17 +39,17 @@ class BundledPatternApprovalTest {
             assertEquals("1234", view.approval?.accountLast4)
             assertFalse(view.canEdit)
             assertEquals(1, w.applyPending(BARQ, w.catalog().generation).posted)
-            c.processRawSmsUseCase.ingest(sms("live", incoming.replace("100.00", "40.00")))
-            val legs = c.parsedEventRepository.findByRawSmsId("live")!!.event
+            c.sms.processRawSmsUseCase.ingest(sms("live", incoming.replace("100.00", "40.00")))
+            val legs = c.storage.parsedEventRepository.findByRawSmsId("live")!!.event
             assertEquals(ParseStatus.SUCCESS, legs.parseStatus)
             assertEquals(AccountReference(Bank(BARQ), "1234"), legs.destinationAccountRef)
-            assertEquals(2, c.financialTransactionRepository.listAll().size)
+            assertEquals(2, c.storage.financialTransactionRepository.listAll().size)
         }
     }
 
     @Test fun builtInApprovalKeepsItsFamilyAndRejectsReferenceAndFundingAccountChoices() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             val account = w.confirmPatternAccount(BARQ, "1234")
             fun rejected(block: suspend () -> Unit) = assertTrue(runBlocking { runCatching { block() } }.isFailure)
             rejected { w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_OUT,
@@ -60,7 +60,7 @@ class BundledPatternApprovalTest {
             rejected { w.previewFinancial(w.catalog().generation, BARQ, "barq.purchase", PatternOperation.PURCHASE,
                 account.id, purchase, null, emptySet()) }
             // Links never cross families: an incoming transfer has no card.
-            val card = requireNotNull(c.cardRegistryRepository.get(c.settingsRegistryWorkflow.addCard(BARQ, "4321", null, cardConfig)))
+            val card = requireNotNull(c.storage.cardRegistryRepository.get(c.dashboard.settingsRegistryWorkflow.addCard(BARQ, "4321", null, cardConfig)))
             rejected { w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_IN,
                 account.id, incoming, null, emptySet(), cardId = card.id) }
             assertFalse(w.catalog().banks.single { it.bankId == BARQ }.currentPatterns.single { it.id == "barq.notice" }.canApprove)
@@ -69,9 +69,9 @@ class BundledPatternApprovalTest {
 
     @Test fun purchaseWithoutACardTakesTheLinkedCardAndANamedCardStaysItsOwn() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
-            val card = requireNotNull(c.cardRegistryRepository.get(c.settingsRegistryWorkflow.addCard(BARQ, "4321", null, cardConfig)))
-            val other = requireNotNull(c.cardRegistryRepository.get(c.settingsRegistryWorkflow.addCard(BARQ, "1111", null, cardConfig)))
+            val w = c.patterns.messagePatternsWorkflow
+            val card = requireNotNull(c.storage.cardRegistryRepository.get(c.dashboard.settingsRegistryWorkflow.addCard(BARQ, "4321", null, cardConfig)))
+            val other = requireNotNull(c.storage.cardRegistryRepository.get(c.dashboard.settingsRegistryWorkflow.addCard(BARQ, "1111", null, cardConfig)))
             val named = "شراء\nمبلغ 25 SAR\nبطاقة مدى: **4321\nلدى TEST\n2026-09-15 12:30"
             assertTrue(runCatching { w.previewFinancial(w.catalog().generation, BARQ, "barq.purchase", PatternOperation.PURCHASE,
                 null, named, null, emptySet(), cardId = other.id) }.isFailure)
@@ -81,47 +81,47 @@ class BundledPatternApprovalTest {
             val links = w.load().banks.single { it.bankId == BARQ }.currentPatterns.single { it.id == "barq.purchase" }.factContract!!.accountBindings
             assertEquals(listOf(PatternAccountRole.CARD to "4321"), links.map { it.role to it.last4 })
             assertEquals("4321", w.catalog().banks.single { it.bankId == BARQ }.currentPatterns.single { it.id == "barq.purchase" }.approval?.cardLast4)
-            c.processRawSmsUseCase.ingest(sms("purchase", purchase))
-            assertEquals(CardReference(Bank(BARQ), "4321"), c.parsedEventRepository.findByRawSmsId("purchase")!!.event.cardRef)
-            assertEquals(1, c.financialTransactionRepository.listAll().size)
+            c.sms.processRawSmsUseCase.ingest(sms("purchase", purchase))
+            assertEquals(CardReference(Bank(BARQ), "4321"), c.storage.parsedEventRepository.findByRawSmsId("purchase")!!.event.cardRef)
+            assertEquals(1, c.storage.financialTransactionRepository.listAll().size)
             // A message naming another owned card keeps that card; the link never moves it.
-            c.processRawSmsUseCase.ingest(sms("other-card", named.replace("4321", "1111")))
-            assertEquals(CardReference(Bank(BARQ), "1111"), c.parsedEventRepository.findByRawSmsId("other-card")!!.event.cardRef)
-            assertEquals(2, c.financialTransactionRepository.listAll().size)
+            c.sms.processRawSmsUseCase.ingest(sms("other-card", named.replace("4321", "1111")))
+            assertEquals(CardReference(Bank(BARQ), "1111"), c.storage.parsedEventRepository.findByRawSmsId("other-card")!!.event.cardRef)
+            assertEquals(2, c.storage.financialTransactionRepository.listAll().size)
         }
     }
 
     @Test fun losingOwnershipOfALinkedAccountOrCardStopsPosting() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             val account = w.confirmPatternAccount(BARQ, "1234")
             w.saveFinancial(w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_IN,
                 account.id, incoming, null, emptySet()))
-            val ref = c.settingsRegistryWorkflow.addCard(BARQ, "4321", null, cardConfig)
-            val card = requireNotNull(c.cardRegistryRepository.get(ref))
+            val ref = c.dashboard.settingsRegistryWorkflow.addCard(BARQ, "4321", null, cardConfig)
+            val card = requireNotNull(c.storage.cardRegistryRepository.get(ref))
             w.saveFinancial(w.previewFinancial(w.catalog().generation, BARQ, "barq.purchase", PatternOperation.PURCHASE,
                 null, purchase, null, emptySet(), cardId = card.id))
-            c.accountRegistryRepository.setOwnership(AccountReference(Bank(BARQ), "1234"), OwnershipStatus.EXTERNAL)
-            c.cardRegistryRepository.setOwnership(ref, OwnershipStatus.EXTERNAL)
-            c.processRawSmsUseCase.ingest(sms("after-account", incoming))
-            c.processRawSmsUseCase.ingest(sms("after-card", purchase))
-            assertTrue(c.financialTransactionRepository.listAll().isEmpty())
+            c.storage.accountRegistryRepository.setOwnership(AccountReference(Bank(BARQ), "1234"), OwnershipStatus.EXTERNAL)
+            c.storage.cardRegistryRepository.setOwnership(ref, OwnershipStatus.EXTERNAL)
+            c.sms.processRawSmsUseCase.ingest(sms("after-account", incoming))
+            c.sms.processRawSmsUseCase.ingest(sms("after-card", purchase))
+            assertTrue(c.storage.financialTransactionRepository.listAll().isEmpty())
         }
     }
 
     @Test fun linkingLaterKeepsMessagesThatNameTheirOwnAccountPostingAndPairing() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             val named = "حوالة واردة داخلية\n100.00 SAR\nحساب المرسل: **5555\nلحساب: **1111\n2026-10-02 22:01"
             w.confirmPatternAccount(BARQ, "1111")
-            c.processRawSmsUseCase.ingest(sms("before-link", named))
-            val posted = requireNotNull(c.parsedEventRepository.findByRawSmsId("before-link"))
+            c.sms.processRawSmsUseCase.ingest(sms("before-link", named))
+            val posted = requireNotNull(c.storage.parsedEventRepository.findByRawSmsId("before-link"))
             assertEquals(ParseStatus.SUCCESS, posted.event.parseStatus)
             val account = w.confirmPatternAccount(BARQ, "1234")
             w.saveFinancial(w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_IN,
                 account.id, incoming, null, emptySet()))
             val policy = com.baraa.masroof.application.interpretation.PatternInterpretationWritePolicy(
-                com.baraa.masroof.data.patterns.MessagePatternStore(context), c.accountRegistryRepository, c.cardRegistryRepository)
+                com.baraa.masroof.data.patterns.MessagePatternStore(context), c.storage.accountRegistryRepository, c.storage.cardRegistryRepository)
             assertTrue("a leg posted before the link still pairs", policy.isCurrent(posted, posted = true))
             // The approval summary shows where an example really posts, not only the chosen link.
             val preview = w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_IN,
@@ -129,9 +129,9 @@ class BundledPatternApprovalTest {
             assertEquals("1111", preview.accountLast4)
             assertEquals("1234", w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_IN,
                 account.id, incoming, null, emptySet()).accountLast4)
-            c.processRawSmsUseCase.ingest(sms("after-link", named.replace("100.00", "70.00")))
+            c.sms.processRawSmsUseCase.ingest(sms("after-link", named.replace("100.00", "70.00")))
             assertEquals(AccountReference(Bank(BARQ), "1111"),
-                c.parsedEventRepository.findByRawSmsId("after-link")!!.event.destinationAccountRef)
+                c.storage.parsedEventRepository.findByRawSmsId("after-link")!!.event.destinationAccountRef)
         }
     }
 
@@ -139,8 +139,8 @@ class BundledPatternApprovalTest {
     /** Leaving the patterns screen cancels its scope; an apply that started must still post what it reparsed. */
     @Test fun applyPendingFinishesWhenTheCallerIsCancelled() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
-            c.processRawSmsUseCase.ingest(sms("pending", incoming))
+            val w = c.patterns.messagePatternsWorkflow
+            c.sms.processRawSmsUseCase.ingest(sms("pending", incoming))
             val account = w.confirmPatternAccount(BARQ, "1234")
             w.saveFinancial(w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_IN,
                 account.id, incoming, null, emptySet()))
@@ -150,7 +150,7 @@ class BundledPatternApprovalTest {
             job.cancel()
             job.join()
 
-            assertEquals(1, c.financialTransactionRepository.listAll().size)
+            assertEquals(1, c.storage.financialTransactionRepository.listAll().size)
         }
     }
 

@@ -220,12 +220,12 @@ class HardeningJourneySmokeTest {
     ) {
         val app = composeRule.activity.application as MasroofApplication
         runBlocking(Dispatchers.IO) {
-            val transaction = app.container.financialTransactionRepository.findByRawSmsId(rawSmsId)
+            val transaction = app.container.storage.financialTransactionRepository.findByRawSmsId(rawSmsId)
             assertNotNull(transaction)
             assertEquals(merchant, transaction!!.merchant)
             assertEquals(FinancialTransactionType.EXPENSE, transaction.type)
             if (resolutionKind == null) return@runBlocking
-            val review = app.container.reviewRepository.findByRawSmsId(rawSmsId)
+            val review = app.container.storage.reviewRepository.findByRawSmsId(rawSmsId)
             assertNotNull(review)
             assertEquals(ReviewStatus.RESOLVED, review!!.status)
             assertEquals(resolutionKind, review.resolutionKind)

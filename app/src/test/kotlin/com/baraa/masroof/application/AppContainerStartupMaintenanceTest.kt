@@ -1,5 +1,6 @@
 package com.baraa.masroof.application
 
+import com.baraa.masroof.application.container.appWorkerFactory
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
@@ -39,7 +40,7 @@ class AppContainerStartupMaintenanceTest {
             context,
             Configuration.Builder()
                 .setExecutor(SynchronousExecutor())
-                .setWorkerFactory(container.workerFactory)
+                .setWorkerFactory(appWorkerFactory(container))
                 .build(),
         )
         workManager = WorkManager.getInstance(context)
@@ -53,8 +54,8 @@ class AppContainerStartupMaintenanceTest {
 
     @Test fun retiredSchemaMarkersCannotTriggerBackfill() = runBlocking {
         recordLastReparsedVersion(9)
-        container.runStartupMaintenance()
-        assertEquals(StartupMaintenanceOutcome.READY, withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() })
+        container.maintenance.runStartupMaintenance()
+        assertEquals(StartupMaintenanceOutcome.READY, withTimeout(STARTUP_TIMEOUT_MILLIS) { container.maintenance.awaitStartupMaintenance() })
         assertTrue(backfillWork().isEmpty())
         assertEquals(9, lastReparsedVersion())
     }
@@ -63,10 +64,10 @@ class AppContainerStartupMaintenanceTest {
     fun upToDate_schedulesNoBackfill() = runBlocking<Unit> {
         recordLastReparsedVersion(MasroofDatabase.VERSION)
 
-        container.runStartupMaintenance()
+        container.maintenance.runStartupMaintenance()
         assertEquals(
             StartupMaintenanceOutcome.READY,
-            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() },
+            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.maintenance.awaitStartupMaintenance() },
         )
 
         assertTrue(backfillWork().isEmpty())
@@ -75,26 +76,26 @@ class AppContainerStartupMaintenanceTest {
     @Test
     fun postStartupBarrier_finishesBeforeNewCaptureCanBeScheduledByStartup() = runBlocking<Unit> {
         recordLastReparsedVersion(MasroofDatabase.VERSION)
-        container.runStartupMaintenance()
+        container.maintenance.runStartupMaintenance()
         assertEquals(
             StartupMaintenanceOutcome.READY,
-            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitStartupMaintenance() },
+            withTimeout(STARTUP_TIMEOUT_MILLIS) { container.maintenance.awaitStartupMaintenance() },
         )
-        withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitPostStartupBackgroundWorkForTesting() }
+        withTimeout(STARTUP_TIMEOUT_MILLIS) { container.maintenance.awaitPostStartupBackgroundWorkForTesting() }
         // Joining again is immediate; there is no delayed startup scheduling left.
-        withTimeout(STARTUP_TIMEOUT_MILLIS) { container.awaitPostStartupBackgroundWorkForTesting() }
+        withTimeout(STARTUP_TIMEOUT_MILLIS) { container.maintenance.awaitPostStartupBackgroundWorkForTesting() }
     }
 
     @Test
     fun successfulRetry_updatesTheAuthorityReadByRecreatedActivities() = runBlocking {
         recordLastReparsedVersion(MasroofDatabase.VERSION)
         prefs().edit().putString(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, "invalid-type").commit()
-        container.runStartupMaintenance()
-        assertEquals(StartupMaintenanceOutcome.BLOCKED, container.awaitStartupMaintenance())
+        container.maintenance.runStartupMaintenance()
+        assertEquals(StartupMaintenanceOutcome.BLOCKED, container.maintenance.awaitStartupMaintenance())
         prefs().edit().remove(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION).commit()
-        assertEquals(StartupMaintenanceOutcome.READY, container.retryStartupMaintenance())
-        assertEquals(StartupMaintenanceOutcome.READY, container.awaitStartupMaintenance())
-        assertEquals(StartupMaintenanceOutcome.READY, container.awaitStartupMaintenance())
+        assertEquals(StartupMaintenanceOutcome.READY, container.maintenance.retryStartupMaintenance())
+        assertEquals(StartupMaintenanceOutcome.READY, container.maintenance.awaitStartupMaintenance())
+        assertEquals(StartupMaintenanceOutcome.READY, container.maintenance.awaitStartupMaintenance())
     }
 
     private fun backfillWork(): List<WorkInfo> =

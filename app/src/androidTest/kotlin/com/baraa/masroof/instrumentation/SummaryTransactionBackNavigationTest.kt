@@ -41,13 +41,13 @@ class SummaryTransactionBackNavigationTest {
                     host.getSharedPreferences(AppLocalePreferences.PREFS_NAME, Context.MODE_PRIVATE).edit()
                         .putString(AppLocalePreferences.KEY_LANGUAGE_TAG, "en").commit()
                     val container = TestRuntime.container(host)
-                    container.awaitPostStartupBackgroundWorkForTesting()
-                    container.appLocaleRepository.setLanguageTag("en")
-                    container.onboardingPreferencesRepository.setOnboardingStarted(true)
-                    container.onboardingPreferencesRepository.setOnboardingCompleted(true)
-                    container.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
+                    container.maintenance.awaitPostStartupBackgroundWorkForTesting()
+                    container.storage.appLocaleRepository.setLanguageTag("en")
+                    container.storage.onboardingPreferencesRepository.setOnboardingStarted(true)
+                    container.storage.onboardingPreferencesRepository.setOnboardingCompleted(true)
+                    container.review.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
                     for (card in listOf("2210", "7271")) {
-                        container.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, card))
+                        container.review.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, card))
                     }
                     repeat(10) { index ->
                         val at = LocalDateTime.now().minusMinutes(index + 1L)
@@ -57,10 +57,10 @@ class SummaryTransactionBackNavigationTest {
                             val instrument = if (credit) "بطاقة ائتمانية: 7271" else "بطاقة مدى: 2210\nخصمت من حساب: 3001"
                             val body = "شراء من نقاط البيع\n$instrument\nلدى: $merchant\nبمبلغ: 12.00 SAR\nفي: $at"
                             val id = "navigation-$credit-$index"
-                            container.processRawSmsUseCase.ingest(RawSms(id, "AlJazira", body, Instant.now(), id, SmsBodyHasher.sha256Hex(body)))
+                            container.sms.processRawSmsUseCase.ingest(RawSms(id, "AlJazira", body, Instant.now(), id, SmsBodyHasher.sha256Hex(body)))
                         }
                     }
-                    assertEquals(20, container.financialTransactionRepository.listAll().size)
+                    assertEquals(20, container.storage.financialTransactionRepository.listAll().size)
                 }
                 try { base.evaluate() } finally { TestRuntime.close() }
             }

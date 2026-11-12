@@ -40,16 +40,16 @@ class AlJaziraSharedPatternsJourneyTest {
         val context = TestStorageContext(compose.activity, "aljazira-pattern-${java.util.UUID.randomUUID()}")
         val c = AppContainer(context)
         try {
-            c.messagePatternsWorkflow.confirmPatternAccount(bankId, "4321")
-            c.processRawSmsUseCase.ingest(raw("posted"))
-            val posted = c.parsedEventRepository.findByRawSmsId("posted")
-            assertEquals(1, c.financialTransactionRepository.listAll().size)
+            c.patterns.messagePatternsWorkflow.confirmPatternAccount(bankId, "4321")
+            c.sms.processRawSmsUseCase.ingest(raw("posted"))
+            val posted = c.storage.parsedEventRepository.findByRawSmsId("posted")
+            assertEquals(1, c.storage.financialTransactionRepository.listAll().size)
             val dark = mutableStateOf(false)
             compose.setContent {
                 val localized = AppLocaleContext.wrap(LocalContext.current, "ar")
                 CompositionLocalProvider(LocalContext provides localized, LocalConfiguration provides localized.resources.configuration,
                     androidx.activity.compose.LocalActivityResultRegistryOwner provides compose.activity) {
-                    MasroofTheme(darkTheme = dark.value) { Surface { MessagePatternsScreen(c.messagePatternsWorkflow, bankId, onBack = {}) } }
+                    MasroofTheme(darkTheme = dark.value) { Surface { MessagePatternsScreen(c.patterns.messagePatternsWorkflow, bankId, onBack = {}) } }
                 }
             }
             val toggle = "pattern-toggle-$bankId-bank.purchase"
@@ -60,24 +60,24 @@ class AlJaziraSharedPatternsJourneyTest {
             compose.runOnIdle { dark.value = true }
             ScreenshotArtifactWriter.capture(compose, "pattern-aljazira", "ready-dark")
             compose.onNodeWithTag(toggle).performClick()
-            compose.waitUntil(10_000) { runBlocking { !c.messagePatternsWorkflow.load().banks.single { it.bankId == bankId }.currentPatterns.single { it.id == "bank.purchase" }.enabled } }
-            c.processRawSmsUseCase.ingest(raw("pending"))
-            assertEquals(1, c.financialTransactionRepository.listAll().size)
+            compose.waitUntil(10_000) { runBlocking { !c.patterns.messagePatternsWorkflow.load().banks.single { it.bankId == bankId }.currentPatterns.single { it.id == "bank.purchase" }.enabled } }
+            c.sms.processRawSmsUseCase.ingest(raw("pending"))
+            assertEquals(1, c.storage.financialTransactionRepository.listAll().size)
             // The toggle's save finishes before the screen leaves its busy state; Advanced is disabled until then.
             compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("pattern-advanced") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("pattern-advanced").performScrollTo().performClick()
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("pattern-restore-$bankId-bank.purchase-1").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("pattern-restore-$bankId-bank.purchase-1").performScrollTo().performClick()
-            compose.waitUntil(10_000) { runBlocking { c.messagePatternsWorkflow.load().banks.single { it.bankId == bankId }.currentPatterns.single { it.id == "bank.purchase" }.revision == 3 } }
+            compose.waitUntil(10_000) { runBlocking { c.patterns.messagePatternsWorkflow.load().banks.single { it.bankId == bankId }.currentPatterns.single { it.id == "bank.purchase" }.revision == 3 } }
             compose.waitUntil(10_000) { compose.onAllNodesWithTag(toggle).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithContentDescription(AppLocaleContext.wrap(compose.activity, "ar").getString(R.string.teaching_saved_patterns)).performClick()
             compose.onNodeWithText(AppLocaleContext.wrap(compose.activity, "ar").getString(R.string.pattern_pending_title)).performScrollTo().performClick()
             val apply = AppLocaleContext.wrap(compose.activity, "ar").getString(R.string.pattern_apply_pending)
             compose.onNodeWithText(apply).performScrollTo().performClick()
             compose.waitUntil(15_000) { runBlocking {
-                c.financialTransactionRepository.listAll().size == 2 && c.reviewRepository.findByRawSmsId("pending")?.status == ReviewStatus.RESOLVED
+                c.storage.financialTransactionRepository.listAll().size == 2 && c.storage.reviewRepository.findByRawSmsId("pending")?.status == ReviewStatus.RESOLVED
             } }
-            assertEquals(posted, c.parsedEventRepository.findByRawSmsId("posted"))
+            assertEquals(posted, c.storage.parsedEventRepository.findByRawSmsId("posted"))
         } finally { c.close(); context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
     }
 }

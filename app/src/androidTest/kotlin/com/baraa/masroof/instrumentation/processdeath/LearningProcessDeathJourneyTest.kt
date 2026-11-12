@@ -31,41 +31,41 @@ class LearningProcessDeathJourneyTest {
     @Test(timeout=120_000) fun armAfterFinancialCorrectionBeforeLearning() = runBlocking {
         assertFalse(Build.FINGERPRINT.equals("robolectric",ignoreCase=true))
         val c=app.container
-        c.awaitPostStartupBackgroundWorkForTesting()
-        c.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA,"3001"))
-        val service=requireNotNull(c.interpretationService)
+        c.maintenance.awaitPostStartupBackgroundWorkForTesting()
+        c.review.onboardingOwnershipWorkflow.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA,"3001"))
+        val service=requireNotNull(c.learning.interpretationService)
         service.synchronizeFeedback()
-        c.processRawSmsUseCase.ingest(sms("death-teach",20))
-        val review=requireNotNull(c.reviewRepository.findByRawSmsId("death-teach"))
-        assertTrue(c.reviewWorkflowService.resolveAsFinancialType(review.id,FinancialTransactionType.LOAN_REPAYMENT) is ReviewWorkflowResult.Success)
+        c.sms.processRawSmsUseCase.ingest(sms("death-teach",20))
+        val review=requireNotNull(c.storage.reviewRepository.findByRawSmsId("death-teach"))
+        assertTrue(c.review.reviewWorkflowService.resolveAsFinancialType(review.id,FinancialTransactionType.LOAN_REPAYMENT) is ReviewWorkflowResult.Success)
         service.synchronizeFeedback()
-        c.processRawSmsUseCase.ingest(sms("death-corrected",21))
-        val tx=requireNotNull(c.financialTransactionRepository.findByRawSmsId("death-corrected"))
+        c.sms.processRawSmsUseCase.ingest(sms("death-corrected",21))
+        val tx=requireNotNull(c.storage.financialTransactionRepository.findByRawSmsId("death-corrected"))
         // Explicitly stop feedback before the commit. The next process must rebuild
         // suppression from financial decisions, not a completed advisory update.
         service.close()
         File(app.filesDir,DebugProcessHalt.REQUEST_FILE_NAME).writeText(DebugProcessHalt.RECLASSIFIED)
         CoroutineScope(SupervisorJob()+Dispatchers.IO).launch {
-            c.transactionReclassificationService.reclassify(tx.id,FinancialTransactionType.EXPENSE)
+            c.review.transactionReclassificationService.reclassify(tx.id,FinancialTransactionType.EXPENSE)
         }
         withTimeout(30_000) {
             while(File(app.filesDir,DebugProcessHalt.MARKER_FILE_NAME).takeIf { it.exists() }?.readText() != DebugProcessHalt.RECLASSIFIED) delay(50)
         }
-        assertEquals(FinancialTransactionType.EXPENSE,c.financialTransactionRepository.getById(tx.id)!!.type)
-        assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE,c.reviewRepository.findByRawSmsId("death-corrected")!!.resolutionKind)
+        assertEquals(FinancialTransactionType.EXPENSE,c.storage.financialTransactionRepository.getById(tx.id)!!.type)
+        assertEquals(ReviewResolutionKind.USER_FINANCIAL_TYPE,c.storage.reviewRepository.findByRawSmsId("death-corrected")!!.resolutionKind)
         DebugProcessHalt.scheduleResume(app.filesDir)
     }
     @Test(timeout=120_000) fun resumeFinancialCorrectionAndBlockNextTemplate() = runBlocking {
         val c=app.container
-        c.awaitPostStartupBackgroundWorkForTesting()
-        val service=requireNotNull(c.interpretationService)
+        c.maintenance.awaitPostStartupBackgroundWorkForTesting()
+        val service=requireNotNull(c.learning.interpretationService)
         service.synchronizeFeedback()
-        assertEquals(FinancialTransactionType.EXPENSE,c.financialTransactionRepository.findByRawSmsId("death-corrected")!!.type)
+        assertEquals(FinancialTransactionType.EXPENSE,c.storage.financialTransactionRepository.findByRawSmsId("death-corrected")!!.type)
         assertEquals(LearningFeedbackState.BLOCKED,service.feedbackStatus("death-corrected")!!.state)
-        val original=c.financialTransactionRepository.listAll()
-        c.processRawSmsUseCase.ingest(sms("death-next",22))
-        assertNull(c.financialTransactionRepository.findByRawSmsId("death-next"))
-        assertEquals(ReviewStatus.REQUIRED,c.reviewRepository.findByRawSmsId("death-next")!!.status)
-        assertEquals(original,c.financialTransactionRepository.listAll())
+        val original=c.storage.financialTransactionRepository.listAll()
+        c.sms.processRawSmsUseCase.ingest(sms("death-next",22))
+        assertNull(c.storage.financialTransactionRepository.findByRawSmsId("death-next"))
+        assertEquals(ReviewStatus.REQUIRED,c.storage.reviewRepository.findByRawSmsId("death-next")!!.status)
+        assertEquals(original,c.storage.financialTransactionRepository.listAll())
     }
 }

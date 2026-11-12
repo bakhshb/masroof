@@ -50,18 +50,18 @@ class PrivateBackupAnalysisTest {
             android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
                 "pm grant ${host.packageName} android.permission.READ_SMS")).use { it.readBytes() }
             val c = AppContainer(context).also { container = it }
-            c.onboardingPreferencesRepository.apply {
+            c.storage.onboardingPreferencesRepository.apply {
                 setOnboardingStarted(preferences.onboardingStarted)
                 setOnboardingCompleted(preferences.onboardingCompleted)
                 setHistoricalImportStartEpochMillis(preferences.historicalImportStartEpochMillis)
                 setHistoricalImportCompleted(preferences.historicalImportCompleted)
             }
-            c.runStartupMaintenance()
-            c.awaitPostStartupBackgroundWorkForTesting()
+            c.maintenance.runStartupMaintenance()
+            c.maintenance.awaitPostStartupBackgroundWorkForTesting()
             c.stopAnalytics()
-            suspend fun ledgerFingerprint(): ByteArray = c.database.withTransaction {
+            suspend fun ledgerFingerprint(): ByteArray = c.storage.database.withTransaction {
                 val digest = MessageDigest.getInstance("SHA-256")
-                c.database.openHelper.readableDatabase.query("SELECT * FROM financial_transaction ORDER BY id").use { cursor ->
+                c.storage.database.openHelper.readableDatabase.query("SELECT * FROM financial_transaction ORDER BY id").use { cursor ->
                     while (cursor.moveToNext()) for (column in 0 until cursor.columnCount) {
                         digest.update((if (cursor.isNull(column)) "<null>" else cursor.getString(column)).toByteArray())
                         digest.update(0.toByte())

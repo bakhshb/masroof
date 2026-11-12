@@ -25,23 +25,23 @@ class ProductionEnginePreservationTest {
         val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "engine-preservation")
         val c = AppContainer(context)
         try {
-            c.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
+            c.review.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
             fun raw(id: String, body: String) = RawSms(id, "AlJazira", body, Instant.now(), id, SmsBodyHasher.sha256Hex(body))
-            c.processRawSmsUseCase.ingest(raw("posted", "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nمبلغ: SAR 12\nلدى: TEST_SHOP"))
-            val service = requireNotNull(c.interpretationService)
-            assertNotNull(c.financialTransactionRepository.findByRawSmsId("posted"))
+            c.sms.processRawSmsUseCase.ingest(raw("posted", "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nمبلغ: SAR 12\nلدى: TEST_SHOP"))
+            val service = requireNotNull(c.learning.interpretationService)
+            assertNotNull(c.storage.financialTransactionRepository.findByRawSmsId("posted"))
             assertFalse(service.mayRefresh("posted"))
-            val ledger = c.financialTransactionRepository.listAll()
-            val posted = c.parsedEventRepository.findByRawSmsId("posted")
+            val ledger = c.storage.financialTransactionRepository.listAll()
+            val posted = c.storage.parsedEventRepository.findByRawSmsId("posted")
 
-            c.processRawSmsUseCase.ingest(raw("undecided", "تنبيه جديد غير معروف\nمبلغ: SAR 5"))
+            c.sms.processRawSmsUseCase.ingest(raw("undecided", "تنبيه جديد غير معروف\nمبلغ: SAR 5"))
             assertTrue(service.mayRefresh("undecided"))
-            c.userCorrectionRepository.save(UserCorrection("merchant-only", "undecided", null, null,
+            c.storage.userCorrectionRepository.save(UserCorrection("merchant-only", "undecided", null, null,
                 "My merchant", null, Instant.now()))
             assertFalse(service.mayRefresh("undecided"))
             service.synchronizeFeedback()
-            assertEquals(ledger, c.financialTransactionRepository.listAll())
-            assertEquals(posted, c.parsedEventRepository.findByRawSmsId("posted"))
+            assertEquals(ledger, c.storage.financialTransactionRepository.listAll())
+            assertEquals(posted, c.storage.parsedEventRepository.findByRawSmsId("posted"))
             assertEquals("masroof.db", context.getDatabasePath("masroof.db").name)
         } finally { c.close() }
     }

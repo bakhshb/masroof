@@ -3,18 +3,20 @@ package com.baraa.masroof.presentation.notification
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.container.DashboardContainer
+import com.baraa.masroof.application.container.StorageContainer
 
 fun notificationCenterViewModelFactory(
-    container: AppContainer,
+    storage: StorageContainer,
+    dashboard: DashboardContainer,
     permissionStateProvider: () -> Boolean,
 ): ViewModelProvider.Factory = viewModelFactory {
     initializer {
         NotificationCenterViewModel(
-            notificationCenterMetricsWorkflow = container.notificationCenterMetricsWorkflow,
-            notificationCenterService = container.notificationCenterService,
+            notificationCenterMetricsWorkflow = dashboard.notificationCenterMetricsWorkflow,
+            notificationCenterService = dashboard.notificationCenterService,
             permissionStateProvider = permissionStateProvider,
-            appLogService = container.appLogService,
+            appLogService = storage.appLogService,
         )
     }
 }

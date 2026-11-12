@@ -55,7 +55,7 @@ class IncomingSmsReceiver : BroadcastReceiver() {
 
         val receivedAt = LiveReceiptTimestamp.resolve(
             providerTimestampsMillis = assembled.providerTimestampsMillis,
-            deviceNow = app.container.clock.now(),
+            deviceNow = app.container.storage.clock.now(),
         )
         val rawSms = try {
             AndroidSmsMapper.toRawSms(
@@ -73,9 +73,9 @@ class IncomingSmsReceiver : BroadcastReceiver() {
         // A system delivery always has a pending result. A debug instrumentation
         // call of onReceive does not, because SMS_RECEIVED cannot be sent by the app.
         val pendingResult = pendingResultOrNull()
-        app.container.applicationScope.launch {
+        app.container.storage.applicationScope.launch {
             try {
-                app.container.liveSmsIntake.ingest(rawSms)
+                app.container.sms.liveSmsIntake.ingest(rawSms)
             } finally {
                 pendingResult?.finish()
             }

@@ -131,15 +131,15 @@ class StatementReconciliationSmokeTest {
     private fun seedLedgerAndEvidence() {
         runBlocking(Dispatchers.IO) {
             val container = application().container
-            container.accountRegistryRepository.setOwnership(
+            container.storage.accountRegistryRepository.setOwnership(
                 AccountReference(Bank.BANK_ALJAZIRA, ACCOUNT),
                 OwnershipStatus.OWNED,
             )
-            container.withDatabaseTransaction {
+            container.storage.withDatabaseTransaction {
                 val account = FinancialContainerIdFactory.accountId(Bank.BANK_ALJAZIRA, ACCOUNT)
                 SEEDED.forEach { row ->
                     val at = at(row.localDateTime)
-                    container.rawSmsRepository.insertIfAbsent(
+                    container.storage.rawSmsRepository.insertIfAbsent(
                         RawSms(
                             id = row.rawSmsId,
                             sender = "AlJazira",
@@ -149,7 +149,7 @@ class StatementReconciliationSmokeTest {
                             bodyHash = SmsBodyHasher.sha256Hex(row.body),
                         ),
                     )
-                    container.parsedEventRepository.save(
+                    container.storage.parsedEventRepository.save(
                         ParsedEvent(
                             id = row.eventId,
                             rawSmsId = row.rawSmsId,
@@ -172,7 +172,7 @@ class StatementReconciliationSmokeTest {
                             transactionReference = if (row.transactionId == "m19-matched") "REF-M" else null,
                         ),
                     )
-                    val saved = container.financialTransactionRepository.save(
+                    val saved = container.storage.financialTransactionRepository.save(
                         transaction = FinancialTransaction(
                             id = row.transactionId,
                             type = FinancialTransactionType.EXPENSE,
@@ -192,7 +192,7 @@ class StatementReconciliationSmokeTest {
                         emulatorMessage("ledger seed was not saved for ${row.transactionId}: $saved")
                     }
                 }
-                container.userCorrectionRepository.save(
+                container.storage.userCorrectionRepository.save(
                     UserCorrection(
                         id = "uc-m19-matched",
                         targetRawSmsId = "m19-sms-matched",
@@ -203,7 +203,7 @@ class StatementReconciliationSmokeTest {
                         createdAt = at("2026-04-02T12:05:00"),
                     ),
                 )
-                container.reviewRepository.upsertRequired(
+                container.storage.reviewRepository.upsertRequired(
                     rawSmsId = "m19-sms-ledger-only",
                     kind = ReviewKind.NEEDS_REVIEW,
                     reasons = listOf("m19_statement_fixture"),
@@ -254,7 +254,7 @@ class StatementReconciliationSmokeTest {
         composeRule.onNodeWithContentDescription(settings).performClick()
         clickText(text(R.string.settings_banks_title))
         val bankName = runBlocking {
-            application().container.messagePatternsWorkflow.catalog().banks
+            application().container.patterns.messagePatternsWorkflow.catalog().banks
                 .single { it.bankId == Bank.BANK_ALJAZIRA.id }.displayName
         } ?: text(R.string.bank_aljazira)
         clickText(bankName)
@@ -496,7 +496,7 @@ class StatementReconciliationSmokeTest {
     }
 
     private fun mutationCounts(): MutationCounts = runBlocking(Dispatchers.IO) {
-        val sqlite = application().container.database.openHelper.readableDatabase
+        val sqlite = application().container.storage.database.openHelper.readableDatabase
         fun count(table: String): Int {
             check(table in COUNTED_TABLES) { emulatorMessage("unexpected table $table") }
             sqlite.query(SimpleSQLiteQuery("SELECT COUNT(*) FROM $table")).use { cursor ->
@@ -681,8 +681,8 @@ private class StatementOnboardingRule : TestRule {
             override fun evaluate() {
                 val app = InstrumentationRegistry.getInstrumentation()
                     .targetContext.applicationContext as MasroofApplication
-                app.container.onboardingPreferencesRepository.setOnboardingStarted(true)
-                app.container.onboardingPreferencesRepository.setOnboardingCompleted(true)
+                app.container.storage.onboardingPreferencesRepository.setOnboardingStarted(true)
+                app.container.storage.onboardingPreferencesRepository.setOnboardingCompleted(true)
                 base.evaluate()
             }
         }

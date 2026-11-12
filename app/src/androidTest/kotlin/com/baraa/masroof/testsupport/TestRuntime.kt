@@ -21,7 +21,7 @@ object TestRuntime {
         val result = AppContainer(this.context(context), restartAfterRestore = { close(); container(context) })
         MasroofApplication::class.java.getDeclaredField("container").apply { isAccessible = true }.set(app, result)
         current = result
-        result.runStartupMaintenance()
+        result.maintenance.runStartupMaintenance()
         return result
     }
     @Synchronized fun close() { current?.close(); current = null }

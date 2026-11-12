@@ -25,11 +25,11 @@ class CurrentDatabaseSchemaTest {
         val context = context()
         try {
             var c = AppContainer(context)
-            try { c.rawSmsRepository.insertIfAbsent(raw) } finally { c.close() }
+            try { c.storage.rawSmsRepository.insertIfAbsent(raw) } finally { c.close() }
             c = AppContainer(context)
             try {
-                assertEquals(raw, c.rawSmsRepository.getById(raw.id))
-                assertEquals(18, c.database.openHelper.readableDatabase.version)
+                assertEquals(raw, c.storage.rawSmsRepository.getById(raw.id))
+                assertEquals(18, c.storage.database.openHelper.readableDatabase.version)
             } finally { c.close() }
         } finally { context.getDatabasePath(MasroofDatabase.NAME).parentFile?.deleteRecursively() }
     }
@@ -38,7 +38,7 @@ class CurrentDatabaseSchemaTest {
         val context = context()
         try {
             var c = AppContainer(context)
-            try { c.rawSmsRepository.insertIfAbsent(raw) } finally { c.close() }
+            try { c.storage.rawSmsRepository.insertIfAbsent(raw) } finally { c.close() }
             val file = context.getDatabasePath(MasroofDatabase.NAME)
             SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use {
                 // v17 has the same financial tables but no provider-alias table.
@@ -48,7 +48,7 @@ class CurrentDatabaseSchemaTest {
             val before = file.readBytes()
             c = AppContainer(context)
             try {
-                val failure = runCatching { c.rawSmsRepository.getById(raw.id) }.exceptionOrNull()
+                val failure = runCatching { c.storage.rawSmsRepository.getById(raw.id) }.exceptionOrNull()
                 assertNotNull("Older database was silently accepted or migrated", failure)
                 assertTrue(failure!!.message.orEmpty().contains("migration", ignoreCase = true))
             } finally { c.close() }

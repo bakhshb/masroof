@@ -41,9 +41,9 @@ class ReplicaSetupJourneyTest {
         shell("rm -rf /sdcard/Download/replica-journey")
         runBlocking { TestRuntime.reset(host) }
         val container = AppContainer(TestStorageContext(host),smsDataSourceOverride = ReferenceHistory.source(host))
-        container.appLocaleRepository.setLanguageTag("en")
-        container.runStartupMaintenance()
-        runBlocking { container.awaitStartupMaintenance() }
+        container.storage.appLocaleRepository.setLanguageTag("en")
+        container.maintenance.runStartupMaintenance()
+        runBlocking { container.maintenance.awaitStartupMaintenance() }
         val store = ViewModelStore()
         lateinit var onboarding: OnboardingViewModel
         lateinit var dashboard: DashboardViewModel
@@ -54,12 +54,12 @@ class ReplicaSetupJourneyTest {
         var analyticsVisible by mutableStateOf(true)
         try {
             compose.runOnUiThread {
-                onboarding = ViewModelProvider(store,onboardingViewModelFactory(container,container.onboardingPreferencesRepository){true})[OnboardingViewModel::class.java]
-                dashboard = ViewModelProvider(store,dashboardViewModelFactory(container,{true}))[DashboardViewModel::class.java]
-                review = ViewModelProvider(store,reviewViewModelFactory(container))[ReviewViewModel::class.java]
-                settings = ViewModelProvider(store,settingsViewModelFactory(container,"test",{true}))[SettingsViewModel::class.java]
-                statement = ViewModelProvider(store,statementReconciliationViewModelFactory(container.statementReconciliationWorkflow))[StatementReconciliationViewModel::class.java]
-                notifications = ViewModelProvider(store,notificationCenterViewModelFactory(container,{true}))[NotificationCenterViewModel::class.java]
+                onboarding = ViewModelProvider(store,onboardingViewModelFactory(container.storage, container.backup, container.review, container.sms, container.patterns, container.storage.onboardingPreferencesRepository){true})[OnboardingViewModel::class.java]
+                dashboard = ViewModelProvider(store,dashboardViewModelFactory(container.storage, container.maintenance, container.dashboard, container.patterns, container.review, { container.analytics }, {true}))[DashboardViewModel::class.java]
+                review = ViewModelProvider(store,reviewViewModelFactory(container.storage, container.maintenance, container.review, container.sms, container.patterns))[ReviewViewModel::class.java]
+                settings = ViewModelProvider(store,settingsViewModelFactory(container.storage, container.backup, container.dashboard, container.patterns, container.review, container.sms, container.update, "test",{true}))[SettingsViewModel::class.java]
+                statement = ViewModelProvider(store,statementReconciliationViewModelFactory(container.sms.statementReconciliationWorkflow))[StatementReconciliationViewModel::class.java]
+                notifications = ViewModelProvider(store,notificationCenterViewModelFactory(container.storage, container.dashboard, {true}))[NotificationCenterViewModel::class.java]
             }
             compose.setContent { CompositionLocalProvider(LocalAnalyticsCardsEnabled provides analyticsVisible) { MasroofTheme {
                 MasroofRoot(onboarding,dashboard,review,settings,statement,notifications,
@@ -114,9 +114,9 @@ class ReplicaSetupJourneyTest {
                 "Baseline without additive forecast card (ms): $before\nWith forecast card (ms): $after\n" +
                 "Measures recomposition through Compose idle, including test synchronization; not startup latency. Training is independent background work.\n")
             runBlocking {
-                val oldDay = container.dashboardPeriodWorkflow.currentPeriod().startDate.minusDays(1)
-                val source = container.financialTransactionRepository.listAll().firstOrNull()?.sourceContainerId
-                container.database.financialTransactionDao().insertTransactionIfAbsent(com.baraa.masroof.data.room.entity.FinancialTransactionEntity(
+                val oldDay = container.dashboard.dashboardPeriodWorkflow.currentPeriod().startDate.minusDays(1)
+                val source = container.storage.financialTransactionRepository.listAll().firstOrNull()?.sourceContainerId
+                container.storage.database.financialTransactionDao().insertTransactionIfAbsent(com.baraa.masroof.data.room.entity.FinancialTransactionEntity(
                     "analytics-prior-payment", "CREDIT_CARD_PAYMENT", "17.00", "SAR",
                     oldDay.atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
                     source, null, "Previous period payment", null, null))
@@ -189,13 +189,13 @@ class ReplicaSetupJourneyTest {
             screenshot("07-recognized-loan")
             click(R.string.nav_home)
             compose.waitUntil(20_000) { dashboard.uiState.value.loansOverview?.hasContent == true }
-            assertEquals(0,runBlocking { container.reviewRepository.listRequired().size })
+            assertEquals(0,runBlocking { container.storage.reviewRepository.listRequired().size })
             screenshot("08-dashboard-with-loan")
             click(R.string.nav_review)
             screenshot("09-review-after-ownership")
             // A genuinely new title stays in the original review flow, not the cards settings.
             val body="سداد تمويل خاص\nمن: 3001\nالقسط: SAR 23\nالمبلغ المتبقي: SAR 298\nلـ: تمويل شخصي\nفي: "+java.time.LocalDateTime.now().minusMinutes(2).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-            runBlocking {container.processRawSmsUseCase.ingest(RawSms("ui-unknown-loan","AlJazira",body,java.time.Instant.now(),"ui-unknown-loan",com.baraa.masroof.sms.hash.SmsBodyHasher.sha256Hex(body)))}
+            runBlocking {container.sms.processRawSmsUseCase.ingest(RawSms("ui-unknown-loan","AlJazira",body,java.time.Instant.now(),"ui-unknown-loan",com.baraa.masroof.sms.hash.SmsBodyHasher.sha256Hex(body)))}
             compose.runOnUiThread {review.refresh()}
             compose.waitUntil(20_000) {review.uiState.value.items.size==1}
             compose.onNodeWithText(text(R.string.reference_review_evidence)).performScrollTo().performClick()
@@ -212,17 +212,17 @@ class ReplicaSetupJourneyTest {
             screenshot("11-review-resolved-in-place")
 
             // The manual decision itself is never labelled as a model decision.
-            assertEquals(com.baraa.masroof.application.interpretation.InterpretationOrigin.MANUAL, runBlocking { container.interpretationProvenanceWorkflow.load("ui-unknown-loan") }.origin)
+            assertEquals(com.baraa.masroof.application.interpretation.InterpretationOrigin.MANUAL, runBlocking { container.patterns.interpretationProvenanceWorkflow.load("ui-unknown-loan") }.origin)
             runBlocking {
-                requireNotNull(container.interpretationService).synchronizeFeedback()
+                requireNotNull(container.learning.interpretationService).synchronizeFeedback()
                 val future = body.replace("SAR 23", "SAR 243.21")
-                container.processRawSmsUseCase.ingest(raw("ui-learned-loan",future))
+                container.sms.processRawSmsUseCase.ingest(raw("ui-learned-loan",future))
             }
             click(R.string.nav_home)
             fun openAmount(amount: String) {
                 compose.runOnUiThread { dashboard.refresh() }
                 compose.waitUntil(20_000) { !dashboard.uiState.value.loading && dashboard.uiState.value.allTransactions.any { it.amount.amount.toPlainString() == amount } }
-                val tx = runBlocking { container.financialTransactionRepository.listAll().single { it.amount.amount.toPlainString() == amount } }
+                val tx = runBlocking { container.storage.financialTransactionRepository.listAll().single { it.amount.amount.toPlainString() == amount } }
                 compose.runOnUiThread { dashboard.openTransactionDetail(tx.id) }
                 compose.waitUntil(20_000) { !dashboard.uiState.value.selectedTransactionSmsLoading }
             }
@@ -234,8 +234,8 @@ class ReplicaSetupJourneyTest {
 
             val incoming = "حوالة محلية واردة\nبنك المرسل: بنك الرياض\nاودعت الى حساب: 3001\nمن: TEST_EMPLOYER\nمبلغ العملية: SAR 2000.00\nفي: " +
                 java.time.LocalDateTime.now().minusMinutes(2).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-            runBlocking { container.processRawSmsUseCase.ingest(raw("ui-model-income",incoming)) }
-            assertNull(runBlocking { container.financialTransactionRepository.findByRawSmsId("ui-model-income") })
+            runBlocking { container.sms.processRawSmsUseCase.ingest(raw("ui-model-income",incoming)) }
+            assertNull(runBlocking { container.storage.financialTransactionRepository.findByRawSmsId("ui-model-income") })
             click(R.string.nav_review)
             compose.runOnUiThread { review.refresh() }
             compose.waitUntil(20_000) { review.uiState.value.items.size == 1 }
@@ -254,12 +254,12 @@ class ReplicaSetupJourneyTest {
             val blockedReviewId = runBlocking {
                 // The preceding unresolved review invalidates feedback asynchronously.
                 // Rebuild before testing an established human-template suggestion.
-                requireNotNull(container.interpretationService).synchronizeFeedback()
-                container.processRawSmsUseCase.ingest(raw("ui-model-blocked",body.replace("SAR 23","SAR 0.00")))
-                requireNotNull(container.interpretationService).synchronizeFeedback()
+                requireNotNull(container.learning.interpretationService).synchronizeFeedback()
+                container.sms.processRawSmsUseCase.ingest(raw("ui-model-blocked",body.replace("SAR 23","SAR 0.00")))
+                requireNotNull(container.learning.interpretationService).synchronizeFeedback()
                 assertEquals(com.baraa.masroof.application.interpretation.InterpretationOrigin.HUMAN_TEMPLATE,
-                    container.interpretationProvenanceWorkflow.load("ui-model-blocked").origin)
-                requireNotNull(container.reviewRepository.findByRawSmsId("ui-model-blocked")).id
+                    container.patterns.interpretationProvenanceWorkflow.load("ui-model-blocked").origin)
+                requireNotNull(container.storage.reviewRepository.findByRawSmsId("ui-model-blocked")).id
             }
             compose.runOnUiThread { review.refresh() }
             compose.waitUntil(20_000) { review.uiState.value.items.size == 2 }
@@ -271,7 +271,7 @@ class ReplicaSetupJourneyTest {
             compose.onNodeWithText(text(R.string.lab_inference_pending)).assertExists()
             screenshot("14-unapproved-template-review")
             compose.runOnUiThread { review.closeDetail() }
-            assertEquals(0,runBlocking { container.financialTransactionRepository.listAll().count { it.amount.amount.signum() == 0 } })
+            assertEquals(0,runBlocking { container.storage.financialTransactionRepository.listAll().count { it.amount.amount.signum() == 0 } })
 
         } finally {
             compose.runOnUiThread { store.clear() }

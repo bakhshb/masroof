@@ -68,8 +68,8 @@ class SettingsBanksJourneyTest {
         }
         val container = AppContainer(context, smsDataSourceOverride = source)
         val store = ViewModelStore()
-        val vm = ViewModelProvider(store, settingsViewModelFactory(container, "1.0-test", { permissionGranted }))[SettingsViewModel::class.java]
-        val statement = StatementReconciliationViewModel(container.statementReconciliationWorkflow)
+        val vm = ViewModelProvider(store, settingsViewModelFactory(container.storage, container.backup, container.dashboard, container.patterns, container.review, container.sms, container.update, "1.0-test", { permissionGranted }))[SettingsViewModel::class.java]
+        val statement = StatementReconciliationViewModel(container.sms.statementReconciliationWorkflow)
         try {
             compose.setContent {
                 val localized = AppLocaleContext.wrap(LocalContext.current, "ar")
@@ -91,8 +91,8 @@ class SettingsBanksJourneyTest {
             input("bank-sender", "TestBank")
             androidx.test.espresso.Espresso.closeSoftKeyboard()
             click(R.string.settings_save)
-            compose.waitUntil(10_000) { runBlocking { container.messagePatternsWorkflow.catalog().banks.any { it.displayName == "بنك التجربة" } } }
-            val bankId = container.messagePatternsWorkflow.catalog().banks.single { it.displayName == "بنك التجربة" }.bankId
+            compose.waitUntil(10_000) { runBlocking { container.patterns.messagePatternsWorkflow.catalog().banks.any { it.displayName == "بنك التجربة" } } }
+            val bankId = container.patterns.messagePatternsWorkflow.catalog().banks.single { it.displayName == "بنك التجربة" }.bankId
             compose.waitUntil(10_000) { compose.onAllNodesWithText(compose.ar(R.string.pattern_import_bank)).fetchSemanticsNodes().isNotEmpty() }
             capture("new-bank")
             click(R.string.pattern_import_bank)
@@ -119,7 +119,7 @@ class SettingsBanksJourneyTest {
             androidx.test.espresso.Espresso.closeSoftKeyboard()
             click(R.string.pattern_financial_account_owned)
             compose.onNodeWithTag("sheet-apply").assertIsEnabled().performClick()
-            compose.waitUntil(10_000) { runBlocking { container.accountRegistryRepository.listAll().any { it.bank.id == bankId } } }
+            compose.waitUntil(10_000) { runBlocking { container.storage.accountRegistryRepository.listAll().any { it.bank.id == bankId } } }
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("masroof-bottom-sheet").fetchSemanticsNodes().isEmpty() }
             back()
             click(R.string.settings_bank_cards_title)
@@ -130,8 +130,8 @@ class SettingsBanksJourneyTest {
             compose.onNodeWithTag("sheet-apply").assertIsEnabled().performClick()
             compose.onNodeWithTag("card-type-CREDIT").performScrollTo().performClick()
             compose.onNodeWithTag("sheet-apply").performClick()
-            compose.waitUntil(10_000) { runBlocking { container.cardRegistryRepository.get(CardReference(Bank(bankId), "8219"))?.cardType == CardType.CREDIT } }
-            assertTrue(container.financialTransactionRepository.listAll().isEmpty())
+            compose.waitUntil(10_000) { runBlocking { container.storage.cardRegistryRepository.get(CardReference(Bank(bankId), "8219"))?.cardType == CardType.CREDIT } }
+            assertTrue(container.storage.financialTransactionRepository.listAll().isEmpty())
             compose.waitUntil(10_000) { compose.onAllNodesWithTag("masroof-bottom-sheet").fetchSemanticsNodes().isEmpty() }
             back(); back(); back()
             click(R.string.settings_about_section)

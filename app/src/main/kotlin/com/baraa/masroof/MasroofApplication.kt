@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import androidx.work.Configuration
 import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.container.appWorkerFactory
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.sms.DebugProcessHalt
 import com.baraa.masroof.application.update.UpdateCheckScheduler
@@ -33,19 +34,19 @@ class MasroofApplication : Application(), Configuration.Provider {
         // The log write is synchronous, so the entry survives the process dying right after.
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            runCatching { container.appLogService.failure(AppLogCategories.CRASH, "Uncaught on ${thread.name}", error) }
+            runCatching { container.storage.appLogService.failure(AppLogCategories.CRASH, "Uncaught on ${thread.name}", error) }
             previous?.uncaughtException(thread, error)
         }
         if (!isRobolectricUnitTest()) {
-            com.baraa.masroof.application.maintenance.RetiredWorkCleanup.schedule(this, container.applicationScope, container.appLogService)
-            container.runStartupMaintenance()
+            com.baraa.masroof.application.maintenance.RetiredWorkCleanup.schedule(this, container.storage.applicationScope, container.storage.appLogService)
+            container.maintenance.runStartupMaintenance()
             UpdateCheckScheduler.schedule(this)
         }
     }
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
-            .setWorkerFactory(container.workerFactory)
+            .setWorkerFactory(appWorkerFactory(container) { container })
             .build()
 
     override fun onTerminate() {

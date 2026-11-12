@@ -34,7 +34,7 @@ class FoldModalWindowJourneyTest {
                 val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MasroofApplication
                 app.getSharedPreferences(AppLocalePreferences.PREFS_NAME, Context.MODE_PRIVATE).edit()
                     .putString(AppLocalePreferences.KEY_LANGUAGE_TAG, args.getString("language") ?: "ar").commit()
-                app.container.themePreferencesRepository.setThemeMode(if (args.getString("dark") == "true") ThemeMode.DARK else ThemeMode.LIGHT)
+                app.container.storage.themePreferencesRepository.setThemeMode(if (args.getString("dark") == "true") ThemeMode.DARK else ThemeMode.LIGHT)
                 JourneySeeder.prepare("dashboard_showsPersistedTransactionAfterReload")
                 val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
                 fun command(value: String): String = android.os.ParcelFileDescriptor.AutoCloseInputStream(

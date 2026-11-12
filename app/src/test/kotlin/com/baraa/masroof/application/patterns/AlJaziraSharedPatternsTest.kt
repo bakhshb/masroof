@@ -33,66 +33,66 @@ class AlJaziraSharedPatternsTest {
 
     @Test fun actualIntakeUsesSharedDefinitionsAndDisableRestoreNeverRewritesPostedEvidence() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             w.confirmPatternAccount(bankId, "4321")
-            assertTrue(c.processRawSmsUseCase.ingest(raw("posted")) is SmsIngestionResult.Parsed)
-            val posted = c.parsedEventRepository.findByRawSmsId("posted")!!
+            assertTrue(c.sms.processRawSmsUseCase.ingest(raw("posted")) is SmsIngestionResult.Parsed)
+            val posted = c.storage.parsedEventRepository.findByRawSmsId("posted")!!
             assertTrue("engine:message-pattern-roles-v1" in posted.event.confidence.reasons)
-            assertEquals(1, c.financialTransactionRepository.listAll().size)
+            assertEquals(1, c.storage.financialTransactionRepository.listAll().size)
             val purchase = w.load().banks.single { it.bankId == bankId }.currentPatterns.single { it.id == "bank.purchase" }
             val disabled = w.setEnabled(w.load().generation, bankId, purchase.id, false)
-            assertTrue(c.processRawSmsUseCase.ingest(raw("pending")) is SmsIngestionResult.ReviewRequired)
-            assertEquals(1, c.financialTransactionRepository.listAll().size)
+            assertTrue(c.sms.processRawSmsUseCase.ingest(raw("pending")) is SmsIngestionResult.ReviewRequired)
+            assertEquals(1, c.storage.financialTransactionRepository.listAll().size)
             val restored = w.restoreRevision(disabled.generation, bankId, purchase.id, 1)
             assertEquals(3, restored.banks.single { it.bankId == bankId }.currentPatterns.single { it.id == purchase.id }.revision)
             assertEquals(1, w.applyPending(bankId, restored.generation).posted)
-            assertEquals(2, c.financialTransactionRepository.listAll().size)
-            c.processStoredSmsUseCase.process("posted")
-            assertEquals(posted, c.parsedEventRepository.findByRawSmsId("posted"))
-            assertEquals(2, c.financialTransactionRepository.listAll().size)
+            assertEquals(2, c.storage.financialTransactionRepository.listAll().size)
+            c.sms.processStoredSmsUseCase.process("posted")
+            assertEquals(posted, c.storage.parsedEventRepository.findByRawSmsId("posted"))
+            assertEquals(2, c.storage.financialTransactionRepository.listAll().size)
         }
     }
 
     @Test fun disablingAfterParseBlocksTheFinancialWriteWithoutReparsingAcceptedFacts() = runBlocking {
         fixture { c ->
-            val w = c.messagePatternsWorkflow
+            val w = c.patterns.messagePatternsWorkflow
             w.confirmPatternAccount(bankId, "4321")
             val raw = raw("between-parse-and-post")
-            c.rawSmsRepository.insertIfAbsent(raw)
-            assertTrue(c.processStoredSmsUseCase.reparseAndStore(raw, historicalBatch = true) is SmsIngestionResult.Parsed)
-            val saved = c.parsedEventRepository.findByRawSmsId(raw.id)
+            c.storage.rawSmsRepository.insertIfAbsent(raw)
+            assertTrue(c.sms.processStoredSmsUseCase.reparseAndStore(raw, historicalBatch = true) is SmsIngestionResult.Parsed)
+            val saved = c.storage.parsedEventRepository.findByRawSmsId(raw.id)
             w.setEnabled(w.load().generation, bankId, "bank.purchase", false)
-            assertTrue(c.processStoredSmsUseCase.process(raw.id) is SmsIngestionResult.DerivedIncomplete)
-            assertTrue(c.financialTransactionRepository.listAll().isEmpty())
-            assertEquals(saved, c.parsedEventRepository.findByRawSmsId(raw.id))
-            c.processStoredSmsUseCase.recordExhaustedDerivedProcessing(raw.id)
-            assertEquals(ReviewStatus.REQUIRED, c.reviewRepository.findByRawSmsId(raw.id)!!.status)
-            assertTrue(c.processingRetryRepository.listRetryableRawSmsIds().contains(raw.id))
+            assertTrue(c.sms.processStoredSmsUseCase.process(raw.id) is SmsIngestionResult.DerivedIncomplete)
+            assertTrue(c.storage.financialTransactionRepository.listAll().isEmpty())
+            assertEquals(saved, c.storage.parsedEventRepository.findByRawSmsId(raw.id))
+            c.sms.processStoredSmsUseCase.recordExhaustedDerivedProcessing(raw.id)
+            assertEquals(ReviewStatus.REQUIRED, c.storage.reviewRepository.findByRawSmsId(raw.id)!!.status)
+            assertTrue(c.storage.processingRetryRepository.listRetryableRawSmsIds().contains(raw.id))
         }
     }
 
     @Test fun correctionArrivingBeforeInitialParseRetainsAuthorityAndStillProcesses() = runBlocking {
         fixture { c ->
-            c.messagePatternsWorkflow.confirmPatternAccount(bankId, "4321")
+            c.patterns.messagePatternsWorkflow.confirmPatternAccount(bankId, "4321")
             val raw = raw("early-correction")
-            c.rawSmsRepository.insertIfAbsent(raw)
+            c.storage.rawSmsRepository.insertIfAbsent(raw)
             val correction = UserCorrection("early", raw.id, MessageFamily.PURCHASE,
                 com.baraa.masroof.core.money.Money.of("15", com.baraa.masroof.core.money.Currency.SAR), null, null, Instant.parse("2026-10-15T10:00:00Z"))
-            c.userCorrectionRepository.save(correction)
-            assertTrue(c.processStoredSmsUseCase.process(raw.id) is SmsIngestionResult.Parsed)
-            assertEquals(correction, c.userCorrectionRepository.latestForRawSmsId(raw.id))
-            assertEquals("10.00", c.parsedEventRepository.findByRawSmsId(raw.id)!!.event.amount!!.amount.toPlainString())
-            assertEquals("15.00", c.financialTransactionRepository.listAll().single().amount.amount.toPlainString())
+            c.storage.userCorrectionRepository.save(correction)
+            assertTrue(c.sms.processStoredSmsUseCase.process(raw.id) is SmsIngestionResult.Parsed)
+            assertEquals(correction, c.storage.userCorrectionRepository.latestForRawSmsId(raw.id))
+            assertEquals("10.00", c.storage.parsedEventRepository.findByRawSmsId(raw.id)!!.event.amount!!.amount.toPlainString())
+            assertEquals("15.00", c.storage.financialTransactionRepository.listAll().single().amount.amount.toPlainString())
         }
     }
 
     @Test fun loadingInstalledDefinitionsIsReadOnlyInsideAdmittedFinancialWork() = runBlocking {
         fixture { c ->
-            val store = MessagePatternStore(c.applicationContext)
+            val store = MessagePatternStore(c.storage.appContext)
             val before = store.captureRaw()
             val generation = store.load().generation
-            c.databaseAccessGate.withAccess {
-                assertEquals(generation, c.messagePatternsWorkflow.load().generation)
+            c.storage.databaseAccessGate.withAccess {
+                assertEquals(generation, c.patterns.messagePatternsWorkflow.load().generation)
             }
             assertEquals(before, store.captureRaw())
         }
@@ -108,7 +108,7 @@ class AlJaziraSharedPatternsTest {
             withTimeout(20_000) {
                 var c = AppContainer(context)
                 try {
-                    val w = c.messagePatternsWorkflow
+                    val w = c.patterns.messagePatternsWorkflow
                     val bank = w.load().banks.single { it.bankId == bankId }
                     assertEquals(taught, bank.patterns.single { it.id == taught.id })
                     assertEquals(13, bank.patterns.count { it.roleProfile != null })
@@ -117,7 +117,7 @@ class AlJaziraSharedPatternsTest {
                 val before = store.captureRaw()
                 c = AppContainer(context)
                 try {
-                    val bank = c.messagePatternsWorkflow.load().banks.single { it.bankId == bankId }
+                    val bank = c.patterns.messagePatternsWorkflow.load().banks.single { it.bankId == bankId }
                     assertFalse(bank.currentPatterns.single { it.id == "bank.purchase" }.enabled)
                     assertEquals(2, bank.patterns.count { it.id == "bank.purchase" })
                     assertEquals(before, store.captureRaw())
