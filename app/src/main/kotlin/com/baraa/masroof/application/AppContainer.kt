@@ -3,7 +3,6 @@ package com.baraa.masroof.application
 import android.content.Context
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.work.WorkManager
-import androidx.work.WorkerFactory
 import com.baraa.masroof.application.analytics.AnalyticsNotifications
 import com.baraa.masroof.application.analytics.AnalyticsWorkflow
 import com.baraa.masroof.application.container.BackupContainer
@@ -15,7 +14,6 @@ import com.baraa.masroof.application.container.ReviewContainer
 import com.baraa.masroof.application.container.SmsContainer
 import com.baraa.masroof.application.container.StorageContainer
 import com.baraa.masroof.application.container.UpdateContainer
-import com.baraa.masroof.application.container.appWorkerFactory
 import com.baraa.masroof.application.sms.HistoricalDerivedRecoveryWorker
 import com.baraa.masroof.bank.BankSmsAdapter
 import com.baraa.masroof.data.room.PreservingOpenHelperFactory
@@ -85,8 +83,6 @@ class AppContainer(
             AnalyticsNotifications.clear(storage.appContext)
         },
     )
-
-    val workerFactory: WorkerFactory = appWorkerFactory(this)
 
     private val analyticsDelegate = lazy { AnalyticsWorkflow(this, storage.appContext) }
     val analytics: AnalyticsWorkflow get() = analyticsDelegate.value

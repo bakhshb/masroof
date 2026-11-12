@@ -1,5 +1,6 @@
 package com.baraa.masroof.application
 
+import com.baraa.masroof.application.container.appWorkerFactory
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
@@ -39,7 +40,7 @@ class AppContainerStartupMaintenanceTest {
             context,
             Configuration.Builder()
                 .setExecutor(SynchronousExecutor())
-                .setWorkerFactory(container.workerFactory)
+                .setWorkerFactory(appWorkerFactory(container))
                 .build(),
         )
         workManager = WorkManager.getInstance(context)

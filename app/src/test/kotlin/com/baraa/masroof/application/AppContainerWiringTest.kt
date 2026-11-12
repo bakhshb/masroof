@@ -5,6 +5,7 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import com.baraa.masroof.application.analytics.AnalyticsWorker
+import com.baraa.masroof.application.container.appWorkerFactory
 import com.baraa.masroof.application.interpretation.ModelRefreshWorker
 import com.baraa.masroof.application.sms.ExchangeRateEnrichmentWorker
 import com.baraa.masroof.application.sms.HistoricalDerivedRecoveryWorker
@@ -57,16 +58,28 @@ class AppContainerWiringTest {
             val context = c.storage.appContext
             workers.forEach { type ->
                 val worker = TestListenableWorkerBuilder.from(context, type)
-                    .setWorkerFactory(c.workerFactory).build()
+                    .setWorkerFactory(appWorkerFactory(c)).build()
                 assertEquals(type, worker.javaClass)
             }
+        }
+    }
+
+    @Test fun theUpdateWorkerReadsTheApplicationsCurrentContainerWhenItRuns() = runBlocking {
+        withAppContainer(uniqueStorageContext("wiring-current")) { c ->
+            var lookups = 0
+            val worker = TestListenableWorkerBuilder<UpdateCheckWorker>(c.storage.appContext)
+                .setWorkerFactory(appWorkerFactory(c) { lookups++; c }).build()
+            assertEquals(0, lookups)
+            worker.doWork()
+            // Device tests swap the application's container after WorkManager took the factory.
+            assertTrue(lookups > 0)
         }
     }
 
     @Test fun anUnknownWorkerStillFallsBackToTheDefaultFactory() = runBlocking {
         withAppContainer(uniqueStorageContext("wiring-fallback")) { c ->
             val worker = TestListenableWorkerBuilder<PlainWorker>(c.storage.appContext)
-                .setWorkerFactory(c.workerFactory).build()
+                .setWorkerFactory(appWorkerFactory(c)).build()
             assertEquals(PlainWorker::class.java, worker.javaClass)
         }
     }

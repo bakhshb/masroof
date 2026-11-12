@@ -17,8 +17,12 @@ import com.baraa.masroof.data.room.DatabaseRestartRequiredException
  * The one place WorkManager gets worker dependencies: all seven workers are created here, never by
  * reaching for the application. Dependencies are read when a worker is created, so a lazy one stays lazy.
  * An unknown class falls through to WorkManager's default reflective factory.
+ *
+ * [current] is the application's container when the worker runs. The model, update and analytics workers
+ * always looked it up at run time, and device tests replace the application's container after WorkManager
+ * has taken this factory; the other four stay bound to [app], as they were.
  */
-internal fun appWorkerFactory(app: AppContainer): WorkerFactory =
+internal fun appWorkerFactory(app: AppContainer, current: () -> AppContainer = { app }): WorkerFactory =
     DelegatingWorkerFactory().apply {
         addFactory(
             LiveSmsProcessingWorker.Factory(
@@ -52,12 +56,17 @@ internal fun appWorkerFactory(app: AppContainer): WorkerFactory =
                 appLogService = app.storage.appLogService,
             ) { app.maintenance.completionSignal.notifyCompleted() },
         )
-        addFactory(ModelRefreshWorker.Factory { app })
+        addFactory(ModelRefreshWorker.Factory(current))
         addFactory(
             UpdateCheckWorker.Factory(
-                onboardingCompleted = { app.storage.onboardingPreferencesRepository.isOnboardingCompleted() },
-                coordinator = { app.update.updateCheckCoordinator },
+                onboardingCompleted = { current().storage.onboardingPreferencesRepository.isOnboardingCompleted() },
+                coordinator = { current().update.updateCheckCoordinator },
             ),
         )
-        addFactory(AnalyticsWorker.Factory(awaitStartup = app.maintenance::awaitStartupMaintenance, analytics = { app.analytics }))
+        addFactory(
+            AnalyticsWorker.Factory(
+                awaitStartup = { current().maintenance.awaitStartupMaintenance() },
+                analytics = { current().analytics },
+            ),
+        )
     }

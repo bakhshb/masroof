@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import androidx.work.Configuration
 import com.baraa.masroof.application.AppContainer
+import com.baraa.masroof.application.container.appWorkerFactory
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.sms.DebugProcessHalt
 import com.baraa.masroof.application.update.UpdateCheckScheduler
@@ -45,7 +46,7 @@ class MasroofApplication : Application(), Configuration.Provider {
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
-            .setWorkerFactory(container.workerFactory)
+            .setWorkerFactory(appWorkerFactory(container) { container })
             .build()
 
     override fun onTerminate() {
