@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.backup
 
+import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
@@ -47,7 +48,7 @@ class LedgerFixturesTest {
     @Before
     fun setUp() {
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Riyadh"))
-        MessagePatternBackup.restore(context, null)
+        LegacyMessagePatternFile.delete(LegacyMessagePatternFile.of(context))
         context.deleteDatabase(MasroofDatabase.NAME)
         DatabaseRestoreRecovery.deleteRestoreArtifacts(context.getDatabasePath(MasroofDatabase.NAME))
         if (System.getenv(REBUILD_ENV) == "1" && !rebuilt) {
@@ -211,7 +212,7 @@ class LedgerFixturesTest {
             assertTrue(exported.exceptionOrNull()?.toString(), exported.isSuccess)
         }
         context.deleteDatabase(MasroofDatabase.NAME)
-        val manifest = BackupManifest(BackupPackageFormat.FORMAT_VERSION, "fixture", 18, committedSchemaHash(), EXPORTED_AT)
+        val manifest = BackupManifest(BackupPackageFormat.LEGACY_FORMAT_VERSION, "fixture", 18, committedSchemaHash(), EXPORTED_AT)
         val preferences = BackupPreferencesSnapshot(
             onboardingStarted = true, onboardingCompleted = true, historicalImportCompleted = true,
             languageTag = AppLocale.DEFAULT_TAG, themeMode = ThemeMode.DEFAULT.name,

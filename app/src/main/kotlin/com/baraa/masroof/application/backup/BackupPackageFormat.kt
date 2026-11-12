@@ -56,8 +56,14 @@ class BackupFailureException(
 ) : Exception(category.logToken)
 
 object BackupPackageFormat {
-    /** Inner ZIP manifest version. Legacy plaintext backups are this version. */
-    const val FORMAT_VERSION: Int = 1
+    /** Inner ZIP manifest version of every new export: the patterns and recurring answers are inside the database. */
+    const val FORMAT_VERSION: Int = 2
+
+    /**
+     * The format of a schema v18 archive, the legacy plaintext ZIP included: its patterns ride in `preferences.json`
+     * and its recurring answers in the analysis archive there. Import converts both into the database.
+     */
+    const val LEGACY_FORMAT_VERSION: Int = 1
 
     /** Outer authenticated envelope version. Not a ZIP. */
     const val ENVELOPE_VERSION: Int = 1

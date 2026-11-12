@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.backup
 
+import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
@@ -100,7 +101,7 @@ class BackupOlderSchemaImportTest {
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
                 val livePath = context.getDatabasePath(MasroofDatabase.NAME)
                 assertEquals(bank?.let(::patternArchive), storedPatterns(livePath))
-                assertNull(MessagePatternBackup.captureOriginal(context))
+                assertFalse(LegacyMessagePatternFile.of(context).exists())
                 val restored = MigrationOpenPathContract.readOnly(livePath, MigrationOpenPathContract::rows)
                 assertEquals(expected - "user_decision", restored - "user_decision" - "pattern_configuration")
             } finally {
@@ -138,7 +139,7 @@ class BackupOlderSchemaImportTest {
             } finally { c.close() }
             val plain = ByteArrayOutputStream().also { out -> exported.inputStream().use { BackupEnvelope.decrypt(it, out, "secret".toCharArray()) } }
             val package_ = entries(plain.toByteArray())
-            val preferences = BackupPackageCodec.decodePreferences(package_.getValue(BackupPackageFormat.PREFERENCES_ENTRY).decodeToString())
+            val preferences = BackupPackageCodec.decodePreferences(package_.getValue(BackupPackageFormat.PREFERENCES_ENTRY).decodeToString(), BackupPackageFormat.FORMAT_VERSION)
             assertEquals(emptyList<Any>(), AnalyticsArchiveStore.validate(preferences.labAnalysis)?.feedback.orEmpty())
             val inside = File(context.cacheDir, "exported.db").apply { writeBytes(package_.getValue(BackupPackageFormat.DATABASE_ENTRY)) }
             val recurring = MigrationOpenPathContract.readOnly(inside, MigrationOpenPathContract::rows).getValue("user_decision")
@@ -189,6 +190,15 @@ class BackupOlderSchemaImportTest {
         for (archive in cases) BackupMigrationContract.assertRejectedUntouched(context, { archive.inputStream() }, next)
         // Production knows no next version: the v18 archive relabelled as the test-only next version is refused too.
         BackupMigrationContract.assertRejectedUntouched(context, { cases.last().inputStream() }, BackupSchema.PRODUCTION)
+        // A format names what the archive holds: the legacy one is a v18 database, the current one a later database,
+        // and only the legacy one may carry patterns beside it. Any other combination is refused, in production too.
+        val v18 = MasroofDatabase.IDENTITY_HASHES.getValue(MasroofDatabase.BASELINE_VERSION)
+        val mismatched = listOf(
+            rewritten(MasroofDatabase.BASELINE_VERSION, v18, format = BackupPackageFormat.FORMAT_VERSION),
+            rewritten(MasroofDatabase.BASELINE_VERSION, v18, format = BackupPackageFormat.FORMAT_VERSION + 1),
+            rewritten(MasroofDatabase.BASELINE_VERSION, v18, format = BackupPackageFormat.FORMAT_VERSION, patterns = patternArchive("MISMATCH")),
+        )
+        for (archive in mismatched) BackupMigrationContract.assertRejectedUntouched(context, { archive.inputStream() }, BackupSchema.PRODUCTION)
         // v19 to v21 never shipped (owner, 2026-11-12): their pairs, in the manifest and the file, are unknown.
         for ((version, hash) in MigrationOpenPathContract.RETIRED_IDENTITY_HASHES) {
             val retired = rewritten(manifestVersion = version, manifestHash = hash,
@@ -224,14 +234,16 @@ class BackupOlderSchemaImportTest {
         database: ByteArray? = null,
         patterns: String? = null,
         labAnalysis: String? = null,
+        // The format that goes with the manifest's schema, unless a case names a mismatch.
+        format: Int = if (manifestVersion == MasroofDatabase.BASELINE_VERSION) BackupPackageFormat.LEGACY_FORMAT_VERSION else BackupPackageFormat.FORMAT_VERSION,
     ): ByteArray {
         val entries = entries(plaintext().use { it.readBytes() }).toMutableMap()
-        val preferences = BackupPackageCodec.decodePreferences(entries.getValue(BackupPackageFormat.PREFERENCES_ENTRY).decodeToString())
+        val preferences = BackupPackageCodec.decodePreferences(entries.getValue(BackupPackageFormat.PREFERENCES_ENTRY).decodeToString(), BackupPackageFormat.LEGACY_FORMAT_VERSION)
         entries[BackupPackageFormat.PREFERENCES_ENTRY] =
             BackupPackageCodec.encodePreferences(preferences.copy(messagePatterns = patterns, labAnalysis = labAnalysis ?: preferences.labAnalysis)).toByteArray()
         val manifest = BackupPackageCodec.decodeManifest(entries.getValue(BackupPackageFormat.MANIFEST_ENTRY).decodeToString())
         entries[BackupPackageFormat.MANIFEST_ENTRY] =
-            BackupPackageCodec.encodeManifest(manifest.copy(roomVersion = manifestVersion, identityHash = manifestHash)).toByteArray()
+            BackupPackageCodec.encodeManifest(manifest.copy(formatVersion = format, roomVersion = manifestVersion, identityHash = manifestHash)).toByteArray()
         if (database != null) entries[BackupPackageFormat.DATABASE_ENTRY] = database
         if (sql.isNotEmpty()) {
             val file = File(context.cacheDir, "rewritten.db").also { it.writeBytes(entries.getValue(BackupPackageFormat.DATABASE_ENTRY)) }
