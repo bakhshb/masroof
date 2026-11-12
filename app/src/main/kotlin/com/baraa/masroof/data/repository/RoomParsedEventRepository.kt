@@ -81,6 +81,22 @@ class RoomParsedEventRepository(
         ).map(ParsedEventMapper::toRecord)
     }
 
+    override suspend fun listTransferCandidates(
+        receivedAt: ClosedRange<java.time.Instant>,
+        occurredAt: ClosedRange<java.time.Instant>,
+        occurredAtLocal: ClosedRange<java.time.LocalDateTime>,
+    ): List<ParsedEventRecord> = accessGate.withAccess {
+        // Whole seconds, widened outward, because datetime() drops fractions.
+        dao.listTransferCandidates(
+            receivedFrom = receivedAt.start.toEpochMilli(),
+            receivedTo = receivedAt.endInclusive.toEpochMilli(),
+            occurredFrom = occurredAt.start.toEpochMilli(),
+            occurredTo = occurredAt.endInclusive.toEpochMilli(),
+            localFrom = occurredAtLocal.start.withNano(0).toString(),
+            localTo = occurredAtLocal.endInclusive.withNano(0).plusSeconds(1).toString(),
+        ).map(ParsedEventMapper::toRecord)
+    }
+
     override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> = accessGate.withAccess {
         RoomBatch.query(rawSmsIds) { chunk -> dao.listByRawSmsIds(chunk) }
             .sortedBy { it.id }

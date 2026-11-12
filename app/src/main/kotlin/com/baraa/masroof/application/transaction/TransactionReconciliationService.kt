@@ -19,7 +19,7 @@ import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.model.EffectiveUserDecisions
 import com.baraa.masroof.domain.model.UserDecision
-import com.baraa.masroof.domain.ids.TransactionIdFactory
+import com.baraa.masroof.ledger.LedgerProjector
 import com.baraa.masroof.application.review.ReviewCorrectionClosure
 import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
@@ -48,14 +48,13 @@ data class ReconciliationSummary(
 )
 
 /**
- * Orchestrates ownership-aware matching/assembly and FinancialTransaction persistence.
+ * Reconciliation: the derived ledger written for the affected raw SMS (plan 3.3a). Every entry point projects with
+ * [LedgerProjector] and writes the differences in one transaction through [LedgerProjectionWriter]
+ * (docs/ARCHITECTURE.md, "Ledger writer"); [automaticWrite] guards each automatic row and [inTransaction] is the
+ * financial write transaction.
  *
- * Reconciliation reads corrected projections through [effectiveParsedEventProvider]
- * without mutating stored ParsedEvent rows.
- *
- * Only automation-eligible evidence ([TransactionAssembler.isAutomationEligible])
- * may create, pair, or heal transactions; non-SUCCESS parses become review
- * candidates. Existing transaction links are preserved.
+ * [useLegacyPath] selects the pre-3.3a repair path below instead; only a debug build can turn it on
+ * ([DebugLegacyReconciliation]). Pieces 3.3b and 3.3c delete that path.
  */
 class TransactionReconciliationService(
     private val rawSmsRepository: RawSmsRepository,
@@ -66,32 +65,34 @@ class TransactionReconciliationService(
     private val reviewRepository: ReviewRepository,
     private val userDecisionRepository: UserDecisionRepository,
     private val zoneId: ZoneId = ZoneId.systemDefault(),
-    private val automaticWrite: (suspend (List<ParsedEventRecord>, suspend () -> FinancialTransactionSaveResult) -> FinancialTransactionSaveResult)? = null,
+    private val automaticWrite: AutomaticWrite? = null,
+    private val inTransaction: suspend (suspend () -> Unit) -> Unit = { it() },
+    private val useLegacyPath: () -> Boolean = { false },
 ) {
+    private val writer = LedgerProjectionWriter(
+        LedgerInputLoader(
+            rawSmsRepository, financialTransactionRepository, reviewRepository, userDecisionRepository,
+            effectiveParsedEventProvider, ownershipResolver, zoneId,
+        ),
+        financialTransactionRepository, ownershipConfirmationService, automaticWrite, inTransaction,
+    )
+
     suspend fun reconcileStoredEvents(): ReconciliationSummary =
         reconcileStoredEventsDetailed().summary
 
-    /**
-     * Full-history reconciliation for explicit maintenance and recovery.
-     * Interactive and incremental callers should use [reconcileAffectedRawSmsIds].
-     *
-     * This pass heals a uniquely proven pair. It does not unlink an already posted
-     * ambiguous self-transfer; that legacy cleanup is [repairLegacyTransfersDetailed].
-     */
-    suspend fun reconcileStoredEventsDetailed(): ReconciliationReport {
-        val records = loadRecords()
-        return reconcileRecordsDetailed(records)
-    }
+    /** Full-history reconciliation for explicit maintenance and recovery; incremental callers use [reconcileAffectedRawSmsIds]. */
+    suspend fun reconcileStoredEventsDetailed(): ReconciliationReport =
+        if (useLegacyPath()) reconcileRecordsDetailed(loadRecords()) else writer.reconcile(null)
 
     /**
-     * One-time upgrade entrypoint. Unlinks irreducibly ambiguous posted single-leg
-     * self-transfers, then runs a full reconcile so unique external or self-transfer
-     * legs can heal. Ordinary scoped and full reconciliation do not call this.
+     * One-time upgrade entrypoint. Unlinks irreducibly ambiguous posted single-leg self-transfers (the keep rule
+     * would keep their double-counted money), then runs a full reconcile so unique legs can heal. Ordinary scoped
+     * and full reconciliation do not call this. Plan 3.3b deletes the release, 3.3c this entrypoint.
      */
     suspend fun repairLegacyTransfersDetailed(): ReconciliationReport {
         val records = loadRecords()
         val release = releaseAmbiguousPostedSelfTransfers(records)
-        val reconciled = reconcileRecordsDetailed(records)
+        val reconciled = if (useLegacyPath()) reconcileRecordsDetailed(records) else writer.reconcile(null)
         return reconciled.copy(
             summary = reconciled.summary.copy(
                 failed = reconciled.summary.failed + release.failedCount,
@@ -101,18 +102,9 @@ class TransactionReconciliationService(
     }
 
     /**
-     * Reconcile [rawSmsIds] without a full-history scan.
-     *
-     * Non-transfer evidence is loaded by those ids only. Transfer evidence also
-     * loads unlinked transfers whose receipt time or SMS-local occurrence time
-     * falls inside two [TransactionMatcher.TRANSFER_MATCH_WINDOW]s of the affected
-     * leg, plus posted external or single-leg self-transfers in that occurred-at
-     * range and the parse rows linked to those legs. [TransactionMatcher] still
-     * decides which of those candidates pair. Rows outside the affected set are
-     * candidates only: they are not posted on their own.
-     *
-     * Affected rows are visited in [rawSmsIds] order. Callers that need the same
-     * transaction ids as message-by-message import pass ids oldest receipt first.
+     * Reconcile [rawSmsIds]: the projection of [LedgerProjector.scope] around them, so the rows written equal a full
+     * pass's. The report covers [rawSmsIds] and the units written; a neighbour that fails or is not written is left
+     * to its own pass (docs/ARCHITECTURE.md, "Ledger writer", Report).
      */
     suspend fun reconcileAffectedRawSmsIds(rawSmsIds: Collection<String>): ReconciliationReport {
         val ids = rawSmsIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
@@ -123,6 +115,7 @@ class TransactionReconciliationService(
                 settledRawSmsIds = emptySet(),
             )
         }
+        if (!useLegacyPath()) return writer.reconcile(ids)
         val affected = loadByRawSmsIds(ids)
         val transfers = affected.filter { it.event.messageFamily.isTransferFamily() }
         val windows = transferCandidateWindows(transfers)
@@ -136,6 +129,8 @@ class TransactionReconciliationService(
             scope = AffectedScope(rawSmsIds = ids.toSet(), transferWindows = windows.receipt),
         )
     }
+
+    // ---- Legacy path (debug switch only; plan 3.3b/3.3c delete it). ----
 
     private fun recordsInCallerOrder(
         records: List<ParsedEventRecord>,
@@ -1103,23 +1098,10 @@ class TransactionReconciliationService(
         evidence: Map<String, ParsedEventRecord>,
     ): DecidedPosting? {
         val decision = decisions.outcome ?: return null
-        val type = decision.transactionType ?: return null
-        val occurredAt = decision.occurredAt ?: return null
-        val zone = decision.occurredAtZone ?: return null
-        val legs = listOfNotNull(decision.rawSmsId, decision.pairedRawSmsId)
+        val legs = decision.legs()
             .map { evidence[it] ?: effectiveParsedEventProvider.findEffectiveByRawSmsId(it) ?: return null }
-        val ids = legs.map { it.event.rawSmsId }.sorted()
-        val amount = legs.first().event.amount?.takeIf { it.amount.signum() > 0 } ?: return null
-        val single = FinancialTransaction.fromSingleEvent(legs.first().event, type, occurredAt,
-            decision.sourceContainerId, decision.destinationContainerId, zone)
-        val transaction = if (legs.size == 1) single else single.copy(
-            id = TransactionIdFactory.fromRawSmsIds(ids),
-            amount = amount,
-            merchant = null,
-            counterparty = legs[0].event.counterparty ?: legs[1].event.counterparty,
-            linkedParsedEventIds = legs.map { it.event.id }.sorted(),
-        )
-        return DecidedPosting(transaction, ids, legs.associateBy { it.event.rawSmsId })
+        val row = LedgerProjector.decidedRow(decision, legs.map { it.event }) ?: return null
+        return DecidedPosting(row.transaction, row.rawSmsIds, legs.associateBy { it.event.rawSmsId })
     }
 
     private class DecidedPosting(

@@ -100,6 +100,31 @@ interface ParsedEventDao {
         endExclusive: String,
     ): List<ParsedEventEntity>
 
+    /** See `ParsedEventRepository.listTransferCandidates`; local bounds are ISO-8601 local date-times. */
+    @Query(
+        """
+        SELECT pe.* FROM parsed_event pe
+        INNER JOIN raw_sms rs ON pe.rawSmsId = rs.id
+        WHERE (pe.messageFamily IN ('TRANSFER_IN', 'TRANSFER_OUT') OR pe.rawSmsId IN (
+            SELECT d.rawSmsId FROM user_decision d
+            WHERE d.kind = 'CORRECTION' AND d.messageFamily IN ('TRANSFER_IN', 'TRANSFER_OUT')
+          ))
+          AND (rs.receivedAtEpochMillis BETWEEN :receivedFrom AND :receivedTo
+            OR pe.occurredAtEpochMillis BETWEEN :occurredFrom AND :occurredTo
+            OR (pe.occurredAtLocal IS NOT NULL
+              AND datetime(pe.occurredAtLocal) BETWEEN datetime(:localFrom) AND datetime(:localTo)))
+        ORDER BY pe.id
+        """,
+    )
+    suspend fun listTransferCandidates(
+        receivedFrom: Long,
+        receivedTo: Long,
+        occurredFrom: Long,
+        occurredTo: Long,
+        localFrom: String,
+        localTo: String,
+    ): List<ParsedEventEntity>
+
     /** Callers keep [rawSmsIds] under [RoomBatch.MAX_BIND_ARGS]. */
     @Query("SELECT * FROM parsed_event WHERE rawSmsId IN (:rawSmsIds)")
     suspend fun listByRawSmsIds(rawSmsIds: List<String>): List<ParsedEventEntity>

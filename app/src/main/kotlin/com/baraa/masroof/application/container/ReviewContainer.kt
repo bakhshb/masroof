@@ -12,6 +12,7 @@ import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
+import com.baraa.masroof.application.transaction.DebugLegacyReconciliation
 import com.baraa.masroof.application.transaction.LedgerInputLoader
 import com.baraa.masroof.application.transaction.TransactionReconciliationService
 import com.baraa.masroof.application.transaction.TransactionRestoreService
@@ -77,9 +78,11 @@ class ReviewContainer(
             reviewRepository = storage.reviewRepository,
             userDecisionRepository = storage.userDecisionRepository,
             automaticWrite = { expected, write -> automaticInterpretationWriteGuard.write(expected, write) },
+            inTransaction = { write -> storage.withDatabaseTransaction(write) },
+            useLegacyPath = { DebugLegacyReconciliation.enabled(storage.appContext.filesDir) },
         )
 
-    /** The derived ledger's inputs (plan 3.2 shadow comparison; the seam the 3.3a writer reuses). */
+    /** The derived ledger's inputs, for the plan 3.2 shadow comparison export. */
     val ledgerInputLoader: LedgerInputLoader =
         LedgerInputLoader(
             rawSmsRepository = storage.rawSmsRepository,

@@ -12,11 +12,14 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.ReviewKind
+import com.baraa.masroof.domain.model.UserDecision
 import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.rules.InformationalMessagePolicy
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 
@@ -89,6 +92,51 @@ object LedgerProjector {
     }
 
     /**
+     * The user's row for a posting decision ([UserDecision.posting] columns) from the effective evidence of its legs
+     * ([UserDecision.legs], in that order), or null when the decision lacks its type or time or a leg has no positive
+     * amount. A decision without a zone rebuilds the row with none, as the stored row of a backfilled decision has
+     * it. A pair is one movement for both legs.
+     */
+    fun decidedRow(decision: UserDecision, legs: List<ParsedEvent>): LedgerRow? {
+        val type = decision.transactionType ?: return null
+        val occurredAt = decision.occurredAt ?: return null
+        if (legs.isEmpty()) return null
+        val ids = legs.map { it.rawSmsId }.sorted()
+        val amount = legs.first().amount?.takeIf { it.amount.signum() > 0 } ?: return null
+        val single = FinancialTransaction.fromSingleEvent(
+            legs.first(), type, occurredAt, decision.sourceContainerId, decision.destinationContainerId, decision.occurredAtZone,
+        )
+        val transaction = if (legs.size == 1) single else single.copy(
+            id = TransactionIdFactory.fromRawSmsIds(ids),
+            amount = amount,
+            merchant = null,
+            counterparty = legs[0].counterparty ?: legs[1].counterparty,
+            linkedParsedEventIds = legs.map { it.id }.sorted(),
+        )
+        return LedgerRow(transaction, ids)
+    }
+
+    /**
+     * Where every transfer leg [mayPair] accepts for [evidence] lies: its receipt time, its event time, or its
+     * SMS-local time falls inside the matching range (inclusive). A query on these ranges is a superset that
+     * [scope] narrows; callers use it to load a scope without reading the whole history.
+     */
+    fun pairingWindow(evidence: LedgerEvidence): PairingWindow {
+        val window = TransactionMatcher.TRANSFER_MATCH_WINDOW
+        val (start, end) = effectiveSpan(evidence)
+        val received = evidence.receivedAt
+        val local = evidence.occurredAtLocal
+        val spanStart = LocalDateTime.ofInstant(start.minus(window).minus(MAX_OFFSET), ZoneOffset.UTC)
+        val spanEnd = LocalDateTime.ofInstant(end.plus(window).plus(MAX_OFFSET), ZoneOffset.UTC)
+        return PairingWindow(
+            receivedAt = minOf(received, start).minus(window)..maxOf(received, end).plus(window),
+            occurredAt = start.minus(window)..end.plus(window),
+            occurredAtLocal = (local?.minus(window)?.let { minOf(it, spanStart) } ?: spanStart)..
+                (local?.plus(window)?.let { maxOf(it, spanEnd) } ?: spanEnd),
+        )
+    }
+
+    /**
      * A superset of the matcher's window test: receipt times, SMS-local times, or the instants the effective time
      * can take in any zone (an SMS-local time lies within 18 hours of its UTC reading).
      */
@@ -112,9 +160,11 @@ object LedgerProjector {
     private val MAX_OFFSET: Duration = Duration.ofHours(18)
 }
 
-private fun MessageFamily.isTransfer(): Boolean = this == MessageFamily.TRANSFER_IN || this == MessageFamily.TRANSFER_OUT
+/** A transfer leg the projector may pair. */
+fun MessageFamily.isTransfer(): Boolean = this == MessageFamily.TRANSFER_IN || this == MessageFamily.TRANSFER_OUT
 
-private fun LedgerEvidence.loanReference(): LoanReference? =
+/** The loan of a financing installment, the unit the loan pre-pass and the scope group by. */
+fun LedgerEvidence.loanReference(): LoanReference? =
     loanType?.takeIf { event.messageFamily == MessageFamily.FINANCING_INSTALLMENT }?.let { LoanReference(event.bank, it) }
 
 /** One projection run. Its ledger is in memory and starts empty; the save rules are those of the Room ledger. */
@@ -129,7 +179,7 @@ private class Projection(
     private val byEventId = records.associateBy { it.event.id }
     private val storedByRawSmsId = stored.rows.flatMap { row -> row.rawSmsIds.map { it to row } }.toMap()
     private val storedRates = stored.rows
-        .filter { it.transaction.appliedExchangeRate != null && it.transaction.exchangeRateSource != null }
+        .filter { it.rawSmsIds.isNotEmpty() && it.transaction.appliedExchangeRate != null && it.transaction.exchangeRateSource != null }
         .associateBy { it.rawSmsIds }
     private val rows = mutableMapOf<String, LedgerRow>()
     private val links = mutableMapOf<String, String>()
@@ -137,23 +187,63 @@ private class Projection(
     private val retry = mutableSetOf<String>()
     private val reviews = mutableListOf<LedgerReviewCandidate>()
     /**
-     * Keep rule (i): stored rows any of whose raw SMS has a posting outcome as its latest decision. They are saved
-     * before any decided posting, so another SMS's posting that names one of their SMS conflicts and is retried.
+     * Keep rule (i): stored rows any of whose raw SMS a human decision protects ([preserved]: an outcome as its
+     * latest decision, or a correction closure), as the old pass never re-opened, paired, healed or released one. A
+     * posting outcome keeps the user's row; a not-financial one keeps a row that still links it, as only the
+     * decision's own writer deletes the row. They are saved before any decided posting, so another SMS's posting that
+     * names one of their SMS conflicts and is retried.
      */
-    private val keptDecided = stored.rows.filter { row -> !removed(row) && row.rawSmsIds.any { decisionsOf(it).postsRow } }
+    private val keptRows = stored.rows.filter { row -> row.rawSmsIds.size <= 2 && row.rawSmsIds.any(::preserved) }
         .onEach { row -> check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" } }
-        .flatMap { it.rawSmsIds }.toSet()
+    private val keptDecided = keptRows.flatMap { it.rawSmsIds }.toSet()
+
+    /**
+     * Keep rule (iii): an undecided stored row of several raw SMS (a pair) is settled as that pair before any leg is
+     * assembled, so its legs never re-enter the matching pool, as the old pass left linked legs alone. It takes today's
+     * detail when its legs alone re-derive exactly it with the same type and amount ([asItself]), else stays verbatim.
+     */
+    private val keptPairs = stored.rows.filter { row -> row.rawSmsIds.size == 2 && row.rawSmsIds.none(::preserved) }
+        .onEach { row -> (asItself(row) ?: row).let { check(save(it.transaction, it.rawSmsIds)) { "kept stored rows never overlap" } } }
+
+    /**
+     * Keep rule (iv): a stored row of more than two raw SMS stays as stored, its legs settled with it, except the old
+     * stale-link release ([staleLegs]), decided per raw SMS as the old pass decided it: an unprotected stale leg leaves
+     * the row and is assembled again as an unlinked leg ([released]).
+     */
+    private val released = mutableSetOf<String>()
+    /** A merged row the release left with one leg: a posted single-leg self-transfer the upgrade may join, as before. */
+    private val reducedToOneLeg = mutableMapOf<String, FinancialTransaction>()
+    private val keptMergedLinks = stored.rows.filter { row -> row.rawSmsIds.size > 2 }.flatMap { row ->
+        val stale = staleLegs(row)
+        released += stale
+        val remaining = row.rawSmsIds - stale.toSet()
+        if (remaining.isEmpty()) return@flatMap emptyList()
+        val releasedEvents = stale.mapNotNull { byRawSmsId[it]?.event?.id }.toSet()
+        val transaction = row.transaction.copy(linkedParsedEventIds = row.transaction.linkedParsedEventIds - releasedEvents)
+        check(save(transaction, remaining)) { "kept stored rows never overlap" }
+        if (remaining.size == 1) {
+            reducedToOneLeg[remaining.single()] = transaction
+            emptyList()
+        } else {
+            remaining
+        }
+    }
+    /** Raw SMS a kept pair or a kept row of three or more SMS still links: never in the upgrade pools. */
+    private val keptPairIds = keptPairs.flatMap { it.rawSmsIds }.toSet() + keptMergedLinks
+
     // Decided rows settle first, so the pre-pass sees only the evidence left to automatic assembly.
     private val automatic = records.filter(::settleDecided)
     private val confirmedLoans = confirmLoans(automatic)
     private val ownership = registry.copy(loans = registry.loans + confirmedLoans.associateWith { OwnershipStatus.OWNED })
 
+    /** The transfer legs left open by single assembly; [keepStoredRowsUnlessReplaced] re-runs the lone-leg step on it. */
+    private val open = mutableListOf<TransferMatchCandidate>()
+
     fun run(): LedgerProjection {
-        val open = mutableListOf<TransferMatchCandidate>()
         automatic.forEach { assemble(it, open) }
         postOpenTransfers(open)
         upgradePostedTransferPairs()
-        keepStoredRowsWithoutDerivation()
+        keepStoredRowsUnlessReplaced()
         return LedgerProjection(
             rows = rows.values.map(::withStoredExchangeRate).sortedBy { it.transaction.id },
             reviewCandidates = reviews.filter { it.rawSmsId !in settled }.groupBy { it.rawSmsId }
@@ -163,6 +253,7 @@ private class Projection(
             settledRawSmsIds = settled,
             retryRawSmsIds = retry,
             confirmedLoans = confirmedLoans,
+            lonePostedRawSmsIds = lonePosted.filterTo(mutableSetOf()) { it in links },
         )
     }
 
@@ -191,26 +282,9 @@ private class Projection(
         return false
     }
 
-    /** The user's row for a posting decision, or null when the decision or its evidence is incomplete. */
     private fun decidedPosting(decided: EffectiveUserDecisions): LedgerRow? {
         val decision = decided.outcome ?: return null
-        val type = decision.transactionType ?: return null
-        val occurredAt = decision.occurredAt ?: return null
-        val zone = decision.occurredAtZone ?: return null
-        val legs = listOfNotNull(decision.rawSmsId, decision.pairedRawSmsId).map { byRawSmsId[it] ?: return null }
-        val ids = legs.map { it.event.rawSmsId }.sorted()
-        val amount = legs.first().event.amount?.takeIf { it.amount.signum() > 0 } ?: return null
-        val single = FinancialTransaction.fromSingleEvent(
-            legs.first().event, type, occurredAt, decision.sourceContainerId, decision.destinationContainerId, zone,
-        )
-        val transaction = if (legs.size == 1) single else single.copy(
-            id = TransactionIdFactory.fromRawSmsIds(ids),
-            amount = amount,
-            merchant = null,
-            counterparty = legs[0].event.counterparty ?: legs[1].event.counterparty,
-            linkedParsedEventIds = legs.map { it.event.id }.sorted(),
-        )
-        return LedgerRow(transaction, ids)
+        return LedgerProjector.decidedRow(decision, decision.legs().map { byRawSmsId[it]?.event ?: return null })
     }
 
     /**
@@ -226,34 +300,88 @@ private class Projection(
             }
         }.toSet()
 
-    private fun assemble(record: LedgerEvidence, open: MutableList<TransferMatchCandidate>) {
+    /**
+     * The old `shouldReleaseStaleSelfTransferLink`, leg by leg in event order: a transfer leg of a stored
+     * self-transfer leaves it when its effective time, read in the row's zone, differs from the row's time (by more
+     * than the match window while the row still links two parsed events, the earlier leg's time being the pair's).
+     */
+    private fun staleLegs(row: LedgerRow): List<String> {
+        if (row.transaction.type != FinancialTransactionType.SELF_TRANSFER) return emptyList()
+        var linkedEvents = row.transaction.linkedParsedEventIds.size
+        val released = mutableListOf<String>()
+        for (record in row.rawSmsIds.mapNotNull(byRawSmsId::get).sortedBy { it.event.id }) {
+            if (!record.event.messageFamily.isTransfer() || preserved(record.event.rawSmsId)) continue
+            val expected = TransactionTiming.effectiveOccurredAt(
+                record.event, record.occurredAtLocal, record.receivedAt, zone, row.transaction.occurredAtZone,
+            )
+            val stale = if (linkedEvents != 2) row.transaction.occurredAt != expected
+            else Duration.between(row.transaction.occurredAt, expected).abs() > TransactionMatcher.TRANSFER_MATCH_WINDOW
+            if (stale) {
+                released += record.event.rawSmsId
+                if (record.event.id in row.transaction.linkedParsedEventIds) linkedEvents--
+            }
+        }
+        return released
+    }
+
+    /** The single assembly of [record] and its matching candidate, read with [facts] and the stored zone. */
+    private fun single(record: LedgerEvidence, facts: OwnershipFacts): Pair<TransactionAssembler.Outcome, TransferMatchCandidate> {
         val event = record.event
         val persistedZone = storedByRawSmsId[event.rawSmsId]?.transaction?.occurredAtZone
         val occurredAt = TransactionTiming.effectiveOccurredAt(
             event, record.occurredAtLocal, record.receivedAt, zone, persistedZone,
         )
-        val sourceOwnership = ownership.account(event.sourceAccountRef)
-        val destinationOwnership = ownership.account(event.destinationAccountRef)
+        val sourceOwnership = facts.account(event.sourceAccountRef)
+        val destinationOwnership = facts.account(event.destinationAccountRef)
         val outcome = TransactionAssembler.assembleSingle(
             event = event,
             receivedAt = record.receivedAt,
             sourceOwnership = sourceOwnership,
             destinationOwnership = destinationOwnership,
-            cardOwnership = ownership.card(event.cardRef),
-            loanOwnership = record.loanReference()?.let(ownership::loan) ?: OwnershipStatus.UNKNOWN,
+            cardOwnership = facts.card(event.cardRef),
+            loanOwnership = record.loanReference()?.let(facts::loan) ?: OwnershipStatus.UNKNOWN,
             loanType = record.loanType,
             transactionOccurredAt = occurredAt,
             userConfirmed = userConfirmed(record),
             occurredAtZone = TransactionTiming.zoneFor(event.bank, persistedZone, zone),
         )
+        return outcome to TransferMatchCandidate(
+            event, record.transactionReference, record.occurredAtLocal, record.receivedAt,
+            sourceOwnership, destinationOwnership, occurredAt,
+        )
+    }
+
+    /**
+     * The stored pair [row] as its legs alone re-derive it, when that is exactly its raw SMS set with the same type
+     * and amount; else null. Account ownership is enough here: no loan takes part in a transfer pair.
+     */
+    private fun asItself(row: LedgerRow): LedgerRow? {
+        val legs = row.rawSmsIds.map { byRawSmsId[it] ?: return null }
+        val candidates = legs.map { leg ->
+            val (outcome, candidate) = single(leg, registry)
+            candidate.takeIf { outcome == TransactionAssembler.Outcome.PendingMatch && leg.event.messageFamily.isTransfer() } ?: return null
+        }
+        val pair = TransactionMatcher.findMutuallyUniquePairs(candidates).singleOrNull() ?: return null
+        val outcome = TransactionAssembler.assembleMatchedPair(
+            pair, pair.outgoing.sourceOwnership, pair.incoming.destinationOwnership,
+            storedZone(pair.outgoing.event.rawSmsId) ?: storedZone(pair.incoming.event.rawSmsId) ?: zone,
+        ) as? TransactionAssembler.Outcome.Assembled ?: return null
+        val derived = LedgerRow(outcome.transaction, outcome.rawSmsIds.sorted())
+        return derived.takeIf { it.rawSmsIds == row.rawSmsIds && !changesTypeOrAmount(row.transaction, it.transaction) }
+    }
+
+    private fun assemble(record: LedgerEvidence, open: MutableList<TransferMatchCandidate>) {
+        val event = record.event
+        val (outcome, candidate) = single(record, ownership)
         when (outcome) {
             is TransactionAssembler.Outcome.Assembled -> post(outcome.transaction, outcome.rawSmsIds)
             TransactionAssembler.Outcome.PendingMatch ->
-                if (event.messageFamily.isTransfer()) {
-                    open += TransferMatchCandidate(
-                        event, record.transactionReference, record.occurredAtLocal, record.receivedAt,
-                        sourceOwnership, destinationOwnership, occurredAt,
-                    )
+                if (event.messageFamily.isTransfer() && linkedAlone(event.rawSmsId) != null) {
+                    // A leg its own stored row links stays out of the matching pool, as the old pass left a linked leg
+                    // alone; only the upgrade below may join a posted external or single-leg self-transfer leg.
+                    linkedAlone(event.rawSmsId)?.let { check(save(it.transaction, it.rawSmsIds)) { "kept stored rows never overlap" } }
+                } else if (event.messageFamily.isTransfer()) {
+                    open += candidate
                 } else {
                     pendingMatch(event.rawSmsId)
                 }
@@ -264,27 +392,63 @@ private class Projection(
         }
     }
 
+    /** The stored row that links [rawSmsId] and nothing else, unless the informational cleanup removes it. */
+    private fun linkedAlone(rawSmsId: String): LedgerRow? =
+        storedByRawSmsId[rawSmsId]?.takeIf { row -> row.rawSmsIds.size == 1 && !removed(row) }
+
     /** Pairs mutually unique legs, then posts a lone owned leg on its own or leaves it pending. */
     private fun postOpenTransfers(open: List<TransferMatchCandidate>) {
         val paired = mutableSetOf<String>()
         for (pair in TransactionMatcher.findMutuallyUniquePairs(open)) {
             val outcome = TransactionAssembler.assembleMatchedPair(
-                pair, pair.outgoing.sourceOwnership, pair.incoming.destinationOwnership, zone,
+                pair, pair.outgoing.sourceOwnership, pair.incoming.destinationOwnership,
+                storedZone(pair.outgoing.event.rawSmsId) ?: storedZone(pair.incoming.event.rawSmsId) ?: zone,
             )
             if (outcome !is TransactionAssembler.Outcome.Assembled) continue
             post(outcome.transaction, outcome.rawSmsIds)
             paired += outcome.rawSmsIds
         }
+        val counterparts = open + storedSingleLegCounterparts(open.mapTo(mutableSetOf()) { it.event.rawSmsId })
         for (candidate in open) {
             if (candidate.event.rawSmsId in paired) continue
-            val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(candidate, open, zone)
+            val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
+                candidate, counterparts, storedZone(candidate.event.rawSmsId) ?: zone,
+            )
             if (outcome is TransactionAssembler.Outcome.Assembled) {
-                post(outcome.transaction, outcome.rawSmsIds)
+                postAlone(outcome)
             } else {
                 pendingMatch(candidate.event.rawSmsId)
             }
         }
     }
+
+    /**
+     * A stored single-leg self-transfer whose leg is not in the open pool (kept for a decision, or kept by rule (ii))
+     * still counts as a pending counterpart, so an intra-bank leg near it stays pending instead of being posted on its
+     * own (the old pass's `postedSingleLegCounterparts`). It never pairs here.
+     */
+    private fun storedSingleLegCounterparts(open: Set<String>): List<TransferMatchCandidate> = stored.rows.mapNotNull { row ->
+        if (!row.transaction.isSingleLegSelfTransfer() || row.rawSmsIds.singleOrNull() in open) return@mapNotNull null
+        val record = row.rawSmsIds.singleOrNull()?.let(byRawSmsId::get) ?: return@mapNotNull null
+        val event = record.event
+        val decided = decisionsOf(event.rawSmsId)
+        if (!event.messageFamily.isTransfer() || decided.isNonFinancial ||
+            decided.outcome?.kind == UserDecisionKind.EXTERNAL_TRANSFER ||
+            !TransactionAssembler.isAutomationEligible(event, userConfirmed(record))
+        ) return@mapNotNull null
+        TransferMatchCandidate(
+            event, record.transactionReference, record.occurredAtLocal, record.receivedAt,
+            ownership.account(event.sourceAccountRef), ownership.account(event.destinationAccountRef),
+            TransactionTiming.effectiveOccurredAt(event, record.occurredAtLocal, record.receivedAt, zone, row.transaction.occurredAtZone),
+        )
+    }
+
+    /**
+     * The zone stored on the row that links [rawSmsId], as the old pass healed a posted leg in it: a bank without a
+     * fixed zone keeps its stored zone when its leg is re-derived (`BankTransactionTimePolicy`).
+     */
+    private fun storedZone(rawSmsId: String): ZoneId? =
+        BankTransactionTimePolicy.storedZoneOrNull(storedByRawSmsId[rawSmsId]?.transaction?.occurredAtZone)
 
     private class Leg(val posted: FinancialTransaction?, val record: LedgerEvidence)
 
@@ -295,7 +459,7 @@ private class Projection(
     private fun upgradePostedTransferPairs() {
         fun eligible(record: LedgerEvidence) =
             TransactionAssembler.isAutomationEligible(record.event, record.automationConfirmed) &&
-                !preserved(record.event.rawSmsId) && record.event.rawSmsId !in keptDecided
+                !preserved(record.event.rawSmsId) && record.event.rawSmsId !in keptDecided && record.event.rawSmsId !in keptPairIds
         val legs = buildList {
             for (row in rows.values) {
                 val posted = row.transaction
@@ -347,30 +511,74 @@ private class Projection(
     }
 
     /**
-     * Keep rule (ii), for undecided stored rows: a stored row stays verbatim when it links no raw SMS, when the
-     * projection derived no row for its raw SMS or only rows inside its set that do not cover it (a stored pair one of
-     * whose legs no longer derives), or when it derived one row on exactly its set with another type or amount (a
-     * type edited only on the row), except the old fee→financing heal. A derived row that reaches outside the set, or
-     * one that covers it with the stored type and amount, wins. Its raw SMS are settled and not retried.
+     * Keep rule (ii), the one place a stored row may be replaced. The projection replaces an undecided stored row of
+     * one raw SMS only by (a) exactly one derived row on the same raw SMS set with the same type and amount (the old
+     * fee→financing heal excepted), or (b) a derived self-transfer pair that joins it with its counterpart where the
+     * old upgrade would have ([oldUpgradePairs]; a posted external transfer or single-leg self-transfer leg);
+     * (c) [removed] drops a lone informational row. Any other stored row stays verbatim: the derived rows on its raw
+     * SMS are dropped, and a raw SMS of theirs that no row links any more is assembled alone again (the lone-owned-leg
+     * step), else pending. Protected rows (rule (i)), pairs (iii) and rows of three or more SMS (iv) are already settled. A link-less row stays unless a derived row took its id. Kept rows' raw SMS are not retried.
      */
-    private fun keepStoredRowsWithoutDerivation() {
-        val kept = stored.rows.mapNotNull { row ->
-            if (removed(row) || row.rawSmsIds.any { decisionsOf(it).outcome != null }) return@mapNotNull null
-            val derivedIds = row.rawSmsIds.mapNotNull(links::get).toSet()
-            val derived = derivedIds.map(rows::getValue)
-            val keep = when {
-                row.rawSmsIds.isEmpty() -> row.transaction.id !in rows
-                derived.any { !row.rawSmsIds.containsAll(it.rawSmsIds) } -> false
-                row.rawSmsIds.any { it !in links } -> true
-                else -> derived.singleOrNull()?.transaction?.let { changesTypeOrAmount(row.transaction, it) } == true
+    private fun keepStoredRowsUnlessReplaced() {
+        val candidates = stored.rows.filter { row -> row.rawSmsIds.size <= 1 && row.rawSmsIds.none(::preserved) && !removed(row) }
+        val dropped = mutableSetOf<String>()
+        var changed = true
+        while (changed) {
+            changed = false
+            for (row in candidates) {
+                if (row.rawSmsIds.isEmpty()) {
+                    if (row.transaction.id !in rows) save(row.transaction, row.rawSmsIds).also { changed = it }
+                    continue
+                }
+                val derived = row.rawSmsIds.mapNotNull(links::get).toSet().map(rows::getValue)
+                if (derived == listOf(row) || replaces(row, derived.singleOrNull())) continue
+                derived.forEach { dropped += it.rawSmsIds; drop(it.transaction.id) }
+                check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" }
+                retry -= row.rawSmsIds.toSet()
+                changed = true
             }
-            (row to derivedIds).takeIf { keep }
         }
-        for ((row, derivedIds) in kept) {
-            derivedIds.forEach(::drop)
-            check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" }
-            retry -= row.rawSmsIds.toSet()
+        // A leg whose derived row was dropped is assembled alone, as the old pass assembled it with its
+        // counterpart linked elsewhere: the lone-owned-leg step against the legs still open.
+        for (rawSmsId in (dropped - links.keys).sorted()) {
+            settled -= rawSmsId
+            val candidate = open.firstOrNull { it.event.rawSmsId == rawSmsId }
+            val counterparts = open.filter { it.event.rawSmsId !in links } +
+                storedSingleLegCounterparts(open.mapTo(mutableSetOf()) { it.event.rawSmsId })
+            val outcome = candidate?.let {
+                TransactionAssembler.assembleUnmatchedOwnedTransfer(it, counterparts, storedZone(rawSmsId) ?: zone)
+            }
+            if (outcome is TransactionAssembler.Outcome.Assembled) postAlone(outcome) else pendingMatch(rawSmsId)
         }
+    }
+
+    /** Rule (a) or (b) of [keepStoredRowsUnlessReplaced]. */
+    private fun replaces(row: LedgerRow, derived: LedgerRow?): Boolean {
+        derived ?: return false
+        if (derived.rawSmsIds == row.rawSmsIds) return !changesTypeOrAmount(row.transaction, derived.transaction)
+        val joinable = row.transaction.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
+            row.transaction.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN || row.transaction.isSingleLegSelfTransfer()
+        return joinable && derived.transaction.type == FinancialTransactionType.SELF_TRANSFER &&
+            derived.rawSmsIds.size == 2 && derived.rawSmsIds.containsAll(row.rawSmsIds) && derived.rawSmsIds in oldUpgradePairs
+    }
+
+    /**
+     * The pairs the old `upgradeStaleExternalPairs` could form: mutually unique, owned at both ends, among the legs it
+     * looked at (a posted external or single-leg self-transfer leg, or an unlinked leg; eligible and not protected).
+     * A leg stored in any other row, or in a kept pair, was not in its pool.
+     */
+    private val oldUpgradePairs: Set<List<String>> by lazy {
+        val pool = records.filter { record ->
+            val id = record.event.rawSmsId
+            val storedRow = reducedToOneLeg[id] ?: storedByRawSmsId[id]?.transaction?.takeIf { id !in released }
+            record.event.messageFamily.isTransfer() && !preserved(id) && id !in keptPairIds &&
+                TransactionAssembler.isAutomationEligible(record.event, record.automationConfirmed) &&
+                (storedRow == null || storedRow.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
+                    storedRow.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN || storedRow.isSingleLegSelfTransfer())
+        }.map { single(it, ownership).second }
+        TransactionMatcher.findMutuallyUniquePairs(pool)
+            .filter { it.outgoing.sourceOwnership == OwnershipStatus.OWNED && it.incoming.destinationOwnership == OwnershipStatus.OWNED }
+            .map { listOf(it.outgoing.event.rawSmsId, it.incoming.event.rawSmsId).sorted() }.toSet()
     }
 
     /** The derivation changes the stored type or amount, other than the old pass's own fee→financing heal. */
@@ -380,14 +588,13 @@ private class Projection(
     }
 
     /**
-     * A stored row the old pass removes: a raw SMS decided not financial, or a lone informational SMS without a
-     * human decision (`InformationalMessagePolicy`, the old stale-link cleanup).
+     * A stored row the old pass removes: a lone informational SMS without a human decision
+     * (`InformationalMessagePolicy`, the old stale-link cleanup).
      */
     private fun removed(row: LedgerRow): Boolean =
-        row.rawSmsIds.any { decisionsOf(it).isNonFinancial } ||
-            row.rawSmsIds.singleOrNull()?.let { id ->
-                !preserved(id) && byRawSmsId[id]?.event?.let(InformationalMessagePolicy::shouldAutoIgnore) == true
-            } == true
+        row.rawSmsIds.singleOrNull()?.let { id ->
+            !preserved(id) && byRawSmsId[id]?.event?.let(InformationalMessagePolicy::shouldAutoIgnore) == true
+        } == true
 
     private fun drop(transactionId: String) {
         rows.remove(transactionId)?.rawSmsIds?.forEach(links::remove)
@@ -398,6 +605,18 @@ private class Projection(
 
     private fun pendingMatch(rawSmsId: String) {
         reviews += LedgerReviewCandidate(rawSmsId, ReviewKind.PENDING_MATCH, listOf("transfer_pending_match"))
+    }
+
+    /** Transfer legs the lone-owned-leg step posted on their own; a failed write leaves them a pending match. */
+    private val lonePosted = mutableSetOf<String>()
+
+    /** Posts a lone owned leg; if it cannot be saved it is also a pending match, as in the old pass. */
+    private fun postAlone(outcome: TransactionAssembler.Outcome.Assembled) {
+        lonePosted += outcome.rawSmsIds
+        if (!save(outcome.transaction, outcome.rawSmsIds)) {
+            retry += outcome.rawSmsIds
+            outcome.rawSmsIds.forEach(::pendingMatch)
+        }
     }
 
     /** Posts an automatic row; a conflict leaves all its raw SMS to retry. */

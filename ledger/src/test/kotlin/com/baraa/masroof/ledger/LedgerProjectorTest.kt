@@ -259,4 +259,23 @@ class LedgerProjectorTest {
         assertEquals(setOf("b"), result.retryRawSmsIds)
         assertEquals(setOf("a"), result.settledRawSmsIds)
     }
+
+    /** A backfilled decision of a row with no stored zone rebuilds that row from nothing, still without a zone. */
+    @Test
+    fun aDecidedPostingWithoutAZoneRebuildsTheRowWithoutOne() {
+        val posted = Instant.parse("2026-07-31T21:00:00Z")
+        val decisions = fold(
+            listOf(
+                UserDecision(
+                    "a", UserDecisionKind.FINANCIAL_TYPE, T0, transactionType = FinancialTransactionType.INCOME,
+                    occurredAt = posted, sourceContainerId = "account:x",
+                ),
+            ),
+        )
+        val row = project(listOf(purchase("a")), decisions, owned).rows.single().transaction
+        assertEquals(FinancialTransactionType.INCOME to posted, row.type to row.occurredAt)
+        assertEquals(null to "account:x", row.occurredAtZone to row.sourceContainerId)
+        val noTime = fold(listOf(UserDecision("a", UserDecisionKind.FINANCIAL_TYPE, T0, transactionType = FinancialTransactionType.INCOME)))
+        assertEquals(null, LedgerProjector.decidedRow(noTime.getValue("a").outcome!!, listOf(purchase("a").event)))
+    }
 }

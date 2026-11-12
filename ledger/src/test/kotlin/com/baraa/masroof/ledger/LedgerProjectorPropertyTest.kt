@@ -37,6 +37,11 @@ class LedgerProjectorPropertyTest {
 
     private val seeds = 0 until 2000
 
+    private val storedTypes = listOf(
+        FinancialTransactionType.EXPENSE, FinancialTransactionType.SELF_TRANSFER, FinancialTransactionType.FEE,
+        FinancialTransactionType.EXTERNAL_TRANSFER_OUT, FinancialTransactionType.EXTERNAL_TRANSFER_IN,
+    )
+
     @Test
     fun theProjectionIsDeterministicAndIgnoresInputOrder() {
         var rows = 0
@@ -68,8 +73,80 @@ class LedgerProjectorPropertyTest {
                 decisions = corpus.decisions.filterKeys { it in scope },
             )
             assertEquals(full.restrictedTo(affected, corpus.events), scoped.restrictedTo(affected, corpus.events), "seed $seed")
+            // The ledger writer writes the whole scope, so every raw SMS in it must project as in the full pass.
+            assertEquals(full.restrictedTo(scope, corpus.events), scoped.restrictedTo(scope, corpus.events), "seed $seed")
         }
         assertTrue(narrower > seeds.count() / 2, "most scopes must leave evidence out")
+    }
+
+    /**
+     * The keep invariant: every stored row is in the projection verbatim, or replaced by (a) one derived row on its
+     * raw SMS set with the same type and amount (FEE→LOAN_REPAYMENT allowed), (b) a self-transfer pair joining a stored
+     * external or single-leg self-transfer leg, or (c) dropped as a lone, unprotected informational row. A protected
+     * row is always verbatim.
+     */
+    @Test
+    fun everyStoredRowIsKeptVerbatimOrReplacedByAnAllowedRule() {
+        var replaced = 0
+        for (seed in seeds) {
+            val corpus = corpus(Random(seed))
+            val result = corpus.project()
+            val events = corpus.events.associateBy { it.event.rawSmsId }
+            for (row in corpus.stored.rows) {
+                if (row in result.rows) continue
+                val sameId = result.rows.singleOrNull { it.transaction.id == row.transaction.id }
+                if (row.rawSmsIds.isEmpty()) {
+                    // A link-less row stays byte for byte unless a derived row took its id.
+                    assertTrue(sameId != null && sameId.rawSmsIds.isNotEmpty(), "seed $seed: link-less $row changed")
+                    continue
+                }
+                if (row.rawSmsIds.size > 2) {
+                    // Rule (iv): only stale legs leave a self-transfer; the rest stays as the stored row.
+                    val rest = sameId?.rawSmsIds.orEmpty()
+                    assertTrue(row.transaction.type == FinancialTransactionType.SELF_TRANSFER && row.rawSmsIds.containsAll(rest) &&
+                        (sameId == null || sameId.transaction.type == row.transaction.type && sameId.transaction.amount == row.transaction.amount),
+                        "seed $seed: $row became $sameId")
+                    replaced++
+                    continue
+                }
+                val protected = row.rawSmsIds.any { corpus.decisions[it]?.outcome != null || it in corpus.stored.correctionClosedRawSmsIds }
+                assertTrue(!protected, "seed $seed: protected $row changed")
+                val over = result.rows.filter { derived -> derived.rawSmsIds.any { it in row.rawSmsIds } }
+                val single = row.rawSmsIds.singleOrNull()
+                val informational = single != null && over.isEmpty() &&
+                    events[single]?.event?.let(com.baraa.masroof.domain.rules.InformationalMessagePolicy::shouldAutoIgnore) == true
+                val derived = over.singleOrNull()
+                val sameSet = derived != null && derived.rawSmsIds == row.rawSmsIds && derived.transaction.amount == row.transaction.amount &&
+                    (derived.transaction.type == row.transaction.type ||
+                        row.transaction.type == FinancialTransactionType.FEE && derived.transaction.type == FinancialTransactionType.LOAN_REPAYMENT)
+                val joinable = row.transaction.type in setOf(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, FinancialTransactionType.EXTERNAL_TRANSFER_IN) ||
+                    row.transaction.type == FinancialTransactionType.SELF_TRANSFER && row.transaction.linkedParsedEventIds.size == 1
+                val joined = single != null && joinable && derived != null && derived.transaction.type == FinancialTransactionType.SELF_TRANSFER &&
+                    derived.rawSmsIds.size == 2 && single in derived.rawSmsIds
+                assertTrue(informational || sameSet || joined, "seed $seed: $row replaced by $over")
+                replaced++
+            }
+        }
+        assertTrue(replaced > 100, "corpora must replace some stored rows: $replaced")
+    }
+
+    @Test
+    fun everyTransferTheScopeReachesLiesInsideThePairingWindow() {
+        var reached = 0
+        for (seed in seeds) {
+            val transfers = corpus(Random(seed)).events.filter {
+                it.event.messageFamily == MessageFamily.TRANSFER_IN || it.event.messageFamily == MessageFamily.TRANSFER_OUT
+            }
+            for (a in transfers) for (b in transfers) {
+                if (a === b || b.event.rawSmsId !in LedgerProjector.scope(listOf(a.event.rawSmsId), listOf(a, b), emptyMap())) continue
+                reached++
+                val window = LedgerProjector.pairingWindow(a)
+                val inside = b.receivedAt in window.receivedAt || b.event.occurredAt?.let { it in window.occurredAt } == true ||
+                    b.occurredAtLocal?.let { it in window.occurredAtLocal } == true
+                assertTrue(inside, "seed $seed")
+            }
+        }
+        assertTrue(reached > seeds.count(), "corpora must hold reachable transfer legs")
     }
 
     private fun LedgerProjection.restrictedTo(ids: Set<String>, events: List<LedgerEvidence>): List<Any> {
@@ -142,20 +219,7 @@ class LedgerProjectorPropertyTest {
             evidence.copy(event = evidence.event.copy(id = "e-$id", rawSmsId = id))
         }
         val ids = events.map { it.event.rawSmsId }
-        // Stored rows link one or two raw SMS each, never one SMS twice; some are kept verbatim by the keep rule.
-        // Some stored rows link raw SMS without evidence.
-        val storedIds = (ids.filter { random.nextInt(3) == 0 } + listOf("ghost1", "ghost2").filter { random.nextInt(3) == 0 }).shuffled(random)
-        val storedSets = storedIds.chunked(2).flatMap { if (it.size == 2 && random.nextInt(3) == 0) listOf(it) else it.map(::listOf) }
-        val types = listOf(FinancialTransactionType.EXPENSE, FinancialTransactionType.SELF_TRANSFER, FinancialTransactionType.FEE)
-        val stored = StoredFacts(
-            rows = storedSets.map { set ->
-                storedRow(
-                    *set.toTypedArray(), zone = listOf("Asia/Dubai", "Asia/Riyadh", null).random(random), type = types.random(random),
-                    rate = BigDecimal("3.75").takeIf { random.nextBoolean() }, rateSource = ExchangeRateSource.SMS,
-                )
-            },
-            correctionClosedRawSmsIds = ids.filter { random.nextInt(6) == 0 }.toSet(),
-        )
+        val stored = StoredFacts(storedRows(random, events, registry), ids.filter { random.nextInt(6) == 0 }.toSet())
         // A posting decision naming an SMS that a stored row of another decided SMS links (keep rule (i) wins).
         val conflict = stored.rows.firstOrNull { it.rawSmsIds.isNotEmpty() && random.nextBoolean() }?.rawSmsIds?.first()?.let { kept ->
             val other = ids.filter { it != kept }.randomOrNull(random) ?: return@let emptyList()
@@ -168,6 +232,33 @@ class LedgerProjectorPropertyTest {
             )
         }.orEmpty()
         return Corpus(events, fold(decisionRows(random, ids) + conflict), registry, stored)
+    }
+
+    /**
+     * Stored rows link one, two or three raw SMS, never one SMS twice; some link raw SMS without evidence, a few link
+     * none. A quarter of the corpora store a consistent earlier ledger instead: the projection with nothing stored.
+     */
+    private fun storedRows(random: Random, events: List<LedgerEvidence>, registry: OwnershipFacts): List<LedgerRow> {
+        if (random.nextInt(4) == 0) return LedgerProjector.project(events, emptyMap(), registry, StoredFacts(), ZoneOffset.ofHours(2)).rows
+        val ids = events.map { it.event.rawSmsId }
+        val storedIds = (ids.filter { random.nextInt(3) == 0 } + listOf("ghost1", "ghost2").filter { random.nextInt(3) == 0 }).shuffled(random)
+        val sets = mutableListOf<List<String>>()
+        var rest = storedIds
+        while (rest.isNotEmpty()) {
+            val size = listOf(1, 1, 1, 2, 2, 3).random(random).coerceAtMost(rest.size)
+            sets += rest.take(size)
+            rest = rest.drop(size)
+        }
+        fun row(vararg set: String) = storedRow(
+            *set, zone = listOf("Asia/Dubai", "Asia/Riyadh", null).random(random), type = storedTypes.random(random),
+            rate = BigDecimal("3.75").takeIf { random.nextBoolean() }, rateSource = ExchangeRateSource.SMS,
+        )
+        val linkless = (0 until random.nextInt(0, 3)).map { n ->
+            row("none").let {
+                LedgerRow(it.transaction.copy(id = "transaction:linkless-$n", linkedParsedEventIds = emptyList()), emptyList())
+            }
+        }
+        return sets.map { row(*it.toTypedArray()) } + linkless
     }
 
     private fun decisionRows(random: Random, ids: List<String>) = (0 until random.nextInt(0, 4)).map {
