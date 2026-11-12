@@ -392,10 +392,10 @@ class ManualDecisionReplayTest {
     /**
      * A decided external transfer whose leg now carries an out-of-date model inference, on an emptied ledger: the
      * write guard rejects the rebuild as `stale_family_inference`, the pass is incomplete with the leg to retry, and
-     * nothing is posted for it.
+     * nothing is posted for it. No retry can succeed (a decided message is never refreshed); plan 3.x decides it.
      */
     @Test
-    fun emptiedLedger_decidedTransferWithAStaleInference_isRejectedAndStaysRetryable() = runBlocking {
+    fun emptiedLedger_decidedTransferWithAStaleInference_isRejectedAndNeverPosts() = runBlocking {
         DashboardLedgerWorld(context()).use { world ->
             val ledger = transferLedger(world)
             val batch = ledger.openBatch()

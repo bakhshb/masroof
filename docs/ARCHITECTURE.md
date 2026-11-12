@@ -314,7 +314,7 @@ Why the store equals the old reads: every writer that sets a review's user resol
 | Read | Decision source now |
 |---|---|
 | `TransactionReconciliationService`: skip a non-financial SMS, keep an external transfer, lift the gate for a financial decision, `preservesExplicitUserDecision`, transfer candidates | `outcome` |
-| `TransactionReconciliationService`: an SMS with a posting decision (`UserDecision.posting` columns) and no posted row | rebuilds the user's row from the decision and the effective evidence (`decidedPosting`); a pair rebuilds one movement for both legs. Only an emptied ledger reaches it: every path that removes a decided row appends a superseding outcome |
+| `TransactionReconciliationService`: an SMS with a posting decision (`UserDecision.posting` columns) and no posted row | rebuilds the user's row from the decision and the effective evidence (`decidedPosting`); a pair rebuilds one movement for both legs. Only an emptied ledger reaches it: every path that removes a decided row appends a superseding outcome. A rebuilt external transfer or pair still passes the automatic write guard: with stale pattern or inference evidence it is rejected on every pass and stays incomplete (phase 3 decides) |
 | `AutomaticInterpretationWriteGuard` (protected posted SMS, financial decision) | `outcome` |
 | `ProcessingRecovery`, `ProcessingRetryDao`, `ParsedEventDao.markHistoricalIntent`, `PatternEvidenceProtection` (non-financial) | `isNonFinancial` |
 | `ProcessStoredSmsUseCase` reprocessing order, `PendingPatternsWorkflow` bank | `selectedBankId` |
