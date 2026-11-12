@@ -41,7 +41,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The plan 3.3a writer: what it writes, what follows a re-keyed row, atomicity, the guard and the debug switch. */
+/** The plan 3.3a writer: what it writes, what follows a re-keyed row, atomicity and the guard. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class LedgerProjectionWriterTest : ReconciliationTestFixture() {
@@ -238,7 +238,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
 
     /**
      * A transfer split by a daily limit, inter-bank without a reference: the stored pair [a1,b] stays through a later
-     * out-leg a2 (posted on its own, as the old pass did) and its in-leg b2 (also on its own: these legs never match).
+     * out-leg a2 (posted on its own: b is linked) and its in-leg b2 (also on its own: these legs never match).
      * The scoped pass for each new leg writes what a full pass writes.
      */
     @Test
@@ -318,8 +318,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
      */
     @Test
     fun aProtectedPostedLeg_leavesItsCounterpartReviewOpen() = runBlocking {
-        // Intra-bank, so the old pass counted the posted leg as a pending counterpart (an inter-bank counterpart is
-        // posted on its own, as the old pass did).
+        // Intra-bank, so the posted leg counts as a pending counterpart (an inter-bank counterpart is posted on its own).
         persistLegs(BankNetworkType.INTRA_BANK)
         val leg = singleLeg(OUT, FinancialTransactionType.SELF_TRANSFER)
         ftRepo.save(leg, listOf(OUT))
@@ -412,7 +411,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         listOf(if (rawSmsId == OUT) "pe-out" else "pe-in"), occurredAtZone = "Asia/Riyadh",
     )
 
-    /** A lone owned leg the guard refuses is failed and, as in the old pass, a pending match again. */
+    /** A lone owned leg the guard refuses is failed and a pending match again. */
     @Test
     fun aLoneLegTheGuardRefuses_isFailedAndPending() = runBlocking {
         confirmation.confirmAccountOwned(source)

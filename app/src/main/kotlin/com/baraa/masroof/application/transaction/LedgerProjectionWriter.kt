@@ -95,9 +95,10 @@ internal class LedgerProjectionWriter(
                 when {
                     now == unit.projected.normalized() -> Unit // Another pass wrote the same rows.
                     now != unit.stored.normalized() -> throw ConcurrentChange()
-                    // A blocked refinement stays as stored, as the old pass never rewrote a posted row. A row of one or
-                    // two raw SMS a decision protects is kept verbatim by the projector, so it is in no unit; a row of
-                    // three or more with a protected leg can still lose its unprotected stale legs, guarded here.
+                    // A blocked refinement (zone, time, container detail or id only) stays as stored, not retried.
+                    // A row of one or two raw SMS a decision protects is kept verbatim by the projector, so it is
+                    // in no unit; a row of three or more with a protected leg can still lose its unprotected stale
+                    // legs, guarded here.
                     !guardAccepts(unit, records) -> if (unit.refinesOnly()) written.kept += unit else written.failed += unit
                     else -> admitted += unit
                 }
@@ -175,9 +176,9 @@ internal class LedgerProjectionWriter(
     /**
      * The report of this pass. A scoped pass ([affected] not null) reports the affected raw SMS and the raw SMS of the
      * units it wrote; a neighbour unit that failed or was not written is left as stored and not reported (it is
-     * reported by its own pass), as the old scoped pass treated neighbours as candidates only. A unit that was not
-     * written ([Written.kept]) settles only the raw SMS its stored rows link; any other raw SMS of its projected rows
-     * has no row, so it is reported as a review candidate, never as settled.
+     * reported by its own pass). A unit that was not written ([Written.kept]) settles only the raw SMS its stored rows
+     * link; any other raw SMS of its projected rows has no row, so it is reported as a review candidate, never as
+     * settled.
      */
     private fun report(
         projection: LedgerProjection,
@@ -208,7 +209,7 @@ internal class LedgerProjectionWriter(
             if (transfer) ReconciliationReviewCandidate(rawSmsId, ReviewKind.PENDING_MATCH, listOf("transfer_pending_match"))
             else ReconciliationReviewCandidate(rawSmsId, ReviewKind.NEEDS_REVIEW, listOf("needs_review"))
         }
-        // A lone leg whose write failed is a pending match again, as the old pass reported it.
+        // A lone leg whose write failed is a pending match again, so its review stays open.
         val failedLoneLegs = failedUnitIds.filter { it in projection.lonePostedRawSmsIds && inReport(it) }
             .map { ReconciliationReviewCandidate(it, ReviewKind.PENDING_MATCH, listOf("transfer_pending_match")) }
         val candidates = projection.reviewCandidates.filter { inReport(it.rawSmsId) }
