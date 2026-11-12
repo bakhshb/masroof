@@ -2,7 +2,6 @@ package com.baraa.masroof.application.transaction
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,12 +16,6 @@ class ReconciliationCompletionPolicyTest {
         )
 
         assertTrue(ReconciliationCompletionPolicy.isComplete(report))
-        assertNull(
-            ReconciliationCompletionPolicy.incompleteOrNull(
-                report = report,
-                maskedRawSmsId = "…abcd",
-            ),
-        )
     }
 
     @Test
@@ -30,10 +23,11 @@ class ReconciliationCompletionPolicyTest {
         val report = report(failed = 1, assembledSingle = 4, pendingMatch = 1, ignored = 2)
 
         assertFalse(ReconciliationCompletionPolicy.isComplete(report))
-        val incomplete = ReconciliationCompletionPolicy.incompleteOrNull(
-            report = report,
-            maskedRawSmsId = "…ab12",
-        )!!
+    }
+
+    @Test
+    fun incompleteException_carriesMaskedIdButNeverInItsMessage() {
+        val incomplete = ReconciliationIncompleteException(failureCount = 1, maskedRawSmsId = "…ab12")
 
         assertEquals(1, incomplete.failureCount)
         assertEquals("…ab12", incomplete.maskedRawSmsId)
@@ -47,7 +41,6 @@ class ReconciliationCompletionPolicyTest {
         val report = report(failed = 3, assembledSingle = 1)
 
         assertFalse(ReconciliationCompletionPolicy.isComplete(report))
-        assertEquals(3, ReconciliationCompletionPolicy.incompleteOrNull(report, "…zzzz")!!.failureCount)
     }
 
     private fun report(

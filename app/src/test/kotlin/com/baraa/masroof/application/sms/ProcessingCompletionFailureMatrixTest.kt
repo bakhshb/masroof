@@ -298,6 +298,7 @@ class ProcessingCompletionFailureMatrixTest {
                     com.baraa.masroof.sms.time.InstantClock { Instant.parse("2026-08-14T12:00:00Z") },
                 ),
                 clock = com.baraa.masroof.sms.time.InstantClock { Instant.parse("2026-08-14T12:00:00Z") },
+                historicalRecoveryScheduler = com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler,
             ),
             appLogService = NoOpAppLog,
         )
@@ -527,8 +528,8 @@ class ProcessingCompletionFailureMatrixTest {
                 userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(harness.db),
                 ingestionReviewService = IngestionReviewService(harness.reviewRepo, clock),
                 clock = clock,
+                historicalRecoveryScheduler = { schedules.incrementAndGet() },
             ),
-            onHistoricalRetry = { schedules.incrementAndGet() },
             appLogService = harness.appLog,
         )
     }

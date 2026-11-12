@@ -193,6 +193,7 @@ class LiveRetryRestartTest {
                 userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ingestionReviewService = ingestionReview,
                 clock = clock,
+                historicalRecoveryScheduler = com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler,
             ),
             userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,

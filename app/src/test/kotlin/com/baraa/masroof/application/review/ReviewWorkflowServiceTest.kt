@@ -1152,6 +1152,7 @@ class ReviewWorkflowServiceTest {
         userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
         ingestionReviewService = IngestionReviewService(reviewRepo, clock),
         clock = clock,
+        historicalRecoveryScheduler = com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler,
     )
 
     private suspend fun persistEvent(

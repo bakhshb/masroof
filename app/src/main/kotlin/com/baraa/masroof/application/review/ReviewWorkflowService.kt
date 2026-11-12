@@ -75,7 +75,6 @@ class ReviewWorkflowService(
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val appLogService: AppLog,
     private val processingRecovery: ProcessingRecovery,
-    private val onHistoricalRetry: (() -> Unit)? = null,
     private val newCorrectionId: () -> String = {
         UserCorrectionIdFactory.create(UUID.randomUUID().toString())
     },
@@ -641,13 +640,13 @@ class ReviewWorkflowService(
         failureCount: Int,
         stage: String = ReconciliationCompletionPolicy.STAGE_RECONCILIATION,
     ) {
-        logIncomplete(
-            stage = stage,
-            failureCount = failureCount,
-            rawSmsIds = rawSmsIds,
-            retryState = "historical_batch",
+        val masked = AppLogFormatting.maskId(rawSmsIds.firstOrNull { it.isNotBlank() } ?: "none")
+        appLogService.error(
+            AppLogCategories.REVIEW,
+            "Derived $stage incomplete failures=$failureCount affected=${rawSmsIds.size} " +
+                "id=$masked retry_state=historical_batch",
         )
-        processingRecovery.markForHistoricalRetry(rawSmsIds.toList(), onHistoricalRetry)
+        processingRecovery.retryLater(rawSmsIds)
     }
 
     private fun incomplete(
@@ -661,19 +660,6 @@ class ReviewWorkflowService(
             stage = stage,
         )
 
-    private fun logIncomplete(
-        stage: String,
-        failureCount: Int,
-        rawSmsIds: Collection<String>,
-        retryState: String,
-    ) {
-        val masked = AppLogFormatting.maskId(rawSmsIds.firstOrNull { it.isNotBlank() } ?: "none")
-        appLogService.error(
-            AppLogCategories.REVIEW,
-            "Derived $stage incomplete failures=$failureCount affected=${rawSmsIds.size} " +
-                "id=$masked retry_state=$retryState",
-        )
-    }
 
     private fun logReviewAction(action: String, reviewId: String) {
         appLogService.info(

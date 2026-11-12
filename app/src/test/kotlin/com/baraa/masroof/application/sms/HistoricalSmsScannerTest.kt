@@ -63,7 +63,6 @@ import org.robolectric.annotation.Config
 import java.time.Instant
 import com.baraa.masroof.testsupport.NoOpAppLog
 import com.baraa.masroof.testsupport.NoOpExchangeRateEnrichmentScheduler
-import com.baraa.masroof.testsupport.NoOpHistoricalBatchRecoveryScheduler
 import com.baraa.masroof.testsupport.noOpProcessingRecovery
 import com.baraa.masroof.testsupport.noOpOwnershipDiscovery
 import com.baraa.masroof.testsupport.noOpReviewQueueUpdater
@@ -404,7 +403,6 @@ class HistoricalSmsScannerTest {
             userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         ),
         appLogService = NoOpAppLog,
-        batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
         exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
         ownershipDiscovery = noOpOwnershipDiscovery(),
         processingRecovery = noOpProcessingRecovery(),
@@ -605,7 +603,6 @@ class HistoricalSmsScannerTest {
             reconciliation = reconciliation,
             reviewQueueUpdater = reviewQueueUpdater,
             appLogService = NoOpAppLog,
-            batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
             processingRecovery = noOpProcessingRecovery(),
         )

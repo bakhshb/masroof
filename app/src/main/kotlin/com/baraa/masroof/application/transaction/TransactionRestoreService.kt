@@ -43,7 +43,6 @@ class TransactionRestoreService(
     private val appLogService: AppLog,
     private val reviewQueueUpdater: ReviewQueueUpdater,
     private val processingRecovery: ProcessingRecovery,
-    private val onHistoricalRetry: (() -> Unit)? = null,
 ) {
     suspend fun restore(
         rawSmsId: String,
@@ -105,21 +104,12 @@ class TransactionRestoreService(
     }
 
     private suspend fun retainRetry(rawSmsId: String, failureCount: Int, stage: String) {
-        logIncomplete(rawSmsId, failureCount, retryState = "historical_batch", stage = stage)
-        processingRecovery.markForHistoricalRetry(listOf(rawSmsId), onHistoricalRetry)
-    }
-
-    private fun logIncomplete(
-        rawSmsId: String,
-        failureCount: Int,
-        retryState: String,
-        stage: String = ReconciliationCompletionPolicy.STAGE_RECONCILIATION,
-    ) {
         appLogService.error(
             AppLogCategories.TRANSACTION,
             "Derived $stage incomplete failures=$failureCount " +
-                "id=${AppLogFormatting.maskId(rawSmsId)} retry_state=$retryState",
+                "id=${AppLogFormatting.maskId(rawSmsId)} retry_state=historical_batch",
         )
+        processingRecovery.retryLater(listOf(rawSmsId))
     }
 
     /** Returns a failure reason when rollback could not complete; null on success. */

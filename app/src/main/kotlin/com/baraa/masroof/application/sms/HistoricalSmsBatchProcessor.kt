@@ -59,7 +59,6 @@ class HistoricalSmsBatchProcessor(
     private val reviewQueueUpdater: ReviewQueueUpdater,
     private val exchangeRateEnrichmentScheduler: ExchangeRateEnrichmentScheduler,
     private val processingRecovery: ProcessingRecovery,
-    private val batchRecoveryScheduler: HistoricalBatchRecoveryScheduler,
     private val appLogService: AppLog,
 ) {
     fun startBatch(bankScope: Bank? = null, bankScopes: Set<Bank>? = null): Batch {
@@ -200,25 +199,13 @@ class HistoricalSmsBatchProcessor(
         }
 
         private suspend fun markAffected() {
-            val affected = storedEvents
-                .filter { it.event.parseStatus != ParseStatus.NON_FINANCIAL }
-                .map { it.event.rawSmsId }
-            if (!processingRecovery.markExhaustedBatch(affected)) return
-            scheduleBatchRecovery()
+            processingRecovery.retryLater(
+                storedEvents.filter { it.event.parseStatus != ParseStatus.NON_FINANCIAL }.map { it.event.rawSmsId },
+            )
         }
 
         private suspend fun clearRecovered() {
-            processingRecovery.clearAll(storedEvents.map { it.event.rawSmsId })
-        }
-
-        private fun scheduleBatchRecovery() {
-            try {
-                batchRecoveryScheduler.schedule()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // The retry set is durable; startup enqueues the one batch worker.
-            }
+            processingRecovery.clear(storedEvents.map { it.event.rawSmsId })
         }
 
         private fun scheduleExchangeRates() {

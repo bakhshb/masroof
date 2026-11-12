@@ -9,6 +9,7 @@ import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.application.review.ReviewOwnershipWorkflow
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowService
+import com.baraa.masroof.application.sms.HistoricalBatchRecoveryScheduler
 import com.baraa.masroof.application.transaction.TransactionIgnoreService
 import com.baraa.masroof.application.transaction.TransactionReclassificationService
 import com.baraa.masroof.application.transaction.LedgerInputLoader
@@ -27,7 +28,7 @@ import com.baraa.masroof.domain.repository.ManualReviewResolutionRepository
 class ReviewContainer(
     private val storage: StorageContainer,
     private val learning: LearningContainer,
-    onHistoricalRetry: () -> Unit,
+    historicalRecoveryScheduler: HistoricalBatchRecoveryScheduler,
 ) {
     val ownershipDiscoveryService: OwnershipDiscoveryService =
         OwnershipDiscoveryService(
@@ -110,6 +111,7 @@ class ReviewContainer(
             userDecisionRepository = storage.userDecisionRepository,
             ingestionReviewService = ingestionReviewService,
             clock = storage.clock,
+            historicalRecoveryScheduler = historicalRecoveryScheduler,
         )
 
     val manualReviewResolutionRepository: ManualReviewResolutionRepository =
@@ -136,7 +138,6 @@ class ReviewContainer(
             clock = storage.clock,
             appLogService = storage.appLogService,
             processingRecovery = processingRecovery,
-            onHistoricalRetry = onHistoricalRetry,
         )
 
     val reviewOwnershipWorkflow: ReviewOwnershipWorkflow =
@@ -185,7 +186,6 @@ class ReviewContainer(
             appLogService = storage.appLogService,
             reviewQueueUpdater = reviewQueueUpdater,
             processingRecovery = processingRecovery,
-            onHistoricalRetry = onHistoricalRetry,
         )
 
     /** Discovers ownership candidates from all already-persisted ParsedEvents. */

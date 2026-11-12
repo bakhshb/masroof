@@ -19,8 +19,6 @@ interface ProcessingRetryRepository {
      */
     suspend fun markRequired(rawSmsIds: List<String>, createdAt: Instant, mode: ProcessingRetryMode)
 
-    suspend fun clear(rawSmsId: String)
-
     /** Deletes every id in one transaction. */
     suspend fun clear(rawSmsIds: List<String>)
 

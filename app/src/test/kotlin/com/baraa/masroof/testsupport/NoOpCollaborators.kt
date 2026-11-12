@@ -42,7 +42,6 @@ internal open class NoOpReviewRepository : EmptyReviewRepository() {
 internal object NoOpProcessingRetryRepository : ProcessingRetryRepository {
     override suspend fun markRequired(rawSmsId: String, createdAt: Instant, mode: ProcessingRetryMode) = Unit
     override suspend fun markRequired(rawSmsIds: List<String>, createdAt: Instant, mode: ProcessingRetryMode) = Unit
-    override suspend fun clear(rawSmsId: String) = Unit
     override suspend fun clear(rawSmsIds: List<String>) = Unit
 }
 
@@ -66,7 +65,8 @@ internal fun noOpReviewQueueUpdater() =
 internal fun noOpIngestionReviewService() = IngestionReviewService(NoOpReviewRepository(), noOpClock)
 
 internal fun noOpProcessingRecovery() =
-    ProcessingRecovery(NoOpProcessingRetryRepository, EmptyReviewRepository(), NoOpUserDecisionRepository, noOpIngestionReviewService(), noOpClock)
+    ProcessingRecovery(NoOpProcessingRetryRepository, EmptyReviewRepository(), NoOpUserDecisionRepository, noOpIngestionReviewService(), noOpClock,
+        NoOpHistoricalBatchRecoveryScheduler)
 
 /** Reads corrections from nowhere, so the projection is the stored event. */
 internal fun noOpEffectiveParsedEventProvider(parsedEventRepository: ParsedEventRepository) =
