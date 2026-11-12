@@ -1,0 +1,115 @@
+======== golden:live_inbox_twin
+# Ledger shadow comparison (plan 3.2)
+old rows: 1  new rows: 1
+row differences: 0  review differences: 0  projection retries: 0
+
+## Summary by reason
+
+## Row differences
+
+## Review differences (open review kind, old -> new)
+
+## Projection retries
+======== golden:m1_two_day_same_amount
+# Ledger shadow comparison (plan 3.2)
+old rows: 2  new rows: 2
+row differences: 0  review differences: 0  projection retries: 0
+
+## Summary by reason
+
+## Row differences
+
+## Review differences (open review kind, old -> new)
+
+## Projection retries
+======== golden:m5_cross_bank_suffix
+# Ledger shadow comparison (plan 3.2)
+old rows: 2  new rows: 2
+row differences: 0  review differences: 0  projection retries: 0
+
+## Summary by reason
+
+## Row differences
+
+## Review differences (open review kind, old -> new)
+
+## Projection retries
+======== golden:m6_account_refund
+# Ledger shadow comparison (plan 3.2)
+old rows: 3  new rows: 3
+row differences: 0  review differences: 0  projection retries: 0
+
+## Summary by reason
+
+## Row differences
+
+## Review differences (open review kind, old -> new)
+
+## Projection retries
+======== golden:m8_asof_fx
+# Ledger shadow comparison (plan 3.2)
+old rows: 2  new rows: 2
+row differences: 0  review differences: 0  projection retries: 0
+
+## Summary by reason
+
+## Row differences
+
+## Review differences (open review kind, old -> new)
+
+## Projection retries
+======== golden:one_intra_pair
+# Ledger shadow comparison (plan 3.2)
+old rows: 1  new rows: 1
+row differences: 0  review differences: 0  projection retries: 0
+
+## Summary by reason
+
+## Row differences
+
+## Review differences (open review kind, old -> new)
+
+## Projection retries
+======== golden:repeated_separate_notices
+# Ledger shadow comparison (plan 3.2)
+old rows: 2  new rows: 2
+row differences: 0  review differences: 0  projection retries: 0
+
+## Summary by reason
+
+## Row differences
+
+## Review differences (open review kind, old -> new)
+
+## Projection retries
+======== all_banks
+# Ledger shadow comparison (plan 3.2)
+old rows: 12  new rows: 12
+row differences: 0  review differences: 1  projection retries: 0
+
+## Summary by reason
+
+## Row differences
+
+## Review differences (open review kind, old -> new)
+…nown#bcbf22: none -> NEEDS_REVIEW  stored=RESOLVED decision=FINANCIAL_TYPE
+
+## Projection retries
+======== legacy:after_repair_and_full_reconcile
+# Ledger shadow comparison (plan 3.2)
+old rows: 5  new rows: 4
+row differences: 1  review differences: 1  projection retries: 0
+
+## Summary by reason
+INSTALLMENT_FEE: 1  (Stored rows: a stored FEE for an installment that cannot become a repayment)
+
+## Row differences
+
+### 1 ONLY_OLD reason=INSTALLMENT_FEE
+raw sms: …loan#efef39
+old: id=…7700#06c170 type=FEE amount=120.00 SAR at=2026-08-28T01:10:00Z zone=Asia/Riyadh source=account:BANK_ALJAZIRA:9003 destination=- merchant=- counterparty=- category=- fx=-/- raw=…loan#efef39 events=…loan#8aea99
+
+## Review differences (open review kind, old -> new)
+…loan#efef39: none -> NEEDS_REVIEW  stored=- decision=-
+
+## Projection retries

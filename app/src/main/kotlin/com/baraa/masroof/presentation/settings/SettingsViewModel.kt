@@ -66,6 +66,8 @@ class SettingsViewModel(
     val messagePatternsWorkflow: com.baraa.masroof.application.patterns.MessagePatternsWorkflow? = null,
     private val historicalMerchantRateCorrectionWorkflow: HistoricalMerchantRateCorrectionWorkflow? = null,
     private val bankSmsImportWorkflow: com.baraa.masroof.application.sms.BankSmsImportWorkflow? = null,
+    /** Debug builds only: writes the plan 3.2 ledger shadow comparison to a document; null hides the action. */
+    private val ledgerShadowExport: (suspend (Uri) -> Unit)? = null,
 ) : ViewModel() {
     private var updatableCorrectionIds: List<String> = emptyList()
     private val _uiState = MutableStateFlow(
@@ -451,6 +453,19 @@ class SettingsViewModel(
             _uiState.update {
                 it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_SUCCESS)
             }
+        }
+    }
+
+    val canExportLedgerShadow: Boolean get() = ledgerShadowExport != null
+
+    fun exportLedgerShadow(uri: Uri) {
+        val export = ledgerShadowExport ?: return
+        launchLogged(appLogService, AppLogCategories.LOGS, "Ledger comparison export", onError = {
+            _uiState.update { it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_FAILED) }
+        }) {
+            _uiState.update { it.copy(exportingLogs = true, logMessage = null) }
+            withContext(Dispatchers.IO) { export(uri) }
+            _uiState.update { it.copy(exportingLogs = false, logMessage = LogMessage.EXPORT_SUCCESS) }
         }
     }
 

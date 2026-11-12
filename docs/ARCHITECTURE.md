@@ -7,7 +7,7 @@ Masroof has one Android application, one financial database and one bank interpr
 - `app`: presentation → application workflows → domain/parsing/data/SMS/bank ports and the pure financial core. `AppContainer` is the manual composition root of the only production runtime (see "Wiring" below).
 - `bank-engine`: pure Kotlin message-pattern matching, literal-role interpretation and extraction evidence, depending only on `finance-core` value contracts. `MessagePatternSmsAdapter` maps its output through `InterpretationDraftMapper` and the production `ParseFinalizer`.
 - `finance-core`: production money/value models, salary and statement periods, bank transaction time, deterministic container/transaction identities, financial classification/impact, transfer matching and assembly, and statement matching. Policies consume supplied facts and return decisions or transactions in memory; there is no ledger, repository, Android dependency or I/O. Existing engine value contracts remain available separately.
-- `ledger`: the pure derived-ledger projector (plan 3.1), depending only on `finance-core`. Not wired into the app yet; see "Derived ledger" below.
+- `ledger`: the pure derived-ledger projector (plan 3.1), depending only on `finance-core`. The app uses it only for the plan 3.2 shadow comparison; see "Derived ledger" below.
 - `ml-assist`: exact human-template family memory, cleaned templates, forecasting and recurring-pattern detection. The engine consumes an injected assistance contract rather than depending on ML implementation.
 - `ui-kit`: shared theme, typography, fonts, cards and charts. It cannot access financial storage.
 
@@ -59,7 +59,7 @@ Keep the existing six modules. Organize by responsibility; a filename containing
 | `app: application.backup` | Pattern capture, restore and rollback integration |
 | `app: presentation.patterns` | Render application models and collect user input |
 | `finance-core` | Financial classification, matching and assembly from supplied facts |
-| `ledger` | Derived ledger from evidence, decisions and ownership (not wired yet) |
+| `ledger` | Derived ledger from evidence, decisions and ownership (shadow comparison only; not the writer yet) |
 
 `StorageContainer` loads `app/src/main/assets/bank-patterns/*.patterns.json`, installs
 missing bundled definitions before admitting work, and wires the store into
@@ -224,7 +224,7 @@ app-side copies and reject fully qualified calls that bypass module import rules
 
 ## Derived ledger (plan 3.1)
 
-`:ledger` holds `LedgerProjector`, a pure function from facts to the ledger. Nothing in the app calls it yet: `TransactionReconciliationService` still writes the ledger, and piece 3.2 compares the two on real data.
+`:ledger` holds `LedgerProjector`, a pure function from facts to the ledger. `TransactionReconciliationService` still writes the ledger; the app calls the projector only to compare the two ("Shadow comparison" below).
 
 `LedgerProjector.project(events, decisions, registry, storedFacts, zone)` takes:
 
@@ -255,6 +255,18 @@ Each one goes to the 3.2 difference report; none is fixed in the projector.
 - **Scope.** The old scoped pass loads two match windows around the affected legs; the projector scope is the whole chain of reachable legs, so a scoped result never differs from the full one.
 - **Missing raw SMS.** Evidence without a raw SMS cannot be expressed (the caller leaves it out); the old pass skips it except for a posting decision.
 - **Counts.** No `ReconciliationSummary` is produced.
+
+### Shadow comparison (plan 3.2)
+
+`application/transaction/LedgerInputLoader` reads the projector's inputs from the database, read-only: the effective parsed events (`EffectiveParsedEventProvider`) with their raw SMS receipt time, `UserDecisionRepository.effectiveFor`, ownership of every referenced account, card and loan through `OwnershipResolver`, `StoredFacts` (each stored row's raw SMS set, zone and exchange-rate pair, and the `USER_CORRECTION` closures), and the zone. It also returns the stored rows with their links and the review items. `ReviewContainer.ledgerInputLoader` builds it; piece 3.3a reuses it as the writer's input.
+
+`LedgerShadowComparison.compare(inputs)` is pure. It joins old and new rows that share a raw SMS: equal raw SMS sets compare field by field (`CHANGED`), a group with no row on one side is `ONLY_OLD` or `ONLY_NEW`, anything else is `GROUPING`. Each difference gets the first reason that fits, mapped to the Known differences above: `MISSING_RAW_SMS`, `ID_ONLY`, `EXCHANGE_RATE`, then for a decided SMS `DECIDED_WITHOUT_POSTING_COLUMNS` or `DECIDED_NOT_STORED` (write guard), then `LOAN_PRE_PASS`, `INSTALLMENT_FEE`, `STALE_EVIDENCE` (the stored row no longer reads its evidence), `ROW_TYPE_OR_OWNERSHIP`; else `UNEXPLAINED`. It also compares the open review kind per raw SMS (stored `REQUIRED` review against the projection's candidate) and lists the projection's retry ids. Settled ids are not compared: they are the complement of rows and reviews.
+
+`LedgerShadowComparison.report(inputs)` is plain text: counts per reason, then one block per difference with both rows. Ids use `AppLogFormatting.maskId` plus a short digest; containers, merchants and counterparties keep only the last four digits of any run of five or more; no SMS text.
+
+- **Corpus (CI).** `LedgerShadowCorpusTest` builds the snapshot corpus as `LedgerSnapshotTest` does (legacy states after the one-time repair), runs the v19 → v20 backfill, writes `app/build/reports/shadow-ledger/shadow_comparison.txt` (uploaded with the unit-test reports) and asserts it equals `testdata/ledger_snapshot/shadow_comparison.expected.txt`. Its differences are pending owner approval. Regenerate only with `MASROOF_UPDATE_SHADOW_COMPARISON=1 ./gradlew :app:testDebugUnitTest --tests '*LedgerShadowCorpusTest' --rerun`.
+- **Device (debug builds).** Settings → Logs shows "Export ledger comparison" only when `BuildConfig.DEBUG`; it writes the report of the device database to a document the user picks.
+- **Any database file.** In a Robolectric test, open the file with `MasroofDatabase.builder(context, MasroofDatabase::class.java, name)` (migrates v18/v19), build a `LedgerInputLoader` over its Room repositories (as `DashboardLedgerWorld.ledgerInputLoader` does) and call `LedgerShadowComparison.report(loader.load())`.
 
 ## Processing and authority
 
