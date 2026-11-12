@@ -5,6 +5,8 @@ import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
+import com.baraa.masroof.domain.model.UserDecision
+import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.repository.TransactionIgnoreOutcome
 import com.baraa.masroof.domain.repository.TransactionIgnoreRepository
 import java.time.Instant
@@ -39,6 +41,7 @@ class RoomTransactionIgnoreRepository(
                     if (resolved.resolutionKind != ReviewResolutionKind.USER_NON_FINANCIAL) {
                         throw IgnoreRollback("review_resolution_failed")
                     }
+                    database.appendDecision(UserDecision(id, UserDecisionKind.IGNORE, resolvedAt))
                     database.processingRetryDao().delete(id)
                     TransactionIgnoreOutcome.Ignored
                 }

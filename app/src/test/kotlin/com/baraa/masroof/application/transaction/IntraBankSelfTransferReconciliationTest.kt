@@ -445,6 +445,7 @@ class IntraBankSelfTransferReconciliationTest {
         reviewRepo.markResolved(review.id, ReviewResolutionKind.USER_NON_FINANCIAL, Instant.now(), null)
         val restore = TransactionRestoreService(
             reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             financialTransactionRepository = ftRepo,
             reconciliation = reconciliation,
             reclassification = TransactionReclassificationService(

@@ -129,6 +129,7 @@ class IntraBankSelfTransferIngestionTest {
     )
     reviewWorkflow = ReviewWorkflowService(
       reviewRepository = reviewRepo,
+      userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
       userCorrectionRepository = RoomUserCorrectionRepository(db.userCorrectionDao()),
       financialTransactionRepository = ftRepo,
       rawSmsRepository = rawRepo,

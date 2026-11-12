@@ -91,9 +91,12 @@
   "com.baraa.masroof.integration.replica.ReportedMessagesJourneyTest#manualTransfersRequireOwnedEndpointsAndRejectExternalClassificationBetweenOwnedAccounts": 2.478,
   "com.baraa.masroof.integration.replica.ReportedMessagesJourneyTest#previouslyUnresolvedReportedMessagesRecoverAfterRuleUpgradeWithoutReset": 6.664,
   "com.baraa.masroof.integration.replica.ReportedMessagesJourneyTest#unknownMessageOffersTransfersAndManualDecisionPostsOnceWithoutClaimingMl": 3.389,
+  "com.baraa.masroof.integration.storage.MigrationOpenPathDeviceTest#v18Fixture_upgradesToTheProductionVersionWithEveryRowIntactAndNoDecisions": 0.2,
   "com.baraa.masroof.integration.storage.MigrationOpenPathDeviceTest#v18Fixture_upgradesToATestOnlyNextVersionWithEveryRowIntact": 0.2,
   "com.baraa.masroof.integration.storage.MigrationOpenPathDeviceTest#olderSchema_isRejectedAndTheFileIsUntouched": 0.2,
   "com.baraa.masroof.integration.storage.MigrationOpenPathDeviceTest#unknownIdentityHash_isRejectedAndTheFileIsUntouched": 0.2,
+  "com.baraa.masroof.integration.storage.MigrationOpenPathDeviceTest#unknownIdentityHashAfterUpgrade_isRejectedAndTheFileIsUntouched": 0.2,
+  "com.baraa.masroof.integration.storage.MigrationOpenPathDeviceTest#unknownBaselineStructure_isRejectedAndTheFileIsUntouched": 0.2,
   "com.baraa.masroof.integration.storage.BackupMigrationDeviceTest#v18EncryptedEnvelope_importsUnderATestOnlyNextVersionWithEveryRowIntact": 2.0,
   "com.baraa.masroof.integration.storage.BackupMigrationDeviceTest#failedMigration_leavesTheLiveDatabaseByteIdentical": 1.0
 }

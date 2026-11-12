@@ -129,7 +129,7 @@ class ForecastLifecycleDeviceTest {
             assertEquals(settled.actual!!+1000,corrected.actual)
             assertEquals(original.personalTotal,corrected.personalTotal)
             assertEquals(original.baselineTotal,corrected.baselineTotal)
-            c.storage.database.openHelper.readableDatabase.query("PRAGMA user_version").use { it.moveToFirst();assertEquals(18,it.getInt(0)) }
+            c.storage.database.openHelper.readableDatabase.query("PRAGMA user_version").use { it.moveToFirst();assertEquals(com.baraa.masroof.data.room.MasroofDatabase.VERSION,it.getInt(0)) }
         } finally { workflow.close();sidecar.close();TestRuntime.reset(host) }
     }
 }

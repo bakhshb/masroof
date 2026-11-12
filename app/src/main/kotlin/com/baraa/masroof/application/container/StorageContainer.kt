@@ -24,6 +24,7 @@ import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
+import com.baraa.masroof.data.repository.RoomUserDecisionRepository
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.Bank
@@ -36,6 +37,7 @@ import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.UserCorrectionRepository
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CoroutineScope
@@ -114,6 +116,8 @@ class StorageContainer(
 
     val reviewRepository: ReviewRepository =
         RoomReviewRepository(database.reviewItemDao(), accessGate = databaseAccessGate)
+
+    val userDecisionRepository: UserDecisionRepository = RoomUserDecisionRepository(database, databaseAccessGate)
 
     val processingRetryRepository: ProcessingRetryRepository =
         RoomProcessingRetryRepository(database.processingRetryDao(), accessGate = databaseAccessGate)

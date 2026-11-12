@@ -96,6 +96,7 @@ class ScopedMutationReconciliationTest {
         workflow = wiring.workflow
         restore = TransactionRestoreService(
             reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             financialTransactionRepository = transactions,
             reconciliation = wiring.reconciliation,
             reclassification = TransactionReclassificationService(

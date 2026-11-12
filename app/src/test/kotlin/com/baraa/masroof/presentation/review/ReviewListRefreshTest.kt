@@ -359,6 +359,7 @@ class ReviewListRefreshTest {
             reviewOwnershipWorkflow = ReviewOwnershipWorkflow(cards, confirmation),
             transactionRestoreService = TransactionRestoreService(
                 reviewRepository = reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 financialTransactionRepository = financial,
                 reconciliation = reconciliation,
                 reclassification = TransactionReclassificationService(

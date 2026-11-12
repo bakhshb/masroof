@@ -64,6 +64,7 @@ internal class RoomReviewWiring(
     val updater = ReviewQueueUpdater(reviewQueueReviews, ledger, clock)
     val workflow = ReviewWorkflowService(
         reviewRepository = reviews,
+        userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
         userCorrectionRepository = corrections,
         financialTransactionRepository = ledger,
         rawSmsRepository = raw,

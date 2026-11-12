@@ -120,6 +120,7 @@ class SmsContainer(
     val explicitBankSelectionWorkflow: ExplicitBankSelectionWorkflow =
         ExplicitBankSelectionWorkflow(
             reviewRepository = storage.reviewRepository,
+            userDecisionRepository = storage.userDecisionRepository,
             rawSmsRepository = storage.rawSmsRepository,
             parsedEventRepository = storage.parsedEventRepository,
             bankSmsRegistry = bankSmsRegistry,

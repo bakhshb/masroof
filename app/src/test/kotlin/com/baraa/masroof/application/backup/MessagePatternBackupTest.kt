@@ -68,7 +68,7 @@ class MessagePatternBackupTest {
             assertEquals(setOf("manifest.json", "preferences.json", "masroof.db"), entries.keys)
             val saved = BackupPackageCodec.decodePreferences(requireNotNull(entries["preferences.json"]).toString(Charsets.UTF_8))
             assertEquals(original, saved.messagePatterns)
-            assertEquals(18, BackupPackageCodec.decodeManifest(requireNotNull(entries["manifest.json"]).toString(Charsets.UTF_8)).roomVersion)
+            assertEquals(MasroofDatabase.VERSION, BackupPackageCodec.decodeManifest(requireNotNull(entries["manifest.json"]).toString(Charsets.UTF_8)).roomVersion)
         } finally {
             continueExport.countDown()
             database.close()

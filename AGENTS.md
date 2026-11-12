@@ -31,7 +31,7 @@ At the end of the PR: one review of the whole PR, then CI green including device
 - No remote pattern download. Wiring stays manual; no DI library unless the owner asks.
 
 ## Never break
-- Database `masroof.db`: the schema changes only through additive, tested Room migrations: a migration test from the committed v18 fixture, a device upgrade test, and v18 backup archives still import. Only schemas from v18 up to the current version are accepted (`MasroofDatabase.IDENTITY_HASHES`); older than v18, unknown and newer are rejected. A backup of an older schema migrates on its staged copy before it replaces the live file. Never a destructive fallback. A schema change needs an explicit design and device verification; no backfill without owner approval.
+- Database `masroof.db`: the schema changes only through additive, tested Room migrations: a migration test from the committed v18 fixture, a device upgrade test, and v18 backup archives still import. Only schemas from v18 up to the current version are accepted (`MasroofDatabase.IDENTITY_HASHES`); older than v18, unknown and newer are rejected. A backup of an older schema migrates on its staged copy before it replaces the live file. Never a destructive fallback. A schema change needs an explicit design and device verification; no backfill without owner approval. Current schema: v19 (adds `user_decision`).
 - Keep the application id, preference names, Keystore alias, worker identities and historical persisted keys.
 - No Lab UI, replica app or parallel intake; no `lab`/`beta` source paths. Engine/model refreshes never reparse posted evidence or override human decisions.
 - Never log SMS bodies, account numbers or secrets. Logs carry stage, failure count, masked id and retry state.
@@ -73,6 +73,7 @@ At the end of the PR: one review of the whole PR, then CI green including device
 - `ReconciliationCompletionPolicy` is the only reading of a reconciliation report: `failed > 0` or a throw = incomplete, even if rows posted. Pending-match and intentional non-financial outcomes are not failures. A stored ParsedEvent is not a posted row.
 - Live failure → `DerivedIncomplete(RECONCILIATION)`, WorkManager retries; on exhaustion keep a `LIVE` retry row plus an error review; startup reschedules.
 - Historical batch with failures stays `Incomplete`, writes one atomic `HISTORICAL_BATCH` set and clears it only after a later pass with `failed == 0` and a successful review update.
+- Every explicit user decision is also appended to `user_decision` (append-only, never updated or deleted) in the same database transaction as its existing write; see `docs/ARCHITECTURE.md`. Nothing reads it yet (plan 2.3).
 - Correction, restore and ownership changes keep the manual decision and record durable retries. A restore that wrote `USER_FINANCIAL_TYPE` stays financial on failure (never rewritten to `USER_NON_FINANCIAL`). Full `refreshReviewQueue` with failures throws and records the ids.
 - Startup waits for integrity repair (`StartupMaintenance`) and fails closed. Background work is idempotent, keeps failed rows retryable and emits `MaintenanceCompletionSignal`.
 

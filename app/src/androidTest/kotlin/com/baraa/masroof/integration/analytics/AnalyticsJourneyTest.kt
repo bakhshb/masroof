@@ -211,7 +211,7 @@ class AnalyticsJourneyTest {
                 AnalyticsBackup.validate(archive)
                 val ledger = container.storage.financialTransactionRepository.listAll()
                 assertEquals(ledger.size, container.storage.database.financialTransactionDao().listAll().size)
-                container.storage.database.openHelper.readableDatabase.query("PRAGMA user_version").use { it.moveToFirst(); assertEquals(18, it.getInt(0)) }
+                container.storage.database.openHelper.readableDatabase.query("PRAGMA user_version").use { it.moveToFirst(); assertEquals(com.baraa.masroof.data.room.MasroofDatabase.VERSION, it.getInt(0)) }
                 if (android.os.Build.VERSION.SDK_INT >= 33) {
                     assertEquals(android.content.pm.PackageManager.PERMISSION_DENIED, host.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS))
                     workflow.updatePreferences(workflow.state.value.preferences.copy(budget = 1, phone = true))

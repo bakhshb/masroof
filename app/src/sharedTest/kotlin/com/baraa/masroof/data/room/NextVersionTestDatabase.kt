@@ -24,6 +24,7 @@ import com.baraa.masroof.data.room.entity.RawSmsEntity
 import com.baraa.masroof.data.room.entity.RawSmsProviderAliasEntity
 import com.baraa.masroof.data.room.entity.ReviewItemEntity
 import com.baraa.masroof.data.room.entity.UserCorrectionEntity
+import com.baraa.masroof.data.room.entity.UserDecisionEntity
 import java.io.File
 import java.io.InputStream
 import org.junit.Assert.assertArrayEquals
@@ -54,6 +55,7 @@ data class MigrationProbeEntity(@PrimaryKey val id: Long, val note: String?)
         ReviewItemEntity::class,
         UserCorrectionEntity::class,
         ProcessingRetryEntity::class,
+        UserDecisionEntity::class,
         MigrationProbeEntity::class,
     ],
     version = NextVersionTestDatabase.VERSION,
@@ -89,37 +91,79 @@ abstract class NextVersionTestDatabase : RoomDatabase() {
 
 /** The open-path contract, run on the JVM and on a device against the committed v18 fixture. */
 object MigrationOpenPathContract {
+    /** Tables the real migrations add after v18; each starts empty (no backfill). */
+    val TABLES_SINCE_V18: Set<String> = setOf("user_decision")
+
+    /** Tables the test-only next version holds beyond the v18 fixture. */
+    val NEXT_VERSION_TABLES: Set<String> = TABLES_SINCE_V18 + "migration_probe"
+
+    /** The v18 fixture upgrades through the production builder to production's own version with every row intact. */
+    fun productionUpgradeKeepsEveryRow(context: Context, fixture: () -> InputStream) {
+        val name = "migration-production.db"
+        upgrade(context, name, fixture, MasroofDatabase::class.java, MasroofDatabase.VERSION, TABLES_SINCE_V18)
+        context.deleteDatabase(name)
+    }
+
     /** The v18 fixture upgrades through the production builder to the next version with every row intact. */
     fun upgradeKeepsEveryRow(context: Context, fixture: () -> InputStream) {
         val name = "migration-upgrade.db"
-        val file = copyFixture(context, name, fixture)
-        val before = readOnly(file) { rows(it) }
-        val db = MasroofDatabase.builder(context, NextVersionTestDatabase::class.java, name)
-            .addMigrations(NextVersionTestDatabase.MIGRATION_TO_NEXT).build()
-        try {
-            db.openHelper.writableDatabase
-        } finally {
-            db.close()
-        }
-        val after = readOnly(file) { assertEquals(NextVersionTestDatabase.VERSION, it.version); rows(it) }
-        assertTrue("fixture has rows", before.values.sumOf { it.size } > 0)
-        assertEquals(before, after - "migration_probe")
-        assertEquals(emptyList<String>(), after["migration_probe"])
+        upgrade(context, name, fixture, NextVersionTestDatabase::class.java, NextVersionTestDatabase.VERSION,
+            NEXT_VERSION_TABLES, NextVersionTestDatabase.MIGRATION_TO_NEXT)
         // The production schema is now older than the file: an app downgrade fails closed.
         rejectsUntouched(context, name)
         context.deleteDatabase(name)
     }
 
+    private fun upgrade(
+        context: Context,
+        name: String,
+        fixture: () -> InputStream,
+        databaseClass: Class<out RoomDatabase>,
+        version: Int,
+        addedTables: Set<String>,
+        vararg extra: Migration,
+    ) {
+        val file = copyFixture(context, name, fixture)
+        val before = readOnly(file) { rows(it) }
+        openOnce(context, databaseClass, name, *extra)
+        val after = readOnly(file) { assertEquals(version, it.version); rows(it) }
+        assertTrue("fixture has rows", before.values.sumOf { it.size } > 0)
+        assertKeepsEveryRow(before, after, addedTables)
+    }
+
+    /** [after] holds every row of [before] unchanged, plus exactly [addedTables], all empty. */
+    fun assertKeepsEveryRow(before: Map<String, List<String>>, after: Map<String, List<String>>, addedTables: Set<String>) {
+        assertEquals(before, after - addedTables)
+        assertEquals(addedTables.associateWith { emptyList<String>() }, after - before.keys)
+    }
+
     fun olderSchemaIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
         editedFixtureIsRejectedUntouched(context, fixture, "PRAGMA user_version = ${MasroofDatabase.BASELINE_VERSION - 1}")
 
+    /** A v18 file with an unknown identity hash fails the hash check in `MIGRATION_18_19` and stays untouched. */
     fun unknownIdentityHashIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
-        editedFixtureIsRejectedUntouched(context, fixture, "UPDATE room_master_table SET identity_hash = '${"0".repeat(32)}'")
+        editedFixtureIsRejectedUntouched(context, fixture, UNKNOWN_HASH)
+
+    /** A file already at the current version with an unknown identity hash is refused by Room's own check. */
+    fun unknownIdentityHashAfterUpgradeIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
+        editedFixtureIsRejectedUntouched(context, fixture, UNKNOWN_HASH) { openOnce(context, MasroofDatabase::class.java, it) }
+
+    private val UNKNOWN_HASH = "UPDATE room_master_table SET identity_hash = '" + "0".repeat(32) + "'"
+
+    /** A v18-labelled file whose tables differ from v18 fails the migration's validation and stays untouched. */
+    fun unknownBaselineStructureIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
+        editedFixtureIsRejectedUntouched(context, fixture, "ALTER TABLE raw_sms ADD COLUMN stray TEXT")
 
     /** A fixture changed by [edit] is refused and its bytes stay the same. */
-    private fun editedFixtureIsRejectedUntouched(context: Context, fixture: () -> InputStream, edit: String) {
+    private fun editedFixtureIsRejectedUntouched(
+        context: Context,
+        fixture: () -> InputStream,
+        edit: String,
+        before: (name: String) -> Unit = {},
+    ) {
         val name = "migration-reject.db"
         val file = copyFixture(context, name, fixture)
+        before(name)
         // WAL like the live file: a rollback-journal edit would flip the header's journal bytes, and Room flips them back.
         val flags = SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING
         SQLiteDatabase.openDatabase(file.path, null, flags).use { it.execSQL(edit) }
@@ -141,6 +185,16 @@ object MigrationOpenPathContract {
         assertArrayEquals(before.second, after.second)
     }
 
+    /** Opens [name] through the production builder once, running any migration, and closes it. */
+    private fun openOnce(context: Context, databaseClass: Class<out RoomDatabase>, name: String, vararg extra: Migration) {
+        val db = MasroofDatabase.builder(context, databaseClass, name).addMigrations(*extra).build()
+        try {
+            db.openHelper.writableDatabase
+        } finally {
+            db.close()
+        }
+    }
+
     private fun snapshot(file: File) =
         file.readBytes() to (File(file.path + "-wal").takeIf { it.isFile }?.readBytes() ?: ByteArray(0))
 
@@ -155,11 +209,16 @@ object MigrationOpenPathContract {
         SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use(block)
 
     /** Every row of every app table, in rowid order. */
-    fun rows(db: SQLiteDatabase): Map<String, List<String>> = db.rawQuery(
+    fun rows(db: SQLiteDatabase): Map<String, List<String>> = rows { db.rawQuery(it, null) }
+
+    /** [rows] through an open Room connection. */
+    fun rows(db: SupportSQLiteDatabase): Map<String, List<String>> = rows { db.query(it) }
+
+    private fun rows(query: (String) -> Cursor): Map<String, List<String>> = query(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'room_%' " +
-            "AND name NOT LIKE 'android_%' AND name NOT LIKE 'sqlite_%' ORDER BY name", null,
+            "AND name NOT LIKE 'android_%' AND name NOT LIKE 'sqlite_%' ORDER BY name",
     ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getString(0)) } }
-        .associateWith { table -> dump(db.rawQuery("SELECT * FROM `$table` ORDER BY rowid", null)) }
+        .associateWith { table -> dump(query("SELECT * FROM `$table` ORDER BY rowid")) }
 
     private fun dump(cursor: Cursor): List<String> = cursor.use {
         buildList {

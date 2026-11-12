@@ -1006,6 +1006,7 @@ class ProcessRawSmsUseCaseTest {
         stored: ProcessStoredSmsUseCase,
     ) = ExplicitBankSelectionWorkflow(
         reviewRepository = reviewRepo,
+        userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
         rawSmsRepository = rawRepo,
         parsedEventRepository = parsedRepo,
         bankSmsRegistry = registry,

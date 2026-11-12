@@ -15,6 +15,10 @@ class MigrationOpenPathDeviceTest {
     private val fixture = { instrumentation.context.assets.open("ledger_fixtures/v18/masroof.db") }
 
     @Test
+    fun v18Fixture_upgradesToTheProductionVersionWithEveryRowIntactAndNoDecisions() =
+        MigrationOpenPathContract.productionUpgradeKeepsEveryRow(context, fixture)
+
+    @Test
     fun v18Fixture_upgradesToATestOnlyNextVersionWithEveryRowIntact() =
         MigrationOpenPathContract.upgradeKeepsEveryRow(context, fixture)
 
@@ -25,4 +29,12 @@ class MigrationOpenPathDeviceTest {
     @Test
     fun unknownIdentityHash_isRejectedAndTheFileIsUntouched() =
         MigrationOpenPathContract.unknownIdentityHashIsRejectedUntouched(context, fixture)
+
+    @Test
+    fun unknownIdentityHashAfterUpgrade_isRejectedAndTheFileIsUntouched() =
+        MigrationOpenPathContract.unknownIdentityHashAfterUpgradeIsRejectedUntouched(context, fixture)
+
+    @Test
+    fun unknownBaselineStructure_isRejectedAndTheFileIsUntouched() =
+        MigrationOpenPathContract.unknownBaselineStructureIsRejectedUntouched(context, fixture)
 }

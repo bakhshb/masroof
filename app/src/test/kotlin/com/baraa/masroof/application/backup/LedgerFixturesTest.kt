@@ -14,6 +14,8 @@ import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.data.room.MigrationOpenPathContract
+import com.baraa.masroof.data.room.entity.UserDecisionEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -67,9 +69,10 @@ class LedgerFixturesTest {
                 assertEquals(committedSchemaHash(), it.getString(0))
             }
         }
-        val db = Room.databaseBuilder(context, MasroofDatabase::class.java, "fixture-v18.db").allowMainThreadQueries().build()
+        // The production builder migrates the frozen file to the current schema (plan 2.1: v19, empty user_decision).
+        val db = MasroofDatabase.builder(context, MasroofDatabase::class.java, "fixture-v18.db").allowMainThreadQueries().build()
         try {
-            assertEquals(18, db.openHelper.writableDatabase.version)
+            assertEquals(MasroofDatabase.VERSION, db.openHelper.writableDatabase.version)
             assertRows(db)
         } finally {
             db.close()
@@ -131,7 +134,50 @@ class LedgerFixturesTest {
         assertTrue("fixture needs a persisted FX pair", transactions.any { it.appliedExchangeRate != null && it.exchangeRateSource != null })
         assertEquals(1, RoomCommitmentRepository.from(db).listAll().size)
         assertTrue("fixture needs a resolved review", RoomReviewRepository(db.reviewItemDao()).listAll().any { it.resolutionKind != null })
+        assertEquals("no backfill", emptyList<UserDecisionEntity>(), db.userDecisionDao().listAll())
     }
+
+    @Test
+    fun currentVersionExport_roundTripsEveryRowIncludingUserDecisions() = runBlocking {
+        val live = MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).allowMainThreadQueries().build()
+        val archive = File(context.cacheDir, "round-trip.masroof")
+        val file = context.getDatabasePath(MasroofDatabase.NAME)
+        try {
+            assertEquals(BackupImportOutcome.SuccessNeedsRestart, service(live).importFrom(Uri.fromFile(fixture(ARCHIVE_FILE)), confirmLegacyPlaintext = true))
+            val migrated = MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).allowMainThreadQueries().build()
+            val rawSmsId = migrated.openHelper.readableDatabase.query("SELECT id FROM raw_sms ORDER BY id LIMIT 1").use {
+                assertTrue(it.moveToFirst()); it.getString(0)
+            }
+            migrated.userDecisionDao().insert(
+                UserDecisionEntity(rawSmsId = rawSmsId, kind = "BANK_SELECTION", decidedAtEpochMillis = EXPORTED_AT, bankId = "BANK_SNB"))
+            assertTrue(service(migrated, closes = false).exportTo(Uri.fromFile(archive), PASSPHRASE.toCharArray()).isSuccess)
+            migrated.close()
+            val expected = MigrationOpenPathContract.readOnly(file, MigrationOpenPathContract::rows)
+            assertEquals(1, expected.getValue("user_decision").size)
+
+            context.deleteDatabase(MasroofDatabase.NAME)
+            val empty = MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).allowMainThreadQueries().build()
+            assertEquals(BackupImportOutcome.SuccessNeedsRestart, service(empty).importFrom(Uri.fromFile(archive), PASSPHRASE.toCharArray()))
+            assertEquals(expected, MigrationOpenPathContract.readOnly(file) {
+                assertEquals(MasroofDatabase.VERSION, it.version)
+                MigrationOpenPathContract.rows(it)
+            })
+        } finally {
+            if (live.isOpen) live.close()
+            archive.delete()
+        }
+    }
+
+    private fun service(live: MasroofDatabase, closes: Boolean = true) = DatabaseBackupService(
+        appContext = context,
+        database = live,
+        closeDatabase = { check(closes) { "export must not close" }; live.close() },
+        appVersionName = "test",
+        clockEpochMillis = { EXPORTED_AT },
+        restartProcess = {},
+        kdfIterations = KDF_ITERATIONS,
+        appLogService = NoOpAppLog,
+    )
 
     private fun rebuild() = runBlocking {
         check(MasroofDatabase.VERSION == 18) { "the v18 fixtures must never be rebuilt from schema ${MasroofDatabase.VERSION}" }

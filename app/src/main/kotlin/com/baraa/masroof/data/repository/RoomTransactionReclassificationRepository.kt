@@ -8,6 +8,8 @@ import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.UserDecision
+import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.TransactionReclassificationRepository
 import java.time.Instant
@@ -37,6 +39,7 @@ class RoomTransactionReclassificationRepository(
                 if (previous == null) check(dao.insertIfAbsent(row) != -1L)
                 else check(dao.updateRow(row.id, row.kind, row.status, row.reasons, timestamp,
                     timestamp, row.resolutionKind, row.resolvedTransactionId) == 1)
+                database.appendDecision(UserDecision.posting(UserDecisionKind.RECLASSIFY, rawSmsId, edited, at))
                 true
             }
         }

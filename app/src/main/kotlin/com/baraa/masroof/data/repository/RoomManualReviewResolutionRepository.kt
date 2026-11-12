@@ -8,6 +8,8 @@ import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
+import com.baraa.masroof.domain.model.UserDecision
+import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.repository.ManualReviewResolutionRepository
@@ -16,7 +18,7 @@ import java.time.Instant
 
 /**
  * Room-backed atomic FT + review resolution. Uses [MasroofDatabase.withTransaction]
- * so FinancialTransaction persistence and ReviewItem updates commit together.
+ * so FinancialTransaction persistence, ReviewItem updates and the `user_decision` row commit together.
  */
 class RoomManualReviewResolutionRepository(
     private val database: MasroofDatabase,
@@ -54,6 +56,7 @@ class RoomManualReviewResolutionRepository(
         resolvedAt: Instant,
         validateBeforeWrite: (suspend () -> Boolean)? = null,
     ): ManualReviewResolutionResult = accessGate.withAccess {
+        val decisionKind = decisionKind(resolutionKind)
         try {
             database.withTransaction {
                 if (validateBeforeWrite != null && !validateBeforeWrite()) {
@@ -71,17 +74,34 @@ class RoomManualReviewResolutionRepository(
 
                     FinancialTransactionSaveResult.Saved,
                     FinancialTransactionSaveResult.AlreadyExists,
-                    -> ManualReviewResolutionResult.Success(
-                        transaction = transaction,
-                        reviews = reviewIds.map { reviewId ->
+                    -> {
+                        // A repeated submit finds its own row and every review already resolved to it by the same
+                        // user choice: no new decision. An automatic resolution to the same id is not a repeat.
+                        val repeat = save == FinancialTransactionSaveResult.AlreadyExists && reviewIds.all { id ->
+                            reviewDao.getById(id)?.let {
+                                it.status == ReviewStatus.RESOLVED.name && it.resolvedTransactionId == transaction.id &&
+                                    it.resolutionKind == resolutionKind.name
+                            } == true
+                        }
+                        val reviews = reviewIds.map { reviewId ->
                             resolveRequiredOrRollback(
                                 reviewId = reviewId,
                                 resolutionKind = resolutionKind,
                                 resolvedAt = resolvedAt,
                                 transactionId = transaction.id,
                             )
-                        },
-                    )
+                        }
+                        if (!repeat) database.appendDecision(
+                            UserDecision.posting(
+                                kind = decisionKind,
+                                rawSmsId = reviews.first().rawSmsId,
+                                transaction = transaction,
+                                decidedAt = resolvedAt,
+                                pairedRawSmsId = reviews.getOrNull(1)?.rawSmsId,
+                            ),
+                        )
+                        ManualReviewResolutionResult.Success(transaction = transaction, reviews = reviews)
+                    }
                 }
             }
         } catch (e: ReviewResolutionRollback) {
@@ -125,6 +145,13 @@ class RoomManualReviewResolutionRepository(
             throw ReviewResolutionRollback("review_resolution_verify_failed")
         }
         return ReviewItemMapper.toDomain(after)
+    }
+
+    private fun decisionKind(resolutionKind: ReviewResolutionKind): UserDecisionKind = when (resolutionKind) {
+        ReviewResolutionKind.USER_FINANCIAL_TYPE -> UserDecisionKind.FINANCIAL_TYPE
+        ReviewResolutionKind.USER_EXTERNAL_TRANSFER -> UserDecisionKind.EXTERNAL_TRANSFER
+        ReviewResolutionKind.USER_SELF_TRANSFER_PAIR -> UserDecisionKind.SELF_TRANSFER_PAIR
+        else -> error("$resolutionKind is not a posting decision")
     }
 
     private class ReviewResolutionRollback(val reason: String) : Exception(reason)
