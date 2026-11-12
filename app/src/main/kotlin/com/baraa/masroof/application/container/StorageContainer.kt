@@ -73,6 +73,11 @@ class StorageContainer(
 
     val databaseAccessGate: DatabaseAccessGate = DatabaseAccessGate()
 
+    /** Opens the financial store (migrations and identity check included); throws when it cannot open. */
+    suspend fun openDatabase() {
+        databaseAccessGate.withAccess { database.openHelper.writableDatabase }
+    }
+
     val bundledPatternBanks = appContext.assets.list("bank-patterns").orEmpty().filter { it.endsWith(".patterns.json") }.sorted().flatMap { file ->
         MessagePatternConfigurationCodec.decode(
             appContext.assets.open("bank-patterns/$file").bufferedReader(Charsets.UTF_8).use { it.readText() }).banks

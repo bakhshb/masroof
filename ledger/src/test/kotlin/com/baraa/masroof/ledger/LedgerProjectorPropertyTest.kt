@@ -84,8 +84,7 @@ class LedgerProjectorPropertyTest {
      * raw SMS set with the same type and amount (FEE→LOAN_REPAYMENT allowed), (b) a self-transfer pair joining a stored
      * external or single-leg self-transfer leg, (c) dropped as a lone, unprotected informational row, or (d) released
      * as a double-posted single-leg self-transfer (another such stored row is released with it; its leg is assembled
-     * again). A protected row is
-     * always verbatim.
+     * again). A protected row is always verbatim.
      */
     @Test
     fun everyStoredRowIsKeptVerbatimOrReplacedByAnAllowedRule() {
@@ -123,7 +122,7 @@ class LedgerProjectorPropertyTest {
                     (derived.transaction.type == row.transaction.type ||
                         row.transaction.type == FinancialTransactionType.FEE && derived.transaction.type == FinancialTransactionType.LOAN_REPAYMENT)
                 val joinable = row.transaction.type in setOf(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, FinancialTransactionType.EXTERNAL_TRANSFER_IN) ||
-                    row.transaction.type == FinancialTransactionType.SELF_TRANSFER && row.transaction.linkedParsedEventIds.size == 1
+                    row.isSingleLegSelf()
                 val joined = single != null && joinable && derived != null && derived.transaction.type == FinancialTransactionType.SELF_TRANSFER &&
                     derived.rawSmsIds.size == 2 && single in derived.rawSmsIds
                 // (d) A released leg then takes what the pass gives it: a pair, a row of its own, or a pending match.

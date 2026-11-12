@@ -50,7 +50,7 @@ class AppContainer(
 
     val maintenance: MaintenanceContainer = MaintenanceContainer(
         storage,
-        openFinancialStore = { storage.databaseAccessGate.withAccess { storage.database.openHelper.writableDatabase } },
+        openFinancialStore = storage::openDatabase,
         runPostStartupBackgroundWork = { runPostStartupBackgroundWork() },
         isOpen = { shutdownStage == "OPEN" },
     )

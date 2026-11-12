@@ -117,7 +117,7 @@ class DatabaseBackupImportTest {
             .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, MasroofDatabase.VERSION)
             .putInt(
                 MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION,
-                1,
+                RETIRED_REPAIR_VERSION,
             )
             .commit()
 
@@ -170,7 +170,7 @@ class DatabaseBackupImportTest {
                 .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, MasroofDatabase.VERSION)
                 .putInt(
                     MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION,
-                    1,
+                    RETIRED_REPAIR_VERSION,
                 )
                 .commit()
 
@@ -200,7 +200,7 @@ class DatabaseBackupImportTest {
                 prefs.getInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, 0),
             )
             assertEquals(
-                1,
+                RETIRED_REPAIR_VERSION,
                 prefs.getInt(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, 0),
             )
             backupZip.delete()
@@ -536,3 +536,6 @@ class DatabaseBackupImportTest {
         override fun commit(): Boolean = false
     }
 }
+
+/** The value the retired transfer-integrity marker held once its repair ran (the repair was deleted in plan 3.3c). */
+private const val RETIRED_REPAIR_VERSION = 1
