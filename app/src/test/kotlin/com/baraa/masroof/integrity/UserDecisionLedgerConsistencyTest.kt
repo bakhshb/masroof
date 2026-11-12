@@ -59,7 +59,7 @@ class UserDecisionLedgerConsistencyTest {
         }
         DashboardLedgerWorld(context).use { world ->
             LedgerSnapshotCorpus.populateLegacy(world)
-            world.reconciliation.repairLegacyTransfersDetailed()
+            world.reconciliation.reconcileStoredEventsDetailed()
             kinds += backfilledAndAgreeing(world)
         }
         assertEquals(listOf("FINANCIAL_TYPE", "NON_FINANCIAL"), kinds.sorted())

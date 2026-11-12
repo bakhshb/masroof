@@ -1,18 +1,15 @@
 package com.baraa.masroof.application.transaction
 
 import com.baraa.masroof.testsupport.backfillDecisions
-import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.dashboard.AccountFlowScopeMode
 import com.baraa.masroof.application.dashboard.CurrentAccountSummaryCalculator
 import com.baraa.masroof.application.dashboard.SelfTransferDeduplicator
-import com.baraa.masroof.application.logging.AppLogService
-import com.baraa.masroof.application.maintenance.BackfillOutcome
-import com.baraa.masroof.application.maintenance.MaintenancePreferences
-import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
-import com.baraa.masroof.application.maintenance.TransferIntegrityRepairResult
+import com.baraa.masroof.application.maintenance.StartupMaintenance
+import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
 import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.testsupport.EngineFixtureParser
 import com.baraa.masroof.core.money.Currency
@@ -544,7 +541,7 @@ class IntraBankSelfTransferReconciliationTest {
     }
 
     @Test
-    fun legacyFourPostedSameMinuteLegs_areRepairedToPendingMatchReviews() = runBlocking {
+    fun doublePostedSameMinuteLegs_areReleasedToPendingMatchReviewsByAFullPass() = runBlocking {
         ownBothAccounts()
         persistSameMinuteAmbiguousLegs()
         seedPostedSingleLegSelf("sms-out-a", "out-a")
@@ -554,23 +551,67 @@ class IntraBankSelfTransferReconciliationTest {
         assertEquals(4, ftRepo.listAll().size)
         assertTrue(ftRepo.listAll().all { it.type == FinancialTransactionType.SELF_TRANSFER })
 
-        val prefs = context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        val coordinator = TransferIntegrityRepairCoordinator(
-            prefs = prefs,
-            appLogService = AppLogService(context),
-            repairStoredTransfers = { repairAndApplyReviews() },
-            completionSignal = MaintenanceCompletionSignal(),
-        )
-        assertEquals(BackfillOutcome.COMPLETED, coordinator.runIfNeeded())
-        assertEquals(BackfillOutcome.UP_TO_DATE, coordinator.runIfNeeded())
+        assertEquals(0, reconcileAndApplyReviews().summary.failed)
+        assertEquals(0, reconcileAndApplyReviews().summary.failed)
 
         assertTrue(
-            "Upgrade must drop the four single-leg self-transfer legs instead of leaving double-counted money",
+            "A full pass must drop the four single-leg self-transfer legs instead of leaving double-counted money",
             ftRepo.listAll().isEmpty(),
         )
         assertEquals(4, parsedRepo.listAll().size)
         assertPendingMatchReviews(SAME_MINUTE_SMS_IDS)
+    }
+
+    /**
+     * Accepted by the owner (2026-11-12): a restored backup that still holds double-posted legs is not repaired at
+     * startup; its rows stay until a pass reaches them (a full pass, or a new message near them).
+     */
+    @Test
+    fun restoredDoublePostedLegs_stayThroughStartupAndAFarPass_untilAFullPassReleasesThem() = runBlocking {
+        ownBothAccounts()
+        persistSameMinuteAmbiguousLegs()
+        SAME_MINUTE_SMS_IDS.forEach { seedPostedSingleLegSelf(it, it.removePrefix("sms-")) }
+
+        assertEquals(StartupMaintenanceOutcome.READY, StartupMaintenance { db.openHelper.writableDatabase }.runBlockingPhase())
+        persistParsed("sms-far", intraOut("2026-09-05 10:00"), Instant.parse("2026-09-05T07:00:00Z"))
+        reviewQueueUpdater.applyReport(reconciliation.reconcileAffectedRawSmsIds(listOf("sms-far")))
+        assertEquals(4, SAME_MINUTE_SMS_IDS.count { ftRepo.findByRawSmsId(it)?.type == FinancialTransactionType.SELF_TRANSFER })
+
+        assertEquals(0, reconcileAndApplyReviews().summary.failed)
+        assertTrue(SAME_MINUTE_SMS_IDS.none { ftRepo.findByRawSmsId(it) != null })
+        assertPendingMatchReviews(SAME_MINUTE_SMS_IDS)
+    }
+
+    @Test
+    fun lonePostedLegsThenAnAmbiguousInLeg_keepBothRowsThroughEveryPass() = runBlocking {
+        ownBothAccounts()
+        persistParsed("sms-out-a", intraOut("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:00Z"))
+        reconcileAndApplyReviews()
+        persistParsed("sms-out-b", intraOut("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:01Z"))
+        reconcileAndApplyReviews()
+        persistParsed("sms-in-a", intraIn("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:02Z"))
+        reviewQueueUpdater.applyReport(reconciliation.reconcileAffectedRawSmsIds(listOf("sms-in-a")))
+        reconcileAndApplyReviews()
+
+        // Each out-leg was posted alone as it arrived; one in-leg is not a second row for either, so nothing is released.
+        assertEquals(setOf("sms-out-a", "sms-out-b"), ftRepo.listAll().flatMap { ftRepo.listRawSmsIds(it.id) }.toSet())
+        assertTrue(ftRepo.listAll().all { it.type == FinancialTransactionType.SELF_TRANSFER })
+        assertPendingMatchReviews(setOf("sms-in-a"))
+    }
+
+    @Test
+    fun doublePostedLegs_areReleasedByAScopedPassOnANearbyNewMessage() = runBlocking {
+        ownBothAccounts()
+        persistSameMinuteAmbiguousLegs()
+        SAME_MINUTE_SMS_IDS.forEach { seedPostedSingleLegSelf(it, it.removePrefix("sms-")) }
+        persistParsed("sms-out-c", intraOut("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:04Z"))
+
+        val report = reconciliation.reconcileAffectedRawSmsIds(listOf("sms-out-c"))
+        reviewQueueUpdater.applyReport(report)
+
+        assertEquals(0, report.summary.failed)
+        assertTrue(ftRepo.listAll().isEmpty())
+        assertPendingMatchReviews(SAME_MINUTE_SMS_IDS + "sms-out-c")
     }
 
     @Test
@@ -599,7 +640,7 @@ class IntraBankSelfTransferReconciliationTest {
     }
 
     @Test
-    fun legacyExternalLegsOnly_repairHealsUniquePairAndKeepsUnrelatedExternal() = runBlocking {
+    fun legacyExternalLegsOnly_aFullPassHealsUniquePairAndKeepsUnrelatedExternal() = runBlocking {
         ownBothAccounts()
         persistPair("unique", "2026-09-02 10:00", "2026-09-02T07:00:00Z")
         seedPostedExternal("sms-unique-out", "unique-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT)
@@ -625,8 +666,7 @@ class IntraBankSelfTransferReconciliationTest {
         )
         assertTrue(ftRepo.listAll().none { it.type == FinancialTransactionType.SELF_TRANSFER })
 
-        val repaired = repairAndApplyReviews()
-        assertEquals(0, repaired.failedCount)
+        assertEquals(0, reconcileAndApplyReviews().summary.failed)
 
         val stored = ftRepo.listAll()
         assertEquals(1, stored.count { it.type == FinancialTransactionType.SELF_TRANSFER })
@@ -638,14 +678,13 @@ class IntraBankSelfTransferReconciliationTest {
             ftRepo.listRawSmsIds(stored.single { it.type == FinancialTransactionType.SELF_TRANSFER }.id).toSet(),
         )
 
-        val again = repairAndApplyReviews()
-        assertEquals(0, again.failedCount)
+        assertEquals(0, reconcileAndApplyReviews().summary.failed)
         assertEquals(1, ftRepo.listAll().count { it.type == FinancialTransactionType.SELF_TRANSFER })
         assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, ftRepo.findByRawSmsId("sms-unrelated-external")?.type)
     }
 
     @Test
-    fun userExternalTransfer_isNotReplacedByAutomaticOrLegacyRepair() = runBlocking {
+    fun userExternalTransfer_isNotReplacedByAutomaticPasses() = runBlocking {
         ownBothAccounts()
         persistPair("chosen", "2026-09-02 10:00", "2026-09-02T07:00:00Z")
         seedPostedExternal("sms-chosen-out", "chosen-out", FinancialTransactionType.EXTERNAL_TRANSFER_OUT)
@@ -667,7 +706,7 @@ class IntraBankSelfTransferReconciliationTest {
         db.backfillDecisions()
 
         reconcileAndApplyReviews()
-        repairAndApplyReviews()
+        reconcileAndApplyReviews()
 
         val kept = ftRepo.findByRawSmsId("sms-chosen-out")
         assertEquals(chosenId, kept?.id)
@@ -680,7 +719,7 @@ class IntraBankSelfTransferReconciliationTest {
     }
 
     @Test
-    fun userNonFinancial_isNotRepostedOrReopenedByLegacyRepair() = runBlocking {
+    fun userNonFinancial_isNotRepostedOrReopenedByTheDoublePostRelease() = runBlocking {
         ownBothAccounts()
         persistSameMinuteAmbiguousLegs()
         seedPostedSingleLegSelf("sms-out-a", "out-a")
@@ -704,7 +743,6 @@ class IntraBankSelfTransferReconciliationTest {
         db.backfillDecisions()
 
         reconcileAndApplyReviews()
-        repairAndApplyReviews()
 
         val kept = ftRepo.findByRawSmsId("sms-out-a")
         assertEquals(ignoredId, kept?.id)
@@ -716,69 +754,33 @@ class IntraBankSelfTransferReconciliationTest {
     }
 
     @Test
-    fun repairLegacyTransfers_onCleanLedger_postsNothing() = runBlocking {
-        val report = reconciliation.repairLegacyTransfersDetailed()
-        assertEquals(0, report.summary.failed)
-        assertTrue(ftRepo.listAll().isEmpty())
-        assertTrue(rawRepo.listIdsByReceivedAt().isEmpty())
-    }
-
-    @Test
-    fun failedExclusiveUnlink_keepsRepairIncompleteUntilRetry() = runBlocking {
-        ownBothAccounts()
-        persistSameMinuteAmbiguousLegs()
-        seedPostedSingleLegSelf("sms-out-a", "out-a")
-        seedPostedSingleLegSelf("sms-out-b", "out-b")
-        seedPostedSingleLegSelf("sms-in-a", "in-a")
-        seedPostedSingleLegSelf("sms-in-b", "in-b")
-        val rejecting = RejectingDeleteRepository(ftRepo, rejectRemaining = 1)
-        val repairing = TransactionReconciliationService(
-            rawSmsRepository = rawRepo,
-            financialTransactionRepository = rejecting,
-            ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
-            reviewRepository = reviewRepo,
-            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
-            zoneId = zoneId,
-            effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
-            ownershipConfirmationService = noOpOwnershipConfirmation(),
-        )
-
-        val first = repairing.repairLegacyTransfersDetailed()
-        assertTrue(first.summary.failed > 0)
-        assertEquals(4, rawRepo.listIdsByReceivedAt().size)
-        assertTrue(SAME_MINUTE_SMS_IDS.any { ftRepo.findByRawSmsId(it) != null })
-
-        val second = repairing.repairLegacyTransfersDetailed()
-        assertEquals(0, second.summary.failed)
-        assertTrue(SAME_MINUTE_SMS_IDS.all { ftRepo.findByRawSmsId(it) == null })
-        assertEquals(4, parsedRepo.listAll().size)
-    }
-
-    @Test
-    fun thrownUnlink_preservesSmsAndPostedRows() = runBlocking {
+    fun aThrownWriteKeepsTheDoublePostedRows_andALaterPassReleasesThem() = runBlocking {
         ownBothAccounts()
         persistSameMinuteAmbiguousLegs()
         seedPostedSingleLegSelf("sms-out-a", "out-a")
         seedPostedSingleLegSelf("sms-in-a", "in-a")
         seedPostedSingleLegSelf("sms-out-b", "out-b")
         seedPostedSingleLegSelf("sms-in-b", "in-b")
-        val rejecting = RejectingDeleteRepository(ftRepo, throwOnDelete = true)
-        val repairing = TransactionReconciliationService(
+        val throwing = TransactionReconciliationService(
             rawSmsRepository = rawRepo,
-            financialTransactionRepository = rejecting,
+            financialTransactionRepository = ThrowingUnlinkRepository(ftRepo),
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
             reviewRepository = reviewRepo,
             userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             zoneId = zoneId,
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
+            inTransaction = { write -> db.withTransaction { write() } },
         )
 
-        val report = repairing.repairLegacyTransfersDetailed()
-        assertTrue(report.summary.failed > 0)
+        assertTrue(runCatching { throwing.reconcileStoredEventsDetailed() }.isFailure)
         assertEquals(4, rawRepo.listIdsByReceivedAt().size)
         assertEquals(4, ftRepo.listAll().size)
         assertEquals(4, parsedRepo.listAll().size)
+
+        assertEquals(0, reconcileAndApplyReviews().summary.failed)
+        assertTrue(ftRepo.listAll().isEmpty())
+        assertPendingMatchReviews(SAME_MINUTE_SMS_IDS)
     }
 
     @Test
@@ -805,7 +807,7 @@ class IntraBankSelfTransferReconciliationTest {
         )
         db.backfillDecisions()
 
-        repairAndApplyReviews()
+        reconcileAndApplyReviews()
 
         val kept = ftRepo.findByRawSmsId("sms-out-a")
         assertEquals(keptId, kept?.id)
@@ -869,15 +871,8 @@ class IntraBankSelfTransferReconciliationTest {
         persistParsed("sms-in-b", intraIn("2026-09-02 10:00"), Instant.parse("2026-09-02T07:00:03Z"))
     }
 
-    private suspend fun reconcileAndApplyReviews() {
-        reviewQueueUpdater.applyReport(reconciliation.reconcileStoredEventsDetailed())
-    }
-
-    private suspend fun repairAndApplyReviews(): TransferIntegrityRepairResult {
-        val report = reconciliation.repairLegacyTransfersDetailed()
-        reviewQueueUpdater.applyReport(report)
-        return TransferIntegrityRepairResult(failedCount = report.summary.failed)
-    }
+    private suspend fun reconcileAndApplyReviews(): ReconciliationReport =
+        reconciliation.reconcileStoredEventsDetailed().also { reviewQueueUpdater.applyReport(it) }
 
     private suspend fun assertPendingMatchReviews(rawSmsIds: Set<String>) {
         val required = reviewRepo.listRequired()
@@ -918,19 +913,10 @@ class IntraBankSelfTransferReconciliationTest {
         )
     }
 
-    private class RejectingDeleteRepository(
+    private class ThrowingUnlinkRepository(
         private val delegate: RoomFinancialTransactionRepository,
-        private var rejectRemaining: Int = 0,
-        private val throwOnDelete: Boolean = false,
     ) : com.baraa.masroof.domain.repository.FinancialTransactionRepository by delegate {
-        override suspend fun deleteIfExclusiveRawSmsLink(rawSmsId: String): Boolean {
-            if (throwOnDelete) error("unlink failed")
-            if (rejectRemaining > 0) {
-                rejectRemaining--
-                return false
-            }
-            return delegate.deleteIfExclusiveRawSmsLink(rawSmsId)
-        }
+        override suspend fun unlinkRawSms(rawSmsId: String): Boolean = error("unlink failed")
     }
 
     private suspend fun seedPostedSingleLegSelf(rawSmsId: String, idSuffix: String) {

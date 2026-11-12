@@ -1,13 +1,9 @@
 package com.baraa.masroof.application.container
 
-import android.content.Context
 import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
-import com.baraa.masroof.application.maintenance.MaintenancePreferences
 import com.baraa.masroof.application.maintenance.StartupMaintenance
 import com.baraa.masroof.application.maintenance.StartupMaintenanceOutcome
-import com.baraa.masroof.application.maintenance.TransferIntegrityRepairCoordinator
-import com.baraa.masroof.application.maintenance.TransferIntegrityRepairResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,33 +15,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /**
- * Startup integrity repair and its outcome, plus the signal open screens reload on. Background financial
- * writes wait for, and require, a successful repair.
+ * Startup maintenance and its outcome, plus the signal open screens reload on. Background financial
+ * writes wait for, and require, a READY startup: the financial store opened.
  */
 class MaintenanceContainer(
     private val storage: StorageContainer,
-    private val repairStoredTransfers: suspend () -> TransferIntegrityRepairResult,
+    private val openFinancialStore: suspend () -> Unit,
     private val runPostStartupBackgroundWork: suspend () -> Unit,
     private val isOpen: () -> Boolean,
 ) {
     /** Emits when background maintenance changed stored data; open screens reload on it. */
     val completionSignal: MaintenanceCompletionSignal = MaintenanceCompletionSignal()
 
-    private val transferIntegrityRepairCoordinator: TransferIntegrityRepairCoordinator by lazy {
-        TransferIntegrityRepairCoordinator(
-            prefs = storage.appContext.getSharedPreferences(
-                MaintenancePreferences.PREFS_NAME,
-                Context.MODE_PRIVATE,
-            ),
-            appLogService = storage.appLogService,
-            repairStoredTransfers = repairStoredTransfers,
-            completionSignal = completionSignal,
-        )
-    }
-
-    private val startupMaintenance: StartupMaintenance by lazy {
-        StartupMaintenance(transferIntegrityRepair = transferIntegrityRepairCoordinator)
-    }
+    private val startupMaintenance = StartupMaintenance(openFinancialStore)
 
     private val startupMaintenanceOutcome = MutableStateFlow<StartupMaintenanceOutcome?>(null)
     private var startupMaintenanceJob: Job? = null
@@ -93,7 +75,7 @@ class MaintenanceContainer(
         checkNotNull(startupMaintenanceJob) { "Startup maintenance has not been launched" }.join()
     }
 
-    /** Background financial writes wait for, and require, a successful integrity repair. */
+    /** Background financial writes wait for, and require, a READY startup. */
     suspend fun startupFinancialReady(): Boolean = awaitStartupMaintenance() == StartupMaintenanceOutcome.READY
 
     /** Returns the safety outcome of the initial startup maintenance attempt. */

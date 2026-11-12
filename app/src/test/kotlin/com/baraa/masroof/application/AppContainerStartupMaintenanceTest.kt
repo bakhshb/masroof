@@ -1,5 +1,6 @@
 package com.baraa.masroof.application
 
+import com.baraa.masroof.application.container.MaintenanceContainer
 import com.baraa.masroof.application.container.appWorkerFactory
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -88,14 +89,19 @@ class AppContainerStartupMaintenanceTest {
 
     @Test
     fun successfulRetry_updatesTheAuthorityReadByRecreatedActivities() = runBlocking {
-        recordLastReparsedVersion(MasroofDatabase.VERSION)
-        prefs().edit().putString(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION, "invalid-type").commit()
-        container.maintenance.runStartupMaintenance()
-        assertEquals(StartupMaintenanceOutcome.BLOCKED, container.maintenance.awaitStartupMaintenance())
-        prefs().edit().remove(MaintenancePreferences.KEY_TRANSFER_INTEGRITY_REPAIR_VERSION).commit()
-        assertEquals(StartupMaintenanceOutcome.READY, container.maintenance.retryStartupMaintenance())
-        assertEquals(StartupMaintenanceOutcome.READY, container.maintenance.awaitStartupMaintenance())
-        assertEquals(StartupMaintenanceOutcome.READY, container.maintenance.awaitStartupMaintenance())
+        var storeOpens = false
+        val maintenance = MaintenanceContainer(
+            container.storage,
+            openFinancialStore = { check(storeOpens) { "file is not a database" } },
+            runPostStartupBackgroundWork = {},
+            isOpen = { true },
+        )
+        maintenance.runStartupMaintenance()
+        assertEquals(StartupMaintenanceOutcome.BLOCKED, maintenance.awaitStartupMaintenance())
+        storeOpens = true
+        assertEquals(StartupMaintenanceOutcome.READY, maintenance.retryStartupMaintenance())
+        assertEquals(StartupMaintenanceOutcome.READY, maintenance.awaitStartupMaintenance())
+        assertEquals(StartupMaintenanceOutcome.READY, maintenance.awaitStartupMaintenance())
     }
 
     private fun backfillWork(): List<WorkInfo> =

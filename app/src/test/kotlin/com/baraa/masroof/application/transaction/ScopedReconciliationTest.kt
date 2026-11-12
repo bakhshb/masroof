@@ -375,7 +375,7 @@ class ScopedReconciliationTest {
     }
 
     @Test
-    fun scopedReconcile_doesNotUnlinkNearbyLegacySelfTransfer() = runBlocking {
+    fun scopedReconcile_releasesNearbyDoublePostedSelfTransfers() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3003"))
         val at = Instant.parse("2026-09-02T07:00:00Z")
@@ -424,20 +424,13 @@ class ScopedReconciliationTest {
         parsed.reset()
         transactions.reset()
 
-        reconciliation.reconcileAffectedRawSmsIds(listOf("sms-new-unrelated"))
+        val report = reconciliation.reconcileAffectedRawSmsIds(listOf("sms-new-unrelated"))
 
+        // The new message's scope reaches the double-posted legs, so the scoped pass releases them as a full pass would.
         assertEquals(0, parsed.listAllCalls)
-        legacySms.forEach { smsId ->
-            val kept = ftDelegate.findByRawSmsId(smsId)
-            assertEquals("tx-$smsId", kept?.id)
-            assertEquals(FinancialTransactionType.SELF_TRANSFER, kept?.type)
-            assertEquals(Money.of("2000.00", Currency.SAR), kept?.amount)
-            assertEquals(setOf(smsId), ftDelegate.listRawSmsIds(kept!!.id).toSet())
-        }
-
-        reconciliation.repairLegacyTransfersDetailed()
-
+        assertEquals(0, report.summary.failed)
         assertTrue(legacySms.all { ftDelegate.findByRawSmsId(it) == null })
+        assertTrue(legacySms.all { it in report.reviewCandidates.map { candidate -> candidate.rawSmsId } })
         assertEquals(5, parsedDelegate.listAll().size)
         assertTrue(legacySms.all { rawRepo.getById(it) != null })
     }

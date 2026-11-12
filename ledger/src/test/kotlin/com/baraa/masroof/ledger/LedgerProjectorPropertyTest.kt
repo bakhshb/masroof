@@ -82,12 +82,15 @@ class LedgerProjectorPropertyTest {
     /**
      * The keep invariant: every stored row is in the projection verbatim, or replaced by (a) one derived row on its
      * raw SMS set with the same type and amount (FEE→LOAN_REPAYMENT allowed), (b) a self-transfer pair joining a stored
-     * external or single-leg self-transfer leg, or (c) dropped as a lone, unprotected informational row. A protected
-     * row is always verbatim.
+     * external or single-leg self-transfer leg, (c) dropped as a lone, unprotected informational row, or (d) released
+     * as a double-posted single-leg self-transfer (another such stored row is released with it; its leg is assembled
+     * again). A protected row is
+     * always verbatim.
      */
     @Test
     fun everyStoredRowIsKeptVerbatimOrReplacedByAnAllowedRule() {
         var replaced = 0
+        var doubles = 0
         for (seed in seeds) {
             val corpus = corpus(Random(seed))
             val result = corpus.project()
@@ -123,11 +126,17 @@ class LedgerProjectorPropertyTest {
                     row.transaction.type == FinancialTransactionType.SELF_TRANSFER && row.transaction.linkedParsedEventIds.size == 1
                 val joined = single != null && joinable && derived != null && derived.transaction.type == FinancialTransactionType.SELF_TRANSFER &&
                     derived.rawSmsIds.size == 2 && single in derived.rawSmsIds
-                assertTrue(informational || sameSet || joined, "seed $seed: $row replaced by $over")
+                // (d) A released leg then takes what the pass gives it: a pair, a row of its own, or a pending match.
+                val released = row.isSingleLegSelf() && corpus.stored.rows.any { other ->
+                    other !== row && other.isSingleLegSelf() && other !in result.rows
+                }
+                if (released && !(informational || sameSet || joined)) doubles++
+                assertTrue(informational || sameSet || joined || released, "seed $seed: $row replaced by $over")
                 replaced++
             }
         }
         assertTrue(replaced > 100, "corpora must replace some stored rows: $replaced")
+        assertTrue(doubles > 10, "corpora must release double-posted legs: $doubles")
     }
 
     @Test
@@ -236,10 +245,15 @@ class LedgerProjectorPropertyTest {
 
     /**
      * Stored rows link one, two or three raw SMS, never one SMS twice; some link raw SMS without evidence, a few link
-     * none. A quarter of the corpora store a consistent earlier ledger instead: the projection with nothing stored.
+     * none. A quarter of the corpora store a consistent earlier ledger instead: the projection with nothing stored;
+     * an eighth store the old per-leg ledger: every transfer leg as its own single-leg self-transfer.
      */
     private fun storedRows(random: Random, events: List<LedgerEvidence>, registry: OwnershipFacts): List<LedgerRow> {
-        if (random.nextInt(4) == 0) return LedgerProjector.project(events, emptyMap(), registry, StoredFacts(), ZoneOffset.ofHours(2)).rows
+        when (random.nextInt(8)) {
+            0, 1 -> return LedgerProjector.project(events, emptyMap(), registry, StoredFacts(), ZoneOffset.ofHours(2)).rows
+            2 -> return events.filter { it.event.messageFamily.isTransfer() }
+                .map { storedRow(it.event.rawSmsId, type = FinancialTransactionType.SELF_TRANSFER) }
+        }
         val ids = events.map { it.event.rawSmsId }
         val storedIds = (ids.filter { random.nextInt(3) == 0 } + listOf("ghost1", "ghost2").filter { random.nextInt(3) == 0 }).shuffled(random)
         val sets = mutableListOf<List<String>>()
@@ -260,6 +274,9 @@ class LedgerProjectorPropertyTest {
         }
         return sets.map { row(*it.toTypedArray()) } + linkless
     }
+
+    private fun LedgerRow.isSingleLegSelf() =
+        rawSmsIds.size == 1 && transaction.type == FinancialTransactionType.SELF_TRANSFER && transaction.linkedParsedEventIds.size == 1
 
     private fun decisionRows(random: Random, ids: List<String>) = (0 until random.nextInt(0, 4)).map {
         val subject = ids.random(random)

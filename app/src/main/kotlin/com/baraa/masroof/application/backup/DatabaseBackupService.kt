@@ -342,7 +342,7 @@ class DatabaseBackupService(
                     preservedRollback,
                 )
                 afterRestoreStage(DatabaseRestoreRecovery.Stage.NEW_INSTALLED)
-                // The incoming snapshot has no maintenance markers, so the next launch re-runs both repairs.
+                // The incoming snapshot has no maintenance markers (both retired; they schedule nothing).
                 DatabaseRestoreRecovery.applyPreferences(
                     appContext,
                     DatabaseRestoreRecovery.incomingPreferences(preferences),

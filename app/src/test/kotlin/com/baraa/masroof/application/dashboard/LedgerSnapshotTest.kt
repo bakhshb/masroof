@@ -124,7 +124,7 @@ class LedgerSnapshotTest {
             val seeded = LedgerSnapshotSerializer.serialize(world)
             assertTrue(seeded.contains("|SELF_TRANSFER|"))
             assertEquals(2, seeded.lines().count { it.startsWith("tx|") && it.contains("|FEE|") })
-            world.reconciliation.repairLegacyTransfersDetailed()
+            world.reconciliation.reconcileStoredEventsDetailed()
             val repaired = LedgerSnapshotSerializer.serialize(world)
             assertEquals(1, repaired.lines().count { it.startsWith("tx|") && it.contains("|FEE|") })
             assertTrue(repaired.contains("|LOAN_REPAYMENT|"))
@@ -146,7 +146,7 @@ class LedgerSnapshotTest {
         DashboardLedgerWorld(context()).use { world ->
             LedgerSnapshotCorpus.populateLegacy(world)
             section("legacy:seeded", world)
-            world.reconciliation.repairLegacyTransfersDetailed()
+            world.reconciliation.reconcileStoredEventsDetailed()
             section("legacy:after_repair_and_full_reconcile", world)
         }
     }

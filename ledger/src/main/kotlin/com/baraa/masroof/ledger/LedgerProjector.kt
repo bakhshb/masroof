@@ -46,7 +46,51 @@ object LedgerProjector {
         require(storedFacts.rows.flatMap { it.rawSmsIds }.let { it.distinct().size == it.size }) { "one stored row per raw SMS" }
         // Stored rows in id order with sorted links, so neither the caller's order nor sorting changes the result.
         val stored = storedFacts.copy(rows = storedFacts.rows.map { it.copy(rawSmsIds = it.rawSmsIds.sorted()) }.sortedBy { it.transaction.id })
-        return Projection(events.sortedBy { it.event.id }, decisions, registry, stored, zone).run()
+        val sorted = events.sortedBy { it.event.id }
+        val doublePosted = doublePostedLegs(sorted, decisions, registry, stored, zone)
+        return Projection(sorted, decisions, registry, stored.copy(rows = stored.rows - doublePosted), zone).run()
+    }
+
+    /**
+     * Two rows for one movement, which only the old per-leg assembler wrote: unprotected stored single-leg
+     * self-transfers of one raw SMS, none in a mutually unique pair among the eligible transfer legs, each with an
+     * intra-bank counterpart ([TransactionMatcher.hasPendingIntraBankCounterpart]) that is another of them. They are
+     * released before the pass, as the old one-time release deleted them, so their legs pair or wait as a pending match.
+     */
+    private fun doublePostedLegs(
+        events: List<LedgerEvidence>,
+        decisions: Map<String, EffectiveUserDecisions>,
+        registry: OwnershipFacts,
+        stored: StoredFacts,
+        zone: ZoneId,
+    ): Set<LedgerRow> {
+        val zones = stored.rows.flatMap { row -> row.rawSmsIds.map { it to row.transaction.occurredAtZone } }.toMap()
+        val candidates = events.mapNotNull { record ->
+            val event = record.event
+            val decided = decisions[event.rawSmsId] ?: EffectiveUserDecisions.NONE
+            val eligible = event.messageFamily.isTransfer() && !decided.isNonFinancial &&
+                TransactionAssembler.isAutomationEligible(event, record.automationConfirmed || decided.confirmsFinancial)
+            if (!eligible) return@mapNotNull null
+            event.rawSmsId to TransferMatchCandidate(
+                event, record.transactionReference, record.occurredAtLocal, record.receivedAt,
+                registry.account(event.sourceAccountRef), registry.account(event.destinationAccountRef),
+                TransactionTiming.effectiveOccurredAt(event, record.occurredAtLocal, record.receivedAt, zone, zones[event.rawSmsId]),
+            )
+        }.toMap()
+        val paired = TransactionMatcher.findMutuallyUniquePairs(candidates.values.toList())
+            .flatMap { listOf(it.outgoing.event.rawSmsId, it.incoming.event.rawSmsId) }.toSet()
+        val singles = stored.rows.mapNotNull { row ->
+            val id = row.rawSmsIds.singleOrNull() ?: return@mapNotNull null
+            val protected = decisions[id]?.outcome != null || id in stored.correctionClosedRawSmsIds
+            val candidate = candidates[id]?.takeIf {
+                row.transaction.type == FinancialTransactionType.SELF_TRANSFER && row.transaction.linkedParsedEventIds.size == 1 &&
+                    id !in paired && !protected
+            }
+            candidate?.let { row to it }
+        }
+        return singles.filter { (row, candidate) ->
+            singles.any { (other, counterpart) -> other !== row && TransactionMatcher.hasPendingIntraBankCounterpart(candidate, listOf(counterpart)) }
+        }.mapTo(mutableSetOf()) { it.first }
     }
 
     /**
