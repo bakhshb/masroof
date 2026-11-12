@@ -12,11 +12,14 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.OwnershipStatus
+import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.ReviewKind
+import com.baraa.masroof.domain.model.UserDecision
 import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.rules.InformationalMessagePolicy
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 
@@ -86,6 +89,51 @@ object LedgerProjector {
             related.filterTo(queue) { it !in scope }
         }
         return scope
+    }
+
+    /**
+     * The user's row for a posting decision ([UserDecision.posting] columns) from the effective evidence of its legs
+     * ([UserDecision.legs], in that order), or null when the decision lacks its type or time or a leg has no positive
+     * amount. A decision without a zone rebuilds the row with none, as the stored row of a backfilled decision has
+     * it. A pair is one movement for both legs.
+     */
+    fun decidedRow(decision: UserDecision, legs: List<ParsedEvent>): LedgerRow? {
+        val type = decision.transactionType ?: return null
+        val occurredAt = decision.occurredAt ?: return null
+        if (legs.isEmpty()) return null
+        val ids = legs.map { it.rawSmsId }.sorted()
+        val amount = legs.first().amount?.takeIf { it.amount.signum() > 0 } ?: return null
+        val single = FinancialTransaction.fromSingleEvent(
+            legs.first(), type, occurredAt, decision.sourceContainerId, decision.destinationContainerId, decision.occurredAtZone,
+        )
+        val transaction = if (legs.size == 1) single else single.copy(
+            id = TransactionIdFactory.fromRawSmsIds(ids),
+            amount = amount,
+            merchant = null,
+            counterparty = legs[0].counterparty ?: legs[1].counterparty,
+            linkedParsedEventIds = legs.map { it.id }.sorted(),
+        )
+        return LedgerRow(transaction, ids)
+    }
+
+    /**
+     * Where every transfer leg [mayPair] accepts for [evidence] lies: its receipt time, its event time, or its
+     * SMS-local time falls inside the matching range (inclusive). A query on these ranges is a superset that
+     * [scope] narrows; callers use it to load a scope without reading the whole history.
+     */
+    fun pairingWindow(evidence: LedgerEvidence): PairingWindow {
+        val window = TransactionMatcher.TRANSFER_MATCH_WINDOW
+        val (start, end) = effectiveSpan(evidence)
+        val received = evidence.receivedAt
+        val local = evidence.occurredAtLocal
+        val spanStart = LocalDateTime.ofInstant(start.minus(window).minus(MAX_OFFSET), ZoneOffset.UTC)
+        val spanEnd = LocalDateTime.ofInstant(end.plus(window).plus(MAX_OFFSET), ZoneOffset.UTC)
+        return PairingWindow(
+            receivedAt = minOf(received, start).minus(window)..maxOf(received, end).plus(window),
+            occurredAt = start.minus(window)..end.plus(window),
+            occurredAtLocal = (local?.minus(window)?.let { minOf(it, spanStart) } ?: spanStart)..
+                (local?.plus(window)?.let { maxOf(it, spanEnd) } ?: spanEnd),
+        )
     }
 
     /**
@@ -191,26 +239,9 @@ private class Projection(
         return false
     }
 
-    /** The user's row for a posting decision, or null when the decision or its evidence is incomplete. */
     private fun decidedPosting(decided: EffectiveUserDecisions): LedgerRow? {
         val decision = decided.outcome ?: return null
-        val type = decision.transactionType ?: return null
-        val occurredAt = decision.occurredAt ?: return null
-        val zone = decision.occurredAtZone ?: return null
-        val legs = listOfNotNull(decision.rawSmsId, decision.pairedRawSmsId).map { byRawSmsId[it] ?: return null }
-        val ids = legs.map { it.event.rawSmsId }.sorted()
-        val amount = legs.first().event.amount?.takeIf { it.amount.signum() > 0 } ?: return null
-        val single = FinancialTransaction.fromSingleEvent(
-            legs.first().event, type, occurredAt, decision.sourceContainerId, decision.destinationContainerId, zone,
-        )
-        val transaction = if (legs.size == 1) single else single.copy(
-            id = TransactionIdFactory.fromRawSmsIds(ids),
-            amount = amount,
-            merchant = null,
-            counterparty = legs[0].event.counterparty ?: legs[1].event.counterparty,
-            linkedParsedEventIds = legs.map { it.event.id }.sorted(),
-        )
-        return LedgerRow(transaction, ids)
+        return LedgerProjector.decidedRow(decision, decision.legs().map { byRawSmsId[it]?.event ?: return null })
     }
 
     /**
@@ -269,7 +300,8 @@ private class Projection(
         val paired = mutableSetOf<String>()
         for (pair in TransactionMatcher.findMutuallyUniquePairs(open)) {
             val outcome = TransactionAssembler.assembleMatchedPair(
-                pair, pair.outgoing.sourceOwnership, pair.incoming.destinationOwnership, zone,
+                pair, pair.outgoing.sourceOwnership, pair.incoming.destinationOwnership,
+                storedZone(pair.outgoing.event.rawSmsId) ?: storedZone(pair.incoming.event.rawSmsId) ?: zone,
             )
             if (outcome !is TransactionAssembler.Outcome.Assembled) continue
             post(outcome.transaction, outcome.rawSmsIds)
@@ -277,7 +309,9 @@ private class Projection(
         }
         for (candidate in open) {
             if (candidate.event.rawSmsId in paired) continue
-            val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(candidate, open, zone)
+            val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
+                candidate, open, storedZone(candidate.event.rawSmsId) ?: zone,
+            )
             if (outcome is TransactionAssembler.Outcome.Assembled) {
                 post(outcome.transaction, outcome.rawSmsIds)
             } else {
@@ -285,6 +319,13 @@ private class Projection(
             }
         }
     }
+
+    /**
+     * The zone stored on the row that links [rawSmsId], as the old pass healed a posted leg in it: a bank without a
+     * fixed zone keeps its stored zone when its leg is re-derived (`BankTransactionTimePolicy`).
+     */
+    private fun storedZone(rawSmsId: String): ZoneId? =
+        BankTransactionTimePolicy.storedZoneOrNull(storedByRawSmsId[rawSmsId]?.transaction?.occurredAtZone)
 
     private class Leg(val posted: FinancialTransaction?, val record: LedgerEvidence)
 

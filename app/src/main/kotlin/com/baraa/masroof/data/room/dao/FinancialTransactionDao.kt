@@ -305,6 +305,27 @@ interface FinancialTransactionDao {
         }
     }
 
+    /** Callers keep [transactionIds] under [RoomBatch.MAX_BIND_ARGS]. */
+    @Query("SELECT sourceTransactionId FROM commitment WHERE sourceTransactionId IN (:transactionIds)")
+    suspend fun listCommittedTransactionIds(transactionIds: List<String>): List<String>
+
+    @Query("UPDATE commitment SET sourceTransactionId = :newId WHERE sourceTransactionId = :oldId")
+    suspend fun moveCommitmentSource(oldId: String, newId: String): Int
+
+    @Query("UPDATE review_item SET resolvedTransactionId = :newId WHERE resolvedTransactionId = :oldId AND rawSmsId = :rawSmsId")
+    suspend fun moveReviewResolution(oldId: String, newId: String, rawSmsId: String): Int
+
+    @Query("UPDATE review_item SET resolvedTransactionId = :newId WHERE resolvedTransactionId = :oldId")
+    suspend fun moveReviewResolutions(oldId: String, newId: String): Int
+
+    /** See `FinancialTransactionRepository.moveTransactionReferences`. */
+    @Transaction
+    suspend fun moveTransactionReferences(oldId: String, newId: String, newIdByRawSmsId: Map<String, String>) {
+        newIdByRawSmsId.forEach { (rawSmsId, id) -> if (id != newId) moveReviewResolution(oldId, id, rawSmsId) }
+        moveReviewResolutions(oldId, newId)
+        moveCommitmentSource(oldId, newId)
+    }
+
     sealed interface SaveAtomicOutcome {
         data object Saved : SaveAtomicOutcome
 

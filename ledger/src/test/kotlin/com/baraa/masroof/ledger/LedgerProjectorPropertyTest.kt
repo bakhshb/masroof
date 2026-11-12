@@ -68,8 +68,29 @@ class LedgerProjectorPropertyTest {
                 decisions = corpus.decisions.filterKeys { it in scope },
             )
             assertEquals(full.restrictedTo(affected, corpus.events), scoped.restrictedTo(affected, corpus.events), "seed $seed")
+            // The ledger writer writes the whole scope, so every raw SMS in it must project as in the full pass.
+            assertEquals(full.restrictedTo(scope, corpus.events), scoped.restrictedTo(scope, corpus.events), "seed $seed")
         }
         assertTrue(narrower > seeds.count() / 2, "most scopes must leave evidence out")
+    }
+
+    @Test
+    fun everyTransferTheScopeReachesLiesInsideThePairingWindow() {
+        var reached = 0
+        for (seed in seeds) {
+            val transfers = corpus(Random(seed)).events.filter {
+                it.event.messageFamily == MessageFamily.TRANSFER_IN || it.event.messageFamily == MessageFamily.TRANSFER_OUT
+            }
+            for (a in transfers) for (b in transfers) {
+                if (a === b || b.event.rawSmsId !in LedgerProjector.scope(listOf(a.event.rawSmsId), listOf(a, b), emptyMap())) continue
+                reached++
+                val window = LedgerProjector.pairingWindow(a)
+                val inside = b.receivedAt in window.receivedAt || b.event.occurredAt?.let { it in window.occurredAt } == true ||
+                    b.occurredAtLocal?.let { it in window.occurredAtLocal } == true
+                assertTrue(inside, "seed $seed")
+            }
+        }
+        assertTrue(reached > seeds.count(), "corpora must hold reachable transfer legs")
     }
 
     private fun LedgerProjection.restrictedTo(ids: Set<String>, events: List<LedgerEvidence>): List<Any> {

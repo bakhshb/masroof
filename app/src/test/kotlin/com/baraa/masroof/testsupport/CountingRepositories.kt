@@ -57,6 +57,18 @@ class CountingParsedEventRepository(
         return delegate.listUnlinkedTransfersOccurredLocalBetween(startInclusive, endExclusive)
     }
 
+    /** The ledger writer's one bounded transfer-candidate query counts as both bounded queries above. */
+    override suspend fun listTransferCandidates(
+        receivedAt: ClosedRange<Instant>,
+        occurredAt: ClosedRange<Instant>,
+        occurredAtLocal: ClosedRange<LocalDateTime>,
+    ): List<ParsedEventRecord> {
+        boundedUnlinkedCalls += 1
+        boundedLocalCalls += 1
+        boundedWindows += receivedAt.start to receivedAt.endInclusive
+        return delegate.listTransferCandidates(receivedAt, occurredAt, occurredAtLocal)
+    }
+
     override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
         listByRawSmsIdsCalls += 1
         loadedRawSmsIdSets += rawSmsIds

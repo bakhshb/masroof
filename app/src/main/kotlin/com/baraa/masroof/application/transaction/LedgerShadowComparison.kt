@@ -36,7 +36,7 @@ object LedgerShadowComparison {
         EXCHANGE_RATE("only the exchange-rate pair differs (Known differences: Exchange rate)"),
         ZONE_FILLED("only the zone differs, and the stored zone is empty"),
         TIME_REDERIVED("only the time differs (the stored zone empty or equal): the stored time is not what the evidence gives today"),
-        DECIDED_WITHOUT_POSTING_COLUMNS("a stored row whose posting outcome decision lacks its type, time or zone"),
+        DECIDED_WITHOUT_POSTING_COLUMNS("a stored row whose posting outcome decision lacks its type or time"),
         DECIDED_NON_FINANCIAL_BUT_STORED("a stored row whose outcome decision says not financial"),
         DECIDED_ROW_NOT_STORED("a decided row the projector posts and the stored ledger lacks; cause not determined"),
         INSTALLMENT_FEE("a stored FEE for a financing installment the projector does not post"),
@@ -186,7 +186,7 @@ object LedgerShadowComparison {
         }
     }
 
-    private fun UserDecision.hasPostingColumns() = transactionType != null && occurredAt != null && occurredAtZone != null
+    private fun UserDecision.hasPostingColumns() = transactionType != null && occurredAt != null
 
     /** True when at least one of the row's containers is in the registry inputs and none of them is OWNED. */
     private fun noOwnedContainer(transaction: FinancialTransaction, inputs: LedgerInputs): Boolean {

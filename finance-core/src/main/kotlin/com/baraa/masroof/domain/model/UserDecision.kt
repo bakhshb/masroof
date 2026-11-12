@@ -37,6 +37,9 @@ data class UserDecision(
     val counterparty: String? = null,
     val bankId: String? = null,
 ) {
+    /** The raw SMS the decision names: the subject, then the paired leg of a pair. */
+    fun legs(): List<String> = listOfNotNull(rawSmsId, pairedRawSmsId)
+
     companion object {
         /** A posting decision: the type, endpoints and effective time of [transaction], as posted. */
         fun posting(

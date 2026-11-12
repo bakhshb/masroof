@@ -162,6 +162,17 @@ interface ParsedEventRepository {
         }
     }
 
+    /**
+     * Transfer rows, by parsed family or by a corrected one, whose raw SMS receipt time, event time or SMS-local
+     * time lies in the given inclusive range, ordered by event id: the superset the ledger scope narrows. In-memory
+     * defaults return every row.
+     */
+    suspend fun listTransferCandidates(
+        receivedAt: ClosedRange<Instant>,
+        occurredAt: ClosedRange<Instant>,
+        occurredAtLocal: ClosedRange<LocalDateTime>,
+    ): List<ParsedEventRecord> = listAll()
+
     /** Every [CardSmsChannel.STATEMENT] row. */
     suspend fun listCardStatementFacts(): List<ParsedEventRecord> =
         listAll().filter { it.details.isStatementSms() }

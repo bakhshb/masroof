@@ -49,7 +49,7 @@ data class FinancialTransaction(
             occurredAt: Instant,
             sourceContainerId: String?,
             destinationContainerId: String?,
-            occurredAtZone: String,
+            occurredAtZone: String?,
         ): FinancialTransaction = FinancialTransaction(
             id = TransactionIdFactory.fromRawSmsIds(listOf(event.rawSmsId)),
             type = type,

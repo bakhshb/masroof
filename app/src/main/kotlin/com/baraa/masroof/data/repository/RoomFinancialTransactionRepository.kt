@@ -210,6 +210,13 @@ class RoomFinancialTransactionRepository(
         dao.unlinkRawSms(rawSmsId)
     }
 
+    override suspend fun moveTransactionReferences(oldId: String, newId: String, newIdByRawSmsId: Map<String, String>) =
+        accessGate.withAccess { dao.moveTransactionReferences(oldId, newId, newIdByRawSmsId) }
+
+    override suspend fun listCommittedTransactionIds(transactionIds: Collection<String>): Set<String> = accessGate.withAccess {
+        RoomBatch.query(transactionIds.distinct(), batchChunkSize) { chunk -> dao.listCommittedTransactionIds(chunk) }.toSet()
+    }
+
     /**
      * One link query and one parsed-event query per bind-sized chunk, then each
      * entity is mapped with its sorted linked event ids. A missing parsed event

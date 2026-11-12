@@ -174,6 +174,17 @@ interface FinancialTransactionRepository {
      * evidence links remain (e.g. releasing a leg wrongly merged onto another date).
      */
     suspend fun unlinkRawSms(rawSmsId: String): Boolean
+
+    /**
+     * Moves what names the removed row [oldId] to the row that replaces it: a review resolved to it whose raw SMS
+     * [newIdByRawSmsId] places in another row goes to that row, every other review and the commitment go to
+     * [newId]. The derived ledger writer calls it inside its write transaction (docs/ARCHITECTURE.md, "Ledger
+     * writer"). The default is for test doubles without commitments or reviews.
+     */
+    suspend fun moveTransactionReferences(oldId: String, newId: String, newIdByRawSmsId: Map<String, String>) = Unit
+
+    /** The ids among [transactionIds] that a commitment names as its source. */
+    suspend fun listCommittedTransactionIds(transactionIds: Collection<String>): Set<String> = emptySet()
 }
 
 sealed interface FinancialTransactionSaveResult {

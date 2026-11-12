@@ -71,3 +71,10 @@ data class LedgerProjection(
     val retryRawSmsIds: Set<String>,
     val confirmedLoans: Set<LoanReference>,
 )
+
+/** The inclusive ranges a transfer counterpart's times may fall in ([LedgerProjector.pairingWindow]). */
+data class PairingWindow(
+    val receivedAt: ClosedRange<Instant>,
+    val occurredAt: ClosedRange<Instant>,
+    val occurredAtLocal: ClosedRange<LocalDateTime>,
+)

@@ -42,6 +42,18 @@ class EffectiveParsedEventProvider(
             parsedEventRepository.listUnlinkedTransfersOccurredLocalBetween(startInclusive, endExclusive),
         )
 
+    /** [ParsedEventRepository.listTransferCandidates] with corrections applied. */
+    suspend fun listTransferCandidatesEffective(
+        receivedAt: ClosedRange<java.time.Instant>,
+        occurredAt: ClosedRange<java.time.Instant>,
+        occurredAtLocal: ClosedRange<java.time.LocalDateTime>,
+    ): List<ParsedEventRecord> =
+        withCorrections(parsedEventRepository.listTransferCandidates(receivedAt, occurredAt, occurredAtLocal))
+
+    /** Every raw SMS whose parse names [loan] (any family; corrections never change the loan). */
+    suspend fun listRawSmsIdsReferencingLoan(loan: com.baraa.masroof.domain.model.LoanReference): List<String> =
+        parsedEventRepository.listRawSmsIdsReferencingLoan(loan)
+
     suspend fun listAllEffective(): List<ParsedEventRecord> =
         withCorrections(parsedEventRepository.listAll())
 

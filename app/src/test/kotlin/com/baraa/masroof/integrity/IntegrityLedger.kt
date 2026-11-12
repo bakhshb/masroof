@@ -1,5 +1,7 @@
 package com.baraa.masroof.integrity
 
+import androidx.room.withTransaction
+
 import com.baraa.masroof.testsupport.latestFor
 import com.baraa.masroof.application.dashboard.GoldenExpected
 import com.baraa.masroof.application.dashboard.GoldenLedgerRunner
@@ -164,21 +166,18 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
             return world.ftRepo.save(transaction, rawSmsIds)
         }
 
-        override suspend fun replaceExclusiveStaleLinks(
-            transaction: FinancialTransaction,
-            rawSmsIds: Collection<String>,
-            staleRawSmsIds: Collection<String>,
-        ): FinancialTransactionSaveResult {
-            if (faults.replaceBeforeFailures > 0) {
-                faults.replaceBeforeFailures -= 1
-                throw IOException("before transactional link replace")
-            }
-            val saved = world.ftRepo.replaceExclusiveStaleLinks(transaction, rawSmsIds, staleRawSmsIds)
-            if (faults.replaceAfterFailures > 0) {
-                faults.replaceAfterFailures -= 1
-                throw IOException("after transactional link replace")
-            }
-            return saved
+    }
+
+    /** The ledger writer's one write transaction, failing just before it starts or just after it commits. */
+    private suspend fun linkReplace(write: suspend () -> Unit) {
+        if (faults.replaceBeforeFailures > 0) {
+            faults.replaceBeforeFailures -= 1
+            throw IOException("before transactional link replace")
+        }
+        world.db.withTransaction { write() }
+        if (faults.replaceAfterFailures > 0) {
+            faults.replaceAfterFailures -= 1
+            throw IOException("after transactional link replace")
         }
     }
 
@@ -229,6 +228,7 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         userDecisionRepository = world.decisionRepo,
         zoneId = world.zone,
         effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
+        inTransaction = { write -> linkReplace(write) },
     )
 
     val productionReconciliation = TransactionReconciliationService(
