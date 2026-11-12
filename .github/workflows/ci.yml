@@ -80,6 +80,7 @@ jobs:
             ml-assist/build/reports/tests/
             ledger/build/reports/tests/
             dashboard-core/build/reports/tests/
+            data/build/reports/tests/
           if-no-files-found: error
 
   static-analysis:

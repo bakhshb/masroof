@@ -8,7 +8,7 @@ import org.junit.Test
 
 /** Released schemas (v18 baseline, v19) are frozen; every later schema is reached by one exported, migrated step. */
 class FinancialSchemaCompatibilityTest {
-    private val schemas = File("schemas/com.baraa.masroof.data.room.MasroofDatabase")
+    private val schemas = File("../data/schemas/com.baraa.masroof.data.room.MasroofDatabase")
 
     @Test
     fun releasedSchemasAreByteFrozen() {

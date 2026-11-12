@@ -374,6 +374,7 @@ class PackageDependencyRulesTest {
             sourceRoot,
             File("../finance-core/src/main/kotlin/com/baraa/masroof"),
             File("../dashboard-core/src/main/kotlin/com/baraa/masroof"),
+            File("../data/src/main/kotlin/com/baraa/masroof"),
         )
 
         val presentationBannedPackages = listOf(

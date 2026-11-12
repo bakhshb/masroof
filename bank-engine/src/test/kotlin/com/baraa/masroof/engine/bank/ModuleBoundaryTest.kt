@@ -78,7 +78,7 @@ class ModuleBoundaryTest {
 
     @Test fun pureModulesNeverDependOnAppAndModuleGraphHasNoCycles() {
         val buildFiles = listOf(File(root, "app/build.gradle.kts")) +
-            listOf("bank-engine", "finance-core", "ml-assist", "ledger", "dashboard-core").map { File(root, "$it/build.gradle.kts") }
+            listOf("bank-engine", "finance-core", "ml-assist", "ledger", "dashboard-core", "data").map { File(root, "$it/build.gradle.kts") }
         val graph = buildFiles.associate { file ->
             val module = ":" + file.parentFile.relativeTo(root).invariantSeparatorsPath.replace('/', ':')
             module to projectDependency.findAll(file.readText()).map { it.groupValues[1] }.toSet()
@@ -92,7 +92,11 @@ class ModuleBoundaryTest {
         assertEquals(setOf(":finance-core"), graph[":bank-engine"])
         assertEquals(setOf(":finance-core"), graph[":ledger"])
         assertEquals(setOf(":finance-core"), graph[":dashboard-core"])
-        assertEquals(setOf(":ui-kit", ":finance-core", ":bank-engine", ":ml-assist", ":ledger", ":dashboard-core"), graph[":app"])
+        assertEquals(setOf(":finance-core", ":ml-assist"), graph[":data"])
+        graph.filterKeys { it != ":app" }.forEach { (module, deps) ->
+            assertFalse(":data" in deps, "$module depends on the data module")
+        }
+        assertEquals(setOf(":ui-kit", ":finance-core", ":bank-engine", ":ml-assist", ":ledger", ":dashboard-core", ":data"), graph[":app"])
         fun visit(module: String, ancestors: Set<String>) {
             assertFalse(module in ancestors, "Dependency cycle: $ancestors -> $module")
             graph[module].orEmpty().forEach { visit(it, ancestors + module) }

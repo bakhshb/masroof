@@ -45,7 +45,7 @@ class RecurringFeedbackPersistenceTest {
         val context = object : android.content.ContextWrapper(app) {
             override fun getDatabasePath(name: String) = java.io.File(directory, name)
         }
-        val schema = Json.parseToJsonElement(java.io.File("schemas/com.baraa.masroof.data.analytics.AnalyticsDatabase/3.json").readText())
+        val schema = Json.parseToJsonElement(java.io.File("../data/schemas/com.baraa.masroof.data.analytics.AnalyticsDatabase/3.json").readText())
             .jsonObject.getValue("database").jsonObject
         android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(AnalyticsDatabase.NAME), null).use { sqlite ->
             schema.getValue("entities").jsonArray.forEach { element ->

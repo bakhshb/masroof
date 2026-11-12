@@ -19,13 +19,13 @@ class DecisionReadBoundaryTest {
     @Test
     fun productionReadsDecisionsFromTheStoreOnly() {
         assertTrue("Expected Kotlin sources", sources.isNotEmpty())
-        assertEquals(emptyList<String>(), violations(sources.map { it.relativeTo(root).invariantSeparatorsPath to it.readText() }))
+        assertEquals(emptyList<String>(), violations(sources.map { relativePath(it) to it.readText() }))
     }
 
     @Test
     fun everyAllowedFileStillNamesALegacyStore() {
         val named = sources.filter { file -> LEGACY_TOKENS.any { it.containsMatchIn(file.readText()) } }
-            .map { it.relativeTo(root).invariantSeparatorsPath }.toSet()
+            .map(::relativePath).toSet()
         assertEquals(emptySet<String>(), ALLOWED.keys - named)
     }
 
@@ -50,9 +50,13 @@ class DecisionReadBoundaryTest {
     private fun violations(files: List<Pair<String, String>>): List<String> =
         files.filter { (path, text) -> path !in ALLOWED && LEGACY_TOKENS.any { it.containsMatchIn(text) } }.map { it.first }
 
+    private fun relativePath(file: File): String =
+        file.canonicalFile.relativeTo(roots.first { file.canonicalFile.startsWith(it.canonicalFile) }.canonicalFile).invariantSeparatorsPath
+
     private companion object {
-        val root = File("src/main/kotlin/com/baraa/masroof")
-        val sources: List<File> = root.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        // The app and the modules that moved out of it (the stores live in :data, the models in :finance-core).
+        val roots = listOf("src/main", "../data/src/main", "../finance-core/src/main").map { File(it, "kotlin/com/baraa/masroof") }
+        val sources: List<File> = roots.flatMap { root -> root.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList() }
 
         val LEGACY_TOKENS = listOf(
             Regex("""\bresolutionKind\b"""),

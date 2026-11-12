@@ -362,7 +362,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     private fun alerts(snapshot: AnalysisSnapshot, candidates: List<AnalysisCandidate>, previous: List<AnalysisAlertRow>, prefs: AnalysisPreferencesRow) =
         AnalysisAlertPolicy.evaluate(snapshot, candidates, previous, prefs, LocalDate.now(clock).toEpochDay())
     suspend fun updatePreferences(value: AnalysisPreferencesRow) {
-        require(value.budget == null || value.budget > 0); require(value.reminderDays in 1..30)
+        require(value.budget.let { it == null || it > 0 }); require(value.reminderDays in 1..30)
         mutex.withLock {
             if (closed) return@withLock
             container.storage.databaseAccessGate.withAccess {

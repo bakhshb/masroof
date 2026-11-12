@@ -99,7 +99,7 @@ abstract class MasroofDatabase : RoomDatabase() {
         /** Oldest schema that opens; anything older has no migration and is rejected. */
         const val BASELINE_VERSION: Int = 18
 
-        /** Must match app/schemas/.../20.json identityHash; v20 is v19's structure, so 19 has the same hash. */
+        /** Must match data/schemas/.../20.json identityHash; v20 is v19's structure, so 19 has the same hash. */
         const val IDENTITY_HASH: String = "358f8daabc18a4cc065c8b8e51261442"
 
         /**

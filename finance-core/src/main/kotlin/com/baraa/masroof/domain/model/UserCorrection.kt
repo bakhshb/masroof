@@ -10,7 +10,7 @@ import java.time.Instant
  * Targets [targetRawSmsId] so corrections survive ParsedEvent reprocessing.
  *
  * Ownership changes are not represented here — use
- * [com.baraa.masroof.domain.ownership.OwnershipConfirmationService].
+ * `OwnershipConfirmationService` (app, `domain.ownership`).
  */
 data class UserCorrection(
     val id: String,
