@@ -93,7 +93,7 @@ class MessagePatternStore(private val database: () -> SupportSQLiteDatabase, pri
      */
     fun importLegacyFile(file: File) {
         val legacy = LegacyMessagePatternFile.read(file) ?: return
-        transaction { if (readRow() == null) put(MessagePatternConfigurationCodec.decode(legacy).generation, legacy) }
+        transaction { if (readRow() == null) restoreRaw(legacy) }
         if (captureRaw() != legacy) load()
         LegacyMessagePatternFile.delete(file)
     }
