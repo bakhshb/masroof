@@ -28,8 +28,6 @@ import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
-import com.baraa.masroof.parsing.repository.ParsedEventRecord
-import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.testsupport.SmsParseGateway
@@ -258,12 +256,11 @@ class ProcessStoredSmsUseCaseTest {
 
     @Test
     fun liveProcess_doesNotScanGlobalTransferLists() = runBlocking {
-        val countedParsed = CountingParsedEvents(parsedRepo)
         val countedTransactions = CountingTransactions(ftRepo)
         val cards = RoomCardRegistryRepository.from(db)
         val live = ProcessStoredSmsUseCase(
             rawSmsRepository = rawRepo,
-            parsedEventRepository = countedParsed,
+            parsedEventRepository = parsedRepo,
             bankSmsRegistry = registry,
             reconciliation = TransactionReconciliationService(
                 rawSmsRepository = rawRepo,
@@ -274,7 +271,7 @@ class ProcessStoredSmsUseCaseTest {
                     NoOpLoanRegistryRepository,
                 ),
                 effectiveParsedEventProvider = EffectiveParsedEventProvider(
-                    countedParsed,
+                    parsedRepo,
                     com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ),
                 reviewRepository = reviewRepo,
@@ -296,30 +293,13 @@ class ProcessStoredSmsUseCaseTest {
         }
         val raw = sms(PURCHASE_BODY)
         assertTrue(capture.capture(raw) is BankSmsCaptureResult.Captured)
-        countedParsed.reset()
         countedTransactions.reset()
 
         val result = live.process(raw.id)
 
         assertTrue(result is SmsIngestionResult.Parsed)
         assertEquals(FinancialTransactionType.EXPENSE, ftRepo.findByRawSmsId(raw.id)!!.type)
-        assertEquals(0, countedParsed.globalUnlinkedCalls)
         assertEquals(0, countedTransactions.listByTypesCalls)
-    }
-
-    private class CountingParsedEvents(
-        private val delegate: ParsedEventRepository,
-    ) : ParsedEventRepository by delegate {
-        var globalUnlinkedCalls: Int = 0
-
-        fun reset() {
-            globalUnlinkedCalls = 0
-        }
-
-        override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> {
-            globalUnlinkedCalls += 1
-            return delegate.listUnlinkedTransfers()
-        }
     }
 
     private class CountingTransactions(

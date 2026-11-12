@@ -101,21 +101,6 @@ interface FinancialTransactionDao {
     @Query(
         """
         SELECT * FROM financial_transaction
-        WHERE type IN (:types)
-          AND occurredAtEpochMillis >= :startInclusiveEpochMillis
-          AND occurredAtEpochMillis < :endExclusiveEpochMillis
-        ORDER BY occurredAtEpochMillis, id
-        """,
-    )
-    suspend fun listByTypesOccurredBetween(
-        types: List<String>,
-        startInclusiveEpochMillis: Long,
-        endExclusiveEpochMillis: Long,
-    ): List<FinancialTransactionEntity>
-
-    @Query(
-        """
-        SELECT * FROM financial_transaction
         WHERE amountCurrency != :primaryCurrency
           AND (appliedExchangeRate IS NULL OR exchangeRateSource IS NULL)
         ORDER BY occurredAtEpochMillis, id
@@ -229,46 +214,6 @@ interface FinancialTransactionDao {
             deleteTransactionById(link.transactionId)
         }
         return true
-    }
-
-    /**
-     * Atomically removes exclusive stale external rows blocking [links], then saves
-     * [entity]. Rolls back together when pre-checks fail or the write cannot complete.
-     */
-    @Transaction
-    suspend fun replaceExclusiveStaleLinksAtomic(
-        entity: FinancialTransactionEntity,
-        links: List<FinancialTransactionRawSmsLinkEntity>,
-        staleRawSmsIds: List<String>,
-    ): SaveAtomicOutcome {
-        val staleTransactionIds = mutableSetOf<String>()
-        for (rawSmsId in staleRawSmsIds.distinct()) {
-            val link = findLinkByRawSmsId(rawSmsId) ?: continue
-            if (link.transactionId == entity.id) continue
-            if (!isOnlyLink(link.transactionId, rawSmsId)) {
-                return SaveAtomicOutcome.Conflict(rawSmsId, link.transactionId)
-            }
-            staleTransactionIds += link.transactionId
-        }
-
-        for (link in links) {
-            val existing = findLinkByRawSmsId(link.rawSmsId)
-            if (existing != null &&
-                existing.transactionId != entity.id &&
-                existing.transactionId !in staleTransactionIds
-            ) {
-                return SaveAtomicOutcome.Conflict(link.rawSmsId, existing.transactionId)
-            }
-        }
-
-        for (rawSmsId in staleRawSmsIds.distinct()) {
-            val link = findLinkByRawSmsId(rawSmsId) ?: continue
-            if (link.transactionId == entity.id) continue
-            deleteLinkByRawSmsId(rawSmsId)
-            deleteTransactionById(link.transactionId)
-        }
-
-        return saveAtomic(entity, links)
     }
 
     @Transaction

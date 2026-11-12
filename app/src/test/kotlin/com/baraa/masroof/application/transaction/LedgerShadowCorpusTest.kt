@@ -26,7 +26,7 @@ import org.robolectric.annotation.Config
  * the projection. The report is written to `app/build/reports/shadow-ledger/shadow_comparison.txt` (a CI artifact)
  * and must equal `testdata/ledger_snapshot/shadow_comparison.expected.txt`, so a new difference fails.
  *
- * The owner decided gate 3.2 on 2026-11-12 (the projector's keep rule; docs/ARCHITECTURE.md, "Known differences");
+ * The owner decided gate 3.2 on 2026-11-12 (the projector's keep rule; docs/ARCHITECTURE.md, "Rules of the derived ledger");
  * the expected file then holds no difference. A new difference goes to the owner before regenerating, only with
  * `MASROOF_UPDATE_SHADOW_COMPARISON=1 ./gradlew :app:testDebugUnitTest --tests '*LedgerShadowCorpusTest' --rerun`.
  */

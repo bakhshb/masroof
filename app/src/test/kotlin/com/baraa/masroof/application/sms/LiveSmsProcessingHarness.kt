@@ -146,14 +146,6 @@ internal class LiveSmsProcessingHarness(context: Context) : AutoCloseable {
                 return parsedRepo.listAll()
             }
 
-            override suspend fun listReceivedBetween(
-                startInclusive: Instant,
-                endExclusive: Instant,
-            ): List<ParsedEventRecord> {
-                failReconciliationIfInjected()
-                return parsedRepo.listReceivedBetween(startInclusive, endExclusive)
-            }
-
             override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {
                 failReconciliationIfInjected()
                 return parsedRepo.listByRawSmsIds(rawSmsIds)

@@ -387,7 +387,6 @@ class ScopedMutationReconciliationTest {
 
     private fun assertNoGlobalScan() {
         assertEquals(0, parsed.listAllCalls)
-        assertEquals(0, parsed.globalUnlinkedCalls)
         assertEquals(0, transactions.listAllCalls)
         assertEquals(0, transactions.listByTypesCalls)
     }

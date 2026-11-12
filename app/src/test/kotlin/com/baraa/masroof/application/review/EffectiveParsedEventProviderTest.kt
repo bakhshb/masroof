@@ -32,6 +32,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import java.time.LocalDateTime
 
 /**
  * Locks correction overlay results and the batched read shape.
@@ -102,9 +103,10 @@ class EffectiveParsedEventProviderTest {
 
         val windowStart = Instant.parse("2026-08-01T00:00:00Z")
         val windowEnd = Instant.parse("2026-08-06T00:00:00Z")
-        val transfers = expectedEffective(parsedRepo.listUnlinkedTransfers())
+        val local = LocalDateTime.parse("2026-08-01T00:00:00")..LocalDateTime.parse("2026-08-06T00:00:00")
+        val transfers = expectedEffective(parsedRepo.listTransferCandidates(windowStart..windowEnd, windowStart..windowEnd, local))
         countingDao.reset()
-        assertEquals(transfers, provider.listUnlinkedTransfersEffectiveReceivedBetween(windowStart, windowEnd))
+        assertEquals(transfers, provider.listTransferCandidatesEffective(windowStart..windowEnd, windowStart..windowEnd, local))
         assertEquals(listOf("raw-transfer-in", "raw-transfer-out"), transfers.map { it.event.rawSmsId })
         assertEquals(1, countingDao.batchQueries)
         assertEquals(0, countingDao.perSmsQueries)
@@ -114,20 +116,6 @@ class EffectiveParsedEventProviderTest {
         assertEquals("Sibling", transfer.event.counterparty)
         assertTrue(transfer.userCorrected)
         assertFalse(transfer.automationConfirmed)
-
-        val receivedStart = Instant.parse("2026-08-04T00:00:00Z")
-        val receivedEnd = Instant.parse("2026-08-05T00:00:00Z")
-        val boundedTransfers = expectedEffective(
-            parsedRepo.listUnlinkedTransfersReceivedBetween(receivedStart, receivedEnd),
-        )
-        countingDao.reset()
-        assertEquals(
-            boundedTransfers,
-            provider.listUnlinkedTransfersEffectiveReceivedBetween(receivedStart, receivedEnd),
-        )
-        assertEquals(listOf("raw-transfer-out"), boundedTransfers.map { it.event.rawSmsId })
-        assertEquals(1, countingDao.batchQueries)
-        assertEquals(0, countingDao.perSmsQueries)
 
         val selected = expectedEffective(parsedRepo.listByRawSmsIds(listOf("raw-plain", "raw-multi")))
         countingDao.reset()

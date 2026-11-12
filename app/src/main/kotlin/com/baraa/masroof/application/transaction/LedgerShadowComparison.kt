@@ -32,8 +32,8 @@ object LedgerShadowComparison {
     enum class Reason(val description: String) {
         STORED_ROW_WITHOUT_LINKS("a stored row that links no raw SMS"),
         RAW_SMS_WITHOUT_EVIDENCE("every stored row of the group links a raw SMS with no effective parsed event"),
-        ID_ONLY("only the transaction id differs (Known differences: Ids)"),
-        EXCHANGE_RATE("only the exchange-rate pair differs (Known differences: Exchange rate)"),
+        ID_ONLY("only the transaction id differs (rules of the derived ledger: Ids)"),
+        EXCHANGE_RATE("only the exchange-rate pair differs (rules of the derived ledger: Exchange rate)"),
         ZONE_FILLED("only the zone differs, and the stored zone is empty"),
         TIME_REDERIVED("only the time differs (the stored zone empty or equal): the stored time is not what the evidence gives today"),
         DECIDED_WITHOUT_POSTING_COLUMNS("a stored row whose posting outcome decision lacks its type or time"),

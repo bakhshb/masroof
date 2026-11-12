@@ -17,7 +17,6 @@
     <ID>LargeClass:SettingsViewModel.kt:SettingsViewModel : ViewModel</ID>
     <ID>LargeClass:SettingsViewModelTest.kt:SettingsViewModelTest</ID>
     <ID>LargeClass:StatementReconciliationServiceTest.kt:StatementReconciliationServiceTest</ID>
-    <ID>LargeClass:TransactionReconciliationService.kt:TransactionReconciliationService</ID>
     <ID>LargeClass:TransactionReconciliationServiceTest.kt:TransactionReconciliationServiceTest : ReconciliationTestFixture</ID>
     <ID>LongMethod:AccountFlowClassifier.kt:AccountFlowClassifier$internal fun classifyWithAmount: List&lt;FlowAssignment&gt;</ID>
     <ID>LongMethod:AnalysisExplanationViews.kt:@Composable internal fun AnalysisDataQuality</ID>
@@ -54,7 +53,6 @@
     <ID>LongMethod:ReviewWorkflowService.kt:ReviewWorkflowService$suspend fun resolveSelfTransferPair: ReviewWorkflowResult</ID>
     <ID>LongMethod:ReviewWorkflowService.kt:ReviewWorkflowService$suspend fun resolveTransferAsExternal: ReviewWorkflowResult</ID>
     <ID>LongMethod:ReviewWorkflowServiceTest.kt:ReviewWorkflowServiceTest$@Test fun manualResolution_matchesAutomaticAlJaziraTimeAroundSalaryBoundary</ID>
-    <ID>LongMethod:ScopedReconciliationTest.kt:ScopedReconciliationTest$@Test fun boundedQueries_keepOnlyUnlinkedTransfersAndTypedRowsInsideTheRange</ID>
     <ID>LongMethod:ScopedReconciliationTest.kt:ScopedReconciliationTest$private suspend fun ambiguousLocalOutcome: AmbiguousLocalOutcome</ID>
     <ID>LongMethod:SettingsAboutScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsAboutScreen</ID>
     <ID>LongMethod:SettingsBankAccountsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsBankAccountsScreen</ID>
@@ -71,9 +69,6 @@
     <ID>LongMethod:TransactionDetailScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun TransactionDetailScreen</ID>
     <ID>LongMethod:TransactionListScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun TransactionListScreen</ID>
     <ID>LongMethod:TransactionReclassificationService.kt:TransactionReclassificationService$suspend fun reclassify: ReclassificationResult</ID>
-    <ID>LongMethod:TransactionReconciliationService.kt:TransactionReconciliationService$private suspend fun reconcileRecordsDetailed: ReconciliationReport</ID>
-    <ID>LongMethod:TransactionReconciliationService.kt:TransactionReconciliationService$private suspend fun upgradeStaleExternalPairs: UpgradePassResult</ID>
-    <ID>LongMethod:TransactionReconciliationService.kt:TransactionReconciliationService$private suspend fun upgradeStaleFeeFinancingInstallments: UpgradePassResult</ID>
     <ID>LongMethod:TransactionSarEquivalentResolver.kt:TransactionSarEquivalentResolver$suspend fun resolve: Map&lt;String, SarEquivalentResolution&gt;</ID>
   </CurrentIssues>
 </SmellBaseline>

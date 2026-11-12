@@ -467,6 +467,5 @@ class DashboardEvidenceQueriesTest {
             records.firstOrNull { it.event.rawSmsId == rawSmsId }
         override suspend fun deleteByRawSmsId(rawSmsId: String) = Unit
         override suspend fun listAll(): List<ParsedEventRecord> = records
-        override suspend fun listReceivedBetween(startInclusive: Instant, endExclusive: Instant) = records
     }
 }

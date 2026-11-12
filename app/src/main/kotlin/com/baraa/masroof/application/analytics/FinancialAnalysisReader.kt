@@ -49,7 +49,6 @@ internal object FinancialAnalysisReader {
                 override suspend fun listOccurredBetween(startInclusive: Instant, endExclusive: Instant) = rows.filter { it.occurredAt >= startInclusive && it.occurredAt < endExclusive }.asReversed()
                 override suspend fun listByTypes(types: Collection<FinancialTransactionType>) = rows.filter { it.type in types }
                 override suspend fun listByTypesOccurredSince(types: Collection<FinancialTransactionType>, startInclusive: Instant) = rows.filter { it.type in types && it.occurredAt >= startInclusive }
-                override suspend fun listByTypesOccurredBetween(types: Collection<FinancialTransactionType>, startInclusive: Instant, endExclusive: Instant) = rows.filter { it.type in types && it.occurredAt >= startInclusive && it.occurredAt < endExclusive }
             }
             val service = DashboardService(financial,
                 object : ReviewRepository by c.storage.reviewRepository {

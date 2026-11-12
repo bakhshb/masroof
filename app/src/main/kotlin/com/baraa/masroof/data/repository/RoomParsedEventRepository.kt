@@ -45,42 +45,6 @@ class RoomParsedEventRepository(
         dao.listAll().map(ParsedEventMapper::toRecord)
     }
 
-    override suspend fun listReceivedBetween(
-        startInclusive: java.time.Instant,
-        endExclusive: java.time.Instant,
-    ): List<ParsedEventRecord> = accessGate.withAccess {
-        dao.listReceivedBetween(
-            startInclusiveMillis = startInclusive.toEpochMilli(),
-            endExclusiveMillis = endExclusive.toEpochMilli(),
-        ).map(ParsedEventMapper::toRecord)
-    }
-
-    override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> = accessGate.withAccess {
-        dao.listUnlinkedTransfers().map(ParsedEventMapper::toRecord)
-    }
-
-    override suspend fun listUnlinkedTransfersReceivedBetween(
-        startInclusive: java.time.Instant,
-        endExclusive: java.time.Instant,
-    ): List<ParsedEventRecord> = accessGate.withAccess {
-        if (!startInclusive.isBefore(endExclusive)) return@withAccess emptyList()
-        return@withAccess dao.listUnlinkedTransfersReceivedBetween(
-            startInclusiveMillis = startInclusive.toEpochMilli(),
-            endExclusiveMillis = endExclusive.toEpochMilli(),
-        ).map(ParsedEventMapper::toRecord)
-    }
-
-    override suspend fun listUnlinkedTransfersOccurredLocalBetween(
-        startInclusive: java.time.LocalDateTime,
-        endExclusive: java.time.LocalDateTime,
-    ): List<ParsedEventRecord> = accessGate.withAccess {
-        if (!startInclusive.isBefore(endExclusive)) return@withAccess emptyList()
-        return@withAccess dao.listUnlinkedTransfersOccurredLocalBetween(
-            startInclusive = startInclusive.toString(),
-            endExclusive = endExclusive.toString(),
-        ).map(ParsedEventMapper::toRecord)
-    }
-
     override suspend fun listTransferCandidates(
         receivedAt: ClosedRange<java.time.Instant>,
         occurredAt: ClosedRange<java.time.Instant>,

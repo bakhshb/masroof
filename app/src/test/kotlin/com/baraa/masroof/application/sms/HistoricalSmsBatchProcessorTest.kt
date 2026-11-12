@@ -320,7 +320,6 @@ class HistoricalSmsBatchProcessorTest {
 
         assertTrue(finished is HistoricalBatchDerivedResult.Succeeded)
         assertEquals(0, parsedRepo.listAllCalls)
-        assertEquals(0, parsedRepo.globalUnlinkedCalls)
         assertEquals(1, parsedRepo.scopedLoadCalls)
         assertEquals(FinancialTransactionType.EXPENSE, transactions.findByRawSmsId(fresh)!!.type)
         assertEquals(null, transactions.findByRawSmsId(older))
@@ -346,7 +345,6 @@ class HistoricalSmsBatchProcessorTest {
 
         assertTrue(finished is HistoricalBatchDerivedResult.Succeeded)
         assertEquals(0, parsedRepo.listAllCalls)
-        assertEquals(0, parsedRepo.globalUnlinkedCalls)
         assertTrue(parsedRepo.scopedLoadCalls > 0)
         val posted = transactions.findByRawSmsId(outgoing)!!
         assertEquals(FinancialTransactionType.SELF_TRANSFER, posted.type)
@@ -446,17 +444,11 @@ class HistoricalSmsBatchProcessorTest {
     ) : ParsedEventRepository by delegate {
         var listAllCalls: Int = 0
         var scopedLoadCalls: Int = 0
-        var globalUnlinkedCalls: Int = 0
         var failScopedLoad: Boolean = false
 
         override suspend fun listAll(): List<ParsedEventRecord> {
             listAllCalls += 1
             return delegate.listAll()
-        }
-
-        override suspend fun listUnlinkedTransfers(): List<ParsedEventRecord> {
-            globalUnlinkedCalls += 1
-            return delegate.listUnlinkedTransfers()
         }
 
         override suspend fun listByRawSmsIds(rawSmsIds: Collection<String>): List<ParsedEventRecord> {

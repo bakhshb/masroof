@@ -26,10 +26,9 @@ import java.time.ZoneOffset
 /**
  * Derives the ledger from evidence, decisions and ownership, with no I/O (docs/ARCHITECTURE.md, "Derived ledger").
  *
- * It applies the rules of the app's `TransactionReconciliationService` to an empty ledger, then the keep rule the
- * owner decided at gate 3.2: a stored row the user decided, or one the projection no longer derives, is carried
- * verbatim ("Known differences" lists what still differs). Evidence and stored rows are visited in id order, so the
- * input order never changes the result.
+ * It derives the ledger as if it were empty, then applies the keep rule the owner decided at gate 3.2: a stored row
+ * the user decided, or one the projection no longer derives, is carried verbatim ("Rules of the derived ledger").
+ * Evidence and stored rows are visited in id order, so the input order never changes the result.
  */
 object LedgerProjector {
     /**
@@ -301,7 +300,7 @@ private class Projection(
         }.toSet()
 
     /**
-     * The old `shouldReleaseStaleSelfTransferLink`, leg by leg in event order: a transfer leg of a stored
+     * The stale-link release, leg by leg in event order: a transfer leg of a stored
      * self-transfer leaves it when its effective time, read in the row's zone, differs from the row's time (by more
      * than the match window while the row still links two parsed events, the earlier leg's time being the pair's).
      */
@@ -425,7 +424,7 @@ private class Projection(
     /**
      * A stored single-leg self-transfer whose leg is not in the open pool (kept for a decision, or kept by rule (ii))
      * still counts as a pending counterpart, so an intra-bank leg near it stays pending instead of being posted on its
-     * own (the old pass's `postedSingleLegCounterparts`). It never pairs here.
+     * own. It never pairs here.
      */
     private fun storedSingleLegCounterparts(open: Set<String>): List<TransferMatchCandidate> = stored.rows.mapNotNull { row ->
         if (!row.transaction.isSingleLegSelfTransfer() || row.rawSmsIds.singleOrNull() in open) return@mapNotNull null
@@ -453,7 +452,7 @@ private class Projection(
     private class Leg(val posted: FinancialTransaction?, val record: LedgerEvidence)
 
     /**
-     * The old `upgradeStaleExternalPairs` over this run's rows: a posted external transfer or single-leg
+     * The posted-leg upgrade over this run's rows: a posted external transfer or single-leg
      * self-transfer joins a counterpart that is mutually unique among the posted and still-open legs.
      */
     private fun upgradePostedTransferPairs() {
@@ -563,7 +562,7 @@ private class Projection(
     }
 
     /**
-     * The pairs the old `upgradeStaleExternalPairs` could form: mutually unique, owned at both ends, among the legs it
+     * The pairs the posted-leg upgrade may form for a stored row: mutually unique, owned at both ends, among the legs it
      * looked at (a posted external or single-leg self-transfer leg, or an unlinked leg; eligible and not protected).
      * A leg stored in any other row, or in a kept pair, was not in its pool.
      */
@@ -626,7 +625,7 @@ private class Projection(
 
     /**
      * Saves like `FinancialTransactionDao.saveAtomic` (a link to another row conflicts) after dropping the rows of
-     * [replacing] that link only that SMS (`replaceExclusiveStaleLinksAtomic`), and settles the linked raw SMS.
+     * [replacing] that link only that SMS, and settles the linked raw SMS.
      */
     private fun save(transaction: FinancialTransaction, rawSmsIds: List<String>, replacing: List<String> = emptyList()): Boolean {
         val stale = replacing.mapNotNull(links::get).filter { it != transaction.id }.toSet()
