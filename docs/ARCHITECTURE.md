@@ -442,7 +442,7 @@ Reads kept on the legacy stores, each allowed by name in `DecisionReadBoundaryTe
 - `TransactionRestoreService` checks that the review is ignored before it rewrites that same review (`markResolvedAtomic` lets only an ignored review be restored); it is a legacy-store writer.
 - `BankInterpretationService` learning feedback keys its decisions by review and correction ids and reads the resolved row's current type; switching would change the learned decisions and their fingerprint.
 - `PatternEvidenceProtection` treats any settled review, automatic included, as evidence to keep, and `PendingPatternsWorkflow` skips a `REQUIRED` review with a resolution: queue state, not a user decision.
-- Screens (`ReviewViewModel`, `ReviewReasonLabels`, `ReviewDetailLoader`, `InterpretationProvenanceWorkflow`) display the review.
+- Screens (`ReviewPresentationMapper`, `ReviewReasonLabels`, `ReviewDetailLoader`, `InterpretationProvenanceWorkflow`) display the review.
 
 #### Recurring answers (plan 5.2)
 
