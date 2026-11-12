@@ -38,7 +38,7 @@ class BankInterpretationService(
     private val onFeedbackChanged: () -> Unit = {},
     private val patterns: () -> MessagePatternConfiguration,
 ) : AutoCloseable {
-    private val store = LearningStore(context)
+    private val store = LearningStore(context) { log.warn("ML", "Learning cache corrupt; deleted and rebuilt from decisions (${it.javaClass.simpleName})") }
     private val auditJob = SupervisorJob(scope.coroutineContext[Job])
     private val auditScope = CoroutineScope(scope.coroutineContext + auditJob)
     @Volatile private var closed = false

@@ -235,7 +235,7 @@ class UserDecisionDualWriteTest {
     }
 
     /**
-     * Plan 2.2: with the dual-write rows present the v19→v20 backfill adds nothing; from the legacy traces alone it
+     * Plan 2.2: with the dual-write rows present the backfill adds nothing; from the legacy traces alone it
      * rebuilds [legacy], the same rows except where the legacy trace cannot tell kinds apart (docs/ARCHITECTURE.md).
      */
     private suspend fun assertBackfillMatches(world: DashboardLedgerWorld, dualWrite: List<UserDecisionEntity>, legacy: List<UserDecisionEntity>) {

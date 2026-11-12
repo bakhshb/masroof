@@ -55,7 +55,7 @@ class UserDecisionReaderTest {
     fun kindsMapToTheReviewResolutionTheyStoodFor() = runBlocking {
         val financial = setOf(UserDecisionKind.FINANCIAL_TYPE, UserDecisionKind.RECLASSIFY, UserDecisionKind.RESTORE)
         val nothing = setOf(UserDecisionKind.NON_FINANCIAL, UserDecisionKind.IGNORE, UserDecisionKind.RESTORE_REVERTED)
-        for (kind in UserDecisionKind.entries - UserDecisionKind.CORRECTION - UserDecisionKind.BANK_SELECTION) {
+        for (kind in UserDecisionKind.entries - UserDecisionKind.CORRECTION - UserDecisionKind.BANK_SELECTION - UserDecisionKind.RECURRING) {
             sms(kind.name)
             decide(UserDecision(kind.name, kind, at(1)))
             val read = reader.effectiveFor(kind.name)
@@ -63,6 +63,22 @@ class UserDecisionReaderTest {
             assertEquals(kind.name, kind in financial, read.confirmsFinancial)
             assertEquals(kind.name, kind in nothing, read.isNonFinancial)
         }
+    }
+
+    /** Plan 5.2: a recurring answer names a series, never a raw SMS; no decision read sees it, even keyed by an SMS id. */
+    @Test
+    fun aRecurringAnswer_isNoDecisionOfAnySms() = runBlocking {
+        sms("a")
+        decide(UserDecision("a", UserDecisionKind.FINANCIAL_TYPE, at(1), transactionType = FinancialTransactionType.EXPENSE))
+        val retries = RoomProcessingRetryRepository(db.processingRetryDao())
+        retries.markRequired(listOf("a"), at(1), ProcessingRetryMode.LIVE)
+        val before = reader.effectiveFor("a") to retries.listRetryableRawSmsIds()
+        val answers = RecurringAnswerStore(db, com.baraa.masroof.data.room.DatabaseAccessGate())
+        for (answer in listOf("NOT_RECURRING", "DISMISSED", "CONFIRMED", RecurringAnswerStore.UNDONE)) {
+            answers.record(com.baraa.masroof.data.analytics.RecurringFeedbackRow("a", answer, "{}", at(2).toEpochMilli()))
+        }
+        assertEquals(before, reader.effectiveFor("a") to retries.listRetryableRawSmsIds())
+        assertEquals(EffectiveUserDecisions.NONE, EffectiveUserDecisions.of("b", listOf(UserDecision("b", UserDecisionKind.RECURRING, at(3)))))
     }
 
     @Test
@@ -135,7 +151,7 @@ class UserDecisionReaderTest {
     @Test
     fun retrySql_andReader_agreeForEveryKindAndPairedLeg() = runBlocking {
         val ids = mutableListOf<String>()
-        for (kind in UserDecisionKind.entries) {
+        for (kind in UserDecisionKind.entries - UserDecisionKind.RECURRING) {
             sms(kind.name)
             decide(UserDecision(kind.name, UserDecisionKind.FINANCIAL_TYPE, at(1)))
             decide(UserDecision(kind.name, kind, at(2)))

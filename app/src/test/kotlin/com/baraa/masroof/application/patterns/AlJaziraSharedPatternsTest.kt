@@ -100,7 +100,7 @@ class AlJaziraSharedPatternsTest {
         }
     }
 
-    /** A pre-v21 installation: its teaching is in the legacy file, copied into the database on the first open. */
+    /** A v18 installation: its teaching is in the legacy file, copied into the database on the first open. */
     @Test fun upgradingExistingTeachingAndRepeatedStartupKeepHistoryAndDisabledDefaults() = runBlocking {
         val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "aljazira-upgrade-${java.util.UUID.randomUUID()}")
         val taught = SavedMessagePattern.fromChoices("existing-teaching", bankId, "AlJazira", "PURCHASE", "Old format:10SAR",

@@ -15,7 +15,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 
 /**
- * Plan 5.1, run on the JVM and on a device: the live database's open copies the pre-v21 pattern file before
+ * Plan 5.1, run on the JVM and on a device: the live database's open copies the v18 pattern file before
  * anything can read the patterns, then seeds the bundled banks; a copy that fails fails the open and keeps the file.
  */
 object LegacyPatternFileContract {

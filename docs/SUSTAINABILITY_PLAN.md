@@ -96,7 +96,7 @@ Shared acceptance criteria, for every piece:
 | # | Piece | Model | Own acceptance criteria |
 |---|---|---|---|
 | 5.1 | **Patterns into the database. High.** Migration adds pattern tables; one-time import of `message-patterns/definitions.json`; `MessagePatternStore` keeps its API. | Opus | Imported configuration equals the file (round trip); generation check preserved; old backups containing the file still import. |
-| 5.2 | **Recurring decisions. High.** `recurring_feedback` moves into `user_decision`. Analytics and learning stay separate database files (their content is derived); `LearningStore` gains the preserving open factory. | Opus | Recurring decisions survive upgrade (device test); a corrupt learning file no longer risks a destructive reopen. |
+| 5.2 | **Recurring decisions. High.** `recurring_feedback` moves into `user_decision`. Analytics and learning stay separate database files (their content is derived); `LearningStore` gains the preserving open factory. Owner, 2026-11-12: the answers go into `user_decision` itself (`RECURRING` rows), and the development-only chain 18→19→20→21 becomes one migration 18→22; only v18 and v22 are accepted. | Opus | Recurring decisions survive upgrade (device test); a corrupt learning file no longer risks a destructive reopen. |
 | 5.3 | **Backup format.** Bump `BackupPackageFormat.FORMAT_VERSION`; patterns travel inside the database; all older formats, including legacy plaintext v1, stay importable. | Opus | Every existing backup fixture imports; encryption tests unchanged; backup code shrinks. |
 
 ### Phase 6 — Presentation

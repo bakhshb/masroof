@@ -108,7 +108,7 @@ class DatabaseBackupImportTest {
         }
     }
 
-    /** A v21 archive's own pattern row must decode; a broken one fails the import and the live patterns stay. */
+    /** A v22 archive's own pattern row must decode; a broken one fails the import and the live patterns stay. */
     @Test
     fun currentArchiveWithAnInvalidPatternRowFailsAndKeepsTheLivePatterns() {
         runBlocking {
@@ -434,7 +434,7 @@ class DatabaseBackupImportTest {
                     OwnershipStatus.OWNED,
                 )
                 MessagePatternStore(liveDatabase).restoreRaw(patternArchive("ORIGINAL"))
-                // A v21 archive's own row wins; its preferences field is ignored.
+                // A v22 archive's own row wins; its preferences field is ignored.
                 val importedDbFile = createCurrentDatabaseFile(context, patternArchive("IMPORTED"))
                 val backupZip = createBackupZip(importedDbFile, patternArchive("IGNORED"))
                 val backupService = DatabaseBackupService(

@@ -135,7 +135,7 @@ class LedgerFixturesTest {
         assertTrue("fixture needs a persisted FX pair", transactions.any { it.appliedExchangeRate != null && it.exchangeRateSource != null })
         assertEquals(1, RoomCommitmentRepository.from(db).listAll().size)
         assertTrue("fixture needs a resolved review", RoomReviewRepository(db.reviewItemDao()).listAll().any { it.resolutionKind != null })
-        // MIGRATION_19_20 backfills the fixture's two resolved reviews (plan 2.2).
+        // MIGRATION_18_22 backfills the fixture's two resolved reviews (plan 2.2).
         assertEquals(UserDecisionBackfillContract.V18_FIXTURE_DECISIONS, db.userDecisionDao().listAll())
     }
 
@@ -152,10 +152,13 @@ class LedgerFixturesTest {
             }
             migrated.userDecisionDao().insert(
                 UserDecisionEntity(rawSmsId = rawSmsId, kind = "BANK_SELECTION", decidedAtEpochMillis = EXPORTED_AT, bankId = "BANK_SNB"))
+            // A recurring answer (plan 5.2) travels inside the database too.
+            migrated.userDecisionDao().insert(UserDecisionEntity(rawSmsId = null, kind = "RECURRING", decidedAtEpochMillis = EXPORTED_AT,
+                subjectKey = "series", answer = "NOT_RECURRING", payload = "{}"))
             assertTrue(service(migrated, closes = false).exportTo(Uri.fromFile(archive), PASSPHRASE.toCharArray()).isSuccess)
             migrated.close()
             val expected = MigrationOpenPathContract.readOnly(file, MigrationOpenPathContract::rows)
-            assertEquals(UserDecisionBackfillContract.V18_FIXTURE_DECISIONS.size + 1, expected.getValue("user_decision").size)
+            assertEquals(UserDecisionBackfillContract.V18_FIXTURE_DECISIONS.size + 2, expected.getValue("user_decision").size)
 
             context.deleteDatabase(MasroofDatabase.NAME)
             val empty = MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).allowMainThreadQueries().build()

@@ -38,7 +38,7 @@ class RoomUserDecisionRepository(
         }
 
     private fun toDomain(row: UserDecisionEntity) = UserDecision(
-        rawSmsId = row.rawSmsId,
+        rawSmsId = requireNotNull(row.rawSmsId),
         kind = UserDecisionKind.valueOf(row.kind),
         decidedAt = Instant.ofEpochMilli(row.decidedAtEpochMillis),
         pairedRawSmsId = row.pairedRawSmsId,
@@ -57,6 +57,7 @@ class RoomUserDecisionRepository(
 
 /** Appends [decision]; the caller is already inside a database transaction. Public only for tests across the module boundary. */
 suspend fun MasroofDatabase.appendDecision(decision: UserDecision) {
+    require(decision.kind != UserDecisionKind.RECURRING) { "Recurring answers go through RecurringAnswerStore" }
     val (amountDecimal, amountCurrency) = MoneyPersistence.toColumns(decision.amount)
     userDecisionDao().insert(
         UserDecisionEntity(

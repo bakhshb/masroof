@@ -21,7 +21,7 @@ import org.robolectric.annotation.Config
 
 /**
  * Plan 3.2 shadow comparison on the snapshot corpus: each world is built as `LedgerSnapshotTest` builds it (the
- * golden scenarios, all banks with extras, and the legacy states after a full pass), the v19 → v20
+ * golden scenarios, all banks with extras, and the legacy states after a full pass), the v18-upgrade
  * decision backfill runs as on an upgraded device, then [LedgerShadowComparison] compares the stored ledger with
  * the projection. The report is written to `app/build/reports/shadow-ledger/shadow_comparison.txt` (a CI artifact)
  * and must equal `testdata/ledger_snapshot/shadow_comparison.expected.txt`, so a new difference fails.

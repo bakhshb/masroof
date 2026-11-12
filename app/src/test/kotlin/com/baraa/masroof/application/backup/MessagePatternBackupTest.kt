@@ -86,7 +86,7 @@ class MessagePatternBackupTest {
         Unit
     }
 
-    /** A restore journal still carries the pre-v21 file; a rollback puts even an invalid one back untouched. */
+    /** A restore journal still carries the v18 file; a rollback puts even an invalid one back untouched. */
     @Test fun rollbackRestoresEvenAnInvalidOriginalLegacyFileInsteadOfSilentlyDiscardingIt() {
         val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "pattern-rollback")
         val live = context.getDatabasePath(MasroofDatabase.NAME)

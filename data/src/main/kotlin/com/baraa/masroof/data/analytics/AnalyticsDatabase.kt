@@ -43,7 +43,6 @@ data class ForecastComparisonRow(@PrimaryKey val id: String, val periodStart: Lo
     @Query("SELECT * FROM recurring_feedback ORDER BY seriesKey") suspend fun feedback(): List<RecurringFeedbackRow>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun feedback(row: RecurringFeedbackRow)
     @Query("DELETE FROM recurring_feedback") suspend fun clearFeedback()
-    @Query("DELETE FROM recurring_feedback WHERE seriesKey=:seriesKey") suspend fun deleteFeedback(seriesKey: String)
     @Query("SELECT * FROM analysis_snapshot ORDER BY rowid DESC LIMIT 1") suspend fun latest(): AnalysisSnapshotRow?
     @Query("SELECT * FROM analysis_snapshot ORDER BY rowid ASC") suspend fun snapshots(): List<AnalysisSnapshotRow>
     @Query("SELECT * FROM analysis_snapshot ORDER BY rowid DESC LIMIT 20") suspend fun recentSnapshots(): List<AnalysisSnapshotRow>

@@ -15,6 +15,12 @@ enum class UserDecisionKind {
     RESTORE,
     RESTORE_REVERTED,
     BANK_SELECTION,
+
+    /**
+     * An answer about a recurring-payment series (plan 5.2), keyed by its series, not by a raw SMS. It is never an
+     * outcome, correction or selection of any SMS: no read in this file or in processing sees it.
+     */
+    RECURRING,
 }
 
 /**
@@ -87,6 +93,8 @@ data class EffectiveUserDecisions(
     companion object {
         val NONE = EffectiveUserDecisions()
 
+        private val NOT_OUTCOMES =
+            setOf(UserDecisionKind.CORRECTION, UserDecisionKind.BANK_SELECTION, UserDecisionKind.RECURRING)
         private val NON_FINANCIAL_OUTCOMES =
             setOf(UserDecisionKind.NON_FINANCIAL, UserDecisionKind.IGNORE, UserDecisionKind.RESTORE_REVERTED)
         private val FINANCIAL_OUTCOMES =
@@ -99,8 +107,7 @@ data class EffectiveUserDecisions(
             val own = decisions.filter { it.rawSmsId == rawSmsId }
             return EffectiveUserDecisions(
                 outcome = decisions.lastOrNull {
-                    it.kind != UserDecisionKind.CORRECTION && it.kind != UserDecisionKind.BANK_SELECTION &&
-                        (it.rawSmsId == rawSmsId || it.pairedRawSmsId == rawSmsId)
+                    it.kind !in NOT_OUTCOMES && (it.rawSmsId == rawSmsId || it.pairedRawSmsId == rawSmsId)
                 },
                 corrections = own.filter { it.kind == UserDecisionKind.CORRECTION }.sortedBy { it.decidedAt },
                 selectedBankId = own.lastOrNull { it.kind == UserDecisionKind.BANK_SELECTION }?.bankId,

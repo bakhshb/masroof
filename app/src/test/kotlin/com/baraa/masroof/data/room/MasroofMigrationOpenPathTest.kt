@@ -9,7 +9,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The production builder against the committed v18 fixture and a v19 file built from it; the device twin is `MigrationOpenPathDeviceTest`. */
+/** The production builder against the committed v18 fixture and v18 files built from it; the device twin is `MigrationOpenPathDeviceTest`. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class MasroofMigrationOpenPathTest {
@@ -26,8 +26,12 @@ class MasroofMigrationOpenPathTest {
         MigrationOpenPathContract.upgradeKeepsEveryRow(context, fixture)
 
     @Test
-    fun v20File_upgradesAddingOnlyTheEmptyPatternTable() =
-        MigrationOpenPathContract.v20UpgradeAddsOnlyThePatternTable(context, fixture)
+    fun v18Fixture_upgradesToTheSchemaRoomCreatesForAFreshFile() =
+        MigrationOpenPathContract.upgradeCreatesTheExportedSchema(context, fixture)
+
+    @Test
+    fun retiredDevelopmentVersions_areRejectedAndTheFileIsUntouched() =
+        MigrationOpenPathContract.retiredVersionsAreRejectedUntouched(context, fixture)
 
     @Test
     fun olderSchema_isRejectedAndTheFileIsUntouched() =
@@ -46,13 +50,5 @@ class MasroofMigrationOpenPathTest {
         MigrationOpenPathContract.unknownBaselineStructureIsRejectedUntouched(context, fixture)
 
     @Test
-    fun v19File_backfillsEveryDecisionKindOnUpgrade() = UserDecisionBackfillContract.everyKindIsBackfilled(context, fixture)
-
-    @Test
-    fun v19File_keepsDualWriteRowsLatestWithoutDuplicates() =
-        UserDecisionBackfillContract.dualWriteRowsStayLatestAndAreNotDuplicated(context, fixture)
-
-    @Test
-    fun unknownV19IdentityHash_isRejectedAndTheFileIsUntouched() =
-        UserDecisionBackfillContract.unknownV19IdentityHashIsRejectedUntouched(context, fixture)
+    fun v18FileWithEveryLegacyTrace_backfillsEveryDecisionKindOnUpgrade() = UserDecisionBackfillContract.everyKindIsBackfilled(context, fixture)
 }

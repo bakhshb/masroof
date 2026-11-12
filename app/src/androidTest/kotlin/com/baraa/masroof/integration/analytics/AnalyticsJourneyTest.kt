@@ -545,6 +545,10 @@ class AnalyticsJourneyTest {
             awaitAnalysis(c.analytics) { state -> state.recurringCorrections.any {
                 it.seriesKey == candidate.seriesKey && it.kind == "DISMISSED"
             } }
+            // Plan 5.2: each answer, the undo included, is one appended row of user_decision.
+            assertEquals(listOf("NOT_RECURRING", "UNDONE", "DISMISSED"), runBlocking {
+                c.storage.database.userDecisionDao().listRecurring().filter { it.subjectKey == candidate.seriesKey }.map { it.answer }
+            })
             assertEquals(before, runBlocking { c.storage.financialTransactionRepository.listAll() })
             screen("recurring-explicit-feedback")
         } finally {
