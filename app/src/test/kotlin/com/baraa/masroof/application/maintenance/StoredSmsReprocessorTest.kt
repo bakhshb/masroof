@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.maintenance
 
+import com.baraa.masroof.testsupport.latestFor
 import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
@@ -210,7 +211,7 @@ class StoredSmsReprocessorTest {
         assertEquals(linked.id, after.id)
         assertEquals(linked.type, after.type)
         assertEquals(1, ftRepo.listAll().size)
-        assertNotNull(correctionRepo.latestForRawSmsId(raw.id))
+        assertNotNull(correctionRepo.latestFor(raw.id))
         assertEquals(
             "Keeta Corrected",
             EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)).findEffectiveByRawSmsId(raw.id)!!.event.merchant,

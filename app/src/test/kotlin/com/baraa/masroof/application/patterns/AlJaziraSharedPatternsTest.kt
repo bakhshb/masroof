@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.latestFor
 import com.baraa.masroof.testsupport.saveCorrection
 import com.baraa.masroof.testsupport.ingest
 import com.baraa.masroof.testsupport.uniqueStorageContext
@@ -81,7 +82,7 @@ class AlJaziraSharedPatternsTest {
                 com.baraa.masroof.core.money.Money.of("15", com.baraa.masroof.core.money.Currency.SAR), null, null, Instant.parse("2026-10-15T10:00:00Z"))
             c.storage.database.saveCorrection(correction)
             assertTrue(c.sms.processStoredSmsUseCase.process(raw.id) is SmsIngestionResult.Parsed)
-            assertEquals(correction, c.storage.userCorrectionRepository.latestForRawSmsId(raw.id))
+            assertEquals(correction, c.storage.userCorrectionRepository.latestFor(raw.id))
             assertEquals("10.00", c.storage.parsedEventRepository.findByRawSmsId(raw.id)!!.event.amount!!.amount.toPlainString())
             assertEquals("15.00", c.storage.financialTransactionRepository.listAll().single().amount.amount.toPlainString())
         }

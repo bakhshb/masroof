@@ -1,5 +1,6 @@
 package com.baraa.masroof.integrity
 
+import com.baraa.masroof.testsupport.latestFor
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
@@ -233,7 +234,7 @@ class ManualDecisionReplayTest {
             assertEquals("seed=$seed correction family", MessageFamily.PURCHASE, success.correction.correctedType)
 
             ledger.replayProduction()
-            val stored = ledger.corrections.latestForRawSmsId(rawId)!!
+            val stored = ledger.corrections.latestFor(rawId)!!
             assertEquals("seed=$seed correction lost merchant", "TEST_CORRECTION", stored.correctedMerchant)
             assertEquals("seed=$seed correction lost amount", amount, stored.correctedAmount)
             assertEquals("seed=$seed correction lost family", MessageFamily.PURCHASE, stored.correctedType)

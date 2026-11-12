@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.testsupport.latestFor
 import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction
@@ -149,7 +150,7 @@ class TransactionReclassificationServiceTest {
         val result=guard.write(listOf(assembledFrom)) { wrote=true;FinancialTransactionSaveResult.Saved }
         assertTrue(result is FinancialTransactionSaveResult.Conflict)
         assertTrue(!wrote)
-        assertEquals("150.00",corrections.latestForRawSmsId("racing-edit")!!.correctedAmount!!.amount.toPlainString())
+        assertEquals("150.00",corrections.latestFor("racing-edit")!!.correctedAmount!!.amount.toPlainString())
     }
 
     @Test

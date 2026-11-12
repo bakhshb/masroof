@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.testsupport.listFor
+import com.baraa.masroof.testsupport.latestFor
 import com.baraa.masroof.testsupport.saveCorrection
 import com.baraa.masroof.testsupport.RoomReviewWiring
 import android.content.Context
@@ -269,7 +271,7 @@ class ReviewWorkflowServiceTest {
         assertEquals(bodyBefore, rawRepo.getById("sms-buy")!!.body)
         assertNull(parsedRepo.findByRawSmsId("sms-buy")!!.event.amount)
         assertEquals(parsedBefore.id, parsedRepo.findByRawSmsId("sms-buy")!!.event.id)
-        assertNotNull(correctionRepo.latestForRawSmsId("sms-buy"))
+        assertNotNull(correctionRepo.latestFor("sms-buy"))
     }
 
     @Test
@@ -304,7 +306,7 @@ class ReviewWorkflowServiceTest {
             .findEffectiveByRawSmsId("sms-r")!!
         assertEquals("e2", effective.event.id)
         assertEquals(money("51.99"), effective.event.amount)
-        assertEquals("sms-r", correctionRepo.latestForRawSmsId("sms-r")!!.targetRawSmsId)
+        assertEquals("sms-r", correctionRepo.latestFor("sms-r")!!.targetRawSmsId)
     }
 
     @Test
@@ -774,7 +776,7 @@ class ReviewWorkflowServiceTest {
         )
         db.saveCorrection(a)
         db.saveCorrection(b)
-        val listed = correctionRepo.listForRawSmsId("sms-c2")
+        val listed = correctionRepo.listFor("sms-c2")
         assertEquals(2, listed.size)
         assertNotEquals(listed[0].id, listed[1].id)
         assertEquals(listOf(a.id, b.id).sorted(), listed.map { it.id }.sorted())
@@ -1113,7 +1115,7 @@ class ReviewWorkflowServiceTest {
 
         assertTrue(result is ReviewWorkflowResult.Rejected)
         assertEquals("reconciliation_incomplete", (result as ReviewWorkflowResult.Rejected).reason)
-        assertEquals(money("51.99"), correctionRepo.latestForRawSmsId("sms-conflict")!!.correctedAmount)
+        assertEquals(money("51.99"), correctionRepo.latestFor("sms-conflict")!!.correctedAmount)
         assertEquals(0, ftRepo.listAll().size)
         val review = reviewRepo.findByRawSmsId("sms-conflict")!!
         assertEquals(ReviewStatus.REQUIRED, review.status)

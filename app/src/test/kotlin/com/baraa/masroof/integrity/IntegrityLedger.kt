@@ -1,5 +1,6 @@
 package com.baraa.masroof.integrity
 
+import com.baraa.masroof.testsupport.latestFor
 import com.baraa.masroof.application.dashboard.GoldenExpected
 import com.baraa.masroof.application.dashboard.GoldenLedgerRunner
 import com.baraa.masroof.application.dashboard.GoldenLedgerScenario
@@ -561,7 +562,7 @@ internal suspend fun assertFinancialInvariants(
                 world.ftRepo.findByRawSmsId(rawSmsId)!!.id,
             )
             val parsedAmount = world.parsedRepo.findByRawSmsId(rawSmsId)?.event?.amount
-            val correctedAmount = corrections.latestForRawSmsId(rawSmsId)?.correctedAmount
+            val correctedAmount = corrections.latestFor(rawSmsId)?.correctedAmount
             if (parsedAmount != null && correctedAmount == null) {
                 assertEquals(
                     "$prefix stored currency",

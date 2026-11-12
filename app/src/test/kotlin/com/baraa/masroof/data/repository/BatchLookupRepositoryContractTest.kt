@@ -80,7 +80,8 @@ class BatchLookupRepositoryContractTest {
             )
         }
 
-        assertEquals(corrections.listForRawSmsIds(raw.listIdsByReceivedAt()), corrections.listAll())
+        // Grouped by target, then oldest first: the order the per-SMS lookups used to give.
+        assertEquals(listOf("c-1", "c-2", "c-0"), corrections.listAll().map { it.id })
     }
 
     private fun rawSms(id: String) = RawSms(id, "AlJazira", "body-$id", now, null, "hash-$id")

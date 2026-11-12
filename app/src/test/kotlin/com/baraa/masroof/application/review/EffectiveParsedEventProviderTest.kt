@@ -7,14 +7,11 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.repository.RoomUserDecisionRepository
 import com.baraa.masroof.domain.model.EffectiveUserDecisions
 import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.testsupport.DecidedCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
-import com.baraa.masroof.data.room.dao.UserCorrectionDao
-import com.baraa.masroof.data.room.entity.UserCorrectionEntity
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.MessageFamily
@@ -154,20 +151,20 @@ class EffectiveParsedEventProviderTest {
     }
 
     @Test
-    fun batchLookup_ordersByTargetThenTimeThenId_andChunksAtTheBindLimit() = runBlocking {
+    fun batchLookup_ordersByTargetThenTimeThenId_likeTheLegacyStore() = runBlocking {
         val lookup = listOf("raw-outside", "missing", "raw-multi", "raw-merchant", "raw-transfer-out")
         val orderedIds = listOf("corr-merchant", "corr-a", "corr-b", "corr-c", "corr-old", "corr-xfer")
-        assertEquals(orderedIds, db.userCorrectionDao().listForRawSmsIds(lookup).map { it.id })
-        assertEquals(orderedIds, corrections.listForRawSmsIds(lookup).map { it.id })
-        assertEquals(emptyList<UserCorrection>(), corrections.listForRawSmsIds(emptyList()))
-
-        val correctionDao = CountingUserCorrectionDao(db.userCorrectionDao())
-        val chunkedCorrections = RoomUserCorrectionRepository(correctionDao, batchChunkSize = 1)
-        assertEquals(orderedIds, chunkedCorrections.listForRawSmsIds(lookup).map { it.id })
-        assertEquals(lookup.distinct().size, correctionDao.batchQueries)
-        assertEquals(0, correctionDao.perSmsQueries)
-        assertTrue(correctionDao.batchIdChunks.all { it.size == 1 })
-        // The provider's own chunking moved into the decision reader (UserDecisionReaderTest).
+        val legacy = corrections.listAll().filter { it.targetRawSmsId in lookup }
+        assertEquals(orderedIds, legacy.map { it.id })
+        val read = decisions.effectiveFor(lookup)
+        // Chunking of this read is covered by UserDecisionReaderTest.
+        assertEquals(
+            legacy.map { listOf(it.targetRawSmsId, it.correctedType, it.correctedAmount, it.correctedMerchant, it.correctedCounterparty) },
+            lookup.sorted().flatMap { id ->
+                read.getValue(id).corrections.map { listOf(it.rawSmsId, it.messageFamily, it.amount, it.merchant, it.counterparty) }
+            },
+        )
+        assertEquals(emptyMap<String, Any>(), decisions.effectiveFor(emptyList()))
     }
 
     private suspend fun expectedEffective(records: List<ParsedEventRecord>): List<ParsedEventRecord> =
@@ -313,31 +310,6 @@ class EffectiveParsedEventProviderTest {
             batchQueries += 1
             batchIdChunks += rawSmsIds.toList()
             return delegate.effectiveFor(rawSmsIds)
-        }
-    }
-
-    private class CountingUserCorrectionDao(
-        private val delegate: UserCorrectionDao,
-    ) : UserCorrectionDao by delegate {
-        var perSmsQueries: Int = 0
-        var batchQueries: Int = 0
-        val batchIdChunks: MutableList<List<String>> = mutableListOf()
-
-        fun reset() {
-            perSmsQueries = 0
-            batchQueries = 0
-            batchIdChunks.clear()
-        }
-
-        override suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrectionEntity> {
-            perSmsQueries += 1
-            return delegate.listForRawSmsId(rawSmsId)
-        }
-
-        override suspend fun listForRawSmsIds(rawSmsIds: List<String>): List<UserCorrectionEntity> {
-            batchQueries += 1
-            batchIdChunks += rawSmsIds
-            return delegate.listForRawSmsIds(rawSmsIds)
         }
     }
 }

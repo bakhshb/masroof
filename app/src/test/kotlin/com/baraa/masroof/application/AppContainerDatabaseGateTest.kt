@@ -28,7 +28,8 @@ class AppContainerDatabaseGateTest {
             { container.storage.financialTransactionRepository.listAll() },
             { container.storage.reviewRepository.listAll() },
             { container.storage.processingRetryRepository.listRetryableRawSmsIds() },
-            { container.storage.userCorrectionRepository.listForRawSmsId("irrelevant") },
+            { container.storage.userCorrectionRepository.listAll() },
+            { container.storage.userDecisionRepository.effectiveFor("irrelevant") },
         )
         container.storage.databaseAccessGate.retire()
         reads.forEachIndexed { index, read ->

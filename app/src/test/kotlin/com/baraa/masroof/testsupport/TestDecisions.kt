@@ -16,6 +16,12 @@ import com.baraa.masroof.domain.repository.UserCorrectionRepository
  */
 internal fun MasroofDatabase.backfillDecisions() = UserDecisionBackfill.run(openHelper.writableDatabase)
 
+/** [rawSmsId]'s legacy `user_correction` rows, oldest first (the store's `listAll` order). */
+internal suspend fun UserCorrectionRepository.listFor(rawSmsId: String) = listAll().filter { it.targetRawSmsId == rawSmsId }
+
+/** [rawSmsId]'s latest legacy `user_correction` row. */
+internal suspend fun UserCorrectionRepository.latestFor(rawSmsId: String) = listFor(rawSmsId).lastOrNull()
+
 /** Appends [decision] as its production writer does, for tests that seed the legacy store by hand. */
 internal suspend fun MasroofDatabase.recordDecision(decision: UserDecision) = withTransaction { appendDecision(decision) }
 
