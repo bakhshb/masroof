@@ -34,6 +34,10 @@ class MasroofMigrationOpenPathTest {
         MigrationOpenPathContract.unknownIdentityHashIsRejectedUntouched(context, fixture)
 
     @Test
+    fun unknownIdentityHashAfterUpgrade_isRejectedAndTheFileIsUntouched() =
+        MigrationOpenPathContract.unknownIdentityHashAfterUpgradeIsRejectedUntouched(context, fixture)
+
+    @Test
     fun unknownBaselineStructure_isRejectedAndTheFileIsUntouched() =
         MigrationOpenPathContract.unknownBaselineStructureIsRejectedUntouched(context, fixture)
 }

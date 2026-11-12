@@ -42,7 +42,9 @@ class ExplicitBankSelectionWorkflow(
         if (existing.status != ReviewStatus.REQUIRED) return
         val routeReason = existing.reasons.firstOrNull { it in ExplicitBankSelection.ROUTE_REASONS_OFFERING_CHOICE }
         val now = clock.now()
-        userDecisionRepository.recordWith(UserDecision(rawSmsId, UserDecisionKind.BANK_SELECTION, now, bankId = bank.id)) {
+        val decision = UserDecision(rawSmsId, UserDecisionKind.BANK_SELECTION, now, bankId = bank.id)
+        // A repeat of the same bank, or a review resolved meanwhile, returns the stored row unchanged: no new decision.
+        userDecisionRepository.recordWith(decision, { reviewRepository.findByRawSmsId(rawSmsId) }) {
             reviewRepository.upsertRequired(
                 rawSmsId = rawSmsId,
                 kind = existing.kind,

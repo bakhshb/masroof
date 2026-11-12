@@ -12,10 +12,11 @@ class RoomUserDecisionRepository(
     private val database: MasroofDatabase,
     private val accessGate: DatabaseAccessGate = DatabaseAccessGate(),
 ) : UserDecisionRepository {
-    override suspend fun <R : Any> recordWith(decision: UserDecision, write: suspend () -> R?): R? =
+    override suspend fun <R : Any> recordWith(decision: UserDecision, before: suspend () -> R?, write: suspend () -> R?): R? =
         accessGate.withAccess {
             database.withTransaction {
-                write()?.also { database.appendDecision(decision) }
+                val previous = before()
+                write()?.also { if (it != previous) database.appendDecision(decision) }
             }
         }
 }
@@ -32,6 +33,8 @@ internal suspend fun MasroofDatabase.appendDecision(decision: UserDecision) {
             transactionType = decision.transactionType?.name,
             sourceContainerId = decision.sourceContainerId,
             destinationContainerId = decision.destinationContainerId,
+            occurredAtEpochMillis = decision.occurredAt?.toEpochMilli(),
+            occurredAtZone = decision.occurredAtZone,
             messageFamily = decision.messageFamily?.name,
             amountDecimal = amountDecimal,
             amountCurrency = amountCurrency,

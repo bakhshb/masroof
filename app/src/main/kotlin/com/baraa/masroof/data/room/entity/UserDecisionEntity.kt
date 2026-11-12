@@ -38,6 +38,8 @@ data class UserDecisionEntity(
     val transactionType: String? = null,
     val sourceContainerId: String? = null,
     val destinationContainerId: String? = null,
+    val occurredAtEpochMillis: Long? = null,
+    val occurredAtZone: String? = null,
     val messageFamily: String? = null,
     val amountDecimal: String? = null,
     val amountCurrency: String? = null,

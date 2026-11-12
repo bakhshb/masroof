@@ -140,14 +140,15 @@ object MigrationOpenPathContract {
     fun olderSchemaIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
         editedFixtureIsRejectedUntouched(context, fixture, "PRAGMA user_version = ${MasroofDatabase.BASELINE_VERSION - 1}")
 
-    /**
-     * Room checks the identity hash only of a file already at the current version (a migration validates the
-     * resulting tables instead), so the hash is changed on the fixture after it is upgraded to production.
-     */
+    /** A v18 file with an unknown identity hash fails the hash check in `MIGRATION_18_19` and stays untouched. */
     fun unknownIdentityHashIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
-        editedFixtureIsRejectedUntouched(context, fixture, "UPDATE room_master_table SET identity_hash = '${"0".repeat(32)}'") {
-            openOnce(context, MasroofDatabase::class.java, it)
-        }
+        editedFixtureIsRejectedUntouched(context, fixture, UNKNOWN_HASH)
+
+    /** A file already at the current version with an unknown identity hash is refused by Room's own check. */
+    fun unknownIdentityHashAfterUpgradeIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
+        editedFixtureIsRejectedUntouched(context, fixture, UNKNOWN_HASH) { openOnce(context, MasroofDatabase::class.java, it) }
+
+    private val UNKNOWN_HASH = "UPDATE room_master_table SET identity_hash = '" + "0".repeat(32) + "'"
 
     /** A v18-labelled file whose tables differ from v18 fails the migration's validation and stays untouched. */
     fun unknownBaselineStructureIsRejectedUntouched(context: Context, fixture: () -> InputStream) =

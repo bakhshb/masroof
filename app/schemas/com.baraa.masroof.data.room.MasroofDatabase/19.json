@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 19,
-    "identityHash": "ae0c7cc4860648762a79c62a0d1ac542",
+    "identityHash": "358f8daabc18a4cc065c8b8e51261442",
     "entities": [
       {
         "tableName": "raw_sms",
@@ -1252,7 +1252,7 @@
       },
       {
         "tableName": "user_decision",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `rawSmsId` TEXT NOT NULL, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, `decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, `destinationContainerId` TEXT, `messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, `merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `rawSmsId` TEXT NOT NULL, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, `decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, `destinationContainerId` TEXT, `occurredAtEpochMillis` INTEGER, `occurredAtZone` TEXT, `messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, `merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "sequence",
@@ -1296,6 +1296,16 @@
           {
             "fieldPath": "destinationContainerId",
             "columnName": "destinationContainerId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "occurredAtEpochMillis",
+            "columnName": "occurredAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "occurredAtZone",
+            "columnName": "occurredAtZone",
             "affinity": "TEXT"
           },
           {
@@ -1384,7 +1394,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ae0c7cc4860648762a79c62a0d1ac542')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '358f8daabc18a4cc065c8b8e51261442')"
     ]
   }
 }

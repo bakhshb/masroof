@@ -227,7 +227,7 @@ class ReviewWorkflowService(
             merchant = correctedMerchant,
             counterparty = correctedCounterparty,
         )
-        userDecisionRepository.recordWith(decision) { userCorrectionRepository.save(correction) }
+        userDecisionRepository.recordWith(decision, before = { null }) { userCorrectionRepository.save(correction) }
 
         val incomplete = reconcileAffectedAndUpdateReviews(listOf(review.rawSmsId))
         if (incomplete != null) {
@@ -486,7 +486,8 @@ class ReviewWorkflowService(
             return ReviewWorkflowResult.Rejected("raw_sms_already_finalized")
         }
         val now = clock.now()
-        val marked = userDecisionRepository.recordWith(UserDecision(review.rawSmsId, UserDecisionKind.NON_FINANCIAL, now)) {
+        val decision = UserDecision(review.rawSmsId, UserDecisionKind.NON_FINANCIAL, now)
+        val marked = userDecisionRepository.recordWith(decision, { reviewRepository.getById(review.id) }) {
             reviewRepository.markResolved(
                 id = review.id,
                 resolutionKind = ReviewResolutionKind.USER_NON_FINANCIAL,

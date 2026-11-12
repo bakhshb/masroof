@@ -143,7 +143,7 @@ class TransactionRestoreService(
         decisionKind: UserDecisionKind,
     ): ReviewItem? {
         val now = clock.now()
-        return userDecisionRepository.recordWith(UserDecision(rawSmsId, decisionKind, now)) {
+        return userDecisionRepository.recordWith(UserDecision(rawSmsId, decisionKind, now), { reviewRepository.getById(reviewId) }) {
             reviewRepository.markResolved(id = reviewId, resolutionKind = resolutionKind, resolvedAt = now, resolvedTransactionId = null)
         }
     }

@@ -57,7 +57,8 @@ internal object EmptyUserCorrectionRepository : UserCorrectionRepository {
 
 /** Runs the write and keeps no decision row. */
 internal object NoOpUserDecisionRepository : UserDecisionRepository {
-    override suspend fun <R : Any> recordWith(decision: UserDecision, write: suspend () -> R?): R? = write()
+    override suspend fun <R : Any> recordWith(decision: UserDecision, before: suspend () -> R?, write: suspend () -> R?): R? =
+        write()
 }
 
 internal fun noOpOwnershipDiscovery() =

@@ -5,8 +5,9 @@ import com.baraa.masroof.domain.model.UserDecision
 /** Append-only store of explicit user decisions. */
 interface UserDecisionRepository {
     /**
-     * Runs [write] and, when it returns a result, appends [decision], both in one database transaction.
-     * A null result appends nothing; a throw from either rolls both back.
+     * In one database transaction: reads [before], runs [write] and appends [decision] only when [write] returns
+     * a result that differs from [before]. A null result, or one equal to [before] (an idempotent repeat that
+     * changed nothing), appends nothing; a throw from any step rolls all of them back.
      */
-    suspend fun <R : Any> recordWith(decision: UserDecision, write: suspend () -> R?): R?
+    suspend fun <R : Any> recordWith(decision: UserDecision, before: suspend () -> R?, write: suspend () -> R?): R?
 }

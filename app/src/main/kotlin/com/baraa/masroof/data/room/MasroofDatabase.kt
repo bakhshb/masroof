@@ -100,7 +100,7 @@ abstract class MasroofDatabase : RoomDatabase() {
         const val BASELINE_VERSION: Int = 18
 
         /** Must match app/schemas/.../19.json identityHash. */
-        const val IDENTITY_HASH: String = "ae0c7cc4860648762a79c62a0d1ac542"
+        const val IDENTITY_HASH: String = "358f8daabc18a4cc065c8b8e51261442"
 
         /**
          * The identity hash of every schema from [BASELINE_VERSION] to [VERSION], the only pairs a backup may carry.
@@ -114,12 +114,19 @@ abstract class MasroofDatabase : RoomDatabase() {
         /** Adds the append-only `user_decision` table (plan 2.1); no existing row changes and nothing is backfilled. */
         val MIGRATION_18_19: Migration = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                // Room checks only the tables after a migration; an unknown v18 hash fails here, inside the upgrade
+                // transaction, so the file is left untouched.
+                val hash = db.query("SELECT identity_hash FROM room_master_table").use {
+                    if (it.moveToFirst()) it.getString(0) else null
+                }
+                check(hash == IDENTITY_HASHES.getValue(18)) { "Unknown schema 18 identity hash" }
                 // Copied from 19.json; Room validates the result on open.
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `user_decision` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                         "`rawSmsId` TEXT NOT NULL, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, " +
                         "`decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, " +
-                        "`destinationContainerId` TEXT, `messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, " +
+                        "`destinationContainerId` TEXT, `occurredAtEpochMillis` INTEGER, `occurredAtZone` TEXT, " +
+                        "`messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, " +
                         "`merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, " +
                         "FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , " +
                         "FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",

@@ -29,6 +29,8 @@ data class UserDecision(
     val transactionType: FinancialTransactionType? = null,
     val sourceContainerId: String? = null,
     val destinationContainerId: String? = null,
+    val occurredAt: Instant? = null,
+    val occurredAtZone: String? = null,
     val messageFamily: MessageFamily? = null,
     val amount: Money? = null,
     val merchant: String? = null,
@@ -36,7 +38,7 @@ data class UserDecision(
     val bankId: String? = null,
 ) {
     companion object {
-        /** A posting decision: the type and endpoints of [transaction]. */
+        /** A posting decision: the type, endpoints and effective time of [transaction], as posted. */
         fun posting(
             kind: UserDecisionKind,
             rawSmsId: String,
@@ -51,6 +53,8 @@ data class UserDecision(
             transactionType = transaction.type,
             sourceContainerId = transaction.sourceContainerId,
             destinationContainerId = transaction.destinationContainerId,
+            occurredAt = transaction.occurredAt,
+            occurredAtZone = transaction.occurredAtZone,
         )
     }
 }
