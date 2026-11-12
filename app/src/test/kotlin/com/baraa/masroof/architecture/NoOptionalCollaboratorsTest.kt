@@ -68,7 +68,7 @@ class NoOptionalCollaboratorsTest {
         }
 
     private companion object {
-        val applicationFiles: List<File> = listOf("src/main", "../dashboard-core/src/main")
+        val applicationFiles: List<File> = listOf("src/main", "../dashboard-core/src/main", "../data/src/main")
             .flatMap { File(it, "kotlin/com/baraa/masroof/application").walkTopDown() }
             .filter { it.isFile && it.extension == "kt" }.toList()
 
