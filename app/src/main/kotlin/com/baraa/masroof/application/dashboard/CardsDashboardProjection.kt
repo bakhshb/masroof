@@ -3,12 +3,6 @@ package com.baraa.masroof.application.dashboard
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 
-data class CardsDashboardSection(
-    val creditFacilities: CreditFacilitiesOverview,
-    val transactionCardInvolvement: Map<String, Set<String>>,
-    val transactionDebitSpendInvolvement: Map<String, Set<String>>,
-)
-
 /**
  * Credit facilities (statement window), debit-card spending, and card involvement.
  *

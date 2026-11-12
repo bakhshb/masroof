@@ -29,6 +29,10 @@ class ModuleBoundaryTest {
                 "com.baraa.masroof.domain.assembly.",
                 "com.baraa.masroof.domain.matching.",
                 "com.baraa.masroof.domain.statement.",
+                "com.baraa.masroof.parsing.model.",
+                "com.baraa.masroof.parsing.repository.",
+                "com.baraa.masroof.application.locale.",
+                "com.baraa.masroof.application.commitment.",
             ),
             "bank-engine" to common + listOf("com.baraa.masroof.engine.bank.", "com.baraa.masroof.finance.value."),
             "ledger" to common + listOf(
@@ -39,6 +43,18 @@ class ModuleBoundaryTest {
                 "com.baraa.masroof.domain.assembly.",
                 "com.baraa.masroof.domain.matching.",
                 "com.baraa.masroof.domain.rules.",
+            ),
+            "dashboard-core" to common + listOf(
+                "com.baraa.masroof.application.dashboard.",
+                "com.baraa.masroof.application.locale.",
+                "com.baraa.masroof.application.commitment.",
+                "com.baraa.masroof.core.money.",
+                "com.baraa.masroof.domain.model.",
+                "com.baraa.masroof.domain.ids.",
+                "com.baraa.masroof.domain.period.",
+                "com.baraa.masroof.domain.assembly.",
+                "com.baraa.masroof.parsing.model.",
+                "com.baraa.masroof.parsing.repository.",
             ),
         ).forEach { (module, allowed) ->
             val sources = File(root, "$module/src/main/kotlin").walkTopDown().filter { it.extension == "kt" }.toList()
@@ -62,7 +78,7 @@ class ModuleBoundaryTest {
 
     @Test fun pureModulesNeverDependOnAppAndModuleGraphHasNoCycles() {
         val buildFiles = listOf(File(root, "app/build.gradle.kts")) +
-            listOf("bank-engine", "finance-core", "ml-assist", "ledger").map { File(root, "$it/build.gradle.kts") }
+            listOf("bank-engine", "finance-core", "ml-assist", "ledger", "dashboard-core").map { File(root, "$it/build.gradle.kts") }
         val graph = buildFiles.associate { file ->
             val module = ":" + file.parentFile.relativeTo(root).invariantSeparatorsPath.replace('/', ':')
             module to projectDependency.findAll(file.readText()).map { it.groupValues[1] }.toSet()
@@ -75,7 +91,8 @@ class ModuleBoundaryTest {
         assertEquals(emptySet<String>(), graph[":finance-core"])
         assertEquals(setOf(":finance-core"), graph[":bank-engine"])
         assertEquals(setOf(":finance-core"), graph[":ledger"])
-        assertEquals(setOf(":ui-kit", ":finance-core", ":bank-engine", ":ml-assist", ":ledger"), graph[":app"])
+        assertEquals(setOf(":finance-core"), graph[":dashboard-core"])
+        assertEquals(setOf(":ui-kit", ":finance-core", ":bank-engine", ":ml-assist", ":ledger", ":dashboard-core"), graph[":app"])
         fun visit(module: String, ancestors: Set<String>) {
             assertFalse(module in ancestors, "Dependency cycle: $ancestors -> $module")
             graph[module].orEmpty().forEach { visit(it, ancestors + module) }

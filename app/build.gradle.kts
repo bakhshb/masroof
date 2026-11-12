@@ -107,6 +107,7 @@ android {
             it.inputs.files(
                 fileTree("src/main/kotlin") { include("**/*.kt") },
                 rootProject.fileTree("finance-core/src/main/kotlin") { include("**/*.kt") },
+                rootProject.fileTree("dashboard-core/src/main/kotlin") { include("**/*.kt") },
                 fileTree("schemas/com.baraa.masroof.data.room.MasroofDatabase") { include("*.json") },
             ).withPathSensitivity(PathSensitivity.RELATIVE)
             if (it.name == "testDebugUnitTest") {
@@ -135,6 +136,7 @@ dependencies {
     implementation(project(":finance-core"))
     implementation(project(":ml-assist"))
     implementation(project(":ledger"))
+    implementation(project(":dashboard-core"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.viewmodel)
@@ -165,6 +167,7 @@ dependencies {
     implementation(libs.androidx.work.runtime)
 
     testImplementation(testFixtures(project(":bank-engine")))
+    testImplementation(testFixtures(project(":finance-core")))
     androidTestImplementation(testFixtures(project(":bank-engine")))
 
     testImplementation(libs.junit)

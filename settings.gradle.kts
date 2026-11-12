@@ -21,5 +21,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Masroof"
 include(":app")
-include(":finance-core", ":bank-engine", ":ml-assist", ":ledger")
+include(":finance-core", ":bank-engine", ":ml-assist", ":ledger", ":dashboard-core")
 include(":ui-kit")

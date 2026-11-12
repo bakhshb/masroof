@@ -8,11 +8,12 @@ Masroof has one Android application, one financial database and one bank interpr
 - `bank-engine`: pure Kotlin message-pattern matching, literal-role interpretation and extraction evidence, depending only on `finance-core` value contracts. `MessagePatternSmsAdapter` maps its output through `InterpretationDraftMapper` and the production `ParseFinalizer`.
 - `finance-core`: production money/value models, salary and statement periods, bank transaction time, deterministic container/transaction identities, financial classification/impact, transfer matching and assembly, and statement matching. Policies consume supplied facts and return decisions or transactions in memory; there is no ledger, repository, Android dependency or I/O. Existing engine value contracts remain available separately.
 - `ledger`: the pure derived-ledger projector (plan 3.1), depending only on `finance-core`. Since plan 3.3a it is how reconciliation writes the ledger; see "Derived ledger" and "Ledger writer" below.
+- `dashboard-core` (plan 4.1): the pure JVM dashboard read model, depending only on `finance-core`: the `*Builder`, `*Calculator`, `*Overview`, `*Resolver`, `*Classifier`, `*Scope` and value types of `application/dashboard`, plus the Accounts and Analysis section projections, and `DashboardOverview`/`DashboardEvidence`/`DashboardProjectionContext`. Packages stay `com.baraa.masroof.application.dashboard`. What loads data stays in `app`: `DashboardService`, `DashboardProjectionBuilder`, the Cards and Commitments projections (they read repositories), `DashboardEvidenceScope`/`TransactionSmsEvidenceLoader`, `DashboardCommitmentsWorkflow`/`DashboardRegistryWorkflow`/`DashboardPeriodWorkflow` (repositories, clock), `ChartDataWorkflow` and `DashboardLayoutPreferences` (kotlinx.serialization/coroutines) and `AnalysisSpendingInsightsBuilder` (`@Serializable` output). Tests that need Robolectric or the app database (`DashboardFixtureCharacterizationTest`, `LedgerSnapshotTest`, `DashboardProjectionBuilderTest`, the golden-ledger tests) stay in `app`.
 - `ml-assist`: exact human-template family memory, cleaned templates, forecasting and recurring-pattern detection. The engine consumes an injected assistance contract rather than depending on ML implementation.
 - `ui-kit`: shared theme, typography, fonts, cards and charts. It cannot access financial storage.
 
 Source namespaces use `com.baraa.masroof.engine.bank`, `com.baraa.masroof.finance.value`,
-`com.baraa.masroof.ml`, `com.baraa.masroof.analytics` and `com.baraa.masroof.ledger`. Application integration
+`com.baraa.masroof.ml`, `com.baraa.masroof.analytics` and `com.baraa.masroof.ledger`. `dashboard-core` keeps `com.baraa.masroof.application.dashboard`, and `finance-core` also holds the plain value models the dashboard reads (`RawSms`, registry entries, `Commitment`, `ParsedEventDetails`, `ParsedEventRecord`, `AppLocale`) under their original packages. Application integration
 tests use `com.baraa.masroof.integration`. Historical `lab`/`beta` source paths and
 source file prefixes have been removed. Existing serialized backup keys and retired
 work identifiers keep their original spelling for upgrade compatibility.
@@ -59,6 +60,7 @@ Keep the existing six modules. Organize by responsibility; a filename containing
 | `app: application.backup` | Pattern capture, restore and rollback integration |
 | `app: presentation.patterns` | Render application models and collect user input |
 | `finance-core` | Financial classification, matching and assembly from supplied facts |
+| `dashboard-core` | Dashboard builders, calculators and section projections from supplied facts (no repositories) |
 | `ledger` | Derived ledger from evidence, decisions and ownership (shadow comparison only; not the writer yet) |
 
 `StorageContainer` loads `app/src/main/assets/bank-patterns/*.patterns.json`, installs
