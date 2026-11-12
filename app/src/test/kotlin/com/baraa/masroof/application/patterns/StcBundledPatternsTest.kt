@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.withPatternDatabase
 import com.baraa.masroof.testsupport.bundledPatterns
 import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.data.patterns.MessagePatternStore
@@ -9,10 +10,14 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
-import java.nio.file.Files
 import com.baraa.masroof.testsupport.NoOpAppLog
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class StcBundledPatternsTest {
     @Test fun sarieTransferMatchesAnEmptyAccountLineWithoutInventingAnAccountReference() {
         val bank = bundledPatterns("BANK_STC").banks.single()
@@ -77,9 +82,8 @@ class StcBundledPatternsTest {
     }
 
     @Test fun defaultsInstallOnceWithoutOverwritingUserRevisionsOrSenderIdentities() = runBlocking {
-        val directory = Files.createTempDirectory("stc-defaults-").toFile()
-        try {
-            val store = MessagePatternStore(directory.resolve("patterns.json"))
+        withPatternDatabase { db ->
+            val store = MessagePatternStore(db)
             val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(generate()), appLogService = NoOpAppLog)
             val seeded = workflow.load()
             assertEquals(1L, seeded.generation)
@@ -91,7 +95,7 @@ class StcBundledPatternsTest {
             store.saveBank(0, BankMessagePatterns("USER_STC", listOf("STC Bank"), "My bank"))
             assertEquals(listOf("USER_STC"), workflow.load().banks.map { it.bankId })
             assertEquals(1L, store.load().generation)
-        } finally { directory.deleteRecursively() }
+        }
         Unit
     }
 }

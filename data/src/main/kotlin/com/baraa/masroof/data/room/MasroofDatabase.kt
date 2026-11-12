@@ -28,6 +28,7 @@ import com.baraa.masroof.data.room.entity.CommitmentEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 import com.baraa.masroof.data.room.entity.ParsedEventEntity
+import com.baraa.masroof.data.room.entity.PatternConfigurationEntity
 import com.baraa.masroof.data.room.entity.ProcessingRetryEntity
 import com.baraa.masroof.data.room.entity.RawSmsEntity
 import com.baraa.masroof.data.room.entity.RawSmsProviderAliasEntity
@@ -58,6 +59,7 @@ import com.baraa.masroof.data.room.entity.UserDecisionEntity
         UserCorrectionEntity::class,
         ProcessingRetryEntity::class,
         UserDecisionEntity::class,
+        PatternConfigurationEntity::class,
     ],
     version = MasroofDatabase.VERSION,
     exportSchema = true,
@@ -94,13 +96,13 @@ abstract class MasroofDatabase : RoomDatabase() {
          * must finish before Room opens this name.
          */
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 20
+        const val VERSION: Int = 21
 
         /** Oldest schema that opens; anything older has no migration and is rejected. */
         const val BASELINE_VERSION: Int = 18
 
-        /** Must match data/schemas/.../20.json identityHash; v20 is v19's structure, so 19 has the same hash. */
-        const val IDENTITY_HASH: String = "358f8daabc18a4cc065c8b8e51261442"
+        /** Must match data/schemas/.../21.json identityHash. */
+        const val IDENTITY_HASH: String = "e95d7b7c49b64fae9ff76f795a439ade"
 
         /**
          * The identity hash of every schema from [BASELINE_VERSION] to [VERSION], the only pairs a backup may carry.
@@ -109,6 +111,8 @@ abstract class MasroofDatabase : RoomDatabase() {
         val IDENTITY_HASHES: Map<Int, String> = mapOf(
             18 to "71f1193767b3aa12bcb6cc6e7ce77147",
             19 to "358f8daabc18a4cc065c8b8e51261442",
+            // v20 is v19's structure, so it has the same hash.
+            20 to "358f8daabc18a4cc065c8b8e51261442",
             VERSION to IDENTITY_HASH,
         )
 
@@ -136,8 +140,20 @@ abstract class MasroofDatabase : RoomDatabase() {
         /** No structural change: backfills `user_decision` from the legacy stores (plan 2.2, [UserDecisionBackfill]). */
         val MIGRATION_19_20: Migration = checkedStep(19, UserDecisionBackfill::run)
 
+        /**
+         * Adds the one-row `pattern_configuration` table (plan 5.1); empty after the step. The message-pattern file is
+         * copied into it when the live database opens, never here (`MessagePatternStore.importLegacyFile`).
+         */
+        val MIGRATION_20_21: Migration = checkedStep(20) { db ->
+            // Copied from 21.json; Room validates the result on open.
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `pattern_configuration` (`id` INTEGER NOT NULL, `generation` INTEGER NOT NULL, " +
+                    "`document` TEXT NOT NULL, PRIMARY KEY(`id`))",
+            )
+        }
+
         /** One additive step per version from [BASELINE_VERSION] to [VERSION], each tested from the v18 fixture. */
-        val MIGRATIONS: List<Migration> = listOf(MIGRATION_18_19, MIGRATION_19_20)
+        val MIGRATIONS: List<Migration> = listOf(MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
 
         /**
          * The step from [from] to the next version. Room checks only the tables after a migration, so the step first

@@ -28,7 +28,7 @@ import kotlinx.coroutines.runBlocking
  * Callers use the feature container that owns what they need. Does not use fallbackToDestructiveMigration.
  *
  * Build order, with restore recovery first because Room must not open until it has chosen a valid file:
- * [StorageContainer] (recovery, pattern store, database, repositories) -> [MaintenanceContainer] ->
+ * [StorageContainer] (recovery, database with its pattern store, repositories) -> [MaintenanceContainer] ->
  * [UpdateContainer] -> [LearningContainer] -> [ReviewContainer] -> [DashboardContainer] -> [SmsContainer] ->
  * [PatternsContainer] -> [BackupContainer] -> the worker factory. Anything that would form a cycle is read
  * lazily through a lambda.
@@ -88,6 +88,7 @@ class AppContainer(
     private val analyticsDelegate = lazy { AnalyticsWorkflow(this, storage.appContext) }
     val analytics: AnalyticsWorkflow get() = analyticsDelegate.value
     fun stopAnalytics() { if (analyticsDelegate.isInitialized()) analytics.close() }
+    internal val analyticsDiagnostics: String get() = if (analyticsDelegate.isInitialized()) analytics.diagnostics else "none"
 
     private suspend fun runPostStartupBackgroundWork() {
         learning.interpretationService?.startLearning(storage.database.invalidationTracker)

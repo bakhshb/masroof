@@ -1,5 +1,7 @@
 package com.baraa.masroof.instrumentation
 
+import com.baraa.masroof.data.room.MasroofDatabase
+import androidx.room.Room
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
@@ -47,8 +49,8 @@ class PatternTeachingClarityJourneyTest {
     }
 
     @Test fun questionBackAndMissingAnswerRemainVisibleThroughTheWholeTeachingFlow() = runBlocking {
-        val file = compose.activity.cacheDir.resolve("teaching-clarity-${java.util.UUID.randomUUID()}.json")
-        val store = MessagePatternStore(file)
+        val patternDb = Room.inMemoryDatabaseBuilder(compose.activity, MasroofDatabase::class.java).build()
+        val store = MessagePatternStore(patternDb)
         val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), appLogService = NoOpAppLog)
         workflow.saveBank(0, BankMessagePatterns("STC", listOf("STC Bank"), "STC Bank"))
         try {
@@ -93,6 +95,6 @@ class PatternTeachingClarityJourneyTest {
             click(R.string.pattern_save)
             compose.waitUntil(10_000) { store.load().banks.single().patterns.isNotEmpty() }
             assertNull(store.load().banks.single().currentPatterns.single().factContract)
-        } finally { file.delete() }
+        } finally { patternDb.close() }
     }
 }

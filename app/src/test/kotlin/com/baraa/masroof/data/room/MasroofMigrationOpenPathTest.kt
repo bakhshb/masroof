@@ -26,6 +26,10 @@ class MasroofMigrationOpenPathTest {
         MigrationOpenPathContract.upgradeKeepsEveryRow(context, fixture)
 
     @Test
+    fun v20File_upgradesAddingOnlyTheEmptyPatternTable() =
+        MigrationOpenPathContract.v20UpgradeAddsOnlyThePatternTable(context, fixture)
+
+    @Test
     fun olderSchema_isRejectedAndTheFileIsUntouched() =
         MigrationOpenPathContract.olderSchemaIsRejectedUntouched(context, fixture)
 

@@ -95,7 +95,9 @@ object UserDecisionBackfillContract {
     fun everyKindIsBackfilled(context: Context, fixture: () -> InputStream) {
         val (before, after) = upgrade(context, fixture)
         assertEquals(EXPECTED.map(::dump), after.getValue("user_decision"))
-        assertEquals(before - "user_decision", after - "user_decision")
+        // v21 only adds the empty pattern table.
+        assertEquals(emptyList<String>(), after.getValue("pattern_configuration"))
+        assertEquals(before - "user_decision", after - "user_decision" - "pattern_configuration")
     }
 
     /** No trace the v19 dual write recorded is backfilled again, and every v19 row outranks every backfilled one. */

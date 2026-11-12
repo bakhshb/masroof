@@ -155,7 +155,8 @@ object DatabaseRestoreRecovery {
             reparsedSchemaVersion = null,
             transferIntegrityRepairVersion = null,
             labAnalysis = snapshot.labAnalysis,
-            messagePatterns = snapshot.messagePatterns,
+            // The patterns are inside the incoming database (converted there for an older archive), so the legacy file goes.
+            messagePatterns = null,
         )
 
     internal fun writeSnapshots(live: File, original: PreferenceSnapshot, incoming: PreferenceSnapshot) {

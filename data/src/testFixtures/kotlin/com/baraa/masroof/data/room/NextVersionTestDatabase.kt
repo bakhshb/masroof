@@ -10,6 +10,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.sqlite.db.SupportSQLiteOpenHelper
+import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import com.baraa.masroof.data.room.entity.AccountRegistryEntity
 import com.baraa.masroof.data.room.entity.BankRegistryEntity
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
@@ -19,6 +21,7 @@ import com.baraa.masroof.data.room.entity.FinancialTransactionEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionRawSmsLinkEntity
 import com.baraa.masroof.data.room.entity.LoanRegistryEntity
 import com.baraa.masroof.data.room.entity.ParsedEventEntity
+import com.baraa.masroof.data.room.entity.PatternConfigurationEntity
 import com.baraa.masroof.data.room.entity.ProcessingRetryEntity
 import com.baraa.masroof.data.room.entity.RawSmsEntity
 import com.baraa.masroof.data.room.entity.RawSmsProviderAliasEntity
@@ -56,6 +59,7 @@ data class MigrationProbeEntity(@PrimaryKey val id: Long, val note: String?)
         UserCorrectionEntity::class,
         ProcessingRetryEntity::class,
         UserDecisionEntity::class,
+        PatternConfigurationEntity::class,
         MigrationProbeEntity::class,
     ],
     version = NextVersionTestDatabase.VERSION,
@@ -93,7 +97,10 @@ abstract class NextVersionTestDatabase : RoomDatabase() {
 object MigrationOpenPathContract {
     /** Tables the real migrations add after v18, with the rows they hold once the v18 fixture is upgraded. */
     val TABLES_SINCE_V18: Map<String, List<String>> =
-        mapOf("user_decision" to UserDecisionBackfillContract.V18_FIXTURE_DECISIONS.map(UserDecisionBackfillContract::dump))
+        mapOf(
+            "user_decision" to UserDecisionBackfillContract.V18_FIXTURE_DECISIONS.map(UserDecisionBackfillContract::dump),
+            "pattern_configuration" to emptyList(),
+        )
 
     /** Tables the test-only next version holds beyond the v18 fixture. */
     val NEXT_VERSION_TABLES: Map<String, List<String>> = TABLES_SINCE_V18 + ("migration_probe" to emptyList())
@@ -112,6 +119,34 @@ object MigrationOpenPathContract {
             NEXT_VERSION_TABLES, NextVersionTestDatabase.MIGRATION_TO_NEXT)
         // The production schema is now older than the file: an app downgrade fails closed.
         rejectsUntouched(context, name)
+        context.deleteDatabase(name)
+    }
+
+    /** A real v20 file: the v18 fixture through the production steps up to v20, as a v20 install holds it. */
+    fun v20File(context: Context, name: String, fixture: () -> InputStream): File {
+        val file = copyFixture(context, name, fixture)
+        val callback = object : SupportSQLiteOpenHelper.Callback(20) {
+            override fun onCreate(db: SupportSQLiteDatabase) = error("the fixture exists")
+
+            override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {
+                MasroofDatabase.MIGRATIONS.filter { it.endVersion <= newVersion }.forEach { it.migrate(db) }
+            }
+        }
+        val helper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context).name(name).callback(callback).build(),
+        )
+        try { helper.writableDatabase } finally { helper.close() }
+        return file
+    }
+
+    /** A v20 file upgrades through the production builder adding only the empty `pattern_configuration` table (plan 5.1). */
+    fun v20UpgradeAddsOnlyThePatternTable(context: Context, fixture: () -> InputStream) {
+        val name = "migration-v20.db"
+        val file = v20File(context, name, fixture)
+        val before = readOnly(file) { assertEquals(20, it.version); rows(it) }
+        openOnce(context, MasroofDatabase::class.java, name)
+        val after = readOnly(file) { assertEquals(MasroofDatabase.VERSION, it.version); rows(it) }
+        assertKeepsEveryRow(before, after, mapOf("pattern_configuration" to emptyList()))
         context.deleteDatabase(name)
     }
 

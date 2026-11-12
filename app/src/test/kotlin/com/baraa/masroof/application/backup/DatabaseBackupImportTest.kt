@@ -30,18 +30,19 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.storedPatterns
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class DatabaseBackupImportTest {
     @Test fun olderManifestAndDisguisedOlderDatabaseAreRejectedBeforeTouchingLiveData() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val patterns = MessagePatternStore(context)
-        val original = patternArchive("ORIGINAL")
-        patterns.restoreRaw(original)
         val prefs = context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE)
         prefs.edit().putBoolean("onboarding_completed", false).commit()
         val live = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).allowMainThreadQueries().build()
+        val patterns = MessagePatternStore(live)
+        val original = patternArchive("ORIGINAL")
+        patterns.restoreRaw(original)
         val card = CardReference(Bank.BANK_ALJAZIRA, "1111")
         try {
             RoomCardRegistryRepository.from(live).setOwnership(card, OwnershipStatus.OWNED)
@@ -66,7 +67,7 @@ class DatabaseBackupImportTest {
     @Before
     fun clearMaintenancePreferences() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        MessagePatternStore(context).restoreRaw(null)
+        MessagePatternBackup.restore(context, null)
         context.deleteDatabase(MasroofDatabase.NAME)
         DatabaseRestoreRecovery.deleteRestoreArtifacts(
             context.getDatabasePath(MasroofDatabase.NAME),
@@ -81,11 +82,11 @@ class DatabaseBackupImportTest {
     fun unsupportedPatternsAreRejectedBeforeClosingOrChangingLiveData() {
         runBlocking {
             val context = ApplicationProvider.getApplicationContext<Context>()
-            val patterns = MessagePatternStore(context)
-            val original = patternArchive("ORIGINAL")
-            patterns.restoreRaw(original)
             val live = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
                 .allowMainThreadQueries().build()
+            val patterns = MessagePatternStore(live)
+            val original = patternArchive("ORIGINAL")
+            patterns.restoreRaw(original)
             val imported = createCurrentDatabaseFile(context)
             val zip = createBackupZip(imported, "{}")
             val closed = AtomicBoolean(false)
@@ -107,11 +108,34 @@ class DatabaseBackupImportTest {
         }
     }
 
+    /** A v21 archive's own pattern row must decode; a broken one fails the import and the live patterns stay. */
+    @Test
+    fun currentArchiveWithAnInvalidPatternRowFailsAndKeepsTheLivePatterns() {
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val live = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
+                .allowMainThreadQueries().build()
+            MessagePatternStore(live).restoreRaw(patternArchive("ORIGINAL"))
+            val imported = createCurrentDatabaseFile(context)
+            android.database.sqlite.SQLiteDatabase.openDatabase(imported.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE)
+                .use { it.execSQL("INSERT INTO pattern_configuration VALUES (1, 1, '{broken')") }
+            val zip = createBackupZip(imported)
+            try {
+                val outcome = DatabaseBackupService(context, live, { live.close() }, "test", restartProcess = {}, appLogService = NoOpAppLog)
+                    .importFrom(Uri.fromFile(zip), confirmLegacyPlaintext = true)
+                assertEquals(BackupImportOutcome.Failed, outcome)
+                assertEquals(patternArchive("ORIGINAL"), storedPatterns(context.getDatabasePath(MasroofDatabase.NAME)))
+            } finally {
+                if (live.isOpen) live.close()
+                imported.delete(); zip.delete()
+            }
+        }
+    }
+
     @Test
     fun importCurrentBackup_resetsRetiredMaintenanceMarkers() {
         runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        MessagePatternStore(context).restoreRaw(patternArchive("STC"))
         context.getSharedPreferences(MaintenancePreferences.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putInt(MaintenancePreferences.KEY_LAST_REPARSED_SCHEMA_VERSION, MasroofDatabase.VERSION)
@@ -128,6 +152,7 @@ class DatabaseBackupImportTest {
         val liveDatabase = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
             .allowMainThreadQueries()
             .build()
+        MessagePatternStore(liveDatabase).restoreRaw(patternArchive("STC"))
 
         val backupService = DatabaseBackupService(
             appContext = context,
@@ -154,7 +179,8 @@ class DatabaseBackupImportTest {
 
         assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
         assertTrue(restartRequested.get())
-        assertTrue(MessagePatternStore(context).load().banks.isEmpty())
+        // The imported database has no pattern row, so the original document is gone and bundled seeding runs next start.
+        assertNull(storedPatterns(context.getDatabasePath(MasroofDatabase.NAME)))
 
         backupZip.delete()
         importedDbFile.delete()
@@ -394,7 +420,6 @@ class DatabaseBackupImportTest {
                 DatabaseRestoreRecovery.Stage.COMMITTED to "imported",
             )
             for ((stage, expectedOwner) in stages) {
-                MessagePatternStore(context).restoreRaw(patternArchive("ORIGINAL"))
                 context.deleteDatabase(MasroofDatabase.NAME)
                 DatabaseRestoreRecovery.deleteRestoreArtifacts(context.getDatabasePath(MasroofDatabase.NAME))
                 context.getSharedPreferences("onboarding_prefs", Context.MODE_PRIVATE)
@@ -408,8 +433,10 @@ class DatabaseBackupImportTest {
                     CardReference(Bank.BANK_ALJAZIRA, "1111"),
                     OwnershipStatus.OWNED,
                 )
-                val importedDbFile = createCurrentDatabaseFile(context)
-                val backupZip = createBackupZip(importedDbFile, patternArchive("IMPORTED"))
+                MessagePatternStore(liveDatabase).restoreRaw(patternArchive("ORIGINAL"))
+                // A v21 archive's own row wins; its preferences field is ignored.
+                val importedDbFile = createCurrentDatabaseFile(context, patternArchive("IMPORTED"))
+                val backupZip = createBackupZip(importedDbFile, patternArchive("IGNORED"))
                 val backupService = DatabaseBackupService(
                     appContext = context,
                     database = liveDatabase,
@@ -430,7 +457,8 @@ class DatabaseBackupImportTest {
                 }
                 DatabaseRestoreRecovery.recover(context)
                 assertEquals(patternArchive(if (expectedOwner == "original") "ORIGINAL" else "IMPORTED"),
-                    MessagePatternStore(context).captureRaw())
+                    storedPatterns(context.getDatabasePath(MasroofDatabase.NAME)))
+                assertNull(MessagePatternBackup.captureOriginal(context))
                 val reopened = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
                     .allowMainThreadQueries()
                     .build()
@@ -471,12 +499,13 @@ class DatabaseBackupImportTest {
         }
     }
 
-    private suspend fun createCurrentDatabaseFile(context: Context): File {
+    private suspend fun createCurrentDatabaseFile(context: Context, patterns: String? = null): File {
         val name = "current-export.db"
         context.deleteDatabase(name)
         val db = Room.databaseBuilder(context, MasroofDatabase::class.java, name).allowMainThreadQueries().build()
         try {
             RoomCardRegistryRepository.from(db).setOwnership(CardReference(Bank.BANK_ALJAZIRA, "7271"), OwnershipStatus.OWNED)
+            patterns?.let(MessagePatternStore(db)::restoreRaw)
         } finally { db.close() }
         val exported = File(context.cacheDir, "current-backup.db")
         context.getDatabasePath(name).copyTo(exported, overwrite = true)

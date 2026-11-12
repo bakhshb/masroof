@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.storedPatterns
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -65,7 +66,7 @@ class DatabaseBackupEncryptionTest {
 
     @Before
     fun resetStorage() {
-        MessagePatternStore(context).restoreRaw(null)
+        MessagePatternBackup.restore(context, null)
         context.deleteDatabase(MasroofDatabase.NAME)
         DatabaseRestoreRecovery.deleteRestoreArtifacts(context.getDatabasePath(MasroofDatabase.NAME))
         context.getSharedPreferences(SharedPrefsOnboardingPreferencesRepository.PREFS_NAME, Context.MODE_PRIVATE)
@@ -135,7 +136,7 @@ class DatabaseBackupEncryptionTest {
             val restartRequested = AtomicBoolean(false)
             try {
                 insertProbe(live)
-                val patternStore = MessagePatternStore(context)
+                val patternStore = MessagePatternStore(live)
                 patternStore.restoreRaw(patternArchive("STC"))
                 RoomCardRegistryRepository.from(live).setOwnership(card, OwnershipStatus.OWNED)
                 val exported = service(live).exportTo(Uri.fromFile(destination), passphrase.copyOf())
@@ -158,7 +159,8 @@ class DatabaseBackupEncryptionTest {
                 ).importFrom(Uri.fromFile(destination), passphrase.copyOf())
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
                 assertTrue(restartRequested.get())
-                assertEquals(patternArchive("STC"), patternStore.captureRaw())
+                // A v21 backup carries its patterns inside its database.
+                assertEquals(patternArchive("STC"), storedPatterns(context.getDatabasePath(MasroofDatabase.NAME)))
             } finally {
                 if (live.isOpen) live.close()
             }

@@ -9,7 +9,7 @@ Masroof has one Android application, one financial database and one bank interpr
 - `finance-core`: production money/value models, salary and statement periods, bank transaction time, deterministic container/transaction identities, financial classification/impact, transfer matching and assembly, and statement matching. Policies consume supplied facts and return decisions or transactions in memory; there is no ledger, repository, Android dependency or I/O. Existing engine value contracts remain available separately.
 - `ledger`: the pure derived-ledger projector (plan 3.1), depending only on `finance-core`. Since plan 3.3a it is how reconciliation writes the ledger; see "Derived ledger" and "Ledger writer" below.
 - `dashboard-core` (plan 4.1): the pure JVM dashboard read model, depending only on `finance-core`: the `*Builder`, `*Calculator`, `*Overview`, `*Resolver`, `*Classifier`, `*Scope` and value types of `application/dashboard`, plus the Accounts and Analysis section projections, and `DashboardOverview`/`DashboardEvidence`/`DashboardProjectionContext`. Packages stay `com.baraa.masroof.application.dashboard`. What loads data stays in `app`: `DashboardService`, `DashboardProjectionBuilder`, the Cards and Commitments projections (they read repositories), `DashboardEvidenceScope`/`TransactionSmsEvidenceLoader`, `DashboardCommitmentsWorkflow`/`DashboardRegistryWorkflow`/`DashboardPeriodWorkflow` (repositories, clock), `ChartDataWorkflow` (kotlinx.serialization/coroutines) and `AnalysisSpendingInsightsBuilder` (`@Serializable` output). Tests that need Robolectric or the app database (`DashboardFixtureCharacterizationTest`, `LedgerSnapshotTest`, `DashboardProjectionBuilderTest`, the golden-ledger tests) stay in `app`.
-- `data` (plan 4.2): an Android library holding Room and everything stored through it, plus the preference stores. `data/room` (the three databases `MasroofDatabase`, `LearningDatabase`, `AnalyticsDatabase`, entities, DAOs, mappers, migrations, `PreservingOpenHelperFactory`, `DatabaseAccessGate`), `data/repository` (the `Room*Repository` classes), `data/learning`, `data/analytics` and `data/preferences` (the SharedPreferences stores). It depends on `finance-core` and `ml-assist` and never on `app`; `app` applies neither Room nor KSP. Room schemas export to `data/schemas` (the committed v18 to v20 JSON files, unchanged). The ports these stores implement moved down with them under their original packages: `domain.repository`, `parsing.repository.ParsedEventRepository`, the preference interfaces (`application.theme|locale|notification|onboarding|update`, `DashboardLayoutPreferencesRepository`) and `domain.ownership.RegistryIdentity`; the plain models they use (`domain.model.ReviewItem`, `UserCorrection`, `CardConfiguration`, ...) and `ReviewIdFactory`/`UserCorrectionIdFactory` moved to `finance-core`. Test fixtures of `:data` (`NextVersionTestDatabase`, `UserDecisionBackfillContract`, `NoOpLoanRegistryRepository`) are used by `app` unit and device tests. Staying in `app`: `data/patterns` (file store of pattern revisions, no Room), `data/exchange` (OkHttp client), `data/statement` (CSV parser over statement ports) and `SharedPrefsChartDataPreferencesRepository` (its `ChartDataPreferences` type lives with `ChartDataWorkflow`).
+- `data` (plan 4.2): an Android library holding Room and everything stored through it, plus the preference stores. `data/room` (the three databases `MasroofDatabase`, `LearningDatabase`, `AnalyticsDatabase`, entities, DAOs, mappers, migrations, `PreservingOpenHelperFactory`, `DatabaseAccessGate`), `data/repository` (the `Room*Repository` classes), `data/learning`, `data/analytics` and `data/preferences` (the SharedPreferences stores). It depends on `finance-core` and `ml-assist` and never on `app`; `app` applies neither Room nor KSP. Room schemas export to `data/schemas` (the committed v18 to v21 JSON files; v18 to v20 frozen). The ports these stores implement moved down with them under their original packages: `domain.repository`, `parsing.repository.ParsedEventRepository`, the preference interfaces (`application.theme|locale|notification|onboarding|update`, `DashboardLayoutPreferencesRepository`) and `domain.ownership.RegistryIdentity`; the plain models they use (`domain.model.ReviewItem`, `UserCorrection`, `CardConfiguration`, ...) and `ReviewIdFactory`/`UserCorrectionIdFactory` moved to `finance-core`. Test fixtures of `:data` (`NextVersionTestDatabase`, `UserDecisionBackfillContract`, `NoOpLoanRegistryRepository`) are used by `app` unit and device tests. Staying in `app`: `data/patterns` (the pattern store over the `pattern_configuration` row, its codecs and the legacy file), `data/exchange` (OkHttp client), `data/statement` (CSV parser over statement ports) and `SharedPrefsChartDataPreferencesRepository` (its `ChartDataPreferences` type lives with `ChartDataWorkflow`).
 - `ml-assist`: exact human-template family memory, cleaned templates, forecasting and recurring-pattern detection. The engine consumes an injected assistance contract rather than depending on ML implementation.
 - `ui-kit`: shared theme, typography, fonts, cards and charts. It cannot access financial storage.
 
@@ -27,7 +27,7 @@ completion signal, schedulers, app log, stores) exists once. A dependency that w
 
 | Order | Container | Owns |
 |---|---|---|
-| 1 | `StorageContainer` | restore recovery, pattern store, Room database and access gate, repositories, preferences, app log, application scope |
+| 1 | `StorageContainer` | restore recovery, Room database (whose open copies the legacy pattern file and seeds bundled patterns), pattern store, access gate, repositories, preferences, app log, application scope |
 | 2 | `MaintenanceContainer` | startup maintenance (the financial store opens, else BLOCKED) and its outcome, `MaintenanceCompletionSignal` |
 | 3 | `UpdateContainer` | release checks, pending update, token, APK installer, the shared HTTP client |
 | 4 | `LearningContainer` | `BankInterpretationService` (absent when a test supplies its own bank adapter) |
@@ -40,7 +40,7 @@ completion signal, schedulers, app log, stores) exists once. A dependency that w
 The root also holds `analytics`, `close()` and the shutdown stage. `appWorkerFactory` creates all seven workers
 (`LiveSmsProcessingWorker`, `ExchangeRateEnrichmentWorker`, `HistoricalDerivedRecoveryWorker`, `LiveCaptureRecoveryWorker`,
 `ModelRefreshWorker`, `UpdateCheckWorker`, `AnalyticsWorker`); no worker reads the application. Unknown classes fall back to WorkManager's
-default factory. `DatabaseRestoreRecovery.recover` runs first, inside `StorageContainer`, before the pattern store and Room are created.
+default factory. `DatabaseRestoreRecovery.recover` runs first, inside `StorageContainer`, before Room is created.
 ViewModel factories take the feature containers they read from. Test seams: `bankAdapterOverride`, `smsDataSourceOverride`,
 `databaseOpenHelperFactory`, `restartAfterRestore`.
 
@@ -57,8 +57,8 @@ Keep the existing modules. Organize by responsibility; a filename containing
 | `app: application.patterns` | Teaching, revisions, financial approval, pending preview/application and display models |
 | `app: application.interpretation` | Configured adapter snapshots, family assistance and automatic-write eligibility |
 | `app: application.ingestion` | Durable processing, protected evidence and retry/resume orchestration |
-| `app: data.patterns` | Strict JSON codecs, immutable revision persistence and atomic file replacement |
-| `app: application.backup` | Pattern capture, restore and rollback integration |
+| `app: data.patterns` | Strict JSON codecs, immutable revision persistence in the `pattern_configuration` row, the one-time copy of the legacy file |
+| `app: application.backup` | Conversion of older archives' patterns, restore and rollback integration |
 | `app: presentation.patterns` | Render application models and collect user input |
 | `finance-core` | Financial classification, matching and assembly from supplied facts |
 | `dashboard-core` | Dashboard builders, calculators and section projections from supplied facts (no repositories) |
@@ -66,7 +66,8 @@ Keep the existing modules. Organize by responsibility; a filename containing
 | `ledger` | Derived ledger from evidence, decisions and ownership (shadow comparison only; not the writer yet) |
 
 `StorageContainer` loads `app/src/main/assets/bank-patterns/*.patterns.json`, installs
-missing bundled definitions before admitting work, and wires the store into
+missing bundled definitions when the live database opens (before anything can read the
+patterns, see [Pattern configuration](#pattern-configuration-pattern_configuration-schema-v21)), and wires the store into
 `ConfiguredPatternAdapters`. Each routing attempt receives a complete immutable
 snapshot. `BankSmsRegistry` evaluates every adapter; only a resolved bank reaches
 `PatternFactInterpreter`. Banks with bundled role rules (AlJazira, Alinma, Barq,
@@ -163,8 +164,8 @@ generation again, atomically removes every revision and retains only the deleted
 to suppress bundled reinstallation. Pattern configuration schema 4 persists those
 bank-qualified deletion markers through backup/restore; schemas 1–3 remain readable
 and retain their existing encoding until a deletion is saved. Deletion changes no
-RawSms, parsed evidence, corrections or posted financial rows. The financial Room schema
-is unchanged; deleted patterns cannot be recovered through revision restore.
+RawSms, parsed evidence, corrections or posted financial rows. Deletion adds no column
+or table; deleted patterns cannot be recovered through revision restore.
 
 Keep integration fixtures on the bundled production definitions. Kotlin rule
 profiles live only in `bank-engine/src/testFixtures/`, shared through Gradle's built-in test-fixtures support. The offline CLI is an explicit test tool. Neither
@@ -461,9 +462,26 @@ review updates using that same report. Settings reloads registries after a compl
 reparse or rescan; it does not start another financial pass. A failed report remains
 incomplete and durably retryable even if a second pass could succeed.
 
+Patterns in backups (plan 5.1): export writes the pattern document only inside the database (`BackupPreferencesSnapshot.messagePatterns` is written as null) and fails when the stored document does not decode. An archive older than v21 carries it in `preferences.json`: import validates it with the codec before the live database is closed, migrates the staged copy, and writes the field into that copy's `pattern_configuration` row (`MessagePatternBackup.DATABASE_VERSION`), so the patterns are installed in the same rename as the database; a null field leaves no row, and bundled seeding runs on the next start. A v21 archive's own row wins and the field is ignored. Every imported row must decode before the live file is replaced. A rollback restores the parked original database, and with it the original patterns. Restore snapshots still carry the legacy file, so a journal written by an older app version finishes with its patterns, and the next open copies them; a committed import deletes any legacy file left behind. `BackupPackageFormat.FORMAT_VERSION` is unchanged (piece 5.3).
+
 Encrypted backups retain the existing envelope. A restore accepts only a known financial (version, identity hash) pair from v18 up to the current version (`MasroofDatabase.IDENTITY_HASHES`, checked against the exported schemas); anything else is an invalid package and the live database is not touched. An older backup migrates on its staged copy through `MasroofDatabase.builder` with the preserving open helper, while the live database is still open, before the restore journal is written and the live file is replaced; a failed migration leaves the live files, preferences and journal unchanged (`BackupOlderSchemaImportTest`, `BackupMigrationDeviceTest`). Export always writes the current version and hash. Optional analysis is included in the durable restore journal for commit/rollback. Restoring an older backup clears stale analysis and rebuilds available results. Learning state is invalidated and reconstructed from retained human decisions.
 
 See [AGENTS.md](../AGENTS.md) for enforced boundaries and [ANALYTICS.md](ANALYTICS.md) for model and alert policy.
+
+### Pattern configuration (`pattern_configuration`, schema v21)
+
+Plan 5.1, design approved by the owner on 2026-11-12. The message-pattern document (the `MessagePatternConfigurationCodec` text, revisions, deleted ids and role profiles included) is one row of `masroof.db`: `pattern_configuration(id INTEGER NOT NULL, generation INTEGER NOT NULL, document TEXT NOT NULL, PRIMARY KEY(id))`, id always 1, `generation` repeating the document's own. `MIGRATION_20_21` only creates the table; every v20 table stays as it was (`FinancialSchemaCompatibilityTest`). No row means an empty configuration.
+
+`MessagePatternStore` keeps its API. Each write (`saveBank`, `deletePattern`, `installMissingBanks`, `restoreRaw`) reads, checks the expected generation and replaces the row in one database transaction; the generation still grows by one per write, and the size cap, codec validation and revision rules are unchanged. No Kotlin lock is held around database access, so a read from inside the financial write transaction (`PatternInterpretationWritePolicy`, through `AutomaticInterpretationWriteGuard`) runs on that transaction's connection and never waits on a writer. The decoded document is cached per process keyed by the stored generation and text, so another database, a restore or another writer is always seen. A row whose generation column disagrees with its document is refused like a corrupt one. The store uses plain SQL on the open connection, not a DAO, because the open callback has no DAO yet; every touch holds a `DatabaseAccessGate.withBlockingAccess` admission (immediate inside a lease of the gate, also on a Room transaction thread), and retirement waits for admitted ones, so a read or write after a restore or close retired the gate throws `DatabaseRestartRequiredException` (handled like a repository call) and never reopens the file. Room's change tracking does not observe the table.
+
+**One-time copy.** Before v21 the document lived in `files/message-patterns/definitions.json`. The live database's Room `onOpen` callback (`StorageContainer`) runs `importLegacyFile` and then the bundled seeding, before the open returns, so no reader can see the patterns before both are done; the staged copies a restore opens have no such callback. The steps and what a crash at each leaves:
+
+1. Read the file (bounded, strict UTF-8). No file: nothing to do (a rerun after success ends here). An unreadable or undecodable file throws: the open fails closed (startup is blocked and retried), the file stays.
+2. If there is no row, insert the file's text unchanged with its generation, in one transaction. A crash before the commit leaves no row and the file: the next open repeats the copy.
+3. Read the row back. Equal to the file: delete the file. A crash between the insert and the delete leaves row and file equal: the next open deletes the file and keeps the row.
+4. A row that differs from the file was there first. Once a row exists every write goes to it and no app version writes the file again (v21 never downgrades; only a restore journal written by an older app version restores the file, and it then installs a database without a row), so the file is the older document: the row wins once it decodes, and the file is deleted. A row that does not decode never wins: the open fails and both stay.
+
+**Backups.** See the backups paragraph above: patterns travel inside the database from v21; older archives' `preferences.json` patterns become the staged database's row.
 
 ### Closing SQLite-backed services
 

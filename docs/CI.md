@@ -24,12 +24,12 @@ in the existing unit job, as do the derived-ledger tests (`:ledger:test`). The `
 with the shared Detekt 2 configuration and ktlint wrapper. Architecture test inputs
 include the relocated sources and the financial schema exported by `:data` (`data/schemas`), so a source-only boundary
 change cannot reuse an unrelated cached result. `FinancialSchemaCompatibilityTest`
-pins the byte-frozen v18 schema, contiguous exported versions, one migration per
+pins the byte-frozen v18 to v20 schemas, that v21 only adds the pattern table, contiguous exported versions, one migration per
 step and the known identity hashes; `MasroofMigrationOpenPathTest` (and its device twin) upgrades the committed v18
-fixture to production v20 (with its decisions backfilled) and through a test-only next version, upgrades a v19 file holding every legacy
+fixture to production v21 (with its decisions backfilled) and through a test-only next version, upgrades a v20 file adding only the empty pattern table, upgrades a v19 file holding every legacy
 decision trace and dual-write rows (`UserDecisionBackfillContract`: every kind backfilled, v19 rows stay latest, no duplicate),
 and proves rejected schemas leave the file untouched. `LedgerFixturesTest` imports the committed v18 archives under production and round-trips a current export;
-`BackupOlderSchemaImportTest` also imports a v19 archive and checks its backfill; `UserDecisionLedgerConsistencyTest` checks the decision store against the ledger on the corpus;
+`BackupOlderSchemaImportTest` also imports a v19 archive and checks its backfill, and v18/v20 archives whose patterns ride in `preferences.json` land in the database; `LegacyPatternFileOnOpenTest` (device twin `PatternUpgradeDeviceTest`) proves the one-time copy of the pre-v21 pattern file; `UserDecisionLedgerConsistencyTest` checks the decision store against the ledger on the corpus;
 `UserDecisionDualWriteTest` proves each decision kind appends one `user_decision` row in the transaction of its write, and that the backfill of its legacy trace equals that row.
 `BackupOlderSchemaImportTest` (and `BackupMigrationDeviceTest`) imports the committed v18
 archives under that next version and proves a failed migration leaves the live database byte-identical. Financial effect fixtures pin the extraction baseline. The backup/recovery device suites remain required.

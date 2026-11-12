@@ -17,7 +17,7 @@ class CiDiagnosticsListener : RunListener() {
             clock.schedule(object : TimerTask() {
                 override fun run() {
                     val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MasroofApplication
-                    Log.e("CiDiagnostics", "pending=${description.className}#${description.methodName} shutdown=${app.container.shutdownStage} startupCancelled=${app.container.maintenance.startupCancelled}")
+                    Log.e("CiDiagnostics", "pending=${description.className}#${description.methodName} shutdown=${app.container.shutdownStage} startupCancelled=${app.container.maintenance.startupCancelled} analytics=${app.container.analyticsDiagnostics}")
                     Thread.getAllStackTraces().forEach { (thread, stack) ->
                         Log.e("CiDiagnostics", "${thread.name} ${thread.state}\n${stack.joinToString("\n")}")
                     }

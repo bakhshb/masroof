@@ -121,7 +121,7 @@ class BundledPatternApprovalTest {
             w.saveFinancial(w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_IN,
                 account.id, incoming, null, emptySet()))
             val policy = com.baraa.masroof.application.interpretation.PatternInterpretationWritePolicy(
-                com.baraa.masroof.data.patterns.MessagePatternStore(context), c.storage.accountRegistryRepository, c.storage.cardRegistryRepository)
+                c.storage.messagePatternStore, c.storage.accountRegistryRepository, c.storage.cardRegistryRepository)
             assertTrue("a leg posted before the link still pairs", policy.isCurrent(posted, posted = true))
             // The approval summary shows where an example really posts, not only the chosen link.
             val preview = w.previewFinancial(w.catalog().generation, BARQ, "barq.transfer-in", PatternOperation.TRANSFER_IN,

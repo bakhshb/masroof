@@ -1,5 +1,7 @@
 package com.baraa.masroof.instrumentation
 
+import com.baraa.masroof.data.room.MasroofDatabase
+import androidx.room.Room
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.ComponentActivity
@@ -37,7 +39,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
-import java.io.File
 import com.baraa.masroof.testsupport.NoOpAppLog
 
 class PatternManagementJourneyTest {
@@ -168,14 +169,14 @@ class PatternManagementJourneyTest {
     }
 
     private suspend fun fixture(block: suspend (MessagePatternsWorkflow, MessagePatternStore) -> Unit) {
-        val directory = File(compose.activity.cacheDir, "pattern-management-${java.util.UUID.randomUUID()}").apply { mkdirs() }
+        val patternDb = Room.inMemoryDatabaseBuilder(compose.activity, MasroofDatabase::class.java).build()
         try {
             val bank = compose.activity.assets.open("bank-patterns/BANK_STC.patterns.json").bufferedReader().use {
                 MessagePatternConfigurationCodec.decode(it.readText()).banks.single()
             }
-            val store = MessagePatternStore(File(directory, "patterns.json"))
+            val store = MessagePatternStore(patternDb)
             store.installMissingBanks(listOf(bank))
             block(MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(bank), requiredBundledBankIds = setOf(bank.bankId), appLogService = NoOpAppLog), store)
-        } finally { directory.deleteRecursively() }
+        } finally { patternDb.close() }
     }
 }

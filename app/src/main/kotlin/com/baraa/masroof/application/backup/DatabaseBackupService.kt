@@ -9,6 +9,7 @@ import com.baraa.masroof.application.logging.AppLogCategories
 import com.baraa.masroof.application.logging.AppLog
 import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.maintenance.MaintenancePreferences
+import com.baraa.masroof.data.patterns.MessagePatternStore
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
 import kotlinx.coroutines.Dispatchers
@@ -290,7 +291,10 @@ class DatabaseBackupService(
 
             // An older schema migrates here, on the staged copy, while the live database is still open and untouched.
             // A current-schema copy is only validated after close, as before.
-            if (manifest.roomVersion != schema.version) openAndValidate(dbFile)
+            // An archive before v21 carries its patterns in preferences.json; they become the staged database's row.
+            if (manifest.roomVersion != schema.version) {
+                openAndValidate(dbFile, preferences.messagePatterns.takeIf { manifest.roomVersion < MessagePatternBackup.DATABASE_VERSION })
+            }
 
             checkpointWal()
             databaseAccessGate.retire()
@@ -607,10 +611,12 @@ class DatabaseBackupService(
 
     private fun capturePreferences(): BackupPreferencesSnapshot {
         val current = DatabaseRestoreRecovery.capturePreferences(appContext)
-        MessagePatternBackup.validate(current.messagePatterns)
+        // The patterns travel inside the database; a document that cannot decode fails the export as before.
+        // A codec error can quote the document, so only this message is logged.
+        check(runCatching { MessagePatternStore(database, databaseAccessGate).load() }.isSuccess) { "Stored pattern configuration is invalid" }
         return BackupPreferencesSnapshot(
             labAnalysis = current.labAnalysis,
-            messagePatterns = current.messagePatterns,
+            messagePatterns = null,
             onboardingStarted = current.onboardingStarted,
             onboardingCompleted = current.onboardingCompleted,
             historicalImportStartEpochMillis = current.historicalImportStartEpochMillis,
@@ -748,9 +754,10 @@ class DatabaseBackupService(
 
     /**
      * Migrates a staged copy of the backup to [BackupSchema.version] and checks it before the live file is replaced.
-     * The live database stays in place until the validated copy is renamed over it.
+     * The live database stays in place until the validated copy is renamed over it. [legacyPatterns] (an older
+     * archive's patterns) become its pattern row; the row it ends with must decode.
      */
-    private fun openAndValidate(dbFile: File) {
+    private fun openAndValidate(dbFile: File, legacyPatterns: String? = null) {
         val opened = MasroofDatabase.builder(appContext, schema.databaseClass, dbFile.path)
             .addMigrations(*schema.extraMigrations.toTypedArray())
             .build()
@@ -758,6 +765,9 @@ class DatabaseBackupService(
             val db = opened.openHelper.writableDatabase
             check(db.version == schema.version) {
                 "Imported database is not schema ${schema.version}"
+            }
+            check(runCatching { MessagePatternStore(opened).run { legacyPatterns?.let(::restoreRaw); load() } }.isSuccess) {
+                "Imported pattern configuration is invalid"
             }
             db.query("PRAGMA integrity_check").use { cursor ->
                 check(cursor.moveToFirst() && cursor.getString(0) == "ok" && !cursor.moveToNext()) {

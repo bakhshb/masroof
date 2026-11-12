@@ -1,38 +1,49 @@
 package com.baraa.masroof.data.patterns
 
-import com.baraa.masroof.engine.bank.patterns.SenderIdentity
-import android.content.Context
+import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.baraa.masroof.data.room.DatabaseAccessGate
+import com.baraa.masroof.data.room.entity.PatternConfigurationEntity
 import com.baraa.masroof.engine.bank.patterns.BankMessagePatterns
 import com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration
 import com.baraa.masroof.engine.bank.patterns.SavedMessagePattern
+import com.baraa.masroof.engine.bank.patterns.SenderIdentity
 import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 /**
- * Durable user definitions, never a rebuildable learning cache. The decoded document is reused only
- * while the file's text is byte-for-byte unchanged, so any writer, restore or other instance is seen.
+ * Durable user definitions, never a rebuildable learning cache: the whole document is the one
+ * `pattern_configuration` row of `masroof.db` (schema v21). Each write reads, checks and replaces the row in one
+ * database transaction, so the generation check holds across threads; no lock is held around database access, so
+ * a read from inside a financial transaction joins it and never waits on a writer. Each touch holds a blocking
+ * admission of the access gate (immediate inside a lease), so a read during a restore can never reopen the file. The decoded document is
+ * reused only while the stored row is unchanged, so any writer, restore or other database is seen.
  */
-class MessagePatternStore(private val file: File, private val beforeReplace: () -> Unit = {}) {
-    constructor(context: Context) : this(File(context.filesDir, "message-patterns/definitions.json"))
+class MessagePatternStore(
+    private val database: () -> SupportSQLiteDatabase,
+    private val accessGate: DatabaseAccessGate = DatabaseAccessGate(),
+    private val beforeCommit: () -> Unit = {},
+) {
+    /** Every touch of [database] holds an [accessGate] admission: after the gate retires nothing reopens Room. */
+    constructor(database: RoomDatabase, accessGate: DatabaseAccessGate = DatabaseAccessGate(), beforeCommit: () -> Unit = {}) :
+        this({ database.openHelper.writableDatabase }, accessGate, beforeCommit)
 
-    fun load(): MessagePatternConfiguration = synchronized(lock) {
-        val raw = captureRaw() ?: return@synchronized MessagePatternConfiguration()
-        val path = file.absolutePath
-        decoded?.takeIf { it.path == path && it.raw == raw }?.configuration
-            ?: MessagePatternConfigurationCodec.decode(raw).also { decoded = Decoded(path, raw, it) }
+    fun load(): MessagePatternConfiguration {
+        val (generation, raw) = readRow() ?: return MessagePatternConfiguration()
+        decoded?.takeIf { it.generation == generation && it.raw == raw }?.let { return it.configuration }
+        val configuration = MessagePatternConfigurationCodec.decode(raw)
+        check(configuration.generation == generation) { "Pattern configuration generation mismatch" }
+        decoded = Decoded(generation, raw, configuration)
+        return configuration
     }
 
-    /** Startup-only before this container admits work; interactive installation uses the exclusive access gate. */
-    fun installMissingBanks(bundled: List<BankMessagePatterns>, mergeBankIds: Set<String> = emptySet()): MessagePatternConfiguration = synchronized(lock) {
+    /** Runs when the live database opens (bundled seeding) and under the exclusive access gate (interactive installation). */
+    fun installMissingBanks(bundled: List<BankMessagePatterns>, mergeBankIds: Set<String> = emptySet()): MessagePatternConfiguration = transaction {
         var current = load()
         for (bank in bundled) installation(current, bank, mergeBankIds)?.let { current = write(current, it) }
         current
     }
 
-    fun saveBank(expectedGeneration: Long, bank: BankMessagePatterns): MessagePatternConfiguration = synchronized(lock) {
+    fun saveBank(expectedGeneration: Long, bank: BankMessagePatterns): MessagePatternConfiguration = transaction {
         val current = load()
         check(current.generation == expectedGeneration) { "Pattern configuration changed" }
         val prior = current.banks.singleOrNull { it.bankId == bank.bankId }
@@ -53,7 +64,7 @@ class MessagePatternStore(private val file: File, private val beforeReplace: () 
         write(current, bank.copy(patterns = keepRecent(versions.values), deletedPatternIds = deletedIds))
     }
 
-    fun deletePattern(expectedGeneration: Long, bankId: String, patternId: String): MessagePatternConfiguration = synchronized(lock) {
+    fun deletePattern(expectedGeneration: Long, bankId: String, patternId: String): MessagePatternConfiguration = transaction {
         val current = load()
         check(current.generation == expectedGeneration) { "Pattern configuration changed" }
         val bank = current.banks.single { it.bankId == bankId }
@@ -68,40 +79,52 @@ class MessagePatternStore(private val file: File, private val beforeReplace: () 
         val next = current.copy(generation = Math.addExact(current.generation, 1),
             banks = current.banks.filterNot { it.bankId == updated.bankId } + updated)
         val raw = MessagePatternConfigurationCodec.encode(next)
-        replace(raw)
+        put(next.generation, raw)
         return MessagePatternConfigurationCodec.decode(raw)
     }
 
-    /** Bounded raw capture lets restore recovery preserve even a corrupt original without executing it. */
-    fun captureRaw(): String? = synchronized(lock) {
-        if (!file.exists()) return@synchronized null
-        require(file.isFile && file.length() <= MessagePatternConfigurationCodec.MAX_BYTES) { "Invalid pattern configuration file" }
-        file.readText(Charsets.UTF_8)
+    /** The stored document exactly as written, or null when there is none. */
+    fun captureRaw(): String? = readRow()?.second
+
+    /** Replaces the whole document with [raw] (validated first), or removes it when null. */
+    fun restoreRaw(raw: String?): Unit = transaction {
+        if (raw == null) database().execSQL("DELETE FROM pattern_configuration")
+        else put(MessagePatternConfigurationCodec.decode(raw).generation, raw)
     }
 
-    /** Validation may be skipped ONLY when rollback restores the trusted original journal snapshot. */
-    fun restoreRaw(raw: String?, validate: Boolean = true): Unit = synchronized(lock) {
-        if (raw != null) {
-            require(raw.toByteArray(Charsets.UTF_8).size <= MessagePatternConfigurationCodec.MAX_BYTES)
-            if (validate) MessagePatternConfigurationCodec.decode(raw)
-            replace(raw)
-        } else if (file.exists() && (!file.isFile || !file.delete())) {
-            throw IOException("Cannot clear pattern configuration")
-        }
+    /**
+     * One-time copy of the pre-v21 [file] into the row, byte for byte; runs when the live database opens.
+     * The file is deleted only after the stored row was read back: equal to the file, or, when a row was already
+     * there and differs, once that row decodes. Once a row exists every write goes to it and no app version writes
+     * the file again (v21 never downgrades), so a differing file is the older one. Any throw keeps the file and the
+     * next open repeats the copy; after success there is no file and a rerun does nothing.
+     */
+    fun importLegacyFile(file: File) {
+        val legacy = LegacyMessagePatternFile.read(file) ?: return
+        transaction { if (readRow() == null) restoreRaw(legacy) }
+        if (captureRaw() != legacy) load()
+        LegacyMessagePatternFile.delete(file)
     }
 
-    private fun replace(raw: String) {
-        val target = file.absoluteFile
-        val directory = requireNotNull(target.parentFile)
-        check(directory.isDirectory || directory.mkdirs()) { "Cannot create pattern directory" }
-        val temporary = Files.createTempFile(directory.toPath(), ".patterns-", ".new")
+    private fun readRow(): Pair<Long, String>? = accessGate.withBlockingAccess {
+        database().query("SELECT generation, document FROM pattern_configuration WHERE id = ${PatternConfigurationEntity.ROW_ID}")
+            .use { if (it.moveToFirst()) it.getLong(0) to it.getString(1) else null }
+    }
+
+    private fun put(generation: Long, raw: String) = database().execSQL(
+        "INSERT OR REPLACE INTO pattern_configuration (id, generation, document) VALUES (?, ?, ?)",
+        arrayOf<Any>(PatternConfigurationEntity.ROW_ID, generation, raw),
+    )
+
+    /** Nests inside a caller's transaction on the same connection; a throw, also from [beforeCommit], rolls back. */
+    private fun <T> transaction(block: () -> T): T = accessGate.withBlockingAccess {
+        val db = database()
+        db.beginTransaction()
         try {
-            FileOutputStream(temporary.toFile()).use { output ->
-                output.write(raw.toByteArray(Charsets.UTF_8)); output.fd.sync()
-            }
-            beforeReplace()
-            Files.move(temporary, target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        } finally { Files.deleteIfExists(temporary) }
+            block().also { beforeCommit(); db.setTransactionSuccessful() }
+        } finally {
+            db.endTransaction()
+        }
     }
 
     companion object {
@@ -147,11 +170,8 @@ class MessagePatternStore(private val file: File, private val beforeReplace: () 
 
         internal const val KEPT_REVISIONS = 4
 
-        // ponytail: serialize local file operations process-wide; split by path only if multiple profiles need concurrent writes.
-        private val lock = Any()
-
-        /** One slot: the app has one definitions file; tests that make many must not keep every copy. */
-        private class Decoded(val path: String, val raw: String, val configuration: MessagePatternConfiguration)
-        private var decoded: Decoded? = null
+        /** One slot: the app has one document; tests that make many must not keep every copy. */
+        private class Decoded(val generation: Long, val raw: String, val configuration: MessagePatternConfiguration)
+        @Volatile private var decoded: Decoded? = null
     }
 }
