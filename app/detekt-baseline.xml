@@ -26,7 +26,6 @@
     <ID>LongMethod:DashboardEvidenceQueriesTest.kt:DashboardEvidenceQueriesTest$@Test fun chronologicalFacts_ignoreLexicalIds_andDoNotBorrowFactsAfterAsOf</ID>
     <ID>LongMethod:DashboardEvidenceQueriesTest.kt:DashboardEvidenceQueriesTest$@Test fun creditAndDebitEvidenceQueries_useExistingCardIndex</ID>
     <ID>LongMethod:DashboardScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DashboardScreen</ID>
-    <ID>LongMethod:DashboardViewModel.kt:DashboardViewModel$private fun load</ID>
     <ID>LongMethod:DatabaseBackupImportTest.kt:DatabaseBackupImportTest$@Test fun import_terminatedAfterEveryStage_restartsOntoOriginalOrCommittedDatabase</ID>
     <ID>LongMethod:DatabaseBackupService.kt:DatabaseBackupService$private fun importOnIo: BackupImportOutcome</ID>
     <ID>LongMethod:DesignCatalogScreen.kt:@Composable private fun ComponentSection</ID>
