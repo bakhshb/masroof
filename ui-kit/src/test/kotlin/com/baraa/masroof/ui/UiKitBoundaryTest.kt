@@ -9,8 +9,8 @@ class UiKitBoundaryTest {
     @Test fun displayModuleCannotReachBusinessDataOrOtherProjects() {
         val build = File("build.gradle.kts").readText()
         assertFalse("UI kit must not depend on any application project", build.contains("project("))
-        // Without project dependencies, other masroof packages and Room do not compile; the Android SDK does.
-        val forbidden = Regex("android\\.database")
+        // Without project dependencies other masroof packages do not compile; the Android SDK and any added library do.
+        val forbidden = Regex("androidx\\.room|android\\.database")
         val sources = File("src/main/kotlin").walkTopDown().filter { it.extension == "kt" }.toList()
         assertTrue(sources.isNotEmpty())
         sources.forEach { file ->
