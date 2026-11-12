@@ -38,10 +38,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     kspTestFixtures(libs.androidx.room.compiler)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
 
-    testFixturesApi(libs.androidx.room.runtime)
     testFixturesApi(libs.junit)
 
     testImplementation(testFixtures(project(":finance-core")))
