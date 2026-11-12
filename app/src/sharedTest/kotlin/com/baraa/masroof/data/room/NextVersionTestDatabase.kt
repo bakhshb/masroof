@@ -91,13 +91,14 @@ abstract class NextVersionTestDatabase : RoomDatabase() {
 
 /** The open-path contract, run on the JVM and on a device against the committed v18 fixture. */
 object MigrationOpenPathContract {
-    /** Tables the real migrations add after v18; each starts empty (no backfill). */
-    val TABLES_SINCE_V18: Set<String> = setOf("user_decision")
+    /** Tables the real migrations add after v18, with the rows they hold once the v18 fixture is upgraded. */
+    val TABLES_SINCE_V18: Map<String, List<String>> =
+        mapOf("user_decision" to UserDecisionBackfillContract.V18_FIXTURE_DECISIONS.map(UserDecisionBackfillContract::dump))
 
     /** Tables the test-only next version holds beyond the v18 fixture. */
-    val NEXT_VERSION_TABLES: Set<String> = TABLES_SINCE_V18 + "migration_probe"
+    val NEXT_VERSION_TABLES: Map<String, List<String>> = TABLES_SINCE_V18 + ("migration_probe" to emptyList())
 
-    /** The v18 fixture upgrades through the production builder to production's own version with every row intact. */
+    /** The v18 fixture upgrades through the production builder to production's own version with every row intact and its decisions backfilled. */
     fun productionUpgradeKeepsEveryRow(context: Context, fixture: () -> InputStream) {
         val name = "migration-production.db"
         upgrade(context, name, fixture, MasroofDatabase::class.java, MasroofDatabase.VERSION, TABLES_SINCE_V18)
@@ -120,7 +121,7 @@ object MigrationOpenPathContract {
         fixture: () -> InputStream,
         databaseClass: Class<out RoomDatabase>,
         version: Int,
-        addedTables: Set<String>,
+        addedTables: Map<String, List<String>>,
         vararg extra: Migration,
     ) {
         val file = copyFixture(context, name, fixture)
@@ -131,10 +132,10 @@ object MigrationOpenPathContract {
         assertKeepsEveryRow(before, after, addedTables)
     }
 
-    /** [after] holds every row of [before] unchanged, plus exactly [addedTables], all empty. */
-    fun assertKeepsEveryRow(before: Map<String, List<String>>, after: Map<String, List<String>>, addedTables: Set<String>) {
-        assertEquals(before, after - addedTables)
-        assertEquals(addedTables.associateWith { emptyList<String>() }, after - before.keys)
+    /** [after] holds every row of [before] unchanged, plus exactly [addedTables] with their rows. */
+    fun assertKeepsEveryRow(before: Map<String, List<String>>, after: Map<String, List<String>>, addedTables: Map<String, List<String>>) {
+        assertEquals(before, after - addedTables.keys)
+        assertEquals(addedTables, after - before.keys)
     }
 
     fun olderSchemaIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
@@ -146,23 +147,24 @@ object MigrationOpenPathContract {
 
     /** A file already at the current version with an unknown identity hash is refused by Room's own check. */
     fun unknownIdentityHashAfterUpgradeIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
-        editedFixtureIsRejectedUntouched(context, fixture, UNKNOWN_HASH) { openOnce(context, MasroofDatabase::class.java, it) }
+        editedFixtureIsRejectedUntouched(context, fixture, UNKNOWN_HASH, before = { openOnce(context, MasroofDatabase::class.java, it) })
 
-    private val UNKNOWN_HASH = "UPDATE room_master_table SET identity_hash = '" + "0".repeat(32) + "'"
+    val UNKNOWN_HASH = "UPDATE room_master_table SET identity_hash = '" + "0".repeat(32) + "'"
 
     /** A v18-labelled file whose tables differ from v18 fails the migration's validation and stays untouched. */
     fun unknownBaselineStructureIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
         editedFixtureIsRejectedUntouched(context, fixture, "ALTER TABLE raw_sms ADD COLUMN stray TEXT")
 
-    /** A fixture changed by [edit] is refused and its bytes stay the same. */
-    private fun editedFixtureIsRejectedUntouched(
+    /** A fixture (or the file [copy] makes from it) changed by [edit] is refused and its bytes stay the same. */
+    fun editedFixtureIsRejectedUntouched(
         context: Context,
         fixture: () -> InputStream,
         edit: String,
+        copy: (name: String) -> File = { copyFixture(context, it, fixture) },
         before: (name: String) -> Unit = {},
     ) {
         val name = "migration-reject.db"
-        val file = copyFixture(context, name, fixture)
+        val file = copy(name)
         before(name)
         // WAL like the live file: a rollback-journal edit would flip the header's journal bytes, and Room flips them back.
         val flags = SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING
@@ -186,7 +188,7 @@ object MigrationOpenPathContract {
     }
 
     /** Opens [name] through the production builder once, running any migration, and closes it. */
-    private fun openOnce(context: Context, databaseClass: Class<out RoomDatabase>, name: String, vararg extra: Migration) {
+    fun openOnce(context: Context, databaseClass: Class<out RoomDatabase>, name: String, vararg extra: Migration) {
         val db = MasroofDatabase.builder(context, databaseClass, name).addMigrations(*extra).build()
         try {
             db.openHelper.writableDatabase

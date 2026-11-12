@@ -15,6 +15,7 @@ import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.room.MigrationOpenPathContract
+import com.baraa.masroof.data.room.UserDecisionBackfillContract
 import com.baraa.masroof.data.room.entity.UserDecisionEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -69,7 +70,7 @@ class LedgerFixturesTest {
                 assertEquals(committedSchemaHash(), it.getString(0))
             }
         }
-        // The production builder migrates the frozen file to the current schema (plan 2.1: v19, empty user_decision).
+        // The production builder migrates the frozen file to the current schema, backfilling user_decision.
         val db = MasroofDatabase.builder(context, MasroofDatabase::class.java, "fixture-v18.db").allowMainThreadQueries().build()
         try {
             assertEquals(MasroofDatabase.VERSION, db.openHelper.writableDatabase.version)
@@ -134,7 +135,8 @@ class LedgerFixturesTest {
         assertTrue("fixture needs a persisted FX pair", transactions.any { it.appliedExchangeRate != null && it.exchangeRateSource != null })
         assertEquals(1, RoomCommitmentRepository.from(db).listAll().size)
         assertTrue("fixture needs a resolved review", RoomReviewRepository(db.reviewItemDao()).listAll().any { it.resolutionKind != null })
-        assertEquals("no backfill", emptyList<UserDecisionEntity>(), db.userDecisionDao().listAll())
+        // MIGRATION_19_20 backfills the fixture's two resolved reviews (plan 2.2).
+        assertEquals(UserDecisionBackfillContract.V18_FIXTURE_DECISIONS, db.userDecisionDao().listAll())
     }
 
     @Test
@@ -153,7 +155,7 @@ class LedgerFixturesTest {
             assertTrue(service(migrated, closes = false).exportTo(Uri.fromFile(archive), PASSPHRASE.toCharArray()).isSuccess)
             migrated.close()
             val expected = MigrationOpenPathContract.readOnly(file, MigrationOpenPathContract::rows)
-            assertEquals(1, expected.getValue("user_decision").size)
+            assertEquals(UserDecisionBackfillContract.V18_FIXTURE_DECISIONS.size + 1, expected.getValue("user_decision").size)
 
             context.deleteDatabase(MasroofDatabase.NAME)
             val empty = MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).allowMainThreadQueries().build()

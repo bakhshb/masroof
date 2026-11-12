@@ -9,7 +9,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The production builder against the committed v18 fixture; the device twin is `MigrationOpenPathDeviceTest`. */
+/** The production builder against the committed v18 fixture and a v19 file built from it; the device twin is `MigrationOpenPathDeviceTest`. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class MasroofMigrationOpenPathTest {
@@ -18,7 +18,7 @@ class MasroofMigrationOpenPathTest {
     private val fixture = { file.inputStream() }
 
     @Test
-    fun v18Fixture_upgradesToTheProductionVersionWithEveryRowIntactAndNoDecisions() =
+    fun v18Fixture_upgradesToTheProductionVersionWithEveryRowIntactAndItsDecisionsBackfilled() =
         MigrationOpenPathContract.productionUpgradeKeepsEveryRow(context, fixture)
 
     @Test
@@ -40,4 +40,15 @@ class MasroofMigrationOpenPathTest {
     @Test
     fun unknownBaselineStructure_isRejectedAndTheFileIsUntouched() =
         MigrationOpenPathContract.unknownBaselineStructureIsRejectedUntouched(context, fixture)
+
+    @Test
+    fun v19File_backfillsEveryDecisionKindOnUpgrade() = UserDecisionBackfillContract.everyKindIsBackfilled(context, fixture)
+
+    @Test
+    fun v19File_keepsDualWriteRowsLatestWithoutDuplicates() =
+        UserDecisionBackfillContract.dualWriteRowsStayLatestAndAreNotDuplicated(context, fixture)
+
+    @Test
+    fun unknownV19IdentityHash_isRejectedAndTheFileIsUntouched() =
+        UserDecisionBackfillContract.unknownV19IdentityHashIsRejectedUntouched(context, fixture)
 }
