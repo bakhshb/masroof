@@ -26,9 +26,11 @@ include the relocated sources and financial schema, so a source-only boundary
 change cannot reuse an unrelated cached result. `FinancialSchemaCompatibilityTest`
 pins the byte-frozen v18 schema, contiguous exported versions, one migration per
 step and the known identity hashes; `MasroofMigrationOpenPathTest` (and its device twin) upgrades the committed v18
-fixture to production v19 (empty `user_decision`) and through a test-only next version, and proves rejected schemas leave the file
-untouched. `LedgerFixturesTest` imports the committed v18 archives under production and round-trips a v19 export;
-`UserDecisionDualWriteTest` proves each decision kind appends one `user_decision` row in the transaction of its write.
+fixture to production v20 (with its decisions backfilled) and through a test-only next version, upgrades a v19 file holding every legacy
+decision trace and dual-write rows (`UserDecisionBackfillContract`: every kind backfilled, v19 rows stay latest, no duplicate),
+and proves rejected schemas leave the file untouched. `LedgerFixturesTest` imports the committed v18 archives under production and round-trips a current export;
+`BackupOlderSchemaImportTest` also imports a v19 archive and checks its backfill; `UserDecisionLedgerConsistencyTest` checks the decision store against the ledger on the corpus;
+`UserDecisionDualWriteTest` proves each decision kind appends one `user_decision` row in the transaction of its write, and that the backfill of its legacy trace equals that row.
 `BackupOlderSchemaImportTest` (and `BackupMigrationDeviceTest`) imports the committed v18
 archives under that next version and proves a failed migration leaves the live database byte-identical. Financial effect fixtures pin the extraction baseline. The backup/recovery device suites remain required.
 

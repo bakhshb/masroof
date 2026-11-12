@@ -23,6 +23,7 @@ import com.baraa.masroof.data.repository.RoomTransactionReclassificationReposito
 import com.baraa.masroof.data.repository.RoomUserDecisionRepository
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MigrationOpenPathContract
+import com.baraa.masroof.data.room.UserDecisionBackfill
 import com.baraa.masroof.data.room.entity.UserDecisionEntity
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransaction
@@ -54,7 +55,8 @@ import org.robolectric.annotation.Config
 /**
  * Plan 2.1: every decision kind, made through its real service, appends exactly one `user_decision` row in the
  * same transaction as its existing write. A failure injected at the decision insert (a trigger that aborts after
- * the row is written) leaves every table exactly as before, so the existing write rolled back too.
+ * the row is written) leaves every table exactly as before, so the existing write rolled back too. Plan 2.2: for each
+ * kind, the backfill of the legacy trace equals the dual-write row, and adds nothing when that row exists.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -158,6 +160,8 @@ class UserDecisionDualWriteTest {
             assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, world.reviewRepo.findByRawSmsId(raw.id)!!.resolutionKind)
             assertEquals(listOf(row(raw.id, "RESTORE"), row(raw.id, "RESTORE_REVERTED")),
                 world.db.userDecisionDao().listAll().map { it.copy(sequence = 0) })
+            // The undone restore leaves only its ignore trace.
+            assertBackfillMatches(world, listOf(row(raw.id, "RESTORE"), row(raw.id, "RESTORE_REVERTED")), listOf(row(raw.id, "NON_FINANCIAL")))
         }
     }
 
@@ -237,7 +241,21 @@ class UserDecisionDualWriteTest {
                 runCatching { case.action() }
                 assertEquals("a repeat appended a row", expected, world.db.userDecisionDao().listAll().map { it.copy(sequence = 0) })
             }
+            assertBackfillMatches(world, expected, expected.map { it.copy(kind = LEGACY_KIND[it.kind] ?: it.kind) })
         }
+    }
+
+    /**
+     * Plan 2.2: with the dual-write rows present the v19→v20 backfill adds nothing; from the legacy traces alone it
+     * rebuilds [legacy], the same rows except where the legacy trace cannot tell kinds apart (docs/ARCHITECTURE.md).
+     */
+    private suspend fun assertBackfillMatches(world: DashboardLedgerWorld, dualWrite: List<UserDecisionEntity>, legacy: List<UserDecisionEntity>) {
+        val sql = world.db.openHelper.writableDatabase
+        UserDecisionBackfill.run(sql)
+        assertEquals("the backfill repeated a recorded decision", dualWrite, world.db.userDecisionDao().listAll().map { it.copy(sequence = 0) })
+        sql.execSQL("DELETE FROM user_decision")
+        UserDecisionBackfill.run(sql)
+        assertEquals("the backfill differs from the dual write", legacy, world.db.userDecisionDao().listAll().map { it.copy(sequence = 0) })
     }
 
     private fun row(
@@ -316,5 +334,8 @@ class UserDecisionDualWriteTest {
     private companion object {
         /** The instant of `IntegrityLedger.clock` and `DashboardLedgerWorld.clock`, which every decision here records. */
         val NOW: Instant = Instant.parse("2026-09-15T09:00:00Z")
+
+        /** A reclassification and an ignore leave the same review trace as a review's financial type and non-financial. */
+        val LEGACY_KIND = mapOf("RECLASSIFY" to "FINANCIAL_TYPE", "IGNORE" to "NON_FINANCIAL")
     }
 }

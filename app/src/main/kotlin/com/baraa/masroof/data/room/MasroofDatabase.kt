@@ -94,12 +94,12 @@ abstract class MasroofDatabase : RoomDatabase() {
          * must finish before Room opens this name.
          */
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 19
+        const val VERSION: Int = 20
 
         /** Oldest schema that opens; anything older has no migration and is rejected. */
         const val BASELINE_VERSION: Int = 18
 
-        /** Must match app/schemas/.../19.json identityHash. */
+        /** Must match app/schemas/.../20.json identityHash; v20 is v19's structure, so 19 has the same hash. */
         const val IDENTITY_HASH: String = "358f8daabc18a4cc065c8b8e51261442"
 
         /**
@@ -108,18 +108,14 @@ abstract class MasroofDatabase : RoomDatabase() {
          */
         val IDENTITY_HASHES: Map<Int, String> = mapOf(
             18 to "71f1193767b3aa12bcb6cc6e7ce77147",
+            19 to "358f8daabc18a4cc065c8b8e51261442",
             VERSION to IDENTITY_HASH,
         )
 
         /** Adds the append-only `user_decision` table (plan 2.1); no existing row changes and nothing is backfilled. */
         val MIGRATION_18_19: Migration = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Room checks only the tables after a migration; an unknown v18 hash fails here, inside the upgrade
-                // transaction, so the file is left untouched.
-                val hash = db.query("SELECT identity_hash FROM room_master_table").use {
-                    if (it.moveToFirst()) it.getString(0) else null
-                }
-                check(hash == IDENTITY_HASHES.getValue(18)) { "Unknown schema 18 identity hash" }
+                checkIdentityHash(db, 18)
                 // Copied from 19.json; Room validates the result on open.
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `user_decision` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
@@ -137,11 +133,34 @@ abstract class MasroofDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_user_decision_pairedRawSmsId` ON `user_decision` (`pairedRawSmsId`)",
                 )
+                stampIdentityHash(db, 19)
+            }
+        }
+
+        /** No structural change: backfills `user_decision` from the legacy stores (plan 2.2, [UserDecisionBackfill]). */
+        val MIGRATION_19_20: Migration = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                checkIdentityHash(db, 19)
+                UserDecisionBackfill.run(db)
+                stampIdentityHash(db, 20)
             }
         }
 
         /** One additive step per version from [BASELINE_VERSION] to [VERSION], each tested from the v18 fixture. */
-        val MIGRATIONS: List<Migration> = listOf(MIGRATION_18_19)
+        val MIGRATIONS: List<Migration> = listOf(MIGRATION_18_19, MIGRATION_19_20)
+
+        /**
+         * Room checks only the tables after a migration, so a step first refuses an unknown hash of its start
+         * version, inside the upgrade transaction: the file is left untouched.
+         */
+        private fun checkIdentityHash(db: SupportSQLiteDatabase, version: Int) {
+            val hash = db.query("SELECT identity_hash FROM room_master_table").use { if (it.moveToFirst()) it.getString(0) else null }
+            check(hash == IDENTITY_HASHES.getValue(version)) { "Unknown schema $version identity hash" }
+        }
+
+        /** Room writes the hash only after the last step of a chained upgrade; each step stamps its own for the next check. */
+        private fun stampIdentityHash(db: SupportSQLiteDatabase, version: Int) =
+            db.execSQL("UPDATE room_master_table SET identity_hash = '${IDENTITY_HASHES.getValue(version)}'")
 
         /**
          * The builder for the live financial file. [databaseClass] fixes the target version; tests pass a

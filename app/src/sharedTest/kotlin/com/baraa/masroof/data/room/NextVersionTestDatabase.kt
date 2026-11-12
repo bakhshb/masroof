@@ -91,13 +91,14 @@ abstract class NextVersionTestDatabase : RoomDatabase() {
 
 /** The open-path contract, run on the JVM and on a device against the committed v18 fixture. */
 object MigrationOpenPathContract {
-    /** Tables the real migrations add after v18; each starts empty (no backfill). */
-    val TABLES_SINCE_V18: Set<String> = setOf("user_decision")
+    /** Tables the real migrations add after v18, with the rows they hold once the v18 fixture is upgraded. */
+    val TABLES_SINCE_V18: Map<String, List<String>> =
+        mapOf("user_decision" to UserDecisionBackfillContract.V18_FIXTURE_DECISIONS.map(UserDecisionBackfillContract::dump))
 
     /** Tables the test-only next version holds beyond the v18 fixture. */
-    val NEXT_VERSION_TABLES: Set<String> = TABLES_SINCE_V18 + "migration_probe"
+    val NEXT_VERSION_TABLES: Map<String, List<String>> = TABLES_SINCE_V18 + ("migration_probe" to emptyList())
 
-    /** The v18 fixture upgrades through the production builder to production's own version with every row intact. */
+    /** The v18 fixture upgrades through the production builder to production's own version with every row intact and its decisions backfilled. */
     fun productionUpgradeKeepsEveryRow(context: Context, fixture: () -> InputStream) {
         val name = "migration-production.db"
         upgrade(context, name, fixture, MasroofDatabase::class.java, MasroofDatabase.VERSION, TABLES_SINCE_V18)
@@ -120,7 +121,7 @@ object MigrationOpenPathContract {
         fixture: () -> InputStream,
         databaseClass: Class<out RoomDatabase>,
         version: Int,
-        addedTables: Set<String>,
+        addedTables: Map<String, List<String>>,
         vararg extra: Migration,
     ) {
         val file = copyFixture(context, name, fixture)
@@ -131,10 +132,10 @@ object MigrationOpenPathContract {
         assertKeepsEveryRow(before, after, addedTables)
     }
 
-    /** [after] holds every row of [before] unchanged, plus exactly [addedTables], all empty. */
-    fun assertKeepsEveryRow(before: Map<String, List<String>>, after: Map<String, List<String>>, addedTables: Set<String>) {
-        assertEquals(before, after - addedTables)
-        assertEquals(addedTables.associateWith { emptyList<String>() }, after - before.keys)
+    /** [after] holds every row of [before] unchanged, plus exactly [addedTables] with their rows. */
+    fun assertKeepsEveryRow(before: Map<String, List<String>>, after: Map<String, List<String>>, addedTables: Map<String, List<String>>) {
+        assertEquals(before, after - addedTables.keys)
+        assertEquals(addedTables, after - before.keys)
     }
 
     fun olderSchemaIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
@@ -171,7 +172,7 @@ object MigrationOpenPathContract {
         context.deleteDatabase(name)
     }
 
-    private fun rejectsUntouched(context: Context, name: String) {
+    fun rejectsUntouched(context: Context, name: String) {
         val file = context.getDatabasePath(name)
         val before = snapshot(file)
         val db = MasroofDatabase.builder(context, MasroofDatabase::class.java, name).build()

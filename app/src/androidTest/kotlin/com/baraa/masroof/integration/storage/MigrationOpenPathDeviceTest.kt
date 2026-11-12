@@ -3,6 +3,7 @@ package com.baraa.masroof.integration.storage
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.baraa.masroof.data.room.MigrationOpenPathContract
+import com.baraa.masroof.data.room.UserDecisionBackfillContract
 import com.baraa.masroof.testsupport.TestStorageContext
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,7 +16,7 @@ class MigrationOpenPathDeviceTest {
     private val fixture = { instrumentation.context.assets.open("ledger_fixtures/v18/masroof.db") }
 
     @Test
-    fun v18Fixture_upgradesToTheProductionVersionWithEveryRowIntactAndNoDecisions() =
+    fun v18Fixture_upgradesToTheProductionVersionWithEveryRowIntactAndItsDecisionsBackfilled() =
         MigrationOpenPathContract.productionUpgradeKeepsEveryRow(context, fixture)
 
     @Test
@@ -37,4 +38,15 @@ class MigrationOpenPathDeviceTest {
     @Test
     fun unknownBaselineStructure_isRejectedAndTheFileIsUntouched() =
         MigrationOpenPathContract.unknownBaselineStructureIsRejectedUntouched(context, fixture)
+
+    @Test
+    fun v19File_backfillsEveryDecisionKindOnUpgrade() = UserDecisionBackfillContract.everyKindIsBackfilled(context, fixture)
+
+    @Test
+    fun v19File_keepsDualWriteRowsLatestWithoutDuplicates() =
+        UserDecisionBackfillContract.dualWriteRowsStayLatestAndAreNotDuplicated(context, fixture)
+
+    @Test
+    fun unknownV19IdentityHash_isRejectedAndTheFileIsUntouched() =
+        UserDecisionBackfillContract.unknownV19IdentityHashIsRejectedUntouched(context, fixture)
 }

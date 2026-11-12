@@ -5,10 +5,13 @@ import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.data.room.MigrationOpenPathContract
 import com.baraa.masroof.data.room.NextVersionTestDatabase
+import com.baraa.masroof.data.room.UserDecisionBackfillContract
 import com.baraa.masroof.testsupport.TestStorageContext
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,6 +40,37 @@ class BackupOlderSchemaImportTest {
         BackupMigrationContract.v18ArchiveImportsUnderTheNextVersion(
             context, { File(fixtures, "masroof-v18-backup.masroof").inputStream() }, database, BackupMigrationContract.PASSPHRASE,
         )
+
+    /** A backup taken at v19 migrates on its staged copy like a live v19 file, so its decisions are backfilled too. */
+    @Test
+    fun v19Archive_importsUnderProductionWithItsDecisionsBackfilled() = runBlocking {
+        val v19 = UserDecisionBackfillContract.v19File(context, "backup-v19.db", database)
+        assertFalse("the v19 file is self-contained", File(v19.path + "-wal").let { it.isFile && it.length() > 0 })
+        val expected = MigrationOpenPathContract.readOnly(v19, MigrationOpenPathContract::rows)
+        val entries = entries(plaintext().use { it.readBytes() }).toMutableMap()
+        val manifest = BackupPackageCodec.decodeManifest(entries.getValue(BackupPackageFormat.MANIFEST_ENTRY).decodeToString())
+        entries[BackupPackageFormat.MANIFEST_ENTRY] = BackupPackageCodec.encodeManifest(
+            manifest.copy(roomVersion = 19, identityHash = MasroofDatabase.IDENTITY_HASHES.getValue(19))).toByteArray()
+        entries[BackupPackageFormat.DATABASE_ENTRY] = v19.readBytes()
+        context.deleteDatabase("backup-v19.db")
+        val archive = File(context.cacheDir, "v19.zip").also { file -> file.outputStream().use { writeZip(it, entries.toList()) } }
+        val live = MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).build()
+        try {
+            val outcome = DatabaseBackupService(context, live, { live.close() }, "test", restartProcess = {}, appLogService = NoOpAppLog)
+                .importFrom(Uri.fromFile(archive), confirmLegacyPlaintext = true)
+            assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
+            val restored = MigrationOpenPathContract.readOnly(context.getDatabasePath(MasroofDatabase.NAME)) {
+                assertEquals(MasroofDatabase.VERSION, it.version)
+                MigrationOpenPathContract.rows(it)
+            }
+            assertEquals(expected - "user_decision", restored - "user_decision")
+            assertEquals(UserDecisionBackfillContract.EXPECTED.map(UserDecisionBackfillContract::dump), restored.getValue("user_decision"))
+        } finally {
+            if (live.isOpen) live.close()
+            archive.delete()
+            context.deleteDatabase(MasroofDatabase.NAME)
+        }
+    }
 
     @Test
     fun failedMigration_leavesTheLiveDatabaseByteIdentical() =
