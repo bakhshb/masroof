@@ -45,7 +45,7 @@ ViewModel factories take the feature containers they read from. Test seams: `ban
 
 ## Message-pattern ownership
 
-Keep the existing six modules. Organize by responsibility; a filename containing
+Keep the existing modules. Organize by responsibility; a filename containing
 `Pattern` does not mean its approval, storage or UI belongs in the engine.
 
 | Location (under `com.baraa.masroof`) | Owns |

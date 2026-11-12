@@ -68,8 +68,9 @@ class NoOptionalCollaboratorsTest {
         }
 
     private companion object {
-        val applicationFiles: List<File> = File("src/main/kotlin/com/baraa/masroof/application")
-            .walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        val applicationFiles: List<File> = listOf("src/main", "../dashboard-core/src/main")
+            .flatMap { File(it, "kotlin/com/baraa/masroof/application").walkTopDown() }
+            .filter { it.isFile && it.extension == "kt" }.toList()
 
         /**
          * `val|var name: Type?[ = null]` ending in `,`, `)` or the line, like a parameter; a local
