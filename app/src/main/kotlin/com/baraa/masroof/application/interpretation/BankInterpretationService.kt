@@ -11,6 +11,7 @@ import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.data.learning.*
 import com.baraa.masroof.domain.repository.*
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
+import com.baraa.masroof.application.review.ReviewCorrectionClosure
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -30,6 +31,7 @@ class BankInterpretationService(
     private val parsed: ParsedEventRepository,
     private val corrections: UserCorrectionRepository,
     private val reviews: ReviewRepository,
+    private val decisions: UserDecisionRepository,
     private val transactions: FinancialTransactionRepository,
     private val scope: CoroutineScope,
     private val log: AppLogService,
@@ -350,8 +352,9 @@ class BankInterpretationService(
     }
     /** Do not re-interpret posted evidence or human decisions on engine/model upgrades; an automatic settlement is not one. */
     suspend fun mayRefresh(rawSmsId: String): Boolean =
-        !transactions.isRawSmsLinked(rawSmsId) && corrections.latestForRawSmsId(rawSmsId) == null &&
-            reviews.findByRawSmsId(rawSmsId)?.resolutionKind.let { it == null || it == ReviewResolutionKind.AUTO_NO_LONGER_REQUIRED }
+        !transactions.isRawSmsLinked(rawSmsId) && decisions.effectiveFor(rawSmsId).let {
+            it.corrections.isEmpty() && !ReviewCorrectionClosure.protects(it, reviews.findByRawSmsId(rawSmsId))
+        }
 
     private data class Decision(val id: String,val rawId: String,val family: MessageFamily?,val at: Long,
         val provenance: String,val type: FinancialTransactionType? = null,val reason: String? = null)

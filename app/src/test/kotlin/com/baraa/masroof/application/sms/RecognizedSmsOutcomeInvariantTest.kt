@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.sms
 
+import com.baraa.masroof.testsupport.backfillDecisions
 import com.baraa.masroof.testsupport.TestSmsBodies.OTP_BODY
 import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import com.baraa.masroof.testsupport.TestSmsBodies.COLLIDING_TRANSFER_BODY
@@ -313,6 +314,7 @@ class RecognizedSmsOutcomeInvariantTest {
             resolvedAt = Instant.parse("2026-08-11T12:05:00Z"),
             resolvedTransactionId = null,
         )
+        harness.db.backfillDecisions()
         assertTrue(batch.finish() is HistoricalBatchDerivedResult.Incomplete)
         assertEquals(listOf(financial.id), harness.processingRetryRepo.listRetryableRawSmsIds())
 
@@ -419,6 +421,7 @@ class RecognizedSmsOutcomeInvariantTest {
             resolvedAt = Instant.parse("2026-08-11T12:05:00Z"),
             resolvedTransactionId = null,
         )
+        harness.db.backfillDecisions()
         val exhausted = harness.processStored(
             derivedFailures = DerivedFailureInjection(
                 reconciliationFailuresRemaining = AtomicInteger(Int.MAX_VALUE),

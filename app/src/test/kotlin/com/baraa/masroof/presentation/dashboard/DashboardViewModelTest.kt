@@ -822,7 +822,7 @@ class DashboardViewModelTest {
                 financialTransactionRepository = SettingsViewModelTestSupport.emptyFinancialTransactionRepository(),
                 effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
                     SettingsViewModelTestSupport.emptyParsedEventRepository(),
-                    SettingsViewModelTestSupport.emptyUserCorrectionRepository(),
+                    com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
                 ),
                 ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(
                     SettingsViewModelTestSupport.emptyAccountRegistry(),

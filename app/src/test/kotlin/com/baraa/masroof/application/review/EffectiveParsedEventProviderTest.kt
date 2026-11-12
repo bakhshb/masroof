@@ -7,10 +7,11 @@ import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
+import com.baraa.masroof.data.repository.RoomUserDecisionRepository
+import com.baraa.masroof.domain.model.EffectiveUserDecisions
+import com.baraa.masroof.domain.repository.UserDecisionRepository
+import com.baraa.masroof.testsupport.DecidedCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
-import com.baraa.masroof.data.room.dao.UserCorrectionDao
-import com.baraa.masroof.data.room.entity.UserCorrectionEntity
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
 import com.baraa.masroof.domain.model.MessageFamily
@@ -41,8 +42,9 @@ import java.time.Instant
 class EffectiveParsedEventProviderTest {
     private lateinit var db: MasroofDatabase
     private lateinit var parsedRepo: RoomParsedEventRepository
-    private lateinit var corrections: RoomUserCorrectionRepository
-    private lateinit var countingDao: CountingUserCorrectionDao
+    private lateinit var corrections: DecidedCorrectionRepository
+    private lateinit var decisions: RoomUserDecisionRepository
+    private lateinit var countingDao: CountingDecisions
     private lateinit var provider: EffectiveParsedEventProvider
 
     @Before
@@ -53,13 +55,11 @@ class EffectiveParsedEventProviderTest {
             .build()
         val rawRepo = RoomRawSmsRepository(db.rawSmsDao())
         parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
-        corrections = RoomUserCorrectionRepository(db.userCorrectionDao())
+        corrections = DecidedCorrectionRepository(db)
+        decisions = RoomUserDecisionRepository(db)
         seed(rawRepo)
-        countingDao = CountingUserCorrectionDao(db.userCorrectionDao())
-        provider = EffectiveParsedEventProvider(
-            parsedRepo,
-            RoomUserCorrectionRepository(countingDao),
-        )
+        countingDao = CountingDecisions(decisions)
+        provider = EffectiveParsedEventProvider(parsedRepo, countingDao)
     }
 
     @After
@@ -151,32 +151,25 @@ class EffectiveParsedEventProviderTest {
     }
 
     @Test
-    fun batchLookup_ordersByTargetThenTimeThenId_andChunksAtTheBindLimit() = runBlocking {
+    fun batchLookup_ordersByTargetThenTimeThenId_likeTheLegacyStore() = runBlocking {
         val lookup = listOf("raw-outside", "missing", "raw-multi", "raw-merchant", "raw-transfer-out")
         val orderedIds = listOf("corr-merchant", "corr-a", "corr-b", "corr-c", "corr-old", "corr-xfer")
-        assertEquals(orderedIds, db.userCorrectionDao().listForRawSmsIds(lookup).map { it.id })
-        assertEquals(orderedIds, corrections.listForRawSmsIds(lookup).map { it.id })
-        assertEquals(emptyList<UserCorrection>(), corrections.listForRawSmsIds(emptyList()))
-
-        val chunkedCorrections = RoomUserCorrectionRepository(countingDao, batchChunkSize = 1)
-        countingDao.reset()
-        assertEquals(orderedIds, chunkedCorrections.listForRawSmsIds(lookup).map { it.id })
-        assertEquals(lookup.distinct().size, countingDao.batchQueries)
-        assertEquals(0, countingDao.perSmsQueries)
-        assertTrue(countingDao.batchIdChunks.all { it.size == 1 })
-
-        val chunked = EffectiveParsedEventProvider(parsedRepo, chunkedCorrections)
-        val expected = expectedEffective(parsedRepo.listAll())
-        countingDao.reset()
-        assertEquals(expected, chunked.listAllEffective())
-        assertEquals(expected.size, countingDao.batchQueries)
-        assertEquals(0, countingDao.perSmsQueries)
-        assertEquals(expected.map { it.event.rawSmsId }, countingDao.batchIdChunks.flatten())
+        val legacy = corrections.listAll().filter { it.targetRawSmsId in lookup }
+        assertEquals(orderedIds, legacy.map { it.id })
+        val read = decisions.effectiveFor(lookup)
+        // Chunking of this read is covered by UserDecisionReaderTest.
+        assertEquals(
+            legacy.map { listOf(it.targetRawSmsId, it.correctedType, it.correctedAmount, it.correctedMerchant, it.correctedCounterparty) },
+            lookup.sorted().flatMap { id ->
+                read.getValue(id).corrections.map { listOf(it.rawSmsId, it.messageFamily, it.amount, it.merchant, it.counterparty) }
+            },
+        )
+        assertEquals(emptyMap<String, Any>(), decisions.effectiveFor(emptyList()))
     }
 
     private suspend fun expectedEffective(records: List<ParsedEventRecord>): List<ParsedEventRecord> =
         records.map { record ->
-            provider.applyCorrections(record, corrections.listForRawSmsId(record.event.rawSmsId))
+            provider.applyCorrections(record, decisions.effectiveFor(record.event.rawSmsId).corrections)
         }
 
     private suspend fun seed(rawRepo: RoomRawSmsRepository) {
@@ -296,9 +289,8 @@ class EffectiveParsedEventProviderTest {
         createdAt = createdAt,
     )
 
-    private class CountingUserCorrectionDao(
-        private val delegate: UserCorrectionDao,
-    ) : UserCorrectionDao by delegate {
+    /** Counts the provider's decision reads: one per list read, one per single-record read. */
+    private class CountingDecisions(private val delegate: UserDecisionRepository) : UserDecisionRepository by delegate {
         var perSmsQueries: Int = 0
         var batchQueries: Int = 0
         val batchIdChunks: MutableList<List<String>> = mutableListOf()
@@ -309,15 +301,15 @@ class EffectiveParsedEventProviderTest {
             batchIdChunks.clear()
         }
 
-        override suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrectionEntity> {
+        override suspend fun effectiveFor(rawSmsId: String): EffectiveUserDecisions {
             perSmsQueries += 1
-            return delegate.listForRawSmsId(rawSmsId)
+            return delegate.effectiveFor(rawSmsId)
         }
 
-        override suspend fun listForRawSmsIds(rawSmsIds: List<String>): List<UserCorrectionEntity> {
+        override suspend fun effectiveFor(rawSmsIds: Collection<String>): Map<String, EffectiveUserDecisions> {
             batchQueries += 1
-            batchIdChunks += rawSmsIds
-            return delegate.listForRawSmsIds(rawSmsIds)
+            batchIdChunks += rawSmsIds.toList()
+            return delegate.effectiveFor(rawSmsIds)
         }
     }
 }

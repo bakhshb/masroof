@@ -1,5 +1,6 @@
 package com.baraa.masroof.integration.bank
 
+import com.baraa.masroof.testsupport.saveCorrection
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.AppContainer
@@ -182,7 +183,7 @@ class StcSingleAccountJourneyTest {
             rows.forEach { container.sms.processRawSmsUseCase.ingest(it) }
             val dismissed = container.storage.reviewRepository.findByRawSmsId(rows[1].id)!!
             container.storage.reviewRepository.markResolved(dismissed.id, ReviewResolutionKind.USER_NON_FINANCIAL, Instant.now(), null)
-            container.storage.userCorrectionRepository.save(UserCorrection("counterparty-edit", rows[2].id,
+            container.storage.database.saveCorrection(UserCorrection("counterparty-edit", rows[2].id,
                 null, null, null, "Manually corrected person", Instant.now()))
 
             val workflow = container.patterns.messagePatternsWorkflow

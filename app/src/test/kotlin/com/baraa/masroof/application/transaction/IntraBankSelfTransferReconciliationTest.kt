@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.testsupport.backfillDecisions
 import com.baraa.masroof.application.maintenance.MaintenanceCompletionSignal
 import android.content.Context
 import androidx.room.Room
@@ -125,6 +126,7 @@ class IntraBankSelfTransferReconciliationTest {
             financialTransactionRepository = ftRepo,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
             reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             zoneId = zoneId,
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
@@ -451,7 +453,7 @@ class IntraBankSelfTransferReconciliationTest {
             reclassification = TransactionReclassificationService(
                 ftRepo,
                 com.baraa.masroof.application.review.EffectiveParsedEventProvider(parsedRepo,
-                    com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())),
+                    com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)),
                 OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
                 appLogService = NoOpAppLog,
                 ownershipConfirmationService = noOpOwnershipConfirmation(),
@@ -662,6 +664,7 @@ class IntraBankSelfTransferReconciliationTest {
             resolvedAt = now,
             resolvedTransactionId = chosenId,
         )
+        db.backfillDecisions()
 
         reconcileAndApplyReviews()
         repairAndApplyReviews()
@@ -698,6 +701,7 @@ class IntraBankSelfTransferReconciliationTest {
             resolvedAt = now,
             resolvedTransactionId = null,
         )
+        db.backfillDecisions()
 
         reconcileAndApplyReviews()
         repairAndApplyReviews()
@@ -733,6 +737,7 @@ class IntraBankSelfTransferReconciliationTest {
             financialTransactionRepository = rejecting,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
             reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             zoneId = zoneId,
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
@@ -763,6 +768,7 @@ class IntraBankSelfTransferReconciliationTest {
             financialTransactionRepository = rejecting,
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
             reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             zoneId = zoneId,
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
@@ -797,6 +803,7 @@ class IntraBankSelfTransferReconciliationTest {
             resolvedAt = now,
             resolvedTransactionId = keptId,
         )
+        db.backfillDecisions()
 
         repairAndApplyReviews()
 

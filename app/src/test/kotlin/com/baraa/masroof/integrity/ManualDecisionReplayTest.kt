@@ -1,9 +1,24 @@
 package com.baraa.masroof.integrity
 
+import org.junit.Assert.assertFalse
+import com.baraa.masroof.parsing.repository.ParsedEventRecord
+import com.baraa.masroof.domain.ownership.OwnershipResolver
+import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
+import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
+import com.baraa.masroof.application.transaction.ReconciliationCompletionPolicy
+import com.baraa.masroof.application.transaction.TransactionReconciliationService
+import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.interpretation.AutomaticInterpretationWriteGuard
+import androidx.room.withTransaction
+import com.baraa.masroof.testsupport.latestFor
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
+import com.baraa.masroof.application.review.ExternalTransferDirection
 import com.baraa.masroof.application.review.ReviewWorkflowResult
+import com.baraa.masroof.application.transaction.IgnoreResult
+import com.baraa.masroof.application.transaction.ReclassificationResult
+import com.baraa.masroof.application.transaction.RestoreResult
 import com.baraa.masroof.application.sms.HistoricalBatchDerivedResult
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
@@ -229,13 +244,13 @@ class ManualDecisionReplayTest {
             assertEquals("seed=$seed correction family", MessageFamily.PURCHASE, success.correction.correctedType)
 
             ledger.replayProduction()
-            val stored = ledger.corrections.latestForRawSmsId(rawId)!!
+            val stored = ledger.corrections.latestFor(rawId)!!
             assertEquals("seed=$seed correction lost merchant", "TEST_CORRECTION", stored.correctedMerchant)
             assertEquals("seed=$seed correction lost amount", amount, stored.correctedAmount)
             assertEquals("seed=$seed correction lost family", MessageFamily.PURCHASE, stored.correctedType)
             val effective = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
                 world.parsedRepo,
-                ledger.corrections,
+                world.decisionRepo,
             ).findEffectiveByRawSmsId(rawId)!!
             assertEquals("seed=$seed effective family", MessageFamily.PURCHASE, effective.event.messageFamily)
             assertEquals("seed=$seed effective amount", amount, effective.event.amount)
@@ -251,6 +266,229 @@ class ManualDecisionReplayTest {
             }
             assertFinancialInvariants(world, seed, "correction")
         }
+    }
+
+    // Plan 2.3: every decision survives a reparse and reconcile that start from an emptied ledger, and the
+    // decided rows come back the same, because processing reads the decisions from user_decision.
+
+    @Test
+    fun emptiedLedger_userNonFinancialAndIgnore_postNothing() = emptiedLedgerCase(::purchaseLedger) { world, ledger ->
+        val batch = ledger.openBatch()
+        val before = (batch.ingestProvider(providerRow("empty-nf", bakeryPurchaseBody(), "2026-09-05T06:15:00Z")) as SmsIngestionResult.Parsed).rawSmsId
+        assertTrue(ledger.workflow.resolveAsNonFinancial(requireReview(world, before).id) is ReviewWorkflowResult.Success)
+        val ignored = (batch.ingestProvider(providerRow("empty-ignore", bakeryPurchaseBody(), "2026-09-06T06:15:00Z")) as SmsIngestionResult.Parsed).rawSmsId
+        assertTrue(batch.finish() is HistoricalBatchDerivedResult.Succeeded)
+        assertEquals(IgnoreResult.Success, ledger.ignore.ignore(world.ftRepo.findByRawSmsId(ignored)!!.id))
+        listOf(before, ignored)
+    }
+
+    @Test
+    fun emptiedLedger_userExternalTransfer_isRebuiltAsChosen() = emptiedLedgerCase(::transferLedger) { world, ledger ->
+        val batch = ledger.openBatch()
+        val parsed = batch.ingestProvider(providerRow("empty-ext", intraOut("2026-09-03 10:38"), "2026-09-03T07:38:00Z")) as SmsIngestionResult.Parsed
+        val resolved = ledger.workflow.resolveTransferAsExternal(requireReview(world, parsed.rawSmsId).id, ExternalTransferDirection.OUTGOING)
+        assertTrue("resolve: $resolved", resolved is ReviewWorkflowResult.Success)
+        assertTrue(batch.finish() is HistoricalBatchDerivedResult.Succeeded)
+        listOf(parsed.rawSmsId)
+    }
+
+    @Test
+    fun emptiedLedger_userSelfTransferPair_isRebuiltAsOneMovement() = emptiedLedgerCase(::transferLedger) { world, ledger ->
+        val batch = ledger.openBatch()
+        ambiguousTie("empty").forEach { assertTrue(batch.ingestProvider(it) is SmsIngestionResult.Parsed) }
+        assertTrue(batch.finish() is HistoricalBatchDerivedResult.Succeeded)
+        val outgoing = reviewFor(world, MessageFamily.TRANSFER_OUT)
+        val incoming = reviewFor(world, MessageFamily.TRANSFER_IN)
+        assertTrue(ledger.workflow.resolveSelfTransferPair(outgoing.id, incoming.id) is ReviewWorkflowResult.Success)
+        listOf(outgoing.rawSmsId, incoming.rawSmsId)
+    }
+
+    @Test
+    fun emptiedLedger_userFinancialType_isRebuiltWithTheChosenType() = emptiedLedgerCase(::transferLedger) { world, ledger ->
+        ownCard(world, "2210", com.baraa.masroof.domain.model.CardType.DEBIT)
+        ownAccounts(world, listOf("3001"))
+        val batch = ledger.openBatch()
+        ambiguousTie("empty").forEach { assertTrue(batch.ingestProvider(it) is SmsIngestionResult.Parsed) }
+        assertTrue(batch.finish() is HistoricalBatchDerivedResult.Succeeded)
+        val outgoing = reviewFor(world, MessageFamily.TRANSFER_OUT)
+        val resolved = ledger.workflow.resolveAsFinancialType(outgoing.id, FinancialTransactionType.FEE)
+        assertTrue("resolve: $resolved", resolved is ReviewWorkflowResult.Success)
+        listOf(outgoing.rawSmsId)
+    }
+
+    @Test
+    fun emptiedLedger_reclassifiedRow_isRebuiltWithTheNewType() = emptiedLedgerCase(::purchaseLedger) { world, ledger ->
+        val rawId = postedPurchase(ledger, "empty-reclassify")
+        val reclassified = ledger.reclassification.reclassify(world.ftRepo.findByRawSmsId(rawId)!!.id, FinancialTransactionType.FEE)
+        assertTrue("reclassify: $reclassified", reclassified is ReclassificationResult.Success)
+        listOf(rawId)
+    }
+
+    @Test
+    fun emptiedLedger_restoredSms_isPostedAgain() = emptiedLedgerCase(::purchaseLedger) { world, ledger ->
+        val rawId = postedPurchase(ledger, "empty-restore")
+        assertEquals(IgnoreResult.Success, ledger.ignore.ignore(world.ftRepo.findByRawSmsId(rawId)!!.id))
+        assertTrue(ledger.restore.restore(rawId) is RestoreResult.Success)
+        listOf(rawId)
+    }
+
+    @Test
+    fun emptiedLedger_approvedCorrection_isReappliedToTheEvidence() = emptiedLedgerCase(::purchaseLedger) { world, ledger ->
+        val batch = ledger.openBatch()
+        val parsed = batch.ingestProvider(providerRow("empty-correction", bakeryPurchaseBody(), "2026-09-05T06:15:00Z")) as SmsIngestionResult.Parsed
+        val review = requireReview(world, parsed.rawSmsId)
+        val corrected = ledger.workflow.applyCorrection(review.id, correctedAmount = Money.of("12.00", Currency.SAR),
+            correctedMerchant = "TEST_CORRECTION")
+        assertTrue("correction: $corrected", corrected is ReviewWorkflowResult.Success)
+        assertTrue(batch.finish() is HistoricalBatchDerivedResult.Succeeded)
+        assertEquals(Money.of("12.00", Currency.SAR), world.ftRepo.findByRawSmsId(parsed.rawSmsId)!!.amount)
+        listOf(parsed.rawSmsId)
+    }
+
+    /**
+     * Plan 2.3, the kept limit: a type edited on the posted row without a review or correction is automatic (owner
+     * rule of 2.2) and has no decision. Reconciliation keeps it only because the row is still posted; an emptied
+     * ledger rebuilds it from the evidence. Plan 3.2 reports that difference.
+     */
+    @Test
+    fun typeEditedOnlyOnTheRow_isKeptWhilePosted_andAutomaticOnceTheLedgerIsEmptied() = runBlocking {
+        DashboardLedgerWorld(context()).use { world ->
+            val ledger = purchaseLedger(world)
+            val rawId = postedPurchase(ledger, "row-only-type")
+            val posted = world.ftRepo.findByRawSmsId(rawId)!!
+            assertEquals(FinancialTransactionType.EXPENSE, posted.type)
+            assertTrue(world.ftRepo.update(posted.copy(type = FinancialTransactionType.FEE)))
+            assertTrue("a row-only edit made a decision", world.db.userDecisionDao().listAll().none { it.rawSmsId == rawId })
+
+            ledger.replayProduction()
+            assertEquals(FinancialTransactionType.FEE, world.ftRepo.findByRawSmsId(rawId)!!.type)
+
+            emptyLedger(world)
+            ledger.replayProduction()
+            assertEquals(FinancialTransactionType.EXPENSE, world.ftRepo.findByRawSmsId(rawId)!!.type)
+        }
+    }
+
+    /**
+     * The open case of 2.2, against today's behaviour: a correction needs a REQUIRED review, so an ignored SMS
+     * cannot be corrected; its latest outcome stays IGNORE and it stays unposted, review and store alike.
+     */
+    @Test
+    fun correctionOfAnIgnoredSms_isRejected_andItStaysNonFinancial() = runBlocking {
+        DashboardLedgerWorld(context()).use { world ->
+            val ledger = purchaseLedger(world)
+            val rawId = postedPurchase(ledger, "ignored-correction")
+            assertEquals(IgnoreResult.Success, ledger.ignore.ignore(world.ftRepo.findByRawSmsId(rawId)!!.id))
+            val review = world.reviewRepo.findByRawSmsId(rawId)!!
+            val corrected = ledger.workflow.applyCorrection(review.id, correctedMerchant = "TEST_CORRECTION")
+            assertEquals(ReviewWorkflowResult.Rejected("review_not_required"), corrected)
+            assertTrue(world.decisionRepo.effectiveFor(rawId).let { it.isNonFinancial && it.corrections.isEmpty() })
+
+            ledger.replayProduction()
+            assertResolution(world, IntegritySeeds.MANUAL, rawId, ReviewResolutionKind.USER_NON_FINANCIAL, posted = false)
+        }
+    }
+
+    /**
+     * A decided external transfer whose leg now carries an out-of-date model inference, on an emptied ledger: the
+     * write guard rejects the rebuild as `stale_family_inference`, the pass is incomplete with the leg to retry, and
+     * nothing is posted for it. No retry can succeed (a decided message is never refreshed); plan 3.x decides it.
+     */
+    @Test
+    fun emptiedLedger_decidedTransferWithAStaleInference_isRejectedAndNeverPosts() = runBlocking {
+        DashboardLedgerWorld(context()).use { world ->
+            val ledger = transferLedger(world)
+            val batch = ledger.openBatch()
+            val parsed = batch.ingestProvider(providerRow("stale-ext", intraOut("2026-09-03 10:38"), "2026-09-03T07:38:00Z")) as SmsIngestionResult.Parsed
+            val resolved = ledger.workflow.resolveTransferAsExternal(requireReview(world, parsed.rawSmsId).id, ExternalTransferDirection.OUTGOING)
+            assertTrue("resolve: $resolved", resolved is ReviewWorkflowResult.Success)
+            assertTrue(batch.finish() is HistoricalBatchDerivedResult.Succeeded)
+            val stored = world.parsedRepo.findByRawSmsId(parsed.rawSmsId)!!
+            val inferred = stored.event.confidence.copy(reasons = stored.event.confidence.reasons + "family_origin:ML" + "model:old")
+            world.parsedRepo.save(stored.event.copy(confidence = inferred), stored.details)
+            val decisions = world.db.userDecisionDao().listAll()
+            emptyLedger(world)
+
+            val guard = writeGuard(world) { record -> record.event.confidence.reasons.none { it.startsWith("family_origin:") } }
+            var conflict: FinancialTransactionSaveResult? = null
+            val reconciliation = TransactionReconciliationService(
+                rawSmsRepository = world.rawRepo,
+                financialTransactionRepository = world.ftRepo,
+                ownershipResolver = OwnershipResolver(world.accounts, world.cards, world.loans),
+                ownershipConfirmationService = OwnershipConfirmationService(world.accounts, world.cards, world.loans),
+                effectiveParsedEventProvider = EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo),
+                reviewRepository = world.reviewRepo,
+                userDecisionRepository = world.decisionRepo,
+                zoneId = world.zone,
+                automaticWrite = { expected, write -> guard.write(expected, write).also { if (it is FinancialTransactionSaveResult.Conflict) conflict = it } },
+            )
+            val report = reconciliation.reconcileStoredEventsDetailed()
+
+            assertEquals(FinancialTransactionSaveResult.Conflict(parsed.rawSmsId, "stale_family_inference"), conflict)
+            assertFalse("a stale rebuild looked complete", ReconciliationCompletionPolicy.isComplete(report))
+            assertTrue(parsed.rawSmsId in report.failedRawSmsIds)
+            assertNull(world.ftRepo.findByRawSmsId(parsed.rawSmsId))
+            assertTrue(world.ftRepo.listAll().isEmpty())
+            assertEquals(decisions, world.db.userDecisionDao().listAll())
+            assertResolution(world, IntegritySeeds.MANUAL, parsed.rawSmsId, ReviewResolutionKind.USER_EXTERNAL_TRANSFER, posted = false)
+        }
+    }
+
+    /** Runs [decide], empties the ledger, replays, and requires the same decisions, reviews and rows for its subjects. */
+    private fun emptiedLedgerCase(
+        ledgerOf: suspend (DashboardLedgerWorld) -> IntegrityLedger,
+        decide: suspend (DashboardLedgerWorld, IntegrityLedger) -> List<String>,
+    ) = runBlocking {
+        val seed = IntegritySeeds.MANUAL
+        DashboardLedgerWorld(context()).use { world ->
+            val ledger = ledgerOf(world)
+            val subjects = decide(world, ledger)
+            val decisions = world.db.userDecisionDao().listAll()
+            val before = decidedState(world, subjects)
+            assertTrue("seed=$seed nothing was decided", decisions.isNotEmpty())
+
+            emptyLedger(world)
+            ledger.replayProduction()
+            assertEquals("seed=$seed replay changed a decision", decisions, world.db.userDecisionDao().listAll())
+            assertEquals("seed=$seed rows not rebuilt as decided", before, decidedState(world, subjects))
+            // Every posted decided subject, the paired leg of a pair included, is still protected from automatic writes.
+            val guard = writeGuard(world) { true }
+            for (id in subjects.filter { world.ftRepo.findByRawSmsId(it) != null }) {
+                val record = requireNotNull(EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo).findEffectiveByRawSmsId(id))
+                var wrote = false
+                val result = guard.write(listOf(record)) { wrote = true; FinancialTransactionSaveResult.Saved }
+                assertTrue("seed=$seed $id lost its protection: $result", result is FinancialTransactionSaveResult.Conflict && !wrote)
+            }
+            assertFinancialInvariants(world, seed, "emptied_ledger")
+        }
+    }
+
+    private fun writeGuard(world: DashboardLedgerWorld, inferenceCurrent: suspend (ParsedEventRecord) -> Boolean) =
+        AutomaticInterpretationWriteGuard(
+            EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo), world.reviewRepo, world.decisionRepo, world.ftRepo,
+            inferenceCurrent = inferenceCurrent,
+            inTransaction = { mutation -> world.db.withTransaction { mutation() } },
+            // The pattern definitions are current here; only the family inference is under test.
+            patternsCurrent = { _, _ -> true },
+        )
+
+    private suspend fun decidedState(world: DashboardLedgerWorld, subjects: List<String>) = subjects.associateWith { id ->
+        val review = world.reviewRepo.findByRawSmsId(id)
+        val posted = world.ftRepo.findByRawSmsId(id)
+        Triple(review?.status to review?.resolutionKind, posted, posted?.let { world.ftRepo.listRawSmsIds(it.id).toSet() })
+    }
+
+    private fun emptyLedger(world: DashboardLedgerWorld) {
+        val sql = world.db.openHelper.writableDatabase
+        sql.execSQL("DELETE FROM financial_transaction_raw_sms_link")
+        sql.execSQL("DELETE FROM financial_transaction")
+    }
+
+    private suspend fun postedPurchase(ledger: IntegrityLedger, id: String): String {
+        val batch = ledger.openBatch()
+        val parsed = batch.ingestProvider(providerRow(id, bakeryPurchaseBody(), "2026-09-05T06:15:00Z")) as SmsIngestionResult.Parsed
+        assertTrue(batch.finish() is HistoricalBatchDerivedResult.Succeeded)
+        return parsed.rawSmsId
     }
 
     private suspend fun requireReview(world: DashboardLedgerWorld, rawSmsId: String): ReviewItem {

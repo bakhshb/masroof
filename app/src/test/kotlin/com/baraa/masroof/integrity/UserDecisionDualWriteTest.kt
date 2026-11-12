@@ -5,23 +5,15 @@ import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.application.review.ExplicitBankSelectionWorkflow
 import com.baraa.masroof.application.review.ExternalTransferDirection
-import com.baraa.masroof.application.review.ReviewQueueUpdater
 import com.baraa.masroof.application.review.ReviewWorkflowResult
 import com.baraa.masroof.application.transaction.IgnoreResult
 import com.baraa.masroof.application.transaction.ReclassificationResult
 import com.baraa.masroof.application.transaction.RestoreResult
-import com.baraa.masroof.application.transaction.TransactionIgnoreService
-import com.baraa.masroof.application.transaction.TransactionReclassificationService
-import com.baraa.masroof.application.transaction.TransactionRestoreService
-import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
-import com.baraa.masroof.data.repository.RoomTransactionIgnoreRepository
-import com.baraa.masroof.data.repository.RoomTransactionReclassificationRepository
 import com.baraa.masroof.data.repository.RoomUserDecisionRepository
-import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MigrationOpenPathContract
 import com.baraa.masroof.data.room.UserDecisionBackfill
 import com.baraa.masroof.data.room.entity.UserDecisionEntity
@@ -36,12 +28,9 @@ import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ReviewKind
-import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
-import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
 import com.baraa.masroof.testsupport.NoOpAppLog
 import com.baraa.masroof.testsupport.engineFixtureAdapter
-import com.baraa.masroof.testsupport.noOpProcessingRecovery
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -122,7 +111,7 @@ class UserDecisionDualWriteTest {
     fun reclassify_appendsOneRow_andRollsBackWithIt() = eachOutcome { world, ledger ->
         val rawId = postedPurchase(ledger, "reclassify")
         val transactionId = world.ftRepo.findByRawSmsId(rawId)!!.id
-        val action = suspend { reclassification(world, ledger).reclassify(transactionId, FinancialTransactionType.FEE) }
+        val action = suspend { ledger.reclassification.reclassify(transactionId, FinancialTransactionType.FEE) }
         Case(action, accepted = { it is ReclassificationResult.Success }) {
             row(rawId, "RECLASSIFY", transactionType = "FEE", source = "account:BANK_ALJAZIRA:3001", posted = posted(world, rawId))
         }
@@ -132,16 +121,16 @@ class UserDecisionDualWriteTest {
     fun ignore_appendsOneRow_andRollsBackWithIt() = eachOutcome { world, ledger ->
         val rawId = postedPurchase(ledger, "ignore")
         val transactionId = world.ftRepo.findByRawSmsId(rawId)!!.id
-        val action = suspend { ignore(world, ledger).ignore(transactionId) }
+        val action = suspend { ledger.ignore.ignore(transactionId) }
         Case(action, accepted = { it == IgnoreResult.Success }) { row(rawId, "IGNORE") }
     }
 
     @Test
     fun restore_appendsOneRow_andRollsBackWithIt() = eachOutcome { world, ledger ->
         val rawId = postedPurchase(ledger, "restore")
-        assertEquals(IgnoreResult.Success, ignore(world, ledger).ignore(world.ftRepo.findByRawSmsId(rawId)!!.id))
+        assertEquals(IgnoreResult.Success, ledger.ignore.ignore(world.ftRepo.findByRawSmsId(rawId)!!.id))
         world.db.openHelper.writableDatabase.execSQL("DELETE FROM user_decision")
-        val action = suspend { restore(world, ledger).restore(rawId) }
+        val action = suspend { ledger.restore.restore(rawId) }
         // Appended before reconciliation posts the row, so it carries no posted time.
         Case(action, accepted = { it is RestoreResult.Success }) { row(rawId, "RESTORE") }
     }
@@ -156,7 +145,7 @@ class UserDecisionDualWriteTest {
             required(world, raw.id)
             world.reviewRepo.markResolved(review(world, raw.id), ReviewResolutionKind.USER_NON_FINANCIAL, NOW, null)
 
-            assertEquals(RestoreResult.Rejected("reconcile_failed"), restore(world, ledger).restore(raw.id))
+            assertEquals(RestoreResult.Rejected("reconcile_failed"), ledger.restore.restore(raw.id))
             assertEquals(ReviewResolutionKind.USER_NON_FINANCIAL, world.reviewRepo.findByRawSmsId(raw.id)!!.resolutionKind)
             assertEquals(listOf(row(raw.id, "RESTORE"), row(raw.id, "RESTORE_REVERTED")),
                 world.db.userDecisionDao().listAll().map { it.copy(sequence = 0) })
@@ -303,31 +292,6 @@ class UserDecisionDualWriteTest {
 
     private suspend fun rawIdFor(world: DashboardLedgerWorld, family: MessageFamily) =
         world.parsedRepo.listAll().first { it.event.messageFamily == family }.event.rawSmsId
-
-    private fun reclassification(world: DashboardLedgerWorld, ledger: IntegrityLedger) = TransactionReclassificationService(
-        financialTransactionRepository = world.ftRepo,
-        effectiveParsedEventProvider = EffectiveParsedEventProvider(world.parsedRepo, ledger.corrections),
-        ownershipResolver = OwnershipResolver(world.accounts, world.cards, world.loans),
-        ownershipConfirmationService = OwnershipConfirmationService(world.accounts, world.cards, world.loans),
-        appLogService = NoOpAppLog,
-        persistence = RoomTransactionReclassificationRepository(world.db, world.ftRepo, DatabaseAccessGate()),
-        clock = world.clock,
-    )
-
-    private fun ignore(world: DashboardLedgerWorld, ledger: IntegrityLedger) =
-        TransactionIgnoreService(RoomTransactionIgnoreRepository(world.db), ledger.clock, NoOpAppLog)
-
-    private fun restore(world: DashboardLedgerWorld, ledger: IntegrityLedger) = TransactionRestoreService(
-        reviewRepository = world.reviewRepo,
-        userDecisionRepository = RoomUserDecisionRepository(world.db),
-        financialTransactionRepository = world.ftRepo,
-        reconciliation = ledger.productionReconciliation,
-        reclassification = reclassification(world, ledger),
-        clock = ledger.clock,
-        appLogService = NoOpAppLog,
-        reviewQueueUpdater = ReviewQueueUpdater(world.reviewRepo, world.ftRepo, ledger.clock),
-        processingRecovery = noOpProcessingRecovery(),
-    )
 
     private fun context(): Context = ApplicationProvider.getApplicationContext()
 

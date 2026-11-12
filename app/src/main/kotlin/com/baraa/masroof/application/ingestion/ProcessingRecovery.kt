@@ -2,33 +2,31 @@ package com.baraa.masroof.application.ingestion
 
 import com.baraa.masroof.application.review.IngestionReviewService
 import com.baraa.masroof.domain.model.ProcessingRetryMode
-import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CancellationException
 
 /**
  * Persists the retry marker for evidence whose derived processing did not finish.
  *
- * A [ReviewResolutionKind.USER_NON_FINANCIAL] review stays closed.
+ * An SMS the user decided posts nothing ([com.baraa.masroof.domain.model.EffectiveUserDecisions.isNonFinancial])
+ * stays closed.
  * Other resolved reviews stay resolved; recoverability is the processing-retry row.
  * Writing the marker throws when persistence fails so callers can retry.
  */
 class ProcessingRecovery(
     private val processingRetryRepository: ProcessingRetryRepository,
     private val reviewRepository: ReviewRepository,
+    private val userDecisionRepository: UserDecisionRepository,
     private val ingestionReviewService: IngestionReviewService,
     private val clock: InstantClock,
 ) {
     suspend fun markExhausted(rawSmsId: String) {
+        if (userDecisionRepository.effectiveFor(rawSmsId).isNonFinancial) return
         val review = reviewRepository.findByRawSmsId(rawSmsId)
-        if (review?.status == ReviewStatus.RESOLVED &&
-            review.resolutionKind == ReviewResolutionKind.USER_NON_FINANCIAL
-        ) {
-            return
-        }
         if (review?.status != ReviewStatus.RESOLVED) {
             ingestionReviewService.requireReview(
                 rawSmsId,
@@ -46,12 +44,8 @@ class ProcessingRecovery(
     suspend fun markExhaustedBatch(rawSmsIds: List<String>): Boolean {
         if (rawSmsIds.isEmpty()) return false
         val ids = rawSmsIds.distinct()
-        val reviews = reviewRepository.findByRawSmsIds(ids)
-        val affected = ids.filter { rawSmsId ->
-            val review = reviews[rawSmsId]
-            review?.status != ReviewStatus.RESOLVED ||
-                review.resolutionKind != ReviewResolutionKind.USER_NON_FINANCIAL
-        }
+        val decisions = userDecisionRepository.effectiveFor(ids)
+        val affected = ids.filterNot { decisions.getValue(it).isNonFinancial }
         if (affected.isEmpty()) return false
         processingRetryRepository.markRequired(
             affected,

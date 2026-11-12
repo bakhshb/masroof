@@ -26,7 +26,6 @@ import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -180,11 +179,9 @@ class LiveRetryRestartTest {
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = ledger,
                 ownershipResolver = resolver,
-                effectiveParsedEventProvider = EffectiveParsedEventProvider(
-                    parsedRepo,
-                    RoomUserCorrectionRepository(db.userCorrectionDao()),
-                ),
+                effectiveParsedEventProvider = EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)),
                 reviewRepository = reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ledger, clock),
@@ -193,10 +190,11 @@ class LiveRetryRestartTest {
             processingRecovery = com.baraa.masroof.application.ingestion.ProcessingRecovery(
                 processingRetryRepository = retryRepo,
                 reviewRepository = reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ingestionReviewService = ingestionReview,
                 clock = clock,
             ),
-            reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
         )
     }

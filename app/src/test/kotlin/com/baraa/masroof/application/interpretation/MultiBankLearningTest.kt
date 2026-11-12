@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.interpretation
 
+import com.baraa.masroof.testsupport.saveCorrection
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
@@ -144,7 +145,7 @@ class MultiBankLearningTest {
 
             // The user later says this wording is a purchase: both hidden copies go back to review, the
             // automatically settled one included, and they are read once, not on every refresh.
-            c.storage.userCorrectionRepository.save(com.baraa.masroof.domain.model.UserCorrection("promo-was-purchase", "promo-one",
+            c.storage.database.saveCorrection(com.baraa.masroof.domain.model.UserCorrection("promo-was-purchase", "promo-one",
                 com.baraa.masroof.domain.model.MessageFamily.PURCHASE, null, null, null, Instant.now()))
             service.synchronizeFeedback()
             assertEquals(setOf("promo-waiting", "promo-next"), service.revokedMemories())

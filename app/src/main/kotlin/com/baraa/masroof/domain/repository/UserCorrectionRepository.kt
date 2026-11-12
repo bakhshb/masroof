@@ -3,20 +3,11 @@ package com.baraa.masroof.domain.repository
 import com.baraa.masroof.domain.model.UserCorrection
 
 /**
- * Append-only persistence for [UserCorrection] overlays.
+ * Append-only persistence for [UserCorrection] overlays, the legacy trace of each `CORRECTION` decision.
+ * Processing reads corrections from `user_decision`; only learning reads this store.
  */
 interface UserCorrectionRepository {
     suspend fun save(correction: UserCorrection)
-
-    suspend fun latestForRawSmsId(rawSmsId: String): UserCorrection?
-
-    suspend fun listForRawSmsId(rawSmsId: String): List<UserCorrection>
-
-    /**
-     * Corrections for [rawSmsIds], ordered by target, [UserCorrection.createdAt], then id.
-     * Ids with no corrections are omitted.
-     */
-    suspend fun listForRawSmsIds(rawSmsIds: Collection<String>): List<UserCorrection>
 
     /** Every correction. Each one targets a stored RawSms, which the schema enforces. */
     suspend fun listAll(): List<UserCorrection>

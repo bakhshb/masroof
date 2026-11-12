@@ -101,9 +101,10 @@ class ProcessStoredSmsUseCaseTest {
                 ),
                 effectiveParsedEventProvider = EffectiveParsedEventProvider(
                     parsedRepo,
-                    RoomUserCorrectionRepository(db.userCorrectionDao()),
+                    com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ),
                 reviewRepository = reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ownershipConfirmationService = noOpOwnershipConfirmation(),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock),
@@ -112,7 +113,7 @@ class ProcessStoredSmsUseCaseTest {
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
             ownershipDiscovery = noOpOwnershipDiscovery(),
             processingRecovery = noOpProcessingRecovery(),
-            reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
         capture = CaptureBankSmsUseCase(rawRepo, registry, appLogService = NoOpAppLog)
         Unit
@@ -182,7 +183,7 @@ class ProcessStoredSmsUseCaseTest {
             processingRecovery = noOpProcessingRecovery(),
             reconciliation = noOpReconciliation(),
             reviewQueueUpdater = noOpReviewQueueUpdater(),
-            reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
         val raw = sms(PURCHASE_BODY)
         assertTrue(CaptureBankSmsUseCase(rawRepo, ambiguous, appLogService = NoOpAppLog).capture(raw) is BankSmsCaptureResult.Captured)
@@ -248,7 +249,7 @@ class ProcessStoredSmsUseCaseTest {
             processingRecovery = noOpProcessingRecovery(),
             reconciliation = noOpReconciliation(),
             reviewQueueUpdater = noOpReviewQueueUpdater(),
-            reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
 
         assertTrue(multiBank.process(raw.id) is SmsIngestionResult.NotRelevant)
@@ -274,9 +275,10 @@ class ProcessStoredSmsUseCaseTest {
                 ),
                 effectiveParsedEventProvider = EffectiveParsedEventProvider(
                     countedParsed,
-                    RoomUserCorrectionRepository(db.userCorrectionDao()),
+                    com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ),
                 reviewRepository = reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 ownershipConfirmationService = noOpOwnershipConfirmation(),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, countedTransactions, clock),
@@ -285,7 +287,7 @@ class ProcessStoredSmsUseCaseTest {
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
             ownershipDiscovery = noOpOwnershipDiscovery(),
             processingRecovery = noOpProcessingRecovery(),
-            reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
         repeat(12) { index ->
             rawRepo.insertIfAbsent(

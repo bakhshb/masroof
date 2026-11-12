@@ -47,7 +47,6 @@ import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -1005,11 +1004,9 @@ private class DeviceSmsSession(
                 rawSmsRepository = rawRepo,
                 financialTransactionRepository = effectiveLedger,
                 ownershipResolver = OwnershipResolver(accounts, cards, loans),
-                effectiveParsedEventProvider = EffectiveParsedEventProvider(
-                    parsedRepo,
-                    RoomUserCorrectionRepository(database.userCorrectionDao()),
-                ),
+                effectiveParsedEventProvider = EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(database)),
                 reviewRepository = reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(database),
                 ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
             ),
             reviewQueueUpdater = ReviewQueueUpdater(reviewForUpdate, ftRepo, clock),
@@ -1018,10 +1015,11 @@ private class DeviceSmsSession(
             processingRecovery = ProcessingRecovery(
                 processingRetryRepository = retryRepo,
                 reviewRepository = reviewRepo,
+                userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(database),
                 ingestionReviewService = ingestionReview,
                 clock = clock,
             ),
-            reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(database),
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
         )
     }

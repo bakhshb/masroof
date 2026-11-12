@@ -3,9 +3,9 @@ package com.baraa.masroof.domain.model
 /**
  * Per-RawSms bank choice recorded on the review row.
  *
- * The choice is one reason, `user_selected_bank:<bankId>`. Queue refresh replaces
- * the other reasons; [mergePreservedSelection] copies this prefix forward so a
- * later reprocess still parses with the adapter the user named.
+ * The choice is one reason, `user_selected_bank:<bankId>`, written with its `BANK_SELECTION`
+ * decision. Queue refresh replaces the other reasons; [mergePreservedSelection] copies this
+ * prefix forward so the review keeps showing it. Reprocessing reads the decision, not the prefix.
  */
 object ExplicitBankSelection {
     const val REASON_PREFIX: String = "user_selected_bank:"

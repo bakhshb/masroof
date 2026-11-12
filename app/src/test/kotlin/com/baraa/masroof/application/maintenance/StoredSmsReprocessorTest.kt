@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.maintenance
 
+import com.baraa.masroof.testsupport.latestFor
 import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
@@ -66,7 +67,7 @@ class StoredSmsReprocessorTest {
     private lateinit var parsedRepo: RoomParsedEventRepository
     private lateinit var ftRepo: RoomFinancialTransactionRepository
     private lateinit var reviewRepo: RoomReviewRepository
-    private lateinit var correctionRepo: RoomUserCorrectionRepository
+    private lateinit var correctionRepo: com.baraa.masroof.testsupport.DecidedCorrectionRepository
     private lateinit var cards: RoomCardRegistryRepository
     private lateinit var reconciliation: TransactionReconciliationService
     private lateinit var reviewQueueUpdater: ReviewQueueUpdater
@@ -84,7 +85,7 @@ class StoredSmsReprocessorTest {
         parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
         ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
-        correctionRepo = RoomUserCorrectionRepository(db.userCorrectionDao())
+        correctionRepo = com.baraa.masroof.testsupport.DecidedCorrectionRepository(db)
         cards = RoomCardRegistryRepository.from(db)
         cards.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "7271"), OwnershipStatus.OWNED)
         reconciliation = TransactionReconciliationService(
@@ -95,8 +96,9 @@ class StoredSmsReprocessorTest {
                 cards,
                 NoOpLoanRegistryRepository,
             ),
-            effectiveParsedEventProvider = EffectiveParsedEventProvider(parsedRepo, correctionRepo),
+            effectiveParsedEventProvider = EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)),
             reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
         )
         reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock)
@@ -209,10 +211,10 @@ class StoredSmsReprocessorTest {
         assertEquals(linked.id, after.id)
         assertEquals(linked.type, after.type)
         assertEquals(1, ftRepo.listAll().size)
-        assertNotNull(correctionRepo.latestForRawSmsId(raw.id))
+        assertNotNull(correctionRepo.latestFor(raw.id))
         assertEquals(
             "Keeta Corrected",
-            EffectiveParsedEventProvider(parsedRepo, correctionRepo).findEffectiveByRawSmsId(raw.id)!!.event.merchant,
+            EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)).findEffectiveByRawSmsId(raw.id)!!.event.merchant,
         )
     }
 

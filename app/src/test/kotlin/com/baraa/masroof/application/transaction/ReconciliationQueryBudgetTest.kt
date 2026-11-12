@@ -89,6 +89,7 @@ class ReconciliationQueryBudgetTest {
             financialTransactionRepository = ledger,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
             reviewRepository = RoomReviewRepository(db.reviewItemDao()),
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
         )

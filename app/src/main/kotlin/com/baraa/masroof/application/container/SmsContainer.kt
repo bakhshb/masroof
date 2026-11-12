@@ -108,10 +108,10 @@ class SmsContainer(
             appLogService = storage.appLogService,
             exchangeRateEnrichmentScheduler = exchangeRateEnrichmentScheduler,
             processingRecovery = review.processingRecovery,
-            reviewRepository = storage.reviewRepository,
+            userDecisionRepository = storage.userDecisionRepository,
             debugProcessHalt = storage.debugProcessHaltProbe,
             patternProcessing = PatternEvidenceProtection(
-                storage.reviewRepository, storage.userCorrectionRepository, storage.financialTransactionRepository,
+                storage.reviewRepository, storage.userDecisionRepository, storage.financialTransactionRepository,
                 storage.parsedEventRepository,
                 inTransaction = { work -> storage.withDatabaseTransaction(work) })::run,
             onHistoricalRetry = enqueueHistoricalRecovery,

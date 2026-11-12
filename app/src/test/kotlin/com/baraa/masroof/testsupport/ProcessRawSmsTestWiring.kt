@@ -10,7 +10,7 @@ import com.baraa.masroof.application.transaction.TransactionReconciliationServic
 import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.domain.ownership.OwnershipDiscoveryService
 import com.baraa.masroof.domain.repository.RawSmsRepository
-import com.baraa.masroof.domain.repository.ReviewRepository
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 
 /** Tests only: wires capture and processing over the same repositories, as the old convenience constructor did. */
@@ -23,7 +23,7 @@ fun processRawSmsUseCaseOf(
     reviewQueueUpdater: ReviewQueueUpdater = noOpReviewQueueUpdater(),
     ingestionReviewService: IngestionReviewService = noOpIngestionReviewService(),
     appLogService: AppLog = NoOpAppLog,
-    reviewRepository: ReviewRepository = EmptyReviewRepository(),
+    userDecisionRepository: UserDecisionRepository = NoOpUserDecisionRepository,
 ) = ProcessRawSmsUseCase(
     capture = CaptureBankSmsUseCase(rawSmsRepository, bankSmsRegistry, appLogService),
     processStored = ProcessStoredSmsUseCase(
@@ -35,7 +35,7 @@ fun processRawSmsUseCaseOf(
         reviewQueueUpdater = reviewQueueUpdater,
         ingestionReviewService = ingestionReviewService,
         appLogService = appLogService,
-        reviewRepository = reviewRepository,
+        userDecisionRepository = userDecisionRepository,
         exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
         processingRecovery = noOpProcessingRecovery(),
     ),

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.analytics
 
+import com.baraa.masroof.testsupport.backfillDecisions
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.MasroofApplication
@@ -34,6 +35,7 @@ class FinancialAnalysisReaderTest {
 
             val review = container.storage.reviewRepository.upsertRequired(raw.id, ReviewKind.NEEDS_REVIEW, listOf("processing_error"), now)
             container.storage.reviewRepository.markResolved(review.id, ReviewResolutionKind.USER_NON_FINANCIAL, now, null)
+            container.storage.database.backfillDecisions()
 
             assertFalse(FinancialAnalysisReader.capture(container, start, end, ZoneOffset.UTC).retry)
         } finally {

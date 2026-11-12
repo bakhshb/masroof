@@ -5,12 +5,11 @@ import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.data.patterns.MessagePatternStore
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.domain.model.Bank
-import com.baraa.masroof.domain.model.ExplicitBankSelection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.domain.repository.UserCorrectionRepository
+import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -45,7 +44,7 @@ class PendingPatternsWorkflow(
     private val reviews: ReviewRepository,
     private val rawMessages: RawSmsRepository,
     private val parsedEvents: ParsedEventRepository,
-    private val corrections: UserCorrectionRepository,
+    private val decisions: UserDecisionRepository,
     private val transactions: FinancialTransactionRepository,
     private val registry: BankSmsRegistry,
     private val batches: HistoricalSmsBatchProcessor? = null,
@@ -85,15 +84,16 @@ class PendingPatternsWorkflow(
             for (row in report.rows.filter { it.status == PendingPatternStatus.MATCHED && it.matches.single().patternId in approved &&
                     (patternId == null || it.matches.single().patternId == patternId) }) {
                 requireNotNull(inTransaction).invoke {
-                    val review = reviews.getById(row.reviewId)
-                    if (review == null || review.status != ReviewStatus.REQUIRED || review.resolutionKind != null ||
-                        corrections.listForRawSmsId(review.rawSmsId).isNotEmpty() || transactions.isRawSmsLinked(review.rawSmsId)) {
+                    val review = reviews.getById(row.reviewId) ?: return@invoke SmsIngestionResult.Duplicate
+                    val decided = decisions.effectiveFor(review.rawSmsId)
+                    if (review.status != ReviewStatus.REQUIRED || review.resolutionKind != null ||
+                        decided.corrections.isNotEmpty() || transactions.isRawSmsLinked(review.rawSmsId)) {
                         return@invoke SmsIngestionResult.Duplicate
                     }
                     val event = parsedEvents.findByRawSmsId(review.rawSmsId)?.event
                     if (event?.parseStatus == ParseStatus.SUCCESS) return@invoke SmsIngestionResult.Duplicate
                     val raw = rawMessages.getById(review.rawSmsId) ?: return@invoke SmsIngestionResult.Duplicate
-                    val selected = ExplicitBankSelection.selectedBankId(review.reasons) ?: event?.bank?.takeUnless { it == Bank.UNKNOWN }?.id
+                    val selected = decided.selectedBankId ?: event?.bank?.takeUnless { it == Bank.UNKNOWN }?.id
                     if (selected != null && selected != bankId) return@invoke SmsIngestionResult.Duplicate
                     if (selected == null) {
                         val route = registry.route(raw.sender, raw.body)
@@ -137,12 +137,13 @@ class PendingPatternsWorkflow(
             // Bound shown rows per bank after routing, so another bank's queue cannot hide this one.
             scan@ for (batch in required.chunked(200)) {
                 val parsed = parsedEvents.listByRawSmsIds(batch.map { it.rawSmsId }).associateBy { it.event.rawSmsId }
-                fun storedBankOf(review: ReviewItem) = ExplicitBankSelection.selectedBankId(review.reasons)
+                val decided = decisions.effectiveFor(batch.map { it.rawSmsId })
+                fun storedBankOf(review: ReviewItem) = decided.getValue(review.rawSmsId).selectedBankId
                     ?: parsed[review.rawSmsId]?.event?.bank?.takeUnless { it == Bank.UNKNOWN }?.id
-                // Another bank's stored review is never a candidate; skip its body and correction reads.
+                // Another bank's stored review is never a candidate; skip its body reads.
                 val relevant = batch.filter { storedBankOf(it).let { stored -> stored == null || stored == bankId } }
                 val ids = relevant.map { it.rawSmsId }
-                val protected = corrections.listForRawSmsIds(ids).mapTo(hashSetOf()) { it.targetRawSmsId }
+                val protected = ids.filterTo(hashSetOf()) { decided.getValue(it).corrections.isNotEmpty() }
                 val raw = rawMessages.getByIds(ids).associateBy { it.id }
                 for (review in relevant) {
                     val event = parsed[review.rawSmsId]?.event

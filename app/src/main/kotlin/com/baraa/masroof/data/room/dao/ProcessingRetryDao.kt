@@ -36,34 +36,30 @@ interface ProcessingRetryDao {
         }
     }
 
-    /**
-     * Oldest receipt first. A [com.baraa.masroof.domain.model.ReviewResolutionKind.USER_NON_FINANCIAL]
-     * review stays closed and is not returned.
-     */
+    /** Oldest receipt first. An SMS whose latest outcome decision posts nothing stays closed and is not returned. */
     @Query(
         """
         SELECT p.rawSmsId FROM processing_retry p
         INNER JOIN raw_sms r ON r.id = p.rawSmsId
-        LEFT JOIN review_item v ON v.rawSmsId = p.rawSmsId
-        WHERE v.resolutionKind IS NULL OR v.resolutionKind != 'USER_NON_FINANCIAL'
+        WHERE $RETRY_NOT_DECIDED_NON_FINANCIAL
         ORDER BY r.receivedAtEpochMillis ASC, r.id ASC
         """,
     )
     suspend fun listRetryableRawSmsIds(): List<String>
 
-    /**
-     * Retry rows of one [mode]. A review row does not change this set.
-     * [com.baraa.masroof.domain.model.ReviewResolutionKind.USER_NON_FINANCIAL] stays excluded.
-     */
+    /** Retry rows of one [mode]. A review row does not change this set; a decided non-financial SMS stays excluded. */
     @Query(
         """
         SELECT p.rawSmsId FROM processing_retry p
         INNER JOIN raw_sms r ON r.id = p.rawSmsId
-        LEFT JOIN review_item v ON v.rawSmsId = p.rawSmsId
         WHERE p.mode = :mode
-          AND (v.resolutionKind IS NULL OR v.resolutionKind != 'USER_NON_FINANCIAL')
+          AND $RETRY_NOT_DECIDED_NON_FINANCIAL
         ORDER BY r.receivedAtEpochMillis ASC, r.id ASC
         """,
     )
     suspend fun listRetryableRawSmsIdsByMode(mode: String): List<String>
 }
+
+/** `p.rawSmsId` is not an SMS whose latest outcome decision posts nothing (`EffectiveUserDecisions.isNonFinancial`). */
+private const val RETRY_NOT_DECIDED_NON_FINANCIAL = "COALESCE((" + LATEST_OUTCOME_KIND_SQL +
+    "(d.rawSmsId = p.rawSmsId OR d.pairedRawSmsId = p.rawSmsId)" + NOT_NON_FINANCIAL_SQL

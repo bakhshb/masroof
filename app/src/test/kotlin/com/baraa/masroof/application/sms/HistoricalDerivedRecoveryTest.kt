@@ -121,6 +121,7 @@ class HistoricalDerivedRecoveryTest {
                 effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(harness.parsedRepo),
                 ownershipConfirmationService = noOpOwnershipConfirmation(),
                 reviewRepository = EmptyReviewRepository(),
+                userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
             ),
             reviewQueueUpdater = ReviewQueueUpdater(failingReviews, harness.ftRepo, clock),
             rawSmsRepository = harness.rawRepo,

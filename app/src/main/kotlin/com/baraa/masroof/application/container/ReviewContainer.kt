@@ -53,12 +53,13 @@ class ReviewContainer(
     val effectiveParsedEventProvider: EffectiveParsedEventProvider =
         EffectiveParsedEventProvider(
             parsedEventRepository = storage.parsedEventRepository,
-            userCorrectionRepository = storage.userCorrectionRepository,
+            userDecisionRepository = storage.userDecisionRepository,
         )
 
     private val automaticInterpretationWriteGuard by lazy {
         AutomaticInterpretationWriteGuard(
-            effectiveParsedEventProvider, storage.reviewRepository, storage.financialTransactionRepository,
+            effectiveParsedEventProvider, storage.reviewRepository, storage.userDecisionRepository,
+            storage.financialTransactionRepository,
             inferenceCurrent = { learning.interpretationService?.isInferenceCurrent(it) != false },
             inTransaction = { mutation -> storage.withDatabaseTransaction(mutation) },
             patternsCurrent = PatternInterpretationWritePolicy(
@@ -73,6 +74,7 @@ class ReviewContainer(
             ownershipConfirmationService = ownershipConfirmationService,
             effectiveParsedEventProvider = effectiveParsedEventProvider,
             reviewRepository = storage.reviewRepository,
+            userDecisionRepository = storage.userDecisionRepository,
             automaticWrite = { expected, write -> automaticInterpretationWriteGuard.write(expected, write) },
         )
 
@@ -93,6 +95,7 @@ class ReviewContainer(
         ProcessingRecovery(
             processingRetryRepository = storage.processingRetryRepository,
             reviewRepository = storage.reviewRepository,
+            userDecisionRepository = storage.userDecisionRepository,
             ingestionReviewService = ingestionReviewService,
             clock = storage.clock,
         )

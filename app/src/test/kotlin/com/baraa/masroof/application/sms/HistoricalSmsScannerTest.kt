@@ -401,7 +401,7 @@ class HistoricalSmsScannerTest {
             processingRecovery = noOpProcessingRecovery(),
             reconciliation = noOpReconciliation(),
             reviewQueueUpdater = noOpReviewQueueUpdater(),
-            reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         ),
         appLogService = NoOpAppLog,
         batchRecoveryScheduler = NoOpHistoricalBatchRecoveryScheduler,
@@ -565,9 +565,10 @@ class HistoricalSmsScannerTest {
             ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
             effectiveParsedEventProvider = EffectiveParsedEventProvider(
                 parsedRepo,
-                RoomUserCorrectionRepository(db.userCorrectionDao()),
+                com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             ),
             reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
         )
         private val reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, clock)
         private val capture = CaptureBankSmsUseCase(rawRepo, registry, appLogService = NoOpAppLog)
@@ -582,7 +583,7 @@ class HistoricalSmsScannerTest {
             appLogService = NoOpAppLog,
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
             processingRecovery = noOpProcessingRecovery(),
-            reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
         init {
             if (preOwned) {

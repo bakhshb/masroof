@@ -95,6 +95,7 @@ class ScopedReconciliationTest {
             zoneId = zoneId,
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
             reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
     }
 
@@ -264,7 +265,7 @@ class ScopedReconciliationTest {
             amount = null,
             status = ParseStatus.REVIEW_REQUIRED,
         )
-        val corrections = RoomUserCorrectionRepository(db.userCorrectionDao())
+        val corrections = com.baraa.masroof.testsupport.DecidedCorrectionRepository(db)
         corrections.save(
             UserCorrection(
                 id = "corr-amount",
@@ -281,9 +282,10 @@ class ScopedReconciliationTest {
             financialTransactionRepository = transactions,
             ownershipResolver = reconciliationOwnership(),
             ownershipConfirmationService = confirmation,
-            effectiveParsedEventProvider = EffectiveParsedEventProvider(parsed, corrections),
+            effectiveParsedEventProvider = EffectiveParsedEventProvider(parsed, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)),
             zoneId = zoneId,
             reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
         parsed.reset()
         transactions.reset()
@@ -635,6 +637,7 @@ class ScopedReconciliationTest {
                 zoneId = zoneId,
                 effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(countedParsed),
                 reviewRepository = EmptyReviewRepository(),
+                userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
             )
             persistTransfer(
                 smsId = "sms-local-a",

@@ -399,7 +399,7 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
     @Test
     fun merchantOnlyCorrection_doesNotLiftParseStatusGate() = runBlocking {
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
-        val correctionRepo = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())
+        val correctionRepo = com.baraa.masroof.testsupport.DecidedCorrectionRepository(db)
         val withCorrections = TransactionReconciliationService(
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
@@ -407,9 +407,10 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
             ownershipConfirmationService = confirmation,
             effectiveParsedEventProvider = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
                 parsedRepo,
-                correctionRepo,
+                com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             ),
             reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
         persistEvent(
             smsId = "sms-rr-merchant-only",
@@ -446,8 +447,7 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
     fun restoreIgnoredReviewRequiredPurchase_assemblesExpense() = runBlocking {
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
         val reviewRepo = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
-        val correctionRepo = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao())
-        val effective = com.baraa.masroof.application.review.EffectiveParsedEventProvider(parsedRepo, correctionRepo)
+        val effective = com.baraa.masroof.application.review.EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db))
         val resolver = OwnershipResolver(accounts, cards, loans)
         val withReviews = TransactionReconciliationService(
             rawSmsRepository = rawRepo,
@@ -455,6 +455,7 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
             ownershipResolver = resolver,
             ownershipConfirmationService = confirmation,
             reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             effectiveParsedEventProvider = effective,
         )
         val clock = com.baraa.masroof.sms.time.InstantClock { Instant.parse("2026-08-02T12:00:00Z") }

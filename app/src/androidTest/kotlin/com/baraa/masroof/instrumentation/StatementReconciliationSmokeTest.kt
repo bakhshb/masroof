@@ -192,17 +192,25 @@ class StatementReconciliationSmokeTest {
                         emulatorMessage("ledger seed was not saved for ${row.transactionId}: $saved")
                     }
                 }
-                container.storage.userCorrectionRepository.save(
-                    UserCorrection(
-                        id = "uc-m19-matched",
-                        targetRawSmsId = "m19-sms-matched",
-                        correctedType = null,
-                        correctedAmount = null,
-                        correctedMerchant = "Anon merchant",
-                        correctedCounterparty = null,
-                        createdAt = at("2026-04-02T12:05:00"),
-                    ),
-                )
+                val correctedAt = at("2026-04-02T12:05:00")
+                // As the app corrects it: the correction and its decision together.
+                container.storage.userDecisionRepository.recordWith(
+                    com.baraa.masroof.domain.model.UserDecision("m19-sms-matched",
+                        com.baraa.masroof.domain.model.UserDecisionKind.CORRECTION, correctedAt, merchant = "Anon merchant"),
+                    before = { null },
+                ) {
+                    container.storage.userCorrectionRepository.save(
+                        UserCorrection(
+                            id = "uc-m19-matched",
+                            targetRawSmsId = "m19-sms-matched",
+                            correctedType = null,
+                            correctedAmount = null,
+                            correctedMerchant = "Anon merchant",
+                            correctedCounterparty = null,
+                            createdAt = correctedAt,
+                        ),
+                    )
+                }
                 container.storage.reviewRepository.upsertRequired(
                     rawSmsId = "m19-sms-ledger-only",
                     kind = ReviewKind.NEEDS_REVIEW,

@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.testsupport.latestFor
 import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction
@@ -76,7 +77,7 @@ class TransactionReclassificationServiceTest {
             financialTransactionRepository = ftRepo,
             effectiveParsedEventProvider = EffectiveParsedEventProvider(
                 parsedRepo,
-                RoomUserCorrectionRepository(db.userCorrectionDao()),
+                com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             ),
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
             ownershipConfirmationService = confirmation,
@@ -136,20 +137,20 @@ class TransactionReclassificationServiceTest {
     @Test fun anAmountCorrectionBetweenAssemblyAndPostingInvalidatesTheOldEvidenceEvenWhenManuallyConfirmed() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA,"3001"))
         persistIncomeTransfer(smsId="racing-edit",counterparty="TEST",amount="100.00")
-        val corrections=RoomUserCorrectionRepository(db.userCorrectionDao())
-        val effective=EffectiveParsedEventProvider(parsedRepo,corrections)
+        val corrections=com.baraa.masroof.testsupport.DecidedCorrectionRepository(db)
+        val effective=EffectiveParsedEventProvider(parsedRepo,com.baraa.masroof.data.repository.RoomUserDecisionRepository(db))
         val assembledFrom=effective.findEffectiveByRawSmsId("racing-edit")!!
         corrections.save(com.baraa.masroof.domain.model.UserCorrection("new-amount","racing-edit",null,
             Money.of(BigDecimal("150.00"),Currency.SAR),null,null,Instant.now()))
         assertTrue(effective.findEffectiveByRawSmsId("racing-edit")!!.automationConfirmed)
         val guard=com.baraa.masroof.application.interpretation.AutomaticInterpretationWriteGuard(effective,
-            com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao()),ftRepo,
+            com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao()),com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),ftRepo,
             inferenceCurrent={ true },inTransaction={ work -> db.withTransaction { work() } })
         var wrote=false
         val result=guard.write(listOf(assembledFrom)) { wrote=true;FinancialTransactionSaveResult.Saved }
         assertTrue(result is FinancialTransactionSaveResult.Conflict)
         assertTrue(!wrote)
-        assertEquals("150.00",corrections.latestForRawSmsId("racing-edit")!!.correctedAmount!!.amount.toPlainString())
+        assertEquals("150.00",corrections.latestFor("racing-edit")!!.correctedAmount!!.amount.toPlainString())
     }
 
     @Test

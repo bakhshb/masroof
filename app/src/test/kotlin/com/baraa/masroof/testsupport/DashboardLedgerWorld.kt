@@ -33,7 +33,6 @@ import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
@@ -100,6 +99,7 @@ class DashboardLedgerWorld(
     val parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
     val ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
     val reviewRepo = RoomReviewRepository(db.reviewItemDao())
+    val decisionRepo = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)
     val accounts = RoomAccountRegistryRepository.from(db)
     val cards = RoomCardRegistryRepository.from(db)
     val loans = RoomLoanRegistryRepository.from(db)
@@ -118,17 +118,15 @@ class DashboardLedgerWorld(
         financialTransactionRepository = ftRepo,
         ownershipResolver = OwnershipResolver(accounts, cards, loans),
         ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
-        effectiveParsedEventProvider = EffectiveParsedEventProvider(
-            parsedRepo,
-            RoomUserCorrectionRepository(db.userCorrectionDao()),
-        ),
+        effectiveParsedEventProvider = EffectiveParsedEventProvider(parsedRepo, decisionRepo),
         reviewRepository = reviewRepo,
+        userDecisionRepository = decisionRepo,
     )
     private val reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, importClock)
 
     private val processingRecovery = com.baraa.masroof.application.ingestion.ProcessingRecovery(
         com.baraa.masroof.data.repository.RoomProcessingRetryRepository(db.processingRetryDao()),
-        reviewRepo, IngestionReviewService(reviewRepo, importClock), importClock,
+        reviewRepo, decisionRepo, IngestionReviewService(reviewRepo, importClock), importClock,
     )
 
     val captureBankSms = CaptureBankSmsUseCase(rawRepo, registry, appLogService = NoOpAppLog)
@@ -144,7 +142,7 @@ class DashboardLedgerWorld(
             processingRecovery = processingRecovery,
             ingestionReviewService = IngestionReviewService(reviewRepo, importClock),
             patternProcessing = com.baraa.masroof.application.ingestion.PatternEvidenceProtection(
-                reviewRepo, RoomUserCorrectionRepository(db.userCorrectionDao()), ftRepo, parsedRepo,
+                reviewRepo, decisionRepo, ftRepo, parsedRepo,
                 inTransaction = { work -> db.withTransaction { work() } })::run,
             exchangeRateEnrichmentScheduler = exchangeRateEnrichment?.let { workflow ->
                 com.baraa.masroof.application.sms.ImmediateExchangeRateEnrichmentScheduler(
@@ -152,7 +150,7 @@ class DashboardLedgerWorld(
                 )
             } ?: NoOpExchangeRateEnrichmentScheduler,
             appLogService = NoOpAppLog,
-            reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = NoOpUserDecisionRepository,
         )
 
     suspend fun ownFixtureInstruments() {

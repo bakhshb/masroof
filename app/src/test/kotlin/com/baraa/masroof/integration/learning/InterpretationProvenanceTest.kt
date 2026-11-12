@@ -10,7 +10,6 @@ import com.baraa.masroof.parsing.model.*
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
@@ -61,8 +60,8 @@ class InterpretationProvenanceTest {
             val parsed = port(ParsedEventRepository::class.java) { name ->
                 check(name == "findByRawSmsId"); record()
             }
-            val corrections = port(UserCorrectionRepository::class.java) { name ->
-                check(name == "listForRawSmsId"); emptyList<UserCorrection>()
+            val corrections = port(com.baraa.masroof.domain.repository.UserDecisionRepository::class.java) { name ->
+                check(name == "effectiveFor"); com.baraa.masroof.domain.model.EffectiveUserDecisions.NONE
             }
             val reviews = port(ReviewRepository::class.java) { throw failure }
             return InterpretationProvenanceWorkflow(EffectiveParsedEventProvider(parsed,corrections),reviews)

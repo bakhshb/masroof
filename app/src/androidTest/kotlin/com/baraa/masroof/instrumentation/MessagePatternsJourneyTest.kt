@@ -196,7 +196,7 @@ class MessagePatternsJourneyTest {
             }
             val workflow = MessagePatternsWorkflow(store, gate, pendingPreview = com.baraa.masroof.application.patterns.PendingPatternsWorkflow(
                 store, gate, reviews, raw, com.baraa.masroof.data.repository.RoomParsedEventRepository(db.parsedEventDao()),
-                com.baraa.masroof.data.repository.RoomUserCorrectionRepository(db.userCorrectionDao()),
+                com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
                 com.baraa.masroof.data.repository.RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao()),
                 com.baraa.masroof.bank.BankSmsRegistry(emptyList())),
                 appLogService = NoOpAppLog,)

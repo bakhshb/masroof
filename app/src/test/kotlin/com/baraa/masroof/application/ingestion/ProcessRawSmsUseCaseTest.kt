@@ -542,6 +542,7 @@ class ProcessRawSmsUseCaseTest {
                 effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
                 ownershipConfirmationService = noOpOwnershipConfirmation(),
                 reviewRepository = EmptyReviewRepository(),
+                userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
             )
         } ?: noOpReconciliation(),
         reviewQueueUpdater = reviews?.let { ReviewQueueUpdater(it, requireNotNull(ledger), InstantClock.System) }
@@ -651,6 +652,7 @@ class ProcessRawSmsUseCaseTest {
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
             reviewRepository = EmptyReviewRepository(),
+            userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
         ReviewQueueUpdater(reviewRepo, ftRepo, InstantClock.System)
             .applyReport(reconciliation.reconcileStoredEventsDetailed())
@@ -819,7 +821,7 @@ class ProcessRawSmsUseCaseTest {
                 reviewRepo,
                 InstantClock { Instant.parse("2026-08-03T15:00:00Z") },
             ),
-            reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             appLogService = NoOpAppLog,
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
             ownershipDiscovery = noOpOwnershipDiscovery(),
@@ -985,7 +987,7 @@ class ProcessRawSmsUseCaseTest {
                 reviewRepo,
                 InstantClock { Instant.parse("2026-08-03T15:00:00Z") },
             ),
-            reviewRepository = reviewRepo,
+            userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
             appLogService = NoOpAppLog,
             exchangeRateEnrichmentScheduler = NoOpExchangeRateEnrichmentScheduler,
             ownershipDiscovery = noOpOwnershipDiscovery(),
