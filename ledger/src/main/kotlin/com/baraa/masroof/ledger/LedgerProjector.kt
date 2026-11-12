@@ -193,7 +193,7 @@ private class Projection(
      * decision's own writer deletes the row. They are saved before any decided posting, so another SMS's posting that
      * names one of their SMS conflicts and is retried.
      */
-    private val keptRows = stored.rows.filter { row -> row.rawSmsIds.any(::preserved) }
+    private val keptRows = stored.rows.filter { row -> row.rawSmsIds.size <= 2 && row.rawSmsIds.any(::preserved) }
         .onEach { row -> check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" } }
     private val keptDecided = keptRows.flatMap { it.rawSmsIds }.toSet()
 
@@ -206,19 +206,23 @@ private class Projection(
         .onEach { row -> (asItself(row) ?: row).let { check(save(it.transaction, it.rawSmsIds)) { "kept stored rows never overlap" } } }
 
     /**
-     * Keep rule (iv): an undecided stored row of more than two raw SMS stays as stored, its legs settled with it, except
-     * the old stale-link release ([staleLegs]): those legs leave the row and are assembled again.
+     * Keep rule (iv): a stored row of more than two raw SMS stays as stored, its legs settled with it, except the old
+     * stale-link release ([staleLegs]), decided per raw SMS as the old pass decided it: an unprotected stale leg leaves
+     * the row and is assembled again as an unlinked leg ([released]).
      */
-    private val keptMerged = stored.rows.filter { row -> row.rawSmsIds.size > 2 && row.rawSmsIds.none(::preserved) }
-        .onEach { row ->
-            val released = staleLegs(row)
-            val remaining = row.rawSmsIds - released
-            if (remaining.isEmpty()) return@onEach
-            val releasedEvents = released.mapNotNull { byRawSmsId[it]?.event?.id }.toSet()
-            val transaction = row.transaction.copy(linkedParsedEventIds = row.transaction.linkedParsedEventIds - releasedEvents)
-            check(save(transaction, remaining)) { "kept stored rows never overlap" }
-        }
-    private val keptPairIds = (keptPairs + keptMerged).flatMap { it.rawSmsIds }.toSet()
+    private val released = mutableSetOf<String>()
+    private val keptMergedLinks = stored.rows.filter { row -> row.rawSmsIds.size > 2 }.flatMap { row ->
+        val stale = staleLegs(row)
+        released += stale
+        val remaining = row.rawSmsIds - stale.toSet()
+        if (remaining.isEmpty()) return@flatMap emptyList()
+        val releasedEvents = stale.mapNotNull { byRawSmsId[it]?.event?.id }.toSet()
+        val transaction = row.transaction.copy(linkedParsedEventIds = row.transaction.linkedParsedEventIds - releasedEvents)
+        check(save(transaction, remaining)) { "kept stored rows never overlap" }
+        remaining
+    }
+    /** Raw SMS a kept pair or a kept row of three or more SMS still links: never in the upgrade pools. */
+    private val keptPairIds = keptPairs.flatMap { it.rawSmsIds }.toSet() + keptMergedLinks
 
     // Decided rows settle first, so the pre-pass sees only the evidence left to automatic assembly.
     private val automatic = records.filter(::settleDecided)
@@ -298,7 +302,7 @@ private class Projection(
         var linkedEvents = row.transaction.linkedParsedEventIds.size
         val released = mutableListOf<String>()
         for (record in row.rawSmsIds.mapNotNull(byRawSmsId::get).sortedBy { it.event.id }) {
-            if (!record.event.messageFamily.isTransfer()) continue
+            if (!record.event.messageFamily.isTransfer() || preserved(record.event.rawSmsId)) continue
             val expected = TransactionTiming.effectiveOccurredAt(
                 record.event, record.occurredAtLocal, record.receivedAt, zone, row.transaction.occurredAtZone,
             )
@@ -558,7 +562,7 @@ private class Projection(
     private val oldUpgradePairs: Set<List<String>> by lazy {
         val pool = records.filter { record ->
             val id = record.event.rawSmsId
-            val storedRow = storedByRawSmsId[id]?.transaction
+            val storedRow = storedByRawSmsId[id]?.transaction?.takeIf { id !in released }
             record.event.messageFamily.isTransfer() && !preserved(id) && id !in keptPairIds &&
                 TransactionAssembler.isAutomationEligible(record.event, record.automationConfirmed) &&
                 (storedRow == null || storedRow.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||

@@ -388,4 +388,48 @@ class LedgerProjectorKeepStoredTest {
         assertTrue(edited in result.rows)
         assertTrue(listOf("in", "out") to FinancialTransactionType.SELF_TRANSFER in result.sets(), "rows: ${result.sets()}")
     }
+
+    /**
+     * A stale leg released from a stored self-transfer of three SMS is unlinked, as the old `unlinkRawSms` left it, so the
+     * upgrade can join it with a posted external leg: [a,c] stays, [b,d] becomes a self-transfer.
+     */
+    @Test
+    fun aLegReleasedFromAMergedRowJoinsAPostedExternalLeg() {
+        val external = account("9999")
+        val registry = owned.copy(accounts = owned.accounts + (external to OwnershipStatus.EXTERNAL))
+        val later = T0.plusSeconds(3_600)
+        val row = storedRow("a", "b", "c", type = FinancialTransactionType.SELF_TRANSFER, zone = "UTC")
+        val d = storedRow("d", type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT).let {
+            it.copy(transaction = it.transaction.copy(occurredAt = later))
+        }
+        val result = project(
+            listOf(
+                evidence(event("a", MessageFamily.TRANSFER_OUT, source = ownedA, destination = ownedB, network = BankNetworkType.INTRA_BANK), T0),
+                evidence(event("b", MessageFamily.TRANSFER_IN, source = ownedA, destination = ownedB, network = BankNetworkType.INTRA_BANK, occurredAt = later), later, transactionReference = "R1"),
+                purchase("c"),
+                evidence(event("d", MessageFamily.TRANSFER_OUT, source = ownedA, destination = external, network = BankNetworkType.INTRA_BANK, occurredAt = later), later, transactionReference = "R1"),
+            ),
+            registry = registry, stored = StoredFacts(rows = listOf(row, d)),
+        )
+        assertEquals(
+            setOf(listOf("a", "c") to FinancialTransactionType.SELF_TRANSFER, listOf("b", "d") to FinancialTransactionType.SELF_TRANSFER),
+            result.sets(),
+        )
+    }
+
+    /** The release is decided per raw SMS: a protected leg stays, an unprotected stale leg of the same row leaves. */
+    @Test
+    fun aMergedRowWithAProtectedLegStillReleasesItsOtherStaleLegs() {
+        val later = T0.plusSeconds(86_400 * 30L)
+        val row = storedRow("a1", "b1", "a2", type = FinancialTransactionType.SELF_TRANSFER, zone = "UTC")
+        val result = project(
+            listOf(
+                leg("a1", MessageFamily.TRANSFER_OUT, BankNetworkType.INTRA_BANK), leg("b1", MessageFamily.TRANSFER_IN, BankNetworkType.INTRA_BANK),
+                evidence(event("a2", MessageFamily.TRANSFER_OUT, source = ownedA, destination = ownedB, network = BankNetworkType.INTRA_BANK, occurredAt = later), later),
+            ),
+            registry = owned, stored = StoredFacts(rows = listOf(row), correctionClosedRawSmsIds = setOf("a1")),
+        )
+        assertEquals(listOf("a1", "b1"), result.rows.single { it.transaction.id == row.transaction.id }.rawSmsIds)
+        assertTrue(result.rows.any { it.rawSmsIds == listOf("a2") })
+    }
 }
