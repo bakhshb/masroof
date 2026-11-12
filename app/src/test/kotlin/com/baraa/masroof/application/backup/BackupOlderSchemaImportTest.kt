@@ -47,13 +47,9 @@ class BackupOlderSchemaImportTest {
         val v19 = UserDecisionBackfillContract.v19File(context, "backup-v19.db", database)
         assertFalse("the v19 file is self-contained", File(v19.path + "-wal").let { it.isFile && it.length() > 0 })
         val expected = MigrationOpenPathContract.readOnly(v19, MigrationOpenPathContract::rows)
-        val entries = entries(plaintext().use { it.readBytes() }).toMutableMap()
-        val manifest = BackupPackageCodec.decodeManifest(entries.getValue(BackupPackageFormat.MANIFEST_ENTRY).decodeToString())
-        entries[BackupPackageFormat.MANIFEST_ENTRY] = BackupPackageCodec.encodeManifest(
-            manifest.copy(roomVersion = 19, identityHash = MasroofDatabase.IDENTITY_HASHES.getValue(19))).toByteArray()
-        entries[BackupPackageFormat.DATABASE_ENTRY] = v19.readBytes()
+        val archive = File(context.cacheDir, "v19.zip")
+        archive.writeBytes(rewritten(19, MasroofDatabase.IDENTITY_HASHES.getValue(19), database = v19.readBytes()))
         context.deleteDatabase("backup-v19.db")
-        val archive = File(context.cacheDir, "v19.zip").also { file -> file.outputStream().use { writeZip(it, entries.toList()) } }
         val live = MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).build()
         try {
             val outcome = DatabaseBackupService(context, live, { live.close() }, "test", restartProcess = {}, appLogService = NoOpAppLog)
@@ -129,16 +125,18 @@ class BackupOlderSchemaImportTest {
         }
     }
 
-    /** The committed plaintext archive with its manifest pair and/or its database file changed. */
+    /** The committed plaintext archive with its manifest pair changed, and its database file replaced by [database] and/or edited by [sql]. */
     private fun rewritten(
         manifestVersion: Int = MasroofDatabase.VERSION,
         manifestHash: String = MasroofDatabase.IDENTITY_HASH,
         sql: String? = null,
+        database: ByteArray? = null,
     ): ByteArray {
         val entries = entries(plaintext().use { it.readBytes() }).toMutableMap()
         val manifest = BackupPackageCodec.decodeManifest(entries.getValue(BackupPackageFormat.MANIFEST_ENTRY).decodeToString())
         entries[BackupPackageFormat.MANIFEST_ENTRY] =
             BackupPackageCodec.encodeManifest(manifest.copy(roomVersion = manifestVersion, identityHash = manifestHash)).toByteArray()
+        if (database != null) entries[BackupPackageFormat.DATABASE_ENTRY] = database
         if (sql != null) {
             val file = File(context.cacheDir, "rewritten.db").also { it.writeBytes(entries.getValue(BackupPackageFormat.DATABASE_ENTRY)) }
             SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { it.execSQL(sql) }

@@ -1,7 +1,6 @@
 package com.baraa.masroof.data.room
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
@@ -114,27 +113,15 @@ object UserDecisionBackfillContract {
     }
 
     /** A v19 file with an unknown identity hash fails the check in `MIGRATION_19_20` and stays untouched. */
-    fun unknownV19IdentityHashIsRejectedUntouched(context: Context, fixture: () -> InputStream) {
-        val name = "backfill-reject.db"
-        val file = v19File(context, name, fixture)
-        val flags = SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING
-        SQLiteDatabase.openDatabase(file.path, null, flags).use {
-            it.execSQL("UPDATE room_master_table SET identity_hash = '" + "0".repeat(32) + "'")
-        }
-        MigrationOpenPathContract.rejectsUntouched(context, name)
-        context.deleteDatabase(name)
-    }
+    fun unknownV19IdentityHashIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
+        MigrationOpenPathContract.editedFixtureIsRejectedUntouched(context, fixture, MigrationOpenPathContract.UNKNOWN_HASH,
+            copy = { v19File(context, it, fixture) })
 
     private fun upgrade(context: Context, fixture: () -> InputStream): Pair<Map<String, List<String>>, Map<String, List<String>>> {
         val name = "backfill-upgrade.db"
         val file = v19File(context, name, fixture)
         val before = MigrationOpenPathContract.readOnly(file) { assertEquals(19, it.version); MigrationOpenPathContract.rows(it) }
-        val db = MasroofDatabase.builder(context, MasroofDatabase::class.java, name).build()
-        try {
-            db.openHelper.writableDatabase
-        } finally {
-            db.close()
-        }
+        MigrationOpenPathContract.openOnce(context, MasroofDatabase::class.java, name)
         val after = MigrationOpenPathContract.readOnly(file) { assertEquals(MasroofDatabase.VERSION, it.version); MigrationOpenPathContract.rows(it) }
         context.deleteDatabase(name)
         return before to after

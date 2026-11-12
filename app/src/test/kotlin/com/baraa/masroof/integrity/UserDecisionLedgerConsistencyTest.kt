@@ -11,7 +11,7 @@ import com.baraa.masroof.data.room.MigrationOpenPathContract
 import com.baraa.masroof.data.room.UserDecisionBackfill
 import com.baraa.masroof.data.room.UserDecisionBackfillContract
 import com.baraa.masroof.testsupport.DashboardLedgerWorld
-import java.io.File
+import com.baraa.masroof.testsupport.testdataFile
 import java.util.TimeZone
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -34,9 +34,7 @@ import org.robolectric.annotation.Config
 class UserDecisionLedgerConsistencyTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val originalZone: TimeZone = TimeZone.getDefault()
-    private val fixture = {
-        File(if (File("src/test").isDirectory) "." else "app", "src/test/resources/testdata/ledger_fixtures/v18/masroof.db").inputStream()
-    }
+    private val fixture = { testdataFile("ledger_fixtures/v18/masroof.db").inputStream() }
 
     @Before
     fun pinZone() = TimeZone.setDefault(TimeZone.getTimeZone("Asia/Riyadh"))

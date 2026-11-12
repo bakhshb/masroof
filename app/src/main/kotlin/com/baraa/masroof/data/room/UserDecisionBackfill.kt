@@ -11,7 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 internal object UserDecisionBackfill {
     fun run(db: SupportSQLiteDatabase) {
         val existing = db.query("SELECT COALESCE(MAX(sequence), 0) FROM user_decision").use { it.moveToFirst(); it.getLong(0) }
-        db.execSQL(INSERT_BACKFILL, arrayOf(existing, existing, existing))
+        db.execSQL(INSERT_BACKFILL, arrayOf(existing))
         if (existing == 0L) return
         db.execSQL("INSERT INTO user_decision ($COLUMNS) SELECT $COLUMNS FROM user_decision WHERE sequence <= ? ORDER BY sequence", arrayOf(existing))
         db.execSQL("DELETE FROM user_decision WHERE sequence <= ?", arrayOf(existing))
@@ -24,7 +24,7 @@ internal object UserDecisionBackfill {
     private const val OUTCOME_KINDS = "'FINANCIAL_TYPE', 'EXTERNAL_TRANSFER', 'SELF_TRANSFER_PAIR', 'NON_FINANCIAL', " +
         "'RECLASSIFY', 'IGNORE', 'RESTORE', 'RESTORE_REVERTED'"
 
-    /** The three `?` are the highest sequence before the backfill: only those rows count as already recorded. */
+    /** `?1` is the highest sequence before the backfill: only those rows count as already recorded. */
     private val INSERT_BACKFILL = """
         INSERT INTO user_decision ($COLUMNS)
         WITH
@@ -70,7 +70,7 @@ internal object UserDecisionBackfill {
                 NULL AS merchant, NULL AS counterparty, NULL AS bankId
             FROM (SELECT * FROM single UNION ALL SELECT * FROM pair) d
             WHERE NOT EXISTS (
-                SELECT 1 FROM user_decision s WHERE s.sequence <= ? AND s.kind IN ($OUTCOME_KINDS)
+                SELECT 1 FROM user_decision s WHERE s.sequence <= ?1 AND s.kind IN ($OUTCOME_KINDS)
                     AND (s.rawSmsId IN (d.rawSmsId, d.pairedRawSmsId) OR s.pairedRawSmsId IN (d.rawSmsId, d.pairedRawSmsId))
             )
         ),
@@ -82,7 +82,7 @@ internal object UserDecisionBackfill {
                 c.correctedCounterparty AS counterparty, NULL AS bankId
             FROM user_correction c
             WHERE NOT EXISTS (
-                SELECT 1 FROM user_decision s WHERE s.sequence <= ? AND s.kind = 'CORRECTION'
+                SELECT 1 FROM user_decision s WHERE s.sequence <= ?1 AND s.kind = 'CORRECTION'
                     AND s.rawSmsId = c.targetRawSmsId AND s.decidedAtEpochMillis = c.createdAtEpochMillis
                     AND s.messageFamily IS c.correctedMessageFamily AND s.amountDecimal IS c.correctedAmountDecimal
                     AND s.amountCurrency IS c.correctedAmountCurrency AND s.merchant IS c.correctedMerchant
@@ -90,27 +90,29 @@ internal object UserDecisionBackfill {
             )
         ),
         selected AS (
-            SELECT id, rawSmsId, updatedAtEpochMillis,
-                substr(reasons, instr(char(30) || reasons, char(30) || 'user_selected_bank:') + 19) AS rest
-            FROM review_item
-            WHERE instr(char(30) || reasons, char(30) || 'user_selected_bank:') > 0
+            SELECT id, rawSmsId, updatedAtEpochMillis, rest,
+                CASE WHEN instr(rest, char(30)) > 0 THEN substr(rest, 1, instr(rest, char(30)) - 1) ELSE rest END AS bankId
+            FROM (
+                SELECT id, rawSmsId, updatedAtEpochMillis,
+                    substr(reasons, instr(char(30) || reasons, char(30) || 'user_selected_bank:') + 19) AS rest
+                FROM review_item
+                WHERE instr(char(30) || reasons, char(30) || 'user_selected_bank:') > 0
+            )
         ),
         selection AS (
             SELECT rawSmsId, NULL AS pairedRawSmsId, 'BANK_SELECTION' AS kind, updatedAtEpochMillis AS decidedAt,
                 id AS legacyId, 0 AS rank, NULL AS messageFamily, NULL AS amountDecimal, NULL AS amountCurrency,
-                NULL AS merchant, NULL AS counterparty,
-                CASE WHEN instr(rest, char(30)) > 0 THEN substr(rest, 1, instr(rest, char(30)) - 1) ELSE rest END AS bankId
+                NULL AS merchant, NULL AS counterparty, bankId
             FROM selected
-            -- Exactly one selection, as ExplicitBankSelection.selectedBankId reads it.
-            WHERE instr(rest, char(30) || 'user_selected_bank:') = 0
-                AND NOT EXISTS (SELECT 1 FROM user_decision s WHERE s.sequence <= ? AND s.kind = 'BANK_SELECTION' AND s.rawSmsId = selected.rawSmsId)
+            -- Exactly one non-blank selection, as ExplicitBankSelection.selectedBankId reads it.
+            WHERE instr(rest, char(30) || 'user_selected_bank:') = 0 AND trim(bankId) <> ''
+                AND NOT EXISTS (SELECT 1 FROM user_decision s WHERE s.sequence <= ?1 AND s.kind = 'BANK_SELECTION' AND s.rawSmsId = selected.rawSmsId)
         )
         SELECT d.rawSmsId, d.pairedRawSmsId, d.kind, d.decidedAt, f.type, f.sourceContainerId, f.destinationContainerId,
             f.occurredAtEpochMillis, f.occurredAtZone, d.messageFamily, d.amountDecimal, d.amountCurrency,
             d.merchant, d.counterparty, d.bankId
         FROM (
-            SELECT rawSmsId, pairedRawSmsId, kind, decidedAt, legacyId, rank, messageFamily, amountDecimal, amountCurrency,
-                merchant, counterparty, bankId FROM outcome
+            SELECT * FROM outcome
             UNION ALL SELECT * FROM correction
             UNION ALL SELECT * FROM selection
         ) d
@@ -118,7 +120,6 @@ internal object UserDecisionBackfill {
         LEFT JOIN financial_transaction_raw_sms_link l
             ON l.rawSmsId = d.rawSmsId AND d.kind IN ('FINANCIAL_TYPE', 'EXTERNAL_TRANSFER', 'SELF_TRANSFER_PAIR')
         LEFT JOIN financial_transaction f ON f.id = l.transactionId
-        WHERE d.kind <> 'BANK_SELECTION' OR trim(d.bankId) <> ''
         ORDER BY d.decidedAt, d.rank, d.rawSmsId, d.legacyId
     """.trimIndent()
 }

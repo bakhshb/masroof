@@ -147,23 +147,24 @@ object MigrationOpenPathContract {
 
     /** A file already at the current version with an unknown identity hash is refused by Room's own check. */
     fun unknownIdentityHashAfterUpgradeIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
-        editedFixtureIsRejectedUntouched(context, fixture, UNKNOWN_HASH) { openOnce(context, MasroofDatabase::class.java, it) }
+        editedFixtureIsRejectedUntouched(context, fixture, UNKNOWN_HASH, before = { openOnce(context, MasroofDatabase::class.java, it) })
 
-    private val UNKNOWN_HASH = "UPDATE room_master_table SET identity_hash = '" + "0".repeat(32) + "'"
+    val UNKNOWN_HASH = "UPDATE room_master_table SET identity_hash = '" + "0".repeat(32) + "'"
 
     /** A v18-labelled file whose tables differ from v18 fails the migration's validation and stays untouched. */
     fun unknownBaselineStructureIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
         editedFixtureIsRejectedUntouched(context, fixture, "ALTER TABLE raw_sms ADD COLUMN stray TEXT")
 
-    /** A fixture changed by [edit] is refused and its bytes stay the same. */
-    private fun editedFixtureIsRejectedUntouched(
+    /** A fixture (or the file [copy] makes from it) changed by [edit] is refused and its bytes stay the same. */
+    fun editedFixtureIsRejectedUntouched(
         context: Context,
         fixture: () -> InputStream,
         edit: String,
+        copy: (name: String) -> File = { copyFixture(context, it, fixture) },
         before: (name: String) -> Unit = {},
     ) {
         val name = "migration-reject.db"
-        val file = copyFixture(context, name, fixture)
+        val file = copy(name)
         before(name)
         // WAL like the live file: a rollback-journal edit would flip the header's journal bytes, and Room flips them back.
         val flags = SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING
@@ -172,7 +173,7 @@ object MigrationOpenPathContract {
         context.deleteDatabase(name)
     }
 
-    fun rejectsUntouched(context: Context, name: String) {
+    private fun rejectsUntouched(context: Context, name: String) {
         val file = context.getDatabasePath(name)
         val before = snapshot(file)
         val db = MasroofDatabase.builder(context, MasroofDatabase::class.java, name).build()
@@ -187,7 +188,7 @@ object MigrationOpenPathContract {
     }
 
     /** Opens [name] through the production builder once, running any migration, and closes it. */
-    private fun openOnce(context: Context, databaseClass: Class<out RoomDatabase>, name: String, vararg extra: Migration) {
+    fun openOnce(context: Context, databaseClass: Class<out RoomDatabase>, name: String, vararg extra: Migration) {
         val db = MasroofDatabase.builder(context, databaseClass, name).addMigrations(*extra).build()
         try {
             db.openHelper.writableDatabase

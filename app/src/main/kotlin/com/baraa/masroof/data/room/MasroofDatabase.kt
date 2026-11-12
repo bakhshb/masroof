@@ -113,54 +113,45 @@ abstract class MasroofDatabase : RoomDatabase() {
         )
 
         /** Adds the append-only `user_decision` table (plan 2.1); no existing row changes and nothing is backfilled. */
-        val MIGRATION_18_19: Migration = object : Migration(18, 19) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                checkIdentityHash(db, 18)
-                // Copied from 19.json; Room validates the result on open.
-                db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS `user_decision` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                        "`rawSmsId` TEXT NOT NULL, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, " +
-                        "`decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, " +
-                        "`destinationContainerId` TEXT, `occurredAtEpochMillis` INTEGER, `occurredAtZone` TEXT, " +
-                        "`messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, " +
-                        "`merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, " +
-                        "FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , " +
-                        "FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
-                )
-                db.execSQL(
-                    "CREATE INDEX IF NOT EXISTS `index_user_decision_rawSmsId_sequence` ON `user_decision` (`rawSmsId`, `sequence`)",
-                )
-                db.execSQL(
-                    "CREATE INDEX IF NOT EXISTS `index_user_decision_pairedRawSmsId` ON `user_decision` (`pairedRawSmsId`)",
-                )
-                stampIdentityHash(db, 19)
-            }
+        val MIGRATION_18_19: Migration = checkedStep(18) { db ->
+            // Copied from 19.json; Room validates the result on open.
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `user_decision` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`rawSmsId` TEXT NOT NULL, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, " +
+                    "`decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, " +
+                    "`destinationContainerId` TEXT, `occurredAtEpochMillis` INTEGER, `occurredAtZone` TEXT, " +
+                    "`messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, " +
+                    "`merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, " +
+                    "FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , " +
+                    "FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_user_decision_rawSmsId_sequence` ON `user_decision` (`rawSmsId`, `sequence`)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_user_decision_pairedRawSmsId` ON `user_decision` (`pairedRawSmsId`)",
+            )
         }
 
         /** No structural change: backfills `user_decision` from the legacy stores (plan 2.2, [UserDecisionBackfill]). */
-        val MIGRATION_19_20: Migration = object : Migration(19, 20) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                checkIdentityHash(db, 19)
-                UserDecisionBackfill.run(db)
-                stampIdentityHash(db, 20)
-            }
-        }
+        val MIGRATION_19_20: Migration = checkedStep(19, UserDecisionBackfill::run)
 
         /** One additive step per version from [BASELINE_VERSION] to [VERSION], each tested from the v18 fixture. */
         val MIGRATIONS: List<Migration> = listOf(MIGRATION_18_19, MIGRATION_19_20)
 
         /**
-         * Room checks only the tables after a migration, so a step first refuses an unknown hash of its start
-         * version, inside the upgrade transaction: the file is left untouched.
+         * The step from [from] to the next version. Room checks only the tables after a migration, so the step first
+         * refuses an unknown hash of [from], inside the upgrade transaction (the file is left untouched). Room writes
+         * the hash only after the last step of a chained upgrade, so the step then stamps its own for the next check.
          */
-        private fun checkIdentityHash(db: SupportSQLiteDatabase, version: Int) {
-            val hash = db.query("SELECT identity_hash FROM room_master_table").use { if (it.moveToFirst()) it.getString(0) else null }
-            check(hash == IDENTITY_HASHES.getValue(version)) { "Unknown schema $version identity hash" }
+        private fun checkedStep(from: Int, body: (SupportSQLiteDatabase) -> Unit): Migration = object : Migration(from, from + 1) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val hash = db.query("SELECT identity_hash FROM room_master_table").use { if (it.moveToFirst()) it.getString(0) else null }
+                check(hash == IDENTITY_HASHES.getValue(from)) { "Unknown schema $from identity hash" }
+                body(db)
+                db.execSQL("UPDATE room_master_table SET identity_hash = '${IDENTITY_HASHES.getValue(from + 1)}'")
+            }
         }
-
-        /** Room writes the hash only after the last step of a chained upgrade; each step stamps its own for the next check. */
-        private fun stampIdentityHash(db: SupportSQLiteDatabase, version: Int) =
-            db.execSQL("UPDATE room_master_table SET identity_hash = '${IDENTITY_HASHES.getValue(version)}'")
 
         /**
          * The builder for the live financial file. [databaseClass] fixes the target version; tests pass a
