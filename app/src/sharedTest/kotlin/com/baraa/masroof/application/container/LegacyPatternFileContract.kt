@@ -19,10 +19,13 @@ import org.junit.Assert.assertTrue
  * anything can read the patterns, then seeds the bundled banks; a copy that fails fails the open and keeps the file.
  */
 object LegacyPatternFileContract {
+    /** The file as an older build left it; no build writes it any more. */
+    fun write(file: java.io.File, raw: String) { file.parentFile!!.mkdirs(); file.writeText(raw) }
+
     fun upgradeCopiesTheFileOnOpen(context: Context) = runBlocking {
         val legacy = LegacyMessagePatternFile.of(context)
         try {
-            LegacyMessagePatternFile.write(legacy, "{broken", validate = false)
+            write(legacy, "{broken")
             var c = AppContainer(context)
             try {
                 assertTrue(runCatching { c.storage.openDatabase() }.isFailure)
@@ -35,7 +38,7 @@ object LegacyPatternFileContract {
                 listOf(FieldChoice("amount", body.indexOf("10SAR"), body.length)))
             val raw = MessagePatternConfigurationCodec.encode(MessagePatternConfiguration(3,
                 listOf(BankMessagePatterns("USER_BANK", listOf("User Bank"), "My bank", listOf(taught)))))
-            LegacyMessagePatternFile.write(legacy, raw, validate = true)
+            write(legacy, raw)
             c = AppContainer(context)
             try {
                 // The first read opens the database, so it already sees the copied and seeded document.

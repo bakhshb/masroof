@@ -601,9 +601,19 @@ class DatabaseBackupService(
         }
     }
 
+    /**
+     * Before the live file is parked. A database that cannot open (a blocked startup) has nothing to checkpoint and
+     * must still be replaceable by a restore; its sidecars are parked with it, so a rollback gets it back whole.
+     */
     private fun checkpointWal() {
-        database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { cursor ->
-            cursor.moveToFirst()
+        try {
+            database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { cursor ->
+                cursor.moveToFirst()
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            appLogService.warn(AppLogCategories.BACKUP, "Checkpoint before restore skipped (${failure.javaClass.simpleName})")
         }
     }
 

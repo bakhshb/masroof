@@ -96,7 +96,7 @@ class MessagePatternBackupTest {
             languageTag = "ar", themeMode = "SYSTEM"))
         try {
             SQLiteDatabase.openOrCreateDatabase(live, null).use { db -> db.execSQL("CREATE TABLE original_marker(value TEXT)") }
-            LegacyMessagePatternFile.write(legacy, "{broken-original", validate = false)
+            com.baraa.masroof.application.container.LegacyPatternFileContract.write(legacy, "{broken-original")
             DatabaseRestoreRecovery.writeSnapshots(live, DatabaseRestoreRecovery.capturePreferences(context), incoming)
             DatabaseRestoreRecovery.parkOriginal(live)
             live.writeText("corrupt installed database")
