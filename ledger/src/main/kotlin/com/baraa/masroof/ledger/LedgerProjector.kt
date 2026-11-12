@@ -1,5 +1,6 @@
 package com.baraa.masroof.ledger
 
+import com.baraa.masroof.domain.assembly.BankTransactionTimePolicy
 import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.assembly.TransactionTiming
 import com.baraa.masroof.domain.ids.TransactionIdFactory
@@ -53,23 +54,28 @@ object LedgerProjector {
     ): Set<String> {
         val byRawSmsId = events.associateBy { it.event.rawSmsId }
         val transfers = events.filter { it.event.messageFamily.isTransfer() }
+        val byLoan = events.groupBy { it.loanReference() }
+        // Every SMS a decision names, by each SMS it names.
+        val named = mutableMapOf<String, MutableSet<String>>()
+        for ((subject, decided) in decisions) {
+            val outcome = decided.outcome ?: continue
+            val ids = setOfNotNull(subject, outcome.rawSmsId, outcome.pairedRawSmsId)
+            ids.forEach { named.getOrPut(it, ::mutableSetOf) += ids }
+        }
         val scope = mutableSetOf<String>()
         val queue = ArrayDeque(affected)
         while (queue.isNotEmpty()) {
             val rawSmsId = queue.removeFirst()
             if (!scope.add(rawSmsId)) continue
-            for ((subject, decided) in decisions) {
-                val outcome = decided.outcome ?: continue
-                val legs = listOfNotNull(outcome.rawSmsId, outcome.pairedRawSmsId)
-                if (subject == rawSmsId || rawSmsId in legs) queue += legs + subject
-            }
-            val record = byRawSmsId[rawSmsId] ?: continue
-            val loan = record.loanReference()
-            queue += when {
+            val record = byRawSmsId[rawSmsId]
+            val loan = record?.loanReference()
+            val related = when {
+                record == null -> emptyList()
                 record.event.messageFamily.isTransfer() -> transfers.filter { mayPair(record, it) }
-                loan != null -> events.filter { it.loanReference() == loan }
+                loan != null -> byLoan.getValue(loan)
                 else -> emptyList()
-            }.map { it.event.rawSmsId }
+            }.map { it.event.rawSmsId } + named[rawSmsId].orEmpty()
+            related.filterTo(queue) { it !in scope }
         }
         return scope
     }
@@ -92,11 +98,10 @@ object LedgerProjector {
     private fun effectiveSpan(evidence: LedgerEvidence): Pair<Instant, Instant> {
         evidence.event.occurredAt?.let { return it to it }
         val local = evidence.occurredAtLocal?.toInstant(ZoneOffset.UTC) ?: return evidence.receivedAt to evidence.receivedAt
-        val offset = Duration.ofHours(MAX_OFFSET_HOURS)
-        return local.minus(offset) to local.plus(offset)
+        return local.minus(MAX_OFFSET) to local.plus(MAX_OFFSET)
     }
 
-    private const val MAX_OFFSET_HOURS = 18L
+    private val MAX_OFFSET: Duration = Duration.ofHours(18)
 }
 
 private fun MessageFamily.isTransfer(): Boolean = this == MessageFamily.TRANSFER_IN || this == MessageFamily.TRANSFER_OUT
@@ -123,12 +128,12 @@ private class Projection(
     private val settled = mutableSetOf<String>()
     private val retry = mutableSetOf<String>()
     private val reviews = mutableListOf<LedgerReviewCandidate>()
-    private var ownership = registry
+    // Decided rows settle first, so the pre-pass sees only the evidence left to automatic assembly.
+    private val automatic = records.filter(::settleDecided)
+    private val confirmedLoans = confirmLoans(automatic)
+    private val ownership = registry.copy(loans = registry.loans + confirmedLoans.associateWith { OwnershipStatus.OWNED })
 
     fun run(): LedgerProjection {
-        val automatic = records.filter(::settleDecided)
-        val confirmedLoans = confirmLoans(automatic)
-        ownership = registry.copy(loans = registry.loans + confirmedLoans.associateWith { OwnershipStatus.OWNED })
         val open = mutableListOf<TransferMatchCandidate>()
         automatic.forEach { assemble(it, open) }
         postOpenTransfers(open)
@@ -139,8 +144,8 @@ private class Projection(
                 .map { (rawSmsId, group) ->
                     LedgerReviewCandidate(rawSmsId, group.first().kind, group.flatMap { it.reasons }.distinct().sorted())
                 }.sortedBy { it.rawSmsId },
-            settledRawSmsIds = settled.toSet(),
-            retryRawSmsIds = retry.toSet(),
+            settledRawSmsIds = settled,
+            retryRawSmsIds = retry,
             confirmedLoans = confirmedLoans,
         )
     }
@@ -158,26 +163,20 @@ private class Projection(
     private fun settleDecided(record: LedgerEvidence): Boolean {
         val rawSmsId = record.event.rawSmsId
         val decided = decisionsOf(rawSmsId)
+        val posting = decidedPosting(decided)
         when {
             decided.isNonFinancial -> settled += rawSmsId
             // Only a decided pair links a second SMS, and that SMS's own decisions name the pair, so it is kept.
             rawSmsId in links -> settled += rawSmsId
-            else -> {
-                val posting = decidedPosting(decided)
-                if (posting != null) {
-                    if (!save(posting.first, posting.second)) retry += rawSmsId
-                } else if (decided.outcome?.kind == UserDecisionKind.EXTERNAL_TRANSFER) {
-                    settled += rawSmsId
-                } else {
-                    return true
-                }
-            }
+            posting != null -> if (!save(posting.transaction, posting.rawSmsIds)) retry += rawSmsId
+            decided.outcome?.kind == UserDecisionKind.EXTERNAL_TRANSFER -> settled += rawSmsId
+            else -> return true
         }
         return false
     }
 
     /** The user's row for a posting decision, or null when the decision or its evidence is incomplete. */
-    private fun decidedPosting(decided: EffectiveUserDecisions): Pair<FinancialTransaction, List<String>>? {
+    private fun decidedPosting(decided: EffectiveUserDecisions): LedgerRow? {
         val decision = decided.outcome ?: return null
         val type = decision.transactionType ?: return null
         val occurredAt = decision.occurredAt ?: return null
@@ -195,7 +194,7 @@ private class Projection(
             counterparty = legs[0].event.counterparty ?: legs[1].event.counterparty,
             linkedParsedEventIds = legs.map { it.event.id }.sorted(),
         )
-        return transaction to ids
+        return LedgerRow(transaction, ids)
     }
 
     /**
@@ -317,9 +316,8 @@ private class Projection(
             val hasStaleExternal = outLeg.posted?.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
                 inLeg.posted?.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN
             if (!hasStaleExternal && postedLegs.none { it.isSingleLegSelfTransfer() }) continue
-            val healZone = postedLegs.firstNotNullOfOrNull { posted ->
-                posted.occurredAtZone?.let { runCatching { ZoneId.of(it) }.getOrNull() }
-            } ?: zone
+            val healZone = postedLegs.firstNotNullOfOrNull { BankTransactionTimePolicy.storedZoneOrNull(it.occurredAtZone) }
+                ?: zone
             val rawSmsIds = listOf(pair.outgoing.event.rawSmsId, pair.incoming.event.rawSmsId).sorted()
             val outcome = TransactionAssembler.assembleMatchedPair(
                 pair, pair.outgoing.sourceOwnership, pair.incoming.destinationOwnership, healZone,

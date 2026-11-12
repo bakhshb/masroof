@@ -12,7 +12,9 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.UserDecision
+import com.baraa.masroof.domain.model.LoanType
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 
@@ -37,7 +39,6 @@ fun event(
     network: BankNetworkType? = null,
     status: ParseStatus = ParseStatus.SUCCESS,
     occurredAt: Instant? = null,
-    counterparty: String? = null,
 ) = ParsedEvent(
     id = "e-$id",
     rawSmsId = id,
@@ -50,12 +51,20 @@ fun event(
     destinationAccountRef = destination,
     cardRef = card,
     merchant = null,
-    counterparty = counterparty,
+    counterparty = null,
     occurredAt = occurredAt,
     bankNetworkType = network,
     confidence = Confidence(1.0),
     parseStatus = status,
 )
+
+fun evidence(
+    event: ParsedEvent,
+    receivedAt: Instant,
+    transactionReference: String? = null,
+    occurredAtLocal: LocalDateTime? = null,
+    loanType: LoanType? = null,
+) = LedgerEvidence(event, receivedAt, transactionReference, occurredAtLocal, loanType, automationConfirmed = false)
 
 /** Folds [rows] (in append order) into the decisions in force for every raw SMS they name. */
 fun fold(rows: List<UserDecision>): Map<String, EffectiveUserDecisions> =

@@ -2,6 +2,7 @@ package com.baraa.masroof.ledger
 
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
+import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.ExchangeRateSource
@@ -32,10 +33,10 @@ class LedgerProjectorTest {
     )
 
     private fun purchase(id: String, status: ParseStatus = ParseStatus.SUCCESS) =
-        LedgerEvidence(event(id, MessageFamily.PURCHASE, card = card, status = status), T0)
+        evidence(event(id, MessageFamily.PURCHASE, card = card, status = status), T0)
 
     private fun intraBank(id: String, family: MessageFamily, at: Instant = T0, reference: String? = null) =
-        LedgerEvidence(
+        evidence(
             event(id, family, source = ownedA, destination = ownedB, network = BankNetworkType.INTRA_BANK),
             at, transactionReference = reference,
         )
@@ -85,9 +86,9 @@ class LedgerProjectorTest {
     fun informationalFamiliesAreIgnoredEvenWhenAStoredRowLinksThem() {
         val result = project(
             listOf(
-                LedgerEvidence(event("otp", MessageFamily.OTP, card = card), T0),
-                LedgerEvidence(event("note", MessageFamily.BALANCE_NOTICE, source = ownedA), T0),
-                LedgerEvidence(event("unknown", MessageFamily.UNKNOWN), T0),
+                evidence(event("otp", MessageFamily.OTP, card = card), T0),
+                evidence(event("note", MessageFamily.BALANCE_NOTICE, source = ownedA), T0),
+                evidence(event("unknown", MessageFamily.UNKNOWN), T0),
             ),
             registry = owned,
             stored = StoredFacts(rows = listOf(StoredLedgerRow(setOf("otp"), "Asia/Riyadh"))),
@@ -155,12 +156,12 @@ class LedgerProjectorTest {
             ),
         )
         val events = listOf(
-            LedgerEvidence(
+            evidence(
                 event("out", MessageFamily.TRANSFER_OUT, source = ownedA, destination = externalDestination,
                     network = BankNetworkType.INTER_BANK),
                 T0, transactionReference = "REF1",
             ),
-            LedgerEvidence(
+            evidence(
                 event("in", MessageFamily.TRANSFER_IN, bank = D360, destination = ownedDestination,
                     network = BankNetworkType.INTER_BANK),
                 T0.plusSeconds(120), transactionReference = "ref1",
@@ -182,8 +183,8 @@ class LedgerProjectorTest {
     @Test
     fun aFinancingInstallmentRepaysAPreConfirmedLoan_whateverTheOrder() {
         val loan = LoanReference(AJ, LoanType.PERSONAL)
-        fun installment(id: String, source: com.baraa.masroof.domain.model.AccountReference, loanType: LoanType?) =
-            LedgerEvidence(event(id, MessageFamily.FINANCING_INSTALLMENT, source = source), T0, loanType = loanType)
+        fun installment(id: String, source: AccountReference, loanType: LoanType?) =
+            evidence(event(id, MessageFamily.FINANCING_INSTALLMENT, source = source), T0, loanType = loanType)
         val events = listOf(
             installment("i1", account("5555"), LoanType.PERSONAL),
             installment("i2", ownedA, LoanType.PERSONAL),
@@ -213,7 +214,7 @@ class LedgerProjectorTest {
     @Test
     fun storedZoneAndCompleteExchangeRatePairAreInputs() {
         val d360Card = CardReference(D360, "4444")
-        val evidence = LedgerEvidence(
+        val evidence = evidence(
             event("fx", MessageFamily.PURCHASE, bank = D360, card = d360Card), T0,
             occurredAtLocal = LocalDateTime.parse("2026-08-01T10:00:00"),
         )

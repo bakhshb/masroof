@@ -21,10 +21,10 @@ import java.time.LocalDateTime
 data class LedgerEvidence(
     val event: ParsedEvent,
     val receivedAt: Instant,
-    val transactionReference: String? = null,
-    val occurredAtLocal: LocalDateTime? = null,
-    val loanType: LoanType? = null,
-    val automationConfirmed: Boolean = false,
+    val transactionReference: String?,
+    val occurredAtLocal: LocalDateTime?,
+    val loanType: LoanType?,
+    val automationConfirmed: Boolean,
 )
 
 /** Registry ownership already resolved for the references the evidence names; a reference not listed is UNKNOWN. */
