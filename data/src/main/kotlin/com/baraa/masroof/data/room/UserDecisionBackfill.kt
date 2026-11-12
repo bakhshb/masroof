@@ -14,7 +14,9 @@ object UserDecisionBackfill {
         val existing = db.query("SELECT COALESCE(MAX(sequence), 0) FROM user_decision").use { it.moveToFirst(); it.getLong(0) }
         db.execSQL(INSERT_BACKFILL, arrayOf(existing))
         if (existing == 0L) return
-        db.execSQL("INSERT INTO user_decision ($COLUMNS) SELECT $COLUMNS FROM user_decision WHERE sequence <= ? ORDER BY sequence", arrayOf(existing))
+        // Rows already there move behind the backfilled ones whole, a recurring answer's own columns included.
+        val all = "$COLUMNS, subjectKey, answer, payload"
+        db.execSQL("INSERT INTO user_decision ($all) SELECT $all FROM user_decision WHERE sequence <= ? ORDER BY sequence", arrayOf(existing))
         db.execSQL("DELETE FROM user_decision WHERE sequence <= ?", arrayOf(existing))
     }
 

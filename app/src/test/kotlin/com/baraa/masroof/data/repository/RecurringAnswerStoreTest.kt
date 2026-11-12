@@ -64,13 +64,15 @@ class RecurringAnswerStoreTest {
     }
 
     @Test
-    fun aFailedAlongsideWriteRecordsNoAnswer() = runBlocking {
+    fun anAnswerIsKeptWhenItsAdvisoryWriteFails_andAFailedUndoKeepsTheAnswer() = runBlocking {
+        // The answer commits first: an advisory status never exists without the answer behind it.
         assertThrows(IllegalStateException::class.java) { runBlocking { store.record(confirmed) { error("advisory write failed") } } }
+        assertEquals(listOf(confirmed), store.effective())
         store.record(notRecurring)
         assertThrows(IllegalStateException::class.java) {
             runBlocking { store.undo(notRecurring.seriesKey, setOf("NOT_RECURRING"), 5_000) { error("advisory write failed") } }
         }
-        assertEquals(listOf(notRecurring), store.effective())
+        assertEquals(listOf(confirmed, notRecurring).sortedBy { it.seriesKey }, store.effective())
     }
 
     @Test

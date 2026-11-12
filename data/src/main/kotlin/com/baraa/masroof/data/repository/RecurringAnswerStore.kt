@@ -20,17 +20,20 @@ class RecurringAnswerStore(
     /** The answer in force for each answered series, ordered by series key. */
     suspend fun effective(): List<RecurringFeedbackRow> = accessGate.withAccess { effective(database.userDecisionDao().listRecurring()) }
 
-    /** Appends [answer], then runs [alongside] (an advisory write elsewhere), in one `masroof.db` transaction. */
+    /**
+     * Appends [answer] and, once it is committed, runs [alongside] (an advisory write to another database). The two
+     * files cannot commit together, so the answer goes first: a failed advisory write leaves an answer the next
+     * refresh applies, never an advisory status without the answer that explains it.
+     */
     suspend fun record(answer: RecurringFeedbackRow, alongside: suspend () -> Unit = {}) = accessGate.withAccess {
-        database.withTransaction {
-            database.userDecisionDao().insert(entity(answer.seriesKey, answer.kind, answer.payload, answer.decidedAt))
-            alongside()
-        }
+        database.userDecisionDao().insert(entity(answer.seriesKey, answer.kind, answer.payload, answer.decidedAt))
+        alongside()
     }
 
     /**
-     * When the answer in force for [seriesKey] is one of [answers], appends [UNDONE] at [at] and runs [alongside], in one
-     * transaction; returns whether it did.
+     * When the answer in force for [seriesKey] is one of [answers], appends [UNDONE] at [at] and runs [alongside] before
+     * the commit; returns whether it did. Here the advisory write goes first: if the commit then fails, the answer
+     * still stands and still explains what the user sees, and the undo can be repeated.
      */
     suspend fun undo(seriesKey: String, answers: Set<String>, at: Long, alongside: suspend () -> Unit = {}): Boolean =
         accessGate.withAccess {

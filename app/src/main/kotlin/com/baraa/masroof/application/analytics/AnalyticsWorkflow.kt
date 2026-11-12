@@ -434,8 +434,8 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     }
 
     /**
-     * Appends the answer and runs [alongside] (the candidate's advisory status in [store]) inside the same `masroof.db`
-     * transaction, so a failed status write records no answer. A candidate without a series records none.
+     * Appends the answer, then runs [alongside] (the candidate's advisory status in [store]): the answer is committed
+     * first, so a status never exists without the answer behind it. A candidate without a series records none.
      */
     private suspend fun recordRecurringFeedback(candidate: AnalysisCandidate, kind: String, label: String?,
         alongside: suspend () -> Unit = {}) {
