@@ -78,6 +78,7 @@ Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Andro
 | `app` | Android UI, workflows, SMS intake, persistence, and recovery |
 | `bank-engine` | Pure bank-pattern interpretation and extraction evidence |
 | `finance-core` | Money, periods, identities, financial classification, matching, and assembly |
+| `ledger` | Pure derived-ledger projector (not wired into the app yet) |
 | `ml-assist` | Local family assistance, forecasting, and recurrence detection |
 | `ui-kit` | Shared theme, fonts, components, and charts |
 

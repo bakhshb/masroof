@@ -31,6 +31,14 @@ class ModuleBoundaryTest {
                 "com.baraa.masroof.domain.statement.",
             ),
             "bank-engine" to common + listOf("com.baraa.masroof.engine.bank.", "com.baraa.masroof.finance.value."),
+            "ledger" to common + listOf(
+                "com.baraa.masroof.ledger.",
+                "com.baraa.masroof.core.money.",
+                "com.baraa.masroof.domain.model.",
+                "com.baraa.masroof.domain.ids.",
+                "com.baraa.masroof.domain.assembly.",
+                "com.baraa.masroof.domain.matching.",
+            ),
         ).forEach { (module, allowed) ->
             val sources = File(root, "$module/src/main/kotlin").walkTopDown().filter { it.extension == "kt" }.toList()
             assertTrue(sources.isNotEmpty(), "Missing $module source tree")
@@ -53,7 +61,7 @@ class ModuleBoundaryTest {
 
     @Test fun pureModulesNeverDependOnAppAndModuleGraphHasNoCycles() {
         val buildFiles = listOf(File(root, "app/build.gradle.kts")) +
-            listOf("bank-engine", "finance-core", "ml-assist").map { File(root, "$it/build.gradle.kts") }
+            listOf("bank-engine", "finance-core", "ml-assist", "ledger").map { File(root, "$it/build.gradle.kts") }
         val graph = buildFiles.associate { file ->
             val module = ":" + file.parentFile.relativeTo(root).invariantSeparatorsPath.replace('/', ':')
             module to projectDependency.findAll(file.readText()).map { it.groupValues[1] }.toSet()
@@ -65,6 +73,7 @@ class ModuleBoundaryTest {
         assertEquals(emptySet<String>(), graph[":ml-assist"])
         assertEquals(emptySet<String>(), graph[":finance-core"])
         assertEquals(setOf(":finance-core"), graph[":bank-engine"])
+        assertEquals(setOf(":finance-core"), graph[":ledger"])
         assertEquals(setOf(":ui-kit", ":finance-core", ":bank-engine", ":ml-assist"), graph[":app"])
         fun visit(module: String, ancestors: Set<String>) {
             assertFalse(module in ancestors, "Dependency cycle: $ancestors -> $module")
