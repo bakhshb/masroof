@@ -12,11 +12,15 @@ class BackupPackageCodecTest {
     @Test
     fun legacyPreferencesDefaultToNoPatternsAndUnsupportedPatternsAreRejected() {
         val legacy = """{"onboardingStarted":true,"onboardingCompleted":true,"historicalImportCompleted":true,"languageTag":"ar","themeMode":"SYSTEM"}"""
-        val old = BackupPackageCodec.decodePreferences(legacy)
+        val old = BackupPackageCodec.decodePreferences(legacy, BackupPackageFormat.LEGACY_FORMAT_VERSION)
         assertNull(old.messagePatterns)
         assertThrows(IllegalArgumentException::class.java) {
-            BackupPackageCodec.decodePreferences(BackupPackageCodec.encodePreferences(old.copy(messagePatterns = "{}")))
+            BackupPackageCodec.decodePreferences(BackupPackageCodec.encodePreferences(old.copy(messagePatterns = "{}")), BackupPackageFormat.LEGACY_FORMAT_VERSION)
         }
+        // The current format keeps its patterns in the database: a valid document beside it is refused too.
+        val withPatterns = BackupPackageCodec.encodePreferences(old.copy(messagePatterns = patternArchive("STC")))
+        assertEquals(patternArchive("STC"), BackupPackageCodec.decodePreferences(withPatterns, BackupPackageFormat.LEGACY_FORMAT_VERSION).messagePatterns)
+        assertThrows(IllegalArgumentException::class.java) { BackupPackageCodec.decodePreferences(withPatterns, BackupPackageFormat.FORMAT_VERSION) }
     }
     @Test
     fun encodeDecode_roundTripsManifest() {
@@ -41,7 +45,7 @@ class BackupPackageCodecTest {
             languageTag = "ar",
             themeMode = "DARK",
         )
-        val decoded = BackupPackageCodec.decodePreferences(BackupPackageCodec.encodePreferences(prefs))
+        val decoded = BackupPackageCodec.decodePreferences(BackupPackageCodec.encodePreferences(prefs), BackupPackageFormat.FORMAT_VERSION)
         assertEquals(prefs, decoded)
     }
 
@@ -115,8 +119,17 @@ class BackupPackageCodecTest {
     }
 
     @Test
-    fun formatVersion_remainsTheLegacyZipManifest() {
-        assertEquals(1, BackupPackageFormat.FORMAT_VERSION)
+    fun eachFormatGoesWithItsSchema() {
+        assertEquals(2, BackupPackageFormat.FORMAT_VERSION)
+        assertEquals(1, BackupPackageFormat.LEGACY_FORMAT_VERSION)
+        fun accepted(format: Int, version: Int) = BackupPackageCodec.validateManifest(
+            BackupManifest(format, "0.2.0", version, MasroofDatabase.IDENTITY_HASHES.getValue(version), 1L), MasroofDatabase.IDENTITY_HASHES)
+        assertTrue(accepted(BackupPackageFormat.LEGACY_FORMAT_VERSION, MasroofDatabase.BASELINE_VERSION))
+        assertTrue(accepted(BackupPackageFormat.FORMAT_VERSION, MasroofDatabase.VERSION))
+        assertFalse(accepted(BackupPackageFormat.FORMAT_VERSION, MasroofDatabase.BASELINE_VERSION))
+        assertFalse(accepted(BackupPackageFormat.LEGACY_FORMAT_VERSION, MasroofDatabase.VERSION))
+        assertFalse(accepted(BackupPackageFormat.FORMAT_VERSION + 1, MasroofDatabase.VERSION))
+        assertFalse(accepted(0, MasroofDatabase.BASELINE_VERSION))
         assertTrue(BackupEnvelope.DEFAULT_ITERATIONS >= 100_000)
     }
 

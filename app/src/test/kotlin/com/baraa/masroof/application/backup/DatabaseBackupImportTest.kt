@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.backup
 
+import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
@@ -67,7 +68,7 @@ class DatabaseBackupImportTest {
     @Before
     fun clearMaintenancePreferences() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        MessagePatternBackup.restore(context, null)
+        LegacyMessagePatternFile.delete(LegacyMessagePatternFile.of(context))
         context.deleteDatabase(MasroofDatabase.NAME)
         DatabaseRestoreRecovery.deleteRestoreArtifacts(
             context.getDatabasePath(MasroofDatabase.NAME),
@@ -434,9 +435,9 @@ class DatabaseBackupImportTest {
                     OwnershipStatus.OWNED,
                 )
                 MessagePatternStore(liveDatabase).restoreRaw(patternArchive("ORIGINAL"))
-                // A v22 archive's own row wins; its preferences field is ignored.
+                // A current-format archive carries its patterns in its own row.
                 val importedDbFile = createCurrentDatabaseFile(context, patternArchive("IMPORTED"))
-                val backupZip = createBackupZip(importedDbFile, patternArchive("IGNORED"))
+                val backupZip = createBackupZip(importedDbFile)
                 val backupService = DatabaseBackupService(
                     appContext = context,
                     database = liveDatabase,
@@ -458,7 +459,7 @@ class DatabaseBackupImportTest {
                 DatabaseRestoreRecovery.recover(context)
                 assertEquals(patternArchive(if (expectedOwner == "original") "ORIGINAL" else "IMPORTED"),
                     storedPatterns(context.getDatabasePath(MasroofDatabase.NAME)))
-                assertNull(MessagePatternBackup.captureOriginal(context))
+                assertFalse(LegacyMessagePatternFile.of(context).exists())
                 val reopened = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
                     .allowMainThreadQueries()
                     .build()

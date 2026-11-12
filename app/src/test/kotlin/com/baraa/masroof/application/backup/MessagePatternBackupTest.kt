@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.backup
 
+import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
@@ -67,7 +68,7 @@ class MessagePatternBackupTest {
             }
             assertEquals(setOf("manifest.json", "preferences.json", "masroof.db"), entries.keys)
             // The patterns travel inside the exported database only, at the generation of its financial snapshot.
-            val saved = BackupPackageCodec.decodePreferences(requireNotNull(entries["preferences.json"]).toString(Charsets.UTF_8))
+            val saved = BackupPackageCodec.decodePreferences(requireNotNull(entries["preferences.json"]).toString(Charsets.UTF_8), BackupPackageFormat.FORMAT_VERSION)
             assertNull(saved.messagePatterns)
             val exported = context.cacheDir.resolve("exported.db").apply { writeBytes(requireNotNull(entries["masroof.db"])) }
             SQLiteDatabase.openDatabase(exported.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
@@ -86,28 +87,40 @@ class MessagePatternBackupTest {
         Unit
     }
 
-    /** A restore journal still carries the v18 file; a rollback puts even an invalid one back untouched. */
-    @Test fun rollbackRestoresEvenAnInvalidOriginalLegacyFileInsteadOfSilentlyDiscardingIt() {
+    /** The restore journal carries no pattern file: a rollback leaves a file from before the restore as it was, and only a committed restore removes it. */
+    @Test fun aRollbackKeepsAnUncopiedLegacyFileAndACommitRemovesIt() {
         val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "pattern-rollback")
         val live = context.getDatabasePath(MasroofDatabase.NAME)
+        val legacy = LegacyMessagePatternFile.of(context)
+        val incoming = DatabaseRestoreRecovery.incomingPreferences(BackupPreferencesSnapshot(true, true, historicalImportCompleted = true,
+            languageTag = "ar", themeMode = "SYSTEM"))
         try {
             SQLiteDatabase.openOrCreateDatabase(live, null).use { db -> db.execSQL("CREATE TABLE original_marker(value TEXT)") }
-            MessagePatternBackup.restore(context, "{broken-original", validate = false)
-            DatabaseRestoreRecovery.writeSnapshots(live, DatabaseRestoreRecovery.capturePreferences(context),
-                DatabaseRestoreRecovery.incomingPreferences(BackupPreferencesSnapshot(true, true, historicalImportCompleted = true,
-                    languageTag = "ar", themeMode = "SYSTEM", messagePatterns = patternArchive("IMPORTED"))))
+            com.baraa.masroof.application.container.LegacyPatternFileContract.write(legacy, "{broken-original")
+            DatabaseRestoreRecovery.writeSnapshots(live, DatabaseRestoreRecovery.capturePreferences(context), incoming)
             DatabaseRestoreRecovery.parkOriginal(live)
             live.writeText("corrupt installed database")
-            MessagePatternBackup.restore(context, patternArchive("IMPORTED"))
             DatabaseRestoreRecovery.writeJournal(live, DatabaseRestoreRecovery.Stage.NEW_INSTALLED, false)
             DatabaseRestoreRecovery.recover(context)
-            assertEquals("{broken-original", MessagePatternBackup.captureOriginal(context))
+            assertEquals("{broken-original", LegacyMessagePatternFile.read(legacy))
             SQLiteDatabase.openDatabase(live.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
                 db.rawQuery("SELECT * FROM original_marker", null).use { assertEquals(0, it.count) }
+            }
+
+            // The same restore, this time with a valid installed database: it commits, and the old file goes.
+            DatabaseRestoreRecovery.writeSnapshots(live, DatabaseRestoreRecovery.capturePreferences(context), incoming)
+            DatabaseRestoreRecovery.parkOriginal(live)
+            SQLiteDatabase.openOrCreateDatabase(live, null).use { db -> db.execSQL("CREATE TABLE installed_marker(value TEXT)") }
+            DatabaseRestoreRecovery.writeJournal(live, DatabaseRestoreRecovery.Stage.NEW_INSTALLED, false)
+            DatabaseRestoreRecovery.recover(context)
+            assertFalse(legacy.exists())
+            SQLiteDatabase.openDatabase(live.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                db.rawQuery("SELECT * FROM installed_marker", null).use { assertEquals(0, it.count) }
             }
         } finally {
             DatabaseRestoreRecovery.deleteRestoreArtifacts(live)
             live.parentFile?.deleteRecursively()
+            legacy.parentFile?.deleteRecursively()
         }
     }
 }

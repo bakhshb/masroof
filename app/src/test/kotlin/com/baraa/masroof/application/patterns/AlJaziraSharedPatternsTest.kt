@@ -106,8 +106,8 @@ class AlJaziraSharedPatternsTest {
         val taught = SavedMessagePattern.fromChoices("existing-teaching", bankId, "AlJazira", "PURCHASE", "Old format:10SAR",
             listOf(FieldChoice("amount", 11, 16)))
         val legacy = LegacyMessagePatternFile.of(context)
-        LegacyMessagePatternFile.write(legacy, MessagePatternConfigurationCodec.encode(MessagePatternConfiguration(1,
-            listOf(BankMessagePatterns(bankId, listOf("AlJazira"), "My bank", listOf(taught))))), validate = true)
+        com.baraa.masroof.application.container.LegacyPatternFileContract.write(legacy, MessagePatternConfigurationCodec.encode(MessagePatternConfiguration(1,
+            listOf(BankMessagePatterns(bankId, listOf("AlJazira"), "My bank", listOf(taught))))))
         try {
             withTimeout(20_000) {
                 var c = AppContainer(context)

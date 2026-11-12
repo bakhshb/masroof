@@ -167,7 +167,7 @@ class DatabaseBackupService(
                         return@withLock BackupVerificationOutcome.INVALID_PACKAGE
                     }
                     runCatching {
-                        BackupPackageCodec.decodePreferences(File(directory, BackupPackageFormat.PREFERENCES_ENTRY).readText())
+                        BackupPackageCodec.decodePreferences(File(directory, BackupPackageFormat.PREFERENCES_ENTRY).readText(), manifest.formatVersion)
                     }.getOrElse { return@withLock BackupVerificationOutcome.INVALID_PACKAGE }
                     BackupVerificationOutcome.VERIFIED
                 }
@@ -286,15 +286,13 @@ class DatabaseBackupService(
             if (!hasKnownSchema(manifest, dbFile)) return BackupImportOutcome.InvalidPackage
 
             val preferences = runCatching {
-                BackupPackageCodec.decodePreferences(prefsFile.readText())
+                BackupPackageCodec.decodePreferences(prefsFile.readText(), manifest.formatVersion)
             }.getOrElse { return BackupImportOutcome.InvalidPackage }
 
             // An older schema migrates here, on the staged copy, while the live database is still open and untouched.
             // A current-schema copy is only validated after close, as before.
-            // A v18 archive carries its patterns in preferences.json; they become the staged database's row.
-            if (manifest.roomVersion != schema.version) {
-                openAndValidate(dbFile, preferences.messagePatterns.takeIf { manifest.roomVersion < MessagePatternBackup.DATABASE_VERSION })
-            }
+            // A legacy-format archive carries its patterns in preferences.json; they become the staged database's row.
+            if (manifest.roomVersion != schema.version) openAndValidate(dbFile, preferences.messagePatterns)
 
             checkpointWal()
             databaseAccessGate.retire()
@@ -603,9 +601,19 @@ class DatabaseBackupService(
         }
     }
 
+    /**
+     * Before the live file is parked. A database that cannot open (a blocked startup) has nothing to checkpoint and
+     * must still be replaceable by a restore; its sidecars are parked with it, so a rollback gets it back whole.
+     */
     private fun checkpointWal() {
-        database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { cursor ->
-            cursor.moveToFirst()
+        try {
+            database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { cursor ->
+                cursor.moveToFirst()
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            appLogService.warn(AppLogCategories.BACKUP, "Checkpoint before restore skipped (${failure.javaClass.simpleName})")
         }
     }
 

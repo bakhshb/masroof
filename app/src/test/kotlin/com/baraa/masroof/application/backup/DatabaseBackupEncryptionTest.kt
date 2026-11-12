@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.backup
 
+import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import android.content.Context
 import android.net.Uri
 import androidx.room.Room
@@ -66,7 +67,7 @@ class DatabaseBackupEncryptionTest {
 
     @Before
     fun resetStorage() {
-        MessagePatternBackup.restore(context, null)
+        LegacyMessagePatternFile.delete(LegacyMessagePatternFile.of(context))
         context.deleteDatabase(MasroofDatabase.NAME)
         DatabaseRestoreRecovery.deleteRestoreArtifacts(context.getDatabasePath(MasroofDatabase.NAME))
         context.getSharedPreferences(SharedPrefsOnboardingPreferencesRepository.PREFS_NAME, Context.MODE_PRIVATE)

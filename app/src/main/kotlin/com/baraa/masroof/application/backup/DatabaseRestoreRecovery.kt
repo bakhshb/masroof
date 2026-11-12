@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.backup
 
+import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.baraa.masroof.application.locale.AppLocale
@@ -86,8 +87,13 @@ object DatabaseRestoreRecovery {
         val reparsedSchemaVersion: Int?,
         val transferIntegrityRepairVersion: Int?,
         val labAnalysis: String? = null,
-        val messagePatterns: String? = null,
         val onboardingSetup: String? = null,
+        /**
+         * Only in a journal that an app version before schema v22 wrote: the old pattern file that goes with this
+         * snapshot (empty = no file). That version kept the patterns beside the database, so its unfinished restore
+         * still finishes, or rolls back, with them. Null in every journal this version writes.
+         */
+        val olderAppPatternFile: String? = null,
     )
 
     fun recover(context: Context) {
@@ -125,7 +131,6 @@ object DatabaseRestoreRecovery {
         }
         return PreferenceSnapshot(
             labAnalysis = com.baraa.masroof.application.analytics.AnalyticsBackup.capture(context),
-            messagePatterns = com.baraa.masroof.application.backup.MessagePatternBackup.captureOriginal(context),
             onboardingStarted = onboarding.getBoolean(KEY_ONBOARDING_STARTED, false),
             onboardingCompleted = onboarding.getBoolean(KEY_ONBOARDING_COMPLETED, false),
             historicalImportStartEpochMillis = importStart,
@@ -155,8 +160,6 @@ object DatabaseRestoreRecovery {
             reparsedSchemaVersion = null,
             transferIntegrityRepairVersion = null,
             labAnalysis = snapshot.labAnalysis,
-            // The patterns are inside the incoming database (converted there for an older archive), so the legacy file goes.
-            messagePatterns = null,
         )
 
     internal fun writeSnapshots(live: File, original: PreferenceSnapshot, incoming: PreferenceSnapshot) {
@@ -226,6 +229,14 @@ object DatabaseRestoreRecovery {
             discardDatabase(rollbackFile(live))
             discardDatabase(preservedRollbackFile(live))
             discardDatabase(incomingFile(live))
+            // The patterns are in the installed database (or it has none): a pattern file from before the restore
+            // must not be copied into it by the next open. A failed delete keeps the journal, so this step reruns.
+            // Only with our own incoming snapshot: an older version's restore put its patterns in that file, and
+            // a rerun after the snapshots are gone has already done this.
+            val incoming = readPreferences(incomingPrefsFile(live))
+            if (incoming != null && incoming.olderAppPatternFile == null) {
+                LegacyMessagePatternFile.delete(LegacyMessagePatternFile.of(context))
+            }
             deleteSnapshots(live)
             journalFile(live).delete()
             return true
@@ -347,7 +358,7 @@ object DatabaseRestoreRecovery {
         reclaimOrphanedPreservedRollback(live)
         val originalPrefs = readPreferences(originalPrefsFile(live))
         if (originalPrefs != null) {
-            applyPreferences(context, originalPrefs, validatePatterns = false)
+            applyPreferences(context, originalPrefs)
             discardDatabase(incomingFile(live))
             deleteSnapshots(live)
             journalFile(live).delete()
@@ -486,7 +497,7 @@ object DatabaseRestoreRecovery {
             ?: throw IncompleteRestoreException(
                 "Original preference snapshot is required to pair with the original database",
             )
-        applyPreferences(context, snapshot, validatePatterns = false)
+        applyPreferences(context, snapshot)
     }
 
     private fun signalOriginalRestore(step: OriginalRestoreStep) {
@@ -527,10 +538,12 @@ object DatabaseRestoreRecovery {
     internal fun applyPreferences(
         context: Context,
         snapshot: PreferenceSnapshot,
-        validatePatterns: Boolean = true,
         maintenance: android.content.SharedPreferences = prefs(context, MaintenancePreferences.PREFS_NAME),
     ) {
-        com.baraa.masroof.application.backup.MessagePatternBackup.restore(context, snapshot.messagePatterns, validatePatterns)
+        snapshot.olderAppPatternFile?.let { patterns ->
+            val file = LegacyMessagePatternFile.of(context)
+            if (patterns.isEmpty()) LegacyMessagePatternFile.delete(file) else writeDurable(file, patterns)
+        }
         com.baraa.masroof.application.analytics.AnalyticsBackup.restore(context, snapshot.labAnalysis)
         val onboarding = prefs(context, SharedPrefsOnboardingPreferencesRepository.PREFS_NAME)
         val locale = prefs(context, SharedPrefsAppLocaleRepository.PREFS_NAME)
@@ -710,12 +723,13 @@ object DatabaseRestoreRecovery {
             reparsedSchemaVersion = values["reparsedSchemaVersion"]?.toIntOrNull(),
             transferIntegrityRepairVersion = values["transferIntegrityRepairVersion"]?.toIntOrNull(),
             labAnalysis = values["labAnalysis"]?.takeIf { it.isNotEmpty() }?.let { String(java.util.Base64.getDecoder().decode(it), Charsets.UTF_8) },
-            messagePatterns = values["messagePatterns"]?.takeIf { it.isNotEmpty() }?.let { String(java.util.Base64.getDecoder().decode(it), Charsets.UTF_8) },
+            olderAppPatternFile = values[OLDER_APP_PATTERNS_KEY]?.let { String(java.util.Base64.getDecoder().decode(it), Charsets.UTF_8) },
         )
     }
 
     private fun encodePreferences(snapshot: PreferenceSnapshot): String = buildString {
-        appendLine("messagePatterns=${snapshot.messagePatterns?.let { java.util.Base64.getEncoder().encodeToString(it.toByteArray(Charsets.UTF_8)) } ?: ""}")
+        // Never set by this version; written back only so a test can stage an older version's journal.
+        snapshot.olderAppPatternFile?.let { appendLine("$OLDER_APP_PATTERNS_KEY=${java.util.Base64.getEncoder().encodeToString(it.toByteArray(Charsets.UTF_8))}") }
         appendLine("labAnalysis=${snapshot.labAnalysis?.let { java.util.Base64.getEncoder().encodeToString(it.toByteArray(Charsets.UTF_8)) } ?: ""}")
         appendLine("onboardingStarted=${snapshot.onboardingStarted}")
         appendLine("onboardingCompleted=${snapshot.onboardingCompleted}")
@@ -795,6 +809,7 @@ object DatabaseRestoreRecovery {
         0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
     )
     private const val WAL_FORMAT_OFFSET = 18
+    private const val OLDER_APP_PATTERNS_KEY = "messagePatterns"
     private const val WAL_FORMAT_VERSION = 2.toByte()
 
     private const val KEY_ONBOARDING_STARTED = "onboarding_started"
