@@ -187,14 +187,15 @@ private class Projection(
     private val retry = mutableSetOf<String>()
     private val reviews = mutableListOf<LedgerReviewCandidate>()
     /**
-     * Keep rule (i): stored rows any of whose raw SMS has an outcome as its latest decision. A posting outcome keeps
-     * the user's row; a not-financial one keeps a row that still links it, as the old pass skipped such an SMS and only
-     * the decision's own writer deletes the row. They are saved before any decided posting, so another SMS's posting
-     * that names one of their SMS conflicts and is retried.
+     * Keep rule (i): stored rows any of whose raw SMS a human decision protects ([preserved]: an outcome as its
+     * latest decision, or a correction closure), as the old pass never re-opened, paired, healed or released one. A
+     * posting outcome keeps the user's row; a not-financial one keeps a row that still links it, as only the
+     * decision's own writer deletes the row. They are saved before any decided posting, so another SMS's posting that
+     * names one of their SMS conflicts and is retried.
      */
-    private val keptDecided = stored.rows.filter { row -> row.rawSmsIds.any { decisionsOf(it).outcome != null } }
+    private val keptRows = stored.rows.filter { row -> row.rawSmsIds.any(::preserved) }
         .onEach { row -> check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" } }
-        .flatMap { it.rawSmsIds }.toSet()
+    private val keptDecided = keptRows.flatMap { it.rawSmsIds }.toSet()
     // Decided rows settle first, so the pre-pass sees only the evidence left to automatic assembly.
     private val automatic = records.filter(::settleDecided)
     private val confirmedLoans = confirmLoans(automatic)
@@ -311,10 +312,11 @@ private class Projection(
             post(outcome.transaction, outcome.rawSmsIds)
             paired += outcome.rawSmsIds
         }
+        val counterparts = open + keptSingleLegCounterparts()
         for (candidate in open) {
             if (candidate.event.rawSmsId in paired) continue
             val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
-                candidate, open, storedZone(candidate.event.rawSmsId) ?: zone,
+                candidate, counterparts, storedZone(candidate.event.rawSmsId) ?: zone,
             )
             if (outcome is TransactionAssembler.Outcome.Assembled) {
                 post(outcome.transaction, outcome.rawSmsIds)
@@ -322,6 +324,26 @@ private class Projection(
                 pendingMatch(candidate.event.rawSmsId)
             }
         }
+    }
+
+    /**
+     * A kept single-leg self-transfer still counts as a pending counterpart, so a lone leg near it is not posted on its
+     * own and stays pending (the old pass's `postedSingleLegCounterparts`). It never pairs: the kept row stays as stored.
+     */
+    private fun keptSingleLegCounterparts(): List<TransferMatchCandidate> = keptRows.mapNotNull { row ->
+        if (!row.transaction.isSingleLegSelfTransfer()) return@mapNotNull null
+        val record = row.rawSmsIds.singleOrNull()?.let(byRawSmsId::get) ?: return@mapNotNull null
+        val event = record.event
+        val decided = decisionsOf(event.rawSmsId)
+        if (!event.messageFamily.isTransfer() || decided.isNonFinancial ||
+            decided.outcome?.kind == UserDecisionKind.EXTERNAL_TRANSFER ||
+            !TransactionAssembler.isAutomationEligible(event, userConfirmed(record))
+        ) return@mapNotNull null
+        TransferMatchCandidate(
+            event, record.transactionReference, record.occurredAtLocal, record.receivedAt,
+            ownership.account(event.sourceAccountRef), ownership.account(event.destinationAccountRef),
+            TransactionTiming.effectiveOccurredAt(event, record.occurredAtLocal, record.receivedAt, zone, row.transaction.occurredAtZone),
+        )
     }
 
     /**
@@ -400,7 +422,7 @@ private class Projection(
      */
     private fun keepStoredRowsWithoutDerivation() {
         val kept = stored.rows.mapNotNull { row ->
-            if (removed(row) || row.rawSmsIds.any { decisionsOf(it).outcome != null }) return@mapNotNull null
+            if (removed(row) || row.rawSmsIds.any(::preserved)) return@mapNotNull null
             val derivedIds = row.rawSmsIds.mapNotNull(links::get).toSet()
             val derived = derivedIds.map(rows::getValue)
             val keep = when {

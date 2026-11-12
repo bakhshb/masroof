@@ -7,6 +7,7 @@ import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.ledger.LedgerProjection
 import com.baraa.masroof.ledger.LedgerProjector
 import com.baraa.masroof.ledger.LedgerRow
+import com.baraa.masroof.ledger.isTransfer
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 
 /** The automatic write guard: runs the write only when the evidence it was derived from is still current. */
@@ -45,7 +46,7 @@ internal class LedgerProjectionWriter(
             }
             // A save that lost to another writer: project again once if the rows really moved meanwhile.
             if (written.conflicted && attempt++ < ATTEMPTS && changedMeanwhile(units, written)) continue
-            return report(projection, written)
+            return report(projection, written, affected?.toSet(), inputs.records)
         }
     }
 
@@ -100,14 +101,17 @@ internal class LedgerProjectionWriter(
                     // A blocked refinement, or a change to a row the user protected, stays as stored and settled: the
                     // old pass never rewrote a posted row or touched a protected one.
                     !guardAccepts(unit, records) ->
-                        if (!unit.refinesOnly() && unit.stored.none { row -> row.rawSmsIds.any { it in protected } }) {
+                        if (unit.refinesOnly() || unit.stored.any { row -> row.rawSmsIds.any { it in protected } }) {
+                            written.kept += unit
+                        } else {
                             written.failed += unit
                         }
                     else -> admitted += unit
                 }
             }
+            // Two commitments cannot name one row: the unit stays as stored rather than lose a commitment's row.
             val (clashing, clear) = admitted.partition(commitmentClashes(admitted))
-            written.failed += clashing
+            written.kept += clashing
             for (unit in clear) {
                 if (apply(unit)) {
                     written.applied += unit
@@ -135,7 +139,7 @@ internal class LedgerProjectionWriter(
 
     /**
      * Units whose re-keyed commitment would name a row that already has one (the commitment source is unique):
-     * they are not written and stay retryable.
+     * they are not written and stay as stored.
      */
     private suspend fun commitmentClashes(units: List<Change>): (Change) -> Boolean {
         val committed = transactions.listCommittedTransactionIds(units.flatMap { it.ids })
@@ -175,16 +179,44 @@ internal class LedgerProjectionWriter(
         return true
     }
 
-    private fun report(projection: LedgerProjection, written: Written): ReconciliationReport {
-        val failedUnitIds = written.failed.flatMapTo(mutableSetOf()) { it.rawSmsIds }
-        val failedIds = projection.retryRawSmsIds + failedUnitIds
-        val settled = projection.settledRawSmsIds - failedIds
+    /**
+     * The report of this pass. A scoped pass ([affected] not null) reports the affected raw SMS and the raw SMS of the
+     * units it wrote; a neighbour unit that failed or was not written is left as stored and not reported (it is
+     * reported by its own pass), as the old scoped pass treated neighbours as candidates only. A unit that was not
+     * written ([Written.kept]) settles only the raw SMS its stored rows link; any other raw SMS of its projected rows
+     * has no row, so it is reported as a review candidate, never as settled.
+     */
+    private fun report(
+        projection: LedgerProjection,
+        written: Written,
+        affected: Set<String>?,
+        records: Map<String, ParsedEventRecord>,
+    ): ReconciliationReport {
+        fun reported(unit: Change) = affected == null || unit.rawSmsIds.any { it in affected }
+        val reportable = affected?.let { it + written.applied.flatMap { unit -> unit.rawSmsIds } }
+        fun inReport(rawSmsId: String) = reportable == null || rawSmsId in reportable
+        val failedUnits = written.failed.filter(::reported)
+        val failedUnitIds = failedUnits.flatMapTo(mutableSetOf()) { it.rawSmsIds }
+        val retryIds = projection.retryRawSmsIds.filterTo(mutableSetOf()) { affected == null || it in affected }
+        val failedIds = retryIds + failedUnitIds
+        val unwritten = written.failed.flatMap { it.rawSmsIds } + written.kept.flatMap { unit ->
+            unit.projected.flatMap { it.rawSmsIds } - unit.stored.flatMap { it.rawSmsIds }.toSet()
+        }
+        val settled = projection.settledRawSmsIds.filterTo(mutableSetOf()) { inReport(it) } - failedIds - unwritten.toSet()
         val posted = written.applied.flatMap { unit ->
             unit.projected.filter { row -> unit.stored.none { it.rawSmsIds == row.rawSmsIds && it.transaction.id == row.transaction.id } }
         }
         val postedIds = posted.flatMap { it.rawSmsIds }.toSet()
         val linkedIds = projection.rows.flatMap { it.rawSmsIds }.toSet()
-        val candidates = projection.reviewCandidates.map { ReconciliationReviewCandidate(it.rawSmsId, it.kind, it.reasons) }
+        val keptCandidates = written.kept.flatMap { unit ->
+            unit.projected.flatMap { it.rawSmsIds } - unit.stored.flatMap { it.rawSmsIds }.toSet()
+        }.filter(::inReport).map { rawSmsId ->
+            val transfer = records[rawSmsId]?.event?.messageFamily?.isTransfer() == true
+            if (transfer) ReconciliationReviewCandidate(rawSmsId, ReviewKind.PENDING_MATCH, listOf("transfer_pending_match"))
+            else ReconciliationReviewCandidate(rawSmsId, ReviewKind.NEEDS_REVIEW, listOf("needs_review"))
+        }
+        val candidates = projection.reviewCandidates.filter { inReport(it.rawSmsId) }
+            .map { ReconciliationReviewCandidate(it.rawSmsId, it.kind, it.reasons) } + keptCandidates
         return ReconciliationReport(
             summary = ReconciliationSummary(
                 assembledSingle = posted.count { it.rawSmsIds.size == 1 },
@@ -193,7 +225,7 @@ internal class LedgerProjectionWriter(
                 needsReview = candidates.count { it.kind == ReviewKind.NEEDS_REVIEW },
                 ignored = settled.count { it !in linkedIds },
                 alreadyLinked = settled.count { it in linkedIds && it !in postedIds },
-                failed = written.failed.size + (projection.retryRawSmsIds - failedUnitIds).size,
+                failed = failedUnits.size + (retryIds - failedUnitIds).size,
             ),
             reviewCandidates = candidates,
             settledRawSmsIds = settled,
@@ -227,6 +259,8 @@ internal class LedgerProjectionWriter(
     private class Written(
         val applied: MutableList<Change> = mutableListOf(),
         val failed: MutableList<Change> = mutableListOf(),
+        /** Units left as stored on purpose (a blocked refinement or protected row, a commitment clash): not retried. */
+        val kept: MutableList<Change> = mutableListOf(),
     ) {
         /** A save lost to another writer (only without a write transaction). */
         var conflicted = false

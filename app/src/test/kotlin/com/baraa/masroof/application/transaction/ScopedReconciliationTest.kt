@@ -360,7 +360,7 @@ class ScopedReconciliationTest {
         assertTrue(parsed.transferCandidateCalls > 0)
         assertTrue(parsed.boundedWindows.all { (start, _) -> start.isAfter(Instant.parse("2026-08-01T00:00:00Z")) })
         assertTrue(
-            transactions.boundedWindows.all { (start, end) ->
+            parsed.boundedWindows.all { (start, end) ->
                 start.isAfter(Instant.parse("2026-08-01T00:00:00Z")) && end.isAfter(start)
             },
         )

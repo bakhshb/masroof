@@ -17,6 +17,7 @@ import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
+import com.baraa.masroof.domain.model.ReviewStatus
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
@@ -171,7 +172,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         assertEquals(before, ftRepo.findByRawSmsId(LOAN))
     }
 
-    /** A chain of transfers longer than the scope rounds is read whole: the scoped report still covers all of it. */
+    /** A chain of transfers longer than the scope rounds is read whole, once, and narrowed to the scope. */
     @Test
     fun aLongTransferChain_isScopedFromAFullRead() = runBlocking {
         val ids = (0 until 16).map { "sms-chain-$it" }
@@ -181,10 +182,12 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
                 AT.plusSeconds(day * 86_400L))
         }
 
-        val report = writing().reconcileAffectedRawSmsIds(listOf(ids.first()))
+        val counting = com.baraa.masroof.testsupport.CountingParsedEventRepository(parsedRepo)
 
-        val covered = report.settledRawSmsIds + report.reviewCandidates.map { it.rawSmsId }
-        assertEquals(ids.toSet(), covered.filter { it in ids }.toSet())
+        val report = writing(parsed = counting).reconcileAffectedRawSmsIds(listOf(ids.first()))
+
+        assertEquals(1, counting.listAllCalls)
+        assertEquals(writing().reconcileStoredEventsDetailed().reviewCandidates.filter { it.rawSmsId == ids.first() }, report.reviewCandidates)
     }
 
     /** A second full pass right after one writes nothing: no save, unlink, update or reference move, no transaction. */
@@ -243,6 +246,106 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         assertEquals(null, ftRepo.findByRawSmsId(P3))
     }
 
+    /**
+     * A correction-closed leg posted alone and its counterpart arriving later: the leg is not re-opened, and the
+     * counterpart keeps an open pending-match review through the review queue, on the first and on a repeated pass.
+     */
+    @Test
+    fun aProtectedPostedLeg_leavesItsCounterpartReviewOpen() = runBlocking {
+        // Intra-bank, so the old pass counted the posted leg as a pending counterpart (an inter-bank counterpart is
+        // posted on its own, as the old pass did).
+        persistLegs(BankNetworkType.INTRA_BANK)
+        val leg = singleLeg(OUT, FinancialTransactionType.SELF_TRANSFER)
+        ftRepo.save(leg, listOf(OUT))
+        val reviews = RoomReviewRepository(db.reviewItemDao())
+        val closure = reviews.upsertRequired(OUT, ReviewKind.NEEDS_REVIEW, listOf("needs_review"), AT)
+        reviews.markResolved(closure.id, ReviewResolutionKind.USER_CORRECTION, AT, leg.id)
+        reviews.upsertRequired(IN, ReviewKind.PENDING_MATCH, listOf("transfer_pending_match"), AT)
+        val queue = com.baraa.masroof.application.review.ReviewQueueUpdater(reviews, ftRepo) { AT }
+        val before = ftRepo.findByRawSmsId(OUT)
+
+        repeat(2) { pass ->
+            // The guard refuses any automatic write on the protected, posted leg, as the real one does.
+            val report = writing(guard = { expected, write -> if (expected.any { it.event.rawSmsId == OUT }) blocking(OUT)(expected, write) else write() },
+                reviews = reviews).reconcileStoredEventsDetailed()
+            queue.applyReport(report)
+
+            assertTrue("pass $pass", ReconciliationCompletionPolicy.isComplete(report))
+            assertFalse("pass $pass: the counterpart was settled without a row", IN in report.settledRawSmsIds)
+            assertEquals("pass $pass", before, ftRepo.findByRawSmsId(OUT))
+            assertEquals("pass $pass", null, ftRepo.findByRawSmsId(IN))
+            val open = reviews.findByRawSmsId(IN)!!
+            assertEquals("pass $pass", ReviewStatus.REQUIRED to ReviewKind.PENDING_MATCH, open.status to open.kind)
+        }
+    }
+
+    /**
+     * Re-keying would put two commitments on the pair row: the unit stays as stored, no commitment loses its row, the
+     * leg without a row comes back as a review candidate, and nothing is failed or retried.
+     */
+    @Test
+    fun aCommitmentClash_keepsTheUnitAsStored_andReportsTheUnpostedLegForReview() = runBlocking {
+        persistLegs()
+        val external = singleLeg(OUT, FinancialTransactionType.EXTERNAL_TRANSFER_OUT).copy(destinationContainerId = null)
+        ftRepo.save(external, listOf(OUT))
+        commit(external.id)
+        commit(pairId, id = "commitment-2")
+
+        repeat(2) { pass ->
+            val report = writing().reconcileStoredEventsDetailed()
+
+            assertTrue("pass $pass", ReconciliationCompletionPolicy.isComplete(report))
+            assertEquals("pass $pass", listOf(external), ftRepo.listAll())
+            assertTrue("pass $pass", OUT in report.settledRawSmsIds && IN !in report.settledRawSmsIds)
+            assertEquals("pass $pass", listOf(IN), report.reviewCandidates.map { it.rawSmsId })
+            assertEquals("pass $pass", setOf(external.id, pairId),
+                RoomCommitmentRepository.from(db).listAll().map { it.sourceTransactionId }.toSet())
+        }
+    }
+
+    /** A live SMS whose scope reaches a neighbour that fails on every pass is still complete; a full pass is not. */
+    @Test
+    fun aScopedPass_doesNotReportANeighboursLastingFailure() = runBlocking {
+        persistLegs()
+        persistEvent(NEIGHBOUR, event("pe-neighbour", NEIGHBOUR, MessageFamily.TRANSFER_OUT, money("11.00"), source = source,
+            destination = com.baraa.masroof.domain.model.AccountReference(Bank.BANK_ALJAZIRA, "9999"), network = BankNetworkType.INTER_BANK),
+            at = Instant.parse("2026-08-10T09:00:30Z"))
+        val guard = { neighbourBlocked: Boolean -> blocking(NEIGHBOUR).takeIf { neighbourBlocked } }
+        val failing: AutomaticWrite = { expected, write -> if (expected.any { it.event.rawSmsId == NEIGHBOUR }) guard(true)!!(expected, write) else write() }
+
+        val scoped = writing(guard = failing).reconcileAffectedRawSmsIds(listOf(IN))
+
+        assertTrue(ReconciliationCompletionPolicy.isComplete(scoped))
+        assertTrue(NEIGHBOUR !in scoped.failedRawSmsIds && NEIGHBOUR !in scoped.settledRawSmsIds)
+        assertEquals(setOf(OUT, IN), ftRepo.listRawSmsIds(pairId).toSet())
+        assertEquals(null, ftRepo.findByRawSmsId(NEIGHBOUR))
+        val full = writing(guard = failing).reconcileStoredEventsDetailed()
+        assertEquals(setOf(NEIGHBOUR), full.failedRawSmsIds)
+    }
+
+    /** A stored FEE whose amount differs from its installment stays exactly as stored (no stored amount changes). */
+    @Test
+    fun aStoredFeeWithAnotherAmount_staysAFee() = runBlocking {
+        confirmation.confirmAccountOwned(source)
+        persistEvent(LOAN, event("pe-loan", LOAN, MessageFamily.FINANCING_INSTALLMENT, money("300.00"), source = source),
+            ParsedEventDetails(loanType = LoanType.PERSONAL), AT)
+        val fee = FinancialTransaction(TransactionIdFactory.fromRawSmsIds(listOf(LOAN)), FinancialTransactionType.FEE,
+            money("10.00"), AT, FinancialContainerIdFactory.accountId(source), null, null, null, null, listOf("pe-loan"),
+            occurredAtZone = "Asia/Riyadh")
+        ftRepo.save(fee, listOf(LOAN))
+
+        val report = writing().reconcileStoredEventsDetailed()
+
+        assertTrue(ReconciliationCompletionPolicy.isComplete(report))
+        assertEquals(fee, ftRepo.findByRawSmsId(LOAN))
+    }
+
+    private fun singleLeg(rawSmsId: String, type: FinancialTransactionType) = FinancialTransaction(
+        TransactionIdFactory.fromRawSmsIds(listOf(rawSmsId)), type, money("700.00"), Instant.parse("2026-08-10T09:00:00Z"),
+        FinancialContainerIdFactory.accountId(source), FinancialContainerIdFactory.accountId(destination), null, null, null,
+        listOf(if (rawSmsId == OUT) "pe-out" else "pe-in"), occurredAtZone = "Asia/Riyadh",
+    )
+
     @Test
     fun unchangedRows_areNotRewritten() = runBlocking {
         persistPurchases()
@@ -285,12 +388,13 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         legacy: () -> Boolean = { false },
         reviews: ReviewRepository = EmptyReviewRepository(),
         onTransaction: () -> Unit = {},
+        parsed: com.baraa.masroof.parsing.repository.ParsedEventRepository = parsedRepo,
     ) = TransactionReconciliationService(
         rawSmsRepository = rawRepo,
         financialTransactionRepository = ledger,
         ownershipResolver = OwnershipResolver(accounts, cards, loans),
         ownershipConfirmationService = confirmation,
-        effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
+        effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
         reviewRepository = reviews,
         userDecisionRepository = NoOpUserDecisionRepository,
         zoneId = ZoneId.of("Asia/Riyadh"),
@@ -302,8 +406,8 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
     /** A guard that rejects every automatic write, as stale evidence would. */
     private fun blocking(rawSmsId: String): AutomaticWrite = { _, _ -> FinancialTransactionSaveResult.Conflict(rawSmsId, "stale_pattern_definition") }
 
-    private suspend fun commit(transactionId: String) = RoomCommitmentRepository.from(db).create(
-        Commitment("commitment-1", "Rent", money("700.00"), LocalDate.parse("2026-08-10"), null, null, true,
+    private suspend fun commit(transactionId: String, id: String = "commitment-1") = RoomCommitmentRepository.from(db).create(
+        Commitment(id, "Rent", money("700.00"), LocalDate.parse("2026-08-10"), null, null, true,
             sourceTransactionId = transactionId, createdAt = AT, updatedAt = AT),
     )
 
@@ -315,15 +419,15 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         }
     }
 
-    private suspend fun persistLegs() {
+    private suspend fun persistLegs(network: BankNetworkType = BankNetworkType.INTER_BANK) {
         confirmation.confirmAccountOwned(source)
         confirmation.confirmAccountOwned(destination)
         val local = LocalDateTime.parse("2026-08-10T12:00:00")
         persistEvent(OUT, event("pe-out", OUT, MessageFamily.TRANSFER_OUT, money("700.00"), source = source,
-            destination = destination, network = BankNetworkType.INTER_BANK),
+            destination = destination, network = network),
             ParsedEventDetails(occurredAtLocal = local, transactionReference = "REF-1"), Instant.parse("2026-08-10T09:00:00Z"))
         persistEvent(IN, event("pe-in", IN, MessageFamily.TRANSFER_IN, money("700.00"), source = source,
-            destination = destination, network = BankNetworkType.INTER_BANK),
+            destination = destination, network = network),
             ParsedEventDetails(occurredAtLocal = local.plusMinutes(1), transactionReference = "REF-1"), Instant.parse("2026-08-10T09:01:00Z"))
     }
 
@@ -342,6 +446,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         const val P1 = "sms-writer-p1"
         const val P2 = "sms-writer-p2"
         const val P3 = "sms-writer-p3"
+        const val NEIGHBOUR = "sms-writer-neighbour"
         const val LOAN = "sms-writer-loan"
         val AT: Instant = Instant.parse("2026-08-01T12:00:00Z")
     }

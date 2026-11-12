@@ -4,6 +4,9 @@ import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.MessageFamily
+import com.baraa.masroof.domain.model.LoanType
+import com.baraa.masroof.domain.model.LoanReference
+import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.UserDecision
@@ -185,5 +188,32 @@ class LedgerProjectorKeepStoredTest {
     fun theScopeIncludesEveryLegOfAStoredRow() {
         val stored = StoredFacts(rows = listOf(storedRow("a", "b")))
         assertEquals(setOf("a", "b"), LedgerProjector.scope(listOf("a"), listOf(purchase("a"), purchase("b")), emptyMap(), stored))
+    }
+
+    /**
+     * A correction-closed leg posted as a single-leg self-transfer is not re-opened when its counterpart arrives: the
+     * stored row stays, and the counterpart stays a pending match (the old pass counted the posted leg as a pending
+     * counterpart and never upgraded a protected leg).
+     */
+    @Test
+    fun aProtectedSingleLegIsNotReopened_andItsCounterpartStaysPending() {
+        val leg = storedRow("a", type = FinancialTransactionType.SELF_TRANSFER, source = "account:BANK_ALJAZIRA:1111")
+        val result = project(
+            listOf(intraBank("a", MessageFamily.TRANSFER_OUT), intraBank("b", MessageFamily.TRANSFER_IN)),
+            registry = owned, stored = StoredFacts(rows = listOf(leg), correctionClosedRawSmsIds = setOf("a")),
+        )
+        assertEquals(listOf(leg), result.rows)
+        assertEquals(listOf(LedgerReviewCandidate("b", ReviewKind.PENDING_MATCH, listOf("transfer_pending_match"))), result.reviewCandidates)
+        assertEquals(setOf("a"), result.settledRawSmsIds)
+    }
+
+    /** A stored FEE whose amount differs from its installment stays as stored: no stored amount changes. */
+    @Test
+    fun aStoredFeeWithAnotherAmountThanItsInstallmentStaysAFee() {
+        val loan = LoanReference(AJ, LoanType.PERSONAL)
+        val fee = storedRow("loan", type = FinancialTransactionType.FEE, source = "account:BANK_ALJAZIRA:1111")
+        val installment = evidence(event("loan", MessageFamily.FINANCING_INSTALLMENT, amount = "300", source = ownedA), T0, loanType = LoanType.PERSONAL)
+        val result = project(listOf(installment), registry = owned.copy(loans = mapOf(loan to OwnershipStatus.OWNED)), stored = StoredFacts(rows = listOf(fee)))
+        assertKept(result, fee)
     }
 }
