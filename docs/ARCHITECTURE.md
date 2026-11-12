@@ -242,8 +242,8 @@ The rules are those of `TransactionReconciliationService` applied to an empty le
 
 Keep rule (owner, gate 3.2, 2026-11-12). A stored row is carried into the projection verbatim (type, amount, time, zone, containers, merchant, counterparty, id, exchange-rate pair), its raw SMS settled and given no review candidate, when:
 
-1. any of its raw SMS has a posting outcome as its latest decision (`EXTERNAL_TRANSFER`, `FINANCIAL_TYPE`, `RECLASSIFY`, `RESTORE`, `SELF_TRANSFER_PAIR`), with or without posting columns; the stored row wins over the decision's own columns. This runs with the decisions, before automatic assembly; or
-2. the projection derives no row for any of its raw SMS, or only rows inside its set that do not cover it (a stored pair one of whose legs no longer derives). This runs last. A derived row that reaches outside the set, or a derived grouping that covers it (two posted external legs joining into one pair, a fee healed into a repayment), wins.
+1. any of its raw SMS has a posting outcome as its latest decision (`EXTERNAL_TRANSFER`, `FINANCIAL_TYPE`, `RECLASSIFY`, `RESTORE`, `SELF_TRANSFER_PAIR`), with or without posting columns; the stored row wins over the decision's own columns. These rows are saved first, before any decided posting, so a posting from another SMS's decision that names one of their SMS conflicts and is retried; their SMS never join the external-pair upgrade; or
+2. for a row with no outcome decision on any of its SMS, run last: it links no raw SMS; or the projection derives no row for any of its raw SMS, or only rows inside its set that do not cover it (a stored pair one of whose legs no longer derives); or it derives one row on exactly its set with another type or amount (a type or amount edited only on the row), except the old pass's own fee→financing heal (stored `FEE`, derived `LOAN_REPAYMENT`). A derived row that reaches outside the set (two posted external legs joining into one pair), or a derived grouping that covers it with the stored type and amount, wins. A kept row's SMS are removed from the retry ids.
 
 Neither applies when a raw SMS of the row is decided not financial (`NON_FINANCIAL`, `IGNORE`, `RESTORE_REVERTED`), or when the row links one SMS of an informational family (`InformationalMessagePolicy`) that no outcome decision or correction closure protects. With no stored rows the projection is the rebuild from nothing of plan 3.1: a decided row comes back only from complete posting columns (`decidedPosting`).
 
@@ -253,11 +253,11 @@ Neither applies when a raw SMS of the row is decided not financial (`NON_FINANCI
 
 The owner decided these at gate 3.2 (2026-11-12). None is fixed by changing the old path.
 
-Gone, through the keep rule: a decided row whose decision lacks its type, time or zone; a type edited only on the row; a stored row whose evidence is no longer automation-eligible; a stored row whose card or account is no longer owned; a stored `FEE` for an installment that cannot become a repayment; a stored pair one of whose legs no longer derives. Each stays exactly as stored.
+Gone, through the keep rule: a decided row whose decision lacks its type, time or zone; a type or amount edited only on the row; a stored row that links no raw SMS; a stored row whose evidence is no longer automation-eligible; a stored row whose card or account is no longer owned; a stored `FEE` for an installment that cannot become a repayment; a stored pair one of whose legs no longer derives. Each stays exactly as stored.
 
 Accepted (the derived row wins over the stored one):
 
-- **Re-derived automatic rows.** A row the projection still derives takes today's derivation: a filled zone, a re-derived bank time, more container detail (a transfer's destination account, the card used), a derived pairing that covers the stored rows.
+- **Re-derived automatic rows.** A row the projection still derives with the stored type and amount takes today's derivation: a filled zone, a re-derived bank time, more container detail (a transfer's destination account, the card used), merchant and counterparty, a derived pairing that covers the stored rows. A stored `FEE` healed into a `LOAN_REPAYMENT` takes the derived type, as the old fee→financing upgrade does.
 - **Ids.** The old fee→financing upgrade keeps the stored row id; a derived row's id always comes from its raw SMS set, so a re-paired self-transfer gets a new id.
 - **Loan pre-pass.** The old pass confirms a loan while visiting an installment, so an earlier installment of the same loan still sees UNKNOWN until the next pass; the projector confirms first.
 - **Exchange rate.** Only a complete stored pair on the same raw SMS set is carried to a derived row. A changed pairing or a half pair has none until enrichment runs (piece 3.3a re-keys).

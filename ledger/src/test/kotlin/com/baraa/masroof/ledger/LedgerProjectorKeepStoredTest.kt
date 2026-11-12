@@ -81,6 +81,47 @@ class LedgerProjectorKeepStoredTest {
     }
 
     @Test
+    fun aTypeOrAmountEditedOnlyOnTheRowIsKept_butOtherFieldsAreRederived() {
+        val fee = storedRow("fee", type = FinancialTransactionType.FEE)
+        assertKept(project(listOf(purchase("fee")), registry = owned, stored = StoredFacts(rows = listOf(fee))), fee)
+
+        val merchant = storedRow("m")
+        val row = project(listOf(purchase("m")), registry = owned, stored = StoredFacts(rows = listOf(merchant))).rows.single()
+        assertEquals(FinancialTransactionType.EXPENSE, row.transaction.type)
+        assertEquals(null, row.transaction.merchant)
+    }
+
+    @Test
+    fun aStoredRowWithoutLinksIsKept() {
+        val unlinked = LedgerRow(storedRow("gone").transaction.copy(id = "transaction:unlinked"), emptyList())
+        assertKept(project(listOf(purchase("p")), registry = owned, stored = StoredFacts(rows = listOf(unlinked))).let {
+            it.copy(rows = it.rows.filter { row -> row.rawSmsIds.isEmpty() })
+        }, unlinked)
+    }
+
+    @Test
+    fun aKeptDecidedRowWinsOverAnotherSmsPostingThatNamesIt_inEitherOrder() {
+        val b = storedRow("b", type = FinancialTransactionType.INCOME)
+        val decisions = fold(
+            listOf(
+                UserDecision(
+                    "a", UserDecisionKind.SELF_TRANSFER_PAIR, T0, pairedRawSmsId = "b",
+                    transactionType = FinancialTransactionType.SELF_TRANSFER, occurredAt = T0, occurredAtZone = "UTC",
+                ),
+                UserDecision("b", UserDecisionKind.FINANCIAL_TYPE, T0),
+            ),
+        )
+        val events = listOf(purchase("a"), purchase("b"))
+        val stored = StoredFacts(rows = listOf(b))
+        val result = project(events, decisions, owned, stored)
+        assertEquals(listOf(b), result.rows)
+        assertEquals(setOf("a"), result.retryRawSmsIds)
+        assertEquals(result, project(events.reversed(), decisions, owned, stored))
+        val swapped = events.map { it.copy(event = it.event.copy(id = if (it.event.rawSmsId == "a") "e-z" else it.event.id)) }
+        assertEquals(listOf(b), project(swapped, decisions, owned, stored).rows)
+    }
+
+    @Test
     fun aRowTheProjectionStillDerivesTakesTodaysDerivation() {
         val stored = storedRow("p", zone = null)
         val row = project(listOf(purchase("p")), registry = owned, stored = StoredFacts(rows = listOf(stored))).rows.single()

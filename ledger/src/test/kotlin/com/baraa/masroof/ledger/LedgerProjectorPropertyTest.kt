@@ -28,8 +28,11 @@ class LedgerProjectorPropertyTest {
         val registry: OwnershipFacts,
         val stored: StoredFacts,
     ) {
-        fun project(events: List<LedgerEvidence> = this.events, decisions: Map<String, EffectiveUserDecisions> = this.decisions) =
-            LedgerProjector.project(events, decisions, registry, stored, ZoneOffset.ofHours(2))
+        fun project(
+            events: List<LedgerEvidence> = this.events,
+            decisions: Map<String, EffectiveUserDecisions> = this.decisions,
+            stored: StoredFacts = this.stored,
+        ) = LedgerProjector.project(events, decisions, registry, stored, ZoneOffset.ofHours(2))
     }
 
     private val seeds = 0 until 2000
@@ -44,6 +47,8 @@ class LedgerProjectorPropertyTest {
             assertEquals(expected, corpus.project(), "seed $seed")
             assertEquals(expected, corpus.project(corpus.events.shuffled(Random(seed + 1))), "seed $seed")
             assertEquals(expected, corpus.project(decisions = corpus.decisions.entries.shuffled(Random(seed)).associate { it.toPair() }), "seed $seed")
+            val shuffledStored = corpus.stored.copy(rows = corpus.stored.rows.shuffled(Random(seed)).map { it.copy(rawSmsIds = it.rawSmsIds.reversed()) })
+            assertEquals(expected, corpus.project(stored = shuffledStored), "seed $seed")
         }
         assertTrue(rows > seeds.count(), "corpora must post rows")
     }
@@ -138,7 +143,8 @@ class LedgerProjectorPropertyTest {
         }
         val ids = events.map { it.event.rawSmsId }
         // Stored rows link one or two raw SMS each, never one SMS twice; some are kept verbatim by the keep rule.
-        val storedIds = ids.filter { random.nextInt(3) == 0 }.shuffled(random)
+        // Some stored rows link raw SMS without evidence.
+        val storedIds = (ids.filter { random.nextInt(3) == 0 } + listOf("ghost1", "ghost2").filter { random.nextInt(3) == 0 }).shuffled(random)
         val storedSets = storedIds.chunked(2).flatMap { if (it.size == 2 && random.nextInt(3) == 0) listOf(it) else it.map(::listOf) }
         val types = listOf(FinancialTransactionType.EXPENSE, FinancialTransactionType.SELF_TRANSFER, FinancialTransactionType.FEE)
         val stored = StoredFacts(
@@ -150,7 +156,18 @@ class LedgerProjectorPropertyTest {
             },
             correctionClosedRawSmsIds = ids.filter { random.nextInt(6) == 0 }.toSet(),
         )
-        return Corpus(events, fold(decisionRows(random, ids)), registry, stored)
+        // A posting decision naming an SMS that a stored row of another decided SMS links (keep rule (i) wins).
+        val conflict = stored.rows.firstOrNull { it.rawSmsIds.isNotEmpty() && random.nextBoolean() }?.rawSmsIds?.first()?.let { kept ->
+            val other = ids.filter { it != kept }.randomOrNull(random) ?: return@let emptyList()
+            listOf(
+                UserDecision(
+                    other, UserDecisionKind.SELF_TRANSFER_PAIR, T0, pairedRawSmsId = kept,
+                    transactionType = FinancialTransactionType.SELF_TRANSFER, occurredAt = T0, occurredAtZone = "UTC",
+                ),
+                UserDecision(kept, UserDecisionKind.FINANCIAL_TYPE, T0),
+            )
+        }.orEmpty()
+        return Corpus(events, fold(decisionRows(random, ids) + conflict), registry, stored)
     }
 
     private fun decisionRows(random: Random, ids: List<String>) = (0 until random.nextInt(0, 4)).map {

@@ -42,7 +42,9 @@ object LedgerProjector {
     ): LedgerProjection {
         require(events.distinctBy { it.event.rawSmsId }.size == events.size) { "one evidence per raw SMS" }
         require(storedFacts.rows.flatMap { it.rawSmsIds }.let { it.distinct().size == it.size }) { "one stored row per raw SMS" }
-        return Projection(events.sortedBy { it.event.id }, decisions, registry, storedFacts, zone).run()
+        // Stored rows in id order with sorted links, so neither the caller's order nor sorting changes the result.
+        val stored = storedFacts.copy(rows = storedFacts.rows.map { it.copy(rawSmsIds = it.rawSmsIds.sorted()) }.sortedBy { it.transaction.id })
+        return Projection(events.sortedBy { it.event.id }, decisions, registry, stored, zone).run()
     }
 
     /**
@@ -134,9 +136,13 @@ private class Projection(
     private val settled = mutableSetOf<String>()
     private val retry = mutableSetOf<String>()
     private val reviews = mutableListOf<LedgerReviewCandidate>()
-    /** Keep rule (i): stored rows any of whose raw SMS has a posting outcome as its latest decision. */
+    /**
+     * Keep rule (i): stored rows any of whose raw SMS has a posting outcome as its latest decision. They are saved
+     * before any decided posting, so another SMS's posting that names one of their SMS conflicts and is retried.
+     */
     private val keptDecided = stored.rows.filter { row -> !removed(row) && row.rawSmsIds.any { decisionsOf(it).postsRow } }
-        .flatMap { row -> row.rawSmsIds.map { it to row } }.toMap()
+        .onEach { row -> check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" } }
+        .flatMap { it.rawSmsIds }.toSet()
     // Decided rows settle first, so the pre-pass sees only the evidence left to automatic assembly.
     private val automatic = records.filter(::settleDecided)
     private val confirmedLoans = confirmLoans(automatic)
@@ -174,13 +180,10 @@ private class Projection(
         val rawSmsId = record.event.rawSmsId
         val decided = decisionsOf(rawSmsId)
         val posting = decidedPosting(decided)
-        val kept = keptDecided[rawSmsId]
         when {
             decided.isNonFinancial -> settled += rawSmsId
-            // A decided pair, or a kept stored row, links a second SMS; it stays with the row.
+            // A kept stored row (rule i), or a decided pair, links this SMS; it stays with the row.
             rawSmsId in links -> settled += rawSmsId
-            // Keep rule (i): the user's stored row stays verbatim, even when its decision lacks posting columns.
-            kept != null -> if (!save(kept.transaction, kept.rawSmsIds)) retry += rawSmsId
             posting != null -> if (!save(posting.transaction, posting.rawSmsIds)) retry += rawSmsId
             decided.outcome?.kind == UserDecisionKind.EXTERNAL_TRANSFER -> settled += rawSmsId
             else -> return true
@@ -292,7 +295,7 @@ private class Projection(
     private fun upgradePostedTransferPairs() {
         fun eligible(record: LedgerEvidence) =
             TransactionAssembler.isAutomationEligible(record.event, record.automationConfirmed) &&
-                !preserved(record.event.rawSmsId)
+                !preserved(record.event.rawSmsId) && record.event.rawSmsId !in keptDecided
         val legs = buildList {
             for (row in rows.values) {
                 val posted = row.transaction
@@ -344,22 +347,36 @@ private class Projection(
     }
 
     /**
-     * Keep rule (ii): a stored row stays verbatim when the projection derived no row for its raw SMS, or only rows
-     * inside its set that do not cover it (a stored pair one of whose legs no longer derives). A derived row that
-     * reaches outside the set, or a derived grouping that covers it, wins. Its raw SMS are settled.
+     * Keep rule (ii), for undecided stored rows: a stored row stays verbatim when it links no raw SMS, when the
+     * projection derived no row for its raw SMS or only rows inside its set that do not cover it (a stored pair one of
+     * whose legs no longer derives), or when it derived one row on exactly its set with another type or amount (a
+     * type edited only on the row), except the old fee→financing heal. A derived row that reaches outside the set, or
+     * one that covers it with the stored type and amount, wins. Its raw SMS are settled and not retried.
      */
     private fun keepStoredRowsWithoutDerivation() {
         val kept = stored.rows.mapNotNull { row ->
             if (removed(row) || row.rawSmsIds.any { decisionsOf(it).outcome != null }) return@mapNotNull null
             val derivedIds = row.rawSmsIds.mapNotNull(links::get).toSet()
-            // Derived rows inside the set that leave one of its SMS without a row.
-            val inside = derivedIds.all { row.rawSmsIds.containsAll(rows.getValue(it).rawSmsIds) }
-            (row to derivedIds).takeIf { inside && row.rawSmsIds.any { it !in links } }
+            val derived = derivedIds.map(rows::getValue)
+            val keep = when {
+                row.rawSmsIds.isEmpty() -> row.transaction.id !in rows
+                derived.any { !row.rawSmsIds.containsAll(it.rawSmsIds) } -> false
+                row.rawSmsIds.any { it !in links } -> true
+                else -> derived.singleOrNull()?.transaction?.let { changesTypeOrAmount(row.transaction, it) } == true
+            }
+            (row to derivedIds).takeIf { keep }
         }
         for ((row, derivedIds) in kept) {
             derivedIds.forEach(::drop)
             check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" }
+            retry -= row.rawSmsIds.toSet()
         }
+    }
+
+    /** The derivation changes the stored type or amount, other than the old pass's own fee→financing heal. */
+    private fun changesTypeOrAmount(stored: FinancialTransaction, derived: FinancialTransaction): Boolean {
+        val feeHeal = stored.type == FinancialTransactionType.FEE && derived.type == FinancialTransactionType.LOAN_REPAYMENT
+        return (stored.type != derived.type && !feeHeal) || stored.amount != derived.amount
     }
 
     /**
