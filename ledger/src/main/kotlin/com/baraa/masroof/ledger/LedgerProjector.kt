@@ -204,13 +204,31 @@ private class Projection(
      */
     private val keptPairs = stored.rows.filter { row -> row.rawSmsIds.size == 2 && row.rawSmsIds.none(::preserved) }
         .onEach { row -> (asItself(row) ?: row).let { check(save(it.transaction, it.rawSmsIds)) { "kept stored rows never overlap" } } }
+
+    /**
+     * Keep rule (iv): an undecided stored row of more than two raw SMS stays as stored, its legs settled with it, except
+     * the old stale-link release ([staleLegs]): those legs leave the row and are assembled again.
+     */
+    private val keptMerged = stored.rows.filter { row -> row.rawSmsIds.size > 2 && row.rawSmsIds.none(::preserved) }
+        .onEach { row ->
+            val released = staleLegs(row)
+            val remaining = row.rawSmsIds - released
+            if (remaining.isEmpty()) return@onEach
+            val releasedEvents = released.mapNotNull { byRawSmsId[it]?.event?.id }.toSet()
+            val transaction = row.transaction.copy(linkedParsedEventIds = row.transaction.linkedParsedEventIds - releasedEvents)
+            check(save(transaction, remaining)) { "kept stored rows never overlap" }
+        }
+    private val keptPairIds = (keptPairs + keptMerged).flatMap { it.rawSmsIds }.toSet()
+
     // Decided rows settle first, so the pre-pass sees only the evidence left to automatic assembly.
     private val automatic = records.filter(::settleDecided)
     private val confirmedLoans = confirmLoans(automatic)
     private val ownership = registry.copy(loans = registry.loans + confirmedLoans.associateWith { OwnershipStatus.OWNED })
 
+    /** The transfer legs left open by single assembly; [keepStoredRowsUnlessReplaced] re-runs the lone-leg step on it. */
+    private val open = mutableListOf<TransferMatchCandidate>()
+
     fun run(): LedgerProjection {
-        val open = mutableListOf<TransferMatchCandidate>()
         automatic.forEach { assemble(it, open) }
         postOpenTransfers(open)
         upgradePostedTransferPairs()
@@ -269,6 +287,30 @@ private class Projection(
                     registry.loan(it) == OwnershipStatus.UNKNOWN
             }
         }.toSet()
+
+    /**
+     * The old `shouldReleaseStaleSelfTransferLink`, leg by leg in event order: a transfer leg of a stored
+     * self-transfer leaves it when its effective time, read in the row's zone, differs from the row's time (by more
+     * than the match window while the row still links two parsed events, the earlier leg's time being the pair's).
+     */
+    private fun staleLegs(row: LedgerRow): List<String> {
+        if (row.transaction.type != FinancialTransactionType.SELF_TRANSFER) return emptyList()
+        var linkedEvents = row.transaction.linkedParsedEventIds.size
+        val released = mutableListOf<String>()
+        for (record in row.rawSmsIds.mapNotNull(byRawSmsId::get).sortedBy { it.event.id }) {
+            if (!record.event.messageFamily.isTransfer()) continue
+            val expected = TransactionTiming.effectiveOccurredAt(
+                record.event, record.occurredAtLocal, record.receivedAt, zone, row.transaction.occurredAtZone,
+            )
+            val stale = if (linkedEvents != 2) row.transaction.occurredAt != expected
+            else Duration.between(row.transaction.occurredAt, expected).abs() > TransactionMatcher.TRANSFER_MATCH_WINDOW
+            if (stale) {
+                released += record.event.rawSmsId
+                if (record.event.id in row.transaction.linkedParsedEventIds) linkedEvents--
+            }
+        }
+        return released
+    }
 
     /** The single assembly of [record] and its matching candidate, read with [facts] and the stored zone. */
     private fun single(record: LedgerEvidence, facts: OwnershipFacts): Pair<TransactionAssembler.Outcome, TransferMatchCandidate> {
@@ -397,7 +439,7 @@ private class Projection(
     private fun upgradePostedTransferPairs() {
         fun eligible(record: LedgerEvidence) =
             TransactionAssembler.isAutomationEligible(record.event, record.automationConfirmed) &&
-                !preserved(record.event.rawSmsId) && record.event.rawSmsId !in keptDecided
+                !preserved(record.event.rawSmsId) && record.event.rawSmsId !in keptDecided && record.event.rawSmsId !in keptPairIds
         val legs = buildList {
             for (row in rows.values) {
                 val posted = row.transaction
@@ -451,14 +493,14 @@ private class Projection(
     /**
      * Keep rule (ii), the one place a stored row may be replaced. The projection replaces an undecided stored row of
      * one raw SMS only by (a) exactly one derived row on the same raw SMS set with the same type and amount (the old
-     * fee→financing heal excepted), or (b) a derived self-transfer pair that joins it with its counterpart, the old
-     * upgrade passes' rule (a posted external transfer or single-leg self-transfer leg); (c) [removed] drops a lone
-     * informational row; (d) [splitsAWrongMerge]. Any other stored row stays verbatim: the derived rows on its raw SMS are dropped, and a raw
-     * SMS of theirs that no row links any more is pending again. Protected rows (rule (i)) and pairs (rule (iii)) are
-     * already settled. A link-less row stays unless a derived row took its id. Kept rows' raw SMS are not retried.
+     * fee→financing heal excepted), or (b) a derived self-transfer pair that joins it with its counterpart where the
+     * old upgrade would have ([oldUpgradePairs]; a posted external transfer or single-leg self-transfer leg);
+     * (c) [removed] drops a lone informational row. Any other stored row stays verbatim: the derived rows on its raw
+     * SMS are dropped, and a raw SMS of theirs that no row links any more is assembled alone again (the lone-owned-leg
+     * step), else pending. Protected rows (rule (i)), pairs (iii) and rows of three or more SMS (iv) are already settled. A link-less row stays unless a derived row took its id. Kept rows' raw SMS are not retried.
      */
     private fun keepStoredRowsUnlessReplaced() {
-        val candidates = stored.rows.filter { row -> row.rawSmsIds.size != 2 && row.rawSmsIds.none(::preserved) && !removed(row) }
+        val candidates = stored.rows.filter { row -> row.rawSmsIds.size <= 1 && row.rawSmsIds.none(::preserved) && !removed(row) }
         val dropped = mutableSetOf<String>()
         var changed = true
         while (changed) {
@@ -469,35 +511,54 @@ private class Projection(
                     continue
                 }
                 val derived = row.rawSmsIds.mapNotNull(links::get).toSet().map(rows::getValue)
-                if (derived == listOf(row) || replaces(row, derived.singleOrNull()) || splitsAWrongMerge(row, derived)) continue
+                if (derived == listOf(row) || replaces(row, derived.singleOrNull())) continue
                 derived.forEach { dropped += it.rawSmsIds; drop(it.transaction.id) }
                 check(save(row.transaction, row.rawSmsIds)) { "kept stored rows never overlap" }
                 retry -= row.rawSmsIds.toSet()
                 changed = true
             }
         }
-        for (rawSmsId in dropped - links.keys) {
+        // A leg whose derived row was dropped is assembled alone, as the old pass assembled it with its
+        // counterpart linked elsewhere: the lone-owned-leg step against the legs still open.
+        for (rawSmsId in (dropped - links.keys).sorted()) {
             settled -= rawSmsId
-            pendingMatch(rawSmsId)
+            val candidate = open.firstOrNull { it.event.rawSmsId == rawSmsId }
+            val counterparts = open.filter { it.event.rawSmsId !in links } +
+                storedSingleLegCounterparts(open.mapTo(mutableSetOf()) { it.event.rawSmsId })
+            val outcome = candidate?.let {
+                TransactionAssembler.assembleUnmatchedOwnedTransfer(it, counterparts, storedZone(rawSmsId) ?: zone)
+            }
+            if (outcome is TransactionAssembler.Outcome.Assembled) post(outcome.transaction, outcome.rawSmsIds) else pendingMatch(rawSmsId)
         }
     }
-
-    /**
-     * Rule (d): a stored row of more than two raw SMS, which no assembler writes (only an old wrong merge of two
-     * movements), is replaced by derived rows inside its set that link all of it, as the old stale-link release did.
-     */
-    private fun splitsAWrongMerge(row: LedgerRow, derived: List<LedgerRow>): Boolean =
-        row.rawSmsIds.size > 2 && row.rawSmsIds.all { it in links } && derived.all { row.rawSmsIds.containsAll(it.rawSmsIds) }
 
     /** Rule (a) or (b) of [keepStoredRowsUnlessReplaced]. */
     private fun replaces(row: LedgerRow, derived: LedgerRow?): Boolean {
         derived ?: return false
         if (derived.rawSmsIds == row.rawSmsIds) return !changesTypeOrAmount(row.transaction, derived.transaction)
-        if (row.rawSmsIds.size > 2) return false
         val joinable = row.transaction.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
             row.transaction.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN || row.transaction.isSingleLegSelfTransfer()
         return joinable && derived.transaction.type == FinancialTransactionType.SELF_TRANSFER &&
-            derived.rawSmsIds.size == 2 && derived.rawSmsIds.containsAll(row.rawSmsIds)
+            derived.rawSmsIds.size == 2 && derived.rawSmsIds.containsAll(row.rawSmsIds) && derived.rawSmsIds in oldUpgradePairs
+    }
+
+    /**
+     * The pairs the old `upgradeStaleExternalPairs` could form: mutually unique, owned at both ends, among the legs it
+     * looked at (a posted external or single-leg self-transfer leg, or an unlinked leg; eligible and not protected).
+     * A leg stored in any other row, or in a kept pair, was not in its pool.
+     */
+    private val oldUpgradePairs: Set<List<String>> by lazy {
+        val pool = records.filter { record ->
+            val id = record.event.rawSmsId
+            val storedRow = storedByRawSmsId[id]?.transaction
+            record.event.messageFamily.isTransfer() && !preserved(id) && id !in keptPairIds &&
+                TransactionAssembler.isAutomationEligible(record.event, record.automationConfirmed) &&
+                (storedRow == null || storedRow.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
+                    storedRow.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN || storedRow.isSingleLegSelfTransfer())
+        }.map { single(it, ownership).second }
+        TransactionMatcher.findMutuallyUniquePairs(pool)
+            .filter { it.outgoing.sourceOwnership == OwnershipStatus.OWNED && it.incoming.destinationOwnership == OwnershipStatus.OWNED }
+            .map { listOf(it.outgoing.event.rawSmsId, it.incoming.event.rawSmsId).sorted() }.toSet()
     }
 
     /** The derivation changes the stored type or amount, other than the old pass's own fee→financing heal. */

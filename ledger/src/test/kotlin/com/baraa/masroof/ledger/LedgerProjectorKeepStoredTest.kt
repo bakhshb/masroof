@@ -1,5 +1,6 @@
 package com.baraa.masroof.ledger
 
+import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -291,5 +292,83 @@ class LedgerProjectorKeepStoredTest {
         assertEquals(listOf("a1", "b"), row.rawSmsIds)
         assertEquals(null, row.transaction.merchant)
         assertTrue(row.transaction.occurredAtZone != null)
+    }
+
+    /** A stored expense over three purchase SMS (several messages about one purchase) stays one row. */
+    @Test
+    fun aStoredRowOfThreeNonTransferSmsIsKeptVerbatim() {
+        val row = storedRow("p1", "p2", "p3")
+        val result = project(listOf(purchase("p1"), purchase("p2"), purchase("p3")), registry = owned, stored = StoredFacts(rows = listOf(row)))
+        assertKept(result, row)
+    }
+
+    /** A stored self-transfer {a,b,c} whose third SMS is a second message about a, all at the row's time, stays one row. */
+    @Test
+    fun aStoredSelfTransferOfThreeSmsAtItsOwnTimeIsKeptVerbatim() {
+        val net = BankNetworkType.INTRA_BANK
+        val row = storedRow("a", "b", "c", type = FinancialTransactionType.SELF_TRANSFER)
+        val result = project(
+            listOf(leg("a", MessageFamily.TRANSFER_OUT, net), leg("b", MessageFamily.TRANSFER_IN, net), leg("c", MessageFamily.TRANSFER_OUT, net)),
+            registry = owned, stored = StoredFacts(rows = listOf(row)),
+        )
+        assertKept(result, row)
+    }
+
+    /** The old stale-link release: legs of a stored self-transfer whose time no longer matches it leave the row. */
+    @Test
+    fun aWronglyMergedSelfTransferReleasesOnlyItsStaleLegs() {
+        val net = BankNetworkType.INTRA_BANK
+        val later = T0.plusSeconds(86_400 * 30L)
+        val row = storedRow("a1", "b1", "a2", "b2", type = FinancialTransactionType.SELF_TRANSFER, zone = "UTC")
+        val legs = listOf(
+            leg("a1", MessageFamily.TRANSFER_OUT, net), leg("b1", MessageFamily.TRANSFER_IN, net),
+            evidence(event("a2", MessageFamily.TRANSFER_OUT, source = ownedA, destination = ownedB, network = net, occurredAt = later), later),
+            evidence(event("b2", MessageFamily.TRANSFER_IN, source = ownedA, destination = ownedB, network = net, occurredAt = later), later),
+        )
+        val result = project(legs, registry = owned, stored = StoredFacts(rows = listOf(row)))
+        assertEquals(setOf(listOf("a1", "b1"), listOf("a2", "b2")), result.rows.map { it.rawSmsIds }.toSet())
+        assertEquals(row.transaction.id, result.rows.single { "a1" in it.rawSmsIds }.transaction.id)
+    }
+
+    /**
+     * The old upgrade joins a stored external leg only when the pair is mutually unique among the posted and unlinked
+     * legs: d, a stored external in-leg with the same reference, makes a ambiguous, so b is posted on its own.
+     */
+    @Test
+    fun aStoredExternalLegIsNotJoinedWhenTheOldUpgradeFoundItAmbiguous() {
+        val unknown = account("9999")
+        val external = account("8888")
+        val registry = owned.copy(accounts = owned.accounts + (external to OwnershipStatus.EXTERNAL))
+        fun transfer(id: String, family: MessageFamily, source: AccountReference, destination: AccountReference) =
+            evidence(event(id, family, source = source, destination = destination, network = BankNetworkType.INTER_BANK), T0, transactionReference = "R1")
+        val a = storedRow("a", type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT)
+        val d = storedRow("d", type = FinancialTransactionType.EXTERNAL_TRANSFER_IN)
+        val result = project(
+            listOf(transfer("a", MessageFamily.TRANSFER_OUT, ownedA, unknown), transfer("b", MessageFamily.TRANSFER_IN, unknown, ownedB),
+                transfer("d", MessageFamily.TRANSFER_IN, external, ownedB)),
+            registry = registry, stored = StoredFacts(rows = listOf(a, d)),
+        )
+        assertTrue(result.rows.none { it.rawSmsIds.size > 1 }, "rows: ${result.sets()}")
+        assertTrue(a in result.rows)
+    }
+
+    /**
+     * A leg whose counterpart is linked to a stored row that cannot be joined is assembled on its own, as the old pass
+     * did (the counterpart was never in its pool): an owned out-leg to an unknown account posts as an external transfer.
+     */
+    @Test
+    fun aLegWhoseCounterpartStaysStoredIsPostedOnItsOwn() {
+        val unknown = account("9999")
+        val b = storedRow("b", type = FinancialTransactionType.INCOME)
+        val result = project(
+            listOf(
+                evidence(event("a", MessageFamily.TRANSFER_OUT, source = ownedA, destination = unknown, network = BankNetworkType.INTER_BANK), T0, transactionReference = "R1"),
+                evidence(event("b", MessageFamily.TRANSFER_IN, source = ownedA, destination = ownedB, network = BankNetworkType.INTER_BANK), T0, transactionReference = "R1"),
+            ),
+            registry = owned, stored = StoredFacts(rows = listOf(b)),
+        )
+        assertTrue(b in result.rows)
+        assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, result.rows.single { it.rawSmsIds == listOf("a") }.transaction.type)
+        assertEquals(emptyList<LedgerReviewCandidate>(), result.reviewCandidates)
     }
 }

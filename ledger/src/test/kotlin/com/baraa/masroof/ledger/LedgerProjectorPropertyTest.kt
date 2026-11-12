@@ -94,6 +94,21 @@ class LedgerProjectorPropertyTest {
             val events = corpus.events.associateBy { it.event.rawSmsId }
             for (row in corpus.stored.rows) {
                 if (row in result.rows) continue
+                val sameId = result.rows.singleOrNull { it.transaction.id == row.transaction.id }
+                if (row.rawSmsIds.isEmpty()) {
+                    // A link-less row stays byte for byte unless a derived row took its id.
+                    assertTrue(sameId != null && sameId.rawSmsIds.isNotEmpty(), "seed $seed: link-less $row changed")
+                    continue
+                }
+                if (row.rawSmsIds.size > 2) {
+                    // Rule (iv): only stale legs leave a self-transfer; the rest stays as the stored row.
+                    val rest = sameId?.rawSmsIds.orEmpty()
+                    assertTrue(row.transaction.type == FinancialTransactionType.SELF_TRANSFER && row.rawSmsIds.containsAll(rest) &&
+                        (sameId == null || sameId.transaction.type == row.transaction.type && sameId.transaction.amount == row.transaction.amount),
+                        "seed $seed: $row became $sameId")
+                    replaced++
+                    continue
+                }
                 val protected = row.rawSmsIds.any { corpus.decisions[it]?.outcome != null || it in corpus.stored.correctionClosedRawSmsIds }
                 assertTrue(!protected, "seed $seed: protected $row changed")
                 val over = result.rows.filter { derived -> derived.rawSmsIds.any { it in row.rawSmsIds } }
@@ -204,19 +219,7 @@ class LedgerProjectorPropertyTest {
             evidence.copy(event = evidence.event.copy(id = "e-$id", rawSmsId = id))
         }
         val ids = events.map { it.event.rawSmsId }
-        // Stored rows link one or two raw SMS each, never one SMS twice; some are kept verbatim by the keep rule.
-        // Some stored rows link raw SMS without evidence.
-        val storedIds = (ids.filter { random.nextInt(3) == 0 } + listOf("ghost1", "ghost2").filter { random.nextInt(3) == 0 }).shuffled(random)
-        val storedSets = storedIds.chunked(2).flatMap { if (it.size == 2 && random.nextInt(3) == 0) listOf(it) else it.map(::listOf) }
-        val stored = StoredFacts(
-            rows = storedSets.map { set ->
-                storedRow(
-                    *set.toTypedArray(), zone = listOf("Asia/Dubai", "Asia/Riyadh", null).random(random), type = storedTypes.random(random),
-                    rate = BigDecimal("3.75").takeIf { random.nextBoolean() }, rateSource = ExchangeRateSource.SMS,
-                )
-            },
-            correctionClosedRawSmsIds = ids.filter { random.nextInt(6) == 0 }.toSet(),
-        )
+        val stored = StoredFacts(storedRows(random, events, registry), ids.filter { random.nextInt(6) == 0 }.toSet())
         // A posting decision naming an SMS that a stored row of another decided SMS links (keep rule (i) wins).
         val conflict = stored.rows.firstOrNull { it.rawSmsIds.isNotEmpty() && random.nextBoolean() }?.rawSmsIds?.first()?.let { kept ->
             val other = ids.filter { it != kept }.randomOrNull(random) ?: return@let emptyList()
@@ -229,6 +232,33 @@ class LedgerProjectorPropertyTest {
             )
         }.orEmpty()
         return Corpus(events, fold(decisionRows(random, ids) + conflict), registry, stored)
+    }
+
+    /**
+     * Stored rows link one, two or three raw SMS, never one SMS twice; some link raw SMS without evidence, a few link
+     * none. A quarter of the corpora store a consistent earlier ledger instead: the projection with nothing stored.
+     */
+    private fun storedRows(random: Random, events: List<LedgerEvidence>, registry: OwnershipFacts): List<LedgerRow> {
+        if (random.nextInt(4) == 0) return LedgerProjector.project(events, emptyMap(), registry, StoredFacts(), ZoneOffset.ofHours(2)).rows
+        val ids = events.map { it.event.rawSmsId }
+        val storedIds = (ids.filter { random.nextInt(3) == 0 } + listOf("ghost1", "ghost2").filter { random.nextInt(3) == 0 }).shuffled(random)
+        val sets = mutableListOf<List<String>>()
+        var rest = storedIds
+        while (rest.isNotEmpty()) {
+            val size = listOf(1, 1, 1, 2, 2, 3).random(random).coerceAtMost(rest.size)
+            sets += rest.take(size)
+            rest = rest.drop(size)
+        }
+        fun row(vararg set: String) = storedRow(
+            *set, zone = listOf("Asia/Dubai", "Asia/Riyadh", null).random(random), type = storedTypes.random(random),
+            rate = BigDecimal("3.75").takeIf { random.nextBoolean() }, rateSource = ExchangeRateSource.SMS,
+        )
+        val linkless = (0 until random.nextInt(0, 3)).map { n ->
+            row("none").let {
+                LedgerRow(it.transaction.copy(id = "transaction:linkless-$n", linkedParsedEventIds = emptyList()), emptyList())
+            }
+        }
+        return sets.map { row(*it.toTypedArray()) } + linkless
     }
 
     private fun decisionRows(random: Random, ids: List<String>) = (0 until random.nextInt(0, 4)).map {
