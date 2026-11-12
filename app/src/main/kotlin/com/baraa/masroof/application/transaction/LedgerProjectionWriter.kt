@@ -207,8 +207,11 @@ internal class LedgerProjectionWriter(
             if (transfer) ReconciliationReviewCandidate(rawSmsId, ReviewKind.PENDING_MATCH, listOf("transfer_pending_match"))
             else ReconciliationReviewCandidate(rawSmsId, ReviewKind.NEEDS_REVIEW, listOf("needs_review"))
         }
+        // A lone leg whose write failed is a pending match again, as the old pass reported it.
+        val failedLoneLegs = failedUnitIds.filter { it in projection.lonePostedRawSmsIds && inReport(it) }
+            .map { ReconciliationReviewCandidate(it, ReviewKind.PENDING_MATCH, listOf("transfer_pending_match")) }
         val candidates = projection.reviewCandidates.filter { inReport(it.rawSmsId) }
-            .map { ReconciliationReviewCandidate(it.rawSmsId, it.kind, it.reasons) } + keptCandidates
+            .map { ReconciliationReviewCandidate(it.rawSmsId, it.kind, it.reasons) } + keptCandidates + failedLoneLegs
         return ReconciliationReport(
             summary = ReconciliationSummary(
                 assembledSingle = posted.count { it.rawSmsIds.size == 1 },

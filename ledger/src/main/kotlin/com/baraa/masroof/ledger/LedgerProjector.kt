@@ -211,6 +211,8 @@ private class Projection(
      * the row and is assembled again as an unlinked leg ([released]).
      */
     private val released = mutableSetOf<String>()
+    /** A merged row the release left with one leg: a posted single-leg self-transfer the upgrade may join, as before. */
+    private val reducedToOneLeg = mutableMapOf<String, FinancialTransaction>()
     private val keptMergedLinks = stored.rows.filter { row -> row.rawSmsIds.size > 2 }.flatMap { row ->
         val stale = staleLegs(row)
         released += stale
@@ -219,7 +221,12 @@ private class Projection(
         val releasedEvents = stale.mapNotNull { byRawSmsId[it]?.event?.id }.toSet()
         val transaction = row.transaction.copy(linkedParsedEventIds = row.transaction.linkedParsedEventIds - releasedEvents)
         check(save(transaction, remaining)) { "kept stored rows never overlap" }
-        remaining
+        if (remaining.size == 1) {
+            reducedToOneLeg[remaining.single()] = transaction
+            emptyList()
+        } else {
+            remaining
+        }
     }
     /** Raw SMS a kept pair or a kept row of three or more SMS still links: never in the upgrade pools. */
     private val keptPairIds = keptPairs.flatMap { it.rawSmsIds }.toSet() + keptMergedLinks
@@ -246,6 +253,7 @@ private class Projection(
             settledRawSmsIds = settled,
             retryRawSmsIds = retry,
             confirmedLoans = confirmedLoans,
+            lonePostedRawSmsIds = lonePosted.filterTo(mutableSetOf()) { it in links },
         )
     }
 
@@ -407,7 +415,7 @@ private class Projection(
                 candidate, counterparts, storedZone(candidate.event.rawSmsId) ?: zone,
             )
             if (outcome is TransactionAssembler.Outcome.Assembled) {
-                post(outcome.transaction, outcome.rawSmsIds)
+                postAlone(outcome)
             } else {
                 pendingMatch(candidate.event.rawSmsId)
             }
@@ -540,7 +548,7 @@ private class Projection(
             val outcome = candidate?.let {
                 TransactionAssembler.assembleUnmatchedOwnedTransfer(it, counterparts, storedZone(rawSmsId) ?: zone)
             }
-            if (outcome is TransactionAssembler.Outcome.Assembled) post(outcome.transaction, outcome.rawSmsIds) else pendingMatch(rawSmsId)
+            if (outcome is TransactionAssembler.Outcome.Assembled) postAlone(outcome) else pendingMatch(rawSmsId)
         }
     }
 
@@ -562,7 +570,7 @@ private class Projection(
     private val oldUpgradePairs: Set<List<String>> by lazy {
         val pool = records.filter { record ->
             val id = record.event.rawSmsId
-            val storedRow = storedByRawSmsId[id]?.transaction?.takeIf { id !in released }
+            val storedRow = reducedToOneLeg[id] ?: storedByRawSmsId[id]?.transaction?.takeIf { id !in released }
             record.event.messageFamily.isTransfer() && !preserved(id) && id !in keptPairIds &&
                 TransactionAssembler.isAutomationEligible(record.event, record.automationConfirmed) &&
                 (storedRow == null || storedRow.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
@@ -597,6 +605,18 @@ private class Projection(
 
     private fun pendingMatch(rawSmsId: String) {
         reviews += LedgerReviewCandidate(rawSmsId, ReviewKind.PENDING_MATCH, listOf("transfer_pending_match"))
+    }
+
+    /** Transfer legs the lone-owned-leg step posted on their own; a failed write leaves them a pending match. */
+    private val lonePosted = mutableSetOf<String>()
+
+    /** Posts a lone owned leg; if it cannot be saved it is also a pending match, as in the old pass. */
+    private fun postAlone(outcome: TransactionAssembler.Outcome.Assembled) {
+        lonePosted += outcome.rawSmsIds
+        if (!save(outcome.transaction, outcome.rawSmsIds)) {
+            retry += outcome.rawSmsIds
+            outcome.rawSmsIds.forEach(::pendingMatch)
+        }
     }
 
     /** Posts an automatic row; a conflict leaves all its raw SMS to retry. */

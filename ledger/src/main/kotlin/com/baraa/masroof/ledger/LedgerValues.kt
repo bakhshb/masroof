@@ -70,6 +70,8 @@ data class LedgerProjection(
     val settledRawSmsIds: Set<String>,
     val retryRawSmsIds: Set<String>,
     val confirmedLoans: Set<LoanReference>,
+    /** Rows of the lone-owned-leg step: if such a row cannot be written, its leg is a pending match again. */
+    val lonePostedRawSmsIds: Set<String> = emptySet(),
 )
 
 /** The inclusive ranges a transfer counterpart's times may fall in ([LedgerProjector.pairingWindow]). */

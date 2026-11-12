@@ -432,4 +432,22 @@ class LedgerProjectorKeepStoredTest {
         assertEquals(listOf("a1", "b1"), result.rows.single { it.transaction.id == row.transaction.id }.rawSmsIds)
         assertTrue(result.rows.any { it.rawSmsIds == listOf("a2") })
     }
+
+    /**
+     * A merged self-transfer the old release leaves with one leg is a posted single-leg self-transfer, and the old
+     * upgrade joins it with its released counterpart.
+     */
+    @Test
+    fun aMergedRowReducedToOneLegJoinsItsReleasedCounterpart() {
+        val net = BankNetworkType.INTRA_BANK
+        val row = storedRow("a", "b", "c", type = FinancialTransactionType.SELF_TRANSFER, zone = "UTC")
+        fun at(seconds: Long, id: String, family: MessageFamily) = T0.plusSeconds(seconds).let {
+            evidence(event(id, family, source = ownedA, destination = ownedB, network = net, occurredAt = it), it)
+        }
+        val result = project(
+            listOf(at(0, "a", MessageFamily.TRANSFER_OUT), at(60, "b", MessageFamily.TRANSFER_IN), at(7_200, "c", MessageFamily.TRANSFER_OUT)),
+            registry = owned, stored = StoredFacts(rows = listOf(row)),
+        )
+        assertTrue(listOf("a", "b") to FinancialTransactionType.SELF_TRANSFER in result.sets(), "rows: ${result.sets()}")
+    }
 }

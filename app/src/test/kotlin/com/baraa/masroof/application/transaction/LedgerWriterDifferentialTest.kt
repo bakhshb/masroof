@@ -4,26 +4,38 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.interpretation.AutomaticInterpretationWriteGuard
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
+import com.baraa.masroof.application.review.ExternalTransferDirection
 import com.baraa.masroof.application.review.ReviewQueueUpdater
+import com.baraa.masroof.application.review.ReviewWorkflowService
 import com.baraa.masroof.core.money.Currency
 import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.data.repository.RoomAccountRegistryRepository
 import com.baraa.masroof.data.repository.RoomCardRegistryRepository
+import com.baraa.masroof.data.repository.RoomCommitmentRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
+import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
+import com.baraa.masroof.data.repository.RoomTransactionIgnoreRepository
+import com.baraa.masroof.data.repository.RoomTransactionReclassificationRepository
+import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.repository.RoomUserDecisionRepository
-import com.baraa.masroof.data.repository.appendDecision
+import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.data.room.mapper.FinancialTransactionMapper
+import com.baraa.masroof.domain.ids.ReviewIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
 import com.baraa.masroof.domain.model.CardReference
+import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.Confidence
+import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
 import com.baraa.masroof.domain.model.LoanReference
@@ -35,18 +47,21 @@ import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewStatus
-import com.baraa.masroof.domain.model.UserDecision
-import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.sms.hash.SmsBodyHasher
+import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.noOpProcessingRecovery
 import java.math.BigDecimal
+import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlin.random.Random
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -56,14 +71,18 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Differential oracle for plan 3.3a: random SMS sequences run through the pre-3.3a reconciliation path (the debug
- * switch) and through the ledger writer on two identical in-memory databases, with ownership changes, user decisions
- * and seeded legacy rows mid-sequence. After every step both ledgers must agree per raw SMS set on row presence,
- * type, amount, currency and containers, on the open review kind per raw SMS and on `summary.failed`. Zone, time,
- * id, merchant and counterparty are not compared (owner-accepted re-derivation, docs/ARCHITECTURE.md "Known
- * differences"). One other difference is allowed, "Scope": the writer may differ from the old scoped path where it
- * equals the old path run with full passes only (a third world), because a scoped result never differs from the full
- * one while the old scoped pass was narrower.
+ * Differential oracle for plan 3.3a. Random scenarios run on three in-memory databases wired like production (the
+ * write guard, the review workflow, reclassify, ignore and restore): the pre-3.3a path with production entry points,
+ * the pre-3.3a path with a full pass wherever production runs a scoped one, and the ledger writer. After every step
+ * the writer must equal the old path per raw SMS set on row presence, type, amount, currency, containers and
+ * exchange-rate pair; on the raw SMS set each commitment resolves to; on review status, kind and resolution per raw
+ * SMS; and on whether the pass is incomplete (`summary.failed > 0`) and the failed raw SMS ids (the count itself is
+ * only logged, and the old pass counted a failed pair and its follow-up writes separately). Zone, time, id, merchant and counterparty are not compared
+ * (owner-accepted re-derivation, docs/ARCHITECTURE.md "Known differences").
+ *
+ * One exclusion, "Scope": a step may differ from the old scoped path only where the writer equals the old full-pass
+ * path and every differing raw SMS lies inside the step's scope (a scoped result never differs from the full one; the
+ * old scoped pass was narrower). After the first such step a scenario compares with the full-pass path only.
  *
  * Deleted together with the old path in plan 3.3b.
  */
@@ -74,34 +93,32 @@ class LedgerWriterDifferentialTest {
 
     @Test
     fun theWriterMatchesTheOldPathOnRandomScenarios() = runBlocking {
+        val seeds = System.getenv("MASROOF_DIFFERENTIAL_SEEDS")?.toIntOrNull() ?: SEEDS
         val failures = mutableListOf<String>()
-        var rows = 0
-        var pairs = 0
-        var scopeLags = 0
-        for (seed in SEEDS) {
-            val scenario = Scenario(Random(seed))
-            World(context, legacy = true).use { old ->
-                World(context, legacy = true, fullPassesOnly = true).use { oldFull ->
-                    World(context, legacy = false).use { new ->
+        val shapes = sortedMapOf<String, Int>()
+        val only = System.getenv("MASROOF_DIFFERENTIAL_SEED")?.toIntOrNull()
+        for (seed in (only?.let { it..it } ?: 0 until seeds)) {
+            val scenario = Scenario(Random(seed), shapes)
+            World(context, scenario, legacy = true).use { old ->
+                World(context, scenario, legacy = true, fullPassesOnly = true).use { oldFull ->
+                    World(context, scenario, legacy = false).use { new ->
                         scenario.run(old, oldFull, new)?.let { failures += "seed $seed: $it\n${scenario.log.joinToString("\n")}" }
-                        scopeLags += scenario.excludedScope
-                        new.ledger.listAll().forEach { tx -> rows++; if (new.ledger.listRawSmsIds(tx.id).size > 1) pairs++ }
+                        new.ledger.listAll().forEach { tx ->
+                            shapes.merge("rows", 1, Int::plus)
+                            if (new.ledger.listRawSmsIds(tx.id).size > 1) shapes.merge("rows of several SMS", 1, Int::plus)
+                        }
                     }
                 }
             }
             if (failures.size >= 3) break
         }
         if (failures.isNotEmpty()) fail(failures.joinToString("\n\n"))
-        // The scenarios must post and pair, or agreeing proves nothing.
-        assertTrue("rows=$rows pairs=$pairs", rows > SEEDS.count() * 2 && pairs > SEEDS.count() / 4)
-        println("differential: ${SEEDS.count()} scenarios, rows=$rows pairs=$pairs, steps equal only to the old full-pass path (Scope)=$scopeLags")
+        println("differential: $seeds scenarios, $shapes")
+        assertTrue("$shapes", (shapes["rows"] ?: 0) > seeds * 2 && (shapes["rows of several SMS"] ?: 0) > seeds / 4)
     }
 
-    /**
-     * One database with its reconciliation on the old path ([legacy]) or the writer; [fullPassesOnly] runs a full pass
-     * wherever production runs a scoped one.
-     */
-    private class World(context: Context, legacy: Boolean, private val fullPassesOnly: Boolean = false) : AutoCloseable {
+    /** One database; [legacy] runs the pre-3.3a path, [fullPassesOnly] a full pass wherever production runs a scoped one. */
+    private class World(context: Context, scenario: Scenario, legacy: Boolean, private val fullPassesOnly: Boolean = false) : AutoCloseable {
         val db: MasroofDatabase = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java).allowMainThreadQueries().build()
         val raw = RoomRawSmsRepository(db.rawSmsDao())
         val parsed = RoomParsedEventRepository(db.parsedEventDao())
@@ -111,168 +128,393 @@ class LedgerWriterDifferentialTest {
         val accounts = RoomAccountRegistryRepository.from(db)
         val cards = RoomCardRegistryRepository.from(db)
         val loans = RoomLoanRegistryRepository.from(db)
-        private val queue = ReviewQueueUpdater(reviews, ledger) { AT }
-        private val service = TransactionReconciliationService(
-            rawSmsRepository = raw, financialTransactionRepository = ledger,
-            ownershipResolver = OwnershipResolver(accounts, cards, loans),
-            ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
-            effectiveParsedEventProvider = EffectiveParsedEventProvider(parsed, decisions),
-            reviewRepository = reviews, userDecisionRepository = decisions, zoneId = ZONE,
+        val commitments = RoomCommitmentRepository.from(db)
+        private val clock = com.baraa.masroof.sms.time.InstantClock { AT }
+        private val resolver = OwnershipResolver(accounts, cards, loans)
+        private val confirmation = OwnershipConfirmationService(accounts, cards, loans)
+        private val effective = EffectiveParsedEventProvider(parsed, decisions)
+        private val queue = ReviewQueueUpdater(reviews, ledger, clock)
+        private val guard = AutomaticInterpretationWriteGuard(
+            effective, reviews, decisions, ledger,
+            inferenceCurrent = { it.event.rawSmsId !in scenario.staleInference },
+            inTransaction = { mutation -> db.withTransaction { mutation() } },
+        )
+        val service = TransactionReconciliationService(
+            rawSmsRepository = raw, financialTransactionRepository = ledger, ownershipResolver = resolver,
+            ownershipConfirmationService = confirmation, effectiveParsedEventProvider = effective,
+            reviewRepository = reviews, userDecisionRepository = decisions, zoneId = scenario.deviceZone,
+            automaticWrite = { expected, write -> guard.write(expected, write) },
             inTransaction = { write -> db.withTransaction { write() } }, useLegacyPath = { legacy },
         )
+        val loader = LedgerInputLoader(raw, ledger, reviews, decisions, effective, resolver, scenario.deviceZone)
+        val workflow = ReviewWorkflowService(
+            reviewRepository = reviews, userCorrectionRepository = RoomUserCorrectionRepository(db.userCorrectionDao()),
+            financialTransactionRepository = ledger, rawSmsRepository = raw, ownershipResolver = resolver,
+            ownershipConfirmationService = confirmation, effectiveParsedEventProvider = effective, parsedEventRepository = parsed,
+            reconciliationService = service, reviewQueueUpdater = queue,
+            manualReviewResolutionRepository = RoomManualReviewResolutionRepository(db, ledger),
+            userDecisionRepository = decisions, clock = clock, zoneId = scenario.deviceZone, appLogService = NoOpAppLog,
+            processingRecovery = noOpProcessingRecovery(), ioDispatcher = Dispatchers.Unconfined,
+        )
+        val reclassify = TransactionReclassificationService(
+            ledger, effective, resolver, confirmation, NoOpAppLog,
+            RoomTransactionReclassificationRepository(db, ledger, DatabaseAccessGate()), Clock.fixed(AT, ZoneOffset.UTC),
+        )
+        val ignore = TransactionIgnoreService(RoomTransactionIgnoreRepository(db), clock, NoOpAppLog)
+        val restore = TransactionRestoreService(reviews, decisions, ledger, service, reclassify, clock, NoOpAppLog, queue, noOpProcessingRecovery())
 
-        suspend fun reconcile(ids: List<String>?): Int {
-            val report = if (ids == null || fullPassesOnly) service.reconcileStoredEventsDetailed() else service.reconcileAffectedRawSmsIds(ids)
+        /** Runs one pass and applies its report to the review queue, as the production callers do. */
+        suspend fun reconcile(ids: List<String>?, repair: Boolean = false): String {
+            val report = when {
+                repair -> service.repairLegacyTransfersDetailed()
+                ids == null || fullPassesOnly -> service.reconcileStoredEventsDetailed()
+                else -> service.reconcileAffectedRawSmsIds(ids)
+            }
             queue.applyReport(report)
-            return report.summary.failed
+            // The count is only logged; the old pass counted a failed pair and its follow-up writes separately.
+            return "incomplete=${report.summary.failed > 0} ${report.failedRawSmsIds.sorted()}"
         }
 
-        /** Row facts per raw SMS set, then the open review kind per raw SMS. */
-        suspend fun state(): String {
+        /** Rows (with their exchange-rate pair), commitments by the raw SMS set of their row, and every review. */
+        suspend fun state(): Set<String> {
+            val sets = mutableMapOf<String, List<String>>()
             val rows = ledger.listAll().map { tx ->
-                val ids = ledger.listRawSmsIds(tx.id).sorted()
-                "$ids ${tx.type} ${tx.amount.amount.toPlainString()} ${tx.amount.currency} ${tx.sourceContainerId} ${tx.destinationContainerId}"
-            }.sorted()
-            val open = reviews.listAll().filter { it.status == ReviewStatus.REQUIRED }.map { "${it.rawSmsId}:${it.kind}" }.sorted()
-            return (rows + open).joinToString("\n")
+                val ids = ledger.listRawSmsIds(tx.id).sorted().also { sets[tx.id] = it }
+                "row $ids ${tx.type} ${tx.amount.amount.toPlainString()} ${tx.amount.currency} ${tx.sourceContainerId} " +
+                    "${tx.destinationContainerId} fx=${tx.appliedExchangeRate?.toPlainString()}/${tx.exchangeRateSource}"
+            }
+            val links = commitments.listAll().map { "commitment ${it.name} -> ${sets[it.sourceTransactionId] ?: "dangling"}" }
+            val queue = reviews.listAll().map { "review ${it.rawSmsId} ${it.status} ${it.kind} ${it.resolutionKind}" }
+            return (rows + links + queue).toSet()
+        }
+
+        /** Raw SMS a single-leg self-transfer links that is what is left of a stored row of several SMS. */
+        suspend fun remnantSingleLegs(): Set<String> = ledger.listAll().mapNotNullTo(mutableSetOf()) { tx ->
+            val ids = ledger.listRawSmsIds(tx.id)
+            ids.singleOrNull()?.takeIf { tx.type == FinancialTransactionType.SELF_TRANSFER && tx.id != TransactionIdFactory.fromRawSmsIds(ids) }
+        }
+
+        /** The raw SMS a scoped pass for [ids] covers: the writer's scope. */
+        suspend fun scopeOf(ids: List<String>): Set<String> {
+            val inputs = loader.loadScope(ids)
+            return inputs.events.map { it.event.rawSmsId }.toSet() + inputs.storedFacts.rows.flatMap { it.rawSmsIds } + ids
         }
 
         override fun close() = db.close()
     }
 
-    /** A random sequence of arrivals, ownership changes, decisions and full passes, applied to both worlds alike. */
-    private class Scenario(private val random: Random) {
+    /** A random sequence of steps, applied alike to every world. */
+    private class Scenario(private val random: Random, private val shapes: MutableMap<String, Int>) {
         val log = mutableListOf<String>()
+        val deviceZone: ZoneId = listOf(ZoneId.of("Asia/Riyadh"), ZoneId.of("UTC"), ZoneId.of("Asia/Dubai")).random(random)
+        val staleInference = mutableSetOf<String>()
         private var next = 0
         private var clock = T0
         private val arrived = mutableListOf<String>()
-        var excludedScope = 0
-
+        private var judgedByFullPasses = emptySet<String>()
+        /** The writer's scope for this step's raw SMS, read before the step writes. */
+        private var stepScope = emptySet<String>()
         /**
-         * Applies every step to the three worlds and compares the writer with the old path after each one. A difference
-         * from the old scoped path is allowed when the writer equals the old path run with full passes only (Known
-         * differences, "Scope": a scoped result never differs from the full one; the old scoped pass was narrower).
+         * Raw SMS left out of the comparison, each by a Known-differences entry: "Fee with another amount" (the old heal
+         * took the derived amount; the keep rule keeps the fee) and "Stale self-transfer release" (see [compare]).
          */
+        private val feeKept = mutableSetOf<String>()
+        /** Commitments the old pass left dangling (exclusion "Re-keyed commitment", see [compare]). */
+        private val rekeyed = mutableSetOf<String>()
+
+        private fun count(shape: String) { shapes.merge(shape, 1, Int::plus) }
+
         suspend fun run(old: World, oldFull: World, new: World): String? {
             val worlds = listOf(old, oldFull, new)
             val initial = ACCOUNTS.associateWith { listOf(OwnershipStatus.OWNED, OwnershipStatus.OWNED, OwnershipStatus.EXTERNAL, null).random(random) }
             for ((account, status) in initial) if (status != null) worlds.forEach { it.accounts.setOwnership(account, status) }
             worlds.forEach { it.cards.setOwnership(CARD, OwnershipStatus.OWNED) }
-            log += "ownership $initial"
+            log += "device zone $deviceZone, ownership ${initial.mapKeys { "${it.key.bank.id}:${it.key.maskedNumber}" }}"
             if (random.nextInt(3) == 0) seedLegacy(worlds)
-            repeat(random.nextInt(4, 12)) { step ->
-                val failed = when (random.nextInt(10)) {
-                    in 0..5 -> arrive(worlds)
-                    6 -> changeOwnership(worlds)
-                    7 -> decide(worlds)
-                    8 -> editRow(worlds)
-                    else -> { log += "full"; worlds.map { it.reconcile(null) } }
+            repeat(random.nextInt(4, 14)) { step ->
+                val (affected, failed) = when (random.nextInt(20)) {
+                    in 0..8 -> arrive(worlds)
+                    9 -> changeOwnership(worlds)
+                    in 10..13 -> decide(worlds)
+                    14 -> commit(worlds)
+                    15 -> { log += "legacy repair"; count("legacy repair"); null to worlds.map { it.reconcile(null, repair = true) } }
+                    16 -> historicalBatch(worlds)
+                    else -> { log += "full"; null to worlds.map { it.reconcile(null) } }
                 }
-                compare(old, oldFull, new, failed)?.let { return "step $step: $it" }
+                compare(old, oldFull, new, failed, affected)?.let { return "step $step: $it" }
             }
-            return compare(old, oldFull, new, worlds.map { it.reconcile(null) }.also { log += "final full" })
+            log += "final full"
+            return compare(old, oldFull, new, worlds.map { it.reconcile(null) }, null)
         }
 
-        private suspend fun compare(old: World, oldFull: World, new: World, failed: List<Int>): String? {
-            val b = new.state()
-            val a = old.state()
-            if (a == b && failed[0] == failed[2]) return null
-            val full = oldFull.state()
-            if (full == b && failed[1] == failed[2]) {
-                log += "  (differs from the old scoped path, equals the old full-pass path: Scope)"
-                excludedScope++
-                return null
+        /**
+         * Lines whose raw SMS all lie in [judgedByFullPasses] are compared with the old full-pass world, every other
+         * line with the old scoped world. That set grows only by a step's own scope, and only when the step's whole
+         * difference lies inside it (exclusion "Scope"). Lines naming a fee kept with another amount are left out
+         * (exclusion "Fee with another amount").
+         */
+        private suspend fun compare(old: World, oldFull: World, new: World, failed: List<String>, affected: List<String>?): String? {
+            fun ids(line: String) = ID.findAll(line).map { it.value }.toSet()
+            // Exclusion "Stale self-transfer release" (Known differences): the old pass unlinks a leg left alone in a
+            // merged self-transfer once its time no longer matches, and nothing posts it again; the keep rule keeps it.
+            val newState = new.state()
+            fun linesOf(state: Set<String>, id: String) = state.filterTo(mutableSetOf()) { id in ids(it) }
+            val oldState = old.state()
+            val fullState = oldFull.state()
+            new.remnantSingleLegs().filter {
+                it !in feeKept && (linesOf(oldState, it) != linesOf(newState, it) || linesOf(fullState, it) != linesOf(newState, it))
+            }.forEach {
+                feeKept += it
+                log += "  ($it: remnant single leg the old pass released: excluded, Stale self-transfer release)"
+                count("raw SMS excluded: Stale self-transfer release")
             }
-            return "failed old=${failed[0]} oldFull=${failed[1]} new=${failed[2]}\n--- old\n$a\n--- old, full passes only\n$full\n--- new\n$b"
+            // Exclusion "Re-keyed commitment" (3.3a acceptance: `commitment.sourceTransactionId` resolves): the old pass
+            // left a commitment naming a row it deleted; the writer moves it to the row that replaced it.
+            (oldState + fullState).filter { it.startsWith("commitment ") && it.endsWith("-> dangling") }
+                .map { it.removePrefix("commitment ").substringBefore(" ->") }
+                .filter { name -> rekeyed.add(name) }
+                .forEach { name ->
+                    log += "  (commitment $name left dangling by the old pass: excluded, Re-keyed commitment)"
+                    count("commitments excluded: Re-keyed commitment")
+                }
+            fun Set<String>.visible() = filterTo(mutableSetOf()) { line ->
+                ids(line).none { it in feeKept } && rekeyed.none { line.startsWith("commitment $it ->") }
+            }
+            val a = oldState.visible()
+            val b = newState.visible()
+            val full = fullState.visible()
+            fun agrees(judged: Set<String>): Boolean {
+                fun inScope(line: String) = ids(line).let { it.isNotEmpty() && judged.containsAll(it) }
+                return b.filter(::inScope).toSet() == full.filter(::inScope).toSet() &&
+                    b.filterNot(::inScope).toSet() == a.filterNot(::inScope).toSet()
+            }
+            val failedAgrees = failed[2] == failed[0] || (judgedByFullPasses.isNotEmpty() && failed[2] == failed[1])
+            if ((a == b || agrees(judgedByFullPasses)) && failedAgrees) return null
+            if (affected != null) {
+                val widened = judgedByFullPasses + stepScope
+                if (agrees(widened) && (failed[2] == failed[0] || failed[2] == failed[1])) {
+                    log += "  (differs from the old scoped path only inside the step's scope, where it equals the old full-pass path: Scope)"
+                    count("steps allowed under Scope")
+                    judgedByFullPasses = widened
+                    return null
+                }
+                log += "  scope of the step: ${stepScope.sorted()}"
+            }
+            return "failed old=${failed[0]} oldFull=${failed[1]} new=${failed[2]}\n" +
+                "--- only old\n${(a - b).sorted().joinToString("\n")}\n--- only old, full passes\n${(full - b).sorted().joinToString("\n")}\n" +
+                "--- only new (against old)\n${(b - a).sorted().joinToString("\n")}"
         }
 
-        private suspend fun arrive(worlds: List<World>): List<Int> {
+        private suspend fun arrive(worlds: List<World>): Pair<List<String>, List<String>> {
             val batch = (0 until listOf(1, 1, 1, 2, 3).random(random)).map { message() }
             log += "arrive ${batch.joinToString { describe(it) }}"
-            for ((event, details, at) in batch) worlds.forEach { it.persist(event, details, at) }
-            arrived += batch.map { it.first.rawSmsId }
-            return worlds.map { it.reconcile(batch.map { it.first.rawSmsId }) }
+            for (message in batch) worlds.forEach { it.persist(message) }
+            val ids = batch.map { it.first.rawSmsId }
+            arrived += ids
+            stepScope = worlds[2].scopeOf(ids)
+            return ids to worlds.map { it.reconcile(ids) }
         }
 
-        private suspend fun changeOwnership(worlds: List<World>): List<Int> {
+        /** More than 200 SMS at once: the historical batch, which reads the whole history. */
+        private var batched = false
+
+        private suspend fun historicalBatch(worlds: List<World>): Pair<List<String>?, List<String>> {
+            // At most one batch, in a fraction of the scenarios: 205 SMS in three worlds is the slowest step.
+            if (batched || random.nextInt(5) != 0) return null to worlds.map { it.reconcile(null) }.also { log += "full" }
+            batched = true
+            val batch = (0 until 205).map { if (it % 20 == 0) transfer() else purchase() }
+            log += "historical batch of ${batch.size}"
+            count("historical batch")
+            for (message in batch) worlds.forEach { it.persist(message) }
+            val ids = batch.map { it.first.rawSmsId }
+            arrived += ids
+            stepScope = worlds[2].scopeOf(ids)
+            return ids to worlds.map { it.reconcile(ids) }
+        }
+
+        private suspend fun changeOwnership(worlds: List<World>): Pair<List<String>, List<String>> {
+            if (random.nextInt(4) == 0) {
+                val status = listOf(OwnershipStatus.OWNED, OwnershipStatus.EXTERNAL).random(random)
+                log += "loan ownership -> $status"
+                count("loan ownership change")
+                worlds.forEach { it.loans.setOwnership(LOAN, status) }
+                val ids = worlds[2].parsed.listRawSmsIdsReferencingLoan(LOAN)
+                stepScope = worlds[2].scopeOf(ids)
+                return ids to worlds.map { it.reconcile(ids) }
+            }
             val account = ACCOUNTS.random(random)
             val status = listOf(OwnershipStatus.OWNED, OwnershipStatus.EXTERNAL).random(random)
-            log += "ownership $account -> $status"
+            log += "ownership ${account.bank.id}:${account.maskedNumber} -> $status"
+            count("account ownership change")
             worlds.forEach { it.accounts.setOwnership(account, status) }
-            return worlds.map { world -> world.reconcile(world.parsed.listRawSmsIdsReferencingAccount(account)) }
+            val ids = worlds[2].parsed.listRawSmsIdsReferencingAccount(account)
+            stepScope = worlds[2].scopeOf(ids)
+            return ids to worlds.map { it.reconcile(ids) }
         }
 
-        /** A legacy edit on a posted single row, the same in both worlds: its type edited, or its zone emptied. */
-        private suspend fun editRow(worlds: List<World>): List<Int> {
-            val rows = worlds.last().ledger.listAll().filter { row ->
-                worlds.last().ledger.listRawSmsIds(row.id).size == 1 && worlds.all { it.ledger.getById(row.id) != null }
+        /** A user decision through the real workflow, on the same raw SMS in every world. */
+        private suspend fun decide(worlds: List<World>): Pair<List<String>?, List<String>> {
+            val newWorld = worlds[2]
+            val open = arrived.filter { newWorld.reviews.findByRawSmsId(it)?.status == ReviewStatus.REQUIRED }
+            val posted = arrived.filter { id -> newWorld.ledger.findByRawSmsId(id)?.let { newWorld.ledger.listRawSmsIds(it.id).size == 1 } == true }
+            val ignored = arrived.filter { newWorld.decisions.effectiveFor(it).isNonFinancial }
+            val kind = random.nextInt(8)
+            val subject = when (kind) {
+                in 0..4 -> open.randomOrNull(random)
+                5, 6 -> posted.randomOrNull(random)
+                else -> ignored.randomOrNull(random)
+            } ?: return null to worlds.map { it.reconcile(null) }
+            val family = newWorld.parsed.findByRawSmsId(subject)?.event?.messageFamily
+            val name = when (kind) {
+                0 -> "resolve not financial"
+                1 -> "resolve external"
+                2 -> "resolve financial type"
+                3 -> "correct amount"
+                4 -> "resolve pair"
+                5 -> "reclassify"
+                6 -> "ignore"
+                else -> "restore"
             }
-            val row = rows.randomOrNull(random) ?: return worlds.map { it.reconcile(null) }
-            val edited = if (random.nextBoolean()) row.copy(type = FinancialTransactionType.INCOME) else row.copy(occurredAtZone = null)
-            log += "edit ${row.id.takeLast(6)} type=${edited.type} zone=${edited.occurredAtZone}"
-            worlds.forEach { world -> world.ledger.getById(row.id)?.let { world.ledger.update(edited.copy(occurredAt = it.occurredAt)) } }
-            return worlds.map { it.reconcile(null) }
-        }
-
-        /** A decision on an SMS no row links in either world, the state every real decision writer leaves it in. */
-        private suspend fun decide(worlds: List<World>): List<Int> {
-            val free = arrived.filter { id -> worlds.all { it.ledger.findByRawSmsId(id) == null } }
-            val subject = free.randomOrNull(random) ?: return worlds.map { it.reconcile(null) }
-            val receivedAt = worlds[0].raw.getById(subject)!!.receivedAt
-            val partner = free.filter { it != subject }.randomOrNull(random)
-            val decision = when (random.nextInt(5)) {
-                4 -> UserDecision(subject, UserDecisionKind.SELF_TRANSFER_PAIR, AT, pairedRawSmsId = partner,
-                    transactionType = FinancialTransactionType.SELF_TRANSFER, occurredAt = receivedAt, occurredAtZone = ZONE.id)
-                0 -> UserDecision(subject, UserDecisionKind.NON_FINANCIAL, AT)
-                1 -> UserDecision(subject, UserDecisionKind.EXTERNAL_TRANSFER, AT)
-                2 -> UserDecision(subject, UserDecisionKind.FINANCIAL_TYPE, AT, transactionType = FinancialTransactionType.EXPENSE,
-                    occurredAt = receivedAt, occurredAtZone = ZONE.id)
-                else -> UserDecision(subject, UserDecisionKind.CORRECTION, AT, amount = Money.of(BigDecimal("33.00"), Currency.SAR))
+            val partner = open.filter { it != subject }.firstOrNull { id ->
+                newWorld.parsed.findByRawSmsId(id)?.event?.messageFamily.let { it != family && it?.let { f -> f == MessageFamily.TRANSFER_IN || f == MessageFamily.TRANSFER_OUT } == true }
             }
-            log += "decide ${decision.kind} on $subject"
-            worlds.forEach { it.db.appendDecision(decision) }
-            return worlds.map { it.reconcile(listOfNotNull(subject, decision.pairedRawSmsId)) }
+            log += "decide $name on $subject${if (kind == 4) " with $partner" else ""}"
+            stepScope = worlds[2].scopeOf(listOfNotNull(subject, partner.takeIf { kind == 4 }))
+            count("decision: $name")
+            val outcomes = worlds.map { world ->
+                val review = ReviewIdFactory.fromRawSmsId(subject)
+                val result: Any? = when (kind) {
+                    0 -> world.workflow.resolveAsNonFinancial(review)
+                    1 -> world.workflow.resolveTransferAsExternal(review,
+                        if (family == MessageFamily.TRANSFER_IN) ExternalTransferDirection.INCOMING else ExternalTransferDirection.OUTGOING)
+                    2 -> world.workflow.resolveAsFinancialType(review, FinancialTransactionType.EXPENSE)
+                    3 -> world.workflow.applyCorrection(review, correctedAmount = Money.of(BigDecimal("33.00"), Currency.SAR))
+                    4 -> partner?.let {
+                        val (out, inn) = if (family == MessageFamily.TRANSFER_OUT) subject to it else it to subject
+                        world.workflow.resolveSelfTransferPair(ReviewIdFactory.fromRawSmsId(out), ReviewIdFactory.fromRawSmsId(inn))
+                    }
+                    5 -> world.ledger.findByRawSmsId(subject)?.let { world.reclassify.reclassify(it.id, FinancialTransactionType.INCOME) }
+                    6 -> world.ledger.findByRawSmsId(subject)?.let { world.ignore.ignore(it.id) }
+                    else -> world.restore.restore(subject)
+                }
+                result?.javaClass?.simpleName ?: "none"
+            }
+            log += "  outcomes $outcomes"
+            // The workflows reconcile what they decide themselves; their outcome must agree too.
+            return listOfNotNull(subject, partner.takeIf { kind == 4 }) to outcomes.map { "decision $it" }
         }
 
-        /** Legacy rows as older versions left them, the same in both worlds: a 3-SMS expense and a link-less row. */
+        /** A commitment created from the same posted row in every world. */
+        private suspend fun commit(worlds: List<World>): Pair<List<String>?, List<String>> {
+            val candidates = worlds[2].ledger.listAll().filter { tx -> worlds.all { it.ledger.getById(tx.id) != null } }
+            val tx = candidates.randomOrNull(random) ?: return null to worlds.map { it.reconcile(null) }
+            val name = "c${next++}"
+            log += "commitment $name on ${tx.id.takeLast(6)}"
+            count("commitment")
+            worlds.forEach {
+                runCatching {
+                    it.commitments.create(Commitment(name, name, tx.amount, LocalDate.parse("2026-08-01"), null, null, true,
+                        sourceTransactionId = tx.id, createdAt = AT, updatedAt = AT))
+                }
+            }
+            return null to worlds.map { it.reconcile(null) }
+        }
+
+        /** Legacy rows as older versions left them, the same in every world. */
         private suspend fun seedLegacy(worlds: List<World>) {
-            val purchases = (0 until 3).map { purchase(Random(it)) }
-            for ((event, details, at) in purchases) worlds.forEach { it.persist(event, details, at) }
-            val ids = purchases.map { it.first.rawSmsId }
-            val merged = FinancialTransaction(TransactionIdFactory.fromRawSmsIds(ids), FinancialTransactionType.EXPENSE,
-                Money.of(BigDecimal("10.00"), Currency.SAR), purchases[0].third, "card:BANK_ALJAZIRA:7271", null, null, null, null,
-                purchases.map { it.first.id }.sorted(), occurredAtZone = null)
-            val linkless = merged.copy(id = "transaction:legacy-linkless", linkedParsedEventIds = emptyList(),
-                appliedExchangeRate = BigDecimal("3.75"), exchangeRateSource = com.baraa.masroof.domain.model.ExchangeRateSource.SMS)
-            worlds.forEach { world ->
-                world.ledger.save(merged, ids)
-                world.db.financialTransactionDao().insertTransactionIfAbsent(com.baraa.masroof.data.room.mapper.FinancialTransactionMapper.toEntity(linkless))
+            suspend fun store(transaction: FinancialTransaction, messages: List<Triple<ParsedEvent, ParsedEventDetails, Instant>>) {
+                for (message in messages) worlds.forEach { it.persist(message) }
+                val ids = messages.map { it.first.rawSmsId }
+                worlds.forEach { it.ledger.save(transaction.copy(linkedParsedEventIds = messages.map { m -> m.first.id }.sorted()), ids) }
+                arrived += ids
             }
-            arrived += ids
-            log += "legacy 3-sms expense $ids, link-less row"
+            fun row(type: FinancialTransactionType, amount: String, at: Instant, ids: List<String>, currency: Currency = Currency.SAR) =
+                FinancialTransaction(TransactionIdFactory.fromRawSmsIds(ids), type, Money.of(BigDecimal(amount), currency), at,
+                    "account:BANK_ALJAZIRA:1111", "account:BANK_ALJAZIRA:2222", null, null, null, emptyList(),
+                    occurredAtZone = listOf(null, "Asia/Riyadh", "UTC").random(random))
+            val shapesSeeded = mutableListOf<String>()
+            if (random.nextBoolean()) {
+                val p = (0 until 3).map { purchase() }
+                store(row(FinancialTransactionType.EXPENSE, "10.00", p[0].third, p.map { it.first.rawSmsId }), p)
+                shapesSeeded += "3-SMS expense"
+            }
+            if (random.nextBoolean()) {
+                val out = transfer(MessageFamily.TRANSFER_OUT, ACCOUNTS[0], ACCOUNTS[1], "100.00")
+                val inn = transfer(MessageFamily.TRANSFER_IN, ACCOUNTS[0], ACCOUNTS[1], "100.00")
+                val stale = transfer(MessageFamily.TRANSFER_OUT, ACCOUNTS[0], ACCOUNTS[1], "100.00", later = 3_600)
+                val legs = listOf(out, inn, stale)
+                store(row(FinancialTransactionType.SELF_TRANSFER, "100.00", out.third, legs.map { it.first.rawSmsId }), legs)
+                shapesSeeded += "3-SMS self-transfer with a stale leg"
+            }
+            if (random.nextBoolean()) {
+                val p = (0 until 2).map { purchase() }
+                store(row(FinancialTransactionType.EXPENSE, "10.00", p[0].third, p.map { it.first.rawSmsId }), p)
+                shapesSeeded += "2-SMS non-pair row"
+            }
+            if (random.nextBoolean()) {
+                val otp = simple(MessageFamily.OTP, amount = null)
+                store(row(FinancialTransactionType.EXPENSE, "10.00", otp.third, listOf(otp.first.rawSmsId)), listOf(otp))
+                shapesSeeded += "posted informational SMS"
+            }
+            if (random.nextBoolean()) {
+                val fee = installment()
+                val amount = if (random.nextBoolean()) fee.first.amount!!.amount.toPlainString() else "9.00".also {
+                    feeKept += fee.first.rawSmsId
+                    count("raw SMS excluded: Fee with another amount")
+                }
+                store(row(FinancialTransactionType.FEE, amount, fee.third, listOf(fee.first.rawSmsId)).copy(destinationContainerId = null), listOf(fee))
+                shapesSeeded += "stored FEE for an installment"
+            }
+            if (random.nextBoolean()) {
+                val usd = purchase(currency = Currency.USD)
+                val half = random.nextBoolean()
+                store(row(FinancialTransactionType.EXPENSE, usd.first.amount!!.amount.toPlainString(), usd.third, listOf(usd.first.rawSmsId), Currency.USD)
+                    .copy(sourceContainerId = "card:BANK_ALJAZIRA:7271", destinationContainerId = null, appliedExchangeRate = BigDecimal("3.75"),
+                        exchangeRateSource = ExchangeRateSource.SMS.takeIf { !half }), listOf(usd))
+                shapesSeeded += if (half) "half exchange-rate pair" else "complete exchange-rate pair"
+            }
+            if (random.nextBoolean()) {
+                val linkless = row(FinancialTransactionType.EXPENSE, "10.00", T0, listOf("none")).copy(id = "transaction:legacy-linkless",
+                    appliedExchangeRate = BigDecimal("3.75"), exchangeRateSource = ExchangeRateSource.SMS)
+                worlds.forEach { it.db.financialTransactionDao().insertTransactionIfAbsent(FinancialTransactionMapper.toEntity(linkless)) }
+                shapesSeeded += "link-less row"
+            }
+            shapesSeeded.forEach { count("legacy: $it") }
+            log += "legacy $shapesSeeded"
         }
 
         private fun message(): Triple<ParsedEvent, ParsedEventDetails, Instant> =
-            when (random.nextInt(10)) {
-                in 0..1 -> purchase(random)
-                2 -> simple(MessageFamily.REFUND, card = CARD)
-                3 -> simple(MessageFamily.OTP, amount = null)
-                4 -> simple(MessageFamily.FINANCING_INSTALLMENT, source = ACCOUNTS[0], loan = true)
+            when (random.nextInt(12)) {
+                in 0..1 -> purchase()
+                2 -> purchase(currency = Currency.USD)
+                3 -> simple(MessageFamily.REFUND, card = CARD)
+                4 -> simple(MessageFamily.OTP, amount = null)
+                5 -> installment()
                 else -> transfer()
-            }
+            }.also { if (random.nextInt(12) == 0) staleInference += it.first.rawSmsId.also { id -> log += "  stale inference on $id" } }
 
-        private fun purchase(random: Random) = simple(MessageFamily.PURCHASE, card = CARD,
+        private fun purchase(currency: Currency = Currency.SAR) = simple(MessageFamily.PURCHASE, card = CARD, currency = currency,
             status = if (random.nextInt(6) == 0) ParseStatus.REVIEW_REQUIRED else ParseStatus.SUCCESS)
 
-        private fun transfer(): Triple<ParsedEvent, ParsedEventDetails, Instant> {
-            val family = listOf(MessageFamily.TRANSFER_OUT, MessageFamily.TRANSFER_IN).random(random)
-            val source = (ACCOUNTS + OTHER).random(random)
-            val destination = (ACCOUNTS + OTHER).filter { it != source }.random(random)
-            return simple(family, source = source, destination = destination,
+        private fun installment() = simple(MessageFamily.FINANCING_INSTALLMENT, source = ACCOUNTS[0], loan = true)
+
+        private fun transfer(
+            family: MessageFamily = listOf(MessageFamily.TRANSFER_OUT, MessageFamily.TRANSFER_IN).random(random),
+            source: AccountReference? = null,
+            destination: AccountReference? = null,
+            amount: String = listOf("100.00", "100.00", "250.00").random(random),
+            later: Long = 0,
+        ): Triple<ParsedEvent, ParsedEventDetails, Instant> {
+            val bank = BANKS.random(random)
+            val pool = ACCOUNTS.filter { it.bank == bank } + AccountReference(bank, "9999")
+            val from = source ?: pool.random(random)
+            val to = destination ?: pool.filter { it != from }.random(random)
+            return simple(family, source = from, destination = to, bank = bank, amount = amount, later = later,
                 network = listOf(BankNetworkType.INTRA_BANK, BankNetworkType.INTER_BANK).random(random),
-                reference = listOf(null, "R1", "R2").random(random), amount = listOf("100.00", "100.00", "250.00").random(random))
+                reference = listOf(null, "R1", "R2").random(random))
         }
 
+        @Suppress("LongParameterList")
         private fun simple(
             family: MessageFamily,
             amount: String? = listOf("10.00", "20.00").random(random),
@@ -283,47 +525,54 @@ class LedgerWriterDifferentialTest {
             reference: String? = null,
             loan: Boolean = false,
             status: ParseStatus = ParseStatus.SUCCESS,
+            currency: Currency = Currency.SAR,
+            bank: Bank = Bank.BANK_ALJAZIRA,
+            later: Long = 0,
         ): Triple<ParsedEvent, ParsedEventDetails, Instant> {
             // Mostly close together, so transfers compete within the match window; sometimes a day later.
             clock = clock.plusSeconds(if (random.nextInt(5) == 0) 86_400 else random.nextLong(0, 240))
+            val at = clock.plusSeconds(later)
             val id = "sms-${next++}"
             val event = ParsedEvent(
-                id = "pe-$id", rawSmsId = id, bank = Bank.BANK_ALJAZIRA, messageFamily = family, direction = MoneyDirection.OUTGOING,
-                amount = amount?.let { Money.of(BigDecimal(it), Currency.SAR) }, purchaseChannel = null, sourceAccountRef = source,
-                destinationAccountRef = destination, cardRef = card, merchant = "M$id", counterparty = null, occurredAt = null,
-                bankNetworkType = network, confidence = Confidence(1.0), parseStatus = status,
+                id = "pe-$id", rawSmsId = id, bank = bank, messageFamily = family, direction = MoneyDirection.OUTGOING,
+                amount = amount?.let { Money.of(BigDecimal(it), currency) }, purchaseChannel = null, sourceAccountRef = source,
+                destinationAccountRef = destination, cardRef = card, merchant = "M$id", counterparty = null,
+                occurredAt = at.takeIf { random.nextInt(6) == 0 }, bankNetworkType = network, confidence = Confidence(1.0), parseStatus = status,
             )
             val details = ParsedEventDetails(
                 transactionReference = reference, loanType = LoanType.PERSONAL.takeIf { loan },
-                occurredAtLocal = LocalDateTime.ofInstant(clock, ZoneOffset.ofHours(3)).takeIf { random.nextBoolean() },
+                occurredAtLocal = LocalDateTime.ofInstant(at, ZoneOffset.ofHours(3)).takeIf { random.nextBoolean() },
             )
-            return Triple(event, details, clock)
+            return Triple(event, details, at)
         }
 
         private fun describe(message: Triple<ParsedEvent, ParsedEventDetails, Instant>): String {
             val (event, details, at) = message
-            return "${event.rawSmsId} ${event.messageFamily} ${event.amount?.amount} ${event.sourceAccountRef?.maskedNumber}->" +
+            return "${event.rawSmsId} ${event.bank.id} ${event.messageFamily} ${event.amount} ${event.sourceAccountRef?.maskedNumber}->" +
                 "${event.destinationAccountRef?.maskedNumber} ${event.bankNetworkType} ref=${details.transactionReference} " +
-                "local=${details.occurredAtLocal != null} ${event.parseStatus} at=$at"
+                "local=${details.occurredAtLocal != null} occurred=${event.occurredAt != null} ${event.parseStatus} at=$at"
         }
     }
 
     private companion object {
-        val SEEDS = 0 until 300
-        val ZONE: ZoneId = ZoneId.of("Asia/Riyadh")
+        const val SEEDS = 200
         val T0: Instant = Instant.parse("2026-08-01T09:00:00Z")
         val AT: Instant = Instant.parse("2026-09-01T00:00:00Z")
-        val ACCOUNTS = listOf("1111", "2222", "3333").map { AccountReference(Bank.BANK_ALJAZIRA, it) }
-        val OTHER = AccountReference(Bank.BANK_ALJAZIRA, "9999")
+        /** AlJazira has a fixed zone; SNB keeps the stored zone (`BankTransactionTimePolicy`). */
+        val BANKS = listOf(Bank.BANK_ALJAZIRA, Bank.BANK_ALJAZIRA, Bank.fromId("BANK_SNB"))
+        val ACCOUNTS = listOf("1111", "2222", "3333").map { AccountReference(Bank.BANK_ALJAZIRA, it) } +
+            listOf("5555", "6666").map { AccountReference(Bank.fromId("BANK_SNB"), it) }
         val CARD = CardReference(Bank.BANK_ALJAZIRA, "7271")
+        val LOAN = LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL)
+        val ID = Regex("sms-\\d+")
 
-
-        suspend fun World.persist(event: ParsedEvent, details: ParsedEventDetails, at: Instant) {
+        suspend fun World.persist(message: Triple<ParsedEvent, ParsedEventDetails, Instant>) {
+            val (event, details, at) = message
             raw.insertIfAbsent(RawSms(event.rawSmsId, "AlJazira", "body-${event.rawSmsId}", at, event.rawSmsId, SmsBodyHasher.sha256Hex(event.rawSmsId)))
             parsed.save(event, details)
-            if (event.loanTypeIsPersonal(details)) loans.observe(LoanReference(Bank.BANK_ALJAZIRA, LoanType.PERSONAL), event.rawSmsId)
+            if (details.loanType != null) loans.observe(LOAN, event.rawSmsId)
+            // Every arrival has a review a later decision can resolve, as the ingestion review service gives it.
+            reviews.upsertRequired(event.rawSmsId, com.baraa.masroof.domain.model.ReviewKind.NEEDS_REVIEW, listOf("needs_review"), at)
         }
-
-        fun ParsedEvent.loanTypeIsPersonal(details: ParsedEventDetails) = details.loanType == LoanType.PERSONAL && messageFamily == MessageFamily.FINANCING_INSTALLMENT
     }
 }

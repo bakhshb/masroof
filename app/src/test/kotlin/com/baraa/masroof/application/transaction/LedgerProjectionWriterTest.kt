@@ -401,6 +401,20 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         listOf(if (rawSmsId == OUT) "pe-out" else "pe-in"), occurredAtZone = "Asia/Riyadh",
     )
 
+    /** A lone owned leg the guard refuses is failed and, as in the old pass, a pending match again. */
+    @Test
+    fun aLoneLegTheGuardRefuses_isFailedAndPending() = runBlocking {
+        confirmation.confirmAccountOwned(source)
+        confirmation.confirmAccountOwned(destination)
+        persistEvent(OUT, event("pe-out", OUT, MessageFamily.TRANSFER_OUT, money("700.00"), source = source,
+            destination = destination, network = BankNetworkType.INTRA_BANK), at = AT)
+
+        val report = writing(guard = blocking(OUT)).reconcileAffectedRawSmsIds(listOf(OUT))
+
+        assertEquals(setOf(OUT), report.failedRawSmsIds)
+        assertEquals(listOf(ReviewKind.PENDING_MATCH), report.reviewCandidates.filter { it.rawSmsId == OUT }.map { it.kind })
+    }
+
     @Test
     fun unchangedRows_areNotRewritten() = runBlocking {
         persistPurchases()
