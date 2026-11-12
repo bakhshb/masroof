@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.room.entity.UserDecisionEntity
+import com.baraa.masroof.data.room.mapper.MoneyPersistence
 import com.baraa.masroof.domain.model.UserDecision
 import com.baraa.masroof.domain.repository.UserDecisionRepository
 
@@ -19,8 +20,9 @@ class RoomUserDecisionRepository(
         }
 }
 
-/** Appends [decision]; the caller is already inside a database transaction. Encoded like `user_correction`. */
+/** Appends [decision]; the caller is already inside a database transaction. */
 internal suspend fun MasroofDatabase.appendDecision(decision: UserDecision) {
+    val (amountDecimal, amountCurrency) = MoneyPersistence.toColumns(decision.amount)
     userDecisionDao().insert(
         UserDecisionEntity(
             rawSmsId = decision.rawSmsId,
@@ -31,8 +33,8 @@ internal suspend fun MasroofDatabase.appendDecision(decision: UserDecision) {
             sourceContainerId = decision.sourceContainerId,
             destinationContainerId = decision.destinationContainerId,
             messageFamily = decision.messageFamily?.name,
-            amountDecimal = decision.amount?.amount?.toPlainString(),
-            amountCurrency = decision.amount?.currency?.name,
+            amountDecimal = amountDecimal,
+            amountCurrency = amountCurrency,
             merchant = decision.merchant,
             counterparty = decision.counterparty,
             bankId = decision.bankId,

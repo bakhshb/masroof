@@ -56,6 +56,7 @@ class RoomManualReviewResolutionRepository(
         resolvedAt: Instant,
         validateBeforeWrite: (suspend () -> Boolean)? = null,
     ): ManualReviewResolutionResult = accessGate.withAccess {
+        val decisionKind = decisionKind(resolutionKind)
         try {
             database.withTransaction {
                 if (validateBeforeWrite != null && !validateBeforeWrite()) {
@@ -84,7 +85,7 @@ class RoomManualReviewResolutionRepository(
                         }
                         database.appendDecision(
                             UserDecision.posting(
-                                kind = decisionKind(resolutionKind),
+                                kind = decisionKind,
                                 rawSmsId = reviews.first().rawSmsId,
                                 transaction = transaction,
                                 decidedAt = resolvedAt,
@@ -142,7 +143,7 @@ class RoomManualReviewResolutionRepository(
         ReviewResolutionKind.USER_FINANCIAL_TYPE -> UserDecisionKind.FINANCIAL_TYPE
         ReviewResolutionKind.USER_EXTERNAL_TRANSFER -> UserDecisionKind.EXTERNAL_TRANSFER
         ReviewResolutionKind.USER_SELF_TRANSFER_PAIR -> UserDecisionKind.SELF_TRANSFER_PAIR
-        else -> throw ReviewResolutionRollback("resolution_kind_not_posting")
+        else -> error("$resolutionKind is not a posting decision")
     }
 
     private class ReviewResolutionRollback(val reason: String) : Exception(reason)

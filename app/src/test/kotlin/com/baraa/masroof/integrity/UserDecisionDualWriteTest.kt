@@ -21,7 +21,7 @@ import com.baraa.masroof.data.repository.RoomTransactionIgnoreRepository
 import com.baraa.masroof.data.repository.RoomTransactionReclassificationRepository
 import com.baraa.masroof.data.repository.RoomUserDecisionRepository
 import com.baraa.masroof.data.room.DatabaseAccessGate
-import com.baraa.masroof.data.room.MasroofDatabase
+import com.baraa.masroof.data.room.MigrationOpenPathContract
 import com.baraa.masroof.data.room.entity.UserDecisionEntity
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.FinancialTransactionType
@@ -33,7 +33,6 @@ import com.baraa.masroof.testsupport.DashboardLedgerWorld
 import com.baraa.masroof.testsupport.NoOpAppLog
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 import com.baraa.masroof.testsupport.noOpProcessingRecovery
-import java.time.Clock
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -46,7 +45,7 @@ import org.robolectric.annotation.Config
 /**
  * Plan 2.1: every decision kind, made through its real service, appends exactly one `user_decision` row in the
  * same transaction as its existing write. A failure injected at the decision insert (a trigger that aborts after
- * the row is written) leaves no row and every table exactly as before, so the existing write rolled back too.
+ * the row is written) leaves every table exactly as before, so the existing write rolled back too.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -61,7 +60,7 @@ class UserDecisionDualWriteTest {
     }
 
     @Test
-    fun resolveTransferAsExternal_appendsOneRow_andRollsBackWithIt() = eachOutcome(transfer = true) { world, ledger ->
+    fun resolveTransferAsExternal_appendsOneRow_andRollsBackWithIt() = eachOutcome(::transferLedger) { world, ledger ->
         val batch = ledger.openBatch()
         val rawId = (batch.ingestProvider(providerRow("dual-ext", intraOut("2026-09-03 10:38"), "2026-09-03T07:38:00Z"))
             as SmsIngestionResult.Parsed).rawSmsId
@@ -74,7 +73,7 @@ class UserDecisionDualWriteTest {
     }
 
     @Test
-    fun resolveSelfTransferPair_appendsOneRowNamingBothLegs_andRollsBackWithIt() = eachOutcome(transfer = true) { world, ledger ->
+    fun resolveSelfTransferPair_appendsOneRowNamingBothLegs_andRollsBackWithIt() = eachOutcome(::transferLedger) { world, ledger ->
         val batch = ledger.openBatch()
         for (row in ambiguousTie("dual")) assertTrue(batch.ingestProvider(row) is SmsIngestionResult.Parsed)
         batch.finish()
@@ -146,29 +145,30 @@ class UserDecisionDualWriteTest {
     /** What a case does, whether its outcome is a success, and the one row it must append. */
     private class Case<T>(val action: suspend () -> T, val accepted: (T) -> Boolean, val expected: () -> UserDecisionEntity)
 
-    /** Runs [setUp] twice on fresh worlds: once the action commits one row, once a failing insert rolls it all back. */
-    private fun <T> eachOutcome(transfer: Boolean = false, setUp: suspend (DashboardLedgerWorld, IntegrityLedger) -> Case<T>) =
-        runBlocking {
-            DashboardLedgerWorld(context()).use { world ->
-                val case = setUp(world, if (transfer) transferLedger(world) else purchaseLedger(world))
-                assertEquals("no decision before the action", emptyList<UserDecisionEntity>(), world.db.userDecisionDao().listAll())
-                val result = case.action()
-                assertTrue("rejected: $result", case.accepted(result))
-                assertEquals(listOf(case.expected()), world.db.userDecisionDao().listAll().map { it.copy(sequence = 0) })
-            }
-            DashboardLedgerWorld(context()).use { world ->
-                val case = setUp(world, if (transfer) transferLedger(world) else purchaseLedger(world))
-                world.db.openHelper.writableDatabase.execSQL(
-                    "CREATE TRIGGER fail_decision AFTER INSERT ON user_decision BEGIN SELECT RAISE(ABORT, 'injected'); END",
-                )
-                val before = tables(world.db)
-                val outcome = runCatching { case.action() }
-                assertTrue("the failed write was reported as a success: $outcome",
-                    outcome.isFailure || !case.accepted(outcome.getOrThrow()))
-                assertEquals(before, tables(world.db))
-                assertEquals(emptyList<UserDecisionEntity>(), world.db.userDecisionDao().listAll())
-            }
+    /**
+     * First a failing insert must roll the whole action back, leaving every table as it was; then, with the
+     * failure removed, the same action on that same state appends exactly the expected row.
+     */
+    private fun <T> eachOutcome(
+        ledger: suspend (DashboardLedgerWorld) -> IntegrityLedger = ::purchaseLedger,
+        setUp: suspend (DashboardLedgerWorld, IntegrityLedger) -> Case<T>,
+    ) = runBlocking {
+        DashboardLedgerWorld(context()).use { world ->
+            val case = setUp(world, ledger(world))
+            val sql = world.db.openHelper.writableDatabase
+            assertEquals("no decision before the action", emptyList<UserDecisionEntity>(), world.db.userDecisionDao().listAll())
+            sql.execSQL("CREATE TRIGGER fail_decision AFTER INSERT ON user_decision BEGIN SELECT RAISE(ABORT, 'injected'); END")
+            val before = MigrationOpenPathContract.rows(sql)
+            val failed = runCatching { case.action() }
+            assertTrue("the failed write was reported as a success: $failed", failed.isFailure || !case.accepted(failed.getOrThrow()))
+            assertEquals(before, MigrationOpenPathContract.rows(sql))
+
+            sql.execSQL("DROP TRIGGER fail_decision")
+            val result = case.action()
+            assertTrue("rejected: $result", case.accepted(result))
+            assertEquals(listOf(case.expected()), world.db.userDecisionDao().listAll().map { it.copy(sequence = 0) })
         }
+    }
 
     private fun row(
         rawSmsId: String,
@@ -180,7 +180,6 @@ class UserDecisionDualWriteTest {
     ) = UserDecisionEntity(
         rawSmsId = rawSmsId, pairedRawSmsId = paired, kind = kind, decidedAtEpochMillis = NOW.toEpochMilli(),
         transactionType = transactionType, sourceContainerId = source, destinationContainerId = destination,
-        messageFamily = null, amountDecimal = null, amountCurrency = null, merchant = null, counterparty = null, bankId = null,
     )
 
     private suspend fun unpostedPurchase(world: DashboardLedgerWorld, ledger: IntegrityLedger, id: String): String {
@@ -218,7 +217,7 @@ class UserDecisionDualWriteTest {
         ownershipConfirmationService = OwnershipConfirmationService(world.accounts, world.cards, world.loans),
         appLogService = NoOpAppLog,
         persistence = RoomTransactionReclassificationRepository(world.db, world.ftRepo, DatabaseAccessGate()),
-        clock = Clock.fixed(NOW, world.zone),
+        clock = world.clock,
     )
 
     private fun ignore(world: DashboardLedgerWorld, ledger: IntegrityLedger) =
@@ -236,26 +235,10 @@ class UserDecisionDualWriteTest {
         processingRecovery = noOpProcessingRecovery(),
     )
 
-    /** Every app table's rows in rowid order. */
-    private fun tables(db: MasroofDatabase): Map<String, List<String>> {
-        val sql = db.openHelper.readableDatabase
-        val names = sql.query(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'room_%' AND name NOT LIKE 'sqlite_%' " +
-                "AND name NOT LIKE 'android_%' ORDER BY name",
-        ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getString(0)) } }
-        return names.associateWith { table ->
-            sql.query("SELECT * FROM `$table` ORDER BY rowid").use { cursor ->
-                buildList {
-                    while (cursor.moveToNext()) add((0 until cursor.columnCount).joinToString("|") { cursor.getString(it) ?: "null" })
-                }
-            }
-        }
-    }
-
     private fun context(): Context = ApplicationProvider.getApplicationContext()
 
     private companion object {
-        /** `IntegrityLedger.clock` and the fixed clock given to reclassification. */
+        /** The instant of `IntegrityLedger.clock` and `DashboardLedgerWorld.clock`, which every decision here records. */
         val NOW: Instant = Instant.parse("2026-09-15T09:00:00Z")
     }
 }

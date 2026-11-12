@@ -125,12 +125,7 @@ object MigrationOpenPathContract {
     ) {
         val file = copyFixture(context, name, fixture)
         val before = readOnly(file) { rows(it) }
-        val db = MasroofDatabase.builder(context, databaseClass, name).addMigrations(*extra).build()
-        try {
-            db.openHelper.writableDatabase
-        } finally {
-            db.close()
-        }
+        openOnce(context, databaseClass, name, *extra)
         val after = readOnly(file) { assertEquals(version, it.version); rows(it) }
         assertTrue("fixture has rows", before.values.sumOf { it.size } > 0)
         assertKeepsEveryRow(before, after, addedTables)
@@ -150,8 +145,9 @@ object MigrationOpenPathContract {
      * resulting tables instead), so the hash is changed on the fixture after it is upgraded to production.
      */
     fun unknownIdentityHashIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
-        editedFixtureIsRejectedUntouched(context, fixture, "UPDATE room_master_table SET identity_hash = '${"0".repeat(32)}'",
-            upgradeFirst = true)
+        editedFixtureIsRejectedUntouched(context, fixture, "UPDATE room_master_table SET identity_hash = '${"0".repeat(32)}'") {
+            openOnce(context, MasroofDatabase::class.java, it)
+        }
 
     /** A v18-labelled file whose tables differ from v18 fails the migration's validation and stays untouched. */
     fun unknownBaselineStructureIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
@@ -162,18 +158,11 @@ object MigrationOpenPathContract {
         context: Context,
         fixture: () -> InputStream,
         edit: String,
-        upgradeFirst: Boolean = false,
+        before: (name: String) -> Unit = {},
     ) {
         val name = "migration-reject.db"
         val file = copyFixture(context, name, fixture)
-        if (upgradeFirst) {
-            val db = MasroofDatabase.builder(context, MasroofDatabase::class.java, name).build()
-            try {
-                db.openHelper.writableDatabase
-            } finally {
-                db.close()
-            }
-        }
+        before(name)
         // WAL like the live file: a rollback-journal edit would flip the header's journal bytes, and Room flips them back.
         val flags = SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING
         SQLiteDatabase.openDatabase(file.path, null, flags).use { it.execSQL(edit) }
@@ -195,6 +184,16 @@ object MigrationOpenPathContract {
         assertArrayEquals(before.second, after.second)
     }
 
+    /** Opens [name] through the production builder once, running any migration, and closes it. */
+    private fun openOnce(context: Context, databaseClass: Class<out RoomDatabase>, name: String, vararg extra: Migration) {
+        val db = MasroofDatabase.builder(context, databaseClass, name).addMigrations(*extra).build()
+        try {
+            db.openHelper.writableDatabase
+        } finally {
+            db.close()
+        }
+    }
+
     private fun snapshot(file: File) =
         file.readBytes() to (File(file.path + "-wal").takeIf { it.isFile }?.readBytes() ?: ByteArray(0))
 
@@ -209,11 +208,16 @@ object MigrationOpenPathContract {
         SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use(block)
 
     /** Every row of every app table, in rowid order. */
-    fun rows(db: SQLiteDatabase): Map<String, List<String>> = db.rawQuery(
+    fun rows(db: SQLiteDatabase): Map<String, List<String>> = rows { db.rawQuery(it, null) }
+
+    /** [rows] through an open Room connection. */
+    fun rows(db: SupportSQLiteDatabase): Map<String, List<String>> = rows { db.query(it) }
+
+    private fun rows(query: (String) -> Cursor): Map<String, List<String>> = query(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'room_%' " +
-            "AND name NOT LIKE 'android_%' AND name NOT LIKE 'sqlite_%' ORDER BY name", null,
+            "AND name NOT LIKE 'android_%' AND name NOT LIKE 'sqlite_%' ORDER BY name",
     ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getString(0)) } }
-        .associateWith { table -> dump(db.rawQuery("SELECT * FROM `$table` ORDER BY rowid", null)) }
+        .associateWith { table -> dump(query("SELECT * FROM `$table` ORDER BY rowid")) }
 
     private fun dump(cursor: Cursor): List<String> = cursor.use {
         buildList {

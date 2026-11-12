@@ -148,9 +148,8 @@ class LedgerFixturesTest {
             val rawSmsId = migrated.openHelper.readableDatabase.query("SELECT id FROM raw_sms ORDER BY id LIMIT 1").use {
                 assertTrue(it.moveToFirst()); it.getString(0)
             }
-            migrated.userDecisionDao().insert(UserDecisionEntity(rawSmsId = rawSmsId, pairedRawSmsId = null, kind = "BANK_SELECTION",
-                decidedAtEpochMillis = EXPORTED_AT, transactionType = null, sourceContainerId = null, destinationContainerId = null,
-                messageFamily = null, amountDecimal = null, amountCurrency = null, merchant = null, counterparty = null, bankId = "BANK_SNB"))
+            migrated.userDecisionDao().insert(
+                UserDecisionEntity(rawSmsId = rawSmsId, kind = "BANK_SELECTION", decidedAtEpochMillis = EXPORTED_AT, bankId = "BANK_SNB"))
             assertTrue(service(migrated, closes = false).exportTo(Uri.fromFile(archive), PASSPHRASE.toCharArray()).isSuccess)
             migrated.close()
             val expected = MigrationOpenPathContract.readOnly(file, MigrationOpenPathContract::rows)
