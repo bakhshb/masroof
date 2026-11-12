@@ -371,4 +371,21 @@ class LedgerProjectorKeepStoredTest {
         assertEquals(FinancialTransactionType.EXTERNAL_TRANSFER_OUT, result.rows.single { it.rawSmsIds == listOf("a") }.transaction.type)
         assertEquals(emptyList<LedgerReviewCandidate>(), result.reviewCandidates)
     }
+
+    /**
+     * A transfer leg its own stored row links (here a type edited only on the row) stays out of the matching pool, as
+     * the old pass left a linked leg alone: it does not make a later pair of other legs ambiguous.
+     */
+    @Test
+    fun aLegLinkedByItsOwnStoredRowDoesNotCompeteForALaterPair() {
+        val net = BankNetworkType.INTER_BANK
+        val edited = storedRow("x", type = FinancialTransactionType.INCOME)
+        val result = project(
+            listOf(leg("x", MessageFamily.TRANSFER_OUT, net, "R1"), leg("in", MessageFamily.TRANSFER_IN, net, "R1"),
+                leg("out", MessageFamily.TRANSFER_OUT, net, "R1")),
+            registry = owned, stored = StoredFacts(rows = listOf(edited)),
+        )
+        assertTrue(edited in result.rows)
+        assertTrue(listOf("in", "out") to FinancialTransactionType.SELF_TRANSFER in result.sets(), "rows: ${result.sets()}")
+    }
 }

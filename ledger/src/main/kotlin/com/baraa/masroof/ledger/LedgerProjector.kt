@@ -364,7 +364,11 @@ private class Projection(
         when (outcome) {
             is TransactionAssembler.Outcome.Assembled -> post(outcome.transaction, outcome.rawSmsIds)
             TransactionAssembler.Outcome.PendingMatch ->
-                if (event.messageFamily.isTransfer()) {
+                if (event.messageFamily.isTransfer() && linkedAlone(event.rawSmsId) != null) {
+                    // A leg its own stored row links stays out of the matching pool, as the old pass left a linked leg
+                    // alone; only the upgrade below may join a posted external or single-leg self-transfer leg.
+                    linkedAlone(event.rawSmsId)?.let { check(save(it.transaction, it.rawSmsIds)) { "kept stored rows never overlap" } }
+                } else if (event.messageFamily.isTransfer()) {
                     open += candidate
                 } else {
                     pendingMatch(event.rawSmsId)
@@ -375,6 +379,10 @@ private class Projection(
             TransactionAssembler.Outcome.Ignored -> settled += event.rawSmsId
         }
     }
+
+    /** The stored row that links [rawSmsId] and nothing else, unless the informational cleanup removes it. */
+    private fun linkedAlone(rawSmsId: String): LedgerRow? =
+        storedByRawSmsId[rawSmsId]?.takeIf { row -> row.rawSmsIds.size == 1 && !removed(row) }
 
     /** Pairs mutually unique legs, then posts a lone owned leg on its own or leaves it pending. */
     private fun postOpenTransfers(open: List<TransferMatchCandidate>) {
