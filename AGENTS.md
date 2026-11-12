@@ -38,7 +38,7 @@ At the end of the PR: one review of the whole PR, then CI green including device
 - PRs target `main`. Full tests run in PR/main CI only; never add `testDebugUnitTest` to `release.yml`.
 
 ## Layers
-- `presentation` → `application` → `domain` / `parsing` / `data` / `sms` / `bank`; dependencies point inward. `PackageDependencyRulesTest` enforces it: fix the import, never add an exception.
+- `presentation` → `application` → `domain` / `parsing` / `data` / `sms` / `bank`; dependencies point inward. `PackageDependencyRulesTest` enforces it: fix the import, never add an exception. The Gradle module graph (the `project(...)` dependencies) is what forbids a module from using another's packages (a pure module cannot use `android.*` or `:app`, `:ui-kit` sees no project, no cycles); source-reading tests cover only packages that share a module, plus the pinned graph in `ModuleBoundaryTest`.
 - ViewModels call `application` workflows/services only. Presentation never imports `domain.ids|rules|repository|ownership|assembly|matching` or `domain.period`.
 - `finance-core` owns `core.money`, value models, period/time policies, identities, classification/impact, transfer and statement matching (packages kept as `com.baraa.masroof.core.money` / `domain.*`). It gets facts and returns decisions; ownership, reconciliation writes and CSV stay in `app`; repository ports and their Room implementations live in `:data`, dashboard aggregation in `dashboard-core`. Do not copy these into `app`. Both Money contracts stay distinct.
 - `application` constructors take every service, repository, workflow and scheduler non-null; no `X? = null` collaborator. Tests pass a `NoOp*`/`Empty*` double from `testsupport/` (`NoOptionalCollaboratorsTest` lists the few exceptions; add none).
