@@ -88,6 +88,7 @@ class AppContainer(
     private val analyticsDelegate = lazy { AnalyticsWorkflow(this, storage.appContext) }
     val analytics: AnalyticsWorkflow get() = analyticsDelegate.value
     fun stopAnalytics() { if (analyticsDelegate.isInitialized()) analytics.close() }
+    internal val analyticsDiagnostics: String get() = if (analyticsDelegate.isInitialized()) analytics.diagnostics else "none"
 
     private suspend fun runPostStartupBackgroundWork() {
         learning.interpretationService?.startLearning(storage.database.invalidationTracker)

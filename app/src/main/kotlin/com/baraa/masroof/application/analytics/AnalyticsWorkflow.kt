@@ -43,6 +43,10 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     private var clockJob: Job? = null
     private var importJob: Job? = null
     @Volatile private var closed = false
+    @Volatile private var refreshStage = "NOT_STARTED"
+    @Volatile private var closeStage = "OPEN"
+    /** Where the refresh job and a close are, for a hang report; a stage name only. */
+    internal val diagnostics: String get() = "refresh=$refreshStage close=$closeStage activeJobs=${scopeJob.children.count { it.isActive }}"
     private val stopSignal = CompletableDeferred<Unit>()
     private val changes = Channel<Unit>(Channel.CONFLATED)
     private val mutex = Mutex()
@@ -67,27 +71,32 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         onboardingPrefs.registerOnSharedPreferenceChangeListener(preferenceListener)
         localePrefs.registerOnSharedPreferenceChangeListener(preferenceListener)
         refreshJob = scope.launch {
+            refreshStage = "AWAIT_STARTUP"
             while (!closed && container.maintenance.awaitStartupMaintenance() != StartupMaintenanceOutcome.READY) {
                 withTimeoutOrNull(5_000) { stopSignal.await() }
             }
-            if (closed) return@launch
+            if (closed) { refreshStage = "DONE"; return@launch }
+            refreshStage = "ADD_OBSERVER"
             container.storage.database.invalidationTracker.addObserver(observer)
             try { loadCached() } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) {
                 container.storage.appLogService.failure("LAB_ANALYTICS", "Load cached analysis", failure)
             }
             request()
+            refreshStage = "IDLE"
             for (ignored in changes) {
                 if (closed) break
                 withTimeoutOrNull(1200) { stopSignal.await() }
                 if (closed) break
                 while (changes.tryReceive().isSuccess) { /* coalesce committed batches */ }
-                try { refresh() } catch (e: CancellationException) { throw e }
+                refreshStage = "REFRESH"
+                try { refresh(); refreshStage = "IDLE" } catch (e: CancellationException) { throw e }
                 catch (e: Exception) {
                     container.storage.appLogService.error("LAB_ANALYTICS", "Analysis failed (${e.javaClass.simpleName})")
                     mutable.update { it.copy(updating = false, unavailable = true) }
                 }
             }
+            refreshStage = "DONE"
         }
         clockJob = scope.launch {
             var key = clockKey()
@@ -116,14 +125,17 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     }
 
     private suspend fun loadCached() {
+        refreshStage = "LOAD_CACHED_ANALYTICS"
         val dao = store.analytics()
         dao.initializePreferences(AnalysisPreferencesRow(enabledAt = clock.millis()))
         val prefs = requireNotNull(dao.preferences())
         val cached = dao.latest()?.let { runCatching { json.decodeFromString<AnalysisSnapshot>(it.payload) }.getOrNull() }
         val history = dao.recentSnapshots().mapNotNull { runCatching { json.decodeFromString<AnalysisSnapshot>(it.payload) }.getOrNull() }
         val comparisons = dao.comparisons()
+        refreshStage = "LOAD_CACHED_LEARNING"
         val learning = try { container.patterns.learningInsightsWorkflow.load() } catch(e: CancellationException) { throw e }
             catch(_: Exception) { com.baraa.masroof.application.interpretation.LearningInsights(pending = true) }
+        refreshStage = "LOAD_CACHED_REST"
         val candidates = dao.candidates().mapNotNull { runCatching { json.decodeFromString<AnalysisCandidate>(it.payload) }.getOrNull() }
         val corrections = dao.feedback().filter { it.kind in setOf("NOT_RECURRING", "DISMISSED") }.sortedByDescending { it.decidedAt }.mapNotNull { row ->
             candidates.firstOrNull { it.seriesKey == row.seriesKey }?.let { AnalysisRecurringCorrection(row.seriesKey, it.name, row.kind) }
@@ -520,11 +532,15 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         clockJob?.cancel()
         importJob?.cancel()
         runBlocking {
+            closeStage = "JOIN_REFRESH"
             refreshJob?.join()
+            closeStage = "MUTEX"
             mutex.withLock { }
+            closeStage = "JOIN_SCOPE"
             scopeJob.complete()
             scopeJob.join()
         }
+        closeStage = "CLOSED"
         if (storeDelegate.isInitialized()) store.close()
     }
     companion object {
