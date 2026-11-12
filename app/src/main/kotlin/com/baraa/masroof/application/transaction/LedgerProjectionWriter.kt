@@ -54,7 +54,7 @@ internal class LedgerProjectionWriter(
         val current = currentRows(units)
         return units.any { unit ->
             val expected = if (unit in written.applied) unit.projected else unit.stored
-            current.filter { it.overlaps(unit) }.normalized() != expected.normalized()
+            unit.now(current) != expected.normalized()
         }
     }
 
@@ -93,7 +93,7 @@ internal class LedgerProjectionWriter(
             val current = currentRows(units)
             val admitted = mutableListOf<Change>()
             for (unit in units) {
-                val now = current.filter { row -> row.overlaps(unit) }.normalized()
+                val now = unit.now(current)
                 when {
                     now == unit.projected.normalized() -> Unit // Another pass wrote the same rows.
                     now != unit.stored.normalized() -> throw ConcurrentChange()
@@ -109,18 +109,21 @@ internal class LedgerProjectionWriter(
             val (clashing, clear) = admitted.partition(commitmentClashes(admitted))
             written.failed += clashing
             for (unit in clear) {
-                if (apply(unit)) written.applied += unit else written.failed += unit.also { written.conflicted = true }
+                if (apply(unit)) {
+                    written.applied += unit
+                } else {
+                    written.failed += unit
+                    written.conflicted = true
+                }
             }
         }
         return written
     }
 
     private suspend fun currentRows(units: List<Change>): List<LedgerRow> {
-        val rawSmsIds = units.flatMap { it.rawSmsIds() }
-        val ids = units.flatMap { unit -> (unit.stored + unit.projected).map { it.transaction.id } }
-        val found = (transactions.getByIds(ids) + transactions.findByRawSmsIds(rawSmsIds).values).distinctBy { it.id }
-        val links = transactions.listRawSmsIdsByTransaction(found.map { it.id })
-        return found.map { LedgerRow(it, links[it.id].orEmpty().sorted()) }
+        val ids = units.flatMap { it.ids }
+        val rawSmsIds = units.flatMap { it.rawSmsIds }
+        return transactions.ledgerRows(transactions.getByIds(ids) + transactions.findByRawSmsIds(rawSmsIds).values)
     }
 
     private suspend fun guardAccepts(unit: Change, records: Map<String, ParsedEventRecord>): Boolean {
@@ -135,14 +138,12 @@ internal class LedgerProjectionWriter(
      * they are not written and stay retryable.
      */
     private suspend fun commitmentClashes(units: List<Change>): (Change) -> Boolean {
-        val committed = transactions.listCommittedTransactionIds(
-            units.flatMap { unit -> (unit.stored + unit.projected).map { it.transaction.id } },
-        )
-        if (committed.isEmpty()) return { false }
+        val committed = transactions.listCommittedTransactionIds(units.flatMap { it.ids })
         return { unit ->
-            val targets = unit.removed().filter { it.transaction.id in committed }.mapNotNull { unit.replacementOf(it) }
-            targets.size != targets.distinct().size ||
-                targets.any { target -> target in committed && unit.removed().none { it.transaction.id == target } }
+            val removed = unit.removed()
+            val removedIds = removed.mapTo(mutableSetOf()) { it.transaction.id }
+            val targets = removed.filter { it.transaction.id in committed }.mapNotNull { unit.replacementOf(it) }
+            targets.size != targets.distinct().size || targets.any { it in committed && it !in removedIds }
         }
     }
 
@@ -175,14 +176,14 @@ internal class LedgerProjectionWriter(
     }
 
     private fun report(projection: LedgerProjection, written: Written): ReconciliationReport {
-        val failedIds = projection.retryRawSmsIds + written.failed.flatMap { it.rawSmsIds() }
+        val failedUnitIds = written.failed.flatMapTo(mutableSetOf()) { it.rawSmsIds }
+        val failedIds = projection.retryRawSmsIds + failedUnitIds
         val settled = projection.settledRawSmsIds - failedIds
         val posted = written.applied.flatMap { unit ->
             unit.projected.filter { row -> unit.stored.none { it.rawSmsIds == row.rawSmsIds && it.transaction.id == row.transaction.id } }
         }
         val postedIds = posted.flatMap { it.rawSmsIds }.toSet()
         val linkedIds = projection.rows.flatMap { it.rawSmsIds }.toSet()
-        val failedUnitIds = written.failed.flatMap { it.rawSmsIds() }.toSet()
         val candidates = projection.reviewCandidates.map { ReconciliationReviewCandidate(it.rawSmsId, it.kind, it.reasons) }
         return ReconciliationReport(
             summary = ReconciliationSummary(
@@ -202,10 +203,13 @@ internal class LedgerProjectionWriter(
 
     /** One difference: the stored rows it replaces and the projected rows it writes. */
     private class Change(val stored: List<LedgerRow>, val projected: List<LedgerRow>) {
-        fun rawSmsIds(): Set<String> = (stored + projected).flatMap { it.rawSmsIds }.toSet()
+        private val rows = stored + projected
+        val rawSmsIds: Set<String> = rows.flatMapTo(mutableSetOf()) { it.rawSmsIds }
+        val ids: Set<String> = rows.mapTo(mutableSetOf()) { it.transaction.id }
 
-        fun overlaps(row: LedgerRow): Boolean = row.rawSmsIds.any { it in rawSmsIds() } ||
-            (stored + projected).any { it.transaction.id == row.transaction.id }
+        /** The [current] rows that share a raw SMS or an id with this unit, normalized. */
+        fun now(current: List<LedgerRow>): Set<LedgerRow> =
+            current.filter { row -> row.rawSmsIds.any(rawSmsIds::contains) || row.transaction.id in ids }.normalized()
 
         /** Stored rows whose id the projection does not keep. */
         fun removed(): List<LedgerRow> = stored.filter { row -> projected.none { it.transaction.id == row.transaction.id } }
@@ -219,8 +223,6 @@ internal class LedgerProjectionWriter(
             projected.any { it.rawSmsIds == old.rawSmsIds && it.transaction.type == old.transaction.type && it.transaction.amount == old.transaction.amount }
         }
     }
-
-    private fun LedgerRow.overlaps(unit: Change) = unit.overlaps(this)
 
     private class Written(
         val applied: MutableList<Change> = mutableListOf(),

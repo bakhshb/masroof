@@ -160,9 +160,11 @@ object LedgerProjector {
     private val MAX_OFFSET: Duration = Duration.ofHours(18)
 }
 
-private fun MessageFamily.isTransfer(): Boolean = this == MessageFamily.TRANSFER_IN || this == MessageFamily.TRANSFER_OUT
+/** A transfer leg the projector may pair. */
+fun MessageFamily.isTransfer(): Boolean = this == MessageFamily.TRANSFER_IN || this == MessageFamily.TRANSFER_OUT
 
-private fun LedgerEvidence.loanReference(): LoanReference? =
+/** The loan of a financing installment, the unit the loan pre-pass and the scope group by. */
+fun LedgerEvidence.loanReference(): LoanReference? =
     loanType?.takeIf { event.messageFamily == MessageFamily.FINANCING_INSTALLMENT }?.let { LoanReference(event.bank, it) }
 
 /** One projection run. Its ledger is in memory and starts empty; the save rules are those of the Room ledger. */

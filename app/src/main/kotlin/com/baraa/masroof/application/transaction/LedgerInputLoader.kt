@@ -3,8 +3,8 @@ package com.baraa.masroof.application.transaction
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.review.ReviewCorrectionClosure
 import com.baraa.masroof.domain.model.EffectiveUserDecisions
+import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.LoanReference
-import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
@@ -17,6 +17,8 @@ import com.baraa.masroof.ledger.LedgerProjector
 import com.baraa.masroof.ledger.LedgerRow
 import com.baraa.masroof.ledger.OwnershipFacts
 import com.baraa.masroof.ledger.StoredFacts
+import com.baraa.masroof.ledger.isTransfer
+import com.baraa.masroof.ledger.loanReference
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import java.time.ZoneId
 
@@ -61,15 +63,14 @@ class LedgerInputLoader(
         val events = evidence(records, receivedAt)
         val rawSmsIds = events.map { it.event.rawSmsId }
         val reviews = reviewRepository.listAll()
-        val transactions = financialTransactionRepository.listAll().sortedBy { it.id }
-        val links = financialTransactionRepository.listRawSmsIdsByTransaction(transactions.map { it.id })
+        val rows = financialTransactionRepository.ledgerRows(financialTransactionRepository.listAll()).sortedBy { it.transaction.id }
         return LedgerInputs(
             events = events,
             decisions = userDecisionRepository.effectiveFor(rawSmsIds),
             registry = ownershipFacts(events),
             storedFacts = StoredFacts(
                 // The stored `financial_transaction` rows with their linked raw SMS, sorted by id.
-                rows = transactions.map { LedgerRow(it, links[it.id].orEmpty().sorted()) },
+                rows = rows,
                 correctionClosedRawSmsIds = reviews.filter(ReviewCorrectionClosure::isClosed).map { it.rawSmsId }.toSet(),
             ),
             zone = zoneId,
@@ -104,13 +105,12 @@ class LedgerInputLoader(
             }
             receivedAt += rawSmsRepository.receivedAtByIds(pending)
             decisions += userDecisionRepository.effectiveFor(pending)
-            val found = financialTransactionRepository.findByRawSmsIds(pending).values.filter { it.id !in rows }.distinctBy { it.id }
-            val links = financialTransactionRepository.listRawSmsIdsByTransaction(found.map { it.id })
-            found.forEach { rows[it.id] = LedgerRow(it, links[it.id].orEmpty().sorted()) }
+            val found = financialTransactionRepository.findByRawSmsIds(pending).values.filter { it.id !in rows }
+            financialTransactionRepository.ledgerRows(found).forEach { rows[it.transaction.id] = it }
             loaded += pending
             val events = evidence(records.values, receivedAt)
             scope = LedgerProjector.scope(affected, events, decisions, StoredFacts(rows.values.toList()))
-            val next = (scope - loaded).toMutableSet()
+            val next = scope.toMutableSet()
             for (event in events.filter { it.event.rawSmsId in scope && it.event.rawSmsId !in searched }) {
                 next += neighbours(event, records)
                 searched += event.event.rawSmsId
@@ -148,15 +148,14 @@ class LedgerInputLoader(
     /** The raw SMS [LedgerProjector.scope] may reach from [evidence]: a superset, loaded into [records]. */
     private suspend fun neighbours(evidence: LedgerEvidence, records: MutableMap<String, ParsedEventRecord>): Set<String> {
         val event = evidence.event
-        if (event.messageFamily == MessageFamily.TRANSFER_IN || event.messageFamily == MessageFamily.TRANSFER_OUT) {
+        if (event.messageFamily.isTransfer()) {
             val window = LedgerProjector.pairingWindow(evidence)
             return effectiveParsedEventProvider.listTransferCandidatesEffective(window.receivedAt, window.occurredAt, window.occurredAtLocal)
                 .onEach { records.putIfAbsent(it.event.rawSmsId, it) }
                 .mapTo(mutableSetOf()) { it.event.rawSmsId }
         }
-        val loanType = evidence.loanType ?: return emptySet()
-        if (event.messageFamily != MessageFamily.FINANCING_INSTALLMENT) return emptySet()
-        return effectiveParsedEventProvider.listRawSmsIdsReferencingLoan(LoanReference(event.bank, loanType)).toSet()
+        val loan = evidence.loanReference() ?: return emptySet()
+        return effectiveParsedEventProvider.listRawSmsIdsReferencingLoan(loan).toSet()
     }
 
     private fun evidence(records: Collection<ParsedEventRecord>, receivedAt: Map<String, java.time.Instant>): List<LedgerEvidence> =
@@ -186,4 +185,11 @@ class LedgerInputLoader(
         /** Scope rounds before a full read: each round follows one more hop of decisions, rows, loans or transfers. */
         const val MAX_ROUNDS = 12
     }
+}
+
+/** [transactions] (distinct by id) with the raw SMS each links, sorted: the stored rows the projector and writer compare. */
+internal suspend fun FinancialTransactionRepository.ledgerRows(transactions: Collection<FinancialTransaction>): List<LedgerRow> {
+    val distinct = transactions.distinctBy { it.id }
+    val links = listRawSmsIdsByTransaction(distinct.map { it.id })
+    return distinct.map { LedgerRow(it, links[it.id].orEmpty().sorted()) }
 }

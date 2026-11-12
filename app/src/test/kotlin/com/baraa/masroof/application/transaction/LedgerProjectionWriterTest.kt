@@ -13,12 +13,14 @@ import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.ExchangeRateSource
 import com.baraa.masroof.domain.model.FinancialTransaction
 import com.baraa.masroof.domain.model.FinancialTransactionType
+import com.baraa.masroof.domain.model.LoanType
 import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
+import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.testsupport.EmptyReviewRepository
 import com.baraa.masroof.testsupport.NoOpUserDecisionRepository
@@ -29,6 +31,7 @@ import java.nio.file.Files
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -134,7 +137,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         ftRepo.update(stored.copy(occurredAtZone = null))
         val before = ftRepo.findByRawSmsId(P1)
 
-        val report = writing(guard = { _, _ -> FinancialTransactionSaveResult.Conflict(P1, "stale_pattern_definition") })
+        val report = writing(guard = blocking(P1))
             .reconcileStoredEventsDetailed()
 
         assertTrue(ReconciliationCompletionPolicy.isComplete(report))
@@ -146,7 +149,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
     fun aBlockedHealOfARowTheUserProtected_keepsTheStoredRowAndIsComplete() = runBlocking {
         confirmation.confirmAccountOwned(source)
         persistEvent(LOAN, event("pe-loan", LOAN, MessageFamily.FINANCING_INSTALLMENT, money("300.00"), source = source),
-            ParsedEventDetails(loanType = com.baraa.masroof.domain.model.LoanType.PERSONAL), AT)
+            ParsedEventDetails(loanType = LoanType.PERSONAL), AT)
         val fee = FinancialTransaction(TransactionIdFactory.fromRawSmsIds(listOf(LOAN)), FinancialTransactionType.FEE,
             money("300.00"), AT, FinancialContainerIdFactory.accountId(source), null, null, null, null, listOf("pe-loan"),
             occurredAtZone = "Asia/Riyadh")
@@ -154,14 +157,14 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         val before = ftRepo.findByRawSmsId(LOAN)
         val reviews = RoomReviewRepository(db.reviewItemDao())
         // Unprotected, a blocked heal of the FEE into a repayment is a failure to retry.
-        val unprotected = writing(guard = { _, _ -> FinancialTransactionSaveResult.Conflict(LOAN, "stale_pattern_definition") }, reviews = reviews)
+        val unprotected = writing(guard = blocking(LOAN), reviews = reviews)
             .reconcileStoredEventsDetailed()
         assertEquals(setOf(LOAN), unprotected.failedRawSmsIds)
         assertEquals(before, ftRepo.findByRawSmsId(LOAN))
 
         val review = reviews.upsertRequired(LOAN, ReviewKind.NEEDS_REVIEW, listOf("needs_review"), AT)
         reviews.markResolved(review.id, ReviewResolutionKind.USER_CORRECTION, AT, fee.id)
-        val report = writing(guard = { _, _ -> FinancialTransactionSaveResult.Conflict(LOAN, "stale_family_inference") }, reviews = reviews)
+        val report = writing(guard = blocking(LOAN), reviews = reviews)
             .reconcileStoredEventsDetailed()
 
         assertTrue(ReconciliationCompletionPolicy.isComplete(report))
@@ -224,7 +227,7 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         ledger: FinancialTransactionRepository = ftRepo,
         guard: AutomaticWrite? = null,
         legacy: () -> Boolean = { false },
-        reviews: com.baraa.masroof.domain.repository.ReviewRepository = EmptyReviewRepository(),
+        reviews: ReviewRepository = EmptyReviewRepository(),
     ) = TransactionReconciliationService(
         rawSmsRepository = rawRepo,
         financialTransactionRepository = ledger,
@@ -233,11 +236,14 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
         reviewRepository = reviews,
         userDecisionRepository = NoOpUserDecisionRepository,
-        zoneId = java.time.ZoneId.of("Asia/Riyadh"),
+        zoneId = ZoneId.of("Asia/Riyadh"),
         automaticWrite = guard,
         inTransaction = { write -> db.withTransaction { write() } },
         useLegacyPath = legacy,
     )
+
+    /** A guard that rejects every automatic write, as stale evidence would. */
+    private fun blocking(rawSmsId: String): AutomaticWrite = { _, _ -> FinancialTransactionSaveResult.Conflict(rawSmsId, "stale_pattern_definition") }
 
     private suspend fun commit(transactionId: String) = RoomCommitmentRepository.from(db).create(
         Commitment("commitment-1", "Rent", money("700.00"), LocalDate.parse("2026-08-10"), null, null, true,
