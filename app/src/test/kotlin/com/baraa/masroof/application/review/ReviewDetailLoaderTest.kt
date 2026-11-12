@@ -108,10 +108,9 @@ class ReviewDetailLoaderTest {
             com.baraa.masroof.domain.model.ReviewResolutionKind.USER_NON_FINANCIAL, clock.now(), null)
         val detail = loader.loadDetail(review.id)!!
         assertEquals("STC", detail.bankId)
-        val directory = java.nio.file.Files.createTempDirectory("review-teaching-").toFile()
-        try {
+        run {
             val patterns = com.baraa.masroof.application.patterns.MessagePatternsWorkflow(
-                com.baraa.masroof.data.patterns.MessagePatternStore(directory.resolve("patterns.json")),
+                com.baraa.masroof.data.patterns.MessagePatternStore(db),
                 com.baraa.masroof.data.room.DatabaseAccessGate(),
                 appLogService = NoOpAppLog,)
             patterns.addBank(0, "Synthetic bank", detail.sender!!, detail.bankId)
@@ -124,14 +123,13 @@ class ReviewDetailLoaderTest {
             assertEquals(event, parsed.findByRawSmsId(raw.id)!!.event)
             assertEquals(emptyList<com.baraa.masroof.domain.model.FinancialTransaction>(),
                 RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao()).listAll())
-        } finally { directory.deleteRecursively() }
+        }
         Unit
     }
 
     @Test fun pendingPatternPreviewExtractsEachMessageAndAbstainsOnConflictsWithoutWrites() = runBlocking {
-        val directory = java.nio.file.Files.createTempDirectory("pending-patterns-").toFile()
-        try {
-            val store = com.baraa.masroof.data.patterns.MessagePatternStore(directory.resolve("patterns.json"))
+        run {
+            val store = com.baraa.masroof.data.patterns.MessagePatternStore(db)
             val body = "Payment\nAmount:10SAR"
             val pattern = com.baraa.masroof.engine.bank.patterns.SavedMessagePattern.fromChoices("purchase", "STC", "STC Bank", "PURCHASE", body,
                 listOf(com.baraa.masroof.engine.bank.patterns.FieldChoice("amount", body.indexOf("10SAR"), body.length)))
@@ -198,7 +196,7 @@ class ReviewDetailLoaderTest {
             assertEquals(originalReviews, reviewRepo.listAll())
             assertEquals(originalRaw, rawRepo.getByIds(inputs))
             assertEquals(emptyList<com.baraa.masroof.domain.model.FinancialTransaction>(), transactions.listAll())
-        } finally { directory.deleteRecursively() }
+        }
         Unit
     }
 

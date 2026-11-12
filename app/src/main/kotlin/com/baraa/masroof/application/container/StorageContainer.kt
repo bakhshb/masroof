@@ -1,7 +1,9 @@
 package com.baraa.masroof.application.container
 
 import android.content.Context
+import androidx.room.RoomDatabase
 import androidx.room.withTransaction
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import com.baraa.masroof.application.backup.DatabaseRestoreRecovery
 import com.baraa.masroof.application.locale.AppLocaleRepository
@@ -9,6 +11,7 @@ import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.application.sms.DebugProcessHaltProbe
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
+import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.data.patterns.MessagePatternStore
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
@@ -47,7 +50,7 @@ import kotlinx.coroutines.SupervisorJob
 /**
  * Everything persistent that the other containers share: restore recovery, the database, its access gate,
  * repositories, preferences, the pattern store and the application scope. Built first, once.
- * Construction order matters: restore recovery runs before the pattern store and Room are created.
+ * Construction order matters: restore recovery runs before Room is created.
  */
 class StorageContainer(
     context: Context,
@@ -83,16 +86,24 @@ class StorageContainer(
             appContext.assets.open("bank-patterns/$file").bufferedReader(Charsets.UTF_8).use { it.readText() }).banks
     }
 
-    // Restore recovery has finished and this container has not admitted work yet.
-    val messagePatternStore = MessagePatternStore(appContext).also {
-        if (installBundledPatterns) it.installMissingBanks(bundledPatternBanks, setOf(Bank.BANK_ALJAZIRA.id))
-    }
-
+    /**
+     * Every pattern read and write goes through the database, so the open itself first copies the pre-v21 file once
+     * and seeds the bundled banks: nothing can see the patterns before both are done. A throw fails the open closed.
+     */
     internal val database: MasroofDatabase =
         databaseRestoreRecovered.let {
             MasroofDatabase.builder(appContext, MasroofDatabase::class.java, MasroofDatabase.NAME, databaseOpenHelperFactory)
+                .addCallback(object : RoomDatabase.Callback() {
+                    override fun onOpen(db: SupportSQLiteDatabase) {
+                        val patterns = MessagePatternStore({ db })
+                        patterns.importLegacyFile(LegacyMessagePatternFile.of(appContext))
+                        if (installBundledPatterns) patterns.installMissingBanks(bundledPatternBanks, setOf(Bank.BANK_ALJAZIRA.id))
+                    }
+                })
                 .build()
         }
+
+    val messagePatternStore = MessagePatternStore(database)
 
     val rawSmsRepository: RawSmsRepository =
         RoomRawSmsRepository(database.rawSmsDao(), accessGate = databaseAccessGate)

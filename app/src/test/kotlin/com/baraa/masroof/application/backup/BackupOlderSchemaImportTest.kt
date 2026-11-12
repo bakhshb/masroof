@@ -20,7 +20,10 @@ import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.zip.ZipInputStream
+import com.baraa.masroof.data.patterns.MessagePatternStore
 import com.baraa.masroof.testsupport.NoOpAppLog
+import com.baraa.masroof.testsupport.storedPatterns
+import org.junit.Assert.assertNull
 
 /** A restore accepts only known (version, identity hash) pairs and migrates the staged copy; device twin `BackupMigrationDeviceTest`. */
 @RunWith(RobolectricTestRunner::class)
@@ -48,7 +51,8 @@ class BackupOlderSchemaImportTest {
         assertFalse("the v19 file is self-contained", File(v19.path + "-wal").let { it.isFile && it.length() > 0 })
         val expected = MigrationOpenPathContract.readOnly(v19, MigrationOpenPathContract::rows)
         val archive = File(context.cacheDir, "v19.zip")
-        archive.writeBytes(rewritten(19, MasroofDatabase.IDENTITY_HASHES.getValue(19), database = v19.readBytes()))
+        archive.writeBytes(rewritten(19, MasroofDatabase.IDENTITY_HASHES.getValue(19), database = v19.readBytes(),
+            patterns = patternArchive("V19")))
         context.deleteDatabase("backup-v19.db")
         val live = MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).build()
         try {
@@ -59,12 +63,48 @@ class BackupOlderSchemaImportTest {
                 assertEquals(MasroofDatabase.VERSION, it.version)
                 MigrationOpenPathContract.rows(it)
             }
-            assertEquals(expected - "user_decision", restored - "user_decision")
+            assertEquals(expected - "user_decision", restored - "user_decision" - "pattern_configuration")
             assertEquals(UserDecisionBackfillContract.EXPECTED.map(UserDecisionBackfillContract::dump), restored.getValue("user_decision"))
+            assertEquals(patternArchive("V19"), storedPatterns(context.getDatabasePath(MasroofDatabase.NAME)))
         } finally {
             if (live.isOpen) live.close()
             archive.delete()
             context.deleteDatabase(MasroofDatabase.NAME)
+        }
+    }
+
+    /** Before v21 the patterns rode in preferences.json; import puts them in the restored database, byte for byte. */
+    @Test
+    fun olderArchivesCarryingPatterns_importThemIntoTheDatabase() = runBlocking {
+        val v20 = MigrationOpenPathContract.v20File(context, "backup-v20.db", database)
+        val archives = mapOf(
+            "V18" to rewritten(18, MasroofDatabase.IDENTITY_HASHES.getValue(18), patterns = patternArchive("V18")),
+            "V20" to rewritten(20, MasroofDatabase.IDENTITY_HASHES.getValue(20), database = v20.readBytes(), patterns = patternArchive("V20")),
+            // An archive without patterns restores without a row, so bundled seeding runs on the next start.
+            null to rewritten(18, MasroofDatabase.IDENTITY_HASHES.getValue(18)),
+        )
+        context.deleteDatabase("backup-v20.db")
+        val expected = MigrationOpenPathContract.copyFixture(context, "older-fixture.db", database)
+            .let { MigrationOpenPathContract.readOnly(it, MigrationOpenPathContract::rows) }
+            .also { context.deleteDatabase("older-fixture.db") }
+        for ((bank, bytes) in archives) {
+            val archive = File(context.cacheDir, "older.zip").apply { writeBytes(bytes) }
+            val live = MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).build()
+            MessagePatternStore(live).restoreRaw(patternArchive("LIVE"))
+            try {
+                val outcome = DatabaseBackupService(context, live, { live.close() }, "test", restartProcess = {}, appLogService = NoOpAppLog)
+                    .importFrom(Uri.fromFile(archive), confirmLegacyPlaintext = true)
+                assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
+                val livePath = context.getDatabasePath(MasroofDatabase.NAME)
+                assertEquals(bank?.let(::patternArchive), storedPatterns(livePath))
+                assertNull(MessagePatternBackup.captureOriginal(context))
+                val restored = MigrationOpenPathContract.readOnly(livePath, MigrationOpenPathContract::rows)
+                assertEquals(expected - "user_decision", restored - "user_decision" - "pattern_configuration")
+            } finally {
+                if (live.isOpen) live.close()
+                archive.delete()
+                context.deleteDatabase(MasroofDatabase.NAME)
+            }
         }
     }
 
@@ -131,8 +171,12 @@ class BackupOlderSchemaImportTest {
         manifestHash: String = MasroofDatabase.IDENTITY_HASH,
         sql: String? = null,
         database: ByteArray? = null,
+        patterns: String? = null,
     ): ByteArray {
         val entries = entries(plaintext().use { it.readBytes() }).toMutableMap()
+        val preferences = BackupPackageCodec.decodePreferences(entries.getValue(BackupPackageFormat.PREFERENCES_ENTRY).decodeToString())
+        entries[BackupPackageFormat.PREFERENCES_ENTRY] =
+            BackupPackageCodec.encodePreferences(preferences.copy(messagePatterns = patterns)).toByteArray()
         val manifest = BackupPackageCodec.decodeManifest(entries.getValue(BackupPackageFormat.MANIFEST_ENTRY).decodeToString())
         entries[BackupPackageFormat.MANIFEST_ENTRY] =
             BackupPackageCodec.encodeManifest(manifest.copy(roomVersion = manifestVersion, identityHash = manifestHash)).toByteArray()

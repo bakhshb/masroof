@@ -29,12 +29,12 @@ class MessagePatternBackupTest {
     @Test(timeout = 30_000) fun exportPairsItsFinancialSnapshotWithTheSamePatternGeneration() = runBlocking {
         val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "pattern-export")
         val gate = DatabaseAccessGate()
-        val store = MessagePatternStore(context)
+        val database = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
+            .allowMainThreadQueries().build()
+        val store = MessagePatternStore(database)
         val workflow = MessagePatternsWorkflow(store, gate, Dispatchers.Unconfined, appLogService = NoOpAppLog)
         val original = patternArchive("STC", withBindings = true)
         store.restoreRaw(original)
-        val database = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
-            .allowMainThreadQueries().build()
         val snapshotReady = CountDownLatch(1)
         val continueExport = CountDownLatch(1)
         val secret = "synthetic-pattern-backup".toCharArray()
@@ -66,8 +66,16 @@ class MessagePatternBackupTest {
                 while (entry != null) { entries[entry.name] = zip.readBytes(); entry = zip.nextEntry }
             }
             assertEquals(setOf("manifest.json", "preferences.json", "masroof.db"), entries.keys)
+            // The patterns travel inside the exported database only, at the generation of its financial snapshot.
             val saved = BackupPackageCodec.decodePreferences(requireNotNull(entries["preferences.json"]).toString(Charsets.UTF_8))
-            assertEquals(original, saved.messagePatterns)
+            assertNull(saved.messagePatterns)
+            val exported = context.cacheDir.resolve("exported.db").apply { writeBytes(requireNotNull(entries["masroof.db"])) }
+            SQLiteDatabase.openDatabase(exported.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                db.rawQuery("SELECT generation, document FROM pattern_configuration", null).use {
+                    assertTrue(it.moveToFirst()); assertEquals(1L, it.getLong(0)); assertEquals(original, it.getString(1))
+                    assertFalse(it.moveToNext())
+                }
+            }
             assertEquals(MasroofDatabase.VERSION, BackupPackageCodec.decodeManifest(requireNotNull(entries["manifest.json"]).toString(Charsets.UTF_8)).roomVersion)
         } finally {
             continueExport.countDown()
@@ -78,23 +86,22 @@ class MessagePatternBackupTest {
         Unit
     }
 
-    @Test fun rollbackRestoresEvenAnInvalidOriginalConfigurationInsteadOfSilentlyDiscardingIt() {
+    /** A restore journal still carries the pre-v21 file; a rollback puts even an invalid one back untouched. */
+    @Test fun rollbackRestoresEvenAnInvalidOriginalLegacyFileInsteadOfSilentlyDiscardingIt() {
         val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "pattern-rollback")
         val live = context.getDatabasePath(MasroofDatabase.NAME)
-        val store = MessagePatternStore(context)
         try {
             SQLiteDatabase.openOrCreateDatabase(live, null).use { db -> db.execSQL("CREATE TABLE original_marker(value TEXT)") }
-            store.restoreRaw("{broken-original", validate = false)
+            MessagePatternBackup.restore(context, "{broken-original", validate = false)
             DatabaseRestoreRecovery.writeSnapshots(live, DatabaseRestoreRecovery.capturePreferences(context),
                 DatabaseRestoreRecovery.incomingPreferences(BackupPreferencesSnapshot(true, true, historicalImportCompleted = true,
                     languageTag = "ar", themeMode = "SYSTEM", messagePatterns = patternArchive("IMPORTED"))))
             DatabaseRestoreRecovery.parkOriginal(live)
             live.writeText("corrupt installed database")
-            store.restoreRaw(patternArchive("IMPORTED"))
+            MessagePatternBackup.restore(context, patternArchive("IMPORTED"))
             DatabaseRestoreRecovery.writeJournal(live, DatabaseRestoreRecovery.Stage.NEW_INSTALLED, false)
             DatabaseRestoreRecovery.recover(context)
-            assertEquals("{broken-original", store.captureRaw())
-            assertThrows(Exception::class.java) { store.load() }
+            assertEquals("{broken-original", MessagePatternBackup.captureOriginal(context))
             SQLiteDatabase.openDatabase(live.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
                 db.rawQuery("SELECT * FROM original_marker", null).use { assertEquals(0, it.count) }
             }

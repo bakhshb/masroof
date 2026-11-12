@@ -47,7 +47,7 @@ class LedgerFixturesTest {
     @Before
     fun setUp() {
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Riyadh"))
-        MessagePatternStore(context).restoreRaw(null)
+        MessagePatternBackup.restore(context, null)
         context.deleteDatabase(MasroofDatabase.NAME)
         DatabaseRestoreRecovery.deleteRestoreArtifacts(context.getDatabasePath(MasroofDatabase.NAME))
         if (System.getenv(REBUILD_ENV) == "1" && !rebuilt) {

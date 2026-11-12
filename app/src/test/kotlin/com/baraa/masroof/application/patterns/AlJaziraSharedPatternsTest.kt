@@ -10,7 +10,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
 import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
-import com.baraa.masroof.data.patterns.MessagePatternStore
+import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import com.baraa.masroof.domain.model.*
 import com.baraa.masroof.engine.bank.patterns.*
 import com.baraa.masroof.sms.hash.SmsBodyHasher
@@ -90,7 +90,7 @@ class AlJaziraSharedPatternsTest {
 
     @Test fun loadingInstalledDefinitionsIsReadOnlyInsideAdmittedFinancialWork() = runBlocking {
         fixture { c ->
-            val store = MessagePatternStore(c.storage.appContext)
+            val store = c.storage.messagePatternStore
             val before = store.captureRaw()
             val generation = store.load().generation
             c.storage.databaseAccessGate.withAccess {
@@ -100,12 +100,14 @@ class AlJaziraSharedPatternsTest {
         }
     }
 
+    /** A pre-v21 installation: its teaching is in the legacy file, copied into the database on the first open. */
     @Test fun upgradingExistingTeachingAndRepeatedStartupKeepHistoryAndDisabledDefaults() = runBlocking {
         val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "aljazira-upgrade-${java.util.UUID.randomUUID()}")
-        val store = MessagePatternStore(context)
         val taught = SavedMessagePattern.fromChoices("existing-teaching", bankId, "AlJazira", "PURCHASE", "Old format:10SAR",
             listOf(FieldChoice("amount", 11, 16)))
-        store.saveBank(0, BankMessagePatterns(bankId, listOf("AlJazira"), "My bank", listOf(taught)))
+        val legacy = LegacyMessagePatternFile.of(context)
+        LegacyMessagePatternFile.write(legacy, MessagePatternConfigurationCodec.encode(MessagePatternConfiguration(1,
+            listOf(BankMessagePatterns(bankId, listOf("AlJazira"), "My bank", listOf(taught))))), validate = true)
         try {
             withTimeout(20_000) {
                 var c = AppContainer(context)
@@ -114,16 +116,19 @@ class AlJaziraSharedPatternsTest {
                     val bank = w.load().banks.single { it.bankId == bankId }
                     assertEquals(taught, bank.patterns.single { it.id == taught.id })
                     assertEquals(13, bank.patterns.count { it.roleProfile != null })
+                    assertFalse(legacy.exists())
                     w.setEnabled(w.load().generation, bankId, "bank.purchase", false)
                 } finally { c.close() }
-                val before = store.captureRaw()
                 c = AppContainer(context)
                 try {
+                    val store = c.storage.messagePatternStore
+                    val before = store.captureRaw()
                     val bank = c.patterns.messagePatternsWorkflow.load().banks.single { it.bankId == bankId }
                     assertFalse(bank.currentPatterns.single { it.id == "bank.purchase" }.enabled)
                     assertEquals(2, bank.patterns.count { it.id == "bank.purchase" })
                     assertEquals(before, store.captureRaw())
                     assertEquals(store.load(), MessagePatternConfigurationCodec.decode(MessagePatternConfigurationCodec.encode(store.load())))
+                    assertFalse(legacy.exists())
                 } finally { c.close() }
             }
         } finally { context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }

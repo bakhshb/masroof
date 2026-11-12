@@ -446,7 +446,7 @@ class PatternProcessingMilestoneTest {
 
     @Test fun captureSnapshotsThatExpireBeforeProcessingAreRetriedBeforeSavingFacts() = runBlocking {
         fixture { c ->
-            val store = com.baraa.masroof.data.patterns.MessagePatternStore(c.storage.appContext)
+            val store = c.storage.messagePatternStore
             val registry = com.baraa.masroof.bank.BankSmsRegistry(emptyList(), ConfiguredPatternAdapters(store)::snapshot)
             val raw = sms("stale-capture", incoming)
             val route = registry.route(raw.sender, raw.body)

@@ -26,7 +26,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.nio.file.Files
+import com.baraa.masroof.testsupport.withPatternDatabase
+import com.baraa.masroof.testsupport.writePatternRow
 import java.time.Instant
 import com.baraa.masroof.testsupport.StubAccountRegistryRepository
 import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
@@ -35,9 +36,8 @@ import com.baraa.masroof.testsupport.NoOpCardRegistryRepository
 @Config(sdk = [28])
 class AutomaticPatternWriteGuardTest {
     @Test fun rolePatternStampIsCheckedAndInvalidatedByDisableOrSameGenerationRestore() = runBlocking {
-        val directory = Files.createTempDirectory("role-pattern-guard-").toFile()
-        try {
-            val store = MessagePatternStore(directory.resolve("patterns.json"))
+        withPatternDatabase { db ->
+            val store = MessagePatternStore(db)
             val definition = com.baraa.masroof.engine.bank.rules.AlJaziraRuleProfile.current()
                 .asMessagePatterns("BANK_ALJAZIRA", listOf("AlJazira"))
             val snapshot = store.saveBank(0, definition)
@@ -63,7 +63,7 @@ class AutomaticPatternWriteGuardTest {
             store.saveBank(next.generation, definition.copy(patterns = listOf(purchase.copy(revision = 3, enabled = false))))
             assertFalse(policy.isCurrent(record))
             assertFalse(policy.isCurrent(record, posted = true))
-        } finally { directory.deleteRecursively() }
+        }
     }
 
     private val bank = BankId("BANK_STC")
@@ -72,13 +72,16 @@ class AutomaticPatternWriteGuardTest {
     private val pattern = SavedMessagePattern.fromChoices("purchase", bank.value, input.sender, "PURCHASE", body,
         listOf(FieldChoice("amount", 16, 21))).copy(factContract = PatternFactContract(MessageFamily.PURCHASE, MoneyDirection.OUTGOING))
 
+    private lateinit var fixtureDatabase: MasroofDatabase
+
     private suspend fun withFixture(block: suspend (MessagePatternStore, DatabaseAccessGate, ParsedEventRecord,
         AutomaticInterpretationWriteGuard, EffectiveParsedEventProvider, com.baraa.masroof.testsupport.DecidedCorrectionRepository) -> Unit) {
-        val directory = Files.createTempDirectory("pattern-guard-").toFile()
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java).allowMainThreadQueries().build()
         try {
-            val store = MessagePatternStore(directory.resolve("patterns.json"))
+            // The guard reads the patterns inside its own financial transaction, on the same database.
+            val store = MessagePatternStore(db)
+            fixtureDatabase = db
             val gate = DatabaseAccessGate()
             store.saveBank(0, BankMessagePatterns(bank.value, listOf(input.sender), patterns = listOf(pattern)))
             val raws = RoomRawSmsRepository(db.rawSmsDao())
@@ -96,7 +99,7 @@ class AutomaticPatternWriteGuardTest {
                 { work -> gate.withAccess { db.withTransaction { work() } } },
                 patternsCurrent = { record, posted -> check(db.inTransaction()); policy.isCurrent(record, posted) })
             block(store, gate, requireNotNull(effective.findEffectiveByRawSmsId(input.evidenceId)), guard, effective, corrections)
-        } finally { db.close(); directory.deleteRecursively() }
+        } finally { db.close() }
     }
 
     @Test fun currentProvenanceSurvivesRoomAndAllowsTheGuardedWrite() = runBlocking {
@@ -128,7 +131,7 @@ class AutomaticPatternWriteGuardTest {
             gate.withRestore { store.restoreRaw(com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec.encode(changed)) }
             var wrote = false
             assertTrue(guard.write(listOf(record)) { wrote = true; FinancialTransactionSaveResult.Saved } is FinancialTransactionSaveResult.Conflict)
-            gate.withRestore { store.restoreRaw("{broken", validate = false) }
+            gate.withRestore { fixtureDatabase.writePatternRow("{broken") }
             assertTrue(guard.write(listOf(record)) { wrote = true; FinancialTransactionSaveResult.Saved } is FinancialTransactionSaveResult.Conflict)
             assertFalse(wrote)
         }

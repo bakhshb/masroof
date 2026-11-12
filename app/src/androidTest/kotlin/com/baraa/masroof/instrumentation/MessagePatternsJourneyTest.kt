@@ -1,5 +1,7 @@
 package com.baraa.masroof.instrumentation
 
+import com.baraa.masroof.data.room.MasroofDatabase
+import androidx.room.Room
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
@@ -33,9 +35,8 @@ class MessagePatternsJourneyTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test fun teachPreviewSaveAndDisableInArabic() = runBlocking {
-        val file = compose.activity.cacheDir.resolve("synthetic-pattern-journey.json")
-        file.delete()
-        val store = MessagePatternStore(file)
+        val patternDb = Room.inMemoryDatabaseBuilder(compose.activity, MasroofDatabase::class.java).build()
+        val store = MessagePatternStore(patternDb)
         val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), appLogService = NoOpAppLog)
         workflow.saveBank(0, BankMessagePatterns("STC", listOf("STC Bank"), "بنك التجربة"))
         val dark = androidx.compose.runtime.mutableStateOf(false)
@@ -87,14 +88,13 @@ class MessagePatternsJourneyTest {
         compose.onNodeWithContentDescription(compose.ar(R.string.review_back)).performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText(compose.ar(R.string.pattern_teach)).fetchSemanticsNodes().isNotEmpty() }
         assertEquals(2, store.load().banks.single().patterns.size)
-        file.delete()
+        patternDb.close()
         Unit
     }
 
     @Test fun reviewSourcePrefillsImmutableTextAndReturnsWithoutResolvingReview() = runBlocking {
-        val file = compose.activity.cacheDir.resolve("synthetic-review-pattern-journey.json")
-        file.delete()
-        val store = MessagePatternStore(file)
+        val patternDb = Room.inMemoryDatabaseBuilder(compose.activity, MasroofDatabase::class.java).build()
+        val store = MessagePatternStore(patternDb)
         val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), appLogService = NoOpAppLog)
         val source = com.baraa.masroof.application.patterns.PatternTeachingSource(null, "STC Bank", "Payment\nAmount:73SAR")
         val returned = androidx.compose.runtime.mutableStateOf(false)
@@ -126,14 +126,13 @@ class MessagePatternsJourneyTest {
         assertEquals(listOf("STC Bank"), store.load().banks.single().senders)
         assertEquals(1, store.load().banks.single().patterns.size)
         assertEquals("Payment\nAmount:73SAR", source.body)
-        file.delete()
+        patternDb.close()
         Unit
     }
 
     @Test fun copyFromReviewSurvivesRotationAndBackReturnsToThePattern() = runBlocking {
-        val file = compose.activity.cacheDir.resolve("synthetic-review-copy-restore.json")
-        file.delete()
-        val store = MessagePatternStore(file)
+        val patternDb = Room.inMemoryDatabaseBuilder(compose.activity, MasroofDatabase::class.java).build()
+        val store = MessagePatternStore(patternDb)
         val workflow = MessagePatternsWorkflow(store, DatabaseAccessGate(), appLogService = NoOpAppLog)
         val source = com.baraa.masroof.application.patterns.PatternTeachingSource(null, "STC Bank", "Payment\nAmount:73SAR")
         val returned = androidx.compose.runtime.mutableStateOf(false)
@@ -167,7 +166,7 @@ class MessagePatternsJourneyTest {
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntil(10_000) { returned.value || compose.onAllNodesWithTag("pattern-copy").fetchSemanticsNodes().isNotEmpty() }
         assertFalse("Back from a restored copy left the pattern screen", returned.value)
-        file.delete()
+        patternDb.close()
         Unit
     }
 
@@ -175,10 +174,9 @@ class MessagePatternsJourneyTest {
         val context = compose.activity
         val db = androidx.room.Room.inMemoryDatabaseBuilder(context, com.baraa.masroof.data.room.MasroofDatabase::class.java)
             .allowMainThreadQueries().build()
-        val file = context.cacheDir.resolve("synthetic-pending-patterns.json")
-        file.delete()
+        val patternDb = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java).build()
         try {
-            val store = MessagePatternStore(file)
+            val store = MessagePatternStore(patternDb)
             val gate = DatabaseAccessGate()
             val raw = com.baraa.masroof.data.repository.RoomRawSmsRepository(db.rawSmsDao())
             val reviews = com.baraa.masroof.data.repository.RoomReviewRepository(db.reviewItemDao())
@@ -228,17 +226,16 @@ class MessagePatternsJourneyTest {
             compose.clickAr(R.string.pattern_pending_title)
             compose.waitUntil(10_000) { compose.onAllNodesWithText("غير مطابق: 2").fetchSemanticsNodes().isNotEmpty() }
             assertEquals(2, reviews.listRequired().size)
-        } finally { db.close(); file.delete() }
+        } finally { db.close(); patternDb.close() }
         Unit
     }
 
     @Test fun stcBundledPatternsAppearWithoutTeachingAndKeepUserDisable() = runBlocking {
-        val file = compose.activity.cacheDir.resolve("synthetic-stc-bundle.json")
-        file.delete()
+        val patternDb = Room.inMemoryDatabaseBuilder(compose.activity, MasroofDatabase::class.java).build()
         try {
             val banks = com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec.decode(
                 compose.activity.assets.open("bank-patterns/BANK_STC.patterns.json").bufferedReader().use { it.readText() }).banks
-            val workflow = MessagePatternsWorkflow(MessagePatternStore(file), DatabaseAccessGate(), bundledBanks = banks, appLogService = NoOpAppLog)
+            val workflow = MessagePatternsWorkflow(MessagePatternStore(patternDb), DatabaseAccessGate(), bundledBanks = banks, appLogService = NoOpAppLog)
             compose.setContent {
                 val localized = AppLocaleContext.wrap(LocalContext.current, "ar")
                 CompositionLocalProvider(LocalContext provides localized, LocalConfiguration provides localized.resources.configuration) {
@@ -250,11 +247,11 @@ class MessagePatternsJourneyTest {
             capture("stc-ready-patterns")
             compose.onNodeWithTag("pattern-open-BANK_STC-stc-internal-in").performScrollTo().performClick()
             compose.onNodeWithTag("pattern-toggle-BANK_STC-stc-internal-in").performScrollTo().performClick()
-            compose.waitUntil(10_000) { MessagePatternStore(file).load().generation == 2L }
-            val reopened = MessagePatternsWorkflow(MessagePatternStore(file), DatabaseAccessGate(), bundledBanks = banks, appLogService = NoOpAppLog).load()
+            compose.waitUntil(10_000) { MessagePatternStore(patternDb).load().generation == 2L }
+            val reopened = MessagePatternsWorkflow(MessagePatternStore(patternDb), DatabaseAccessGate(), bundledBanks = banks, appLogService = NoOpAppLog).load()
             assertEquals(2L, reopened.generation)
             assertEquals(1, reopened.banks.single().currentPatterns.count { !it.enabled })
-        } finally { file.delete() }
+        } finally { patternDb.close() }
         Unit
     }
 
