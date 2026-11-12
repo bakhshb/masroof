@@ -15,18 +15,26 @@ When rules pull against each other, the earlier one wins:
 Design serves the feature. A design rule never blocks a correctness fix, delays a feature or justifies rework of a screen that works; if one gets in the way, ship the fix and report the conflict.
 
 ## Workflow
-Run this for each plan phase:
-1. Plan: what changes and the tests that prove it is done. Any change to numbers or behavior the owner sees is asked before implementing. For a new screen, describe its layout in the plan using existing components; make a design mock-up only when the owner asks for one.
+The orchestrator owns the project (owner, 2026-11-13): it reads the code, decides the design and builds the change itself by default. Run this for each change (a plan piece, a feature, a fix):
+1. Plan: what changes and the tests that prove it is done. Any change to numbers or behavior the owner sees is asked before implementing, and so is any schema or backup-format change. For a new screen, describe its layout in the plan using existing components; make a design mock-up only when the owner asks for one.
 2. Implement with its tests, and run them.
-3. Simplify the code and its tests once (`/simplify`), and rerun the tests.
-4. Review for bugs (`/code-review`), fix, rerun the tests; repeat until the review finds no real bug. Owner decisions are reported, not looped on.
+3. Simplify the code and its tests once, and rerun the tests.
+4. Review for bugs, fix, rerun the tests; repeat until the review finds no real bug. Owner decisions are reported, not looped on.
 
-At the end of the PR: one review of the whole PR, then CI green including device tests, then report done.
+Steps 3 and 4 use `/simplify` and `/code-review` for a large or high-risk change; for a small one, simplify and review directly.
+
+Delivery: each change is built in its own git worktree from the latest `main` and goes to `main` as one pull request (no rebases). It deletes the code, tests, imports, fixtures and string resources it makes obsolete, and updates `AGENTS.md`, `CLAUDE.md` and `docs/` when a rule or module changes. At the end of the PR: one review of the whole PR, then CI green including device tests; the orchestrator then merges it and reports done.
+
+### Agents
+Agents are used only where splitting the work really helps, and their cost counts. Small and medium changes, review fixes and CI fixes are never handed to an agent.
+- Implementer (`.claude/agents/implementer.md`, Sonnet by default; pass Opus for intricate or high-risk work): a large, clearly described task, or independent parts in parallel.
+- Reviewer (`.claude/agents/reviewer.md`, Opus): an independent review of a high-risk change only (money, schema, backup and restore, concurrency). The orchestrator reviews everything else itself.
+- A read-only search agent: a broad read where only the conclusion is needed.
+
+The agent definitions describe the role, not a particular plan; the task brief names the plan row or criteria.
 
 ### Work under `docs/SUSTAINABILITY_PLAN.md`
-- One pull request per plan piece, to `main`, one piece at a time, each starting from the latest `main` (no rebases).
-- Each piece is built in its own git worktree by an implementer agent (`.claude/agents/implementer.md`), then reviewed by the Opus reviewer agent (`.claude/agents/reviewer.md`); loop until the review finds no real bug. The Model column of each piece names who implements it (Sonnet for routine pieces, Opus for high-risk or intricate ones). Opus reviews every piece. The orchestrator passes the model override when the column says Opus, because the implementer agent definition defaults to Sonnet.
-- Every piece deletes the code, tests, imports, fixtures and string resources it makes obsolete, and updates `AGENTS.md`, `CLAUDE.md` and `docs/` when a rule or module changes.
+- One pull request per plan piece, one piece at a time. The plan's Model column is guidance for an implementer agent, when one is used.
 - Owner gates (marked Gate) stop and ask before implementing. The derived ledger replaces the old reconciliation path only after the owner approves every difference in the shadow comparison.
 - No remote pattern download. Wiring stays manual; no DI library unless the owner asks.
 

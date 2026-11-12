@@ -17,22 +17,24 @@ Goal: the same app and the same numbers, built so that a change is small, tested
 
 | Topic | Decision |
 |---|---|
-| Schema | The v18 freeze is lifted. Additive, tested migrations only; no destructive fallback. |
+| Schema | The v18 freeze is lifted. Additive, tested migrations only; no destructive fallback. Decided 2026-11-12: the installed build is v18 and nothing is installed until the plan ends, so there is one migration from v18 to the final version; the intermediate versions v19–v21 existed only in CI and are refused (from piece 5.2). |
 | Ledger switch-over | New projection runs beside the old path; the owner approves every difference before the old path is deleted. |
 | Remote pattern updates | Not in this plan. Only a masked "report unparsed message" export. |
 | Wiring | Clean up and split by hand. A DI library is an optional last piece, decided later. |
 | Delivery | One pull request per piece, to `main`. No rebases. |
 | Parallelism | One piece at a time. |
+| Who does the work | Decided 2026-11-13: the orchestrator owns the project and builds pieces itself by default. Agents are used only where splitting really helps, and their cost is weighed (see below). |
 
 ## How each piece is executed
 
 1. **Start.** After the previous pull request is merged, start a branch from the latest `main`. Nothing else is in flight, so no piece ever needs a rebase.
-2. **Worktree.** One agent implements the piece in its own git worktree (`Agent` with `isolation: "worktree"`).
-3. **Models.** The Model column of each piece names who implements it (Sonnet for routine pieces, Opus for high-risk or intricate ones). Opus reviews every piece. The orchestrator passes the model override when the column says Opus, because the implementer agent definition defaults to Sonnet.
-4. **Loop (project workflow).** Implement with tests → run tests → `/simplify` once → Opus `/code-review` → fix → rerun, until the review finds no real bug.
-5. **Clean-up is part of every piece.** Code, tests, imports, fixtures and string resources made obsolete by the piece are deleted in the same piece. `AGENTS.md`, `CLAUDE.md` and the matching `docs/*.md` are updated in the same piece whenever a rule or module changes.
-6. **Deliver.** Push, open one pull request to `main`, watch CI (unit + device shards) and fix failures. The owner merges. The next piece starts only after the merge.
-7. **Owner gates.** A piece that changes a number or behaviour the owner sees stops and asks first (marked **Gate**).
+2. **Worktree.** The piece is built in its own git worktree under `.claude/worktrees/`.
+3. **Who builds it.** The orchestrator builds small and medium pieces itself, and fixes review findings and CI failures itself. An implementer agent builds a piece only when it is large and can be described clearly, or when two independent parts can run in parallel. The agent definitions in `.claude/agents/` are general roles, not tied to this plan; the task brief names the piece. The Model column is guidance for that case (Sonnet for wide routine work, Opus for intricate or high-risk work), not a rule.
+4. **Who reviews it.** The orchestrator reviews every piece. An independent Opus review is added only for high-risk pieces: money, the database schema, backup and restore, or concurrency. A broad read-only search may go to an agent when only the conclusion is needed.
+5. **Loop (project workflow).** Implement with tests → run tests → simplify → review → fix → rerun, until the review finds no real bug. `/simplify` and `/code-review` with their own agents are for large or high-risk pieces; on a small change the orchestrator simplifies and reviews directly.
+6. **Clean-up is part of every piece.** Code, tests, imports, fixtures and string resources made obsolete by the piece are deleted in the same piece. `AGENTS.md`, `CLAUDE.md` and the matching `docs/*.md` are updated in the same piece whenever a rule or module changes.
+7. **Deliver.** Push, open one pull request to `main`, watch CI (unit + device shards) and fix failures. Since 2026-11-11 the orchestrator merges once the review finds no real bug and CI is green. The next piece starts only after the merge.
+8. **Owner gates.** A piece that changes a number or behaviour the owner sees stops and asks first (marked **Gate**). So does any schema or backup-format change: its design is described to the owner before it is built.
 
 **Where tests run.** Unit tests run locally before each push; device tests run in PR CI.
 
@@ -95,8 +97,8 @@ Shared acceptance criteria, for every piece:
 
 | # | Piece | Model | Own acceptance criteria |
 |---|---|---|---|
-| 5.1 | **Patterns into the database. High.** Migration adds pattern tables; one-time import of `message-patterns/definitions.json`; `MessagePatternStore` keeps its API. | Opus | Imported configuration equals the file (round trip); generation check preserved; old backups containing the file still import. |
-| 5.2 | **Recurring decisions. High.** `recurring_feedback` moves into `user_decision`. Analytics and learning stay separate database files (their content is derived); `LearningStore` gains the preserving open factory. Owner, 2026-11-12: the answers go into `user_decision` itself (`RECURRING` rows), and the development-only chain 18→19→20→21 becomes one migration 18→22; only v18 and v22 are accepted. | Opus | Recurring decisions survive upgrade (device test); a corrupt learning file no longer risks a destructive reopen. |
+| 5.1 | **Patterns into the database. High.** Migration adds one table holding the whole pattern document in a single row (owner, 2026-11-12); one-time import of `message-patterns/definitions.json`, the file deleted only after a verified copy; `MessagePatternStore` keeps its API. | Opus | Imported configuration equals the file (round trip); generation check preserved; old backups containing the file still import. |
+| 5.2 | **Recurring decisions. High.** `recurring_feedback` moves into `user_decision` (owner, 2026-11-12). The migration chain is replaced by one migration from v18 to v22 that creates `user_decision` in its final shape (the answers are its `RECURRING` rows), so no table is rebuilt. Analytics and learning stay separate database files (their content is derived); `LearningStore` gains the preserving open factory. | Opus | Recurring decisions survive upgrade (device test); a corrupt learning file no longer risks a destructive reopen; only v18 and the final version are accepted. |
 | 5.3 | **Backup format.** Bump `BackupPackageFormat.FORMAT_VERSION`; patterns travel inside the database; all older formats, including legacy plaintext v1, stay importable. | Opus | Every existing backup fixture imports; encryption tests unchanged; backup code shrinks. |
 
 ### Phase 6 — Presentation
@@ -127,7 +129,7 @@ Shared acceptance criteria, for every piece:
 
 ## Verification
 
-- Per piece: shared and own acceptance criteria, checked by the reviewer agent before the pull request, then PR CI.
+- Per piece: shared and own acceptance criteria, checked by the orchestrator (and by the reviewer agent for high-risk pieces) before the pull request, then PR CI.
 - Money: ledger snapshot and `DashboardFixtureCharacterizationTest` identical except at owner gates.
 - Data safety: migration tests from the v18 fixture database, device upgrade test, import of every existing backup fixture.
 - End of plan: release-build smoke on the emulator and the 7.5 whole-project review.
