@@ -18,16 +18,20 @@ Design serves the feature. A design rule never blocks a correctness fix, delays 
 Run this for each plan phase:
 1. Plan: what changes and the tests that prove it is done. Any change to numbers or behavior the owner sees is asked before implementing. For a new screen, describe its layout in the plan using existing components; make a design mock-up only when the owner asks for one.
 2. Implement with its tests, and run them.
-3. Simplify the code and its tests once (`/simplify`), and rerun the tests.
-4. Review for bugs (`/code-review`), fix, rerun the tests; repeat until the review finds no real bug. Owner decisions are reported, not looped on.
+3. Simplify the code and its tests once, and rerun the tests.
+4. Review for bugs, fix, rerun the tests; repeat until the review finds no real bug. Owner decisions are reported, not looped on.
+
+Steps 3 and 4 use `/simplify` and `/code-review` for a large or high-risk change; for a small one, simplify and review directly.
 
 At the end of the PR: one review of the whole PR, then CI green including device tests, then report done.
 
 ### Work under `docs/SUSTAINABILITY_PLAN.md`
 - One pull request per plan piece, to `main`, one piece at a time, each starting from the latest `main` (no rebases).
-- Each piece is built in its own git worktree by an implementer agent (`.claude/agents/implementer.md`), then reviewed by the Opus reviewer agent (`.claude/agents/reviewer.md`); loop until the review finds no real bug. The Model column of each piece names who implements it (Sonnet for routine pieces, Opus for high-risk or intricate ones). Opus reviews every piece. The orchestrator passes the model override when the column says Opus, because the implementer agent definition defaults to Sonnet.
+- The orchestrator owns the project (owner, 2026-11-13). It builds each piece in its own git worktree, by itself by default: small and medium pieces, review fixes and CI fixes are never handed to an agent.
+- Agents are used only where splitting really helps, and their cost counts: an implementer agent (`.claude/agents/implementer.md`) for a large, clearly described piece or for independent parts in parallel; the Opus reviewer agent (`.claude/agents/reviewer.md`) only for high-risk pieces (money, schema, backup and restore, concurrency); a read-only search agent when only the conclusion is needed. The plan's Model column is guidance for the implementer (Sonnet for wide routine work, Opus for intricate work).
+- The orchestrator reviews every piece itself and loops until no real bug is left. `/simplify` and `/code-review` with their own agents are for large or high-risk pieces. It merges a piece once the review is clean and CI is green.
 - Every piece deletes the code, tests, imports, fixtures and string resources it makes obsolete, and updates `AGENTS.md`, `CLAUDE.md` and `docs/` when a rule or module changes.
-- Owner gates (marked Gate) stop and ask before implementing. The derived ledger replaces the old reconciliation path only after the owner approves every difference in the shadow comparison.
+- Owner gates (marked Gate) stop and ask before implementing, and so does any schema or backup-format change. The derived ledger replaces the old reconciliation path only after the owner approves every difference in the shadow comparison.
 - No remote pattern download. Wiring stays manual; no DI library unless the owner asks.
 
 ## Never break

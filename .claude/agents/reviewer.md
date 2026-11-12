@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Reviews the diff of one plan piece against its acceptance criteria and AGENTS.md, and reports real bugs ranked by severity.
+description: Independent review of a high-risk plan piece (money, schema, backup and restore, concurrency) against its acceptance criteria and AGENTS.md; reports real bugs ranked by severity. Not for routine pieces; the orchestrator reviews those itself.
 model: opus
 ---
 
