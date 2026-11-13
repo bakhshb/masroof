@@ -12,6 +12,8 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.platform.app.InstrumentationRegistry
@@ -75,6 +77,12 @@ class PatternTeachingClarityJourneyTest {
             compose.onNodeWithTag("pattern-field-help").assertIsDisplayed()
             compose.onNode(hasAnyAncestor(hasTestTag("pattern-field-help")) and hasText("مثال", substring = true)).assertIsDisplayed()
             compose.onNodeWithTag("pattern-bind").performClick()
+            // The opening words name the message: they are refused as a value with the reason, instead of a failed preview later.
+            compose.onAllNodes(SemanticsMatcher("opening candidate") {
+                it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("pattern-candidate-0-") == true
+            }).onFirst().performScrollTo().performClick()
+            compose.onNodeWithText(compose.ar(R.string.teaching_opening_value)).assertIsDisplayed()
+            compose.onNodeWithTag("pattern-bind").assertIsNotEnabled()
             repeat(5) { click(R.string.teaching_skip_field) }
             compose.onNodeWithTag("pattern-question").assertIsDisplayed().assertTextContains("بنك الطرف الآخر", substring = true)
             compose.onNodeWithTag("pattern-candidates").performTouchInput { swipeUp() }
