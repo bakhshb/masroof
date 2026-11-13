@@ -171,6 +171,13 @@ class ForecastLifecycleTest {
             assertTrue(rentDue>=250000)
             assertEquals(beforeRent.remaining!!+rentDue,withRent.remaining)
             assertEquals(beforeRent.total!!+rentDue,withRent.total)
+            // The chart draws each due transfer on its day, so the estimated bars rise by exactly the same amount.
+            fun estimated(snapshot: com.baraa.masroof.application.analytics.AnalysisSnapshot)=snapshot.days.mapNotNull { it.forecast }.sum()
+            assertEquals(estimated(beforeRent)+rentDue,estimated(withRent))
+            withRent.dues.filter { it.name=="Landlord" && it.confirmed }.forEach { due ->
+                assertEquals(beforeRent.days.single { it.day==due.day && it.forecast!=null }.forecast!!+due.amount,
+                    withRent.days.single { it.day==due.day && it.forecast!=null }.forecast)
+            }
         } finally { workflow.close();sidecar.close();c.close();androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase();context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
     }
 }

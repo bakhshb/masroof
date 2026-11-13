@@ -159,7 +159,9 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     private data class Source(val clean: CleanData, val start: Long, val end: Long, val today: Long,
         val completed: Int, val dues: List<AnalysisDue>, val committed: Set<String>, val reviews: Int,
         val blocked: Boolean, val fingerprint: String, val reasons: List<String>, val insights: AnalysisSpendingInsights,
-        val committedCadences: Map<String, String>, val plannedTransfers: Long)
+        val committedCadences: Map<String, String>,
+        /** Registered commitments paid by transfer and still due in this period: amount by due day. */
+        val plannedTransfers: Map<Long, Long>)
 
     private suspend fun source(): Source {
             val zone = clock.zone; val today = LocalDate.now(clock); val todayDay = today.toEpochDay()
@@ -269,7 +271,8 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val plannedTransfers = current.commitmentsOverview.rows.filter {
                 it.status == CommitmentPaymentStatus.UNPAID && it.userCommitmentId in read.transferCommitments &&
                     it.amount.currency == Currency.SAR && it.expectedDate?.toEpochDay() in todayDay until period.endDateExclusive.toEpochDay()
-            }.fold(0L) { sum, row -> Math.addExact(sum, row.amount.amount.movePointRight(2).longValueExact()) }
+            }.groupBy({ it.expectedDate!!.toEpochDay() }, { it.amount.amount.movePointRight(2).longValueExact() })
+                .mapValues { (_, amounts) -> amounts.fold(0L, Math::addExact) }
             val committed = read.committed
             val decisions = store.analytics().candidates().filter { it.status != "SUGGESTED" }.sortedBy { it.id }.map { it.id to it.status }
             val feedback = answers.effective().joinToString { "${it.seriesKey}:${it.kind}:${it.decidedAt}:${hash(it.payload)}" }
@@ -319,11 +322,12 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             AnalysisPresentationBuilder.coverage(input.clean, input.today), AnalysisPresentationBuilder.consecutiveCompleteDays(input.clean, input.today))
         val todayFacts = input.clean.days.first { it.day == input.today }
         // A confirmed transfer commitment (rent) still due in this period is known, not estimated.
-        val planned = input.plannedTransfers
+        val planned = input.plannedTransfers.values.fold(0L, Math::addExact)
         val remaining = result.remaining?.let { Math.addExact(it, planned) }
         val total = result.total?.let { Math.addExact(it, planned) }
-        val futureDays = result.points.map { point -> AnalysisDay(point.day, null,
-            if (point.day == input.today) Math.addExact(todayFacts.net, (point.gross - todayFacts.gross).coerceAtLeast(0)) else point.gross) }
+        // Each planned transfer is drawn on its due day, so the estimated bars add up to the remaining figure.
+        val futureDays = result.points.map { point -> AnalysisDay(point.day, null, Math.addExact(input.plannedTransfers[point.day] ?: 0,
+            if (point.day == input.today) Math.addExact(todayFacts.net, (point.gross - todayFacts.gross).coerceAtLeast(0)) else point.gross)) }
         val snapshot = AnalysisSnapshot(input.start, input.end, at, input.fingerprint, result.status, result.method,
             result.actual, remaining, total, result.lower, result.upper,
             input.clean.days.filter { it.day >= input.start }.map { AnalysisDay(it.day, it.net, null) } + futureDays,
