@@ -12,7 +12,7 @@ import com.baraa.masroof.domain.repository.UserCorrectionRepository
 
 /**
  * Fills `user_decision` from review resolutions, selections and corrections a test wrote straight into the legacy
- * stores, as the v18 upgrade (`UserDecisionBackfill`) does for an old install.
+ * stores (`UserDecisionBackfill`).
  */
 internal fun MasroofDatabase.backfillDecisions() = UserDecisionBackfill.run(openHelper.writableDatabase)
 

@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "368596980d2999446c385bc124ead944",
+    "identityHash": "f7c337b86d9ca65685b1c1d8ac1b4eec",
     "entities": [
       {
         "tableName": "engine_interpretation",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `rawId` TEXT NOT NULL, `bankId` TEXT, `engineVersion` TEXT NOT NULL, `rulesVersion` TEXT NOT NULL, `activeModelVersion` TEXT, `origin` TEXT NOT NULL, `family` TEXT NOT NULL, `status` TEXT NOT NULL, `blockers` TEXT NOT NULL, `bodyHash` TEXT NOT NULL, `receivedAt` INTEGER NOT NULL, `interpretedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `rawId` TEXT NOT NULL, `bankId` TEXT, `engineVersion` TEXT NOT NULL, `rulesVersion` TEXT NOT NULL, `activeModelVersion` TEXT, `origin` TEXT NOT NULL, `family` TEXT NOT NULL, `status` TEXT NOT NULL, `blockers` TEXT NOT NULL, `bodyHash` TEXT NOT NULL, `receivedAt` INTEGER NOT NULL, `interpretedAt` INTEGER NOT NULL, `assistRequested` INTEGER NOT NULL DEFAULT 0, `assistOutcome` TEXT NOT NULL DEFAULT 'LEGACY_UNKNOWN', `score` REAL, `margin` REAL, `coverage` REAL, `template` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -23,8 +23,7 @@
           {
             "fieldPath": "bankId",
             "columnName": "bankId",
-            "affinity": "TEXT",
-            "notNull": false
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "engineVersion",
@@ -41,8 +40,7 @@
           {
             "fieldPath": "activeModelVersion",
             "columnName": "activeModelVersion",
-            "affinity": "TEXT",
-            "notNull": false
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "origin",
@@ -85,6 +83,40 @@
             "columnName": "interpretedAt",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "assistRequested",
+            "columnName": "assistRequested",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "assistOutcome",
+            "columnName": "assistOutcome",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'LEGACY_UNKNOWN'"
+          },
+          {
+            "fieldPath": "score",
+            "columnName": "score",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "margin",
+            "columnName": "margin",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "coverage",
+            "columnName": "coverage",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "template",
+            "columnName": "template",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -103,8 +135,7 @@
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_engine_interpretation_rawId` ON `${TABLE_NAME}` (`rawId`)"
           }
-        ],
-        "foreignKeys": []
+        ]
       },
       {
         "tableName": "learning_label",
@@ -197,14 +228,80 @@
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_learning_label_bankId_template` ON `${TABLE_NAME}` (`bankId`, `template`)"
           }
+        ]
+      },
+      {
+        "tableName": "learning_feedback",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`decisionId` TEXT NOT NULL, `rawId` TEXT NOT NULL, `sourceAt` INTEGER NOT NULL, `provenance` TEXT NOT NULL, `state` TEXT NOT NULL, `reason` TEXT, `bankId` TEXT, `template` TEXT, PRIMARY KEY(`decisionId`))",
+        "fields": [
+          {
+            "fieldPath": "decisionId",
+            "columnName": "decisionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rawId",
+            "columnName": "rawId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceAt",
+            "columnName": "sourceAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "provenance",
+            "columnName": "provenance",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bankId",
+            "columnName": "bankId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "template",
+            "columnName": "template",
+            "affinity": "TEXT"
+          }
         ],
-        "foreignKeys": []
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "decisionId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_learning_feedback_rawId",
+            "unique": false,
+            "columnNames": [
+              "rawId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_learning_feedback_rawId` ON `${TABLE_NAME}` (`rawId`)"
+          }
+        ]
       }
     ],
-    "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '368596980d2999446c385bc124ead944')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f7c337b86d9ca65685b1c1d8ac1b4eec')"
     ]
   }
 }

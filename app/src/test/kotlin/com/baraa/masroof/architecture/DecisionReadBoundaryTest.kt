@@ -9,7 +9,7 @@ import org.junit.Test
  * Processing reads user decisions from `user_decision` only (plan 2.3). The legacy stores, review resolutions
  * (`resolutionKind`, [LEGACY_TOKENS]), the `user_selected_bank:` reason prefix and `user_correction`, are still
  * written in the same transaction as each decision, so only the files in [ALLOWED] may name them: their writers,
- * the stores and mappers themselves, wiring, the 2.2 backfill, screens that display a review, and the decision
+ * the stores and mappers themselves, wiring, screens that display a review, and the decision
  * reads kept on purpose (docs/ARCHITECTURE.md, "Reading decisions"). The allowlist is per file: an allowed file may name
  * any legacy token anywhere in it, so keep each entry's reason exact. Fix a new read by going through
  * `UserDecisionRepository.effectiveFor`; never add an entry without the owner's reason.
@@ -94,7 +94,6 @@ class DecisionReadBoundaryTest {
             "data/room/entity/ReviewItemEntity.kt" to STORE,
             "data/room/entity/UserCorrectionEntity.kt" to STORE,
             "data/room/mapper/ReviewItemMapper.kt" to STORE,
-            "data/room/UserDecisionBackfill.kt" to "the 2.2 backfill reads the legacy traces once, in the single v18 upgrade",
             "application/container/StorageContainer.kt" to WIRING,
             "application/container/LearningContainer.kt" to WIRING,
             "application/container/ReviewContainer.kt" to WIRING,

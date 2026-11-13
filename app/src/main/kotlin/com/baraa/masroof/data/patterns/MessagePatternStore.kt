@@ -8,11 +8,10 @@ import com.baraa.masroof.engine.bank.patterns.BankMessagePatterns
 import com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration
 import com.baraa.masroof.engine.bank.patterns.SavedMessagePattern
 import com.baraa.masroof.engine.bank.patterns.SenderIdentity
-import java.io.File
 
 /**
  * Durable user definitions, never a rebuildable learning cache: the whole document is the one
- * `pattern_configuration` row of `masroof.db` (schema v22). Each write reads, checks and replaces the row in one
+ * `pattern_configuration` row of `masroof.db`. Each write reads, checks and replaces the row in one
  * database transaction, so the generation check holds across threads; no lock is held around database access, so
  * a read from inside a financial transaction joins it and never waits on a writer. Each touch holds a blocking
  * admission of the access gate (immediate inside a lease), so a read during a restore can never reopen the file. The decoded document is
@@ -90,20 +89,6 @@ class MessagePatternStore(
     fun restoreRaw(raw: String?): Unit = transaction {
         if (raw == null) database().execSQL("DELETE FROM pattern_configuration")
         else put(MessagePatternConfigurationCodec.decode(raw).generation, raw)
-    }
-
-    /**
-     * One-time copy of the v18 [file] into the row, byte for byte; runs when the live database opens.
-     * The file is deleted only after the stored row was read back: equal to the file, or, when a row was already
-     * there and differs, once that row decodes. Once a row exists every write goes to it and no app version writes
-     * the file again (v22 never downgrades), so a differing file is the older one. Any throw keeps the file and the
-     * next open repeats the copy; after success there is no file and a rerun does nothing.
-     */
-    fun importLegacyFile(file: File) {
-        val legacy = LegacyMessagePatternFile.read(file) ?: return
-        transaction { if (readRow() == null) restoreRaw(legacy) }
-        if (captureRaw() != legacy) load()
-        LegacyMessagePatternFile.delete(file)
     }
 
     private fun readRow(): Pair<Long, String>? = accessGate.withBlockingAccess {

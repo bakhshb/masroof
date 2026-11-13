@@ -48,7 +48,7 @@ class AnalyticsPersistenceTest {
             AnalyticsArchiveStore.restore(db, raw)
             assertEquals(row, db.analytics().latest()); assertEquals(prefs, db.analytics().preferences())
             assertEquals(listOf(alert), db.analytics().alerts())
-            db.openHelper.readableDatabase.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'room_%' AND name NOT LIKE 'android_%' AND name NOT LIKE 'sqlite_%'").use { assertEquals(8, it.count) }
+            db.openHelper.readableDatabase.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'room_%' AND name NOT LIKE 'android_%' AND name NOT LIKE 'sqlite_%'").use { assertEquals(7, it.count) }
         } finally { db.close() }
         val reopened = AnalyticsDatabase.open(c)
         try { assertEquals(row, reopened.analytics().latest()) } finally { reopened.close() }
@@ -58,10 +58,10 @@ class AnalyticsPersistenceTest {
     @Test fun oldPreferencesRemainReadableAndCorruptAnalyticsRejectedBeforeInstall() {
         val original = BackupPreferencesSnapshot(true, true, 1, true, "ar", "DARK")
         val raw = BackupPackageCodec.encodePreferences(original)
-        assertNull(BackupPackageCodec.decodePreferences(raw.replace(",\"labAnalysis\":null", ""), BackupPackageFormat.FORMAT_VERSION).labAnalysis)
+        assertNull(BackupPackageCodec.decodePreferences(raw.replace(",\"labAnalysis\":null", "")).labAnalysis)
         val archive = AnalyticsJson.format.encodeToString(AnalyticsArchive(snapshots = listOf(AnalysisSnapshotRow("bad", "a".repeat(64), 1, "{}"))))
         val corrupt = BackupPackageCodec.encodePreferences(original.copy(labAnalysis = archive))
-        assertTrue(runCatching { BackupPackageCodec.decodePreferences(corrupt, BackupPackageFormat.FORMAT_VERSION) }.isFailure)
+        assertTrue(runCatching { BackupPackageCodec.decodePreferences(corrupt) }.isFailure)
     }
     @Test fun restoreJournalReplaysAnalysisAndRetainsOldBackupCompatibility() = runBlocking {
         val c = context(); c.deleteDatabase(AnalyticsDatabase.NAME)

@@ -17,7 +17,7 @@ Goal: the same app and the same numbers, built so that a change is small, tested
 
 | Topic | Decision |
 |---|---|
-| Schema | The v18 freeze is lifted. Additive, tested migrations only; no destructive fallback. Decided 2026-11-12: the installed build is v18 and nothing is installed until the plan ends, so there is one migration from v18 to the final version; the intermediate versions v19–v21 existed only in CI and are refused (from piece 5.2). |
+| Schema | The v18 freeze is lifted. Additive, tested migrations only; no destructive fallback. Decided 2026-11-12: the installed build is v18 and nothing is installed until the plan ends, so there is one migration from v18 to the final version; the intermediate versions v19–v21 existed only in CI and are refused (from piece 5.2). Superseded 2026-11-13: the numbering restarted at version 1 with no upgrade path from v18 or v22 (see Status). |
 | Ledger switch-over | New projection runs beside the old path; the owner approves every difference before the old path is deleted. |
 | Remote pattern updates | Not in this plan. Only a masked "report unparsed message" export. |
 | Wiring | Clean up and split by hand. A DI library is an optional last piece, decided later. |
@@ -121,14 +121,21 @@ Shared acceptance criteria, for every piece:
 
 ## Status (2026-11-13)
 
-Pieces 0.0 to 6.4, 7.1 to 7.3 and 7.5 are merged. The rows above are the record of what each piece did; a class named in a row as removed no longer exists. Waiting for the owner:
+Pieces 0.0 to 6.4, 7.1 to 7.3 and 7.5 are merged. The rows above are the record of what each piece did; a class named in a row as removed no longer exists, and the schema versions they name (v18 to v22, backup formats 1 and 2) are superseded by the restart below.
 
-| Piece | Question | Orchestrator's recommendation |
-|---|---|---|
-| 6.5 | Reactive reads for the review list, registry and commitments. | Skip: screens already refresh after a write and after background work; the change adds behaviour risk for no visible gain. |
-| 7.2 | 19 long production methods and classes still in the detekt baselines. | Leave them; split each when it changes for another reason. |
-| 7.4 | Report an unparsed message: layout proposed (a share sheet from the review detail, every digit masked). | Approve the layout; mask digits only. |
-| 8 | DI library. | Not asked for. |
+Owner decisions of 2026-11-13: 6.5 is skipped; the 19 long production methods and classes stay in the detekt baselines until each changes for another reason; 7.4 is built with the proposed layout (a share sheet from the review detail, every digit masked); piece 8 (DI library) is not asked for.
+
+### Restart at version 1 (owner, 2026-11-13)
+
+The app is still in development and personal use, so the owner restarted the numbering: `masroof.db`, `analytics.db`, `learning.db` and the backup format are version 1, the app carries no upgrade path from v18 or v22, and the owner's own data is converted once outside the app. One pull request per piece:
+
+| Piece | Work |
+|---|---|
+| R1 | Renumber to version 1; delete `MIGRATION_18_22`, the production backfill, the one-time copies on open (pattern file, recurring answers), the legacy backup format and the v18 fixtures and tests. Same tables, minus the dead `recurring_feedback` in `analytics.db`. |
+| R2 | One store for corrections: drop `user_correction`; `CORRECTION` rows of `user_decision` are the only record. |
+| R3 | Bank selection read from `user_decision` only: the `user_selected_bank:` reason prefix goes. `review_item` keeps its resolution columns (they also hold automatic settlements and queue state). |
+| R4 | Private, no pull request: convert the owner's fresh export with the last build that reads it (tag `pre-v1-reset`), verify row by row, hand over a version 1 backup. Version 1 is frozen from that day; later changes are migrations. |
+| 7.4 | Report an unparsed message. |
 
 ## Order
 

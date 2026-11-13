@@ -20,7 +20,6 @@ data class BackupPreferencesSnapshot(
     val languageTag: String,
     val themeMode: String,
     val labAnalysis: String? = null,
-    val messagePatterns: String? = null,
     val onboardingSetup: String? = null,
 )
 
@@ -56,14 +55,8 @@ class BackupFailureException(
 ) : Exception(category.logToken)
 
 object BackupPackageFormat {
-    /** Inner ZIP manifest version of every new export: the patterns and recurring answers are inside the database. */
-    const val FORMAT_VERSION: Int = 2
-
-    /**
-     * The format of a schema v18 archive, the legacy plaintext ZIP included: its patterns ride in `preferences.json`
-     * and its recurring answers in the analysis archive there. Import converts both into the database.
-     */
-    const val LEGACY_FORMAT_VERSION: Int = 1
+    /** Inner ZIP manifest version. The patterns and recurring answers travel inside the database. */
+    const val FORMAT_VERSION: Int = 1
 
     /** Outer authenticated envelope version. Not a ZIP. */
     const val ENVELOPE_VERSION: Int = 1

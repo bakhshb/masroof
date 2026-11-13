@@ -167,7 +167,7 @@ class DatabaseBackupService(
                         return@withLock BackupVerificationOutcome.INVALID_PACKAGE
                     }
                     runCatching {
-                        BackupPackageCodec.decodePreferences(File(directory, BackupPackageFormat.PREFERENCES_ENTRY).readText(), manifest.formatVersion)
+                        BackupPackageCodec.decodePreferences(File(directory, BackupPackageFormat.PREFERENCES_ENTRY).readText())
                     }.getOrElse { return@withLock BackupVerificationOutcome.INVALID_PACKAGE }
                     BackupVerificationOutcome.VERIFIED
                 }
@@ -286,13 +286,12 @@ class DatabaseBackupService(
             if (!hasKnownSchema(manifest, dbFile)) return BackupImportOutcome.InvalidPackage
 
             val preferences = runCatching {
-                BackupPackageCodec.decodePreferences(prefsFile.readText(), manifest.formatVersion)
+                BackupPackageCodec.decodePreferences(prefsFile.readText())
             }.getOrElse { return BackupImportOutcome.InvalidPackage }
 
             // An older schema migrates here, on the staged copy, while the live database is still open and untouched.
             // A current-schema copy is only validated after close, as before.
-            // A legacy-format archive carries its patterns in preferences.json; they become the staged database's row.
-            if (manifest.roomVersion != schema.version) openAndValidate(dbFile, preferences.messagePatterns)
+            if (manifest.roomVersion != schema.version) openAndValidate(dbFile)
 
             checkpointWal()
             databaseAccessGate.retire()
@@ -624,7 +623,6 @@ class DatabaseBackupService(
         check(runCatching { MessagePatternStore(database, databaseAccessGate).load() }.isSuccess) { "Stored pattern configuration is invalid" }
         return BackupPreferencesSnapshot(
             labAnalysis = current.labAnalysis,
-            messagePatterns = null,
             onboardingStarted = current.onboardingStarted,
             onboardingCompleted = current.onboardingCompleted,
             historicalImportStartEpochMillis = current.historicalImportStartEpochMillis,
@@ -762,10 +760,9 @@ class DatabaseBackupService(
 
     /**
      * Migrates a staged copy of the backup to [BackupSchema.version] and checks it before the live file is replaced.
-     * The live database stays in place until the validated copy is renamed over it. [legacyPatterns] (an older
-     * archive's patterns) become its pattern row; the row it ends with must decode.
+     * The live database stays in place until the validated copy is renamed over it. Its pattern row must decode.
      */
-    private fun openAndValidate(dbFile: File, legacyPatterns: String? = null) {
+    private fun openAndValidate(dbFile: File) {
         val opened = MasroofDatabase.builder(appContext, schema.databaseClass, dbFile.path)
             .addMigrations(*schema.extraMigrations.toTypedArray())
             .build()
@@ -774,7 +771,7 @@ class DatabaseBackupService(
             check(db.version == schema.version) {
                 "Imported database is not schema ${schema.version}"
             }
-            check(runCatching { MessagePatternStore(opened).run { legacyPatterns?.let(::restoreRaw); load() } }.isSuccess) {
+            check(runCatching { MessagePatternStore(opened).load() }.isSuccess) {
                 "Imported pattern configuration is invalid"
             }
             db.query("PRAGMA integrity_check").use { cursor ->

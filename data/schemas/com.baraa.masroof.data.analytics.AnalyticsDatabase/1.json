@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "d726050864a1f4fa548d8cec1217fd8f",
+    "identityHash": "eb124c7fb7e028c230908cad5ab0e317",
     "entities": [
       {
         "tableName": "analysis_snapshot",
@@ -49,8 +49,7 @@
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_analysis_snapshot_issuedAt` ON `${TABLE_NAME}` (`issuedAt`)"
           }
-        ],
-        "foreignKeys": []
+        ]
       },
       {
         "tableName": "analysis_model",
@@ -74,9 +73,7 @@
           "columnNames": [
             "id"
           ]
-        },
-        "indices": [],
-        "foreignKeys": []
+        }
       },
       {
         "tableName": "recurring_candidate",
@@ -106,9 +103,7 @@
           "columnNames": [
             "id"
           ]
-        },
-        "indices": [],
-        "foreignKeys": []
+        }
       },
       {
         "tableName": "analysis_alert",
@@ -189,8 +184,7 @@
           {
             "fieldPath": "evidenceId",
             "columnName": "evidenceId",
-            "affinity": "TEXT",
-            "notNull": false
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "readAt",
@@ -204,9 +198,7 @@
           "columnNames": [
             "id"
           ]
-        },
-        "indices": [],
-        "foreignKeys": []
+        }
       },
       {
         "tableName": "analysis_preferences",
@@ -221,8 +213,7 @@
           {
             "fieldPath": "budget",
             "columnName": "budget",
-            "affinity": "INTEGER",
-            "notNull": false
+            "affinity": "INTEGER"
           },
           {
             "fieldPath": "phone",
@@ -284,15 +275,156 @@
           "columnNames": [
             "id"
           ]
+        }
+      },
+      {
+        "tableName": "analysis_coverage",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `fromDay` INTEGER NOT NULL, `throughDay` INTEGER NOT NULL, `reason` TEXT NOT NULL, `observedAt` INTEGER NOT NULL, `repairedAt` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromDay",
+            "columnName": "fromDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "throughDay",
+            "columnName": "throughDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedAt",
+            "columnName": "observedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "repairedAt",
+            "columnName": "repairedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "analysis_forecast_comparison",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `periodStart` INTEGER NOT NULL, `periodEnd` INTEGER NOT NULL, `issuedAt` INTEGER NOT NULL, `sourceHash` TEXT NOT NULL, `modelVersion` TEXT NOT NULL, `evaluationVersion` TEXT NOT NULL, `personalTotal` INTEGER NOT NULL, `baselineTotal` INTEGER NOT NULL, `actual` INTEGER, `actualSourceHash` TEXT, `evaluatedAt` INTEGER, `originDay` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "periodStart",
+            "columnName": "periodStart",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "periodEnd",
+            "columnName": "periodEnd",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "issuedAt",
+            "columnName": "issuedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceHash",
+            "columnName": "sourceHash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelVersion",
+            "columnName": "modelVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evaluationVersion",
+            "columnName": "evaluationVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "personalTotal",
+            "columnName": "personalTotal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baselineTotal",
+            "columnName": "baselineTotal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actual",
+            "columnName": "actual",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "actualSourceHash",
+            "columnName": "actualSourceHash",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "evaluatedAt",
+            "columnName": "evaluatedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "originDay",
+            "columnName": "originDay",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
         },
-        "indices": [],
-        "foreignKeys": []
+        "indices": [
+          {
+            "name": "index_analysis_forecast_comparison_periodStart",
+            "unique": false,
+            "columnNames": [
+              "periodStart"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_analysis_forecast_comparison_periodStart` ON `${TABLE_NAME}` (`periodStart`)"
+          }
+        ]
       }
     ],
-    "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd726050864a1f4fa548d8cec1217fd8f')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'eb124c7fb7e028c230908cad5ab0e317')"
     ]
   }
 }

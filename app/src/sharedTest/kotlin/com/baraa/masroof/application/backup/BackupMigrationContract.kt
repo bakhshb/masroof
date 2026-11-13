@@ -16,19 +16,19 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import com.baraa.masroof.testsupport.NoOpAppLog
 
-/** Restore of the committed v18 archives under the test-only next schema, run on the JVM and on a device. */
+/** Restore of the committed version 1 archives under the test-only next schema, run on the JVM and on a device. */
 object BackupMigrationContract {
-    const val PASSPHRASE = "synthetic-fixture-passphrase-v18"
+    const val PASSPHRASE = "synthetic-fixture-passphrase-v1"
 
     /** The restore target one version after production, with [step] as its migration. */
     fun nextVersionSchema(context: Context, step: Migration = NextVersionTestDatabase.MIGRATION_TO_NEXT) = BackupSchema(
         NextVersionTestDatabase::class.java,
-        MasroofDatabase.IDENTITY_HASHES + (NextVersionTestDatabase.VERSION to NextVersionTestDatabase.identityHash(context)),
+        BackupSchema.PRODUCTION.identityHashes + (NextVersionTestDatabase.VERSION to NextVersionTestDatabase.identityHash(context)),
         listOf(step),
     )
 
     /** The archive imports; the live file becomes the next version and holds every row of [fixtureDb]. */
-    fun v18ArchiveImportsUnderTheNextVersion(
+    fun archiveImportsUnderTheNextVersion(
         context: Context,
         archive: () -> InputStream,
         fixtureDb: () -> InputStream,

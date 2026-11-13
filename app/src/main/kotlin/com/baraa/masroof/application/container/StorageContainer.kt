@@ -11,8 +11,6 @@ import com.baraa.masroof.application.logging.AppLogService
 import com.baraa.masroof.application.onboarding.OnboardingPreferencesRepository
 import com.baraa.masroof.application.sms.DebugProcessHaltProbe
 import com.baraa.masroof.application.theme.ThemePreferencesRepository
-import com.baraa.masroof.data.analytics.AnalyticsDatabase
-import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
 import com.baraa.masroof.data.patterns.MessagePatternStore
 import com.baraa.masroof.data.preferences.SharedPrefsAppLocaleRepository
@@ -78,7 +76,7 @@ class StorageContainer(
 
     val databaseAccessGate: DatabaseAccessGate = DatabaseAccessGate()
 
-    /** Opens the financial store (migrations and identity check included); throws when it cannot open. */
+    /** Opens the financial store (identity check included); throws when it cannot open. */
     suspend fun openDatabase() {
         databaseAccessGate.withAccess { database.openHelper.writableDatabase }
     }
@@ -89,9 +87,8 @@ class StorageContainer(
     }
 
     /**
-     * Every pattern read and write goes through the database, so the open itself first copies the v18 file once
-     * and seeds the bundled banks: nothing can see the patterns before both are done. A throw fails the open closed.
-     * The open also copies the recurring answers still in `analytics.db` once ([importRecurringAnswers]).
+     * Every pattern read and write goes through the database, so the open itself seeds the bundled banks: nothing can
+     * see the patterns before that is done. A throw fails the open closed.
      */
     internal val database: MasroofDatabase =
         databaseRestoreRecovered.let {
@@ -99,9 +96,7 @@ class StorageContainer(
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         val patterns = MessagePatternStore({ db })
-                        patterns.importLegacyFile(LegacyMessagePatternFile.of(appContext))
                         if (installBundledPatterns) patterns.installMissingBanks(bundledPatternBanks, setOf(Bank.BANK_ALJAZIRA.id))
-                        importRecurringAnswers(db)
                     }
                 })
                 .build()
@@ -110,34 +105,6 @@ class StorageContainer(
     val messagePatternStore = MessagePatternStore(database, databaseAccessGate)
 
     val recurringAnswerStore = RecurringAnswerStore(database, databaseAccessGate)
-
-    /**
-     * Moves the recurring answers an older version kept in `analytics.db` into `user_decision` (plan 5.2), also
-     * after a restore of an older archive put them back there; a copy that already ran finds nothing. An analytics
-     * file that cannot be read is derived data: the copy is logged and retried on the next open, and the financial
-     * open goes on. A failed write or read-back in `masroof.db` throws and fails the open closed.
-     */
-    private fun importRecurringAnswers(db: SupportSQLiteDatabase) {
-        if (!appContext.getDatabasePath(AnalyticsDatabase.NAME).exists()) return
-        val analytics = AnalyticsDatabase.open(appContext)
-        try {
-            val legacy = try {
-                RecurringAnswerStore.readLegacy(analytics.openHelper.writableDatabase)
-            } catch (failure: Exception) {
-                appLogService.warn("RECURRING_COPY", "Analytics file unreadable; copy retried on the next open (${failure.javaClass.simpleName})")
-                return
-            }
-            val copied = RecurringAnswerStore.copyLegacy(db, legacy)
-            if (copied > 0) appLogService.info("RECURRING_COPY", "Copied $copied recurring answers into the decision store")
-            try {
-                RecurringAnswerStore.clearLegacy(analytics.openHelper.writableDatabase, legacy)
-            } catch (failure: Exception) {
-                appLogService.warn("RECURRING_COPY", "Copied answers not cleared; cleared on the next open (${failure.javaClass.simpleName})")
-            }
-        } finally {
-            analytics.close()
-        }
-    }
 
     val rawSmsRepository: RawSmsRepository =
         RoomRawSmsRepository(database.rawSmsDao(), accessGate = databaseAccessGate)

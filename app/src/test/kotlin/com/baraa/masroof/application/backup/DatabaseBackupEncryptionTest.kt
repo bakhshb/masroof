@@ -1,6 +1,5 @@
 package com.baraa.masroof.application.backup
 
-import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import android.content.Context
 import android.net.Uri
 import androidx.room.Room
@@ -67,7 +66,6 @@ class DatabaseBackupEncryptionTest {
 
     @Before
     fun resetStorage() {
-        LegacyMessagePatternFile.delete(LegacyMessagePatternFile.of(context))
         context.deleteDatabase(MasroofDatabase.NAME)
         DatabaseRestoreRecovery.deleteRestoreArtifacts(context.getDatabasePath(MasroofDatabase.NAME))
         context.getSharedPreferences(SharedPrefsOnboardingPreferencesRepository.PREFS_NAME, Context.MODE_PRIVATE)
@@ -160,7 +158,7 @@ class DatabaseBackupEncryptionTest {
                 ).importFrom(Uri.fromFile(destination), passphrase.copyOf())
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
                 assertTrue(restartRequested.get())
-                // A v22 backup carries its patterns inside its database.
+                // A backup carries its patterns inside its database.
                 assertEquals(patternArchive("STC"), storedPatterns(context.getDatabasePath(MasroofDatabase.NAME)))
             } finally {
                 if (live.isOpen) live.close()
