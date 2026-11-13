@@ -33,4 +33,12 @@ object AnalysisCoveragePolicy {
     fun gapDays(rows: List<AnalysisCoverageRow>): Set<Long> = rows.filter {
         it.repairedAt == null && it.reason !in setOf("SCAN_RECEIPT", "CHECKPOINT")
     }.flatMap { (it.fromDay..it.throughDay).toList() }.toSet()
+
+    /**
+     * The first day of an open gap that only an inbox re-read can prove, or null. A scan certifies whole days
+     * through yesterday, so a gap that is only today waits; a processing gap closes when its retry does.
+     */
+    fun rescanFrom(rows: List<AnalysisCoverageRow>, today: Long): Long? = rows.filter {
+        it.repairedAt == null && it.reason !in setOf("SCAN_RECEIPT", "CHECKPOINT", "PROCESSING") && it.fromDay < today
+    }.minOfOrNull { it.fromDay }
 }

@@ -41,6 +41,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     private val scopeJob = SupervisorJob()
     private val scope = CoroutineScope(scopeJob + Dispatchers.Default)
     private var refreshJob: Job? = null
+    @Volatile private var rescanRequestedFrom: Long? = null
     private var clockJob: Job? = null
     private var importJob: Job? = null
     @Volatile private var closed = false
@@ -229,6 +230,13 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val recovered = AnalysisCoveragePolicy.recover(coverageRows,unresolved,at)
             store.analytics().coverage(recovered)
             val gaps = AnalysisCoveragePolicy.gapDays(recovered)
+            // Messages that arrived without the permission are only in the inbox: re-read it from the gap's first
+            // day. The scan's receipt then closes the gap; once per gap start, a failed scan retries itself.
+            val rescanFrom = if (noPermission) null else AnalysisCoveragePolicy.rescanFrom(recovered, todayDay)
+            if (rescanFrom != null && rescanFrom != rescanRequestedFrom) runCatching {
+                container.sms.missedSmsScheduler.schedule(LocalDate.ofEpochDay(rescanFrom).atStartOfDay(zone).toInstant())
+                rescanRequestedFrom = rescanFrom
+            }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
             val gapText = gaps.sorted().joinToString(",")
             if(gapText != prefs.gapDays) {
                 prefs = prefs.copy(gapDays = gapText)

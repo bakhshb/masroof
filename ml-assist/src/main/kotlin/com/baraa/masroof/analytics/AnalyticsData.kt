@@ -5,6 +5,7 @@ import java.time.LocalDate
 import java.text.Normalizer
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.ln
 
 /** Shared training/inference contract, isolated from SMS-family classification. */
 object AnalyticsVersion {
@@ -78,8 +79,14 @@ object FinancialCleaner {
         val amounts = accepted.filterNot { it.refund }.map { it.amount!!.toDouble() }
         val median = median(amounts)
         val mad = median(amounts.map { abs(it - median) })
+        // Spending is skewed: most payments are small and a few are large, so "far from the median" in riyals marks
+        // every tenth purchase. An amount is unusual only when it is also far out on the ratio (log) scale.
+        val logs = amounts.filter { it > 0 }.map(::ln)
+        val logMedian = median(logs)
+        val logLimit = logMedian + 3 * 1.4826 * median(logs.map { abs(it - logMedian) })
         val unusual = if (amounts.size < 5) emptyList() else accepted.filter {
-            !it.refund && it.amount!!.toDouble() > median + maxOf(6 * mad, median * 3, 10000.0)
+            !it.refund && it.amount!!.toDouble().let { amount ->
+                amount > median + maxOf(6 * mad, median * 3, 10000.0) && ln(amount) > logLimit }
         }.map { it.id }
         val report = QualityReport(accepted.size, excluded, unusual, days.count { it.covered }, coveredFrom != null)
         val canonical = facts.distinct().sortedBy { it.id }.joinToString("\n") { "${it.id}|${it.day}|${it.amount}|${it.refund}|${it.included}|${it.merchant}|${it.recurringEligible}|${it.recurringScope}|${it.comparisonScope}|${it.regular}" }
