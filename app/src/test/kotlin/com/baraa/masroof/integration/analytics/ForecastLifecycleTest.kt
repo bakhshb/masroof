@@ -63,6 +63,20 @@ class ForecastLifecycleTest {
                 day=day.plusDays(1)
             }
         }
+        // An open gap makes the analysis schedule an inbox re-read from the gap's first day; let the attempt end, so
+        // its import gate cannot skip the next refresh.
+        suspend fun awaitGapRescan(gap: LocalDate) {
+            val name=com.baraa.masroof.application.sms.LiveCaptureRecoveryWorker.uniqueWorkName(gap.atStartOfDay(zone).toInstant())
+            kotlinx.coroutines.withTimeout(30_000) {
+                while(true) {
+                    val infos=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        androidx.work.WorkManager.getInstance(context).getWorkInfosForUniqueWork(name).get() }
+                    // Without a real inbox the attempt may end in a retry; either way it is no longer running.
+                    if(infos.isNotEmpty() && infos.all { it.state.isFinished || (it.state == androidx.work.WorkInfo.State.ENQUEUED && it.runAttemptCount > 0) }) break
+                    kotlinx.coroutines.delay(20)
+                }
+            }
+        }
         try {
             c.storage.onboardingPreferencesRepository.setOnboardingStarted(true)
             c.storage.onboardingPreferencesRepository.setOnboardingCompleted(true)
@@ -83,6 +97,7 @@ class ForecastLifecycleTest {
                 sidecar.analytics().preferences(prefs.copy(gapDays=missing.toEpochDay().toString()))
                 workflow.refresh()
                 assertTrue(sidecar.analytics().comparisons().isEmpty())
+                awaitGapRescan(missing)
                 origin=origin.plusDays(1)
                 clock.day=origin
                 seed(origin,origin)
@@ -114,6 +129,7 @@ class ForecastLifecycleTest {
             sidecar.analytics().preferences(prefs.copy(gapDays=gap.toEpochDay().toString()))
             workflow.refresh()
             assertEquals("COVERAGE_GAPS",workflow.state.value.snapshot!!.modelReason)
+            awaitGapRescan(gap)
             AnalysisCoverageStore.recordScan(context,gap.atStartOfDay(zone).toInstant(),clock.instant(),zone)
             workflow.refresh()
             assertEquals(com.baraa.masroof.analytics.AnalyticsVersion.MODEL,workflow.state.value.snapshot!!.method)
