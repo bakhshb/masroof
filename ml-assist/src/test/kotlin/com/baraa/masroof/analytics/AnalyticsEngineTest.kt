@@ -39,6 +39,23 @@ class AnalyticsEngineTest {
         val result = PurchaseForecaster.forecast(data, start + 60, start + 90, start + 89, 2, { 0 })
         assertEquals(300000, result.actual); assertEquals(0L, result.remaining); assertEquals(300000L, result.total)
     }
+    @Test fun transfersAreActualSpendingButTheEstimateNeitherLearnsFromThemNorPredictsThem() {
+        val purchases = (0..160).map { FinancialFact("p$it", start + it, 1000 + it % 7 * 500L, false, true) }
+        // A few large transfers, one of them inside the current period.
+        val transfers = listOf(20, 75, 155).map { FinancialFact("t$it", start + it, 3_000_000, false, true, regular = false) }
+        val phase = { day: Long -> ((day - start) % 30).toInt() }
+        val without = PurchaseForecaster.forecast(clean(purchases), start + 150, start + 180, start + 160, 5, phase)
+        val with = PurchaseForecaster.forecast(clean(purchases + transfers), start + 150, start + 180, start + 160, 5, phase)
+        assertEquals(without.remaining, with.remaining)
+        assertEquals(without.points, with.points)
+        assertEquals(without.wholeDaysUpper, with.wholeDaysUpper)
+        assertEquals(without.actual + 3_000_000, with.actual)
+        assertEquals(without.total!! + 3_000_000, with.total)
+        val day = clean(purchases + transfers).days[155]
+        assertEquals(3_000_000L, day.irregular); assertEquals(day.gross + 3_000_000, day.net)
+        // Marking a payment as a transfer is a different input.
+        assertNotEquals(clean(purchases + transfers).fingerprint, clean(purchases + transfers.map { it.copy(regular = true) }).fingerprint)
+    }
     @Test fun robustModelHasFiniteWeightsAndNeverClaimsUnvalidatedAccuracy() {
         val rows = (0..160).map { FinancialFact("p$it", start + it, if (it == 110) 10000000 else (1000 + it * 20L), false, true) }
         val data = clean(rows)

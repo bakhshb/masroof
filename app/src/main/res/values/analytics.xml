@@ -15,7 +15,7 @@
     <string name="lab_analysis_quality_warning">تحتاج جودة البيانات إلى مراجعة؛ تنبيهات التوقع متوقفة</string>
     <string name="lab_analysis_initial">تقدير أولي</string>
     <string name="lab_analysis_ready">التوقع جاهز</string>
-    <string name="lab_analysis_forecast_hint">يعتمد التوقع على نمط مشترياتك السابق والأيام المتبقية من فترة الراتب. الإجمالي هو الفعلي حتى الآن مع تقدير المشتريات المتبقية؛ لا نفترض استردادات مستقبلية.</string>
+    <string name="lab_analysis_forecast_hint">يعتمد التوقع على نمط مشترياتك السابق والأيام المتبقية من فترة الراتب. الإجمالي هو كل ما صرفته حتى الآن مع تقدير المشتريات والسحب المتبقية، ومعه الالتزامات المسجلة التي تدفع بحوالة ولم تدفع بعد. لا نفترض حوالات أخرى ولا استردادات مستقبلية.</string>
     <string name="lab_analysis_updated">آخر نتيجة: %1$s</string>
     <string name="lab_analysis_back">رجوع</string>
     <string name="lab_analysis_settings">حد المشتريات والتنبيهات</string>

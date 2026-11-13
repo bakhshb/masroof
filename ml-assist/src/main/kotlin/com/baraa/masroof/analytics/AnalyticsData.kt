@@ -8,18 +8,24 @@ import kotlin.math.abs
 
 /** Shared training/inference contract, isolated from SMS-family classification. */
 object AnalyticsVersion {
-    const val CLEANING = "financial-clean-v2"
-    const val FEATURES = "purchase-days-v2"
+    const val CLEANING = "financial-clean-v3"
+    const val FEATURES = "purchase-days-v3"
     const val MODEL = "huber-l2-v3"
     const val EVALUATION = "rolling-horizons-v3"
 }
 
 data class FinancialFact(val id: String, val day: Long, val amount: Long?, val refund: Boolean,
     val included: Boolean, val merchant: String? = null, val recurringEligible: Boolean = false,
-    val recurringScope: String? = null, val comparisonScope: String? = null)
+    val recurringScope: String? = null, val comparisonScope: String? = null,
+    /** False for a payment the daily estimate neither learns from nor predicts (an external transfer): it is actual only. */
+    val regular: Boolean = true)
+/**
+ * [gross] is the regular spending the estimate learns from; [irregular] is what was also paid that day but is not
+ * estimated (external transfers: a few large ones carry most of their value). [net] is everything actually paid.
+ */
 data class PurchaseDay(val day: Long, val gross: Long, val refunds: Long, val count: Int,
-    val phase: Int, val covered: Boolean) {
-    val net: Long get() = Math.subtractExact(gross, refunds)
+    val phase: Int, val covered: Boolean, val irregular: Long = 0) {
+    val net: Long get() = Math.subtractExact(Math.addExact(gross, irregular), refunds)
 }
 data class QualityReport(val used: Int, val excluded: Map<String, List<String>>, val unusualIds: List<String>,
     val coveredDays: Int, val coverageKnown: Boolean) {
@@ -64,9 +70,10 @@ object FinancialCleaner {
         val incompleteDays = facts.filter { it.included && (it.amount == null || it.amount < 0) }.map { it.day }.toSet()
         val days = (start..today).map { day ->
             val rows = grouped[day].orEmpty()
-            PurchaseDay(day, rows.filterNot { it.refund }.fold(0L) { total, row -> Math.addExact(total, row.amount!!) },
-                rows.filter { it.refund }.fold(0L) { total, row -> Math.addExact(total, row.amount!!) }, rows.size,
-                phase(day), coveredFrom != null && day >= coveredFrom && day !in gaps && day !in incompleteDays)
+            fun sum(part: (FinancialFact) -> Boolean) = rows.filter(part).fold(0L) { total, row -> Math.addExact(total, row.amount!!) }
+            PurchaseDay(day, sum { !it.refund && it.regular }, sum { it.refund }, rows.size,
+                phase(day), coveredFrom != null && day >= coveredFrom && day !in gaps && day !in incompleteDays,
+                sum { !it.refund && !it.regular })
         }
         val amounts = accepted.filterNot { it.refund }.map { it.amount!!.toDouble() }
         val median = median(amounts)
@@ -75,7 +82,7 @@ object FinancialCleaner {
             !it.refund && it.amount!!.toDouble() > median + maxOf(6 * mad, median * 3, 10000.0)
         }.map { it.id }
         val report = QualityReport(accepted.size, excluded, unusual, days.count { it.covered }, coveredFrom != null)
-        val canonical = facts.distinct().sortedBy { it.id }.joinToString("\n") { "${it.id}|${it.day}|${it.amount}|${it.refund}|${it.included}|${it.merchant}|${it.recurringEligible}|${it.recurringScope}|${it.comparisonScope}" }
+        val canonical = facts.distinct().sortedBy { it.id }.joinToString("\n") { "${it.id}|${it.day}|${it.amount}|${it.refund}|${it.included}|${it.merchant}|${it.recurringEligible}|${it.recurringScope}|${it.comparisonScope}|${it.regular}" }
         return CleanData(days, recurring, report, hash("${AnalyticsVersion.CLEANING}|$start|$today|$coveredFrom|${gaps.sorted()}|$canonical"))
     }
 }

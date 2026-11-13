@@ -12,7 +12,9 @@ import java.time.Clock
 internal data class FinancialAnalysisRead(val service: DashboardService, val rows: List<FinancialTransaction>,
     val committed: Set<String>, val retry: Boolean, val incompleteDays: Set<Long>, val committedCadences: Map<String, String>,
     /** A payment's biller by transaction id, the only name a bill without merchant or counterparty has. */
-    val billers: Map<String, String>)
+    val billers: Map<String, String>,
+    /** Ids of the user's commitments that are paid by an external transfer; the daily estimate does not predict those. */
+    val transferCommitments: Set<String>)
 
 /**
  * Copy only approved facts and the existing bounded dashboard evidence in a short read.
@@ -85,6 +87,7 @@ internal object FinancialAnalysisReader {
                 commitments.mapNotNull { it.recurrence?.name?.let { recurrence -> it.sourceTransactionId to recurrence } }.toMap(),
                 evidence.parsedRecords.associateBy { it.event.id }.let { records -> rows.mapNotNull { tx ->
                     tx.linkedParsedEventIds.firstNotNullOfOrNull { records[it]?.details?.biller?.trim()?.takeIf(String::isNotEmpty) }?.let { tx.id to it }
-                }.toMap() })
+                }.toMap() },
+                commitments.filter { rowsById[it.sourceTransactionId]?.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT }.map { it.id }.toSet())
         } }
 }

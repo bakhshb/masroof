@@ -9,7 +9,7 @@ object ForecastReplay {
         phase: (Long) -> Int, completedPeriodsAt: (Long) -> Int = { completedPeriods }): ForecastReplayRow {
         // The complete origin day's amount was unknown at this simulated start of day.
         val prefix = data.copy(days = data.days.filter { it.day <= originDay }.map { day ->
-            if (day.day == originDay) day.copy(gross = 0, refunds = 0, count = 0) else day
+            if (day.day == originDay) day.copy(gross = 0, refunds = 0, count = 0, irregular = 0) else day
         })
         val forecast = PurchaseForecaster.forecast(prefix, periodStart, periodEnd, originDay, completedPeriods,
             phase, completedPeriodsAt = completedPeriodsAt)

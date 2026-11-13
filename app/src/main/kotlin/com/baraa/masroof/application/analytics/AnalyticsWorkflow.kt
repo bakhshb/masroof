@@ -158,7 +158,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
     private data class Source(val clean: CleanData, val start: Long, val end: Long, val today: Long,
         val completed: Int, val dues: List<AnalysisDue>, val committed: Set<String>, val reviews: Int,
         val blocked: Boolean, val fingerprint: String, val reasons: List<String>, val insights: AnalysisSpendingInsights,
-        val committedCadences: Map<String, String>)
+        val committedCadences: Map<String, String>, val plannedTransfers: Long)
 
     private suspend fun source(): Source {
             val zone = clock.zone; val today = LocalDate.now(clock); val todayDay = today.toEpochDay()
@@ -169,6 +169,9 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             val current = read.service.loadOverview(period)
             val included = historical.spendingTrends?.purchaseScopeTransactionIds.orEmpty()
             val raw = read.rows.associateBy { it.id }
+            val categories = historical.spendingTrends?.purchases?.categoryTrends.orEmpty()
+            val cashIds = categories[ChartDataCategory.CASH_WITHDRAWALS]?.transactionIdsByDate?.values?.flatten()?.toSet().orEmpty()
+            val transferIds = categories[ChartDataCategory.EXTERNAL_TRANSFERS]?.transactionIdsByDate?.values?.flatten()?.toSet().orEmpty()
             val facts = historical.transactions.map { tx ->
                 val original = raw[tx.id] ?: tx
                 val amount = runCatching {
@@ -184,7 +187,9 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
                     tx.type == FinancialTransactionType.REFUND, tx.id in included, tx.merchant ?: tx.counterparty ?: read.billers[tx.id],
                     CommitmentPaymentIdentity.supports(effective),
                     tx.sourceContainerId ?: tx.destinationContainerId,
-                    (tx.sourceContainerId ?: tx.destinationContainerId)?.let { "$it|${original.amount.currency}|${effective.name}" })
+                    (tx.sourceContainerId ?: tx.destinationContainerId)?.let { "$it|${original.amount.currency}|${effective.name}" },
+                    // The same transfers the spending tab shows as their own component.
+                    regular = tx.id !in transferIds)
             }
             val onboarding = container.storage.onboardingPreferencesRepository
             val importedFrom = if (onboarding.isHistoricalImportCompleted()) onboarding.getHistoricalImportStartEpochMillis()
@@ -231,9 +236,6 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             }
             val clean = FinancialCleaner.clean(facts, start.toEpochDay(), todayDay, covered, gaps, ::periodOffset)
             val completed = completedAnalysisPeriods(clean, todayDay)
-            val categories = historical.spendingTrends?.purchases?.categoryTrends.orEmpty()
-            val cashIds = categories[ChartDataCategory.CASH_WITHDRAWALS]?.transactionIdsByDate?.values?.flatten()?.toSet().orEmpty()
-            val transferIds = categories[ChartDataCategory.EXTERNAL_TRANSFERS]?.transactionIdsByDate?.values?.flatten()?.toSet().orEmpty()
             val invalidIds = clean.quality.excluded.filterKeys { it != "DUPLICATE_ID" }.values.flatten().toSet()
             val insightFacts = facts.distinctBy { it.id }.filter { it.included && it.id !in invalidIds && it.amount != null }.map {
                 AnalysisSpendingFact(it.id, it.day, if (it.refund) Math.negateExact(it.amount!!) else it.amount!!,
@@ -256,12 +258,16 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
                 if (it.amount.currency != Currency.SAR) null else AnalysisDue(it.key, it.displayName,
                     it.amount.amount.movePointRight(2).longValueExact(), it.expectedDate?.toEpochDay(), true, it.source, it.loanTypeFallback)
             }
+            val plannedTransfers = current.commitmentsOverview.rows.filter {
+                it.status == CommitmentPaymentStatus.UNPAID && it.userCommitmentId in read.transferCommitments &&
+                    it.amount.currency == Currency.SAR && it.expectedDate?.toEpochDay() in todayDay until period.endDateExclusive.toEpochDay()
+            }.fold(0L) { sum, row -> Math.addExact(sum, row.amount.amount.movePointRight(2).longValueExact()) }
             val committed = read.committed
             val decisions = store.analytics().candidates().filter { it.status != "SUGGESTED" }.sortedBy { it.id }.map { it.id to it.status }
             val feedback = answers.effective().joinToString { "${it.seriesKey}:${it.kind}:${it.decidedAt}:${hash(it.payload)}" }
             val canonical = "continuous-learning-v1|${RecurringDecisionWorkflow.version}|${ForecastPerformancePolicy.VERSION}|${AnalyticsVersion.EVALUATION}|${AnalyticsVersion.MODEL}|${AnalyticsVersion.FEATURES}|${clean.fingerprint}|$dues|${committed.sorted()}|$blocked|${current.summary.reviewRequiredCount}|${period.startDate}|$prefs|$decisions|$feedback|${read.committedCadences}|${clock.millis() / SIX_HOURS_MS}"
             return Source(clean, period.startDate.toEpochDay(), period.endDateExclusive.toEpochDay(), todayDay, completed,
-                dues, committed, current.summary.reviewRequiredCount, blocked, hash(canonical), reasons, insights, read.committedCadences)
+                dues, committed, current.summary.reviewRequiredCount, blocked, hash(canonical), reasons, insights, read.committedCadences, plannedTransfers)
     }
 
     suspend fun refresh() = withContext(Dispatchers.Default) { refreshOnWorker() }
@@ -304,10 +310,14 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             input.clean.days.firstOrNull { it.covered }?.day, input.clean.days.lastOrNull { it.covered }?.day, input.reasons,
             AnalysisPresentationBuilder.coverage(input.clean, input.today), AnalysisPresentationBuilder.consecutiveCompleteDays(input.clean, input.today))
         val todayFacts = input.clean.days.first { it.day == input.today }
+        // A confirmed transfer commitment (rent) still due in this period is known, not estimated.
+        val planned = input.plannedTransfers
+        val remaining = result.remaining?.let { Math.addExact(it, planned) }
+        val total = result.total?.let { Math.addExact(it, planned) }
         val futureDays = result.points.map { point -> AnalysisDay(point.day, null,
             if (point.day == input.today) Math.addExact(todayFacts.net, (point.gross - todayFacts.gross).coerceAtLeast(0)) else point.gross) }
         val snapshot = AnalysisSnapshot(input.start, input.end, at, input.fingerprint, result.status, result.method,
-            result.actual, result.remaining, result.total, result.lower, result.upper,
+            result.actual, remaining, total, result.lower, result.upper,
             input.clean.days.filter { it.day >= input.start }.map { AnalysisDay(it.day, it.net, null) } + futureDays,
             quality, suggested, (input.dues + estimates).nearestFirst(), input.completed,
             trainingFrom = if (result.method == AnalyticsVersion.MODEL) result.model?.trainedFrom else result.baseline?.from,
@@ -315,7 +325,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
             insights = input.insights, evaluations = result.evaluations.map { AnalysisEvaluation(it.horizon, it.count, it.mae, it.bias) },
             modelReason = result.reason, evaluationVersion = AnalyticsVersion.EVALUATION,
             wholeDaysFrom = (input.today + 1).takeIf { it < input.end }, wholeDaysLower = result.wholeDaysLower,
-            wholeDaysUpper = result.wholeDaysUpper, budgetLower = result.wholeDaysLower?.let { Math.addExact(result.actual, it) })
+            wholeDaysUpper = result.wholeDaysUpper, budgetLower = result.wholeDaysLower?.let { Math.addExact(Math.addExact(result.actual, it), planned) })
         // A committed source invalidation while fitting invalidates the entire result.
         // Room tables, preferences, import completion and the clock bump generation; SMS permission does not.
         if (generation.get() != version || ("SMS_PERMISSION" in input.reasons) != smsPermissionMissing()) { request(); return@withLock }
