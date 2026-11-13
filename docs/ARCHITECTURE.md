@@ -1,15 +1,15 @@
 # Production architecture
 
-Masroof has one Android application, one financial database and one bank interpretation engine. Planned structure changes are listed in [the sustainability plan](SUSTAINABILITY_PLAN.md); this document describes the code as it is. The tested engine and advisory features are integrated into the existing app; the parallel Lab application and generated source replica are removed.
+Masroof has one Android application, one financial database and one bank interpretation engine. This document describes the code as it is. The tested engine and advisory features are integrated into the existing app; the parallel Lab application and generated source replica are removed.
 
 ## Modules
 
 - `app`: presentation → application workflows → domain/parsing/data/SMS/bank ports and the pure financial core. `AppContainer` is the manual composition root of the only production runtime (see "Wiring" below).
 - `bank-engine`: pure Kotlin message-pattern matching, literal-role interpretation and extraction evidence, depending only on `finance-core` value contracts. `MessagePatternSmsAdapter` maps its output through `InterpretationDraftMapper` and the production `ParseFinalizer`.
 - `finance-core`: production money/value models, salary and statement periods, bank transaction time, deterministic container/transaction identities, financial classification/impact, transfer matching and assembly, and statement matching. Policies consume supplied facts and return decisions or transactions in memory; there is no ledger, repository, Android dependency or I/O. Existing engine value contracts remain available separately.
-- `ledger`: the pure derived-ledger projector (plan 3.1), depending only on `finance-core`. Since plan 3.3a it is how reconciliation writes the ledger; see "Derived ledger" and "Ledger writer" below.
-- `dashboard-core` (plan 4.1): the pure JVM dashboard read model, depending only on `finance-core`: the `*Builder`, `*Calculator`, `*Overview`, `*Resolver`, `*Classifier`, `*Scope` and value types of `application/dashboard`, plus the Accounts and Analysis section projections, and `DashboardOverview`/`DashboardEvidence`/`DashboardProjectionContext`. Packages stay `com.baraa.masroof.application.dashboard`. What loads data stays in `app`: `DashboardService`, `DashboardProjectionBuilder`, the Cards and Commitments projections (they read repositories), `DashboardEvidenceScope`/`TransactionSmsEvidenceLoader`, `DashboardCommitmentsWorkflow`/`DashboardRegistryWorkflow`/`DashboardPeriodWorkflow` (repositories, clock), `ChartDataWorkflow` (kotlinx.serialization/coroutines) and `AnalysisSpendingInsightsBuilder` (`@Serializable` output). Tests that need Robolectric or the app database (`DashboardFixtureCharacterizationTest`, `LedgerSnapshotTest`, `DashboardProjectionBuilderTest`, the golden-ledger tests) stay in `app`.
-- `data` (plan 4.2): an Android library holding Room and everything stored through it, plus the preference stores. `data/room` (the three databases `MasroofDatabase`, `LearningDatabase`, `AnalyticsDatabase`, entities, DAOs, mappers, migrations, `PreservingOpenHelperFactory`, `DatabaseAccessGate`), `data/repository` (the `Room*Repository` classes), `data/learning`, `data/analytics` and `data/preferences` (the SharedPreferences stores). It depends on `finance-core` and `ml-assist` and never on `app`; `app` applies neither Room nor KSP. Room schemas export to `data/schemas` (one committed file per database, version 1). The ports these stores implement moved down with them under their original packages: `domain.repository`, `parsing.repository.ParsedEventRepository`, the preference interfaces (`application.theme|locale|notification|onboarding|update`, `DashboardLayoutPreferencesRepository`) and `domain.ownership.RegistryIdentity`; the plain models they use (`domain.model.ReviewItem`, `CardConfiguration`, ...) and `ReviewIdFactory` moved to `finance-core`. Test fixtures of `:data` (`NextVersionTestDatabase`, `UserDecisionBackfill`, `NoOpLoanRegistryRepository`) are used by `app` unit and device tests. Staying in `app`: `data/patterns` (the pattern store over the `pattern_configuration` row, its codecs), `data/exchange` (OkHttp client), `data/statement` (CSV parser over statement ports) and `SharedPrefsChartDataPreferencesRepository` (its `ChartDataPreferences` type lives with `ChartDataWorkflow`).
+- `ledger`: the pure derived-ledger projector, depending only on `finance-core`. It is how reconciliation writes the ledger; see "Derived ledger" and "Ledger writer" below.
+- `dashboard-core`: the pure JVM dashboard read model, depending only on `finance-core`: the `*Builder`, `*Calculator`, `*Overview`, `*Resolver`, `*Classifier`, `*Scope` and value types of `application/dashboard`, plus the Accounts and Analysis section projections, and `DashboardOverview`/`DashboardEvidence`/`DashboardProjectionContext`. Packages stay `com.baraa.masroof.application.dashboard`. What loads data stays in `app`: `DashboardService`, `DashboardProjectionBuilder`, the Cards and Commitments projections (they read repositories), `DashboardEvidenceScope`/`TransactionSmsEvidenceLoader`, `DashboardCommitmentsWorkflow`/`DashboardRegistryWorkflow`/`DashboardPeriodWorkflow` (repositories, clock), `ChartDataWorkflow` (kotlinx.serialization/coroutines) and `AnalysisSpendingInsightsBuilder` (`@Serializable` output). Tests that need Robolectric or the app database (`DashboardFixtureCharacterizationTest`, `LedgerSnapshotTest`, `DashboardProjectionBuilderTest`, the golden-ledger tests) stay in `app`.
+- `data`: an Android library holding Room and everything stored through it, plus the preference stores. `data/room` (the three databases `MasroofDatabase`, `LearningDatabase`, `AnalyticsDatabase`, entities, DAOs, mappers, migrations, `PreservingOpenHelperFactory`, `DatabaseAccessGate`), `data/repository` (the `Room*Repository` classes), `data/learning`, `data/analytics` and `data/preferences` (the SharedPreferences stores). It depends on `finance-core` and `ml-assist` and never on `app`; `app` applies neither Room nor KSP. Room schemas export to `data/schemas` (one committed file per database, version 1). The ports these stores implement moved down with them under their original packages: `domain.repository`, `parsing.repository.ParsedEventRepository`, the preference interfaces (`application.theme|locale|notification|onboarding|update`, `DashboardLayoutPreferencesRepository`) and `domain.ownership.RegistryIdentity`; the plain models they use (`domain.model.ReviewItem`, `CardConfiguration`, ...) and `ReviewIdFactory` moved to `finance-core`. Test fixtures of `:data` (`NextVersionTestDatabase`, `UserDecisionBackfill`, `NoOpLoanRegistryRepository`) are used by `app` unit and device tests. Staying in `app`: `data/patterns` (the pattern store over the `pattern_configuration` row, its codecs), `data/exchange` (OkHttp client), `data/statement` (CSV parser over statement ports) and `SharedPrefsChartDataPreferencesRepository` (its `ChartDataPreferences` type lives with `ChartDataWorkflow`).
 - `ml-assist`: exact human-template family memory, cleaned templates, forecasting and recurring-pattern detection. The engine consumes an injected assistance contract rather than depending on ML implementation.
 - `ui-kit`: shared theme, typography, fonts, cards and charts. It cannot access financial storage.
 
@@ -63,7 +63,7 @@ Keep the existing modules. Organize by responsibility; a filename containing
 | `finance-core` | Financial classification, matching and assembly from supplied facts |
 | `dashboard-core` | Dashboard builders, calculators and section projections from supplied facts (no repositories) |
 | `data` | Room databases and schemas, DAOs, Room repositories, preference stores, and the ports they implement |
-| `ledger` | Derived ledger from evidence, decisions and ownership; since plan 3.3a it is how reconciliation writes the ledger |
+| `ledger` | Derived ledger from evidence, decisions and ownership; it is how reconciliation writes the ledger |
 
 `StorageContainer` loads `app/src/main/assets/bank-patterns/*.patterns.json`, installs
 missing bundled definitions when the live database opens (before anything can read the
@@ -170,10 +170,7 @@ or table; deleted patterns cannot be recovered through revision restore.
 Keep integration fixtures on the bundled production definitions. Kotlin rule
 profiles live only in `bank-engine/src/testFixtures/`, shared through Gradle's built-in test-fixtures support. The offline CLI is an explicit test tool. Neither
 is another production definition source. Preserve the frozen AlJazira baselines.
-[Pattern facts](PATTERN_FACT_CONTRACT.md) describes the current write contract;
-[AlJazira compatibility](ALJAZIRA_SHARED_PATTERNS.md) records the frozen-reference
-checks and remaining signed-upgrade/restore release gates. The production ownership
-table above supersedes the completed migration plans and prototype execution logs.
+[Pattern facts](PATTERN_FACT_CONTRACT.md) describes the current write contract.
 
 ## Bank interpretation
 
@@ -227,9 +224,9 @@ the unchanged persistence, orchestration and dashboard paths. Architecture check
 scan both source roots, require the moved policies to exist in core, reject
 app-side copies and reject fully qualified calls that bypass module import rules.
 
-## Derived ledger (plan 3.1)
+## Derived ledger
 
-`:ledger` holds `LedgerProjector`, a pure function from facts to the ledger. Since plan 3.3a `TransactionReconciliationService` writes what it projects ("Ledger writer" below); "Shadow comparison" compares the stored ledger with it.
+`:ledger` holds `LedgerProjector`, a pure function from facts to the ledger. `TransactionReconciliationService` writes what it projects ("Ledger writer" below); "Shadow comparison" compares the stored ledger with it.
 
 `LedgerProjector.project(events, decisions, registry, storedFacts, zone)` takes:
 
@@ -256,9 +253,9 @@ A stored single-leg self-transfer outside the matching pool (kept by any rule) s
 
 Neither applies when the row links one SMS of an informational family (`InformationalMessagePolicy`) that no outcome decision or correction closure protects: that row is removed, as the old stale-link cleanup removes it.
 
-Double-posted legs (owner, 2026-11-12, plan 3.3c). Before any rule above, an unprotected stored single-leg self-transfer of one raw SMS (one linked transfer-family event) is released, as the old one-time release (`repairLegacyTransfersDetailed`, deleted) deleted it, when it is not in a mutually unique pair among the eligible transfer legs (transfer family, not decided not financial, automation-eligible) and it has an intra-bank counterpart (`TransactionMatcher.hasPendingIntraBankCounterpart`) that is also such a released row: two rows for one movement, which only the old per-leg assembler wrote. The released legs are assembled like unlinked legs (a pair if now unique, else a pending match). A single-leg row whose ambiguous counterparts are unlinked or protected is kept (keep rule): today's lone-owned-leg step writes such rows, and they are not double-counted. The scope already reaches every leg this rule reads. After restoring an old backup holding such rows, nothing runs at startup: the next full pass, or a scoped pass for a new message near them, releases them.
+Double-posted legs (owner, 2026-11-12). Before any rule above, an unprotected stored single-leg self-transfer of one raw SMS (one linked transfer-family event) is released, as the old one-time release (`repairLegacyTransfersDetailed`, deleted) deleted it, when it is not in a mutually unique pair among the eligible transfer legs (transfer family, not decided not financial, automation-eligible) and it has an intra-bank counterpart (`TransactionMatcher.hasPendingIntraBankCounterpart`) that is also such a released row: two rows for one movement, which only the old per-leg assembler wrote. The released legs are assembled like unlinked legs (a pair if now unique, else a pending match). A single-leg row whose ambiguous counterparts are unlinked or protected is kept (keep rule): today's lone-owned-leg step writes such rows, and they are not double-counted. The scope already reaches every leg this rule reads. After restoring an old backup holding such rows, nothing runs at startup: the next full pass, or a scoped pass for a new message near them, releases them.
 
-With no stored rows the projection is the rebuild from nothing of plan 3.1: a decided row comes back from its posting columns (`LedgerProjector.decidedRow`): a type and a time, the containers as recorded (they may be null) and the zone as recorded, null included.
+With no stored rows the projection is the rebuild from nothing: a decided row comes back from its posting columns (`LedgerProjector.decidedRow`): a type and a time, the containers as recorded (they may be null) and the zone as recorded, null included.
 
 `LedgerProjector.scope(affected, events, decisions, storedFacts)` returns the raw SMS a projection of `affected` must include so its rows for them equal the full projection's: the legs of every decision or stored row naming one, every installment of the same loan, and every transfer leg reachable through legs whose times may fall within one match window (receipt, SMS-local, or any-zone effective time). `LedgerProjectorPropertyTest` checks determinism, input-order independence and scoped = full on random corpora; `LedgerProjectorTest` covers each rule.
 
@@ -281,7 +278,7 @@ The owner decided these at gate 3.2 (2026-11-12); the projector and the writer f
 - **Rebuild from nothing.** A decision without a zone rebuilds its row without one, as stored. What exists only as a stored row, which the writer therefore never drops (the keep rule holds it), is listed under "Ledger writer".
 - **Counts.** The writer maps the projection onto `ReconciliationSummary` ("Ledger writer", Report); only `failed > 0` and the failed ids are read.
 
-### Shadow comparison (plan 3.2)
+### Shadow comparison
 
 `application/transaction/LedgerInputLoader` reads the projector's inputs from the database, read-only: the effective parsed events (`EffectiveParsedEventProvider`) with their raw SMS receipt time, `UserDecisionRepository.effectiveFor`, ownership of every referenced account, card and loan through `OwnershipResolver`, `StoredFacts` (the stored rows with their linked raw SMS, and the `USER_CORRECTION` closures), and the zone. It also returns the review items. `ReviewContainer.ledgerInputLoader` builds it for the debug export; the writer builds its own over the same repositories.
 
@@ -294,7 +291,7 @@ The owner decided these at gate 3.2 (2026-11-12); the projector and the writer f
 - **Device (debug builds).** Settings → Logs shows "Export ledger comparison" only when `BuildConfig.DEBUG`; it writes the report of the device database to a document the user picks.
 - **Any database file.** In a Robolectric test, open the file with `MasroofDatabase.builder(context, MasroofDatabase::class.java, name)`, build a `LedgerInputLoader` over its Room repositories (as `DashboardLedgerWorld.ledgerInputLoader` does) and call `LedgerShadowComparison.report(loader.load())`. Since the switch the stored ledger was written by the writer, so this compares it with a fresh projection.
 
-### Ledger writer (plan 3.3a)
+### Ledger writer
 
 Gate, approved by the owner on 2026-11-12. Every entry point of `TransactionReconciliationService` projects and writes through `LedgerProjectionWriter`; the callers (live processing, the historical batch, review workflow, restore, reclassify, ignore, ownership changes, model refresh) are unchanged and read the report as before; what the report holds is under "Report" below.
 
@@ -337,16 +334,16 @@ Message learning is "remember my decision", per bank, for every configured bank.
 
 ### Processing retry (`processing_retry`)
 
-One row per raw SMS whose derived pass (ownership discovery, reconciliation, review update) still has to run: the ids still to project. Since the ledger writer (plan 3.3a) a unit that failed is not written while the units the same pass wrote stay, and a rerun is idempotent, so recovery only reruns the pass for the listed ids (a batch set lists every id of the batch, also those whose units posted); nothing records a stage or partial progress (plan 3.4). Columns: `rawSmsId`, `createdAtEpochMillis`, `mode`. `mode` is who reruns the pass and is persisted, so both names stay readable forever:
+One row per raw SMS whose derived pass (ownership discovery, reconciliation, review update) still has to run: the ids still to project. Since the ledger writer a unit that failed is not written while the units the same pass wrote stay, and a rerun is idempotent, so recovery only reruns the pass for the listed ids (a batch set lists every id of the batch, also those whose units posted); nothing records a stage or partial progress. Columns: `rawSmsId`, `createdAtEpochMillis`, `mode`. `mode` is who reruns the pass and is persisted, so both names stay readable forever:
 
 - `LIVE`: written by `ProcessingRecovery.markExhausted` when `LiveSmsProcessingWorker` runs out of attempts, with a `processing_error` review unless the review is already resolved. `LiveSmsIntake.schedulePendingProcessing` hands each id back to the per-message worker at startup; a later complete live pass clears the row.
 - `HISTORICAL_BATCH`: written by `ProcessingRecovery.retryLater` (an incomplete historical batch, interactive reparse, correction, restore, ownership change or full `refreshReviewQueue`), which then enqueues the one `HistoricalDerivedRecoveryWorker` (unique work `historical-derived-recovery`, `KEEP`); startup enqueues it too. Parse paths that must survive process death write it in their parse transaction (`ParsedEventRepository.saveForHistoricalBatch`, `ModelRefreshWorkflow`). `HistoricalDerivedRecovery` runs one pass over the set and clears it only when `ReconciliationCompletionPolicy` reads the report as complete and the review update succeeded. The key is the raw SMS id, so a row has one mode; a later write replaces it, and startup leaves a `HISTORICAL_BATCH` id to the batch pass even if it also has a `processing_error` review.
 
-An SMS whose latest outcome decision posts nothing is never written and never listed (`RETRY_NOT_DECIDED_NON_FINANCIAL`). Every version since the column was added (schema v15) wrote only these two enum names, the shrink in plan 3.4 changed no stored value.
+An SMS whose latest outcome decision posts nothing is never written and never listed (`RETRY_NOT_DECIDED_NON_FINANCIAL`). Every version since the column was added (schema v15) wrote only these two enum names, a later shrink of the enum changed no stored value.
 
 ### User decisions (`user_decision`)
 
-`user_decision` is one append-only table (plans 2.1 and 5.2). Every explicit user decision is appended there in the same database transaction as the existing write it describes; the existing stores (`review_item`, `financial_transaction`) are written exactly as before. A bank choice has no other store either (the `user_selected_bank:` reason prefix went with the restart at version 1). A correction has no other store: its `CORRECTION` row is the only record (the `user_correction` table was dropped at the restart at version 1). Since plan piece 2.3, processing reads decisions from this table only ("Reading decisions" below); the legacy stores are still written so screens and the kept reads keep working. `UserDecisionDao` only inserts and reads; it has no UPDATE or DELETE. A later row for the same subject supersedes an earlier one by `sequence`.
+`user_decision` is one append-only table. Every explicit user decision is appended there in the same database transaction as the existing write it describes; the existing stores (`review_item`, `financial_transaction`) are written exactly as before. A bank choice has no other store either (the `user_selected_bank:` reason prefix went with the restart at version 1). A correction has no other store: its `CORRECTION` row is the only record (the `user_correction` table was dropped at the restart at version 1). Since plan piece 2.3, processing reads decisions from this table only ("Reading decisions" below); the legacy stores are still written so screens and the kept reads keep working. `UserDecisionDao` only inserts and reads; it has no UPDATE or DELETE. A later row for the same subject supersedes an earlier one by `sequence`.
 
 | Column | Meaning |
 |---|---|
@@ -360,7 +357,7 @@ An SMS whose latest outcome decision posts nothing is never written and never li
 | `occurredAtEpochMillis`, `occurredAtZone` | The effective occurred-at instant (`TransactionTiming.effectiveOccurredAt`) and zone exactly as posted on the `financial_transaction` row, for the same kinds. `RESTORE` is appended before reconciliation posts, so it has none; a type chosen on restore adds a `RECLASSIFY` row that has them. The amount is not copied: it comes from the evidence or a correction. |
 | `messageFamily`, `amountDecimal`, `amountCurrency`, `merchant`, `counterparty` | A `CORRECTION`'s fields (family name, `BigDecimal.toPlainString()`, currency name). The user's own text, never SMS body text. |
 | `bankId` | The bank of a `BANK_SELECTION`. |
-| `subjectKey`, `answer`, `payload` | A `RECURRING` row only (plan 5.2): the series key, the answer (`CONFIRMED`, `CONFIRM_PENDING`, `NOT_RECURRING`, `DISMISSED` or `UNDONE`) and the `RecurringFeedbackPayload` JSON exactly as written (null for `UNDONE`). See "Recurring answers" below. |
+| `subjectKey`, `answer`, `payload` | A `RECURRING` row only: the series key, the answer (`CONFIRMED`, `CONFIRM_PENDING`, `NOT_RECURRING`, `DISMISSED` or `UNDONE`) and the `RecurringFeedbackPayload` JSON exactly as written (null for `UNDONE`). See "Recurring answers" below. |
 
 Unused columns are null. Indices: `(rawSmsId, sequence)` for "latest decision for this SMS", `(pairedRawSmsId)` for the second leg of a pair.
 
@@ -384,7 +381,7 @@ Application services join through `UserDecisionRepository.recordWith(decision, b
 
 The owner's data predates the dual write. It was converted once, outside the app, before the restart at version 1; that conversion filled `user_decision` under the rule the owner approved on 2026-11-12: only resolved user reviews, corrections and bank selections became decisions, and a posted transaction with neither is automatic (no row), even if its type was edited without leaving a review. The app holds no backfill. `UserDecisionBackfill` (test fixtures of `:data`) is the same SQL, kept only so tests can seed decisions from review rows they write directly.
 
-#### Reading decisions (plan 2.3)
+#### Reading decisions
 
 Processing reads user decisions through `UserDecisionRepository.effectiveFor(rawSmsIds)` (`RoomUserDecisionRepository`, `UserDecisionDao.listNaming`, chunked under the bind limit). It folds the rows that name each raw SMS, in `sequence` order, into `EffectiveUserDecisions`, three independent layers:
 
@@ -417,7 +414,7 @@ Reads kept on the legacy stores, each allowed by name in `DecisionReadBoundaryTe
 - `PatternEvidenceProtection` treats any settled review, automatic included, as evidence to keep, and `PendingPatternsWorkflow` skips a `REQUIRED` review with a resolution: queue state, not a user decision.
 - Screens (`ReviewPresentationMapper`, `ReviewReasonLabels`, `ReviewDetailLoader`, `InterpretationProvenanceWorkflow`) display the review.
 
-#### Recurring answers (plan 5.2)
+#### Recurring answers
 
 The user's answers about recurring-payment series are kept in `user_decision` itself (owner, 2026-11-12), append-only, as `RECURRING` rows (`subjectKey` = series key, `answer` = the answer kind, `payload` and `decidedAtEpochMillis` as written). `RecurringAnswerStore` (`data/repository`) is the only reader and writer, through `DatabaseAccessGate`, each write one `masroof.db` transaction:
 
@@ -426,7 +423,7 @@ The user's answers about recurring-payment series are kept in `user_decision` it
 
 **Backups.** Exports carry the answers inside `masroof.db`; the analytics archive holds none. A failed or rolled-back restore puts back the original database, which holds the original answers.
 
-Known limits, for plan 3.2: a posted type or endpoint edited without a review or correction has no decision (owner rule of 2.2). Reconciliation keeps it only because the row stays posted; an emptied ledger rebuilds it from the evidence (`ManualDecisionReplayTest.typeEditedOnlyOnTheRow_isKeptWhilePosted_andAutomaticOnceTheLedgerIsEmptied`). A rebuilt row has no exchange-rate pair until enrichment runs again, and a backfilled pair whose outgoing leg was unknown takes the counterparty of its subject leg first. `ManualDecisionReplayTest` empties the ledger and replays for every outcome kind and a correction; a bank selection is a reparse input and does not depend on the ledger.
+Known limits: a posted type or endpoint edited without a review or correction has no decision. Reconciliation keeps it only because the row stays posted; an emptied ledger rebuilds it from the evidence (`ManualDecisionReplayTest.typeEditedOnlyOnTheRow_isKeptWhilePosted_andAutomaticOnceTheLedgerIsEmptied`). A rebuilt row has no exchange-rate pair until enrichment runs again, and a backfilled pair whose outgoing leg was unknown takes the counterparty of its subject leg first. `ManualDecisionReplayTest` empties the ledger and replays for every outcome kind and a correction; a bank selection is a reparse input and does not depend on the ledger.
 
 The learning store is schema 2 and the analytics store is schema 4; both open through `PreservingOpenHelperFactory` (above). Posted type edits atomically update the financial transaction and its latest `USER_FINANCIAL_TYPE` review decision, and append a `RECLASSIFY` row to `user_decision`. Message learning rebuilds from durable decisions before enabling personal assistance; no derived message-model cache is written or loaded. Exact template suppressions include bank and feature identity and revoke human-template assistance. Financial `EXPENSE`/`INCOME`, ownership decisions and field-only edits do not invent family labels. Unsupported or ambiguous decisions have an explicit feedback disposition.
 
@@ -448,7 +445,7 @@ review updates using that same report. Settings reloads registries after a compl
 reparse or rescan; it does not start another financial pass. A failed report remains
 incomplete and durably retryable even if a second pass could succeed.
 
-Patterns in backups (plan 5.1): the pattern document travels only inside the database; export fails when the stored document does not decode, and every imported row must decode before the live file is replaced. A rollback restores the parked original database, and with it the original patterns. The restore journal carries no pattern file.
+Patterns in backups: the pattern document travels only inside the database; export fails when the stored document does not decode, and every imported row must decode before the live file is replaced. A rollback restores the parked original database, and with it the original patterns. The restore journal carries no pattern file.
 
 Backup format: `BackupPackageFormat.FORMAT_VERSION` is 1 (restarted with the schema, owner 2026-11-13). `BackupPackageCodec.validateManifest` accepts only that format with a known (version, identity hash) pair; anything else is an invalid package before the live database is touched. Archives written before the restart (schema v18 or v22) are refused. Only the encrypted envelope is a backup: a bare ZIP, which older builds imported after a confirmation, is an invalid package.
 

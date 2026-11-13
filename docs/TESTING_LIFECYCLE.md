@@ -1,6 +1,6 @@
 # Application lifecycle test contracts
 
-This is a map of existing production paths and executable coverage, not a claim that tests prove every possible bank message or device safe. All tests run on PR/main CI unless the API-specific exception in CI.md applies. Planned test changes are in [the sustainability plan](SUSTAINABILITY_PLAN.md).
+This is a map of existing production paths and executable coverage, not a claim that tests prove every possible bank message or device safe. All tests run on PR/main CI unless the API-specific exception in CI.md applies.
 
 | Boundary | Required evidence |
 | --- | --- |
