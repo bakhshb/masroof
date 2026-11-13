@@ -1,5 +1,4 @@
-# Masroof detekt — focused on dead-code hygiene (unused members and imports).
-# Full default rule sets are disabled; expand gradually as needed.
+# Masroof detekt: dead code (unused members and imports), size limits and the bug-finding rule sets.
 
 style:
   active: true
@@ -20,12 +19,141 @@ ktlint:
     active: true
     autoCorrect: false
 
-# Size limits block new oversized code; existing offenders are listed in each module's detekt-baseline.xml.
+# Size limits block new oversized production code; existing offenders are listed in each module's detekt-baseline.xml.
+# Tests are left out: a long test class or case is a list of scenarios, not a design problem.
 complexity:
   active: true
   LongMethod:
     active: true
     allowedLines: 80
+    excludes: &tests ['**/test/**', '**/androidTest/**', '**/sharedTest/**', '**/testFixtures/**']
+    # A Compose screen function is one layout tree; cutting it by line count scatters the screen.
+    ignoreAnnotated: ['Composable']
   LargeClass:
     active: true
     allowedLines: 600
+    excludes: *tests
+
+# Bug-finding rule sets with detekt's default-active rules (plan 7.2). Formatting, naming, comments and the
+# rest of style stay off: they raise about 40,000 findings on working code and none of them is a defect.
+# Some of these rules only run with type resolution (the detektMain tasks).
+potential-bugs:
+  active: true
+  AvoidReferentialEquality:
+    active: true
+  DoubleMutabilityForCollection:
+    active: true
+  EqualsAlwaysReturnsTrueOrFalse:
+    active: true
+  EqualsWithHashCodeExist:
+    active: true
+  ExplicitGarbageCollectionCall:
+    active: true
+  HasPlatformType:
+    active: true
+  IgnoredReturnValue:
+    active: true
+  ImplicitDefaultLocale:
+    active: true
+  InvalidRange:
+    active: true
+  IteratorHasNextCallsNextMethod:
+    active: true
+  IteratorNotThrowingNoSuchElementException:
+    active: true
+  MapGetWithNotNullAssertionOperator:
+    active: true
+  UnnecessaryNotNullOperator:
+    active: true
+  UnnecessarySafeCall:
+    active: true
+  UnreachableCatchBlock:
+    active: true
+  UnreachableCode:
+    active: true
+  UnsafeCallOnNullableType:
+    active: true
+  UnsafeCast:
+    active: true
+  UnusedUnaryOperator:
+    active: true
+  UselessPostfixExpression:
+    active: true
+  WrongEqualsTypeParameter:
+    active: true
+coroutines:
+  active: true
+  InjectDispatcher:
+    active: true
+  RedundantSuspendModifier:
+    active: true
+  SleepInsteadOfDelay:
+    active: true
+  SuspendFunWithFlowReturnType:
+    active: true
+performance:
+  active: true
+  ArrayPrimitive:
+    active: true
+  ForEachOnRange:
+    active: true
+    excludes: *tests
+  SpreadOperator:
+    active: true
+  UnnecessaryTemporaryInstantiation:
+    active: true
+empty-blocks:
+  active: true
+  EmptyCatchBlock:
+    active: true
+  EmptyClassBlock:
+    active: true
+  EmptyDefaultConstructor:
+    active: true
+  EmptyDoWhileBlock:
+    active: true
+  EmptyElseBlock:
+    active: true
+  EmptyFinallyBlock:
+    active: true
+  EmptyForBlock:
+    active: true
+  EmptyFunctionBlock:
+    active: true
+  EmptyIfBlock:
+    active: true
+  EmptyInitBlock:
+    active: true
+  EmptyKotlinFile:
+    active: true
+  EmptySecondaryConstructor:
+    active: true
+  EmptyTryBlock:
+    active: true
+  EmptyWhenBlock:
+    active: true
+  EmptyWhileBlock:
+    active: true
+exceptions:
+  active: true
+  # Not enabled: TooGenericExceptionCaught and SwallowedException. Background work here catches Exception on
+  # purpose, after rethrowing cancellation, and logs the class without the message (no SMS text in logs).
+  ExceptionRaisedInUnexpectedLocation:
+    active: true
+  InstanceOfCheckForException:
+    active: true
+  PrintStackTrace:
+    active: true
+  RethrowCaughtException:
+    active: true
+  ReturnFromFinally:
+    active: true
+  ThrowingExceptionFromFinally:
+    active: true
+  ThrowingExceptionsWithoutMessageOrCause:
+    active: true
+    excludes: *tests
+  ThrowingNewInstanceOfSameException:
+    active: true
+  TooGenericExceptionThrown:
+    active: true
