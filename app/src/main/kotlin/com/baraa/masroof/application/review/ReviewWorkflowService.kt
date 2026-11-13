@@ -16,7 +16,6 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.assembly.TransactionTiming
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
-import com.baraa.masroof.domain.ids.UserCorrectionIdFactory
 import com.baraa.masroof.domain.matching.TransferMatchCandidate
 import com.baraa.masroof.domain.matching.TransferMatchPair
 import com.baraa.masroof.domain.model.AccountReference
@@ -30,7 +29,6 @@ import com.baraa.masroof.domain.model.OwnershipStatus
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
-import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.model.UserDecision
 import com.baraa.masroof.domain.model.UserDecisionKind
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
@@ -40,14 +38,12 @@ import com.baraa.masroof.domain.repository.ManualReviewResolutionRepository
 import com.baraa.masroof.domain.repository.ManualReviewResolutionResult
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.util.UUID
 
 /** Direction explicitly displayed by the review action when the user confirms it. */
 enum class ExternalTransferDirection(val family: MessageFamily) {
@@ -60,7 +56,6 @@ enum class ExternalTransferDirection(val family: MessageFamily) {
  */
 class ReviewWorkflowService(
     private val reviewRepository: ReviewRepository,
-    private val userCorrectionRepository: UserCorrectionRepository,
     private val financialTransactionRepository: FinancialTransactionRepository,
     private val rawSmsRepository: RawSmsRepository,
     private val ownershipResolver: OwnershipResolver,
@@ -75,9 +70,6 @@ class ReviewWorkflowService(
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val appLogService: AppLog,
     private val processingRecovery: ProcessingRecovery,
-    private val newCorrectionId: () -> String = {
-        UserCorrectionIdFactory.create(UUID.randomUUID().toString())
-    },
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
@@ -208,16 +200,7 @@ class ReviewWorkflowService(
         }
 
         val now = clock.now()
-        val correction = UserCorrection(
-            id = newCorrectionId(),
-            targetRawSmsId = review.rawSmsId,
-            correctedType = correctedType,
-            correctedAmount = correctedAmount,
-            correctedMerchant = correctedMerchant,
-            correctedCounterparty = correctedCounterparty,
-            createdAt = now,
-        )
-        val decision = UserDecision(
+        val correction = UserDecision(
             rawSmsId = review.rawSmsId,
             kind = UserDecisionKind.CORRECTION,
             decidedAt = now,
@@ -226,7 +209,7 @@ class ReviewWorkflowService(
             merchant = correctedMerchant,
             counterparty = correctedCounterparty,
         )
-        userDecisionRepository.recordWith(decision, before = { null }) { userCorrectionRepository.save(correction) }
+        userDecisionRepository.recordWith(correction, before = { null }) { Unit }
 
         val incomplete = reconcileAffectedAndUpdateReviews(listOf(review.rawSmsId))
         if (incomplete != null) {

@@ -111,10 +111,7 @@ class ReplicaMachineLearningTest {
             c.storage.rawSmsRepository.insertIfAbsent(evidence("pending-evidence",body))
             val correctedAt=Instant.now()
             c.storage.userDecisionRepository.recordWith(com.baraa.masroof.domain.model.UserDecision("pending-evidence",
-                com.baraa.masroof.domain.model.UserDecisionKind.CORRECTION,correctedAt,messageFamily=MessageFamily.FINANCING_INSTALLMENT),{ null }) {
-                c.storage.userCorrectionRepository.save(UserCorrection("early-family","pending-evidence",MessageFamily.FINANCING_INSTALLMENT,
-                    null,null,null,correctedAt))
-            }
+                com.baraa.masroof.domain.model.UserDecisionKind.CORRECTION,correctedAt,messageFamily=MessageFamily.FINANCING_INSTALLMENT),{ null }) { Unit }
             service.synchronizeFeedback()
             assertEquals(com.baraa.masroof.application.interpretation.LearningFeedbackState.PENDING,service.feedbackStatus("pending-evidence")!!.state)
             c.sms.processStoredSmsUseCase.process("pending-evidence")

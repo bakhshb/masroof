@@ -51,6 +51,8 @@ internal object NoOpUserDecisionRepository : UserDecisionRepository {
         write()
 
     override suspend fun effectiveFor(rawSmsIds: Collection<String>) = rawSmsIds.associateWith { EffectiveUserDecisions.NONE }
+
+    override suspend fun listCorrections() = emptyMap<Long, UserDecision>()
 }
 
 internal fun noOpOwnershipDiscovery() =

@@ -29,7 +29,6 @@ class BankInterpretationService(
     private val context: Context,
     private val raw: RawSmsRepository,
     private val parsed: ParsedEventRepository,
-    private val corrections: UserCorrectionRepository,
     private val reviews: ReviewRepository,
     private val decisions: UserDecisionRepository,
     private val transactions: FinancialTransactionRepository,
@@ -78,9 +77,9 @@ class BankInterpretationService(
     private val changes = Channel<Unit>(Channel.CONFLATED)
     private var job: Job? = null
     private var tracker: InvalidationTracker? = null
-    private val observer = object : InvalidationTracker.Observer("user_correction","review_item","raw_sms","parsed_event","financial_transaction") {
+    private val observer = object : InvalidationTracker.Observer("user_decision","review_item","raw_sms","parsed_event","financial_transaction") {
         override fun onInvalidated(tables: Set<String>) {
-            if(tables.any { it == "user_correction" || it == "review_item" }) invalidateFeedback()
+            if(tables.any { it == "user_decision" || it == "review_item" }) invalidateFeedback()
             else if(pendingFeedback) changes.trySend(Unit)
         }
     }
@@ -160,11 +159,11 @@ class BankInterpretationService(
      */
     private suspend fun decisions(): List<Decision> {
         val result = mutableListOf<Decision>()
-        corrections.listAll().forEach { correction ->
-            result += Decision("correction:${correction.id}", correction.targetRawSmsId,
-                correction.correctedType?.let { MessageFamily.valueOf(it.name) },
-                correction.createdAt.toEpochMilli(), "USER_MESSAGE_FAMILY",
-                reason = if(correction.correctedType == null) "FIELDS_ONLY" else null)
+        decisions.listCorrections().forEach { (sequence, correction) ->
+            result += Decision("correction:$sequence", correction.rawSmsId,
+                correction.messageFamily?.let { MessageFamily.valueOf(it.name) },
+                correction.decidedAt.toEpochMilli(), "USER_MESSAGE_FAMILY",
+                reason = if(correction.messageFamily == null) "FIELDS_ONLY" else null)
         }
         // USER_CORRECTION is settlement metadata for the append-only correction
         // already read above, not a second human decision that can supersede it.

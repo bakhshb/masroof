@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.testsupport.saveCorrection
+import com.baraa.masroof.testsupport.correction
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
 import com.baraa.masroof.domain.model.AccountReference
@@ -399,7 +401,6 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
     @Test
     fun merchantOnlyCorrection_doesNotLiftParseStatusGate() = runBlocking {
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
-        val correctionRepo = com.baraa.masroof.testsupport.DecidedCorrectionRepository(db)
         val withCorrections = TransactionReconciliationService(
             rawSmsRepository = rawRepo,
             financialTransactionRepository = ftRepo,
@@ -424,15 +425,13 @@ class ReconciliationAuthorityTest : ReconciliationTestFixture() {
                 status = ParseStatus.REVIEW_REQUIRED,
             ),
         )
-        correctionRepo.save(
-            com.baraa.masroof.domain.model.UserCorrection(
-                id = "corr-rr-merchant-only",
-                targetRawSmsId = "sms-rr-merchant-only",
-                correctedType = null,
-                correctedAmount = null,
-                correctedMerchant = "Corrected Merchant",
-                correctedCounterparty = null,
-                createdAt = Instant.parse("2026-08-02T12:00:00Z"),
+        db.saveCorrection(
+            correction(rawSmsId = "sms-rr-merchant-only",
+                family = null,
+                amount = null,
+                merchant = "Corrected Merchant",
+                counterparty = null,
+                at = Instant.parse("2026-08-02T12:00:00Z"),
             ),
         )
 

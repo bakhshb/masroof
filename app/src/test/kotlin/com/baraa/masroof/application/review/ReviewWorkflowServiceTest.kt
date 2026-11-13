@@ -1,7 +1,7 @@
 package com.baraa.masroof.application.review
 
-import com.baraa.masroof.testsupport.listFor
-import com.baraa.masroof.testsupport.latestFor
+import com.baraa.masroof.testsupport.correctionsFor
+import com.baraa.masroof.testsupport.latestCorrectionFor
 import com.baraa.masroof.testsupport.saveCorrection
 import com.baraa.masroof.testsupport.RoomReviewWiring
 import android.content.Context
@@ -17,11 +17,9 @@ import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.ReviewIdFactory
-import com.baraa.masroof.domain.ids.UserCorrectionIdFactory
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.BankNetworkType
@@ -41,7 +39,7 @@ import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
-import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.testsupport.correction
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.parsing.model.ParsedEventDetails
 import com.baraa.masroof.sms.hash.SmsBodyHasher
@@ -75,7 +73,7 @@ class ReviewWorkflowServiceTest {
     private lateinit var parsedRepo: RoomParsedEventRepository
     private lateinit var ftRepo: RoomFinancialTransactionRepository
     private lateinit var reviewRepo: RoomReviewRepository
-    private lateinit var correctionRepo: RoomUserCorrectionRepository
+    private lateinit var correctionRepo: com.baraa.masroof.data.repository.RoomUserDecisionRepository
     private lateinit var loans: RoomLoanRegistryRepository
     private lateinit var confirmation: OwnershipConfirmationService
     private lateinit var workflow: ReviewWorkflowService
@@ -92,7 +90,7 @@ class ReviewWorkflowServiceTest {
         parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
         ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
-        correctionRepo = RoomUserCorrectionRepository(db.userCorrectionDao())
+        correctionRepo = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)
         loans = RoomLoanRegistryRepository.from(db)
         val wiring = wiring(reconcileWithReviews = false)
         confirmation = wiring.confirmation
@@ -112,7 +110,6 @@ class ReviewWorkflowServiceTest {
         parsed = parsedRepo,
         ledger = ledger,
         reviews = reviewRepo,
-        corrections = correctionRepo,
         loans = loans,
         reviewQueueReviews = reviewQueueReviews,
         reconcileWithReviews = reconcileWithReviews,
@@ -271,7 +268,7 @@ class ReviewWorkflowServiceTest {
         assertEquals(bodyBefore, rawRepo.getById("sms-buy")!!.body)
         assertNull(parsedRepo.findByRawSmsId("sms-buy")!!.event.amount)
         assertEquals(parsedBefore.id, parsedRepo.findByRawSmsId("sms-buy")!!.event.id)
-        assertNotNull(correctionRepo.latestFor("sms-buy"))
+        assertNotNull(correctionRepo.latestCorrectionFor("sms-buy"))
     }
 
     @Test
@@ -306,7 +303,7 @@ class ReviewWorkflowServiceTest {
             .findEffectiveByRawSmsId("sms-r")!!
         assertEquals("e2", effective.event.id)
         assertEquals(money("51.99"), effective.event.amount)
-        assertEquals("sms-r", correctionRepo.latestFor("sms-r")!!.targetRawSmsId)
+        assertEquals("sms-r", correctionRepo.latestCorrectionFor("sms-r")!!.rawSmsId)
     }
 
     @Test
@@ -323,25 +320,21 @@ class ReviewWorkflowServiceTest {
             ),
         )
         db.saveCorrection(
-            UserCorrection(
-                id = "corr-a",
-                targetRawSmsId = "sms-c",
-                correctedType = null,
-                correctedAmount = money("120.00"),
-                correctedMerchant = null,
-                correctedCounterparty = null,
-                createdAt = Instant.parse("2026-08-11T10:00:00Z"),
+            correction(rawSmsId = "sms-c",
+                family = null,
+                amount = money("120.00"),
+                merchant = null,
+                counterparty = null,
+                at = Instant.parse("2026-08-11T10:00:00Z"),
             ),
         )
         db.saveCorrection(
-            UserCorrection(
-                id = "corr-b",
-                targetRawSmsId = "sms-c",
-                correctedType = null,
-                correctedAmount = null,
-                correctedMerchant = "Y",
-                correctedCounterparty = null,
-                createdAt = Instant.parse("2026-08-11T11:00:00Z"),
+            correction(rawSmsId = "sms-c",
+                family = null,
+                amount = null,
+                merchant = "Y",
+                counterparty = null,
+                at = Instant.parse("2026-08-11T11:00:00Z"),
             ),
         )
         val effective = EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db))
@@ -756,33 +749,26 @@ class ReviewWorkflowServiceTest {
             ),
         )
         val createdAt = Instant.parse("2026-08-11T10:00:00.000Z")
-        val a = UserCorrection(
-            id = UserCorrectionIdFactory.create("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-            targetRawSmsId = "sms-c2",
-            correctedType = null,
-            correctedAmount = money("120.00"),
-            correctedMerchant = null,
-            correctedCounterparty = null,
-            createdAt = createdAt,
+        val a = correction(rawSmsId = "sms-c2",
+            family = null,
+            amount = money("120.00"),
+            merchant = null,
+            counterparty = null,
+            at = createdAt,
         )
-        val b = UserCorrection(
-            id = UserCorrectionIdFactory.create("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
-            targetRawSmsId = "sms-c2",
-            correctedType = null,
-            correctedAmount = null,
-            correctedMerchant = "Y",
-            correctedCounterparty = null,
-            createdAt = createdAt,
+        val b = correction(rawSmsId = "sms-c2",
+            family = null,
+            amount = null,
+            merchant = "Y",
+            counterparty = null,
+            at = createdAt,
         )
         db.saveCorrection(a)
         db.saveCorrection(b)
-        val listed = correctionRepo.listFor("sms-c2")
+        val listed = correctionRepo.correctionsFor("sms-c2")
         assertEquals(2, listed.size)
-        assertNotEquals(listed[0].id, listed[1].id)
-        assertEquals(listOf(a.id, b.id).sorted(), listed.map { it.id }.sorted())
-        // Ascending createdAt then id
-        assertEquals(a.id, listed[0].id)
-        assertEquals(b.id, listed[1].id)
+        // Equal times stay in append order.
+        assertEquals(listOf(a, b), listed)
         val effective = EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db))
             .findEffectiveByRawSmsId("sms-c2")!!.event
         assertEquals(money("120.00"), effective.amount)
@@ -1115,7 +1101,7 @@ class ReviewWorkflowServiceTest {
 
         assertTrue(result is ReviewWorkflowResult.Rejected)
         assertEquals("reconciliation_incomplete", (result as ReviewWorkflowResult.Rejected).reason)
-        assertEquals(money("51.99"), correctionRepo.latestFor("sms-conflict")!!.correctedAmount)
+        assertEquals(money("51.99"), correctionRepo.latestCorrectionFor("sms-conflict")!!.amount)
         assertEquals(0, ftRepo.listAll().size)
         val review = reviewRepo.findByRawSmsId("sms-conflict")!!
         assertEquals(ReviewStatus.REQUIRED, review.status)

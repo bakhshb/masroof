@@ -26,7 +26,7 @@ import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.testsupport.correction
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.parsing.model.ParsedEventDetails
@@ -190,14 +190,13 @@ class ReconciliationCharacterizationFixture private constructor(
 
     suspend fun saveAmountCorrection() {
         db.saveCorrection(
-            UserCorrection(
-                id = CORRECTION_ID,
-                targetRawSmsId = CORRECTION_SMS,
-                correctedType = null,
-                correctedAmount = Money.of(CORRECTION_AMOUNT, Currency.SAR),
-                correctedMerchant = null,
-                correctedCounterparty = null,
-                createdAt = Instant.parse("2026-08-08T12:00:00Z"),
+            correction(
+                rawSmsId = CORRECTION_SMS,
+                family = null,
+                amount = Money.of(CORRECTION_AMOUNT, Currency.SAR),
+                merchant = null,
+                counterparty = null,
+                at = Instant.parse("2026-08-08T12:00:00Z"),
             ),
         )
     }

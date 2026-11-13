@@ -6,7 +6,7 @@ import java.time.Instant
  * Immutable original SMS evidence from the device.
  *
  * Never overwritten by parser output or user corrections. Corrections are stored
- * separately as [UserCorrection].
+ * separately as `CORRECTION` rows of [UserDecision].
  */
 data class RawSms(
     val id: String,

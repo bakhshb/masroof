@@ -47,7 +47,6 @@ import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewKind
-import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.repository.FinancialTransactionSaveResult
 import com.baraa.masroof.domain.statement.StatementComparisonStatus
 import com.baraa.masroof.presentation.statement.STATEMENT_RECONCILIATION_PICK_TAG
@@ -198,19 +197,7 @@ class StatementReconciliationSmokeTest {
                     com.baraa.masroof.domain.model.UserDecision("m19-sms-matched",
                         com.baraa.masroof.domain.model.UserDecisionKind.CORRECTION, correctedAt, merchant = "Anon merchant"),
                     before = { null },
-                ) {
-                    container.storage.userCorrectionRepository.save(
-                        UserCorrection(
-                            id = "uc-m19-matched",
-                            targetRawSmsId = "m19-sms-matched",
-                            correctedType = null,
-                            correctedAmount = null,
-                            correctedMerchant = "Anon merchant",
-                            correctedCounterparty = null,
-                            createdAt = correctedAt,
-                        ),
-                    )
-                }
+                ) { Unit }
                 container.storage.reviewRepository.upsertRequired(
                     rawSmsId = "m19-sms-ledger-only",
                     kind = ReviewKind.NEEDS_REVIEW,
@@ -516,7 +503,7 @@ class StatementReconciliationSmokeTest {
             financialTransaction = count("financial_transaction"),
             rawSms = count("raw_sms"),
             parsedEvent = count("parsed_event"),
-            userCorrection = count("user_correction"),
+            userDecision = count("user_decision"),
             review = count("review_item"),
         )
     }
@@ -525,7 +512,7 @@ class StatementReconciliationSmokeTest {
         assertTrue(emulatorMessage("financial_transaction seed $counts"), counts.financialTransaction >= 4)
         assertTrue(emulatorMessage("raw_sms seed $counts"), counts.rawSms >= 4)
         assertTrue(emulatorMessage("parsed_event seed $counts"), counts.parsedEvent >= 4)
-        assertTrue(emulatorMessage("user_correction seed $counts"), counts.userCorrection >= 1)
+        assertTrue(emulatorMessage("user_decision seed $counts"), counts.userDecision >= 1)
         assertTrue(emulatorMessage("review_item seed $counts"), counts.review >= 1)
     }
 
@@ -536,7 +523,7 @@ class StatementReconciliationSmokeTest {
                     "financial_transaction ${before.financialTransaction}->${after.financialTransaction}, " +
                     "raw_sms ${before.rawSms}->${after.rawSms}, " +
                     "parsed_event ${before.parsedEvent}->${after.parsedEvent}, " +
-                    "user_correction ${before.userCorrection}->${after.userCorrection}, " +
+                    "user_decision ${before.userDecision}->${after.userDecision}, " +
                     "review_item ${before.review}->${after.review}",
             ),
             before,
@@ -604,7 +591,7 @@ class StatementReconciliationSmokeTest {
         val financialTransaction: Int,
         val rawSms: Int,
         val parsedEvent: Int,
-        val userCorrection: Int,
+        val userDecision: Int,
         val review: Int,
     )
 
@@ -629,7 +616,7 @@ class StatementReconciliationSmokeTest {
             "financial_transaction",
             "raw_sms",
             "parsed_event",
-            "user_correction",
+            "user_decision",
             "review_item",
         )
         val SEEDED: List<SeededMovement> = listOf(

@@ -14,7 +14,7 @@ class LearningContainer(
     val interpretationService: BankInterpretationService? = if (enabled) {
         BankInterpretationService(
             storage.appContext, storage.rawSmsRepository, storage.parsedEventRepository,
-            storage.userCorrectionRepository, storage.reviewRepository, storage.userDecisionRepository,
+            storage.reviewRepository, storage.userDecisionRepository,
             storage.financialTransactionRepository,
             storage.applicationScope, storage.appLogService,
             patterns = storage.messagePatternStore::load,

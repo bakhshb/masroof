@@ -26,7 +26,6 @@ import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.repository.RoomUserDecisionRepository
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
@@ -39,7 +38,6 @@ import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.ProcessingRetryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
@@ -138,9 +136,6 @@ class StorageContainer(
 
     val processingRetryRepository: ProcessingRetryRepository =
         RoomProcessingRetryRepository(database.processingRetryDao(), accessGate = databaseAccessGate)
-
-    val userCorrectionRepository: UserCorrectionRepository =
-        RoomUserCorrectionRepository(database.userCorrectionDao(), accessGate = databaseAccessGate)
 
     val onboardingPreferencesRepository: OnboardingPreferencesRepository =
         SharedPrefsOnboardingPreferencesRepository(

@@ -3,8 +3,8 @@ package com.baraa.masroof.data.room
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
- * Test support: fills `user_decision` from review resolutions, bank selections and corrections a test wrote straight
- * into `review_item` and `user_correction`, the way production writers append a decision with each of them. Plain
+ * Test support: fills `user_decision` from review resolutions and bank selections a test wrote straight
+ * into `review_item`, the way production writers append a decision with each of them. Plain
  * SQL; it only inserts into `user_decision`. Rows already in the table are re-appended after the filled ones in their
  * own order, and a trace an existing row already records is skipped.
  */
@@ -47,9 +47,9 @@ object UserDecisionBackfill {
                 COALESCE(r.resolvedTransactionId,
                     (SELECT l.transactionId FROM financial_transaction_raw_sms_link l WHERE l.rawSmsId = r.rawSmsId)) AS txId,
                 COALESCE(
-                    (SELECT c.correctedMessageFamily FROM user_correction c
-                        WHERE c.targetRawSmsId = r.rawSmsId AND c.correctedMessageFamily IS NOT NULL
-                        ORDER BY c.createdAtEpochMillis DESC, c.id DESC LIMIT 1),
+                    (SELECT c.messageFamily FROM user_decision c
+                        WHERE c.kind = 'CORRECTION' AND c.rawSmsId = r.rawSmsId AND c.messageFamily IS NOT NULL
+                        ORDER BY c.decidedAtEpochMillis DESC, c.sequence DESC LIMIT 1),
                     (SELECT p.messageFamily FROM parsed_event p WHERE p.rawSmsId = r.rawSmsId),
                     '') = 'TRANSFER_OUT' AS outgoing
             FROM review_item r
@@ -76,21 +76,6 @@ object UserDecisionBackfill {
                     AND (s.rawSmsId IN (d.rawSmsId, d.pairedRawSmsId) OR s.pairedRawSmsId IN (d.rawSmsId, d.pairedRawSmsId))
             )
         ),
-        correction AS (
-            SELECT c.targetRawSmsId AS rawSmsId, NULL AS pairedRawSmsId, 'CORRECTION' AS kind,
-                c.createdAtEpochMillis AS decidedAt, c.id AS legacyId, 1 AS rank,
-                c.correctedMessageFamily AS messageFamily, c.correctedAmountDecimal AS amountDecimal,
-                c.correctedAmountCurrency AS amountCurrency, c.correctedMerchant AS merchant,
-                c.correctedCounterparty AS counterparty, NULL AS bankId
-            FROM user_correction c
-            WHERE NOT EXISTS (
-                SELECT 1 FROM user_decision s WHERE s.sequence <= ?1 AND s.kind = 'CORRECTION'
-                    AND s.rawSmsId = c.targetRawSmsId AND s.decidedAtEpochMillis = c.createdAtEpochMillis
-                    AND s.messageFamily IS c.correctedMessageFamily AND s.amountDecimal IS c.correctedAmountDecimal
-                    AND s.amountCurrency IS c.correctedAmountCurrency AND s.merchant IS c.correctedMerchant
-                    AND s.counterparty IS c.correctedCounterparty
-            )
-        ),
         selected AS (
             SELECT id, rawSmsId, updatedAtEpochMillis, rest,
                 CASE WHEN instr(rest, char(30)) > 0 THEN substr(rest, 1, instr(rest, char(30)) - 1) ELSE rest END AS bankId
@@ -115,7 +100,6 @@ object UserDecisionBackfill {
             d.merchant, d.counterparty, d.bankId
         FROM (
             SELECT * FROM outcome
-            UNION ALL SELECT * FROM correction
             UNION ALL SELECT * FROM selection
         ) d
         -- Posting kinds carry the row the SMS is linked to now; with none, the columns stay null.

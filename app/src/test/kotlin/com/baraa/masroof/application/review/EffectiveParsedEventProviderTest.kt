@@ -10,7 +10,6 @@ import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomUserDecisionRepository
 import com.baraa.masroof.domain.model.EffectiveUserDecisions
 import com.baraa.masroof.domain.repository.UserDecisionRepository
-import com.baraa.masroof.testsupport.DecidedCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.Confidence
@@ -19,7 +18,7 @@ import com.baraa.masroof.domain.model.MoneyDirection
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.testsupport.saveCorrection
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -43,7 +42,6 @@ import java.time.LocalDateTime
 class EffectiveParsedEventProviderTest {
     private lateinit var db: MasroofDatabase
     private lateinit var parsedRepo: RoomParsedEventRepository
-    private lateinit var corrections: DecidedCorrectionRepository
     private lateinit var decisions: RoomUserDecisionRepository
     private lateinit var countingDao: CountingDecisions
     private lateinit var provider: EffectiveParsedEventProvider
@@ -56,7 +54,6 @@ class EffectiveParsedEventProviderTest {
             .build()
         val rawRepo = RoomRawSmsRepository(db.rawSmsDao())
         parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
-        corrections = DecidedCorrectionRepository(db)
         decisions = RoomUserDecisionRepository(db)
         seed(rawRepo)
         countingDao = CountingDecisions(decisions)
@@ -138,23 +135,6 @@ class EffectiveParsedEventProviderTest {
         assertEquals(0, countingDao.batchQueries)
     }
 
-    @Test
-    fun batchLookup_ordersByTargetThenTimeThenId_likeTheLegacyStore() = runBlocking {
-        val lookup = listOf("raw-outside", "missing", "raw-multi", "raw-merchant", "raw-transfer-out")
-        val orderedIds = listOf("corr-merchant", "corr-a", "corr-b", "corr-c", "corr-old", "corr-xfer")
-        val legacy = corrections.listAll().filter { it.targetRawSmsId in lookup }
-        assertEquals(orderedIds, legacy.map { it.id })
-        val read = decisions.effectiveFor(lookup)
-        // Chunking of this read is covered by UserDecisionReaderTest.
-        assertEquals(
-            legacy.map { listOf(it.targetRawSmsId, it.correctedType, it.correctedAmount, it.correctedMerchant, it.correctedCounterparty) },
-            lookup.sorted().flatMap { id ->
-                read.getValue(id).corrections.map { listOf(it.rawSmsId, it.messageFamily, it.amount, it.merchant, it.counterparty) }
-            },
-        )
-        assertEquals(emptyMap<String, Any>(), decisions.effectiveFor(emptyList()))
-    }
-
     private suspend fun expectedEffective(records: List<ParsedEventRecord>): List<ParsedEventRecord> =
         records.map { record ->
             provider.applyCorrections(record, decisions.effectiveFor(record.event.rawSmsId).corrections)
@@ -169,53 +149,47 @@ class EffectiveParsedEventProviderTest {
         saveSms(rawRepo, "raw-outside", Instant.parse("2026-07-15T08:00:00Z"), MessageFamily.PURCHASE)
 
         val sameInstant = Instant.parse("2026-08-01T11:00:00Z")
-        corrections.save(
+        db.saveCorrection(
             correction(
-                id = "corr-a",
                 rawSmsId = "raw-multi",
-                createdAt = Instant.parse("2026-08-01T10:00:00Z"),
+                at = Instant.parse("2026-08-01T10:00:00Z"),
                 amount = Money.of("1.00", Currency.SAR),
                 merchant = "First",
             ),
         )
-        corrections.save(
+        db.saveCorrection(
             correction(
-                id = "corr-b",
                 rawSmsId = "raw-multi",
-                createdAt = sameInstant,
+                at = sameInstant,
                 type = MessageFamily.REFUND,
                 amount = Money.of("25.00", Currency.SAR),
             ),
         )
-        corrections.save(
+        db.saveCorrection(
             correction(
-                id = "corr-c",
                 rawSmsId = "raw-multi",
-                createdAt = sameInstant,
+                at = sameInstant,
                 counterparty = "Cashier",
             ),
         )
-        corrections.save(
+        db.saveCorrection(
             correction(
-                id = "corr-merchant",
                 rawSmsId = "raw-merchant",
-                createdAt = Instant.parse("2026-08-03T09:00:00Z"),
+                at = Instant.parse("2026-08-03T09:00:00Z"),
                 merchant = "Renamed",
             ),
         )
-        corrections.save(
+        db.saveCorrection(
             correction(
-                id = "corr-xfer",
                 rawSmsId = "raw-transfer-out",
-                createdAt = Instant.parse("2026-08-04T09:00:00Z"),
+                at = Instant.parse("2026-08-04T09:00:00Z"),
                 counterparty = "Sibling",
             ),
         )
-        corrections.save(
+        db.saveCorrection(
             correction(
-                id = "corr-old",
                 rawSmsId = "raw-outside",
-                createdAt = Instant.parse("2026-07-15T09:00:00Z"),
+                at = Instant.parse("2026-07-15T09:00:00Z"),
                 merchant = "Old",
             ),
         )
@@ -260,22 +234,13 @@ class EffectiveParsedEventProviderTest {
     }
 
     private fun correction(
-        id: String,
         rawSmsId: String,
-        createdAt: Instant,
+        at: Instant,
         type: MessageFamily? = null,
         amount: Money? = null,
         merchant: String? = null,
         counterparty: String? = null,
-    ) = UserCorrection(
-        id = id,
-        targetRawSmsId = rawSmsId,
-        correctedType = type,
-        correctedAmount = amount,
-        correctedMerchant = merchant,
-        correctedCounterparty = counterparty,
-        createdAt = createdAt,
-    )
+    ) = com.baraa.masroof.testsupport.correction(rawSmsId, type, amount, merchant, counterparty, at)
 
     /** Counts the provider's decision reads: one per list read, one per single-record read. */
     private class CountingDecisions(private val delegate: UserDecisionRepository) : UserDecisionRepository by delegate {

@@ -16,7 +16,6 @@ import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.model.AccountReference
@@ -131,7 +130,6 @@ class IntraBankSelfTransferIngestionTest {
     reviewWorkflow = ReviewWorkflowService(
       reviewRepository = reviewRepo,
       userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
-      userCorrectionRepository = RoomUserCorrectionRepository(db.userCorrectionDao()),
       financialTransactionRepository = ftRepo,
       rawSmsRepository = rawRepo,
       ownershipResolver = ownershipResolver,

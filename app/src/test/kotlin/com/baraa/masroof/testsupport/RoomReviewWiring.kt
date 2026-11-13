@@ -13,7 +13,6 @@ import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
@@ -21,7 +20,6 @@ import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.domain.repository.LoanRegistryRepository
 import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
-import com.baraa.masroof.domain.repository.UserCorrectionRepository
 import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CoroutineDispatcher
@@ -37,7 +35,6 @@ internal class RoomReviewWiring(
     ledger: FinancialTransactionRepository =
         RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao()),
     reviews: ReviewRepository = RoomReviewRepository(db.reviewItemDao()),
-    corrections: UserCorrectionRepository = RoomUserCorrectionRepository(db.userCorrectionDao()),
     loans: LoanRegistryRepository = RoomLoanRegistryRepository.from(db),
     /** The review store the queue updater writes; tests inject failures here. */
     reviewQueueReviews: ReviewRepository = reviews,
@@ -67,7 +64,6 @@ internal class RoomReviewWiring(
     val workflow = ReviewWorkflowService(
         reviewRepository = reviews,
         userDecisionRepository = decisions,
-        userCorrectionRepository = corrections,
         financialTransactionRepository = ledger,
         rawSmsRepository = raw,
         ownershipResolver = resolver,

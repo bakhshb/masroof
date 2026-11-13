@@ -37,6 +37,10 @@ class RoomUserDecisionRepository(
             ids.associateWith { id -> naming[id]?.let { EffectiveUserDecisions.of(id, it) } ?: EffectiveUserDecisions.NONE }
         }
 
+    override suspend fun listCorrections(): Map<Long, UserDecision> = accessGate.withAccess {
+        database.userDecisionDao().listCorrections().associate { it.sequence to toDomain(it) }
+    }
+
     private fun toDomain(row: UserDecisionEntity) = UserDecision(
         rawSmsId = requireNotNull(row.rawSmsId),
         kind = UserDecisionKind.valueOf(row.kind),

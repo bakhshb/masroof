@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.transaction
 
+import com.baraa.masroof.testsupport.saveCorrection
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -12,7 +13,6 @@ import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomLoanRegistryRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
@@ -27,7 +27,7 @@ import com.baraa.masroof.domain.model.MessageFamily
 import com.baraa.masroof.domain.model.ParseStatus
 import com.baraa.masroof.domain.model.ParsedEvent
 import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.testsupport.correction
 import com.baraa.masroof.domain.ownership.OwnershipConfirmationService
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.parsing.model.ParsedEventDetails
@@ -154,16 +154,13 @@ class ScopedReconciliationTest {
             amount = null,
             status = ParseStatus.REVIEW_REQUIRED,
         )
-        val corrections = com.baraa.masroof.testsupport.DecidedCorrectionRepository(db)
-        corrections.save(
-            UserCorrection(
-                id = "corr-amount",
-                targetRawSmsId = "sms-corrected",
-                correctedType = null,
-                correctedAmount = Money.of("42.00", Currency.SAR),
-                correctedMerchant = null,
-                correctedCounterparty = null,
-                createdAt = Instant.parse("2026-08-08T12:00:00Z"),
+        db.saveCorrection(
+            correction(rawSmsId = "sms-corrected",
+                family = null,
+                amount = Money.of("42.00", Currency.SAR),
+                merchant = null,
+                counterparty = null,
+                at = Instant.parse("2026-08-08T12:00:00Z"),
             ),
         )
         val scoped = TransactionReconciliationService(

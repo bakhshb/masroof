@@ -124,7 +124,6 @@ class ReviewContainer(
     val reviewWorkflowService: ReviewWorkflowService =
         ReviewWorkflowService(
             reviewRepository = storage.reviewRepository,
-            userCorrectionRepository = storage.userCorrectionRepository,
             financialTransactionRepository = storage.financialTransactionRepository,
             rawSmsRepository = storage.rawSmsRepository,
             ownershipResolver = ownershipResolver,

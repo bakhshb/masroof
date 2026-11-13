@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "5349c1b666aed8239c225512f4498078",
+    "identityHash": "2d1e78f96c1bb8e5036430b295405119",
     "entities": [
       {
         "tableName": "raw_sms",
@@ -1127,87 +1127,6 @@
         ]
       },
       {
-        "tableName": "user_correction",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `targetRawSmsId` TEXT NOT NULL, `correctedMessageFamily` TEXT, `correctedAmountDecimal` TEXT, `correctedAmountCurrency` TEXT, `correctedMerchant` TEXT, `correctedCounterparty` TEXT, `createdAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`targetRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
-        "fields": [
-          {
-            "fieldPath": "id",
-            "columnName": "id",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "targetRawSmsId",
-            "columnName": "targetRawSmsId",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "correctedMessageFamily",
-            "columnName": "correctedMessageFamily",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "correctedAmountDecimal",
-            "columnName": "correctedAmountDecimal",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "correctedAmountCurrency",
-            "columnName": "correctedAmountCurrency",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "correctedMerchant",
-            "columnName": "correctedMerchant",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "correctedCounterparty",
-            "columnName": "correctedCounterparty",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "createdAtEpochMillis",
-            "columnName": "createdAtEpochMillis",
-            "affinity": "INTEGER",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "id"
-          ]
-        },
-        "indices": [
-          {
-            "name": "index_user_correction_targetRawSmsId_createdAtEpochMillis_id",
-            "unique": false,
-            "columnNames": [
-              "targetRawSmsId",
-              "createdAtEpochMillis",
-              "id"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_user_correction_targetRawSmsId_createdAtEpochMillis_id` ON `${TABLE_NAME}` (`targetRawSmsId`, `createdAtEpochMillis`, `id`)"
-          }
-        ],
-        "foreignKeys": [
-          {
-            "table": "raw_sms",
-            "onDelete": "RESTRICT",
-            "onUpdate": "CASCADE",
-            "columns": [
-              "targetRawSmsId"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          }
-        ]
-      },
-      {
         "tableName": "processing_retry",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rawSmsId` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `mode` TEXT NOT NULL, PRIMARY KEY(`rawSmsId`), FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
         "fields": [
@@ -1438,7 +1357,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5349c1b666aed8239c225512f4498078')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2d1e78f96c1bb8e5036430b295405119')"
     ]
   }
 }

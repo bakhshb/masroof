@@ -1,8 +1,9 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.correction
 import com.baraa.masroof.data.patterns.MessagePatternStore
 import com.baraa.masroof.data.room.MasroofDatabase
-import com.baraa.masroof.testsupport.latestFor
+import com.baraa.masroof.testsupport.latestCorrectionFor
 import com.baraa.masroof.testsupport.saveCorrection
 import com.baraa.masroof.testsupport.ingest
 import com.baraa.masroof.testsupport.uniqueStorageContext
@@ -79,11 +80,11 @@ class AlJaziraSharedPatternsTest {
             c.patterns.messagePatternsWorkflow.confirmPatternAccount(bankId, "4321")
             val raw = raw("early-correction")
             c.storage.rawSmsRepository.insertIfAbsent(raw)
-            val correction = UserCorrection("early", raw.id, MessageFamily.PURCHASE,
+            val correction = correction(raw.id, MessageFamily.PURCHASE,
                 com.baraa.masroof.core.money.Money.of("15", com.baraa.masroof.core.money.Currency.SAR), null, null, Instant.parse("2026-10-15T10:00:00Z"))
             c.storage.database.saveCorrection(correction)
             assertTrue(c.sms.processStoredSmsUseCase.process(raw.id) is SmsIngestionResult.Parsed)
-            assertEquals(correction, c.storage.userCorrectionRepository.latestFor(raw.id))
+            assertEquals(correction, c.storage.userDecisionRepository.latestCorrectionFor(raw.id))
             assertEquals("10.00", c.storage.parsedEventRepository.findByRawSmsId(raw.id)!!.event.amount!!.amount.toPlainString())
             assertEquals("15.00", c.storage.financialTransactionRepository.listAll().single().amount.amount.toPlainString())
         }

@@ -1,6 +1,7 @@
 package com.baraa.masroof.application.maintenance
 
-import com.baraa.masroof.testsupport.latestFor
+import com.baraa.masroof.testsupport.saveCorrection
+import com.baraa.masroof.testsupport.latestCorrectionFor
 import com.baraa.masroof.testsupport.TestSmsBodies.PURCHASE_BODY
 import android.content.Context
 import androidx.room.Room
@@ -22,7 +23,6 @@ import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
 import com.baraa.masroof.data.repository.RoomReviewRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -33,7 +33,7 @@ import com.baraa.masroof.domain.model.ProcessingRetryMode
 import com.baraa.masroof.domain.model.RawSms
 import com.baraa.masroof.domain.model.ReviewResolutionKind
 import com.baraa.masroof.domain.model.ReviewStatus
-import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.testsupport.correction
 import com.baraa.masroof.domain.ownership.OwnershipResolver
 import com.baraa.masroof.domain.repository.NoOpLoanRegistryRepository
 import com.baraa.masroof.parsing.model.ParseResult
@@ -67,7 +67,7 @@ class StoredSmsReprocessorTest {
     private lateinit var parsedRepo: RoomParsedEventRepository
     private lateinit var ftRepo: RoomFinancialTransactionRepository
     private lateinit var reviewRepo: RoomReviewRepository
-    private lateinit var correctionRepo: com.baraa.masroof.testsupport.DecidedCorrectionRepository
+    private lateinit var correctionRepo: com.baraa.masroof.data.repository.RoomUserDecisionRepository
     private lateinit var cards: RoomCardRegistryRepository
     private lateinit var reconciliation: TransactionReconciliationService
     private lateinit var reviewQueueUpdater: ReviewQueueUpdater
@@ -85,7 +85,7 @@ class StoredSmsReprocessorTest {
         parsedRepo = RoomParsedEventRepository(db.parsedEventDao())
         ftRepo = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
-        correctionRepo = com.baraa.masroof.testsupport.DecidedCorrectionRepository(db)
+        correctionRepo = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)
         cards = RoomCardRegistryRepository.from(db)
         cards.setOwnership(CardReference(Bank.BANK_ALJAZIRA, "7271"), OwnershipStatus.OWNED)
         reconciliation = TransactionReconciliationService(
@@ -193,15 +193,13 @@ class StoredSmsReprocessorTest {
         val raw = purchase("android-sms:linked")
         useCase(EngineFixtureParser()).ingest(raw)
         val linked = ftRepo.findByRawSmsId(raw.id)!!
-        correctionRepo.save(
-            UserCorrection(
-                id = "corr-linked",
-                targetRawSmsId = raw.id,
-                correctedType = null,
-                correctedAmount = null,
-                correctedMerchant = "Keeta Corrected",
-                correctedCounterparty = null,
-                createdAt = clock.now(),
+        db.saveCorrection(
+            correction(rawSmsId = raw.id,
+                family = null,
+                amount = null,
+                merchant = "Keeta Corrected",
+                counterparty = null,
+                at = clock.now(),
             ),
         )
 
@@ -211,7 +209,7 @@ class StoredSmsReprocessorTest {
         assertEquals(linked.id, after.id)
         assertEquals(linked.type, after.type)
         assertEquals(1, ftRepo.listAll().size)
-        assertNotNull(correctionRepo.latestFor(raw.id))
+        assertNotNull(correctionRepo.latestCorrectionFor(raw.id))
         assertEquals(
             "Keeta Corrected",
             EffectiveParsedEventProvider(parsedRepo, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)).findEffectiveByRawSmsId(raw.id)!!.event.merchant,

@@ -1,6 +1,8 @@
 package com.baraa.masroof.application.transaction
 
-import com.baraa.masroof.testsupport.latestFor
+import com.baraa.masroof.testsupport.saveCorrection
+import com.baraa.masroof.testsupport.correction
+import com.baraa.masroof.testsupport.latestCorrectionFor
 import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction
@@ -13,7 +15,6 @@ import com.baraa.masroof.data.repository.RoomCardRegistryRepository
 import com.baraa.masroof.data.repository.RoomFinancialTransactionRepository
 import com.baraa.masroof.data.repository.RoomParsedEventRepository
 import com.baraa.masroof.data.repository.RoomRawSmsRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
 import com.baraa.masroof.domain.ids.TransactionIdFactory
@@ -137,10 +138,9 @@ class TransactionReclassificationServiceTest {
     @Test fun anAmountCorrectionBetweenAssemblyAndPostingInvalidatesTheOldEvidenceEvenWhenManuallyConfirmed() = runBlocking {
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA,"3001"))
         persistIncomeTransfer(smsId="racing-edit",counterparty="TEST",amount="100.00")
-        val corrections=com.baraa.masroof.testsupport.DecidedCorrectionRepository(db)
         val effective=EffectiveParsedEventProvider(parsedRepo,com.baraa.masroof.data.repository.RoomUserDecisionRepository(db))
         val assembledFrom=effective.findEffectiveByRawSmsId("racing-edit")!!
-        corrections.save(com.baraa.masroof.domain.model.UserCorrection("new-amount","racing-edit",null,
+        db.saveCorrection(correction("racing-edit",null,
             Money.of(BigDecimal("150.00"),Currency.SAR),null,null,Instant.now()))
         assertTrue(effective.findEffectiveByRawSmsId("racing-edit")!!.automationConfirmed)
         val guard=com.baraa.masroof.application.interpretation.AutomaticInterpretationWriteGuard(effective,
@@ -150,7 +150,7 @@ class TransactionReclassificationServiceTest {
         val result=guard.write(listOf(assembledFrom)) { wrote=true;FinancialTransactionSaveResult.Saved }
         assertTrue(result is FinancialTransactionSaveResult.Conflict)
         assertTrue(!wrote)
-        assertEquals("150.00",corrections.latestFor("racing-edit")!!.correctedAmount!!.amount.toPlainString())
+        assertEquals("150.00",com.baraa.masroof.data.repository.RoomUserDecisionRepository(db).latestCorrectionFor("racing-edit")!!.amount!!.amount.toPlainString())
     }
 
     @Test

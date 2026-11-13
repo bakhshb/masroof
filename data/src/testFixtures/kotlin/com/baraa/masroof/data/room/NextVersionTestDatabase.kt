@@ -24,7 +24,6 @@ import com.baraa.masroof.data.room.entity.ProcessingRetryEntity
 import com.baraa.masroof.data.room.entity.RawSmsEntity
 import com.baraa.masroof.data.room.entity.RawSmsProviderAliasEntity
 import com.baraa.masroof.data.room.entity.ReviewItemEntity
-import com.baraa.masroof.data.room.entity.UserCorrectionEntity
 import com.baraa.masroof.data.room.entity.UserDecisionEntity
 import java.io.File
 import java.io.InputStream
@@ -54,7 +53,6 @@ data class MigrationProbeEntity(@PrimaryKey val id: Long, val note: String?)
         FinancialTransactionRawSmsLinkEntity::class,
         CommitmentEntity::class,
         ReviewItemEntity::class,
-        UserCorrectionEntity::class,
         ProcessingRetryEntity::class,
         UserDecisionEntity::class,
         PatternConfigurationEntity::class,

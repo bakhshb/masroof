@@ -2,7 +2,7 @@ package com.baraa.masroof.integrity
 
 import androidx.room.withTransaction
 
-import com.baraa.masroof.testsupport.latestFor
+import com.baraa.masroof.testsupport.latestCorrectionFor
 import com.baraa.masroof.application.dashboard.GoldenExpected
 import com.baraa.masroof.application.dashboard.GoldenLedgerRunner
 import com.baraa.masroof.application.dashboard.GoldenLedgerScenario
@@ -20,7 +20,6 @@ import com.baraa.masroof.bank.BankSmsRegistry
 import com.baraa.masroof.testsupport.engineFixtureAdapter
 import com.baraa.masroof.data.repository.RoomManualReviewResolutionRepository
 import com.baraa.masroof.data.repository.RoomProcessingRetryRepository
-import com.baraa.masroof.data.repository.RoomUserCorrectionRepository
 import com.baraa.masroof.domain.model.AccountReference
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
@@ -112,7 +111,7 @@ internal class IntegrityFaults {
 internal class IntegrityLedger(val world: DashboardLedgerWorld) {
     val faults = IntegrityFaults()
     val clock: InstantClock = InstantClock { Instant.parse("2026-09-15T09:00:00Z") }
-    val corrections = RoomUserCorrectionRepository(world.db.userCorrectionDao())
+    val corrections = com.baraa.masroof.data.repository.RoomUserDecisionRepository(world.db)
     val retries = RoomProcessingRetryRepository(world.db.processingRetryDao())
     private val registry = BankSmsRegistry(listOf(engineFixtureAdapter()))
     private val discovery = OwnershipDiscoveryService(world.accounts, world.cards, world.loans)
@@ -285,7 +284,6 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
     val workflow = ReviewWorkflowService(
         reviewRepository = world.reviewRepo,
         userDecisionRepository = world.decisionRepo,
-        userCorrectionRepository = corrections,
         financialTransactionRepository = world.ftRepo,
         rawSmsRepository = world.rawRepo,
         ownershipResolver = ownership,
@@ -297,12 +295,10 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         manualReviewResolutionRepository = RoomManualReviewResolutionRepository(world.db, world.ftRepo),
         clock = clock,
         zoneId = world.zone,
-        newCorrectionId = { "uc-m18-${correctionSequence++}" },
         appLogService = NoOpAppLog,
         processingRecovery = noOpProcessingRecovery(),
     )
 
-    private var correctionSequence = 1
 
     val reclassification = com.baraa.masroof.application.transaction.TransactionReclassificationService(
         financialTransactionRepository = world.ftRepo,
@@ -531,7 +527,7 @@ internal suspend fun assertFinancialInvariants(
         .listRetryableRawSmsIds()
         .toSet()
     assertTrue("$prefix retry rows remain $retryIds", retryIds.isEmpty())
-    val corrections = RoomUserCorrectionRepository(world.db.userCorrectionDao())
+    val corrections = com.baraa.masroof.data.repository.RoomUserDecisionRepository(world.db)
     val linkOwners = linkedMapOf<String, String>()
     for (transaction in world.ftRepo.listAll()) {
         val links = world.ftRepo.listRawSmsIds(transaction.id)
@@ -549,7 +545,7 @@ internal suspend fun assertFinancialInvariants(
                 world.ftRepo.findByRawSmsId(rawSmsId)!!.id,
             )
             val parsedAmount = world.parsedRepo.findByRawSmsId(rawSmsId)?.event?.amount
-            val correctedAmount = corrections.latestFor(rawSmsId)?.correctedAmount
+            val correctedAmount = corrections.latestCorrectionFor(rawSmsId)?.amount
             if (parsedAmount != null && correctedAmount == null) {
                 assertEquals(
                     "$prefix stored currency",

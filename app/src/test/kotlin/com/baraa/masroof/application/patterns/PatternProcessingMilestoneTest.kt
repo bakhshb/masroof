@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.patterns
 
+import com.baraa.masroof.testsupport.correction
 import com.baraa.masroof.testsupport.saveCorrection
 import com.baraa.masroof.testsupport.ingest
 import com.baraa.masroof.testsupport.uniqueStorageContext
@@ -523,7 +524,7 @@ class PatternProcessingMilestoneTest {
             val account = w.confirmPatternAccount("BANK_STC", "4321")
             w.saveFinancial(w.previewFinancial(w.load().generation, "BANK_STC", "stc-internal-in", PatternOperation.TRANSFER_IN,
                 account.id, incoming, "account_reference", emptySet()))
-            c.storage.database.saveCorrection(UserCorrection("manual-family", "manual-retry", MessageFamily.PURCHASE,
+            c.storage.database.saveCorrection(correction("manual-retry", MessageFamily.PURCHASE,
                 com.baraa.masroof.core.money.Money.of("15", com.baraa.masroof.core.money.Currency.SAR), "MANUAL", null, Instant.now()))
             val review = c.storage.reviewRepository.findByRawSmsId("manual-retry")!!
             c.storage.reviewRepository.markResolved(review.id, ReviewResolutionKind.USER_CORRECTION, Instant.now(), null)

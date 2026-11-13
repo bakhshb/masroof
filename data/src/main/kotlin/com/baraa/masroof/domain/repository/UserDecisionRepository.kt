@@ -15,5 +15,8 @@ interface UserDecisionRepository {
     /** The decisions in force for each of [rawSmsIds]; an SMS without decisions maps to [EffectiveUserDecisions.NONE]. */
     suspend fun effectiveFor(rawSmsIds: Collection<String>): Map<String, EffectiveUserDecisions>
 
+    /** Every `CORRECTION` by its `sequence`, in append order: what learning reads. */
+    suspend fun listCorrections(): Map<Long, UserDecision>
+
     suspend fun effectiveFor(rawSmsId: String): EffectiveUserDecisions = effectiveFor(listOf(rawSmsId)).getValue(rawSmsId)
 }

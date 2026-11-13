@@ -346,19 +346,19 @@ An SMS whose latest outcome decision posts nothing is never written and never li
 
 ### User decisions (`user_decision`)
 
-`user_decision` is one append-only table (plans 2.1 and 5.2). Every explicit user decision is appended there in the same database transaction as the existing write it describes; the existing stores (`review_item`, `user_correction`, the `user_selected_bank:` reason prefix, `financial_transaction`) are written exactly as before. Since plan piece 2.3, processing reads decisions from this table only ("Reading decisions" below); the legacy stores are still written so screens and the kept reads keep working. `UserDecisionDao` only inserts and reads; it has no UPDATE or DELETE. A later row for the same subject supersedes an earlier one by `sequence`.
+`user_decision` is one append-only table (plans 2.1 and 5.2). Every explicit user decision is appended there in the same database transaction as the existing write it describes; the existing stores (`review_item`, the `user_selected_bank:` reason prefix, `financial_transaction`) are written exactly as before. A correction has no other store: its `CORRECTION` row is the only record (the `user_correction` table was dropped at the restart at version 1). Since plan piece 2.3, processing reads decisions from this table only ("Reading decisions" below); the legacy stores are still written so screens and the kept reads keep working. `UserDecisionDao` only inserts and reads; it has no UPDATE or DELETE. A later row for the same subject supersedes an earlier one by `sequence`.
 
 | Column | Meaning |
 |---|---|
 | `sequence` | `INTEGER PRIMARY KEY AUTOINCREMENT`: the append order, never reused. The latest decision for a subject is the one with the highest `sequence`, not the latest clock time. |
-| `rawSmsId` | The subject: the raw SMS the decision is about (the outgoing leg for a pair). Raw SMS ids are stable; transaction ids are not, because reconciliation may recreate a row. Foreign key to `raw_sms` (`RESTRICT`/`CASCADE` like `user_correction`). Null exactly for a `RECURRING` row, which names a series, not an SMS; `UserDecisionDao.insert` refuses any other combination. |
+| `rawSmsId` | The subject: the raw SMS the decision is about (the outgoing leg for a pair). Raw SMS ids are stable; transaction ids are not, because reconciliation may recreate a row. Foreign key to `raw_sms` (delete `RESTRICT`, update `CASCADE`). Null exactly for a `RECURRING` row, which names a series, not an SMS; `UserDecisionDao.insert` refuses any other combination. |
 | `pairedRawSmsId` | The incoming leg of a self-transfer pair, else null. Same foreign key. |
 | `kind` | A `UserDecisionKind` name (below). |
 | `decidedAtEpochMillis` | The injected clock's instant at the decision (the same instant the existing write stores). |
 | `transactionType` | The `FinancialTransactionType` the user chose (or that the chosen action posts), for `FINANCIAL_TYPE`, `EXTERNAL_TRANSFER`, `SELF_TRANSFER_PAIR`, `RECLASSIFY`. |
 | `sourceContainerId`, `destinationContainerId` | The endpoints the decision posted with, for the same kinds. They are derived from evidence and ownership at decision time, so 2.3 can reproduce the user's row without reading it back. |
 | `occurredAtEpochMillis`, `occurredAtZone` | The effective occurred-at instant (`TransactionTiming.effectiveOccurredAt`) and zone exactly as posted on the `financial_transaction` row, for the same kinds. `RESTORE` is appended before reconciliation posts, so it has none; a type chosen on restore adds a `RECLASSIFY` row that has them. The amount is not copied: it comes from the evidence or a correction. |
-| `messageFamily`, `amountDecimal`, `amountCurrency`, `merchant`, `counterparty` | A `CORRECTION`'s fields, encoded like `user_correction` (family name, `BigDecimal.toPlainString()`, currency name). The user's own text, never SMS body text. |
+| `messageFamily`, `amountDecimal`, `amountCurrency`, `merchant`, `counterparty` | A `CORRECTION`'s fields (family name, `BigDecimal.toPlainString()`, currency name). The user's own text, never SMS body text. |
 | `bankId` | The bank of a `BANK_SELECTION`. |
 | `subjectKey`, `answer`, `payload` | A `RECURRING` row only (plan 5.2): the series key, the answer (`CONFIRMED`, `CONFIRM_PENDING`, `NOT_RECURRING`, `DISMISSED` or `UNDONE`) and the `RecurringFeedbackPayload` JSON exactly as written (null for `UNDONE`). See "Recurring answers" below. |
 
@@ -370,7 +370,7 @@ Unused columns are null. Indices: `(rawSmsId, sequence)` for "latest decision fo
 | `EXTERNAL_TRANSFER` | `ReviewWorkflowService.resolveTransferAsExternal` → `RoomManualReviewResolutionRepository.persistSingleResolution` | posted row + review `USER_EXTERNAL_TRANSFER` |
 | `SELF_TRANSFER_PAIR` | `ReviewWorkflowService.resolveSelfTransferPair` → `RoomManualReviewResolutionRepository.persistPairResolution` | posted row + both reviews `USER_SELF_TRANSFER_PAIR` |
 | `NON_FINANCIAL` | `ReviewWorkflowService.resolveAsNonFinancial` | review `USER_NON_FINANCIAL` |
-| `CORRECTION` | `ReviewWorkflowService.applyCorrection` | `user_correction` row (the later `USER_CORRECTION` review closure is its consequence, not a second decision) |
+| `CORRECTION` | `ReviewWorkflowService.applyCorrection` | none: the decision row is the correction (the later `USER_CORRECTION` review closure is its consequence, not a second decision) |
 | `RECLASSIFY` | `TransactionReclassificationService.reclassify` → `RoomTransactionReclassificationRepository.updateWithDecision` | row type/endpoints + review `USER_FINANCIAL_TYPE` |
 | `IGNORE` | `TransactionIgnoreService` → `RoomTransactionIgnoreRepository.ignoreSingle` | row deleted + review `USER_NON_FINANCIAL` |
 | `RESTORE` | `TransactionRestoreService.restore` | review `USER_FINANCIAL_TYPE` (a chosen type adds its own `RECLASSIFY` row) |
@@ -413,7 +413,7 @@ Reads kept on the legacy stores, each allowed by name in `DecisionReadBoundaryTe
 
 - `ReviewCorrectionClosure`: a correction whose own pass posted the SMS closes its review as `USER_CORRECTION`, and that closure protects the posted row (reconciliation, the write guard, `mayRefresh`). The store holds the correction but not whether that pass posted; protecting every posted corrected SMS would change what reconciliation keeps for a correction posted only by a later pass. That difference belongs to the plan 3.2 shadow comparison.
 - `TransactionRestoreService` checks that the review is ignored before it rewrites that same review (`markResolvedAtomic` lets only an ignored review be restored); it is a legacy-store writer.
-- `BankInterpretationService` learning feedback keys its decisions by review and correction ids and reads the resolved row's current type; switching would change the learned decisions and their fingerprint.
+- `BankInterpretationService` learning feedback keys a review decision by its review id (a correction by its `sequence`, from `listCorrections`) and reads the resolved row's current type; switching would change the learned decisions and their fingerprint.
 - `PatternEvidenceProtection` treats any settled review, automatic included, as evidence to keep, and `PendingPatternsWorkflow` skips a `REQUIRED` review with a resolution: queue state, not a user decision.
 - Screens (`ReviewPresentationMapper`, `ReviewReasonLabels`, `ReviewDetailLoader`, `InterpretationProvenanceWorkflow`) display the review.
 
