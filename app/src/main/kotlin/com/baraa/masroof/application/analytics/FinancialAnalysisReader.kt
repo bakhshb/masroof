@@ -10,7 +10,9 @@ import java.time.ZoneId
 import java.time.Clock
 
 internal data class FinancialAnalysisRead(val service: DashboardService, val rows: List<FinancialTransaction>,
-    val committed: Set<String>, val retry: Boolean, val incompleteDays: Set<Long>, val committedCadences: Map<String, String>)
+    val committed: Set<String>, val retry: Boolean, val incompleteDays: Set<Long>, val committedCadences: Map<String, String>,
+    /** A payment's biller by transaction id, the only name a bill without merchant or counterparty has. */
+    val billers: Map<String, String>)
 
 /**
  * Copy only approved facts and the existing bounded dashboard evidence in a short read.
@@ -80,6 +82,9 @@ internal object FinancialAnalysisReader {
                 listOfNotNull(receiptDay, eventDay)
             }.toSet()
             FinancialAnalysisRead(service, rows, commitments.map { it.sourceTransactionId }.toSet(), retry, incompleteDays,
-                commitments.mapNotNull { it.recurrence?.name?.let { recurrence -> it.sourceTransactionId to recurrence } }.toMap())
+                commitments.mapNotNull { it.recurrence?.name?.let { recurrence -> it.sourceTransactionId to recurrence } }.toMap(),
+                evidence.parsedRecords.associateBy { it.event.id }.let { records -> rows.mapNotNull { tx ->
+                    tx.linkedParsedEventIds.firstNotNullOfOrNull { records[it]?.details?.biller?.trim()?.takeIf(String::isNotEmpty) }?.let { tx.id to it }
+                }.toMap() })
         } }
 }

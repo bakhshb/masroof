@@ -437,13 +437,7 @@ object CommitmentsOverviewBuilder {
         source: FinancialTransaction? = null,
         identities: Map<String, CommitmentPaymentIdentity> = emptyMap(),
     ): Boolean {
-        if (
-            transaction.type != FinancialTransactionType.EXPENSE &&
-            transaction.type != FinancialTransactionType.FEE &&
-            transaction.type != FinancialTransactionType.BILL_PAYMENT
-        ) {
-            return false
-        }
+        if (!CommitmentPaymentIdentity.supports(transaction.type)) return false
         val txAmount = TransactionAmountResolver.effectiveAmount(
             tx = transaction,
             primaryCurrency = primaryCurrency,

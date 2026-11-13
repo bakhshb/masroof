@@ -9,8 +9,8 @@ class DashboardCommitmentsWorkflow(
     private val commitmentFromTransactionService: CommitmentFromTransactionService,
     private val commitmentRepository: CommitmentRepository,
 ) {
-    suspend fun createFromTransaction(transactionId: String): CommitmentCreationResult =
-        commitmentFromTransactionService.createFromTransaction(transactionId)
+    suspend fun createFromTransaction(transactionId: String, fallbackName: String? = null): CommitmentCreationResult =
+        commitmentFromTransactionService.createFromTransaction(transactionId, fallbackName)
 
     suspend fun committedSourceTransactionIds(): Set<String> =
         commitmentRepository.listAll().map { it.sourceTransactionId }.toSet()

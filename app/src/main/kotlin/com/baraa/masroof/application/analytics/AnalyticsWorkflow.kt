@@ -9,6 +9,7 @@ import androidx.room.withTransaction
 import com.baraa.masroof.analytics.*
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.commitment.CommitmentCreationResult
+import com.baraa.masroof.application.dashboard.CommitmentPaymentIdentity
 import com.baraa.masroof.application.dashboard.CommitmentPaymentStatus
 import com.baraa.masroof.application.dashboard.AnalysisSpendingInsights
 import com.baraa.masroof.application.dashboard.AnalysisSpendingFact
@@ -180,8 +181,8 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
                 }.getOrNull()
                 val effective = historical.transactionFacts[tx.id]?.effectiveType ?: tx.type
                 FinancialFact(tx.id, tx.occurredAt.atZone(zone).toLocalDate().toEpochDay(), amount,
-                    tx.type == FinancialTransactionType.REFUND, tx.id in included, tx.merchant ?: tx.counterparty,
-                    effective in setOf(FinancialTransactionType.EXPENSE, FinancialTransactionType.FEE, FinancialTransactionType.BILL_PAYMENT),
+                    tx.type == FinancialTransactionType.REFUND, tx.id in included, tx.merchant ?: tx.counterparty ?: read.billers[tx.id],
+                    CommitmentPaymentIdentity.supports(effective),
                     tx.sourceContainerId ?: tx.destinationContainerId,
                     (tx.sourceContainerId ?: tx.destinationContainerId)?.let { "$it|${original.amount.currency}|${effective.name}" })
             }
@@ -423,7 +424,7 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
                 val source = container.storage.financialTransactionRepository.getById(c.sourceIds.last()) ?: error("Source changed")
                 val existing = container.storage.commitmentRepository.getBySourceTransactionId(source.id)
                 if (existing == null) {
-                    check(container.dashboard.dashboardCommitmentsWorkflow.createFromTransaction(source.id) is CommitmentCreationResult.Success)
+                    check(container.dashboard.dashboardCommitmentsWorkflow.createFromTransaction(source.id, draft.name) is CommitmentCreationResult.Success)
                     val created = requireNotNull(container.storage.commitmentRepository.getBySourceTransactionId(source.id))
                     container.dashboard.settingsCommitmentsWorkflow.update(created.id, draft)
                 }
