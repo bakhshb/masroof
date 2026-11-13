@@ -104,6 +104,8 @@ jobs:
       - run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
       - name: Lint and detekt
         run: ./gradlew lintDebug detekt --stacktrace
+      - name: Release build shrinks with R8
+        run: ./gradlew :app:assembleRelease --stacktrace
 
   build-test-apks:
     needs: android-version

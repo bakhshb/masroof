@@ -1,3 +1,6 @@
-# Release minify references this file from app/build.gradle.kts (proguardFiles).
-# Keep the file while isMinifyEnabled is false and no app-specific rules exist.
-# Default ProGuard rules. Add app-specific rules below.
+# Release builds shrink and optimize with R8 (plan 7.1). Libraries bring their own keep rules
+# (Room, WorkManager, kotlinx.serialization, Compose); add an app rule here only for a real failure.
+
+# Names stay as written. WorkManager stores worker class names from earlier builds, and logs name
+# exception classes; the source is public, so renaming would hide nothing.
+-dontobfuscate

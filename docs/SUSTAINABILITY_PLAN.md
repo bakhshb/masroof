@@ -112,7 +112,7 @@ Shared acceptance criteria, for every piece:
 
 | # | Piece | Model | Own acceptance criteria |
 |---|---|---|---|
-| 7.1 | **R8 on.** `isMinifyEnabled = true` with keep rules for serialization, Room, WorkManager. | Sonnet | Release build passes an emulator smoke: SMS in → row on dashboard, backup → restore. |
+| 7.1 | **R8 on.** `isMinifyEnabled = true`; the libraries' own keep rules cover serialization, Room and WorkManager, and names are kept (`-dontobfuscate`) because worker class names are stored. CI builds the release; the emulator smoke is manual (`docs/CI.md`). | Sonnet | Release build passes an emulator smoke: SMS in → row on dashboard, backup → restore. |
 | 7.2 | **Lint.** Enable detekt default rule sets step by step; burn down the 74-entry baseline. | Sonnet | Baseline empty, or only Compose screens with a stated reason. |
 | 7.3 | **Device tests where the device matters.** Keep SMS receipt, process death, upgrade, backup/restore on the emulator; move the rest to JVM. Update `ci/device-suites.json`, `ci/device-durations.json`, `docs/CI.md`. | Sonnet | Every moved test has a JVM twin; fewer emulator shards. |
 | 7.4 | **Report an unparsed message. Gate.** Masked export from the review screen, no network. Layout described and approved first. | Sonnet | Export has no account/card digits and no amounts; Arabic and English labels. |
