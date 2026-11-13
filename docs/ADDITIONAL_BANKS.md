@@ -40,7 +40,7 @@ so these shared changes cannot alter current messages.
 
 ## Deliberately not adopted
 
-- Explicit default account / currency setup sheet (`RuleFactDefaults`).
+- Explicit default account / currency setup sheet.
 - Signed (negative) available balances: they stay in review.
 - Card-funded bill posting and card-bill spending.
 - Cross-bank destination-suffix transfer bridging.

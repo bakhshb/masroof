@@ -75,10 +75,10 @@ Pure JVM modules use JUnit Jupiter; Android/Robolectric tests retain their Andro
 
 | Module | Responsibility |
 | --- | --- |
-| `app` | Android UI, workflows, SMS intake, persistence, and recovery |
+| `app` | Android UI, workflows, SMS intake, the pattern store, and recovery |
 | `bank-engine` | Pure bank-pattern interpretation and extraction evidence |
 | `finance-core` | Money, periods, identities, financial classification, matching, and assembly |
-| `ledger` | Pure derived-ledger projector (not wired into the app yet) |
+| `ledger` | Pure derived-ledger projector; reconciliation writes the ledger through it |
 | `dashboard-core` | Pure dashboard builders, calculators and projections |
 | `data` | Room database, DAOs, repositories, preference stores and the exported schemas |
 | `ml-assist` | Local family assistance, forecasting, and recurrence detection |
