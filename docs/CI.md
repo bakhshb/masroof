@@ -24,15 +24,12 @@ in the existing unit job, as do the derived-ledger tests (`:ledger:test`). The `
 with the shared Detekt 2 configuration and ktlint wrapper. Architecture test inputs
 include the relocated sources and the financial schema exported by `:data` (`data/schemas`), so a source-only boundary
 change cannot reuse an unrelated cached result. `FinancialSchemaCompatibilityTest`
-pins the byte-frozen v18 schema, that v22 keeps every v18 table and adds only `user_decision` and `pattern_configuration`,
-the single migration from v18 and the two known identity hashes; `MasroofMigrationOpenPathTest` (and its device twin) upgrades the committed v18
-fixture to production v22 (with its decisions backfilled) and through a test-only next version, upgrades a v18 file holding every legacy
-decision trace (`UserDecisionBackfillContract`: every kind backfilled), checks the upgraded schema equals a freshly created one,
-and proves rejected schemas, the retired v19 to v21 included, leave the file untouched. `LedgerFixturesTest` imports the committed v18 archives under production and round-trips a current export;
-`BackupOlderSchemaImportTest` also imports a v18 archive holding every legacy trace and checks its backfill, a v18 archive whose patterns and recurring answers ride in `preferences.json` and land in the database, and refuses v19 to v21 archives; `LegacyPatternFileOnOpenTest` (device twin `PatternUpgradeDeviceTest`) proves the one-time copy of the old pattern file, and the `RecurringAnswer*` tests (device twin `RecurringAnswerUpgradeDeviceTest`) the one-time copy of the recurring answers; `UserDecisionLedgerConsistencyTest` checks the decision store against the ledger on the corpus;
-`UserDecisionDualWriteTest` proves each decision kind appends one `user_decision` row in the transaction of its write, and that the backfill of its legacy trace equals that row.
-`BackupOlderSchemaImportTest` (and `BackupMigrationDeviceTest`) imports the committed v18
-archives under that next version and proves a failed migration leaves the live database byte-identical. Financial effect fixtures pin the extraction baseline. The backup/recovery device suites remain required.
+pins that only version 1 is exported and that the code names its identity hash; `MasroofMigrationOpenPathTest` (and its device twin) opens the committed
+version 1 fixture, upgrades it through a test-only next version with every row intact, and proves a file at any other version (the retired 18 and 22 included)
+or with an unknown identity hash is left untouched. `LedgerFixturesTest` imports the committed version 1 archives and round-trips a current export.
+`UserDecisionDualWriteTest` proves each decision kind appends one `user_decision` row in the transaction of its write.
+`BackupOlderSchemaImportTest` (and `BackupMigrationDeviceTest`) imports the committed version 1
+archives under that next version, proves a failed migration leaves the live database byte-identical, and refuses unknown versions, hashes and formats. Financial effect fixtures pin the extraction baseline. The backup/recovery device suites remain required.
 
 `build-test-apks` builds the app and instrumentation APK once. They use the same ephemeral debug signing key. `scripts/ci_device.py bundle` verifies package names and signing certificates, records commit SHA and APK SHA-256 hashes, and downloads the official AndroidX Orchestrator/test-services APKs. Device jobs consume that immutable artifact; they do not compile again. Java setup does not compete with setup-gradle for the Gradle cache.
 

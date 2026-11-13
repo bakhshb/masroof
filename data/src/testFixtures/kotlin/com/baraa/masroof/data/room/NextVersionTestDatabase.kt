@@ -91,26 +91,19 @@ abstract class NextVersionTestDatabase : RoomDatabase() {
     }
 }
 
-/** The open-path contract, run on the JVM and on a device against the committed v18 fixture. */
+/** The open-path contract, run on the JVM and on a device against the committed version 1 fixture. */
 object MigrationOpenPathContract {
-    /** Tables the real migration adds to v18, with the rows they hold once the v18 fixture is upgraded. */
-    val TABLES_SINCE_V18: Map<String, List<String>> =
-        mapOf(
-            "user_decision" to UserDecisionBackfillContract.V18_FIXTURE_DECISIONS.map(UserDecisionBackfillContract::dump),
-            "pattern_configuration" to emptyList(),
-        )
+    /** Tables the test-only next version holds beyond the fixture. */
+    val NEXT_VERSION_TABLES: Map<String, List<String>> = mapOf("migration_probe" to emptyList())
 
-    /** Tables the test-only next version holds beyond the v18 fixture. */
-    val NEXT_VERSION_TABLES: Map<String, List<String>> = TABLES_SINCE_V18 + ("migration_probe" to emptyList())
-
-    /** The v18 fixture upgrades through the production builder to production's own version with every row intact and its decisions backfilled. */
-    fun productionUpgradeKeepsEveryRow(context: Context, fixture: () -> InputStream) {
+    /** The fixture opens through the production builder as it is: same version, every row intact. */
+    fun productionOpenKeepsEveryRow(context: Context, fixture: () -> InputStream) {
         val name = "migration-production.db"
-        upgrade(context, name, fixture, MasroofDatabase::class.java, MasroofDatabase.VERSION, TABLES_SINCE_V18)
+        upgrade(context, name, fixture, MasroofDatabase::class.java, MasroofDatabase.VERSION, emptyMap())
         context.deleteDatabase(name)
     }
 
-    /** The v18 fixture upgrades through the production builder to the next version with every row intact. */
+    /** The fixture upgrades through the production builder to the next version with every row intact. */
     fun upgradeKeepsEveryRow(context: Context, fixture: () -> InputStream) {
         val name = "migration-upgrade.db"
         upgrade(context, name, fixture, NextVersionTestDatabase::class.java, NextVersionTestDatabase.VERSION,
@@ -143,63 +136,25 @@ object MigrationOpenPathContract {
         assertEquals(addedTables, after - before.keys)
     }
 
-    fun olderSchemaIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
-        editedFixtureIsRejectedUntouched(context, fixture, "PRAGMA user_version = ${MasroofDatabase.BASELINE_VERSION - 1}")
-
-    /** A v18 file with an unknown identity hash fails the hash check in `MIGRATION_18_22` and stays untouched. */
+    /** A file with an unknown identity hash is refused by Room's own check and stays untouched. */
     fun unknownIdentityHashIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
         editedFixtureIsRejectedUntouched(context, fixture, UNKNOWN_HASH)
 
-    /** A file already at the current version with an unknown identity hash is refused by Room's own check. */
-    fun unknownIdentityHashAfterUpgradeIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
-        editedFixtureIsRejectedUntouched(context, fixture, UNKNOWN_HASH, before = { openOnce(context, MasroofDatabase::class.java, it) })
+    /** A file labelled with a version production has no step from (the retired 18 and 22 included) is refused untouched. */
+    fun unknownVersionsAreRejectedUntouched(context: Context, fixture: () -> InputStream) {
+        for (version in listOf(MasroofDatabase.VERSION + 1, 18, 22)) editedFixtureIsRejectedUntouched(context, fixture, "PRAGMA user_version = $version")
+    }
 
     val UNKNOWN_HASH = "UPDATE room_master_table SET identity_hash = '" + "0".repeat(32) + "'"
 
-    /** The identity hashes v19 to v21 had in development builds; no release carried them (owner, 2026-11-12). */
-    val RETIRED_IDENTITY_HASHES: Map<Int, String> = mapOf(
-        19 to "358f8daabc18a4cc065c8b8e51261442",
-        20 to "358f8daabc18a4cc065c8b8e51261442",
-        21 to "e95d7b7c49b64fae9ff76f795a439ade",
-    )
-
-    /** A file labelled v19, v20 or v21 with that version's former hash has no migration: it is refused untouched. */
-    fun retiredVersionsAreRejectedUntouched(context: Context, fixture: () -> InputStream) {
-        for ((version, hash) in RETIRED_IDENTITY_HASHES) editedFixtureIsRejectedUntouched(context, fixture,
-            "PRAGMA user_version = $version", "UPDATE room_master_table SET identity_hash = '$hash'")
-    }
-
-    /** The upgraded v18 fixture holds exactly the tables, indices and SQL Room creates for a fresh current-version file. */
-    fun upgradeCreatesTheExportedSchema(context: Context, fixture: () -> InputStream) {
-        val upgraded = "migration-ddl-upgraded.db"
-        copyFixture(context, upgraded, fixture)
-        openOnce(context, MasroofDatabase::class.java, upgraded)
-        val fresh = "migration-ddl-fresh.db"
-        context.deleteDatabase(fresh)
-        openOnce(context, MasroofDatabase::class.java, fresh)
-        fun schema(name: String) = readOnly(context.getDatabasePath(name)) { db ->
-            db.rawQuery("SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%' ORDER BY name", null)
-                .use { buildList { while (it.moveToNext()) add(listOf(it.getString(0), it.getString(1), it.getString(2))) } }
-        }
-        assertEquals(schema(fresh), schema(upgraded))
-        context.deleteDatabase(upgraded)
-        context.deleteDatabase(fresh)
-    }
-
-    /** A v18-labelled file whose tables differ from v18 fails the migration's validation and stays untouched. */
-    fun unknownBaselineStructureIsRejectedUntouched(context: Context, fixture: () -> InputStream) =
-        editedFixtureIsRejectedUntouched(context, fixture, "ALTER TABLE raw_sms ADD COLUMN stray TEXT")
-
-    /** A fixture changed by [edit] (after [before] ran on it) is refused and its bytes stay the same. */
+    /** A fixture changed by [edit] is refused and its bytes stay the same. */
     fun editedFixtureIsRejectedUntouched(
         context: Context,
         fixture: () -> InputStream,
         vararg edit: String,
-        before: (name: String) -> Unit = {},
     ) {
         val name = "migration-reject.db"
         val file = copyFixture(context, name, fixture)
-        before(name)
         // WAL like the live file: a rollback-journal edit would flip the header's journal bytes, and Room flips them back.
         val flags = SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING
         SQLiteDatabase.openDatabase(file.path, null, flags).use { db -> edit.forEach(db::execSQL) }

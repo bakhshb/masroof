@@ -2,8 +2,6 @@ package com.baraa.masroof.data.analytics
 
 import android.content.Context
 import androidx.room.*
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
@@ -16,8 +14,8 @@ data class AnalysisSnapshotRow(@PrimaryKey val id: String, val sourceHash: Strin
 data class AnalysisModelRow(@PrimaryKey val id: String, val payload: String)
 @Serializable @Entity(tableName = "recurring_candidate")
 data class RecurringCandidateRow(@PrimaryKey val id: String, val status: String, val payload: String)
-@Serializable @Entity(tableName = "recurring_feedback")
-data class RecurringFeedbackRow(@PrimaryKey val seriesKey: String, val kind: String, val payload: String, val decidedAt: Long)
+/** A recurring-payment answer; stored as a `RECURRING` row of `user_decision`. */
+data class RecurringFeedbackRow(val seriesKey: String, val kind: String, val payload: String, val decidedAt: Long)
 @Serializable @Entity(tableName = "analysis_alert")
 data class AnalysisAlertRow(@PrimaryKey val id: String, val kind: String, val title: String, val amount: Long,
     val firstSeen: Long, val observedAt: Long, val confirmed: Boolean = false, val read: Boolean = false,
@@ -40,9 +38,6 @@ data class ForecastComparisonRow(@PrimaryKey val id: String, val periodStart: Lo
     val actualSourceHash: String? = null, val evaluatedAt: Long? = null, val originDay: Long? = null)
 
 @Dao interface AnalyticsDao {
-    @Query("SELECT * FROM recurring_feedback ORDER BY seriesKey") suspend fun feedback(): List<RecurringFeedbackRow>
-    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun feedback(row: RecurringFeedbackRow)
-    @Query("DELETE FROM recurring_feedback") suspend fun clearFeedback()
     @Query("SELECT * FROM analysis_snapshot ORDER BY rowid DESC LIMIT 1") suspend fun latest(): AnalysisSnapshotRow?
     @Query("SELECT * FROM analysis_snapshot ORDER BY rowid ASC") suspend fun snapshots(): List<AnalysisSnapshotRow>
     @Query("SELECT * FROM analysis_snapshot ORDER BY rowid DESC LIMIT 20") suspend fun recentSnapshots(): List<AnalysisSnapshotRow>
@@ -80,41 +75,20 @@ data class ForecastComparisonRow(@PrimaryKey val id: String, val periodStart: Lo
 }
 
 @Database(entities = [AnalysisSnapshotRow::class, AnalysisModelRow::class, RecurringCandidateRow::class,
-    AnalysisAlertRow::class, AnalysisPreferencesRow::class, AnalysisCoverageRow::class, ForecastComparisonRow::class,
-    RecurringFeedbackRow::class], version = 4, exportSchema = true)
+    AnalysisAlertRow::class, AnalysisPreferencesRow::class, AnalysisCoverageRow::class, ForecastComparisonRow::class], version = 1, exportSchema = true)
 abstract class AnalyticsDatabase : RoomDatabase() {
     abstract fun analytics(): AnalyticsDao
     companion object {
         const val NAME = "analytics.db"
-        val MIGRATION_1_2 = object : Migration(1,2) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("CREATE TABLE IF NOT EXISTS analysis_coverage (id TEXT NOT NULL PRIMARY KEY, fromDay INTEGER NOT NULL, throughDay INTEGER NOT NULL, reason TEXT NOT NULL, observedAt INTEGER NOT NULL, repairedAt INTEGER)")
-                db.execSQL("CREATE TABLE IF NOT EXISTS analysis_forecast_comparison (id TEXT NOT NULL PRIMARY KEY, periodStart INTEGER NOT NULL, periodEnd INTEGER NOT NULL, issuedAt INTEGER NOT NULL, sourceHash TEXT NOT NULL, modelVersion TEXT NOT NULL, evaluationVersion TEXT NOT NULL, personalTotal INTEGER NOT NULL, baselineTotal INTEGER NOT NULL, actual INTEGER, actualSourceHash TEXT, evaluatedAt INTEGER)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_analysis_forecast_comparison_periodStart ON analysis_forecast_comparison(periodStart)")
-            }
-        }
-        val MIGRATION_2_3 = object : Migration(2,3) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE analysis_forecast_comparison ADD COLUMN originDay INTEGER")
-                // The old policy proves this date; never infer it from a device timezone.
-                db.execSQL("UPDATE analysis_forecast_comparison SET originDay = periodStart + 7 WHERE evaluationVersion = 'published-day8-v1' AND periodEnd > periodStart + 7")
-            }
-        }
-        val MIGRATION_3_4 = object : Migration(3,4) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("CREATE TABLE IF NOT EXISTS recurring_feedback (seriesKey TEXT NOT NULL PRIMARY KEY, kind TEXT NOT NULL, payload TEXT NOT NULL, decidedAt INTEGER NOT NULL)")
-            }
-        }
         fun open(context: Context): AnalyticsDatabase = Room.databaseBuilder(context, AnalyticsDatabase::class.java, NAME)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).openHelperFactory(PreservingOpenHelperFactory()).build()
+            .openHelperFactory(PreservingOpenHelperFactory()).build()
     }
 }
 
-@Serializable data class AnalyticsArchive(val version: Int = 4, val snapshots: List<AnalysisSnapshotRow> = emptyList(),
+@Serializable data class AnalyticsArchive(val version: Int = 1, val snapshots: List<AnalysisSnapshotRow> = emptyList(),
     val models: List<AnalysisModelRow> = emptyList(), val candidates: List<RecurringCandidateRow> = emptyList(),
     val alerts: List<AnalysisAlertRow> = emptyList(), val preferences: AnalysisPreferencesRow? = null,
-    val coverage: List<AnalysisCoverageRow> = emptyList(), val comparisons: List<ForecastComparisonRow> = emptyList(),
-    val feedback: List<RecurringFeedbackRow> = emptyList())
+    val coverage: List<AnalysisCoverageRow> = emptyList(), val comparisons: List<ForecastComparisonRow> = emptyList())
 
 object AnalyticsJson {
     val format = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -126,9 +100,7 @@ object AnalyticsArchiveStore {
         if (raw == null) return null
         require(raw.length <= 128 * 1024 * 1024) { "Analysis archive too large" }
         val archive = AnalyticsJson.format.decodeFromString<AnalyticsArchive>(raw)
-        require(archive.version in 1..4)
-        require(archive.feedback.map { it.seriesKey }.distinct().size == archive.feedback.size)
-        archive.feedback.forEach { require(it.seriesKey.isNotBlank() && it.decidedAt >= 0 && it.kind in setOf("CONFIRMED", "CONFIRM_PENDING", "NOT_RECURRING", "DISMISSED")) }
+        require(archive.version == 1)
         require(archive.snapshots.map { it.id }.distinct().size == archive.snapshots.size)
         require(archive.models.map { it.id }.distinct().size == archive.models.size)
         require(archive.candidates.map { it.id }.distinct().size == archive.candidates.size)
@@ -152,29 +124,25 @@ object AnalyticsArchiveStore {
             require((it.actual == null) == (it.evaluatedAt == null))
             require(it.actualSourceHash == null || it.actualSourceHash.matches(Regex("[0-9a-f]{64}")))
         }
-        return archive.copy(comparisons = archive.comparisons.map { row ->
-            if (row.originDay == null && row.evaluationVersion == "published-day8-v1" && row.periodEnd > row.periodStart + 7)
-                row.copy(originDay = row.periodStart + 7) else row
-        })
+        return archive
     }
     suspend fun export(database: AnalyticsDatabase): String = database.withTransaction {
         val dao = database.analytics()
         AnalyticsJson.format.encodeToString(AnalyticsArchive(snapshots = dao.snapshots(), models = dao.models(),
             candidates = dao.candidates(), alerts = dao.alerts(), preferences = dao.preferences(),
-            coverage = dao.coverage(), comparisons = dao.comparisons(), feedback = dao.feedback()))
+            coverage = dao.coverage(), comparisons = dao.comparisons()))
     }
     suspend fun restore(database: AnalyticsDatabase, raw: String?) {
         val archive = validate(raw) ?: AnalyticsArchive()
         database.withTransaction {
             val dao = database.analytics()
             dao.clearSnapshots(); dao.clearModels(); dao.clearCandidates(); dao.clearAlerts(); dao.clearPreferences()
-            dao.clearCoverage(); dao.clearComparisons(); dao.clearFeedback()
+            dao.clearCoverage(); dao.clearComparisons()
             archive.snapshots.forEach { dao.snapshot(it) }; archive.models.forEach { dao.model(it) }
             dao.candidates(archive.candidates); dao.alerts(archive.alerts)
             archive.preferences?.let { dao.preferences(it) }
             dao.coverage(archive.coverage)
             archive.comparisons.forEach { dao.comparison(it) }
-            archive.feedback.forEach { dao.feedback(it) }
         }
     }
 }

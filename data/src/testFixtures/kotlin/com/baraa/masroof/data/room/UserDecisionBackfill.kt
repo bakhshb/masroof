@@ -3,11 +3,10 @@ package com.baraa.masroof.data.room
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
- * The backfill of `user_decision` from the legacy stores (plan 2.2; rule, mapping and order in docs/ARCHITECTURE.md),
- * run by `MIGRATION_18_22` right after it creates the table. Plain SQL, frozen with the migration: it only inserts into
- * `user_decision`. Rows already in the table (tests seed some; the migration has none) are re-appended after the
- * backfilled ones in their own order, so a backfilled (older) decision never outranks a recorded one, and a trace an
- * existing row already records is skipped.
+ * Test support: fills `user_decision` from review resolutions, bank selections and corrections a test wrote straight
+ * into `review_item` and `user_correction`, the way production writers append a decision with each of them. Plain
+ * SQL; it only inserts into `user_decision`. Rows already in the table are re-appended after the filled ones in their
+ * own order, and a trace an existing row already records is skipped.
  */
 object UserDecisionBackfill {
     fun run(db: SupportSQLiteDatabase) {

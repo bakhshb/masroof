@@ -25,7 +25,7 @@ import java.math.BigDecimal
 import java.time.Instant
 
 /**
- * Synthetic corpus behind the full ledger snapshot (plan 0.2) and the v18 fixtures:
+ * Synthetic corpus behind the full ledger snapshot (plan 0.2) and the version 1 fixtures:
  * every supported bank through the production pattern assets, plus today's "legacy" ledger states.
  */
 internal object LedgerSnapshotCorpus {

@@ -1,6 +1,5 @@
 package com.baraa.masroof.application.backup
 
-import com.baraa.masroof.data.patterns.LegacyMessagePatternFile
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
@@ -51,7 +50,7 @@ class DatabaseBackupImportTest {
                 val imported = createCurrentDatabaseFile(context)
                 if (disguised) android.database.sqlite.SQLiteDatabase.openDatabase(imported.path, null,
                     android.database.sqlite.SQLiteDatabase.OPEN_READWRITE).use { it.version = 17 }
-                val zip = createBackupZip(imported, roomVersion = if (disguised) MasroofDatabase.VERSION else 17)
+                val zip = createBackupZip(imported, roomVersion = if (disguised) MasroofDatabase.VERSION else 18)
                 var closed = false
                 try {
                     val service = DatabaseBackupService(context, live, { closed = true; live.close() }, "test", restartProcess = {}, appLogService = NoOpAppLog)
@@ -68,7 +67,6 @@ class DatabaseBackupImportTest {
     @Before
     fun clearMaintenancePreferences() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        LegacyMessagePatternFile.delete(LegacyMessagePatternFile.of(context))
         context.deleteDatabase(MasroofDatabase.NAME)
         DatabaseRestoreRecovery.deleteRestoreArtifacts(
             context.getDatabasePath(MasroofDatabase.NAME),
@@ -79,37 +77,7 @@ class DatabaseBackupImportTest {
             .commit()
     }
 
-    @Test
-    fun unsupportedPatternsAreRejectedBeforeClosingOrChangingLiveData() {
-        runBlocking {
-            val context = ApplicationProvider.getApplicationContext<Context>()
-            val live = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
-                .allowMainThreadQueries().build()
-            val patterns = MessagePatternStore(live)
-            val original = patternArchive("ORIGINAL")
-            patterns.restoreRaw(original)
-            val imported = createCurrentDatabaseFile(context)
-            val zip = createBackupZip(imported, "{}")
-            val closed = AtomicBoolean(false)
-            try {
-                val card = CardReference(Bank.BANK_ALJAZIRA, "1111")
-                RoomCardRegistryRepository.from(live).setOwnership(card, OwnershipStatus.OWNED)
-                val service = DatabaseBackupService(context, live, { closed.set(true); live.close() }, "test",
-                    restartProcess = {},
-                    appLogService = NoOpAppLog,)
-                assertEquals(BackupImportOutcome.InvalidPackage,
-                    service.importFrom(Uri.fromFile(zip), confirmLegacyPlaintext = true))
-                assertFalse(closed.get())
-                assertEquals(original, patterns.captureRaw())
-                assertEquals(OwnershipStatus.OWNED, RoomCardRegistryRepository.from(live).get(card)!!.ownership)
-            } finally {
-                if (live.isOpen) live.close()
-                imported.delete(); zip.delete()
-            }
-        }
-    }
-
-    /** A v22 archive's own pattern row must decode; a broken one fails the import and the live patterns stay. */
+    /** An archive's own pattern row must decode; a broken one fails the import and the live patterns stay. */
     @Test
     fun currentArchiveWithAnInvalidPatternRowFailsAndKeepsTheLivePatterns() {
         runBlocking {
@@ -459,7 +427,6 @@ class DatabaseBackupImportTest {
                 DatabaseRestoreRecovery.recover(context)
                 assertEquals(patternArchive(if (expectedOwner == "original") "ORIGINAL" else "IMPORTED"),
                     storedPatterns(context.getDatabasePath(MasroofDatabase.NAME)))
-                assertFalse(LegacyMessagePatternFile.of(context).exists())
                 val reopened = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME)
                     .allowMainThreadQueries()
                     .build()
@@ -514,7 +481,7 @@ class DatabaseBackupImportTest {
         return exported
     }
 
-    private fun createBackupZip(importedDbFile: File, messagePatterns: String? = null, roomVersion: Int = MasroofDatabase.VERSION): File {
+    private fun createBackupZip(importedDbFile: File, roomVersion: Int = MasroofDatabase.VERSION): File {
         val zipFile = File.createTempFile("masroof-current-backup", ".masroof")
         val manifest = BackupManifest(
             formatVersion = BackupPackageFormat.FORMAT_VERSION,
@@ -524,7 +491,6 @@ class DatabaseBackupImportTest {
             exportedAtEpochMillis = 1_700_000_000_000L,
         )
         val preferences = BackupPreferencesSnapshot(
-            messagePatterns = messagePatterns,
             onboardingStarted = true,
             onboardingCompleted = true,
             historicalImportStartEpochMillis = null,

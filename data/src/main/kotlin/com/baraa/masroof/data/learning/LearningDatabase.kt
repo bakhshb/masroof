@@ -1,10 +1,8 @@
 package com.baraa.masroof.data.learning
 
 import androidx.room.*
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 
-/** Advisory provenance. Financial authority remains in the unchanged fourteen-table DB. */
+/** Advisory provenance. Financial authority remains in `masroof.db`. */
 @Entity(tableName="engine_interpretation",indices=[Index("rawId")])
 data class EngineInterpretationRow(
     @PrimaryKey val id: String,val rawId: String,val bankId: String?,val engineVersion: String,val rulesVersion: String,
@@ -39,21 +37,7 @@ interface LearningDao {
         replaceLabels(labels); clearFeedback(); if(feedback.isNotEmpty()) feedback(feedback)
     }
 }
-@Database(entities=[EngineInterpretationRow::class,LearningLabelRow::class,LearningFeedbackRow::class],version=2,exportSchema=true)
+@Database(entities=[EngineInterpretationRow::class,LearningLabelRow::class,LearningFeedbackRow::class],version=1,exportSchema=true)
 abstract class LearningDatabase : RoomDatabase() {
     abstract fun learning(): LearningDao
-    companion object {
-        val MIGRATION_1_2 = object : Migration(1,2) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE engine_interpretation ADD COLUMN assistRequested INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE engine_interpretation ADD COLUMN assistOutcome TEXT NOT NULL DEFAULT 'LEGACY_UNKNOWN'")
-                db.execSQL("ALTER TABLE engine_interpretation ADD COLUMN score REAL")
-                db.execSQL("ALTER TABLE engine_interpretation ADD COLUMN margin REAL")
-                db.execSQL("ALTER TABLE engine_interpretation ADD COLUMN coverage REAL")
-                db.execSQL("ALTER TABLE engine_interpretation ADD COLUMN template TEXT")
-                db.execSQL("CREATE TABLE IF NOT EXISTS learning_feedback (decisionId TEXT NOT NULL PRIMARY KEY, rawId TEXT NOT NULL, sourceAt INTEGER NOT NULL, provenance TEXT NOT NULL, state TEXT NOT NULL, reason TEXT, bankId TEXT, template TEXT)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_learning_feedback_rawId ON learning_feedback(rawId)")
-            }
-        }
-    }
 }

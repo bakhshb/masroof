@@ -18,6 +18,6 @@ class BackupSchema(
     val version: Int = identityHashes.keys.max()
 
     companion object {
-        val PRODUCTION = BackupSchema(MasroofDatabase::class.java, MasroofDatabase.IDENTITY_HASHES)
+        val PRODUCTION = BackupSchema(MasroofDatabase::class.java, mapOf(MasroofDatabase.VERSION to MasroofDatabase.IDENTITY_HASH))
     }
 }

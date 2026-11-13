@@ -154,15 +154,6 @@ object AnalyticsBackup {
                 require(c.seriesKey.matches(Regex("[0-9a-f]{64}")))
             }
         }
-        archive.feedback.forEach { row ->
-            val payload = json.decodeFromString<RecurringFeedbackPayload>(row.payload).also { it.validate() }
-            require(row.seriesKey == payload.seriesKey)
-            require(when (row.kind) {
-                "NOT_RECURRING" -> payload.label == "NONE"
-                "DISMISSED" -> payload.label == null
-                else -> payload.label == null || payload.label in setOf("WEEKLY", "MONTHLY", "YEARLY")
-            })
-        }
         archive.alerts.forEach { require(it.kind in setOf("ACTUAL", "BUDGET", "DUE", "PAYMENT") && it.amount >= 0 && it.firstSeen >= 0 && it.observedAt >= it.firstSeen && it.readAt >= 0) }
     }
     fun capture(context: Context): String? {
@@ -192,7 +183,6 @@ object AnalyticsBackup {
             preferences = archive.preferences?.takeIf { valid(empty.copy(preferences = it)) },
             coverage = archive.coverage.distinctBy { it.id }.filter { valid(empty.copy(coverage = listOf(it))) },
             comparisons = archive.comparisons.distinctBy { it.id }.filter { valid(empty.copy(comparisons = listOf(it))) },
-            feedback = archive.feedback.distinctBy { it.seriesKey }.filter { valid(empty.copy(feedback = listOf(it))) },
         )
         return json.encodeToString(AnalyticsArchive.serializer(), pruned).also(::validate)
     }

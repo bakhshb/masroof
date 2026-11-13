@@ -5,7 +5,6 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import com.baraa.masroof.data.room.dao.AccountRegistryDao
 import com.baraa.masroof.data.room.dao.BankRegistryDao
@@ -37,10 +36,8 @@ import com.baraa.masroof.data.room.entity.UserCorrectionEntity
 import com.baraa.masroof.data.room.entity.UserDecisionEntity
 
 /**
- * Masroof Room persistence schema (current version [VERSION]).
- *
- * Opens [BASELINE_VERSION] and [VERSION] only, the baseline through the one additive [MIGRATION_18_22]. Older, newer,
- * intermediate and unknown schemas are rejected by Room with the file untouched; there is never a destructive fallback.
+ * Masroof Room persistence schema, version [VERSION]. Any other version or identity hash is rejected by Room with
+ * the file untouched; there is never a destructive fallback. A later schema change adds its step to [MIGRATIONS].
  */
 @Database(
     entities = [
@@ -96,60 +93,13 @@ abstract class MasroofDatabase : RoomDatabase() {
          * must finish before Room opens this name.
          */
         const val NAME: String = "masroof.db"
-        const val VERSION: Int = 22
+        const val VERSION: Int = 1
 
-        /** Oldest schema that opens; anything older has no migration and is rejected. */
-        const val BASELINE_VERSION: Int = 18
-
-        /** Must match data/schemas/.../22.json identityHash. */
+        /** Must match data/schemas/.../1.json identityHash. */
         const val IDENTITY_HASH: String = "5349c1b666aed8239c225512f4498078"
 
-        /**
-         * The only (version, identity hash) pairs that open or that a backup may carry: the v18 baseline and [VERSION].
-         * v19 to v21 existed only in development builds and are refused like any unknown schema (owner, 2026-11-12).
-         */
-        val IDENTITY_HASHES: Map<Int, String> = mapOf(
-            BASELINE_VERSION to "71f1193767b3aa12bcb6cc6e7ce77147",
-            VERSION to IDENTITY_HASH,
-        )
-
-        /**
-         * The single step from the v18 baseline (owner, 2026-11-12), additive only: creates the append-only `user_decision`
-         * table in its final shape and backfills it from the legacy stores (plan 2.2, [UserDecisionBackfill]), and creates
-         * the empty one-row `pattern_configuration` table (plan 5.1). The message-pattern file and the analytics
-         * recurring answers are copied in when the live database opens, never here. Room checks only the tables after a
-         * migration, so the step first refuses an unknown v18 hash, inside the upgrade transaction (the file stays untouched).
-         */
-        val MIGRATION_18_22: Migration = object : Migration(BASELINE_VERSION, VERSION) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                val hash = db.query("SELECT identity_hash FROM room_master_table").use { if (it.moveToFirst()) it.getString(0) else null }
-                check(hash == IDENTITY_HASHES.getValue(BASELINE_VERSION)) { "Unknown schema $BASELINE_VERSION identity hash" }
-                // Copied from 22.json; Room validates the result on open.
-                db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS `user_decision` (`sequence` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                        "`rawSmsId` TEXT, `pairedRawSmsId` TEXT, `kind` TEXT NOT NULL, " +
-                        "`decidedAtEpochMillis` INTEGER NOT NULL, `transactionType` TEXT, `sourceContainerId` TEXT, " +
-                        "`destinationContainerId` TEXT, `occurredAtEpochMillis` INTEGER, `occurredAtZone` TEXT, " +
-                        "`messageFamily` TEXT, `amountDecimal` TEXT, `amountCurrency` TEXT, " +
-                        "`merchant` TEXT, `counterparty` TEXT, `bankId` TEXT, `subjectKey` TEXT, `answer` TEXT, `payload` TEXT, " +
-                        "FOREIGN KEY(`rawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT , " +
-                        "FOREIGN KEY(`pairedRawSmsId`) REFERENCES `raw_sms`(`id`) ON UPDATE CASCADE ON DELETE RESTRICT )",
-                )
-                db.execSQL(
-                    "CREATE INDEX IF NOT EXISTS `index_user_decision_rawSmsId_sequence` ON `user_decision` (`rawSmsId`, `sequence`)",
-                )
-                db.execSQL(
-                    "CREATE INDEX IF NOT EXISTS `index_user_decision_pairedRawSmsId` ON `user_decision` (`pairedRawSmsId`)",
-                )
-                UserDecisionBackfill.run(db)
-                db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS `pattern_configuration` (`id` INTEGER NOT NULL, `generation` INTEGER NOT NULL, " +
-                        "`document` TEXT NOT NULL, PRIMARY KEY(`id`))",
-                )
-            }
-        }
-
-        val MIGRATIONS: List<Migration> = listOf(MIGRATION_18_22)
+        /** Additive, tested steps from version 1 on; none yet. */
+        val MIGRATIONS: List<Migration> = emptyList()
 
         /**
          * The builder for the live financial file. [databaseClass] fixes the target version; tests pass a

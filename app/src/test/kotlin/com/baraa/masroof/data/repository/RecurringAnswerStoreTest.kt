@@ -3,10 +3,12 @@ package com.baraa.masroof.data.repository
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.baraa.masroof.application.analytics.RecurringAnswerUpgradeContract
 import com.baraa.masroof.application.analytics.RecurringDecisionWorkflow
 import com.baraa.masroof.data.analytics.AnalyticsDatabase
+import com.baraa.masroof.application.analytics.RecurringFeedbackPayload
+import com.baraa.masroof.data.analytics.AnalyticsJson
 import com.baraa.masroof.data.analytics.RecurringFeedbackRow
+import kotlinx.serialization.encodeToString
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.data.room.entity.UserDecisionEntity
@@ -25,14 +27,19 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Plan 5.2: recurring answers as append-only `RECURRING` rows of `user_decision`, and the one-time copy from analytics. */
+/** Plan 5.2: recurring answers as append-only `RECURRING` rows of `user_decision` */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class RecurringAnswerStoreTest {
     private val context = TestStorageContext(ApplicationProvider.getApplicationContext<Context>(), "recurring-answers-${java.util.UUID.randomUUID()}")
     private val db = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java).allowMainThreadQueries().build()
     private val store = RecurringAnswerStore(db, DatabaseAccessGate())
-    private val answers = RecurringAnswerUpgradeContract.ANSWERS
+    private val answers = listOf(
+        answer("series-a", "CONFIRMED", "MONTHLY", 1_000),
+        answer("series-b", "CONFIRM_PENDING", "WEEKLY", 2_000),
+        answer("series-c", "NOT_RECURRING", "NONE", 3_000),
+        answer("series-d", "DISMISSED", null, 4_000),
+    )
     private val confirmed = answers[0]
     private val pending = answers[1]
     private val notRecurring = answers[2]
@@ -119,43 +126,6 @@ class RecurringAnswerStoreTest {
         assertEquals(emptyList<UserDecisionEntity>(), dao.listAll())
     }
 
-    @Test
-    fun theCopyAppendsEachLegacyAnswerOnce_andARerunAfterACrashBeforeTheClearIsANoOp() = runBlocking {
-        RecurringAnswerUpgradeContract.writeAnalytics(context, answers)
-        val analytics = AnalyticsDatabase.open(context)
-        val sql = db.openHelper.writableDatabase
-        try {
-            val read = RecurringAnswerStore.readLegacy(analytics.openHelper.writableDatabase)
-            assertEquals(answers, read)
-            assertEquals(4, RecurringAnswerStore.copyLegacy(sql, read))
-            // A crash here, before the clear: the next open reads the same rows and appends nothing.
-            val rows = db.userDecisionDao().listAll()
-            assertEquals(0, RecurringAnswerStore.copyLegacy(sql, RecurringAnswerStore.readLegacy(analytics.openHelper.writableDatabase)))
-            assertEquals(rows, db.userDecisionDao().listAll())
-            RecurringAnswerStore.clearLegacy(analytics.openHelper.writableDatabase, read)
-            assertEquals(emptyList<RecurringFeedbackRow>(), RecurringAnswerStore.readLegacy(analytics.openHelper.writableDatabase))
-            assertEquals(answers, store.effective())
-        } finally { analytics.close() }
-    }
-
-    @Test
-    fun aCrashBeforeTheCommitAppendsNothing_andTheRetryCopiesEverything() = runBlocking {
-        val sql = db.openHelper.writableDatabase
-        sql.execSQL("CREATE TRIGGER fail_third AFTER INSERT ON user_decision WHEN NEW.sequence = 3 BEGIN SELECT RAISE(ABORT, 'injected'); END")
-        assertThrows(android.database.SQLException::class.java) { RecurringAnswerStore.copyLegacy(sql, answers) }
-        assertEquals(emptyList<UserDecisionEntity>(), db.userDecisionDao().listAll())
-        sql.execSQL("DROP TRIGGER fail_third")
-        assertEquals(4, RecurringAnswerStore.copyLegacy(sql, answers))
-        assertEquals(answers, store.effective())
-    }
-
-    @Test
-    fun aSeriesAnsweredInTheStoreKeepsItsAnswerOverALegacyRow() = runBlocking {
-        store.record(dismissed.copy(seriesKey = confirmed.seriesKey, decidedAt = 99_000))
-        store.undo(pending.seriesKey, setOf("CONFIRM_PENDING"), 1).let { assertFalse(it) }
-        store.record(pending)
-        store.undo(pending.seriesKey, setOf("CONFIRM_PENDING"), 99_000)
-        assertEquals(2, RecurringAnswerStore.copyLegacy(db.openHelper.writableDatabase, answers))
-        assertEquals(listOf(dismissed.copy(seriesKey = confirmed.seriesKey, decidedAt = 99_000), notRecurring, dismissed), store.effective())
-    }
+    private fun answer(seriesKey: String, kind: String, label: String?, at: Long) = RecurringFeedbackRow(seriesKey, kind,
+        AnalyticsJson.format.encodeToString(RecurringFeedbackPayload(seriesKey, listOf("$seriesKey-1", "$seriesKey-2"), label)), at)
 }

@@ -16,7 +16,7 @@ class LearningStore(private val context: Context, private val onCorruption: (SQL
     private var instance: LearningDatabase? = null
 
     @Synchronized private fun database(): LearningDatabase = instance ?: Room.databaseBuilder(context, LearningDatabase::class.java, NAME)
-        .addMigrations(LearningDatabase.MIGRATION_1_2).openHelperFactory(PreservingOpenHelperFactory()).build().also { instance = it }
+        .openHelperFactory(PreservingOpenHelperFactory()).build().also { instance = it }
 
     private suspend fun <T> use(block: suspend (LearningDao) -> T): T = try {
         block(database().learning())
