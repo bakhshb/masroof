@@ -65,7 +65,7 @@ android {
             buildConfigField("boolean", "ENABLE_DESIGN_CATALOG", providers.gradleProperty("masroofDesignCatalog").orElse("false").get())
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

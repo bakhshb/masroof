@@ -51,3 +51,15 @@ The device image is explicitly pinned rather than selected dynamically during a 
 The target for normal review is 10–15 minutes, not a proven percentile. Inspect the critical path in Actions (queue, APK build, image/boot, case execution and evidence upload) and use JUnit/JSON case timings to rebalance. Assess p50/p95 after twenty natural complete runs; do not manufacture repeated reruns or remove coverage to meet the target. Cold caches, queueing and host contention can exceed it.
 
 See [lifecycle contracts](TESTING_LIFECYCLE.md) for the safety map and regressions.
+
+## Release build and R8
+
+The release build shrinks and optimizes with R8 (`isMinifyEnabled = true`); `static-analysis` builds it on every PR, so a missing keep rule that R8 can see fails there. Names are not changed (`-dontobfuscate` in `app/proguard-rules.pro`): WorkManager stores worker class names from earlier builds and logs name exception classes. Libraries bring their own keep rules; add an app rule only for a real failure.
+
+Device tests run the debug build, so a release-only fault needs this manual smoke on an emulator after a change to R8 rules, the Android Gradle plugin or a library that uses reflection:
+
+1. `./gradlew :app:assembleRelease`, sign the APK with the debug key (`apksigner`), install it on a clean emulator and grant `RECEIVE_SMS` and `READ_SMS`.
+2. Finish onboarding with one bank, then send a purchase message: `adb emu sms send AlJazira "<body with \n between lines>"`. The row must appear under Transactions and in the dashboard total.
+3. Settings → data and backup: create an encrypted backup. Then `adb shell pm clear com.baraa.masroof`, open the app, restore that file from the welcome step. The row must be back.
+
+Last run: 2026-11-13, API 36 emulator, passed.
