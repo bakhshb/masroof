@@ -38,7 +38,7 @@ object BackupMigrationContract {
         val live = openLive(context)
         val outcome = runBlocking {
             service(context, live, nextVersionSchema(context), close = { live.close() })
-                .importFrom(stage(context, archive), passphrase.toCharArray(), confirmLegacyPlaintext = true)
+                .let { if (passphrase.isEmpty()) it.importZip(stage(context, archive)) else it.importFrom(Uri.fromFile(stage(context, archive)), passphrase.toCharArray()) }
         }
         assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
         val expected = MigrationOpenPathContract.copyFixture(context, "backup-migration-fixture.db", fixtureDb)
@@ -79,7 +79,7 @@ object BackupMigrationContract {
             val preferences = DatabaseRestoreRecovery.capturePreferences(context)
             val outcome = runBlocking {
                 service(context, live, schema, close = { closed.set(true); live.close() })
-                    .importFrom(stage(context, archive), confirmLegacyPlaintext = true)
+                    .importZip(stage(context, archive))
             }
             assertEquals(expected, outcome)
             assertFalse(closed.get())
@@ -110,10 +110,10 @@ object BackupMigrationContract {
     private fun service(context: Context, live: MasroofDatabase, schema: BackupSchema, close: () -> Unit) =
         DatabaseBackupService(context, live, close, "test", restartProcess = {}, schema = schema, appLogService = NoOpAppLog)
 
-    private fun stage(context: Context, archive: () -> InputStream): Uri {
+    private fun stage(context: Context, archive: () -> InputStream): File {
         val file = File(context.cacheDir, "backup-migration-archive")
         archive().use { input -> file.outputStream().use { input.copyTo(it) } }
-        return Uri.fromFile(file)
+        return file
     }
 
     private fun reset(context: Context) {

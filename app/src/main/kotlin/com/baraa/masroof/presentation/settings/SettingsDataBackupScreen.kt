@@ -80,23 +80,6 @@ fun SettingsDataBackupScreen(
             },
         )
     }
-    if (state.awaitingLegacyImportConfirm) {
-        AlertDialog(
-            onDismissRequest = onCancelPendingImport,
-            title = { Text(stringResource(R.string.settings_import_legacy_title)) },
-            text = { Text(stringResource(R.string.settings_import_legacy_body)) },
-            confirmButton = {
-                TextButton(onClick = onConfirmPendingImport) {
-                    Text(stringResource(R.string.settings_import_confirm_action))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onCancelPendingImport) {
-                    Text(stringResource(R.string.settings_cancel))
-                }
-            },
-        )
-    }
     if (state.awaitingImportConfirm && (showRestoreConfirm || !state.backupVerified)) {
         AlertDialog(
             onDismissRequest = { showRestoreConfirm = false; onCancelPendingImport() },

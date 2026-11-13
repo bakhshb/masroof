@@ -420,7 +420,7 @@ class BoundedZipImportTest {
                     restartProcess = { error("rejected archive must not restart") },
                     beforeValidatedInstall = { recoveryStarted.set(true) },
                     archiveLimits = limits,
-                ).importFrom(Uri.fromFile(zip))
+                ).importZip(zip)
                 zip.delete()
 
                 assertEquals(category.name, BackupImportOutcome.InvalidPackage, outcome)
@@ -447,14 +447,15 @@ class BoundedZipImportTest {
 
             val bomb = ZipFixtures.compressedZeros(BackupPackageFormat.DATABASE_ENTRY, 1024 * 1024)
             assertTrue(bomb.size < 64 * 1024)
-            reject(bomb, ZipFixtures.limits(perEntry = 64, total = 64), BackupArchiveRejection.ENTRY_TOO_LARGE)
+            // The total limit also caps the sealed package itself, so it stays above the archive's own size.
+            reject(bomb, ZipFixtures.limits(perEntry = 64, total = 64 * 1024), BackupArchiveRejection.ENTRY_TOO_LARGE)
 
             reject(
                 ZipFixtures.storedZipBytes(
                     BackupPackageFormat.DATABASE_ENTRY,
                     ByteArray(200) { 4 },
                 ),
-                ZipFixtures.limits(perEntry = 64, total = 64),
+                ZipFixtures.limits(perEntry = 64, total = 4096),
                 BackupArchiveRejection.ENTRY_TOO_LARGE,
             )
 

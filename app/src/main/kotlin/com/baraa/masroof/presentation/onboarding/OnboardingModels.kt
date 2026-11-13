@@ -66,7 +66,6 @@ data class OnboardingUiState(
     val reviewRequiredCount: Int = 0,
     val restoringBackup: Boolean = false,
     val restorePassphrase: String = "",
-    val awaitingLegacyRestoreConfirm: Boolean = false,
     val error: OnboardingError? = null,
 ) {
     val hasUnknownCandidates: Boolean =

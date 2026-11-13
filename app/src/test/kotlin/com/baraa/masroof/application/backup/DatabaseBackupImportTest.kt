@@ -54,7 +54,7 @@ class DatabaseBackupImportTest {
                 var closed = false
                 try {
                     val service = DatabaseBackupService(context, live, { closed = true; live.close() }, "test", restartProcess = {}, appLogService = NoOpAppLog)
-                    assertEquals(BackupImportOutcome.InvalidPackage, service.importFrom(Uri.fromFile(zip), confirmLegacyPlaintext = true))
+                    assertEquals(BackupImportOutcome.InvalidPackage, service.importZip(zip))
                     assertFalse(closed)
                     assertEquals(original, patterns.captureRaw())
                     assertFalse(prefs.getBoolean("onboarding_completed", true))
@@ -91,7 +91,7 @@ class DatabaseBackupImportTest {
             val zip = createBackupZip(imported)
             try {
                 val outcome = DatabaseBackupService(context, live, { live.close() }, "test", restartProcess = {}, appLogService = NoOpAppLog)
-                    .importFrom(Uri.fromFile(zip), confirmLegacyPlaintext = true)
+                    .importZip(zip)
                 assertEquals(BackupImportOutcome.Failed, outcome)
                 assertEquals(patternArchive("ORIGINAL"), storedPatterns(context.getDatabasePath(MasroofDatabase.NAME)))
             } finally {
@@ -144,7 +144,7 @@ class DatabaseBackupImportTest {
             appLogService = NoOpAppLog,
         )
 
-        val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
+        val outcome = backupService.importZip(backupZip)
 
         assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
         assertTrue(restartRequested.get())
@@ -186,7 +186,7 @@ class DatabaseBackupImportTest {
                 appLogService = NoOpAppLog,
             )
 
-            val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
+            val outcome = backupService.importZip(backupZip)
 
             assertEquals(BackupImportOutcome.Failed, outcome)
             assertTrue(restartRequested.get())
@@ -227,7 +227,7 @@ class DatabaseBackupImportTest {
             appLogService = NoOpAppLog,
         )
 
-        val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
+        val outcome = backupService.importZip(backupZip)
 
         assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
         assertTrue(restartRequested.get())
@@ -284,7 +284,7 @@ class DatabaseBackupImportTest {
                 appLogService = NoOpAppLog,
             )
 
-            val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
+            val outcome = backupService.importZip(backupZip)
 
             assertEquals(BackupImportOutcome.Failed, outcome)
             assertTrue(restartRequested.get())
@@ -349,7 +349,7 @@ class DatabaseBackupImportTest {
                 appLogService = NoOpAppLog,
             )
 
-            val outcome = backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
+            val outcome = backupService.importZip(backupZip)
 
             assertEquals(BackupImportOutcome.Failed, outcome)
             assertTrue(restartRequested.get())
@@ -419,7 +419,7 @@ class DatabaseBackupImportTest {
                     appLogService = NoOpAppLog,
                 )
                 try {
-                    backupService.importFrom(Uri.fromFile(backupZip), confirmLegacyPlaintext = true)
+                    backupService.importZip(backupZip)
                     org.junit.Assert.fail("expected termination at $stage")
                 } catch (error: DatabaseRestoreRecovery.ProcessTerminated) {
                     assertEquals(stage.name, error.message?.substringAfterLast(' '))

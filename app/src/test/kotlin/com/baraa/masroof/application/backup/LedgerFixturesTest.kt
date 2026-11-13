@@ -89,7 +89,7 @@ class LedgerFixturesTest {
             clockEpochMillis = { EXPORTED_AT },
             restartProcess = {},
             appLogService = NoOpAppLog,
-        ).importFrom(Uri.fromFile(fixture(ARCHIVE_FILE)), confirmLegacyPlaintext = true)
+        ).importZip(fixture(ARCHIVE_FILE))
         assertEquals(BackupImportOutcome.SuccessNeedsRestart, outcome)
         val restored = Room.databaseBuilder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).allowMainThreadQueries().build()
         try {
@@ -142,7 +142,7 @@ class LedgerFixturesTest {
         val archive = File(context.cacheDir, "round-trip.masroof")
         val file = context.getDatabasePath(MasroofDatabase.NAME)
         try {
-            assertEquals(BackupImportOutcome.SuccessNeedsRestart, service(live).importFrom(Uri.fromFile(fixture(ARCHIVE_FILE)), confirmLegacyPlaintext = true))
+            assertEquals(BackupImportOutcome.SuccessNeedsRestart, service(live).importZip(fixture(ARCHIVE_FILE)))
             val migrated = MasroofDatabase.builder(context, MasroofDatabase::class.java, MasroofDatabase.NAME).allowMainThreadQueries().build()
             val rawSmsId = migrated.openHelper.readableDatabase.query("SELECT id FROM raw_sms ORDER BY id LIMIT 1").use {
                 assertTrue(it.moveToFirst()); it.getString(0)

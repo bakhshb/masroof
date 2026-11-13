@@ -38,7 +38,6 @@ class MasroofApplication : Application(), Configuration.Provider {
             previous?.uncaughtException(thread, error)
         }
         if (!isRobolectricUnitTest()) {
-            com.baraa.masroof.application.maintenance.RetiredWorkCleanup.schedule(this, container.storage.applicationScope, container.storage.appLogService)
             container.maintenance.runStartupMaintenance()
             UpdateCheckScheduler.schedule(this)
         }

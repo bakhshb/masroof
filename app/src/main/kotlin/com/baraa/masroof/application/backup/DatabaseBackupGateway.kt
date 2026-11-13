@@ -19,15 +19,10 @@ interface DatabaseBackupGateway {
     }
 
     /**
-     * Imports an encrypted envelope, or a legacy v1 ZIP when [confirmLegacyPlaintext] is true.
-     * [passphrase] is wiped before return. A legacy ZIP does not use it.
+     * Imports an encrypted envelope; anything else is an invalid package. [passphrase] is wiped before return.
      * Authentication and archive failures return before the live database is closed or replaced.
      */
-    suspend fun importFrom(
-        source: Uri,
-        passphrase: CharArray = CharArray(0),
-        confirmLegacyPlaintext: Boolean = false,
-    ): BackupImportOutcome
+    suspend fun importFrom(source: Uri, passphrase: CharArray): BackupImportOutcome
 }
 
 enum class BackupVerificationOutcome { VERIFIED, AUTHENTICATION_FAILED, INVALID_PACKAGE, FAILED }

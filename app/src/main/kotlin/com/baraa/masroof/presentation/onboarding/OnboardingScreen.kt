@@ -98,8 +98,6 @@ fun OnboardingRoute(
         onOpenAppSettings = onOpenAppSettings,
         onRequestRestoreBackup = onRequestRestoreBackup,
         onRestorePassphraseChange = viewModel::onRestorePassphraseChange,
-        onConfirmLegacyRestore = viewModel::confirmLegacyRestore,
-        onCancelLegacyRestore = viewModel::cancelLegacyRestore,
         onClearBackupError = viewModel::clearBackupError,
         onSelectDateOption = viewModel::selectDateOption,
         onSelectCustomDate = viewModel::selectCustomDate,
@@ -149,8 +147,6 @@ internal fun OnboardingScreen(
     onOpenAppSettings: () -> Unit,
     onRequestRestoreBackup: () -> Unit,
     onRestorePassphraseChange: (String) -> Unit,
-    onConfirmLegacyRestore: () -> Unit,
-    onCancelLegacyRestore: () -> Unit,
     onClearBackupError: () -> Unit,
     onSelectDateOption: (ImportDateOption) -> Unit,
     onSelectCustomDate: (LocalDate) -> Unit,
@@ -184,13 +180,10 @@ internal fun OnboardingScreen(
                 modifier = Modifier.fillMaxSize(),
                 restoringBackup = state.restoringBackup,
                 restorePassphrase = state.restorePassphrase,
-                awaitingLegacyRestoreConfirm = state.awaitingLegacyRestoreConfirm,
                 error = state.error,
                 onStart = onStart,
                 onRequestRestoreBackup = onRequestRestoreBackup,
                 onRestorePassphraseChange = onRestorePassphraseChange,
-                onConfirmLegacyRestore = onConfirmLegacyRestore,
-                onCancelLegacyRestore = onCancelLegacyRestore,
                 onClearBackupError = onClearBackupError,
             )
             OnboardingStep.BANKS -> BanksStep(state, onToggleBank, onContinueBanks, onAddBank, onRetryBanks)
@@ -232,32 +225,12 @@ private fun WelcomeStep(
     modifier: Modifier,
     restoringBackup: Boolean,
     restorePassphrase: String,
-    awaitingLegacyRestoreConfirm: Boolean,
     error: OnboardingError?,
     onStart: () -> Unit,
     onRequestRestoreBackup: () -> Unit,
     onRestorePassphraseChange: (String) -> Unit,
-    onConfirmLegacyRestore: () -> Unit,
-    onCancelLegacyRestore: () -> Unit,
     onClearBackupError: () -> Unit,
 ) {
-    if (awaitingLegacyRestoreConfirm) {
-        AlertDialog(
-            onDismissRequest = onCancelLegacyRestore,
-            title = { Text(stringResource(R.string.settings_import_legacy_title)) },
-            text = { Text(stringResource(R.string.settings_import_legacy_body)) },
-            confirmButton = {
-                TextButton(onClick = onConfirmLegacyRestore) {
-                    Text(stringResource(R.string.settings_import_confirm_action))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onCancelLegacyRestore) {
-                    Text(stringResource(R.string.settings_cancel))
-                }
-            },
-        )
-    }
     if (error == OnboardingError.BACKUP_RESTORE_FAILED ||
         error == OnboardingError.BACKUP_RESTORE_INVALID ||
         error == OnboardingError.BACKUP_PASSPHRASE_REQUIRED

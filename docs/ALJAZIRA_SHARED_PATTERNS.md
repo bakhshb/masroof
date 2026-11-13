@@ -77,11 +77,10 @@ declarations as whole-message example templates.
 
 At this milestone the financial database supported v18 only: older-schema migrations,
 import hashes and automatic fact backfills were removed, and databases and backups older
-than v18 are still rejected without erasing live data. Since then, schema changes above
-v18 go through additive, tested migrations (see `docs/ARCHITECTURE.md`).
-The v18 schema/hash, encryption and restore/rollback remain unchanged (the one-time
-transfer-integrity repair was deleted in plan 3.3c; see `docs/ARCHITECTURE.md`). The retired backfill worker is deleted; startup cancels any queued request by its
-persisted work name (`RetiredWorkCleanup`).
+than v18 were rejected without erasing live data. Since then the numbering restarted:
+the schema and the backup format are version 1 and only that version is accepted
+(owner, 2026-11-13; see `docs/ARCHITECTURE.md`). The retired backfill worker and the
+startup job that cancelled its queued request are deleted.
 
 Removal verification passed 194 targeted app tests and 15 API 36 device tests,
 with both APKs built. Coverage retains encrypted v18 verification/import, restore
