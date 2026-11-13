@@ -58,6 +58,8 @@ internal fun PatternTeachingScreen(
     val focus = LocalFocusManager.current
     val operations = stringArrayResource(R.array.pattern_operations)
     val field = operation.fields[fieldIndex]
+    // Teaching would fail on such a value at the preview, so it is refused here with the reason.
+    val opening = !body.selection.collapsed && opensMessage(body.text, body.selection.min)
     fun back() {
         if (busy) return
         body = body.copy(selection = TextRange.Zero)
@@ -142,7 +144,7 @@ internal fun PatternTeachingScreen(
                     if (step == 1) key(field) {
                         PatternTeachingValues(body, candidates, !busy, { body = it },
                             { body = body.copy(selection = TextRange(it.start, it.end)) },
-                            !busy && !body.selection.collapsed && bindings.size < 16, {
+                            !busy && !body.selection.collapsed && !opening && bindings.size < 16, {
                                 val key = (1..16).firstOrNull { index -> bindings.none { it.field == "ignored_$index" } }
                                 if (key != null) bindSelection("ignored_$key", true)
                             })
@@ -195,12 +197,13 @@ internal fun PatternTeachingScreen(
                             { keyboard?.hide(); focus.clearFocus(); step = 1 }, !busy && !loadingExample && body.text.isNotBlank())
                         1 -> {
                             Text(if (body.selection.collapsed) stringResource(R.string.teaching_select_value)
+                                else if (opening) stringResource(R.string.teaching_opening_value)
                                 else body.text.substring(body.selection.min, body.selection.max), maxLines = 2, overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MasroofSpacing.cardInnerGap)) {
                                 if (field != "amount") MasroofTextButton({ bindings = bindings.filterNot { it.field == field }; advance() },
                                     enabled = !busy) { Text(stringResource(R.string.teaching_skip_field)) }
-                                MasroofButton({ bindSelection(field); advance() }, enabled = !busy && !body.selection.collapsed,
+                                MasroofButton({ bindSelection(field); advance() }, enabled = !busy && !body.selection.collapsed && !opening,
                                     modifier = Modifier.weight(1f).testTag("pattern-bind")) { Text(stringResource(R.string.teaching_confirm_field)) }
                             }
                         }

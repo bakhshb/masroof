@@ -12,6 +12,7 @@
     <string name="teaching_required">مطلوب</string>
     <string name="teaching_optional">اختياري</string>
     <string name="teaching_select_value">اختر قيمة</string>
+    <string name="teaching_opening_value">أول كلمات الرسالة تحدد نوعها ولا تصلح قيمة. اختر «غير موجود» لهذا الحقل.</string>
     <string name="teaching_values">قيم الرسالة</string>
     <string name="teaching_ignore_value">تجاهل قيمة</string>
     <string name="teaching_sample_title">هل تطابق رسالة أخرى؟</string>

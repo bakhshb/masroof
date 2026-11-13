@@ -12,6 +12,7 @@
     <string name="teaching_required">Required</string>
     <string name="teaching_optional">Optional</string>
     <string name="teaching_select_value">Select a value</string>
+    <string name="teaching_opening_value">The opening words identify the message, so they cannot be a value. Choose “Not present” for this field.</string>
     <string name="teaching_values">Message values</string>
     <string name="teaching_ignore_value">Ignore value</string>
     <string name="teaching_sample_title">Does another message match?</string>

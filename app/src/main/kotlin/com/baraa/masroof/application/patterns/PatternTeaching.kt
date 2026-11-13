@@ -21,6 +21,8 @@ enum class PatternOperation(val fields: List<String>) {
 data class PatternTeachingSource(val bankId: String?, val sender: String, val body: String, val reviewId: String? = null)
 
 data class PatternBinding(val field: String, val start: Int, val end: Int, val ignored: Boolean = false)
+/** A value needs fixed words before it: the opening words say which message this is, so teaching rejects a value there. */
+fun opensMessage(body: String, start: Int) = body.take(start).none(Char::isLetter)
 /** [kind] is a lexical hint name from candidate discovery (MONEY, DATE_TIME…); null for extracted fields. */
 data class PatternText(val text: String, val start: Int, val end: Int, val kind: String? = null)
 data class PatternMatch(val patternId: String, val revision: Int, val operation: String, val fields: Map<String, PatternText>)
