@@ -44,23 +44,6 @@ class CoreEvidenceRepositoryContractTest {
         database.close()
     }
 
-    /** A queue refresh racing a bank choice must never drop the user's selection. */
-    @Test
-    fun concurrentReviewUpserts_keepTheBankSelection() = runBlocking {
-        val selection = com.baraa.masroof.domain.model.ExplicitBankSelection.reasonFor(com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA)
-        repeat(20) { round ->
-            val id = "sms-race-$round"
-            rawSms.insertIfAbsent(rawSms(id, "device-race-$round"))
-            reviews.upsertRequired(id, ReviewKind.NEEDS_REVIEW, listOf("ambiguous_bank_route"), now)
-            listOf(listOf(selection), listOf("missing_amount")).map { reasons ->
-                async(Dispatchers.IO) { reviews.upsertRequired(id, ReviewKind.NEEDS_REVIEW, reasons, now) }
-            }.awaitAll()
-
-            assertTrue("round $round", selection in reviews.findByRawSmsId(id)!!.reasons)
-        }
-        assertEquals(20, reviews.countRequired())
-    }
-
     @Test
     fun reviewUpsert_mergesReasonsButDoesNotReopenResolvedReview() = runBlocking {
         rawSms.insertIfAbsent(rawSms("sms-1", "device-1"))

@@ -750,7 +750,7 @@ class ProcessRawSmsUseCaseTest {
         assertEquals(0, lookalike.parseCalls.get())
         assertNull(parsedRepo.findByRawSmsId(other.id))
         val chosenReview = reviewRepo.findByRawSmsId(chosen.id)!!
-        assertTrue(chosenReview.reasons.contains(ExplicitBankSelection.reasonFor(Bank.BANK_ALJAZIRA)))
+        assertEquals(Bank.BANK_ALJAZIRA.id, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db).effectiveFor(chosen.id).selectedBankId)
         assertFalse(ExplicitBankSelection.offersBankChoice(chosenReview.reasons))
 
         reviewRepo.upsertRequired(
@@ -760,7 +760,8 @@ class ProcessRawSmsUseCaseTest {
             now = Instant.parse("2026-08-03T16:00:00Z"),
         )
         val refreshed = reviewRepo.findByRawSmsId(chosen.id)!!
-        assertTrue(refreshed.reasons.contains(ExplicitBankSelection.reasonFor(Bank.BANK_ALJAZIRA)))
+        // A queue refresh replaces the reasons; the choice lives in the decision store.
+        assertEquals(Bank.BANK_ALJAZIRA.id, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db).effectiveFor(chosen.id).selectedBankId)
         assertTrue(refreshed.reasons.contains("needs_review"))
 
         harness.facade.processStored.reparseStored(chosen)
@@ -795,7 +796,7 @@ class ProcessRawSmsUseCaseTest {
         assertNull(parsedRepo.findByRawSmsId(raw.id))
         val reasons = reviewRepo.findByRawSmsId(raw.id)!!.reasons
         assertTrue(reasons.contains(ExplicitBankSelection.REASON_AMBIGUOUS_BANK_ROUTE))
-        assertTrue(reasons.contains(ExplicitBankSelection.reasonFor(lookalike.bank)))
+        assertEquals(lookalike.bank.id, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db).effectiveFor(raw.id).selectedBankId)
         assertTrue(reasons.contains("unsupported_bank_message_format"))
     }
 
@@ -858,10 +859,7 @@ class ProcessRawSmsUseCaseTest {
         assertEquals(Bank.BANK_ALJAZIRA, parsedRepo.findByRawSmsId(chosen.id)!!.event.bank)
         assertEquals(1, parses.get())
         assertNull(parsedRepo.findByRawSmsId(other.id))
-        assertTrue(
-            reviewRepo.findByRawSmsId(chosen.id)!!.reasons
-                .contains(ExplicitBankSelection.reasonFor(Bank.BANK_ALJAZIRA)),
-        )
+        assertEquals(Bank.BANK_ALJAZIRA.id, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db).effectiveFor(chosen.id).selectedBankId)
 
         reviewRepo.upsertRequired(
             rawSmsId = chosen.id,
@@ -870,7 +868,8 @@ class ProcessRawSmsUseCaseTest {
             now = Instant.parse("2026-08-03T16:00:00Z"),
         )
         val refreshed = reviewRepo.findByRawSmsId(chosen.id)!!
-        assertTrue(refreshed.reasons.contains(ExplicitBankSelection.reasonFor(Bank.BANK_ALJAZIRA)))
+        // A queue refresh replaces the reasons; the choice lives in the decision store.
+        assertEquals(Bank.BANK_ALJAZIRA.id, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db).effectiveFor(chosen.id).selectedBankId)
         assertTrue(refreshed.reasons.contains("needs_review"))
 
         facade.processStored.reparseStored(other)

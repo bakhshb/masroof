@@ -47,7 +47,7 @@ class ReviewDetailLoaderTest {
         reviewRepo = RoomReviewRepository(db.reviewItemDao())
         val wiring = com.baraa.masroof.testsupport.RoomReviewWiring(db, clock, raw = rawRepo, reviews = reviewRepo)
         ingestionReviews = IngestionReviewService(reviewRepo, clock)
-        loader = ReviewDetailLoader(wiring.workflow, rawRepo, wiring.effective, provenance = { null })
+        loader = ReviewDetailLoader(wiring.workflow, rawRepo, wiring.effective, wiring.decisions, provenance = { null })
     }
 
     @After
@@ -81,16 +81,18 @@ class ReviewDetailLoaderTest {
         assertNull(detail.messageFamily)
         assertNull(detail.amount)
         assertNull(detail.bankId) // No bank may be guessed from the sender or quoted message text.
-        val selected = reviewRepo.upsertRequired(review.rawSmsId, review.kind,
-            review.reasons + "user_selected_bank:STC", clock.now())
+        assertEquals(false, detail.bankSelectedByUser)
+        db.recordDecision(com.baraa.masroof.domain.model.UserDecision(review.rawSmsId,
+            com.baraa.masroof.domain.model.UserDecisionKind.BANK_SELECTION, clock.now(), bankId = "STC"))
         assertEquals("STC", loader.loadDetail(review.id)!!.bankId)
-        assertEquals(selected, reviewRepo.getById(review.id))
+        assertEquals(true, loader.loadDetail(review.id)!!.bankSelectedByUser)
+        assertEquals(review, reviewRepo.getById(review.id))
         assertEquals(body, rawRepo.getById(review.rawSmsId)!!.body)
 
         val summary = loader.loadSummaries().single()
         assertEquals(review.id, summary.review.id)
         assertEquals(body, summary.body)
-        assertEquals(selected.reasons, summary.review.reasons)
+        assertEquals(review.reasons, summary.review.reasons)
     }
     @Test fun teachingUsesSelectedBankAndNeverChangesTheReviewedEvidenceOrDecision() = runBlocking {
         val body = "Payment\nAmount:10SAR"
@@ -104,7 +106,8 @@ class ReviewDetailLoaderTest {
         parsed.save(event)
         val review = ingestionReviews.requireReview(raw.id, IngestionReviewService.REASON_UNSUPPORTED_FORMAT)
         assertEquals("BANK_ALJAZIRA", loader.loadDetail(review.id)!!.bankId)
-        reviewRepo.upsertRequired(raw.id, review.kind, review.reasons + "user_selected_bank:STC", clock.now())
+        db.recordDecision(com.baraa.masroof.domain.model.UserDecision(raw.id,
+            com.baraa.masroof.domain.model.UserDecisionKind.BANK_SELECTION, clock.now(), bankId = "STC"))
         val decision = reviewRepo.markResolved(review.id,
             com.baraa.masroof.domain.model.ReviewResolutionKind.USER_NON_FINANCIAL, clock.now(), null)
         val detail = loader.loadDetail(review.id)!!
@@ -143,7 +146,6 @@ class ReviewDetailLoaderTest {
                 val review = ingestionReviews.requireReview(id, IngestionReviewService.REASON_UNSUPPORTED_FORMAT)
                 if (id == "resolved") reviewRepo.markResolved(review.id, com.baraa.masroof.domain.model.ReviewResolutionKind.USER_NON_FINANCIAL, clock.now(), null)
                 if (id == "other-bank") {
-                    reviewRepo.upsertRequired(id, review.kind, review.reasons + "user_selected_bank:OTHER", clock.now())
                     db.recordDecision(com.baraa.masroof.domain.model.UserDecision(id,
                         com.baraa.masroof.domain.model.UserDecisionKind.BANK_SELECTION, clock.now(), bankId = "OTHER"))
                 }

@@ -346,7 +346,7 @@ An SMS whose latest outcome decision posts nothing is never written and never li
 
 ### User decisions (`user_decision`)
 
-`user_decision` is one append-only table (plans 2.1 and 5.2). Every explicit user decision is appended there in the same database transaction as the existing write it describes; the existing stores (`review_item`, the `user_selected_bank:` reason prefix, `financial_transaction`) are written exactly as before. A correction has no other store: its `CORRECTION` row is the only record (the `user_correction` table was dropped at the restart at version 1). Since plan piece 2.3, processing reads decisions from this table only ("Reading decisions" below); the legacy stores are still written so screens and the kept reads keep working. `UserDecisionDao` only inserts and reads; it has no UPDATE or DELETE. A later row for the same subject supersedes an earlier one by `sequence`.
+`user_decision` is one append-only table (plans 2.1 and 5.2). Every explicit user decision is appended there in the same database transaction as the existing write it describes; the existing stores (`review_item`, `financial_transaction`) are written exactly as before. A bank choice has no other store either (the `user_selected_bank:` reason prefix went with the restart at version 1). A correction has no other store: its `CORRECTION` row is the only record (the `user_correction` table was dropped at the restart at version 1). Since plan piece 2.3, processing reads decisions from this table only ("Reading decisions" below); the legacy stores are still written so screens and the kept reads keep working. `UserDecisionDao` only inserts and reads; it has no UPDATE or DELETE. A later row for the same subject supersedes an earlier one by `sequence`.
 
 | Column | Meaning |
 |---|---|
@@ -375,7 +375,7 @@ Unused columns are null. Indices: `(rawSmsId, sequence)` for "latest decision fo
 | `IGNORE` | `TransactionIgnoreService` → `RoomTransactionIgnoreRepository.ignoreSingle` | row deleted + review `USER_NON_FINANCIAL` |
 | `RESTORE` | `TransactionRestoreService.restore` | review `USER_FINANCIAL_TYPE` (a chosen type adds its own `RECLASSIFY` row) |
 | `RESTORE_REVERTED` | `TransactionRestoreService.restore` when nothing could post and the restore is undone | review back to `USER_NON_FINANCIAL` |
-| `BANK_SELECTION` | `ExplicitBankSelectionWorkflow.selectAndReparse` | review reasons with the `user_selected_bank:` prefix |
+| `BANK_SELECTION` | `ExplicitBankSelectionWorkflow.selectAndReparse` | none: the decision row is the choice; `ReviewDetailLoader` reads it for the screen |
 | `RECURRING` | `AnalyticsWorkflow` (reject, accept, undo, the pending promotion) → `RecurringAnswerStore` | the candidate's advisory status in `analytics.db`, written after the answer (inside the transaction only for undo) |
 
 Application services join through `UserDecisionRepository.recordWith(decision, before) { write }`, which reads the current row, runs the write and appends in one Room transaction under the access gate, and appends only when the write returns a result that differs from the row before it; the Room repositories append through `UserDecisionDao` inside their own transaction. An idempotent repeat (a double submit, the same bank chosen again) changes nothing and appends nothing. A failure at the append rolls the existing write back too.

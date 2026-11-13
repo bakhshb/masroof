@@ -22,6 +22,7 @@ fun reviewViewModelFactory(
             reviewWorkflowService = review.reviewWorkflowService,
             rawSmsRepository = storage.rawSmsRepository,
             effectiveParsedEventProvider = review.effectiveParsedEventProvider,
+            userDecisionRepository = storage.userDecisionRepository,
             provenance = patterns.interpretationProvenanceWorkflow::load,
         )
         ReviewViewModel(

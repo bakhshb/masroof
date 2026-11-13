@@ -5,7 +5,6 @@ import com.baraa.masroof.data.room.dao.ReviewItemDao
 import com.baraa.masroof.data.room.dao.RoomBatch
 import com.baraa.masroof.data.room.mapper.ReviewItemMapper
 import com.baraa.masroof.domain.ids.ReviewIdFactory
-import com.baraa.masroof.domain.model.ExplicitBankSelection
 import com.baraa.masroof.domain.model.ReviewItem
 import com.baraa.masroof.domain.model.ReviewKind
 import com.baraa.masroof.domain.model.ReviewResolutionKind
@@ -45,11 +44,9 @@ class RoomReviewRepository(
     }
 
     override suspend fun listRetryableProcessingErrorRawSmsIds(): List<String> = accessGate.withAccess {
-        // The only reason, apart from a preserved explicit bank selection.
         dao.listRequiredReasonsContaining(RETRYABLE_PROCESSING_ERROR_REASON)
             .filter { row ->
-                ReviewItemMapper.decodeReasons(row.reasons).filterNot(ExplicitBankSelection::isSelection) ==
-                    listOf(RETRYABLE_PROCESSING_ERROR_REASON)
+                ReviewItemMapper.decodeReasons(row.reasons) == listOf(RETRYABLE_PROCESSING_ERROR_REASON)
             }
             .map { it.rawSmsId }
     }
@@ -67,7 +64,7 @@ class RoomReviewRepository(
                 rawSmsId = rawSmsId,
                 kind = kind,
                 status = ReviewStatus.REQUIRED,
-                reasons = reasons,
+                reasons = reasons.distinct().sorted(), // the stored form: no duplicates, sorted
                 createdAt = now,
                 updatedAt = now,
                 resolvedAt = null,
@@ -75,12 +72,7 @@ class RoomReviewRepository(
                 resolvedTransactionId = null,
             ),
         )
-        return@withAccess ReviewItemMapper.toDomain(
-            dao.upsertRequiredAtomic(entity) { stored ->
-                val existing = stored?.let(ReviewItemMapper::decodeReasons).orEmpty()
-                ReviewItemMapper.encodeReasons(ExplicitBankSelection.mergePreservedSelection(existing, reasons))
-            },
-        )
+        return@withAccess ReviewItemMapper.toDomain(dao.upsertRequired(entity))
     }
 
     override suspend fun markResolved(

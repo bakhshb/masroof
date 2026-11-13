@@ -91,17 +91,8 @@ interface ReviewItemDao {
         resolvedTransactionId: String?,
     ): Int
 
-    /**
-     * [mergeReasons] receives the stored reasons, read inside this transaction, so a bank
-     * selection written by a concurrent caller cannot be lost between the read and the write.
-     */
     @Transaction
-    suspend fun upsertRequiredAtomic(entity: ReviewItemEntity, mergeReasons: (String?) -> String): ReviewItemEntity {
-        val stored = findByRawSmsId(entity.rawSmsId) ?: getById(entity.id)
-        return upsertRequiredMerged(entity.copy(reasons = mergeReasons(stored?.reasons)))
-    }
-
-    private suspend fun upsertRequiredMerged(entity: ReviewItemEntity): ReviewItemEntity {
+    suspend fun upsertRequired(entity: ReviewItemEntity): ReviewItemEntity {
         val inserted = insertIfAbsent(entity)
         if (inserted != -1L) {
             return entity

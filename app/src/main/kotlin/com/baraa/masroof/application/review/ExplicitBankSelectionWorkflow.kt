@@ -35,7 +35,7 @@ class ExplicitBankSelectionWorkflow(
     }
 
     suspend fun selectAndReparse(rawSmsId: String, bankId: String) {
-        if (bankId.isBlank() || '\u001e' in bankId) return
+        if (bankId.isBlank()) return
         val bank = Bank.fromId(bankId)
         if (bankSmsRegistry.adapterFor(bank) == null) return
         val existing = reviewRepository.findByRawSmsId(rawSmsId) ?: return
@@ -43,14 +43,9 @@ class ExplicitBankSelectionWorkflow(
         val routeReason = existing.reasons.firstOrNull { it in ExplicitBankSelection.ROUTE_REASONS_OFFERING_CHOICE }
         val now = clock.now()
         val decision = UserDecision(rawSmsId, UserDecisionKind.BANK_SELECTION, now, bankId = bank.id)
-        // A repeat of the same bank, or a review resolved meanwhile, returns the stored row unchanged: no new decision.
-        userDecisionRepository.recordWith(decision, { reviewRepository.findByRawSmsId(rawSmsId) }) {
-            reviewRepository.upsertRequired(
-                rawSmsId = rawSmsId,
-                kind = existing.kind,
-                reasons = ExplicitBankSelection.withSelection(existing.reasons, bank),
-                now = now,
-            )
+        // A repeat of the same bank, or a review resolved meanwhile, appends no new decision.
+        userDecisionRepository.recordWith(decision, { userDecisionRepository.effectiveFor(rawSmsId).selectedBankId }) {
+            bank.id.takeIf { reviewRepository.findByRawSmsId(rawSmsId)?.status == ReviewStatus.REQUIRED }
         }
         val rawSms = rawSmsRepository.getById(rawSmsId) ?: return
         processStored.reparseStored(rawSms)
