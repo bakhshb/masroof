@@ -23,7 +23,6 @@ internal class SettingsBackupActions(
     private var pendingImportUri: Uri? = null
     private var pendingImportGeneration: Long = 0
     private var verificationJob: kotlinx.coroutines.Job? = null
-    private var pendingLegacyImport: Boolean = false
     private var pendingExportPassphrase: CharArray? = null
 
     fun clearBackupMessage() {
@@ -71,21 +70,9 @@ internal class SettingsBackupActions(
         }) {
             settingsState.update { it.copy(importingBackup = true, backupMessage = null) }
             when (databaseBackupService.inspect(uri)) {
-                BackupPackageKind.LEGACY_PLAINTEXT -> {
-                    pendingImportUri = uri
-                    pendingLegacyImport = true
-                    settingsState.update {
-                        it.copy(
-                            importingBackup = false,
-                            awaitingLegacyImportConfirm = true,
-                            awaitingImportConfirm = false,
-                        )
-                    }
-                }
                 BackupPackageKind.ENCRYPTED -> {
                     if (settingsState.value.importPassphrase.isEmpty()) {
                         pendingImportUri = uri
-                        pendingLegacyImport = false
                         settingsState.update {
                             it.copy(
                                 importingBackup = false,
@@ -95,12 +82,10 @@ internal class SettingsBackupActions(
                         }
                     } else {
                         pendingImportUri = uri
-                        pendingLegacyImport = false
                         settingsState.update {
                             it.copy(
                                 importingBackup = false,
                                 awaitingImportConfirm = true,
-                                awaitingLegacyImportConfirm = false,
                             )
                         }
                     }
@@ -122,9 +107,8 @@ internal class SettingsBackupActions(
         verificationJob?.cancel()
         verificationJob = null
         pendingImportUri = null
-        pendingLegacyImport = false
         settingsState.update {
-            it.copy(awaitingImportConfirm = false, awaitingLegacyImportConfirm = false, awaitingImportPassword = false,
+            it.copy(awaitingImportConfirm = false, awaitingImportPassword = false,
                 backupVerified = false, importingBackup = if (verifying) false else it.importingBackup, importPassphrase = "")
         }
     }
@@ -158,34 +142,14 @@ internal class SettingsBackupActions(
 
     fun confirmPendingImport() {
         val uri = pendingImportUri ?: return
-        val legacy = pendingLegacyImport
-        val passphrase = if (legacy) {
-            CharArray(0)
-        } else {
-            settingsState.value.importPassphrase.toCharArray()
-        }
-        if (!legacy && passphrase.isEmpty()) {
-            pendingImportUri = null
-            pendingLegacyImport = false
-            settingsState.update {
-                it.copy(
-                    awaitingImportConfirm = false,
-                    awaitingLegacyImportConfirm = false,
-                    backupMessage = BackupMessage.PASSPHRASE_REQUIRED,
-                )
-            }
+        val passphrase = settingsState.value.importPassphrase.toCharArray()
+        pendingImportUri = null
+        if (passphrase.isEmpty()) {
+            settingsState.update { it.copy(awaitingImportConfirm = false, backupMessage = BackupMessage.PASSPHRASE_REQUIRED) }
             return
         }
-        pendingImportUri = null
-        pendingLegacyImport = false
-        settingsState.update {
-            it.copy(
-                awaitingImportConfirm = false,
-                awaitingLegacyImportConfirm = false,
-                importPassphrase = if (legacy) it.importPassphrase else "",
-            )
-        }
-        importBackup(uri, passphrase, legacy)
+        settingsState.update { it.copy(awaitingImportConfirm = false, importPassphrase = "") }
+        importBackup(uri, passphrase)
     }
 
     fun exportBackup(uri: Uri) {
@@ -208,11 +172,7 @@ internal class SettingsBackupActions(
         }
     }
 
-    fun importBackup(
-        uri: Uri,
-        passphrase: CharArray = CharArray(0),
-        confirmLegacyPlaintext: Boolean = false,
-    ) {
+    fun importBackup(uri: Uri, passphrase: CharArray) {
         if (settingsState.value.exportingBackup || settingsState.value.importingBackup) return
         scope.launchLogged(appLogService, AppLogCategories.BACKUP, "Settings importBackup", onError = {
             settingsState.update {
@@ -221,11 +181,7 @@ internal class SettingsBackupActions(
         }, onFinally = { passphrase.fill('\u0000') }) {
             settingsState.update { it.copy(importingBackup = true, backupMessage = null, error = null) }
             when (
-                databaseBackupService.importFrom(
-                    source = uri,
-                    passphrase = passphrase,
-                    confirmLegacyPlaintext = confirmLegacyPlaintext,
-                )
+                databaseBackupService.importFrom(uri, passphrase)
             ) {
                 BackupImportOutcome.SuccessNeedsRestart -> {
                     // Process restarts inside the service after a successful restore.
@@ -244,16 +200,6 @@ internal class SettingsBackupActions(
                             backupMessage = BackupMessage.IMPORT_FAILED,
                         )
                     }
-                BackupImportOutcome.LegacyConfirmationRequired -> {
-                    pendingImportUri = uri
-                    pendingLegacyImport = true
-                    settingsState.update {
-                        it.copy(
-                            importingBackup = false,
-                            awaitingLegacyImportConfirm = true,
-                        )
-                    }
-                }
                 BackupImportOutcome.AuthenticationFailed ->
                     settingsState.update {
                         it.copy(

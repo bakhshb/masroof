@@ -172,8 +172,6 @@
     <string name="settings_backup_passphrase_required">Enter a passphrase first</string>
     <string name="settings_import_confirm_title">Import saved copy?</string>
     <string name="settings_import_confirm_body">This replaces all current app data. This cannot be undone.</string>
-    <string name="settings_import_legacy_title">Older unencrypted backup</string>
-    <string name="settings_import_legacy_body">This file is an older unencrypted backup. Importing it replaces the current database. A passphrase is not required. Cancelling leaves your data unchanged.</string>
     <string name="settings_import_confirm_action">Import and replace</string>
     <string name="settings_export_success">Backup exported successfully</string>
     <string name="settings_export_failed">Could not export data</string>

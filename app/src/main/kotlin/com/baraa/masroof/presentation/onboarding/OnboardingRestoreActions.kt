@@ -17,7 +17,6 @@ internal class OnboardingRestoreActions(
     private val databaseBackupService: DatabaseBackupGateway,
     private val appLogService: com.baraa.masroof.application.logging.AppLogService?,
 ) {
-    private var pendingRestoreUri: Uri? = null
 
     fun clearBackupError() {
         uiState.update {
@@ -40,12 +39,6 @@ internal class OnboardingRestoreActions(
         if (uiState.value.restoringBackup) return
         scope.launchLogged(appLogService, AppLogCategories.BACKUP, "Onboarding restoreBackup", onError = { uiState.update { it.copy(error = OnboardingError.BACKUP_RESTORE_FAILED) } }) {
             when (databaseBackupService.inspect(uri)) {
-                BackupPackageKind.LEGACY_PLAINTEXT -> {
-                    pendingRestoreUri = uri
-                    uiState.update {
-                        it.copy(awaitingLegacyRestoreConfirm = true, error = null)
-                    }
-                }
                 BackupPackageKind.ENCRYPTED -> {
                     val passphrase = uiState.value.restorePassphrase
                     if (passphrase.isEmpty()) {
@@ -53,7 +46,7 @@ internal class OnboardingRestoreActions(
                     } else {
                         val secret = passphrase.toCharArray()
                         uiState.update { it.copy(restorePassphrase = "") }
-                        importRestore(uri, secret, confirmLegacyPlaintext = false)
+                        importRestore(uri, secret)
                     }
                 }
                 BackupPackageKind.UNRECOGNIZED ->
@@ -62,23 +55,7 @@ internal class OnboardingRestoreActions(
         }
     }
 
-    fun confirmLegacyRestore() {
-        val uri = pendingRestoreUri ?: return
-        pendingRestoreUri = null
-        uiState.update { it.copy(awaitingLegacyRestoreConfirm = false) }
-        importRestore(uri, CharArray(0), confirmLegacyPlaintext = true)
-    }
-
-    fun cancelLegacyRestore() {
-        pendingRestoreUri = null
-        uiState.update { it.copy(awaitingLegacyRestoreConfirm = false) }
-    }
-
-    private fun importRestore(
-        uri: Uri,
-        passphrase: CharArray,
-        confirmLegacyPlaintext: Boolean,
-    ) {
+    private fun importRestore(uri: Uri, passphrase: CharArray) {
         scope.launchLogged(appLogService, AppLogCategories.BACKUP, "Onboarding importRestore", onError = {
             uiState.update {
                 it.copy(
@@ -89,11 +66,7 @@ internal class OnboardingRestoreActions(
         }, onFinally = { passphrase.fill('\u0000') }) {
             uiState.update { it.copy(restoringBackup = true, error = null) }
             when (
-                databaseBackupService.importFrom(
-                    source = uri,
-                    passphrase = passphrase,
-                    confirmLegacyPlaintext = confirmLegacyPlaintext,
-                )
+                databaseBackupService.importFrom(uri, passphrase)
             ) {
                 BackupImportOutcome.SuccessNeedsRestart -> Unit
                 BackupImportOutcome.InvalidPackage ->
@@ -110,15 +83,6 @@ internal class OnboardingRestoreActions(
                             error = OnboardingError.BACKUP_RESTORE_FAILED,
                         )
                     }
-                BackupImportOutcome.LegacyConfirmationRequired -> {
-                    pendingRestoreUri = uri
-                    uiState.update {
-                        it.copy(
-                            restoringBackup = false,
-                            awaitingLegacyRestoreConfirm = true,
-                        )
-                    }
-                }
                 BackupImportOutcome.AuthenticationFailed ->
                     uiState.update {
                         it.copy(

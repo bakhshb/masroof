@@ -197,10 +197,6 @@ class OnboardingViewModel(
 
     fun restoreBackup(uri: Uri) = restore.restoreBackup(uri)
 
-    fun confirmLegacyRestore() = restore.confirmLegacyRestore()
-
-    fun cancelLegacyRestore() = restore.cancelLegacyRestore()
-
     fun onPermissionResult(granted: Boolean) {
         _uiState.update {
             val nextStep = when (it.step) {

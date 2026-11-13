@@ -135,6 +135,7 @@ The app is still in development and personal use, so the owner restarted the num
 | R2 | Done. One store for corrections: `user_correction` dropped; `CORRECTION` rows of `user_decision` are the only record. |
 | R3 | Done. Bank selection read from `user_decision` only: the `user_selected_bank:` reason prefix goes. `review_item` keeps its resolution columns (they also hold automatic settlements and queue state). |
 | R4 | Private, no pull request: convert the owner's fresh export with the last build that reads it (tag `pre-v1-reset`), verify row by row, hand over a version 1 backup. Version 1 is frozen from that day; later changes are migrations. |
+| R1b | Done. Only the encrypted envelope is a backup: the bare ZIP import and `RetiredWorkCleanup` are deleted (rows 0.3 and 5.3 above describe the time before the restart). |
 | 7.4 | Done. Report an unparsed message: a share sheet in the review detail of an unread message, every digit masked (`UnparsedMessageReport`). |
 
 ## Order

@@ -133,11 +133,7 @@ class DatabaseBackupService(
             raw.use { stream ->
                 val peek = ByteArray(BackupEnvelope.HEADER_SIZE)
                 val read = readPrefix(stream, peek)
-                when {
-                    BackupPackageFormat.looksLikeZip(peek, read) -> BackupPackageKind.LEGACY_PLAINTEXT
-                    BackupEnvelope.looksLikeEnvelope(peek, read) -> BackupPackageKind.ENCRYPTED
-                    else -> BackupPackageKind.UNRECOGNIZED
-                }
+                if (BackupEnvelope.looksLikeEnvelope(peek, read)) BackupPackageKind.ENCRYPTED else BackupPackageKind.UNRECOGNIZED
             }
         }.getOrDefault(BackupPackageKind.UNRECOGNIZED)
     }
@@ -193,21 +189,17 @@ class DatabaseBackupService(
         }
     }
 
-    override suspend fun importFrom(
-        source: Uri,
-        passphrase: CharArray,
-        confirmLegacyPlaintext: Boolean,
-    ): BackupImportOutcome = try {
+    override suspend fun importFrom(source: Uri, passphrase: CharArray): BackupImportOutcome = try {
         withContext(Dispatchers.IO) {
             operationMutex.withLock {
-                databaseAccessGate.withRestore { importOnIo(source, passphrase, confirmLegacyPlaintext) }
+                databaseAccessGate.withRestore { importOnIo(source, passphrase) }
             }
         }
     } finally {
         passphrase.fill('\u0000')
     }
 
-    private fun importOnIo(source: Uri, passphrase: CharArray, confirmLegacyPlaintext: Boolean): BackupImportOutcome {
+    private fun importOnIo(source: Uri, passphrase: CharArray): BackupImportOutcome {
         val secret = passphrase.copyOf()
         passphrase.fill('\u0000')
         var staging: File? = null
@@ -220,7 +212,6 @@ class DatabaseBackupService(
                     BackupImportOutcome.Failed,
                     BackupFailureCategory.IMPORT_FAILED,
                 )
-            var legacyPlaintext = false
             BufferedInputStream(raw).use { buffered ->
                 buffered.mark(BackupEnvelope.PEEK_MARK)
                 val peek = ByteArray(BackupEnvelope.HEADER_SIZE)
@@ -254,19 +245,9 @@ class DatabaseBackupService(
                             plainZip.delete()
                         }
                     }
-                    else -> {
-                        // Plaintext ZIPs and unrecognized bytes share the archive validator.
-                        // A ZIP that passes validation still needs explicit legacy
-                        // confirmation before the live database is closed.
-                        legacyPlaintext = BackupPackageFormat.looksLikeZip(peek, read)
-                        val directory = createStagingDir("import")
-                        staging = directory
-                        extractValidated(buffered, directory)
-                    }
+                    // Only the encrypted envelope is a backup; nothing else is read further.
+                    else -> return loggedImport(BackupImportOutcome.InvalidPackage, BackupFailureCategory.INVALID_PACKAGE)
                 }
-            }
-            if (legacyPlaintext && !confirmLegacyPlaintext) {
-                return BackupImportOutcome.LegacyConfirmationRequired
             }
             val packageDir = staging ?: return loggedImport(
                 BackupImportOutcome.InvalidPackage,

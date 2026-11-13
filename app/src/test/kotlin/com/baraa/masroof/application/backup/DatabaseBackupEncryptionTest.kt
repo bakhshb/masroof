@@ -223,7 +223,7 @@ class DatabaseBackupEncryptionTest {
     }
 
     @Test
-    fun legacyZip_isRejectedUntilConfirmed_andCancelLeavesTheDatabase() {
+    fun bareZip_isRejected_andLeavesTheDatabase() {
         runBlocking {
             val live = openDatabase()
             try {
@@ -232,8 +232,9 @@ class DatabaseBackupEncryptionTest {
                 val before = digest(context.getDatabasePath(MasroofDatabase.NAME))
                 val closed = AtomicBoolean(false)
                 val importer = service(live, closeDatabase = { closed.set(true) })
-                val cancelled = importer.importFrom(Uri.fromFile(zip))
-                assertEquals(BackupImportOutcome.LegacyConfirmationRequired, cancelled)
+                assertEquals(BackupPackageKind.UNRECOGNIZED, importer.inspect(Uri.fromFile(zip)))
+                val rejected = importer.importFrom(Uri.fromFile(zip), CharArray(0))
+                assertEquals(BackupImportOutcome.InvalidPackage, rejected)
                 assertFalse(closed.get())
                 assertEquals(before, digest(context.getDatabasePath(MasroofDatabase.NAME)))
                 assertFalse(onboardingCompleted())
@@ -254,7 +255,7 @@ class DatabaseBackupEncryptionTest {
                         restartRequested.set(true)
                     },
                     appLogService = NoOpAppLog,
-                ).importFrom(Uri.fromFile(zip), confirmLegacyPlaintext = true)
+                ).importZip(zip)
                 assertEquals(BackupImportOutcome.SuccessNeedsRestart, confirmed)
                 assertTrue(restartRequested.get())
                 assertTrue(onboardingCompleted())
@@ -306,7 +307,7 @@ class DatabaseBackupEncryptionTest {
                     hostileZip(BackupPackageFormat.MANIFEST_ENTRY to ByteArray(64) { 7 }),
                 )
                 cases.forEach { zip ->
-                    val outcome = importer.importFrom(Uri.fromFile(zip), confirmLegacyPlaintext = true)
+                    val outcome = importer.importZip(zip)
                     assertEquals(BackupImportOutcome.InvalidPackage, outcome)
                     zip.delete()
                 }

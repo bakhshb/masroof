@@ -77,19 +77,6 @@ class SettingsImportConfirmTest {
     }
 
     @Test
-    fun cancelLegacyImport_doesNotImport() = runTest {
-        val backup = FakeDatabaseBackupGateway(kind = BackupPackageKind.LEGACY_PLAINTEXT)
-        val vm = viewModel(backup)
-        vm.offerImport(Uri.parse("content://backup/legacy.masroof"))
-        advanceUntilIdle()
-        assertTrue(vm.uiState.value.awaitingLegacyImportConfirm)
-        assertEquals(0, backup.importCalls)
-        vm.cancelPendingImport()
-        assertFalse(vm.uiState.value.awaitingLegacyImportConfirm)
-        assertEquals(0, backup.importCalls)
-    }
-
-    @Test
     fun export_afterProcessRecreation_failsClosedWithExplicitRetryMessage() = runTest {
         val backup = FakeDatabaseBackupGateway(kind = BackupPackageKind.ENCRYPTED)
         val old = viewModel(backup)

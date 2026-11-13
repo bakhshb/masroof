@@ -25,11 +25,7 @@ internal class FakeDatabaseBackupGateway(
 
     override suspend fun inspect(source: Uri): BackupPackageKind = kind
 
-    override suspend fun importFrom(
-        source: Uri,
-        passphrase: CharArray,
-        confirmLegacyPlaintext: Boolean,
-    ): BackupImportOutcome {
+    override suspend fun importFrom(source: Uri, passphrase: CharArray): BackupImportOutcome {
         importCalls++
         return outcome
     }

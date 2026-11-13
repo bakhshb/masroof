@@ -383,8 +383,6 @@ class ProductionPageRenderSmokeTest {
                 onOpenAppSettings = {},
                 onRequestRestoreBackup = {},
                 onRestorePassphraseChange = {},
-                onConfirmLegacyRestore = {},
-                onCancelLegacyRestore = {},
                 onClearBackupError = {},
                 onSelectDateOption = {},
                 onSelectCustomDate = {},

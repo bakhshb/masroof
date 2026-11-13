@@ -177,8 +177,6 @@
     <string name="settings_backup_passphrase_required">أدخل عبارة المرور أولا</string>
     <string name="settings_import_confirm_title">استيراد نسخة محفوظة؟</string>
     <string name="settings_import_confirm_body">سيتم استبدال كل البيانات الحالية في التطبيق. لا يمكن التراجع عن هذا الإجراء.</string>
-    <string name="settings_import_legacy_title">نسخة قديمة غير مشفرة</string>
-    <string name="settings_import_legacy_body">هذا الملف نسخة احتياطية أقدم وغير مشفرة. استيراده يستبدل قاعدة البيانات الحالية. لا حاجة لعبارة مرور. الإلغاء يترك البيانات كما هي.</string>
     <string name="settings_import_confirm_action">استيراد واستبدال</string>
     <string name="settings_export_success">تم تصدير النسخة بنجاح</string>
     <string name="settings_export_failed">تعذر تصدير البيانات</string>

@@ -226,5 +226,5 @@ class SettingsViewModel(
     fun verifyPendingImport() = backup.verifyPendingImport()
     fun confirmPendingImport() = backup.confirmPendingImport()
     fun exportBackup(uri: Uri) = backup.exportBackup(uri)
-    fun importBackup(uri: Uri, passphrase: CharArray = CharArray(0), confirmLegacyPlaintext: Boolean = false) = backup.importBackup(uri, passphrase, confirmLegacyPlaintext)
+    fun importBackup(uri: Uri, passphrase: CharArray) = backup.importBackup(uri, passphrase)
 }
