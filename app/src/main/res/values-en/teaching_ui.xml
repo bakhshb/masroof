@@ -30,6 +30,12 @@
     <string name="teaching_review_action">Teach Masroof this message</string>
     <string name="teaching_correct_type">Correct transaction type</string>
     <string name="teaching_correct_type_help">Choose the transaction type for this message and save. Masroof uses the available facts; this action does not create a new message pattern or guess missing amounts or accounts.</string>
+    <string name="review_report_action">Share this message to get it supported</string>
+    <string name="review_report_title">A message Masroof could not read</string>
+    <string name="review_report_preview">Text that will be shared</string>
+    <string name="review_report_help">Every digit in the message is hidden with #, so no amount, account or card number appears. Masroof sends nothing itself; you choose where to share the text.</string>
+    <string name="review_report_unknown_bank">Unknown</string>
+    <string name="review_report_text">A message Masroof could not read\nSender: %1$s\nBank: %2$s\nApp version: %3$s\n\n%4$s</string>
     <string name="teaching_review_why">Why does this need review?</string>
     <string name="teaching_not_financial">Not a financial transaction</string>
     <string name="teaching_apply_current">Apply to this message</string>
