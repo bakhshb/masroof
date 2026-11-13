@@ -1,7 +1,7 @@
 # Masroof agent notes
 
 Android app that turns Saudi bank SMS into a private ledger and dashboard. Arabic first (RTL), English second.
-Reference: `docs/ARCHITECTURE.md` (modules), `docs/ANALYTICS.md` (analysis), `docs/DESIGN_SYSTEM.md` (UI tokens and components), `docs/SUSTAINABILITY_PLAN.md` (approved refactor plan, piece by piece).
+Reference: `docs/ARCHITECTURE.md` (modules), `docs/ANALYTICS.md` (analysis), `docs/DESIGN_SYSTEM.md` (UI tokens and components).
 This file wins when older records disagree.
 
 ## Priorities
@@ -15,7 +15,7 @@ When rules pull against each other, the earlier one wins:
 Design serves the feature. A design rule never blocks a correctness fix, delays a feature or justifies rework of a screen that works; if one gets in the way, ship the fix and report the conflict.
 
 ## Workflow
-The orchestrator owns the project (owner, 2026-11-13): it reads the code, decides the design and builds the change itself by default. Run this for each change (a plan piece, a feature, a fix):
+The orchestrator owns the project (owner, 2026-11-13): it reads the code, decides the design and builds the change itself by default. Run this for each change (a feature, a fix):
 1. Plan: what changes and the tests that prove it is done. Any change to numbers or behavior the owner sees is asked before implementing, and so is any schema or backup-format change. For a new screen, describe its layout in the plan using existing components; make a design mock-up only when the owner asks for one.
 2. Implement with its tests, and run them.
 3. Simplify the code and its tests once, and rerun the tests.
@@ -31,12 +31,9 @@ Agents are used only where splitting the work really helps, and their cost count
 - Reviewer (`.claude/agents/reviewer.md`, Opus): an independent review of a high-risk change only (money, schema, backup and restore, concurrency). The orchestrator reviews everything else itself.
 - A read-only search agent: a broad read where only the conclusion is needed.
 
-The agent definitions describe the role, not a particular plan; the task brief names the plan row or criteria.
+The agent definitions describe the role; the task brief names the criteria.
 
-### Work under `docs/SUSTAINABILITY_PLAN.md`
-- One pull request per plan piece, one piece at a time. The plan's Model column is guidance for an implementer agent, when one is used.
-- Owner gates (marked Gate) stop and ask before implementing. The derived ledger replaces the old reconciliation path only after the owner approves every difference in the shadow comparison.
-- No remote pattern download. Wiring stays manual; no DI library unless the owner asks.
+No remote pattern download. Wiring stays manual; no DI library unless the owner asks.
 
 ## Never break
 - Database `masroof.db` (module `data`, schema exported to `data/schemas`; `app` applies no Room/KSP) is schema version 1, as are `learning.db` and `analytics.db`, and the backup format (owner, 2026-11-13: the app is still in development and personal use, so the numbering restarted, the upgrade path from the earlier v18/v22 was deleted and the owner's data was converted once outside the app). Version 1 is frozen since the owner's converted file was handed over (2026-11-13): the schema changes only through additive, tested Room migrations (1→2, ...): a migration test from the committed version 1 fixture, a device upgrade test, and version 1 backup archives still import (a backup of an earlier known version migrates on its staged copy before it replaces the live file). Any other version or identity hash, in a file or a backup, is rejected untouched (`MasroofDatabase.IDENTITY_HASH`, `BackupSchema`). Never a destructive fallback. A schema change needs an explicit design and device verification; no backfill without owner approval.
@@ -54,7 +51,7 @@ The agent definitions describe the role, not a particular plan; the task brief n
 - `application` constructors take every service, repository, workflow and scheduler non-null; no `X? = null` collaborator. Tests pass a `NoOp*`/`Empty*` double from `testsupport/` (`NoOptionalCollaboratorsTest` lists the few exceptions; add none).
 - `data` (Android library: Room, DAOs, `Room*Repository`, preference stores and the ports they implement) depends on `finance-core` and `ml-assist` only, never on `app`. Add a table, DAO or repository there, not in `app`.
 - `bank-engine` may import only `finance.value` contracts. Pure modules use `engine.bank`, `finance.value`, `ml`, `analytics`, `ledger`, `application.dashboard` (`dashboard-core`); app integration tests live under `integration`.
-- `ledger` (depends only on `finance-core`) holds `LedgerProjector`, the pure derived ledger. Since plan 3.3a it is the reconciliation writer: `TransactionReconciliationService` loads the scope (`LedgerInputLoader`), projects it and writes only the differences in one database transaction (`LedgerProjectionWriter`); there is no other reconciliation path. Its keep rule (owner, 2026-11-12) carries a decided stored row, or one it no longer derives, verbatim; "Rules of the derived ledger" and "Ledger writer" in `docs/ARCHITECTURE.md` list its rules, never changed silently in the projector.
+- `ledger` (depends only on `finance-core`) holds `LedgerProjector`, the pure derived ledger. It is the reconciliation writer: `TransactionReconciliationService` loads the scope (`LedgerInputLoader`), projects it and writes only the differences in one database transaction (`LedgerProjectionWriter`); there is no other reconciliation path. Its keep rule (owner, 2026-11-12) carries a decided stored row, or one it no longer derives, verbatim; "Rules of the derived ledger" and "Ledger writer" in `docs/ARCHITECTURE.md` list its rules, never changed silently in the projector.
 
 ## SMS pipeline
 - Live: `IncomingSmsReceiver` → `LiveSmsIntake` → `CaptureBankSmsUseCase` (durable `RawSms`) → `LiveSmsWorkScheduler` → `LiveSmsProcessingWorker` → `ProcessStoredSmsUseCase`. Work input is the rawSmsId only.
@@ -87,10 +84,10 @@ The agent definitions describe the role, not a particular plan; the task brief n
 - Recovery is one fact: `processing_retry` lists the raw SMS ids still to project. A unit that failed was not written; units the same pass did write stay, and rerunning the pass for an id is safe (idempotent), so recovery only reruns it. `ProcessingRecovery` records failures (`markExhausted`: `LIVE` row plus error review; `retryLater`: one `HISTORICAL_BATCH` set, then enqueues the one `HistoricalDerivedRecoveryWorker`, which startup also enqueues); parse paths write `HISTORICAL_BATCH` in their parse transaction. The stored `mode` says who reruns the pass (`LIVE`: per-message worker, `HISTORICAL_BATCH`: the one batch pass) and stays as stored.
 - Historical batch with failures stays `Incomplete`, writes one atomic `HISTORICAL_BATCH` set and clears it only after a later pass with `failed == 0` and a successful review update.
 - Every explicit user decision is also appended to `user_decision` (append-only, never updated or deleted) in the same database transaction as its existing write.
-- Recurring-payment answers are `RECURRING` rows of `user_decision` (plan 5.2) through `RecurringAnswerStore` only: keyed by series (`subjectKey`, no `rawSmsId`), the latest row of a series is its answer, an undo appends `UNDONE`, a promotion appends `CONFIRMED`. Every other row names a raw SMS (`UserDecisionDao.insert` enforces both), and no SMS decision read sees a `RECURRING` row.
+- Recurring-payment answers are `RECURRING` rows of `user_decision` through `RecurringAnswerStore` only: keyed by series (`subjectKey`, no `rawSmsId`), the latest row of a series is its answer, an undo appends `UNDONE`, a promotion appends `CONFIRMED`. Every other row names a raw SMS (`UserDecisionDao.insert` enforces both), and no SMS decision read sees a `RECURRING` row.
 - Processing reads user decisions only from `user_decision` (`UserDecisionRepository.effectiveFor`). A correction is only its `CORRECTION` row there (no `user_correction` table since the restart at version 1). A bank choice is only its `BANK_SELECTION` row. `review_item` is still written with each outcome decision; only the files `DecisionReadBoundaryTest` names may read them (writers, stores, screens and the reads kept in `docs/ARCHITECTURE.md`, "Reading decisions").
 - Correction, restore and ownership changes keep the manual decision and record durable retries. A restore that wrote `USER_FINANCIAL_TYPE` stays financial on failure (never rewritten to `USER_NON_FINANCIAL`). Full `refreshReviewQueue` with failures throws and records the ids.
-- Startup waits for the financial store to open (`StartupMaintenance`) and fails closed; it runs no reconciliation pass, also not after a restore (plan 3.3c). Double-posted legacy legs are released by `LedgerProjector` in the next pass that reaches them. Background work is idempotent, keeps failed rows retryable and emits `MaintenanceCompletionSignal`.
+- Startup waits for the financial store to open (`StartupMaintenance`) and fails closed; it runs no reconciliation pass, also not after a restore. Double-posted legacy legs are released by `LedgerProjector` in the next pass that reaches them. Background work is idempotent, keeps failed rows retryable and emits `MaintenanceCompletionSignal`.
 
 ## Dashboard and analysis
 - Money totals live in `application/dashboard/*Builder|*Calculator` (module `dashboard-core`, pure JVM; its repository-reading classes stay in `app`) and `AnalysisPresentationBuilder`; Compose only displays. No summing, Mada/credit classification or aggregation in Composables.

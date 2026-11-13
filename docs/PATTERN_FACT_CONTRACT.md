@@ -3,8 +3,7 @@
 Configured banks now use the existing live and historical processing paths.
 Teaching and the STC bundle still create preview-only patterns: financial use needs
 separate explicit approval. AlJazira now uses the same configured adapter and store,
-with preapproved role definitions preserving its existing behavior. See
-[the cutover record](ALJAZIRA_SHARED_PATTERNS.md).
+with preapproved role definitions preserving its existing behavior.
 
 ## Definition and conversion
 
