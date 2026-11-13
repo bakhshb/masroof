@@ -96,6 +96,22 @@ class CommitmentFromTransactionServiceTest {
         )
     }
 
+    @Test
+    fun createFromTransaction_aRegularTransferAndABillKnownOnlyByItsBillerBecomeCommitments() = runBlocking {
+        val rent = tx(id = "tx-rent", type = FinancialTransactionType.EXTERNAL_TRANSFER_OUT, amount = "2500.00", counterparty = "Landlord")
+        val bill = tx(id = "tx-bill", type = FinancialTransactionType.BILL_PAYMENT, amount = "175.00")
+        val repository = ThrowOnDuplicateCommitmentRepository()
+        val service = CommitmentFromTransactionService(repository, FakeFinancialTransactionRepository(listOf(rent, bill)), zone, clock)
+
+        assertEquals(CommitmentCreationResult.Success, service.createFromTransaction(rent.id))
+        // Without a name the bill stays rejected; the suggestion passes the biller it was grouped by.
+        assertEquals(CommitmentCreationResult.Rejected("invalid_transaction"), service.createFromTransaction(bill.id))
+        assertEquals(CommitmentCreationResult.Success, service.createFromTransaction(bill.id, fallbackName = " Water Co "))
+        assertEquals(listOf("Landlord", "Water Co"), repository.created.map { it.name })
+        // An incoming transfer is never a commitment.
+        assertEquals(false, CommitmentFromTransactionService.canMarkAsCommitment(FinancialTransactionType.EXTERNAL_TRANSFER_IN))
+    }
+
     private class ThrowOnDuplicateCommitmentRepository : CommitmentRepository {
         private val bySource = mutableMapOf<String, Commitment>()
         val created: List<Commitment> get() = bySource.values.toList()

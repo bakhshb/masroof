@@ -63,6 +63,20 @@ class ForecastLifecycleTest {
                 day=day.plusDays(1)
             }
         }
+        // An open gap makes the analysis schedule an inbox re-read from the gap's first day; let the attempt end, so
+        // its import gate cannot skip the next refresh.
+        suspend fun awaitGapRescan(gap: LocalDate) {
+            val name=com.baraa.masroof.application.sms.LiveCaptureRecoveryWorker.uniqueWorkName(gap.atStartOfDay(zone).toInstant())
+            kotlinx.coroutines.withTimeout(30_000) {
+                while(true) {
+                    val infos=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        androidx.work.WorkManager.getInstance(context).getWorkInfosForUniqueWork(name).get() }
+                    // Without a real inbox the attempt may end in a retry; either way it is no longer running.
+                    if(infos.isNotEmpty() && infos.all { it.state.isFinished || (it.state == androidx.work.WorkInfo.State.ENQUEUED && it.runAttemptCount > 0) }) break
+                    kotlinx.coroutines.delay(20)
+                }
+            }
+        }
         try {
             c.storage.onboardingPreferencesRepository.setOnboardingStarted(true)
             c.storage.onboardingPreferencesRepository.setOnboardingCompleted(true)
@@ -83,6 +97,7 @@ class ForecastLifecycleTest {
                 sidecar.analytics().preferences(prefs.copy(gapDays=missing.toEpochDay().toString()))
                 workflow.refresh()
                 assertTrue(sidecar.analytics().comparisons().isEmpty())
+                awaitGapRescan(missing)
                 origin=origin.plusDays(1)
                 clock.day=origin
                 seed(origin,origin)
@@ -114,6 +129,7 @@ class ForecastLifecycleTest {
             sidecar.analytics().preferences(prefs.copy(gapDays=gap.toEpochDay().toString()))
             workflow.refresh()
             assertEquals("COVERAGE_GAPS",workflow.state.value.snapshot!!.modelReason)
+            awaitGapRescan(gap)
             AnalysisCoverageStore.recordScan(context,gap.atStartOfDay(zone).toInstant(),clock.instant(),zone)
             workflow.refresh()
             assertEquals(com.baraa.masroof.analytics.AnalyticsVersion.MODEL,workflow.state.value.snapshot!!.method)
@@ -135,6 +151,26 @@ class ForecastLifecycleTest {
             assertEquals(original.personalTotal,corrected.personalTotal)
             assertEquals(original.baselineTotal,corrected.baselineTotal)
             c.storage.database.openHelper.readableDatabase.query("PRAGMA user_version").use { it.moveToFirst();assertEquals(com.baraa.masroof.data.room.MasroofDatabase.VERSION,it.getInt(0)) }
+            val beforeRent=workflow.state.value.snapshot!!
+            // A regular transfer (rent) is a recurring payment like a card subscription.
+            c.storage.database.withTransaction { for(month in 3L downTo 1L) c.storage.database.financialTransactionDao().insertTransactionIfAbsent(
+                FinancialTransactionEntity("rent:$month","EXTERNAL_TRANSFER_OUT","2500.00","SAR",
+                    clock.day.minusMonths(month).atTime(9,0).atZone(zone).toInstant().toEpochMilli(),"account:BANK_ALJAZIRA:9999",null,null,"Landlord",null)) }
+            workflow.refresh()
+            assertEquals(listOf("Landlord" to "MONTHLY"),workflow.state.value.snapshot!!.candidates.map { it.name to it.cadence })
+            // Transfers are actual spending only: the estimate neither learns from them nor predicts them...
+            assertNotNull(beforeRent.remaining)
+            assertEquals(beforeRent.remaining,workflow.state.value.snapshot!!.remaining)
+            // ...until one is a registered commitment still due in this period, which is known and added whole.
+            assertEquals(com.baraa.masroof.application.commitment.CommitmentCreationResult.Success,
+                c.dashboard.dashboardCommitmentsWorkflow.createFromTransaction("rent:1"))
+            workflow.refresh()
+            val withRent=workflow.state.value.snapshot!!
+            // Exactly the unpaid dues the commitments list shows for this period (a 31-day period can hold two).
+            val rentDue=withRent.dues.filter { it.name=="Landlord" && it.confirmed }.sumOf { it.amount }
+            assertTrue(rentDue>=250000)
+            assertEquals(beforeRent.remaining!!+rentDue,withRent.remaining)
+            assertEquals(beforeRent.total!!+rentDue,withRent.total)
         } finally { workflow.close();sidecar.close();c.close();androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase();context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
     }
 }

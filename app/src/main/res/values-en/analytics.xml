@@ -15,7 +15,7 @@
     <string name="lab_analysis_quality_warning">Data quality needs review; forecast alerts are paused</string>
     <string name="lab_analysis_initial">Initial estimate</string>
     <string name="lab_analysis_ready">Forecast ready</string>
-    <string name="lab_analysis_forecast_hint">Uses your past purchase patterns and the remaining salary-period days. The total combines actual purchases so far with estimated remaining purchases; future refunds are not assumed.</string>
+    <string name="lab_analysis_forecast_hint">Uses your past purchase patterns and the remaining salary-period days. The total combines everything spent so far with the estimated remaining purchases and cash, plus registered commitments paid by transfer that are still due. Other future transfers and refunds are not assumed.</string>
     <string name="lab_analysis_updated">Last result: %1$s</string>
     <string name="lab_analysis_back">Back</string>
     <string name="lab_analysis_settings">Purchase limit and alerts</string>

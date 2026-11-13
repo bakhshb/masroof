@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.commitment
 
+import com.baraa.masroof.application.dashboard.CommitmentPaymentIdentity
 import com.baraa.masroof.domain.ids.RegistryEntityIdFactory
 import com.baraa.masroof.domain.model.Commitment
 import com.baraa.masroof.domain.model.CommitmentRecurrence
@@ -28,14 +29,15 @@ class CommitmentFromTransactionService(
     private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val clock: Clock = Clock.systemDefaultZone(),
 ) {
-    suspend fun createFromTransaction(transactionId: String): CommitmentCreationResult {
+    /** [fallbackName] names a payment that carries neither merchant nor counterparty (a bill known by its biller). */
+    suspend fun createFromTransaction(transactionId: String, fallbackName: String? = null): CommitmentCreationResult {
         if (commitmentRepository.getBySourceTransactionId(transactionId) != null) {
             return CommitmentCreationResult.AlreadyExists
         }
         val transaction = financialTransactionRepository.getById(transactionId)
             ?: return CommitmentCreationResult.Rejected("transaction_not_found")
 
-        val draft = buildDraft(transaction) ?: return CommitmentCreationResult.Rejected("invalid_transaction")
+        val draft = buildDraft(transaction, fallbackName) ?: return CommitmentCreationResult.Rejected("invalid_transaction")
         val now = clock.instant()
         try {
             commitmentRepository.create(
@@ -65,18 +67,16 @@ class CommitmentFromTransactionService(
     }
 
     companion object {
-        fun canMarkAsCommitment(type: FinancialTransactionType): Boolean =
-            type == FinancialTransactionType.EXPENSE ||
-                type == FinancialTransactionType.FEE ||
-                type == FinancialTransactionType.BILL_PAYMENT
+        fun canMarkAsCommitment(type: FinancialTransactionType): Boolean = CommitmentPaymentIdentity.supports(type)
     }
 
-    private fun buildDraft(transaction: FinancialTransaction): CommitmentDraft? {
+    private fun buildDraft(transaction: FinancialTransaction, fallbackName: String?): CommitmentDraft? {
         if (!canMarkAsCommitment(transaction.type)) {
             return null
         }
         val name = transaction.merchant?.trim()?.takeIf { it.isNotEmpty() }
             ?: transaction.counterparty?.trim()?.takeIf { it.isNotEmpty() }
+            ?: fallbackName?.trim()?.takeIf { it.isNotEmpty() }
             ?: return null
         if (transaction.amount.amount.signum() <= 0) return null
         val transactionDate = transaction.occurredAt.atZone(zoneId).toLocalDate()

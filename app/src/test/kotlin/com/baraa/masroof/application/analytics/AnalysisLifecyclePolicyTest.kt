@@ -25,6 +25,18 @@ class AnalysisLifecyclePolicyTest {
         assertNull(AnalysisCoveragePolicy.recover(listOf(processing),setOf(10),200).first().repairedAt)
         assertEquals(setOf(11L),AnalysisCoveragePolicy.gapDays(AnalysisCoveragePolicy.recover(listOf(processing,legacy),emptySet(),200)))
     }
+    @Test fun anOpenPermissionGapAsksForAnInboxRereadFromItsFirstDayOnceThatDayIsOver() {
+        val gap = AnalysisCoverageRow("gap",10,12,"PERMISSION",100)
+        assertEquals(10L,AnalysisCoveragePolicy.rescanFrom(listOf(gap),13))
+        assertEquals(8L,AnalysisCoveragePolicy.rescanFrom(listOf(gap,gap.copy(id="old",fromDay=8,throughDay=8,reason="LEGACY")),13))
+        // Today cannot be certified yet, a repaired gap needs nothing, and a processing gap closes with its retry.
+        assertNull(AnalysisCoveragePolicy.rescanFrom(listOf(gap.copy(fromDay=13,throughDay=13)),13))
+        assertNull(AnalysisCoveragePolicy.rescanFrom(listOf(gap.copy(repairedAt=200),gap.copy(id="p",reason="PROCESSING"),
+            AnalysisCoverageRow("scan",10,12,"SCAN_RECEIPT",150,150),AnalysisCoverageRow("last-check",12,12,"CHECKPOINT",150)),13))
+        // The re-read's receipt is what closes it.
+        val scan = AnalysisCoverageRow("scan",10,12,"SCAN_RECEIPT",150,150)
+        assertNull(AnalysisCoveragePolicy.rescanFrom(AnalysisCoveragePolicy.recover(listOf(gap,scan),emptySet(),200),13))
+    }
     private fun comparison(period: Long, personal: Long=150, baseline: Long=110, actual: Long?=100) =
         ForecastComparisonRow("$period",period,period+30,period+7,"a".repeat(64),AnalyticsVersion.MODEL,
             ForecastPerformancePolicy.VERSION,personal,baseline,actual,if(actual!=null) "b".repeat(64) else null,if(actual!=null) period+30 else null,originDay=period+7)
