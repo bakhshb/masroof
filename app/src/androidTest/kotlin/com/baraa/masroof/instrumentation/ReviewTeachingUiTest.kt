@@ -70,6 +70,12 @@ class ReviewTeachingUiTest {
         compose.onNodeWithTag("review-correct-type").performScrollTo().performClick()
         compose.onNodeWithTag("sheet-apply").assertIsNotEnabled()
         compose.onNodeWithTag("sheet-cancel").performClick()
+        // Plan 7.4: the report preview is the text that is shared, with every digit masked.
+        compose.onNodeWithTag("review-report").performScrollTo().performClick()
+        compose.onNodeWithTag("review-report-preview").assertTextContains("Amount:##SAR", substring = true)
+        compose.onNodeWithTag("review-report-preview").assertTextContains("Sender: TEST BANK", substring = true)
+        compose.onNodeWithTag("sheet-cancel").performClick()
+        compose.onNodeWithTag("review-report-preview").assertDoesNotExist()
         compose.onNodeWithTag("review-why").performScrollTo().performClick()
         compose.onNodeWithText("Unsupported bank message format").assertExists()
     }

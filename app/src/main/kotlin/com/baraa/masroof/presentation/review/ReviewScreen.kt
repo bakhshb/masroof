@@ -357,6 +357,7 @@ internal fun ReviewDetailScreen(
 ) {
     var showTypeSheet by androidx.compose.runtime.remember(detail.id) { androidx.compose.runtime.mutableStateOf(false) }
     var showWhy by androidx.compose.runtime.remember(detail.id) { androidx.compose.runtime.mutableStateOf(false) }
+    var showReport by androidx.compose.runtime.remember(detail.id) { androidx.compose.runtime.mutableStateOf(false) }
     val unfamiliar = !detail.showRestoreActions && detail.messageFamily in listOf(null, MessageFamily.UNKNOWN) &&
         detail.reasonLabels.any { it in setOf("unknown_message_family", "unsupported_bank_message_format", "parse_review_required", "parse_partial") }
     if (showTypeSheet) {
@@ -364,6 +365,7 @@ internal fun ReviewDetailScreen(
         ReviewTypeSheet(resolving, { if (!resolving) showTypeSheet = false }, onResolveType,
             error = if (error == ReviewError.ACTION_FAILED) stringResource(reasonLabel ?: R.string.review_action_failed) else null)
     }
+    if (showReport) ReviewReportSheet(detail) { showReport = false }
     MasroofSecondaryScaffold(
         title = stringResource(R.string.review_detail_title),
         onBack = onBack,
@@ -459,6 +461,12 @@ internal fun ReviewDetailScreen(
                     onClick = onTeachPattern, enabled = !resolving,
                     modifier = Modifier.fillMaxWidth().testTag("review-teach-pattern"),
                 ) { Text(stringResource(R.string.teaching_review_action)) }
+            }
+            if (unfamiliar && detail.body.isNotBlank()) {
+                com.baraa.masroof.presentation.common.MasroofTextButton(
+                    onClick = { showReport = true }, enabled = !resolving,
+                    modifier = Modifier.fillMaxWidth().testTag("review-report"),
+                ) { Text(stringResource(R.string.review_report_action)) }
             }
             if (detail.bankChoices.isNotEmpty()) {
                 MasroofSectionHeader(
