@@ -3,7 +3,7 @@ package com.baraa.masroof.data.room
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
- * Test support: fills `user_decision` from review resolutions and bank selections a test wrote straight
+ * Test support: fills `user_decision` from review resolutions a test wrote straight
  * into `review_item`, the way production writers append a decision with each of them. Plain
  * SQL; it only inserts into `user_decision`. Rows already in the table are re-appended after the filled ones in their
  * own order, and a trace an existing row already records is skipped.
@@ -75,32 +75,12 @@ object UserDecisionBackfill {
                 SELECT 1 FROM user_decision s WHERE s.sequence <= ?1 AND s.kind IN ($OUTCOME_KINDS)
                     AND (s.rawSmsId IN (d.rawSmsId, d.pairedRawSmsId) OR s.pairedRawSmsId IN (d.rawSmsId, d.pairedRawSmsId))
             )
-        ),
-        selected AS (
-            SELECT id, rawSmsId, updatedAtEpochMillis, rest,
-                CASE WHEN instr(rest, char(30)) > 0 THEN substr(rest, 1, instr(rest, char(30)) - 1) ELSE rest END AS bankId
-            FROM (
-                SELECT id, rawSmsId, updatedAtEpochMillis,
-                    substr(reasons, instr(char(30) || reasons, char(30) || 'user_selected_bank:') + 19) AS rest
-                FROM review_item
-                WHERE instr(char(30) || reasons, char(30) || 'user_selected_bank:') > 0
-            )
-        ),
-        selection AS (
-            SELECT rawSmsId, NULL AS pairedRawSmsId, 'BANK_SELECTION' AS kind, updatedAtEpochMillis AS decidedAt,
-                id AS legacyId, 0 AS rank, NULL AS messageFamily, NULL AS amountDecimal, NULL AS amountCurrency,
-                NULL AS merchant, NULL AS counterparty, bankId
-            FROM selected
-            -- Exactly one non-blank selection, as ExplicitBankSelection.selectedBankId reads it.
-            WHERE instr(rest, char(30) || 'user_selected_bank:') = 0 AND trim(bankId) <> ''
-                AND NOT EXISTS (SELECT 1 FROM user_decision s WHERE s.sequence <= ?1 AND s.kind = 'BANK_SELECTION' AND s.rawSmsId = selected.rawSmsId)
         )
         SELECT d.rawSmsId, d.pairedRawSmsId, d.kind, d.decidedAt, f.type, f.sourceContainerId, f.destinationContainerId,
             f.occurredAtEpochMillis, f.occurredAtZone, d.messageFamily, d.amountDecimal, d.amountCurrency,
             d.merchant, d.counterparty, d.bankId
         FROM (
             SELECT * FROM outcome
-            UNION ALL SELECT * FROM selection
         ) d
         -- Posting kinds carry the row the SMS is linked to now; with none, the columns stay null.
         LEFT JOIN financial_transaction_raw_sms_link l

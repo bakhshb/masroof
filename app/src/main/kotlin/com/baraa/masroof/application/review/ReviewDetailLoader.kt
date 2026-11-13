@@ -15,6 +15,7 @@ class ReviewDetailLoader(
     private val reviewWorkflowService: ReviewWorkflowService,
     private val rawSmsRepository: RawSmsRepository,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider,
+    private val userDecisionRepository: com.baraa.masroof.domain.repository.UserDecisionRepository,
     private val provenance: suspend (String) -> com.baraa.masroof.application.interpretation.InterpretationProvenance?,
 ) {
     data class ReviewSummary(
@@ -40,6 +41,8 @@ class ReviewDetailLoader(
         val cardRef: CardReference?,
         val provenance: com.baraa.masroof.application.interpretation.InterpretationProvenance? = null,
         val bankId: String? = null,
+        /** The user chose [bankId] for this message (its latest `BANK_SELECTION`). */
+        val bankSelectedByUser: Boolean = false,
     )
 
     /**
@@ -98,6 +101,7 @@ class ReviewDetailLoader(
         val raw = rawSmsRepository.getById(review.rawSmsId)
         val effective = effectiveParsedEventProvider.findEffectiveByRawSmsId(review.rawSmsId)
         val event = effective?.event
+        val selectedBankId = userDecisionRepository.effectiveFor(review.rawSmsId).selectedBankId
         return ReviewDetail(
             review = review,
             sender = raw?.sender,
@@ -109,8 +113,8 @@ class ReviewDetailLoader(
             counterparty = event?.counterparty,
             cardRef = event?.cardRef,
             provenance = provenance(review.rawSmsId),
-            bankId = (com.baraa.masroof.domain.model.ExplicitBankSelection.selectedBankId(review.reasons)
-                ?: event?.bank?.id)?.takeUnless { it == com.baraa.masroof.domain.model.Bank.UNKNOWN.id },
+            bankSelectedByUser = selectedBankId != null,
+            bankId = (selectedBankId ?: event?.bank?.id)?.takeUnless { it == com.baraa.masroof.domain.model.Bank.UNKNOWN.id },
         )
     }
 }

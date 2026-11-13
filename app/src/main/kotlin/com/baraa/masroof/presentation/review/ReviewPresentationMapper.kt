@@ -117,7 +117,7 @@ internal class ReviewPresentationMapper(
             amountLabel = detail.amount?.let { MoneyUiFormatter.format(it, languageTag) },
             merchant = detail.merchant,
             counterparty = detail.counterparty,
-            reasonLabels = review.reasons,
+            reasonLabels = review.reasons + listOfNotNull(ReviewReasonLabels.USER_SELECTED_BANK.takeIf { detail.bankSelectedByUser }),
             pairCandidates = pairCandidates,
             showExternalTransferAction = !ignored && (isTransferOut || isTransferIn) &&
                 (pendingMatch || review.kind == ReviewKind.NEEDS_REVIEW),

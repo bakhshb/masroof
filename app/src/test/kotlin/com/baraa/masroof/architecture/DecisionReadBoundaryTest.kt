@@ -7,7 +7,7 @@ import org.junit.Test
 
 /**
  * Processing reads user decisions from `user_decision` only (plan 2.3). The legacy stores, review resolutions
- * (`resolutionKind`, [LEGACY_TOKENS]) and the `user_selected_bank:` reason prefix, are still
+ * (`resolutionKind`, [LEGACY_TOKENS]), are still
  * written in the same transaction as each decision, so only the files in [ALLOWED] may name them: their writers,
  * the stores and mappers themselves, screens that display a review, and the decision
  * reads kept on purpose (docs/ARCHITECTURE.md, "Reading decisions"). The allowlist is per file: an allowed file may name
@@ -33,16 +33,11 @@ class DecisionReadBoundaryTest {
     fun rule_flagsEachLegacyReadOutsideTheAllowedFiles() {
         val samples = listOf(
             "application/Sample1.kt" to "if (review.resolutionKind == null) post()",
-            "application/Sample2.kt" to "ExplicitBankSelection.selectedBankId(review.reasons)",
-            "application/Sample5.kt" to "reasons.any { it.startsWith(\"user_selected_bank:\") }",
             "application/Sample6.kt" to "kind == ReviewResolutionKind.USER_NON_FINANCIAL",
-            "application/Sample7.kt" to "review.reasons.any(ExplicitBankSelection::isSelection)",
-            "application/Sample8.kt" to "reasons.filter { ExplicitBankSelection.isSelection(it) }",
-            "application/Sample9.kt" to "it.removePrefix(ExplicitBankSelection.REASON_PREFIX)",
             "application/Sample10.kt" to "val bank = decisions.effectiveFor(id).selectedBankId",
             ALLOWED.keys.first() to "review.resolutionKind",
         )
-        assertEquals(samples.take(7).map { it.first }, violations(samples))
+        assertEquals(samples.take(2).map { it.first }, violations(samples))
     }
 
     private fun violations(files: List<Pair<String, String>>): List<String> =
@@ -59,10 +54,6 @@ class DecisionReadBoundaryTest {
         val LEGACY_TOKENS = listOf(
             Regex("""\bresolutionKind\b"""),
             Regex("""\bReviewResolutionKind\b"""),
-            Regex("""ExplicitBankSelection\.selectedBankId\b"""),
-            Regex("""ExplicitBankSelection(\.|::)isSelection\b"""),
-            Regex("""\bREASON_PREFIX\b"""),
-            Regex("""user_selected_bank"""),
         )
 
         private const val WRITER = "writes a decision's legacy trace in the same transaction as its user_decision row"
@@ -78,7 +69,6 @@ class DecisionReadBoundaryTest {
             "data/repository/RoomTransactionReclassificationRepository.kt" to WRITER,
             "domain/model/ReviewResolutionKind.kt" to STORE,
             "domain/model/ReviewItem.kt" to STORE,
-            "domain/model/ExplicitBankSelection.kt" to STORE,
             "domain/repository/ReviewRepository.kt" to STORE,
             "domain/repository/ManualReviewResolutionRepository.kt" to STORE,
             "data/repository/RoomReviewRepository.kt" to STORE,
@@ -86,8 +76,6 @@ class DecisionReadBoundaryTest {
             "data/room/entity/ReviewItemEntity.kt" to STORE,
             "data/room/mapper/ReviewItemMapper.kt" to STORE,
             "presentation/review/ReviewPresentationMapper.kt" to DISPLAY,
-            "presentation/review/ReviewReasonLabels.kt" to DISPLAY,
-            "application/review/ReviewDetailLoader.kt" to DISPLAY,
             "application/interpretation/InterpretationProvenanceWorkflow.kt" to "$DISPLAY (the provenance badge)",
             // Kept reads: the store is not an equivalent source for these yet (docs/ARCHITECTURE.md).
             "application/review/ReviewCorrectionClosure.kt" to

@@ -93,7 +93,7 @@ object LedgerShadowComparison {
         }.sortedBy { it.rawSmsIds.firstOrNull() ?: it.oldRows.first().transaction.id }
         val storedReviews = inputs.reviews.associateBy { it.rawSmsId }
         val newReviews = projection.reviewCandidates.associate { it.rawSmsId to it.kind }
-        // The store never reopens a RESOLVED review (`ReviewItemDao.upsertRequiredMerged`), so a candidate on one
+        // The store never reopens a RESOLVED review (`ReviewItemDao.upsertRequired`), so a candidate on one
         // is compared as the store applies it: no open review. Those are counted, not reported as differences.
         val resolvedNotReopened = evidence.keys.count { storedReviews[it]?.status == ReviewStatus.RESOLVED && it in newReviews }
         val reviews = evidence.keys.sorted().mapNotNull { rawSmsId ->
