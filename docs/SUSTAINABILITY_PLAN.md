@@ -116,8 +116,19 @@ Shared acceptance criteria, for every piece:
 | 7.2 | **Lint.** Enable detekt default rule sets step by step; burn down the 74-entry baseline. Done 2026-11-13: the bug-finding sets are on (potential-bugs, coroutines, performance, empty-blocks, exceptions); formatting, naming and style stay off (about 40,000 findings, none a defect). Size rules skip tests and Compose functions (reasons in `detekt.yml`). 19 long production methods and classes in backup, review resolution, interpreters and dashboard builders remain in the baseline, waiting for the owner. | Sonnet | Baseline empty, or only Compose screens with a stated reason. |
 | 7.3 | **Device tests where the device matters.** Keep SMS receipt, process death, upgrade, backup/restore on the emulator; move the rest to JVM. Update `ci/device-suites.json`, `ci/device-durations.json`, `docs/CI.md`. Done 2026-11-13: three logic journeys moved to JVM (commitment period, forecast lifecycle, financial parity) and two device tests with a full JVM twin removed. The device suite is otherwise screen tests (Compose rule, screenshots, real Activity), which have no JVM runner here, plus the kept categories; the moved tests are about 5% of device time, so the shard count stays at four. | Sonnet | Every moved test has a JVM twin; fewer emulator shards. |
 | 7.4 | **Report an unparsed message. Gate.** Masked export from the review screen, no network. Layout described and approved first. | Sonnet | Export has no account/card digits and no amounts; Arabic and English labels. |
-| 7.5 | **Closing sweep.** Whole-project review; final pass on `AGENTS.md`, `CLAUDE.md`, `docs/*`, `README*`; remove leftover dead code, tests and imports. | Opus | Docs describe the code as it is; no reference to a removed class anywhere. |
+| 7.5 | **Closing sweep.** Whole-project review; final pass on `AGENTS.md`, `CLAUDE.md`, `docs/*`, `README*`; remove leftover dead code, tests and imports. Done 2026-11-13: docs checked statement by statement against the code and corrected; no unused production class or function was found (thirteen functions are used only by tests, as test hooks or full-pass entry points, and stay). | Opus | Docs describe the code as it is; no reference to a removed class anywhere. |
 | 8 | **Optional: DI library.** Only if the owner asks after 1.2. | — | — |
+
+## Status (2026-11-13)
+
+Pieces 0.0 to 6.4, 7.1 to 7.3 and 7.5 are merged. The rows above are the record of what each piece did; a class named in a row as removed no longer exists. Waiting for the owner:
+
+| Piece | Question | Orchestrator's recommendation |
+|---|---|---|
+| 6.5 | Reactive reads for the review list, registry and commitments. | Skip: screens already refresh after a write and after background work; the change adds behaviour risk for no visible gain. |
+| 7.2 | 19 long production methods and classes still in the detekt baselines. | Leave them; split each when it changes for another reason. |
+| 7.4 | Report an unparsed message: layout proposed (a share sheet from the review detail, every digit masked). | Approve the layout; mask digits only. |
+| 8 | DI library. | Not asked for. |
 
 ## Order
 

@@ -63,7 +63,7 @@ Keep the existing modules. Organize by responsibility; a filename containing
 | `finance-core` | Financial classification, matching and assembly from supplied facts |
 | `dashboard-core` | Dashboard builders, calculators and section projections from supplied facts (no repositories) |
 | `data` | Room databases and schemas, DAOs, Room repositories, preference stores, and the ports they implement |
-| `ledger` | Derived ledger from evidence, decisions and ownership (shadow comparison only; not the writer yet) |
+| `ledger` | Derived ledger from evidence, decisions and ownership; since plan 3.3a it is how reconciliation writes the ledger |
 
 `StorageContainer` loads `app/src/main/assets/bank-patterns/*.patterns.json`, installs
 missing bundled definitions when the live database opens (before anything can read the
@@ -210,8 +210,8 @@ Ownership lookup/discovery/confirmation, repository ports, reconciliation,
 human correction, durable retry and `ReconciliationCompletionPolicy` stay in
 `app`. Assembly returns an in-memory outcome; the existing application workflow
 still checks current evidence and human decisions inside the financial write
-transaction. Dashboard builders/calculators and evidence scoping also stay in
-`app`. The statement match policy and direction value live in core; canonical
+transaction. Dashboard builders and calculators live in `dashboard-core`; evidence
+scoping and the dashboard classes that read repositories stay in `app`. The statement match policy and direction value live in core; canonical
 CSV parsing, its stream interface and reconciliation workflow stay in app.
 
 `FinancialTransaction.fromSingleEvent` shares the construction of a transaction
@@ -333,7 +333,7 @@ Message learning is "remember my decision", per bank, for every configured bank.
 
 ## Data and recovery
 
-`masroof.db` opens two schemas only: the frozen v18 baseline (`MasroofDatabase.BASELINE_VERSION`, fourteen tables, unchanged identity hash) and the current `MasroofDatabase.VERSION` (22), the baseline through the one additive, tested `MIGRATION_18_22` (see AGENTS.md). v19 to v21 existed only in development builds and CI; the owner decided on 2026-11-12 to replace their chain with a single step, so a file or backup labelled v19, v20 or v21 is refused like any unknown schema. `MasroofDatabase.builder` (module `data`) is the only builder for the live file. Older, intermediate, unknown and newer schemas are rejected by Room and the file stays byte-identical (`MasroofMigrationOpenPathTest`, `MigrationOpenPathDeviceTest`): Room compares the identity hash of a file at the current version and validates every table after a migration, and `MIGRATION_18_22` first refuses a v18 file whose identity hash is not the known v18 hash (inside the upgrade transaction, so the file stays untouched). The upgraded v18 fixture holds exactly the tables, indices and SQL Room creates for a fresh v22 file (`MigrationOpenPathContract.upgradeCreatesTheExportedSchema`). Never a destructive fallback. Automatic schema-fact backfill is removed; already queued backfill work completes without parsing or writing. Existing preference files, Keystore alias, app id and worker names remain stable. `learning.db` stores labels/provenance; `analytics.db` stores advisory results and preferences. Both are derived and open through `PreservingOpenHelperFactory`, so the framework's corruption handler never deletes them; `LearningStore` reports a corrupt `learning.db` to its caller (`BankInterpretationService` logs it under `ML`), deletes the cache itself (`invalidate`) and rethrows, and the next use opens an empty file that learning refills from the user's decisions (`LearningStoreCorruptionTest`; parsing and posting never wait on it, `ReplicaMachineLearningTest`). Old Lab files are neither imported nor deleted automatically.
+`masroof.db` opens two schemas only: the frozen v18 baseline (`MasroofDatabase.BASELINE_VERSION`, fourteen tables, unchanged identity hash) and the current `MasroofDatabase.VERSION` (22), the baseline through the one additive, tested `MIGRATION_18_22` (see AGENTS.md). v19 to v21 existed only in development builds and CI; the owner decided on 2026-11-12 to replace their chain with a single step, so a file or backup labelled v19, v20 or v21 is refused like any unknown schema. `MasroofDatabase.builder` (module `data`) is the only builder for the live file. Older, intermediate, unknown and newer schemas are rejected by Room and the file stays byte-identical (`MasroofMigrationOpenPathTest`, `MigrationOpenPathDeviceTest`): Room compares the identity hash of a file at the current version and validates every table after a migration, and `MIGRATION_18_22` first refuses a v18 file whose identity hash is not the known v18 hash (inside the upgrade transaction, so the file stays untouched). The upgraded v18 fixture holds exactly the tables, indices and SQL Room creates for a fresh v22 file (`MigrationOpenPathContract.upgradeCreatesTheExportedSchema`). Never a destructive fallback. Automatic schema-fact backfill is removed; already queued backfill work is cancelled once at startup (`RetiredWorkCleanup`). Existing preference files, Keystore alias, app id and worker names remain stable. `learning.db` stores labels/provenance; `analytics.db` stores advisory results and preferences. Both are derived and open through `PreservingOpenHelperFactory`, so the framework's corruption handler never deletes them; `LearningStore` reports a corrupt `learning.db` to its caller (`BankInterpretationService` logs it under `ML`), deletes the cache itself (`invalidate`) and rethrows, and the next use opens an empty file that learning refills from the user's decisions (`LearningStoreCorruptionTest`; parsing and posting never wait on it, `ReplicaMachineLearningTest`). Old Lab files are neither imported nor deleted automatically.
 
 ### Processing retry (`processing_retry`)
 
@@ -376,7 +376,7 @@ Unused columns are null. Indices: `(rawSmsId, sequence)` for "latest decision fo
 | `RESTORE` | `TransactionRestoreService.restore` | review `USER_FINANCIAL_TYPE` (a chosen type adds its own `RECLASSIFY` row) |
 | `RESTORE_REVERTED` | `TransactionRestoreService.restore` when nothing could post and the restore is undone | review back to `USER_NON_FINANCIAL` |
 | `BANK_SELECTION` | `ExplicitBankSelectionWorkflow.selectAndReparse` | review reasons with the `user_selected_bank:` prefix |
-| `RECURRING` | `AnalyticsWorkflow` (reject, accept, undo, the pending promotion) → `RecurringAnswerStore` | the candidate's advisory status in `analytics.db`, written inside the same `masroof.db` transaction |
+| `RECURRING` | `AnalyticsWorkflow` (reject, accept, undo, the pending promotion) → `RecurringAnswerStore` | the candidate's advisory status in `analytics.db`, written after the answer (inside the transaction only for undo) |
 
 Application services join through `UserDecisionRepository.recordWith(decision, before) { write }`, which reads the current row, runs the write and appends in one Room transaction under the access gate, and appends only when the write returns a result that differs from the row before it; the Room repositories append through `UserDecisionDao` inside their own transaction. An idempotent repeat (a double submit, the same bank chosen again) changes nothing and appends nothing. A failure at the append rolls the existing write back too.
 
@@ -449,7 +449,7 @@ Reads kept on the legacy stores, each allowed by name in `DecisionReadBoundaryTe
 The user's answers about recurring-payment series used to be one row per series in `analytics.db` (`recurring_feedback(seriesKey, kind, payload, decidedAt)`), replaced on each answer and deleted on undo. The owner chose (2026-11-12) to keep them in `user_decision` itself, append-only, as `RECURRING` rows (`subjectKey` = series key, `answer` = the old `kind`, `payload` and `decidedAtEpochMillis` as written). `RecurringAnswerStore` (`data/repository`) is the only reader and writer, through `DatabaseAccessGate`, each write one `masroof.db` transaction:
 
 - The answer in force for a series is its latest row (`listRecurring`, ordered by series then `sequence`); a series whose latest row is `UNDONE` behaves as never answered. `effective()` returns the answers in force in the old table's shape and order (`RecurringFeedbackRow`, by series key), so `RecurringDecisionWorkflow.build`, the corrections list and the analysis fingerprint read exactly what they read before for the same answers.
-- Reject, accept and the pending save append an answer; undo appends `UNDONE` when the answer in force is `NOT_RECURRING` or `DISMISSED`; the `CONFIRM_PENDING` → `CONFIRMED` promotion (`RecurringDecisionWorkflow.promotePending`) appends `CONFIRMED` with the pending answer's payload and `decidedAt`. The candidate's advisory status in `analytics.db` is written inside the same `masroof.db` transaction, so a failed status write records no answer.
+- Reject, accept and the pending save append an answer; undo appends `UNDONE` when the answer in force is `NOT_RECURRING` or `DISMISSED`; the `CONFIRM_PENDING` → `CONFIRMED` promotion (`RecurringDecisionWorkflow.promotePending`) appends `CONFIRMED` with the pending answer's payload and `decidedAt`. The answer is written first and the candidate's advisory status in `analytics.db` after it; a failed status write leaves the answer, which the next refresh applies. Undo writes the status inside its `masroof.db` transaction.
 
 **One-time copy.** The live database's `onOpen` (`StorageContainer.importRecurringAnswers`, after the pattern copy) moves any `recurring_feedback` rows into `user_decision` before the open returns, so nothing reads an answer first. Steps (`RecurringAnswerStore.readLegacy`, `copyLegacy`, `clearLegacy`) and what a crash leaves:
 
@@ -460,7 +460,7 @@ The user's answers about recurring-payment series used to be one row per series 
 
 The `recurring_feedback` table stays in `analytics.db` (schema 4, no destructive analytics migration), read only by the copy and by restoring an older archive.
 
-**Backups.** New exports carry the answers inside `masroof.db`; the analytics archive's `feedback` list is what the table holds, empty once the copy ran. An older archive (v18 database plus `labAnalysis.feedback`) restores the rows into `recurring_feedback` with the analysis, paired with its database in the restore journal; the restored database's first open copies them into its `user_decision` (`BackupOlderSchemaImportTest.v18ArchiveWithRecurringAnswers_putsThemInTheRestoredDecisionStore`). A failed or rolled-back restore puts back the original database, which holds the original answers, and the original (empty) analysis. `BackupPackageFormat.FORMAT_VERSION` is unchanged (piece 5.3).
+**Backups.** New exports carry the answers inside `masroof.db`; the analytics archive's `feedback` list is what the table holds, empty once the copy ran. An older archive (v18 database plus `labAnalysis.feedback`) restores the rows into `recurring_feedback` with the analysis, paired with its database in the restore journal; the restored database's first open copies them into its `user_decision` (`BackupOlderSchemaImportTest.v18ArchiveWithRecurringAnswers_putsThemInTheRestoredDecisionStore`). A failed or rolled-back restore puts back the original database, which holds the original answers, and the original (empty) analysis. New exports are `BackupPackageFormat.FORMAT_VERSION` 2; a v18 archive is format 1 (piece 5.3, below).
 
 Known limits, for plan 3.2: a posted type or endpoint edited without a review or correction has no decision (owner rule of 2.2). Reconciliation keeps it only because the row stays posted; an emptied ledger rebuilds it from the evidence (`ManualDecisionReplayTest.typeEditedOnlyOnTheRow_isKeptWhilePosted_andAutomaticOnceTheLedgerIsEmptied`). A rebuilt row has no exchange-rate pair until enrichment runs again, and a backfilled pair whose outgoing leg was unknown takes the counterparty of its subject leg first. `ManualDecisionReplayTest` empties the ledger and replays for every outcome kind and a correction; a bank selection is a reparse input and does not depend on the ledger.
 
@@ -518,7 +518,7 @@ answers are `RECURRING` rows of `user_decision` (see "Recurring answers"), inclu
 intent recorded before the financial save; a later pass completes it only when the saved
 commitment's source and cadence agree. Feedback failure never undoes a saved commitment. Legacy rejection stays a
 dismissal; explicit "not recurring" decisions stay until undone. Archive 4 reads
-archives 1-3 and financial schemas 18 and later.
+archives 1-3 with financial schema 18 or 22.
 
 The forecast baseline is a capped weekday mean (stored key `WEEKDAY_MEDIAN` for
 compatibility); the personal Huber model must beat it to be used. `ForecastReplay`

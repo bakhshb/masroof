@@ -45,8 +45,9 @@ Role provenance uses the existing `engine:` and `rules:` metadata fields. The la
 contains the full configuration fingerprint plus selected id/revision. This preserves
 the original financial fields, evidence and validation findings. The write guard
 checks that stamp and current enabled definition inside the financial transaction.
-Same-generation restores with changed content also invalidate it. Encrypted backup
-carries schema 3 in the existing three-file archive; Room remains v18.
+Same-generation restores with changed content also invalidate it. At this milestone the
+encrypted backup carried schema 3 in `preferences.json` and Room was v18; since v22 the
+patterns travel inside `masroof.db`.
 
 Successful or human-edited saved evidence is resumed, never reinterpreted. A correction
 received before any ParsedEvent exists allows initial extraction while retaining the
@@ -79,9 +80,8 @@ import hashes and automatic fact backfills were removed, and databases and backu
 than v18 are still rejected without erasing live data. Since then, schema changes above
 v18 go through additive, tested migrations (see `docs/ARCHITECTURE.md`).
 The v18 schema/hash, encryption and restore/rollback remain unchanged (the one-time
-transfer-integrity repair was deleted in plan 3.3c; see `docs/ARCHITECTURE.md`). A retired backfill worker completes already queued requests without
-opening or reparsing financial data; its persisted identity and old journal preference
-key remain solely for safe retirement and interrupted v18 restore recovery.
+transfer-integrity repair was deleted in plan 3.3c; see `docs/ARCHITECTURE.md`). The retired backfill worker is deleted; startup cancels any queued request by its
+persisted work name (`RetiredWorkCleanup`).
 
 Removal verification passed 194 targeted app tests and 15 API 36 device tests,
 with both APKs built. Coverage retains encrypted v18 verification/import, restore
