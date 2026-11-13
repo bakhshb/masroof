@@ -160,7 +160,8 @@ class BankInterpretationService(
     private suspend fun decisions(): List<Decision> {
         val result = mutableListOf<Decision>()
         decisions.listCorrections().forEach { (sequence, correction) ->
-            result += Decision("correction:$sequence", correction.rawSmsId,
+            // Zero-padded: the id breaks ties as text, and equal-time corrections must stay in append order.
+            result += Decision("correction:%019d".format(sequence), correction.rawSmsId,
                 correction.messageFamily?.let { MessageFamily.valueOf(it.name) },
                 correction.decidedAt.toEpochMilli(), "USER_MESSAGE_FAMILY",
                 reason = if(correction.messageFamily == null) "FIELDS_ONLY" else null)

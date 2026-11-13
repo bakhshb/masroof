@@ -110,6 +110,9 @@ class UserDecisionReaderTest {
         assertEquals(listOf(null, MessageFamily.PURCHASE, null), read.corrections.map { it.messageFamily })
         assertEquals("LATE", read.corrections.last().merchant)
         assertEquals("BANK_ALJAZIRA", read.selectedBankId)
+        // Learning reads every correction, and only corrections, by sequence in append order.
+        assertEquals(listOf(2L, 3L, 4L), reader.listCorrections().keys.toList())
+        assertEquals(listOf("LATE", null, null), reader.listCorrections().values.map { it.merchant })
     }
 
     @Test
