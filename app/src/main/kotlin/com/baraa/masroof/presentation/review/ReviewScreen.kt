@@ -77,8 +77,10 @@ fun ReviewRoute(viewModel: ReviewViewModel, onBack: (() -> Unit)? = null) {
         viewModel.uiState.map { it.selectedDetail?.id }.distinctUntilChanged().collect { selected ->
             // Follow every message the ViewModel opens. Forget the visit's message only when it is closed, not while it loads.
             // Teaching belongs to one message, so another message opens on its detail.
-            if (selected != null) { if (selected != openReviewId) teaching = false; openReviewId = selected }
-            else if (shown == openReviewId) { openReviewId = null; teaching = false }
+            if (selected != null) {
+                if (selected != openReviewId) teaching = false
+                openReviewId = selected
+            } else if (shown == openReviewId) { openReviewId = null; teaching = false }
             shown = selected
         }
     }

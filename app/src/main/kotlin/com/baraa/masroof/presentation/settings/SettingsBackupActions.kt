@@ -152,8 +152,6 @@ internal class SettingsBackupActions(
                             importingBackup = false, backupVerified = false, backupMessage = BackupMessage.IMPORT_FAILED)
                     }
                 }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
             } finally { passphrase.fill('\u0000') }
         }
     }

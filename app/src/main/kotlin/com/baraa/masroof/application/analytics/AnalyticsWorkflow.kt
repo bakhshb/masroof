@@ -122,7 +122,12 @@ class AnalyticsWorkflow(private val container: AppContainer, private val context
         (day - FinancialPeriodPolicy.periodContaining(LocalDate.ofEpochDay(day)).startDate.toEpochDay()).toInt()
     private fun smsPermissionMissing() =
         ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED
-    fun request() { if (closed) return; generation.incrementAndGet(); mutable.update { it.copy(updating = true) }; changes.trySend(Unit) }
+    fun request() {
+        if (closed) return
+        generation.incrementAndGet()
+        mutable.update { it.copy(updating = true) }
+        changes.trySend(Unit)
+    }
 
     suspend fun messageReviewExamples() = withContext(Dispatchers.IO) {
         container.storage.databaseAccessGate.withAccess { container.patterns.messageReviewWorkflow.load() }
