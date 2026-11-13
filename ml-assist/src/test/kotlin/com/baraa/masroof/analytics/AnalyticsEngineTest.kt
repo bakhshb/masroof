@@ -24,6 +24,12 @@ class AnalyticsEngineTest {
         assertEquals(listOf("large"), data.quality.unusualIds)
         assertTrue(data.quality.excluded.keys.containsAll(listOf("MISSING_VALID_AMOUNT_OR_FX", "OUTSIDE_PURCHASE_SCOPE", "FUTURE_DATE")))
     }
+    @Test fun ordinarySkewedSpendingIsNotUnusualOnlyAnAmountFarOutOnTheRatioScaleIs() {
+        // Everyday purchases from 20 to 320 SAR with a few around 800: the riyal distance alone marked every tenth one.
+        val everyday = (0 until 60).map { FinancialFact("p$it", start + it, 2_000L + it % 10 * 3_000 + if (it % 20 == 19) 50_000 else 0, false, true) }
+        val data = clean(everyday + FinancialFact("rent", start + 61, 3_000_000, false, true), days = 90)
+        assertEquals(listOf("rent"), data.quality.unusualIds)
+    }
     @Test fun missingCoverageIsNotZeroHistoryAndPreventsTraining() {
         val data = clean(emptyList(), covered = null)
         assertTrue(data.days.none { it.covered })
