@@ -99,7 +99,7 @@ class DecisionReadBoundaryTest {
             "application/container/LearningContainer.kt" to WIRING,
             "application/container/ReviewContainer.kt" to WIRING,
             "application/analytics/AnalyticsWorkflow.kt" to "names user_correction only to refresh when the table changes",
-            "presentation/review/ReviewViewModel.kt" to DISPLAY,
+            "presentation/review/ReviewPresentationMapper.kt" to DISPLAY,
             "presentation/review/ReviewReasonLabels.kt" to DISPLAY,
             "application/review/ReviewDetailLoader.kt" to DISPLAY,
             "application/interpretation/InterpretationProvenanceWorkflow.kt" to "$DISPLAY (the provenance badge)",
