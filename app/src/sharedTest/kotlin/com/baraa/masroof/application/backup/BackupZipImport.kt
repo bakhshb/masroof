@@ -7,7 +7,7 @@ private const val ZIP_TEST_PASSPHRASE = "zip-test-passphrase"
 
 /** Test support: the plain package [zip] sealed in an envelope, the only form the app imports. */
 fun sealZip(zip: File): File {
-    val sealed = File.createTempFile("sealed-", ".masroof")
+    val sealed = File.createTempFile("sealed-", ".masroof").also { it.deleteOnExit() }
     sealed.outputStream().use { output ->
         BackupEnvelope.encrypt(output, ZIP_TEST_PASSPHRASE.toCharArray(), 1) { plain -> zip.inputStream().use { it.copyTo(plain) } }
     }

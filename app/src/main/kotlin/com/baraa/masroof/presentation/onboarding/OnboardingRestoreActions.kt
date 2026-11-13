@@ -66,7 +66,7 @@ internal class OnboardingRestoreActions(
         }, onFinally = { passphrase.fill('\u0000') }) {
             uiState.update { it.copy(restoringBackup = true, error = null) }
             when (
-databaseBackupService.importFrom(uri, passphrase)
+                databaseBackupService.importFrom(uri, passphrase)
             ) {
                 BackupImportOutcome.SuccessNeedsRestart -> Unit
                 BackupImportOutcome.InvalidPackage ->

@@ -181,7 +181,7 @@ internal class SettingsBackupActions(
         }, onFinally = { passphrase.fill('\u0000') }) {
             settingsState.update { it.copy(importingBackup = true, backupMessage = null, error = null) }
             when (
-databaseBackupService.importFrom(uri, passphrase)
+                databaseBackupService.importFrom(uri, passphrase)
             ) {
                 BackupImportOutcome.SuccessNeedsRestart -> {
                     // Process restarts inside the service after a successful restore.
