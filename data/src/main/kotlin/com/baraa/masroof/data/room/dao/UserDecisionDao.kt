@@ -32,6 +32,10 @@ interface UserDecisionDao {
     )
     suspend fun listNaming(rawSmsIds: List<String>): List<UserDecisionEntity>
 
+    /** Every `CORRECTION`, in append order. */
+    @Query("SELECT * FROM user_decision WHERE kind = 'CORRECTION' ORDER BY sequence")
+    suspend fun listCorrections(): List<UserDecisionEntity>
+
     /** Every recurring answer, by series and then in append order. */
     @Query("SELECT * FROM user_decision WHERE kind = 'RECURRING' ORDER BY subjectKey, sequence")
     suspend fun listRecurring(): List<UserDecisionEntity>

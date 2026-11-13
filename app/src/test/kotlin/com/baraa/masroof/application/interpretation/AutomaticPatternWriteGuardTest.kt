@@ -1,5 +1,7 @@
 package com.baraa.masroof.application.interpretation
 
+import com.baraa.masroof.testsupport.saveCorrection
+import com.baraa.masroof.testsupport.correction
 import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction
@@ -75,7 +77,7 @@ class AutomaticPatternWriteGuardTest {
     private lateinit var fixtureDatabase: MasroofDatabase
 
     private suspend fun withFixture(block: suspend (MessagePatternStore, DatabaseAccessGate, ParsedEventRecord,
-        AutomaticInterpretationWriteGuard, EffectiveParsedEventProvider, com.baraa.masroof.testsupport.DecidedCorrectionRepository) -> Unit) {
+        AutomaticInterpretationWriteGuard, EffectiveParsedEventProvider, MasroofDatabase) -> Unit) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.inMemoryDatabaseBuilder(context, MasroofDatabase::class.java).allowMainThreadQueries().build()
         try {
@@ -90,7 +92,6 @@ class AutomaticPatternWriteGuardTest {
                 bodyHash = SmsBodyHasher.sha256Hex(body), receivedAt = input.receivedAt, deviceMessageId = null))
             val result = InterpretationDraftMapper().map(input, PatternFactInterpreter(store.load()).interpretRouted(input, bank), Bank(bank.value)) as ParseResult.Success
             parsed.save(result.event, result.details)
-            val corrections = com.baraa.masroof.testsupport.DecidedCorrectionRepository(db)
             val decisions = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)
             val effective = EffectiveParsedEventProvider(parsed, decisions)
             val policy = PatternInterpretationWritePolicy(store, accounts = StubAccountRegistryRepository(), cards = NoOpCardRegistryRepository())
@@ -98,7 +99,7 @@ class AutomaticPatternWriteGuardTest {
                 RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao()), { true },
                 { work -> gate.withAccess { db.withTransaction { work() } } },
                 patternsCurrent = { record, posted -> check(db.inTransaction()); policy.isCurrent(record, posted) })
-            block(store, gate, requireNotNull(effective.findEffectiveByRawSmsId(input.evidenceId)), guard, effective, corrections)
+            block(store, gate, requireNotNull(effective.findEffectiveByRawSmsId(input.evidenceId)), guard, effective, db)
         } finally { db.close() }
     }
 
@@ -157,15 +158,15 @@ class AutomaticPatternWriteGuardTest {
     }
 
     @Test fun explicitFinancialCorrectionsRetainAuthorityWhileMerchantEditsDoNot() = runBlocking {
-        withFixture { store, gate, _, guard, effective, corrections ->
+        withFixture { store, gate, _, guard, effective, db ->
             gate.withRestore { store.saveBank(1, store.load().banks.single().copy(patterns = listOf(pattern.copy(revision = 2, enabled = false)))) }
-            corrections.save(com.baraa.masroof.domain.model.UserCorrection("merchant-edit", input.evidenceId,
+            db.saveCorrection(correction(input.evidenceId,
                 null, null, "Edited merchant", null, Instant.parse("2026-10-16T00:00:00Z")))
             val merchantOnly = requireNotNull(effective.findEffectiveByRawSmsId(input.evidenceId))
             var wrote = false
             assertTrue(guard.write(listOf(merchantOnly)) { wrote = true; FinancialTransactionSaveResult.Saved } is FinancialTransactionSaveResult.Conflict)
             assertFalse(wrote)
-            corrections.save(com.baraa.masroof.domain.model.UserCorrection("amount-edit", input.evidenceId,
+            db.saveCorrection(correction(input.evidenceId,
                 null, com.baraa.masroof.core.money.Money.of("15", com.baraa.masroof.core.money.Currency.SAR),
                 null, null, Instant.parse("2026-10-16T00:01:00Z")))
             val confirmed = requireNotNull(effective.findEffectiveByRawSmsId(input.evidenceId))

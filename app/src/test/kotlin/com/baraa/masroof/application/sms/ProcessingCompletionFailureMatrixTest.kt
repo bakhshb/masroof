@@ -494,9 +494,6 @@ class ProcessingCompletionFailureMatrixTest {
         return com.baraa.masroof.application.review.ReviewWorkflowService(
             reviewRepository = harness.reviewRepo,
             userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(harness.db),
-            userCorrectionRepository = com.baraa.masroof.data.repository.RoomUserCorrectionRepository(
-                harness.db.userCorrectionDao(),
-            ),
             financialTransactionRepository = harness.ledgerUnderTest,
             rawSmsRepository = harness.rawRepo,
             ownershipResolver = resolver,

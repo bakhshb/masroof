@@ -1,5 +1,6 @@
 package com.baraa.masroof.application.review
 
+import com.baraa.masroof.testsupport.correction
 import com.baraa.masroof.testsupport.recordDecision
 import com.baraa.masroof.testsupport.saveCorrection
 import android.content.Context
@@ -147,7 +148,7 @@ class ReviewDetailLoaderTest {
                         com.baraa.masroof.domain.model.UserDecisionKind.BANK_SELECTION, clock.now(), bankId = "OTHER"))
                 }
             }
-            db.saveCorrection(com.baraa.masroof.domain.model.UserCorrection("correction", "corrected", null, null, "USER", null, clock.now()))
+            db.saveCorrection(correction("corrected", null, null, "USER", null, clock.now()))
             val corrections = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)
             val transactions = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao())
             val guardedTransactions = object : com.baraa.masroof.domain.repository.FinancialTransactionRepository by transactions {

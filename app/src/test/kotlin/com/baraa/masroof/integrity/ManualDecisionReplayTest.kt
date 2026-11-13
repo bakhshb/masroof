@@ -10,7 +10,7 @@ import com.baraa.masroof.application.transaction.TransactionReconciliationServic
 import com.baraa.masroof.application.review.EffectiveParsedEventProvider
 import com.baraa.masroof.application.interpretation.AutomaticInterpretationWriteGuard
 import androidx.room.withTransaction
-import com.baraa.masroof.testsupport.latestFor
+import com.baraa.masroof.testsupport.latestCorrectionFor
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.ingestion.SmsIngestionResult
@@ -239,15 +239,15 @@ class ManualDecisionReplayTest {
             )
             assertTrue("seed=$seed correction: $corrected", corrected is ReviewWorkflowResult.Success)
             val success = corrected as ReviewWorkflowResult.Success
-            assertEquals("seed=$seed correction merchant", "TEST_CORRECTION", success.correction!!.correctedMerchant)
-            assertEquals("seed=$seed correction amount", amount, success.correction.correctedAmount)
-            assertEquals("seed=$seed correction family", MessageFamily.PURCHASE, success.correction.correctedType)
+            assertEquals("seed=$seed correction merchant", "TEST_CORRECTION", success.correction!!.merchant)
+            assertEquals("seed=$seed correction amount", amount, success.correction.amount)
+            assertEquals("seed=$seed correction family", MessageFamily.PURCHASE, success.correction.messageFamily)
 
             ledger.replayProduction()
-            val stored = ledger.corrections.latestFor(rawId)!!
-            assertEquals("seed=$seed correction lost merchant", "TEST_CORRECTION", stored.correctedMerchant)
-            assertEquals("seed=$seed correction lost amount", amount, stored.correctedAmount)
-            assertEquals("seed=$seed correction lost family", MessageFamily.PURCHASE, stored.correctedType)
+            val stored = ledger.corrections.latestCorrectionFor(rawId)!!
+            assertEquals("seed=$seed correction lost merchant", "TEST_CORRECTION", stored.merchant)
+            assertEquals("seed=$seed correction lost amount", amount, stored.amount)
+            assertEquals("seed=$seed correction lost family", MessageFamily.PURCHASE, stored.messageFamily)
             val effective = com.baraa.masroof.application.review.EffectiveParsedEventProvider(
                 world.parsedRepo,
                 world.decisionRepo,

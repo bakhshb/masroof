@@ -230,7 +230,8 @@ class UserDecisionDualWriteTest {
                 runCatching { case.action() }
                 assertEquals("a repeat appended a row", expected, world.db.userDecisionDao().listAll().map { it.copy(sequence = 0) })
             }
-            assertBackfillMatches(world, expected, expected.map { it.copy(kind = LEGACY_KIND[it.kind] ?: it.kind) })
+            // A correction has no legacy trace: its decision row is the only record.
+            assertBackfillMatches(world, expected, expected.filter { it.kind != "CORRECTION" }.map { it.copy(kind = LEGACY_KIND[it.kind] ?: it.kind) })
         }
     }
 

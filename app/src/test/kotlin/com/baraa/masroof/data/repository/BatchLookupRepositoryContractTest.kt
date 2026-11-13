@@ -5,7 +5,6 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.data.room.MasroofDatabase
 import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.domain.model.UserCorrection
 import com.baraa.masroof.domain.repository.FinancialTransactionRepository
 import com.baraa.masroof.testsupport.tx
 import kotlinx.coroutines.runBlocking
@@ -25,7 +24,6 @@ class BatchLookupRepositoryContractTest {
     private lateinit var db: MasroofDatabase
     private lateinit var raw: RoomRawSmsRepository
     private lateinit var ledger: RoomFinancialTransactionRepository
-    private lateinit var corrections: RoomUserCorrectionRepository
     private val now = Instant.parse("2026-08-03T10:00:00Z")
 
     @Before
@@ -35,7 +33,6 @@ class BatchLookupRepositoryContractTest {
             .build()
         raw = RoomRawSmsRepository(db.rawSmsDao())
         ledger = RoomFinancialTransactionRepository(db.financialTransactionDao(), db.parsedEventDao(), batchChunkSize = 2)
-        corrections = RoomUserCorrectionRepository(db.userCorrectionDao())
     }
 
     @After
@@ -69,19 +66,6 @@ class BatchLookupRepositoryContractTest {
         assertEquals(ids.mapNotNull { id -> ledger.findByRawSmsId(id)?.let { id to it } }.toMap(), ledger.findByRawSmsIds(ids))
         assertEquals(ids.mapNotNull { id -> reviews.findByRawSmsId(id)?.let { id to it } }.toMap(), reviews.findByRawSmsIds(ids))
         assertEquals(ids.mapNotNull { id -> raw.getById(id)?.let { id to it.receivedAt } }.toMap(), raw.receivedAtByIds(ids))
-    }
-
-    @Test
-    fun correctionListAll_equalsCorrectionsForEveryStoredRawSms() = runBlocking {
-        (1..3).forEach { raw.insertIfAbsent(rawSms("sms-$it")) }
-        listOf("sms-2" to 2L, "sms-1" to 5L, "sms-2" to 1L).forEachIndexed { index, (target, minutes) ->
-            corrections.save(
-                UserCorrection("c-$index", target, null, null, "merchant-$index", null, now.plusSeconds(minutes * 60)),
-            )
-        }
-
-        // Grouped by target, then oldest first: the order the per-SMS lookups used to give.
-        assertEquals(listOf("c-1", "c-2", "c-0"), corrections.listAll().map { it.id })
     }
 
     private fun rawSms(id: String) = RawSms(id, "AlJazira", "body-$id", now, null, "hash-$id")

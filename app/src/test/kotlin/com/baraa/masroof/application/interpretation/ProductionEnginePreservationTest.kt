@@ -7,7 +7,7 @@ import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.model.CardReference
 import com.baraa.masroof.domain.model.RawSms
-import com.baraa.masroof.domain.model.UserCorrection
+import com.baraa.masroof.testsupport.correction
 import com.baraa.masroof.sms.hash.SmsBodyHasher
 import com.baraa.masroof.testsupport.TestStorageContext
 import com.baraa.masroof.testsupport.ingest
@@ -37,7 +37,7 @@ class ProductionEnginePreservationTest {
 
             c.sms.processRawSmsUseCase.ingest(raw("undecided", "تنبيه جديد غير معروف\nمبلغ: SAR 5"))
             assertTrue(service.mayRefresh("undecided"))
-            c.storage.database.saveCorrection(UserCorrection("merchant-only", "undecided", null, null,
+            c.storage.database.saveCorrection(correction("undecided", null, null,
                 "My merchant", null, Instant.now()))
             assertFalse(service.mayRefresh("undecided"))
             service.synchronizeFeedback()

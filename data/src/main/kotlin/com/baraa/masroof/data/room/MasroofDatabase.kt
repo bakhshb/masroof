@@ -16,7 +16,6 @@ import com.baraa.masroof.data.room.dao.ParsedEventDao
 import com.baraa.masroof.data.room.dao.ProcessingRetryDao
 import com.baraa.masroof.data.room.dao.RawSmsDao
 import com.baraa.masroof.data.room.dao.ReviewItemDao
-import com.baraa.masroof.data.room.dao.UserCorrectionDao
 import com.baraa.masroof.data.room.dao.UserDecisionDao
 import com.baraa.masroof.data.room.entity.AccountRegistryEntity
 import com.baraa.masroof.data.room.entity.BankRegistryEntity
@@ -32,7 +31,6 @@ import com.baraa.masroof.data.room.entity.ProcessingRetryEntity
 import com.baraa.masroof.data.room.entity.RawSmsEntity
 import com.baraa.masroof.data.room.entity.RawSmsProviderAliasEntity
 import com.baraa.masroof.data.room.entity.ReviewItemEntity
-import com.baraa.masroof.data.room.entity.UserCorrectionEntity
 import com.baraa.masroof.data.room.entity.UserDecisionEntity
 
 /**
@@ -53,7 +51,6 @@ import com.baraa.masroof.data.room.entity.UserDecisionEntity
         FinancialTransactionRawSmsLinkEntity::class,
         CommitmentEntity::class,
         ReviewItemEntity::class,
-        UserCorrectionEntity::class,
         ProcessingRetryEntity::class,
         UserDecisionEntity::class,
         PatternConfigurationEntity::class,
@@ -83,8 +80,6 @@ abstract class MasroofDatabase : RoomDatabase() {
 
     abstract fun processingRetryDao(): ProcessingRetryDao
 
-    abstract fun userCorrectionDao(): UserCorrectionDao
-
     abstract fun userDecisionDao(): UserDecisionDao
 
     companion object {
@@ -96,7 +91,7 @@ abstract class MasroofDatabase : RoomDatabase() {
         const val VERSION: Int = 1
 
         /** Must match data/schemas/.../1.json identityHash. */
-        const val IDENTITY_HASH: String = "5349c1b666aed8239c225512f4498078"
+        const val IDENTITY_HASH: String = "2d1e78f96c1bb8e5036430b295405119"
 
         /** Additive, tested steps from version 1 on; none yet. */
         val MIGRATIONS: List<Migration> = emptyList()

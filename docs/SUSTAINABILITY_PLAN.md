@@ -131,8 +131,8 @@ The app is still in development and personal use, so the owner restarted the num
 
 | Piece | Work |
 |---|---|
-| R1 | Renumber to version 1; delete `MIGRATION_18_22`, the production backfill, the one-time copies on open (pattern file, recurring answers), the legacy backup format and the v18 fixtures and tests. Same tables, minus the dead `recurring_feedback` in `analytics.db`. |
-| R2 | One store for corrections: drop `user_correction`; `CORRECTION` rows of `user_decision` are the only record. |
+| R1 | Done (#433). Renumber to version 1; delete `MIGRATION_18_22`, the production backfill, the one-time copies on open (pattern file, recurring answers), the legacy backup format and the v18 fixtures and tests. Same tables, minus the dead `recurring_feedback` in `analytics.db`. |
+| R2 | Done. One store for corrections: `user_correction` dropped; `CORRECTION` rows of `user_decision` are the only record. |
 | R3 | Bank selection read from `user_decision` only: the `user_selected_bank:` reason prefix goes. `review_item` keeps its resolution columns (they also hold automatic settlements and queue state). |
 | R4 | Private, no pull request: convert the owner's fresh export with the last build that reads it (tag `pre-v1-reset`), verify row by row, hand over a version 1 backup. Version 1 is frozen from that day; later changes are migrations. |
 | 7.4 | Report an unparsed message. |
