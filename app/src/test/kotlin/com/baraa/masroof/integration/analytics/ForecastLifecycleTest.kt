@@ -1,50 +1,55 @@
 package com.baraa.masroof.integration.analytics
 
 import androidx.room.withTransaction
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
+import android.Manifest
+import android.app.Application
+import androidx.test.core.app.ApplicationProvider
+import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.analytics.*
 import com.baraa.masroof.data.analytics.AnalyticsDatabase
 import com.baraa.masroof.data.room.entity.CardRegistryEntity
 import com.baraa.masroof.data.room.entity.FinancialTransactionEntity
 import com.baraa.masroof.domain.period.FinancialPeriodPolicy
-import com.baraa.masroof.testsupport.TestRuntime
-import com.baraa.masroof.testsupport.TestStorageContext
-import kotlinx.coroutines.runBlocking
+import com.baraa.masroof.testsupport.uniqueStorageContext
+import com.baraa.masroof.testsupport.runOffMainThread
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import java.time.*
 
-@RunWith(AndroidJUnit4::class)
-class ForecastLifecycleDeviceTest {
+/** The forecast pair over a salary period: captured once, settled, never rewritten. Moved from the device suite (plan 7.3). */
+@RunWith(RobolectricTestRunner::class)
+class ForecastLifecycleTest {
     private class MovingClock(var day: LocalDate, private val zone: ZoneId) : Clock() {
         override fun getZone() = zone
         override fun withZone(zone: ZoneId): Clock = MovingClock(day,zone)
         override fun instant(): Instant = day.atTime(12,0).atZone(zone).toInstant()
     }
-    @Test fun repairedCoverageRestoresHistoryAndPublishedPairsAreSettledWithoutRewritingForecasts() = runBlocking {
+    @Test fun repairedCoverageRestoresHistoryAndPublishedPairsAreSettledWithoutRewritingForecasts() = runOffMainThread {
         forecastJourney(7)
     }
-    @Test fun missedDayEightWaitsForValidCoverageAndCapturesOnlyOneRealLateOrigin() = runBlocking {
+    @Test fun missedDayEightWaitsForValidCoverageAndCapturesOnlyOneRealLateOrigin() = runOffMainThread {
         forecastJourney(10, deferForGap = true)
     }
-    @Test fun anExistingDayEightPairIsNotReplacedByTheNewLateOriginPolicy() = runBlocking {
+    @Test fun anExistingDayEightPairIsNotReplacedByTheNewLateOriginPolicy() = runOffMainThread {
         forecastJourney(10, legacyPair = true)
     }
     private suspend fun forecastJourney(offset: Long, deferForGap: Boolean = false, legacyPair: Boolean = false) {
-        val instrumentation=InstrumentationRegistry.getInstrumentation()
-        val host=instrumentation.targetContext
-        android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand("pm grant ${host.packageName} android.permission.READ_SMS")).use { it.readBytes() }
-        TestRuntime.reset(host)
-        val c=TestRuntime.container(host)
+        shadowOf(ApplicationProvider.getApplicationContext<Application>()).grantPermissions(Manifest.permission.READ_SMS)
+        val context=uniqueStorageContext("forecast-lifecycle")
+        val c=AppContainer(context)
+        // The analysis waits for startup maintenance, which the app runs at launch.
+        androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(context, androidx.work.Configuration.Builder()
+            .setExecutor(androidx.work.testing.SynchronousExecutor()).setWorkerFactory(com.baraa.masroof.application.container.appWorkerFactory(c)).build())
+        c.maintenance.runStartupMaintenance()
         c.maintenance.awaitPostStartupBackgroundWorkForTesting()
         c.stopAnalytics()
         val zone=ZoneId.systemDefault()
         val period=FinancialPeriodPolicy.periodContaining(LocalDate.now(zone))
         var origin=period.startDate.plusDays(offset)
         val clock=MovingClock(origin,zone)
-        val context=TestStorageContext(host)
         val workflow=AnalyticsWorkflow(c,context,clock)
         val sidecar=AnalyticsDatabase.open(context)
         val first=origin.minusDays(300)
@@ -130,6 +135,6 @@ class ForecastLifecycleDeviceTest {
             assertEquals(original.personalTotal,corrected.personalTotal)
             assertEquals(original.baselineTotal,corrected.baselineTotal)
             c.storage.database.openHelper.readableDatabase.query("PRAGMA user_version").use { it.moveToFirst();assertEquals(com.baraa.masroof.data.room.MasroofDatabase.VERSION,it.getInt(0)) }
-        } finally { workflow.close();sidecar.close();TestRuntime.reset(host) }
+        } finally { workflow.close();sidecar.close();c.close();androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase();context.getDatabasePath("masroof.db").parentFile?.deleteRecursively() }
     }
 }

@@ -116,7 +116,7 @@ private val SQLITE_HEADER: ByteArray = byteArrayOf(
  * [com.baraa.masroof.MasroofApplication] startup. This class keeps the in-process
  * Room restart coverage and is not that acceptance evidence.
  *
- * The SMS database file is private to the test, matching [LiveRetryRestartTest],
+ * The SMS database file is private to the test, as a JVM test would,
  * so the application process cannot post the same message. Journeys use
  * [LiveSmsIntake], a durable [RawSms] row, [WorkManagerLiveSmsWorkScheduler]'s
  * work request, [LiveSmsProcessingWorker], the AlJazira parser, reconciliation,

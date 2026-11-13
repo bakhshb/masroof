@@ -52,6 +52,10 @@ The target for normal review is 10–15 minutes, not a proven percentile. Inspec
 
 See [lifecycle contracts](TESTING_LIFECYCLE.md) for the safety map and regressions.
 
+## What runs on the emulator
+
+A test belongs in `app/src/androidTest` only when the device matters: a Compose rule, screenshots or a real Activity; a real SMS broadcast; process death; an upgrade or backup on the device's own SQLite; WorkManager's real scheduler. A journey that only drives `AppContainer`, repositories or workflows is a JVM test under `app/src/test` (Robolectric). Helpers both need live in `app/src/sharedTest`. A JVM journey that waits on work posted to the main thread runs through `runOffMainThread`, and one that needs the analysis first runs startup maintenance, as the app does at launch.
+
 ## Release build and R8
 
 The release build shrinks and optimizes with R8 (`isMinifyEnabled = true`); `static-analysis` builds it on every PR, so a missing keep rule that R8 can see fails there. Names are not changed (`-dontobfuscate` in `app/proguard-rules.pro`): WorkManager stores worker class names from earlier builds and logs name exception classes. Libraries bring their own keep rules; add an app rule only for a real failure.

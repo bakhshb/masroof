@@ -2,8 +2,7 @@ package com.baraa.masroof.integration.replica
 
 import com.baraa.masroof.testsupport.*
 import android.content.Context
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.dashboard.DashboardOverview
 import com.baraa.masroof.bank.BankSmsAdapter
@@ -18,24 +17,26 @@ import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.time.*
 
 /** Rules-only and assisted adapters traverse the same Room/reconciliation/dashboard implementation. */
-@RunWith(AndroidJUnit4::class)
+@RunWith(RobolectricTestRunner::class)
 class ReplicaFinancialParityTest {
-    private val host = InstrumentationRegistry.getInstrumentation().targetContext
+    private val host: Context get() = ApplicationProvider.getApplicationContext()
+    private val storage = java.util.UUID.randomUUID().toString()
+    private fun referenceContext() = TestStorageContext(host, "parity-reference-$storage")
+    private fun actualContext() = TestStorageContext(host, "parity-actual-$storage")
     @Test fun importsOwnershipLedgerDashboardReplayAndReopenMatchProduction() = runBlocking { exercise(ReferenceHistory.names) }
     @Test fun fiveReportedMessagesPostWithoutRepeatedReviews() = runBlocking { exercise(ReferenceHistory.reported) }
     @Test fun supportedFormatsPostInTheImportPassWithoutLearningOrAManualRefresh() = runBlocking {
-        TestRuntime.reset(host)
-        val context = TestStorageContext(host,"lab_reference_")
-        context.databaseList().forEach { context.deleteDatabase(it) }
+        val context = referenceContext()
         val names = listOf("personal","vehicle","auto","house","mortgage","generic").map { "supported_loan_$it" } +
             listOf("supported_withdrawal_en","supported_fee_title") +
             listOf("same_bank_other_out","same_bank_other_in","same_bank_own","other_bank_same_suffix").map { "supported_transfer_$it" }
         val source = ReferenceHistory.source(host,names)
         val reference = AppContainer(context,bankAdapterOverride = engineFixtureAdapter(profile = com.baraa.masroof.engine.bank.rules.AlJaziraRuleProfile.current()),smsDataSourceOverride = source)
-        var actual = AppContainer(TestStorageContext(host),smsDataSourceOverride = source)
+        var actual = AppContainer(actualContext(),smsDataSourceOverride = source)
         try {
             for (c in listOf(reference,actual)) {
                 // Existing confirmed ownership, including the same suffix in a different bank.
@@ -63,18 +64,16 @@ class ReplicaFinancialParityTest {
             assertEquals(names.size,replay.duplicates)
             assertEquals(rows,actual.storage.financialTransactionRepository.listAll().sortedBy { it.id })
             actual.close()
-            actual = AppContainer(TestStorageContext(host),smsDataSourceOverride = source)
+            actual = AppContainer(actualContext(),smsDataSourceOverride = source)
             assertEquals(rows,actual.storage.financialTransactionRepository.listAll().sortedBy { it.id })
             assertOverview(overview,actual.dashboard.dashboardService.loadOverview(ReferenceHistory.period()))
-        } finally { reference.close(); actual.close(); TestRuntime.reset(host) }
+        } finally { reference.close(); actual.close() }
     }
     private suspend fun exercise(names: List<String>) {
-        TestRuntime.reset(host)
-        val referenceContext = TestStorageContext(host,"lab_reference_")
-        referenceContext.databaseList().forEach { referenceContext.deleteDatabase(it) }
+        val referenceContext = referenceContext()
         val source = ReferenceHistory.source(host,names)
         val expected = AppContainer(referenceContext,bankAdapterOverride = engineFixtureAdapter(profile = com.baraa.masroof.engine.bank.rules.AlJaziraRuleProfile.current()),smsDataSourceOverride = source)
-        var actual = AppContainer(TestStorageContext(host),smsDataSourceOverride = source)
+        var actual = AppContainer(actualContext(),smsDataSourceOverride = source)
         try {
             for (container in listOf(expected,actual)) {
                 val scan = container.sms.historicalSmsScanner.scan(Instant.EPOCH)
@@ -98,11 +97,9 @@ class ReplicaFinancialParityTest {
             assertEquals(names.size,replay.duplicates)
             assertEquals(actualRows,actual.storage.financialTransactionRepository.listAll().sortedBy { it.id })
             actual.close()
-            actual = AppContainer(TestStorageContext(host),smsDataSourceOverride = source)
+            actual = AppContainer(actualContext(),smsDataSourceOverride = source)
             assertEquals(actualRows,actual.storage.financialTransactionRepository.listAll().sortedBy { it.id })
             assertOverview(baseline,actual.dashboard.dashboardService.loadOverview(period))
-            val report = java.io.File(host.getExternalFilesDir(null),"replica-financial-parity-${names.size}.txt")
-            report.writeText("Same input: ${names.size} messages\nLedger rows: ${actualRows.size}\nReviews after ownership: ${reviews.size}\nSummary: ${baseline.summary}\nReplay duplicates: ${replay.duplicates}\nReopen preserved ledger and dashboard.\n")
         } finally { expected.close(); actual.close() }
     }
     private suspend fun confirmOwnership(container: AppContainer) {
@@ -128,33 +125,3 @@ class ReplicaFinancialParityTest {
     }
 }
 
-internal object ReferenceHistory {
-    fun fixture(name: String): JsonObject {
-        val assets = InstrumentationRegistry.getInstrumentation().context.assets
-        fun locate(path: String): List<String> = assets.list(path).orEmpty().flatMap { child ->
-            val full = "$path/$child"
-            if (child == "$name.json") listOf(full) else if (!child.endsWith(".json")) locate(full) else emptyList()
-        }
-        val path = (locate("bank_aljazira") + locate("engine")).single()
-        return Json.parseToJsonElement(assets.open(path).bufferedReader().use { it.readText() }).jsonObject
-    }
-    val names = listOf("transfer_in_salary_ar_001","purchase_pos_ar_debit_001","purchase_online_ar_001",
-        "financing_installment_ar_001","collision_transfer_fee_line_ar_001","fee_ar_001","card_payment_ar_001")
-    fun period() = FinancialPeriod(LocalDate.now().minusMonths(1).withDayOfMonth(1),LocalDate.now().plusMonths(1).withDayOfMonth(1))
-    val reported = (1..5).map { "reported_" + it.toString().padStart(2,'0') }
-    fun source(context: Context, names: List<String> = this.names): SmsDataSource {
-        // The setup journeys open the current salary period, including its first day.
-        val today = LocalDate.now()
-        val records = names.mapIndexed { index,name ->
-            val json = fixture(name)
-            var body = json.getValue("body").jsonPrimitive.content
-            body = body.replace(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}"),today.toString())
-                .replace(Regex("[0-9]{2}-[0-9]{2}-[0-9]{4}"),today.format(java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy")))
-            ProviderSmsRecord("replica-history-$index",json.getValue("sender").jsonPrimitive.content,body,today.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().plusSeconds(index.toLong()))
-        }
-        return object : SmsDataSource {
-            override suspend fun <T> withInbox(receivedAfter: Instant?, block: suspend (Sequence<InboxRow>) -> T): T = block(queryInbox(receivedAfter))
-            fun queryInbox(receivedAfter: Instant?) = records.asSequence().filter { receivedAfter == null || !it.receivedAt.isBefore(receivedAfter) }.map { InboxRow.Valid(it) }
-        }
-    }
-}

@@ -1,6 +1,5 @@
-package com.baraa.masroof.instrumentation
+package com.baraa.masroof.integration.commitment
 
-import androidx.test.platform.app.InstrumentationRegistry
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.application.commitment.CommitmentCreationResult
 import com.baraa.masroof.application.dashboard.CommitmentPaymentStatus
@@ -10,22 +9,23 @@ import com.baraa.masroof.core.money.Money
 import com.baraa.masroof.domain.model.*
 import com.baraa.masroof.domain.period.FinancialPeriod
 import com.baraa.masroof.sms.hash.SmsBodyHasher
-import com.baraa.masroof.testsupport.TestRuntime
+import com.baraa.masroof.testsupport.uniqueStorageContext
 import com.baraa.masroof.testsupport.ingest
 import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 /** Posted evidence -> user commitment/edit -> next-period payment -> durable cold reopen. */
+@RunWith(RobolectricTestRunner::class)
 class CommitmentPeriodLifecycleTest {
     @Test fun higherPaymentAfterRename_survivesReopenWithoutPayingAnotherPeriod() = runBlocking {
-        val host = InstrumentationRegistry.getInstrumentation().targetContext
-        TestRuntime.reset(host)
-        var c = TestRuntime.container(host)
+        val context = uniqueStorageContext("commitment-lifecycle")
+        var c = AppContainer(context)
         try {
-            c.maintenance.awaitPostStartupBackgroundWorkForTesting()
             c.review.onboardingOwnershipWorkflow.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
             suspend fun ingest(id: String, day: String, amount: String) {
                 val body = "شراء عبر الانترنت\nبطاقة ائتمانية: 7271\nمبلغ: SAR $amount\nلدى: SYNTHETIC_PROVIDER\nفي: $day 12:00"
@@ -58,10 +58,12 @@ class CommitmentPeriodLifecycleTest {
                 assertEquals(ledger, container.storage.financialTransactionRepository.listAll().sortedBy { it.id })
             }
             checkPeriods(c)
-            TestRuntime.close()
-            c = TestRuntime.container(host)
-            c.maintenance.awaitPostStartupBackgroundWorkForTesting()
+            c.close()
+            c = AppContainer(context)
             checkPeriods(c)
-        } finally { TestRuntime.close() }
+        } finally {
+            c.close()
+            context.getDatabasePath("masroof.db").parentFile?.deleteRecursively()
+        }
     }
 }

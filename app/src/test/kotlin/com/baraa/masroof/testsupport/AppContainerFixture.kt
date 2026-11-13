@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.baraa.masroof.application.AppContainer
 import com.baraa.masroof.sms.datasource.SmsDataSource
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 
@@ -27,4 +28,17 @@ internal suspend fun withAppContainer(
         container.close()
         context.getDatabasePath("masroof.db").parentFile?.deleteRecursively()
     }
+}
+
+/**
+ * Runs [block] off the Robolectric main thread while this thread keeps the main looper running.
+ * For journeys that wait on work posted to the main thread, as a device test does from its own thread.
+ */
+internal fun <T> runOffMainThread(block: suspend () -> T): T {
+    val result = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).async { block() }
+    while (!result.isCompleted) {
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        Thread.sleep(5)
+    }
+    return kotlinx.coroutines.runBlocking { result.await() }
 }
