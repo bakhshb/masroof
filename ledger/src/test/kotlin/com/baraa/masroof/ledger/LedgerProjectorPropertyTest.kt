@@ -37,7 +37,7 @@ class LedgerProjectorPropertyTest {
             events: List<LedgerEvidence> = this.events,
             decisions: Map<String, EffectiveUserDecisions> = this.decisions,
             stored: StoredFacts = this.stored,
-        ) = LedgerProjector.project(events, decisions, registry, stored, ZoneOffset.ofHours(2))
+        ) = LedgerProjector.project(events, decisions, registry, stored)
     }
 
     private val seeds = 0 until 2000
@@ -262,7 +262,7 @@ class LedgerProjectorPropertyTest {
      */
     private fun storedRows(random: Random, events: List<LedgerEvidence>, registry: OwnershipFacts): List<LedgerRow> {
         when (random.nextInt(8)) {
-            0, 1 -> return LedgerProjector.project(events, emptyMap(), registry, StoredFacts(), ZoneOffset.ofHours(2)).rows
+            0, 1 -> return LedgerProjector.project(events, emptyMap(), registry, StoredFacts()).rows
             2 -> return events.filter { it.event.messageFamily.isTransfer() }
                 .map { storedRow(it.event.rawSmsId, type = FinancialTransactionType.SELF_TRANSFER) }
         }
@@ -293,8 +293,6 @@ class LedgerProjectorPropertyTest {
      * intra-bank counterpart.
      */
     private fun doublePosted(corpus: Corpus): Set<String> {
-        val zone = ZoneOffset.ofHours(2)
-        val storedZone = corpus.stored.rows.flatMap { row -> row.rawSmsIds.map { it to row.transaction.occurredAtZone } }.toMap()
         val eligible = corpus.events.filter { record ->
             val decided = corpus.decisions[record.event.rawSmsId] ?: EffectiveUserDecisions.NONE
             (record.event.messageFamily == MessageFamily.TRANSFER_IN || record.event.messageFamily == MessageFamily.TRANSFER_OUT) &&
@@ -305,7 +303,7 @@ class LedgerProjectorPropertyTest {
             event.rawSmsId to TransferMatchCandidate(
                 event, record.transactionReference, record.occurredAtLocal, record.receivedAt,
                 corpus.registry.account(event.sourceAccountRef), corpus.registry.account(event.destinationAccountRef),
-                TransactionTiming.effectiveOccurredAt(event, record.occurredAtLocal, record.receivedAt, zone, storedZone[event.rawSmsId]),
+                TransactionTiming.effectiveOccurredAt(event, record.occurredAtLocal, record.receivedAt),
             )
         }
         val paired = TransactionMatcher.findMutuallyUniquePairs(eligible.values.toList())

@@ -176,7 +176,7 @@ class PatternManagementJourneyTest {
             }
             val store = MessagePatternStore(patternDb)
             store.installMissingBanks(listOf(bank))
-            block(MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(bank), requiredBundledBankIds = setOf(bank.bankId), appLogService = NoOpAppLog), store)
+            block(MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(bank), appLogService = NoOpAppLog), store)
         } finally { patternDb.close() }
     }
 }

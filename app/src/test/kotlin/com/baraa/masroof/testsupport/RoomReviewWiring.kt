@@ -24,7 +24,6 @@ import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import java.time.ZoneId
 
 /** Room-backed review workflow and the reconciliation it uses, wired like production. */
 internal class RoomReviewWiring(
@@ -40,7 +39,6 @@ internal class RoomReviewWiring(
     reviewQueueReviews: ReviewRepository = reviews,
     reconcileWithReviews: Boolean = true,
     reconcileWithConfirmation: Boolean = false,
-    zoneId: ZoneId = ZoneId.systemDefault(),
     processingRecovery: ProcessingRecovery = noOpProcessingRecovery(),
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
@@ -58,7 +56,6 @@ internal class RoomReviewWiring(
         effectiveParsedEventProvider = effective,
         reviewRepository = if (reconcileWithReviews) reviews else EmptyReviewRepository(),
         userDecisionRepository = if (reconcileWithReviews) decisions else NoOpUserDecisionRepository,
-        zoneId = zoneId,
     )
     val updater = ReviewQueueUpdater(reviewQueueReviews, ledger, clock)
     val workflow = ReviewWorkflowService(
@@ -74,7 +71,6 @@ internal class RoomReviewWiring(
         reviewQueueUpdater = updater,
         manualReviewResolutionRepository = RoomManualReviewResolutionRepository(db, ledger),
         clock = clock,
-        zoneId = zoneId,
         processingRecovery = processingRecovery,
         ioDispatcher = ioDispatcher,
         appLogService = NoOpAppLog,

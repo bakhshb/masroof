@@ -320,9 +320,9 @@ class TransactionAssemblerTest {
         assertTrue(outcome is TransactionAssembler.Outcome.PendingMatch)
     }
 
-    /** A cross-bank pair stores one zone; both legs' wall clocks are read in it, so a re-check finds the same instant. */
+    /** A cross-bank pair stores the Riyadh zone; both legs' wall clocks are read in it, so a re-check finds the same instant. */
     @Test
-    fun matchedPairAcrossBanks_readsBothWallClocksInTheStoredZone() {
+    fun matchedPairAcrossBanks_readsBothWallClocksInRiyadh() {
         val local = java.time.LocalDateTime.parse("2026-08-10T12:00:00")
         val riyadh = java.time.ZoneId.of("Asia/Riyadh")
         val snb = Bank("BANK_SNB")
@@ -340,7 +340,7 @@ class TransactionAssemblerTest {
 
         val tx = (TransactionAssembler.assembleMatchedPair(
             com.baraa.masroof.domain.matching.TransferMatchPair(out, incoming),
-            OwnershipStatus.OWNED, OwnershipStatus.OWNED, fallbackZone = java.time.ZoneId.of("Asia/Dubai"),
+            OwnershipStatus.OWNED, OwnershipStatus.OWNED,
         ) as TransactionAssembler.Outcome.Assembled).transaction
 
         assertEquals(riyadh.id, tx.occurredAtZone)
@@ -368,7 +368,7 @@ class TransactionAssemblerTest {
 
         val tx = (TransactionAssembler.assembleMatchedPair(
             com.baraa.masroof.domain.matching.TransferMatchPair(out, incoming),
-            OwnershipStatus.OWNED, OwnershipStatus.OWNED, fallbackZone = riyadh,
+            OwnershipStatus.OWNED, OwnershipStatus.OWNED,
         ) as TransactionAssembler.Outcome.Assembled).transaction
 
         assertEquals(outLocal.atZone(riyadh).toInstant(), tx.occurredAt)

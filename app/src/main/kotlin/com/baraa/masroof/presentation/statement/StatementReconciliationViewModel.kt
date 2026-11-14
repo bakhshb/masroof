@@ -105,12 +105,9 @@ fun statementReconciliationUiState(result: StatementImportResult): StatementReco
                     report.ledgerLines
                         .filter { it.status == StatementComparisonStatus.AMBIGUOUS }
                         .map { it.toUi() },
-                unsupportedLines = report.statementLines
+                unsupportedLines = report.ledgerLines
                     .filter { it.status == StatementComparisonStatus.UNSUPPORTED }
-                    .map { it.toUi() } +
-                    report.ledgerLines
-                        .filter { it.status == StatementComparisonStatus.UNSUPPORTED }
-                        .map { it.toUi() },
+                    .map { it.toUi() },
             )
         }
     }

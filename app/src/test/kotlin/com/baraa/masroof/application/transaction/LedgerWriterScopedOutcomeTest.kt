@@ -45,7 +45,6 @@ import com.baraa.masroof.sms.time.InstantClock
 import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
-import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -166,7 +165,6 @@ class LedgerWriterScopedOutcomeTest {
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
             ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
             effectiveParsedEventProvider = effective, reviewRepository = reviews, userDecisionRepository = decisions,
-            zoneId = ZoneId.of("Asia/Riyadh"),
             automaticWrite = { expected, write -> guard.write(expected, write) },
             inTransaction = { write -> db.withTransaction { write() } },
         )

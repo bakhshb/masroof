@@ -419,7 +419,6 @@ class ManualDecisionReplayTest {
                 effectiveParsedEventProvider = EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo),
                 reviewRepository = world.reviewRepo,
                 userDecisionRepository = world.decisionRepo,
-                zoneId = world.zone,
                 automaticWrite = { expected, write -> guard.write(expected, write).also { if (it is FinancialTransactionSaveResult.Conflict) conflict = it } },
             )
             val report = reconciliation.reconcileStoredEventsDetailed()

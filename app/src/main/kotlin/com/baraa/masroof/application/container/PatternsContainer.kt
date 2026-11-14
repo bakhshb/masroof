@@ -6,7 +6,6 @@ import com.baraa.masroof.application.interpretation.MessageReviewWorkflow
 import com.baraa.masroof.application.patterns.MessagePatternsWorkflow
 import com.baraa.masroof.application.patterns.PatternApprovalWorkflow
 import com.baraa.masroof.application.patterns.PendingPatternsWorkflow
-import com.baraa.masroof.domain.model.Bank
 
 /** Bank message patterns (approval and preview) and the learning workflows that read stored evidence. Built after SMS. */
 class PatternsContainer(
@@ -31,7 +30,6 @@ class PatternsContainer(
     val messagePatternsWorkflow by lazy {
         MessagePatternsWorkflow(
             storage.messagePatternStore, storage.databaseAccessGate, bundledBanks = storage.bundledPatternBanks,
-            requiredBundledBankIds = setOf(Bank.BANK_ALJAZIRA.id),
             appLogService = storage.appLogService,
             activation = PatternApprovalWorkflow(storage.messagePatternStore, storage.databaseAccessGate,
                 storage.accountRegistryRepository, review.ownershipConfirmationService, storage.cardRegistryRepository),

@@ -1,6 +1,5 @@
 package com.baraa.masroof.domain.assembly
 
-import com.baraa.masroof.domain.model.Bank
 import java.time.ZoneId
 
 /**
@@ -8,32 +7,15 @@ import java.time.ZoneId
  *
  * This object is the only bank-to-zone mapping. Adapters do not carry a second copy.
  *
- * Bank AlJazira prints civil time with no offset. Saudi Arabia's only civil
- * zone is [ALJAZIRA] (`Asia/Riyadh`, UTC+3, no daylight-saving time). The
- * handset zone is not that clock: using it would move a late-evening purchase
- * onto the next salary-period day after a timezone change.
+ * Every supported bank is Saudi and prints civil time with no offset, so every bank,
+ * [com.baraa.masroof.domain.model.Bank.UNKNOWN] included, reads its wall clock in [RIYADH]
+ * (`Asia/Riyadh`, UTC+3, no daylight-saving time). The handset zone is not that clock:
+ * using it would move a late-evening purchase onto the next salary-period day after a
+ * timezone change. A bank in another zone would make this a per-bank map again.
  *
- * A bank without a fixed zone keeps the zone stored on its first transaction.
- * [fallback] is only for the first resolution of such a bank. A new bank adds
- * its zone here, not on its adapter.
- *
- * Opt-in statement reconciliation uses this same map for offset-less CSV
- * `bookedAt` values. Do not add a second bank-to-zone table for statements.
+ * Opt-in statement reconciliation uses this same zone for offset-less CSV `bookedAt`
+ * values. Do not add a second bank-to-zone table for statements.
  */
 object BankTransactionTimePolicy {
-    val ALJAZIRA: ZoneId = ZoneId.of("Asia/Riyadh")
-
-    fun fixedZone(bank: Bank): ZoneId? =
-        if (bank == Bank.BANK_ALJAZIRA) ALJAZIRA else null
-
-    fun resolve(bank: Bank, persistedZoneId: String?, fallback: ZoneId): ZoneId =
-        zoneOrNull(bank, persistedZoneId) ?: fallback
-
-    /** The fixed zone, else the valid stored zone, else null. Never the handset zone. */
-    fun zoneOrNull(bank: Bank, persistedZoneId: String?): ZoneId? =
-        fixedZone(bank) ?: storedZoneOrNull(persistedZoneId)
-
-    /** A transaction's valid stored zone, or null for a blank or invalid one. */
-    fun storedZoneOrNull(persistedZoneId: String?): ZoneId? =
-        persistedZoneId?.takeIf { it.isNotBlank() }?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+    val RIYADH: ZoneId = ZoneId.of("Asia/Riyadh")
 }

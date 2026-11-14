@@ -229,7 +229,6 @@ class ReconciliationCharacterizationFixture private constructor(
         } else {
             noOpEffectiveParsedEventProvider(parsedRepo)
         },
-        zoneId = ZONE,
         reviewRepository = EmptyReviewRepository(),
         userDecisionRepository = NoOpUserDecisionRepository,
     )

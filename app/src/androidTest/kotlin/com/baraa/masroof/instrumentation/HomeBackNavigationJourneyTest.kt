@@ -300,7 +300,7 @@ class HomeBackNavigationJourneyTest {
         clickText(text(R.string.nav_settings))
         clickText(text(R.string.settings_banks_title))
         // The row shows the catalog display name, which stays Arabic in every locale.
-        click((hasText("بنك الجزيرة") or hasText(text(R.string.bank_aljazira))) and hasClickAction())
+        click(hasText("بنك الجزيرة") and hasClickAction())
         clickText(text(R.string.settings_bank_teaching))
         awaitNode(patternsScreen)
     }

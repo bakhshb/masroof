@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.baraa.masroof.core.money.Money
+import com.baraa.masroof.domain.assembly.BankTransactionTimePolicy
 import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.assembly.TransactionTiming
 import com.baraa.masroof.domain.ids.FinancialContainerIdFactory
@@ -43,7 +44,6 @@ import com.baraa.masroof.parsing.repository.ParsedEventRepository
 import com.baraa.masroof.sms.time.InstantClock
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneId
 
 /** Direction explicitly displayed by the review action when the user confirms it. */
 enum class ExternalTransferDirection(val family: MessageFamily) {
@@ -67,7 +67,6 @@ class ReviewWorkflowService(
     private val manualReviewResolutionRepository: ManualReviewResolutionRepository,
     private val userDecisionRepository: UserDecisionRepository,
     private val clock: InstantClock,
-    private val zoneId: ZoneId = ZoneId.systemDefault(),
     private val appLogService: AppLog,
     private val processingRecovery: ProcessingRecovery,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -595,24 +594,13 @@ class ReviewWorkflowService(
         }
     }
 
-    /**
-     * Same instant and zone as automatic reconciliation: fixed bank zone, then the
-     * bank-local wall clock, then SMS receipt time.
-     */
+    /** Same instant and zone as automatic reconciliation ([TransactionTiming]). */
     private fun resolvedTransactionTime(
         event: ParsedEvent,
         occurredAtLocal: LocalDateTime?,
         receivedAt: Instant,
-    ): Pair<Instant, String> {
-        val zone = TransactionTiming.zoneFor(bank = event.bank, fallback = zoneId)
-        val occurredAt = TransactionTiming.effectiveOccurredAt(
-            event = event,
-            occurredAtLocal = occurredAtLocal,
-            receivedAt = receivedAt,
-            zoneId = zoneId,
-        )
-        return occurredAt to zone.id
-    }
+    ): Pair<Instant, String> =
+        TransactionTiming.effectiveOccurredAt(event, occurredAtLocal, receivedAt) to BankTransactionTimePolicy.RIYADH.id
 
     /**
      * Keeps an already saved manual decision and records the failed RawSms ids for

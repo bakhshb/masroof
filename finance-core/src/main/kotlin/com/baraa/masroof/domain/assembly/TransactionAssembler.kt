@@ -93,7 +93,6 @@ object TransactionAssembler {
         loanType: LoanType? = null,
         transactionOccurredAt: Instant = receivedAt,
         userConfirmed: Boolean = false,
-        occurredAtZone: java.time.ZoneId? = null,
         deferIntraBankPairing: Boolean = true,
     ): Outcome {
         when (event.messageFamily) {
@@ -181,7 +180,6 @@ object TransactionAssembler {
             occurredAt = transactionOccurredAt,
             event = event,
             loanType = loanType,
-            occurredAtZone = occurredAtZone,
         )
     }
 
@@ -201,7 +199,6 @@ object TransactionAssembler {
     fun assembleUnmatchedOwnedTransfer(
         candidate: TransferMatchCandidate,
         pendingCounterparts: List<TransferMatchCandidate> = emptyList(),
-        fallbackZone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
     ): Outcome {
         val event = candidate.event
         val receivedAt = candidate.receivedAt
@@ -219,8 +216,7 @@ object TransactionAssembler {
         if (TransactionMatcher.hasPendingIntraBankCounterpart(candidate, pendingCounterparts)) {
             return Outcome.PendingMatch
         }
-        val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate, fallbackZone)
-        val zone = TransactionTiming.zoneFor(event.bank, fallback = fallbackZone)
+        val transactionOccurredAt = TransactionTiming.effectiveOccurredAt(candidate)
         if (sourceOwnership == OwnershipStatus.OWNED &&
             destinationOwnership == OwnershipStatus.OWNED
         ) {
@@ -231,7 +227,6 @@ object TransactionAssembler {
                 destinationOwnership = destinationOwnership,
                 cardOwnership = OwnershipStatus.UNKNOWN,
                 transactionOccurredAt = transactionOccurredAt,
-                occurredAtZone = zone,
                 deferIntraBankPairing = false,
                 userConfirmed = true,
             )
@@ -264,7 +259,6 @@ object TransactionAssembler {
             type = type,
             occurredAt = transactionOccurredAt,
             event = event,
-            occurredAtZone = zone,
         )
     }
 
@@ -276,7 +270,6 @@ object TransactionAssembler {
         pair: TransferMatchPair,
         outgoingSourceOwnership: OwnershipStatus,
         incomingDestinationOwnership: OwnershipStatus,
-        fallbackZone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
     ): Outcome {
         if (outgoingSourceOwnership != OwnershipStatus.OWNED) {
             return Outcome.PendingMatch
@@ -328,11 +321,7 @@ object TransactionAssembler {
             )
         }
 
-        // Both wall clocks are read in the zone the pair stores, so a later stale-link check that
-        // re-reads them with that zone finds the same instant instead of unlinking the pair.
-        val zone = TransactionTiming.zoneFor(out.bank, fallback = fallbackZone)
-        val occurredAt = listOf(pair.outgoing, pair.incoming)
-            .minOf { TransactionTiming.effectiveOccurredAt(it, fallbackZone, persistedZoneId = zone.id) }
+        val occurredAt = listOf(pair.outgoing, pair.incoming).minOf(TransactionTiming::effectiveOccurredAt)
 
         val rawSmsIds = listOf(out.rawSmsId, inn.rawSmsId).sorted()
         val linked = listOf(out.id, inn.id).sorted()
@@ -347,7 +336,7 @@ object TransactionAssembler {
             counterparty = out.counterparty ?: inn.counterparty,
             categoryId = null,
             linkedParsedEventIds = linked,
-            occurredAtZone = zone.id,
+            occurredAtZone = BankTransactionTimePolicy.RIYADH.id,
         )
         return Outcome.Assembled(tx, rawSmsIds)
     }
@@ -421,10 +410,8 @@ object TransactionAssembler {
         occurredAt: Instant,
         event: ParsedEvent,
         loanType: LoanType? = null,
-        occurredAtZone: java.time.ZoneId? = null,
     ): Outcome.Assembled {
         val rawSmsIds = listOf(event.rawSmsId)
-        val zone = occurredAtZone ?: TransactionTiming.zoneFor(event.bank)
         // Resolve durable ids from references only (null for Bank.UNKNOWN / incomplete).
         val durableSourceAccountId = event.sourceAccountRef?.let(FinancialContainerIdFactory::accountId)
         val durableDestAccountId = event.destinationAccountRef?.let(FinancialContainerIdFactory::accountId)
@@ -458,7 +445,7 @@ object TransactionAssembler {
                 occurredAt = occurredAt,
                 sourceContainerId = sourceId,
                 destinationContainerId = destId,
-                occurredAtZone = zone.id,
+                occurredAtZone = BankTransactionTimePolicy.RIYADH.id,
             ),
             rawSmsIds = rawSmsIds,
         )

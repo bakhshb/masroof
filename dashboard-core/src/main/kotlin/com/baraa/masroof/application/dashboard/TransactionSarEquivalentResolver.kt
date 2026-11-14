@@ -21,9 +21,8 @@ import java.time.ZoneId
  * 4. A market rate for the purchase civil date in the bank zone.
  * 5. No resolution. The row stays unconverted.
  *
- * The market civil date uses [FinancialTransaction.occurredAtZone] when it is a real zone id.
- * Otherwise it uses [BankTransactionTimePolicy] for the linked event's bank. It is not the
- * handset zone. When neither zone is known, the market rate is unavailable.
+ * The market civil date uses [FinancialTransaction.occurredAtZone] when it is a real zone id,
+ * otherwise [BankTransactionTimePolicy.RIYADH]. It is not the handset zone.
  */
 class TransactionSarEquivalentResolver(
     private val marketRateProvider: ForeignSarMarketRateProvider,
@@ -38,7 +37,6 @@ class TransactionSarEquivalentResolver(
         val rateIndex = HistoricalExchangeRateIndex.build(
             parsedRecords = parsedRecords,
             rawSmsById = rawSmsById,
-            persistedZoneIdByEventId = persistedZoneIdByEventId(transactions),
         )
         val result = mutableMapOf<String, SarEquivalentResolution>()
         for (tx in transactions) {
@@ -93,16 +91,6 @@ class TransactionSarEquivalentResolver(
         return result
     }
 
-    private fun persistedZoneIdByEventId(transactions: List<FinancialTransaction>): Map<String, String> {
-        val zones = linkedMapOf<String, String>()
-        for (tx in transactions) {
-            val zone = tx.occurredAtZone?.takeIf { it.isNotBlank() } ?: continue
-            for (eventId in tx.linkedParsedEventIds) {
-                zones.putIfAbsent(eventId, zone)
-            }
-        }
-        return zones
-    }
 
     private fun marketCivilDate(tx: FinancialTransaction, linked: ParsedEventRecord?): LocalDate? {
         val zone = marketZone(tx, linked) ?: return null
@@ -110,14 +98,11 @@ class TransactionSarEquivalentResolver(
     }
 
     /**
-     * Stored transaction zone first. Otherwise the linked event's bank policy.
-     * No handset-zone fallback.
+     * Stored transaction zone first, else the bank zone when the row has linked evidence
+     * (a row with neither stays unconverted, as before). No handset-zone fallback.
      */
-    private fun marketZone(tx: FinancialTransaction, linked: ParsedEventRecord?): ZoneId? {
-        TransactionLocalDate.storedZoneOrNull(tx)?.let { return it }
-        val bank = linked?.event?.bank ?: return null
-        return BankTransactionTimePolicy.fixedZone(bank)
-    }
+    private fun marketZone(tx: FinancialTransaction, linked: ParsedEventRecord?): ZoneId? =
+        TransactionLocalDate.storedZoneOrNull(tx) ?: linked?.let { BankTransactionTimePolicy.RIYADH }
 
     private fun linkedParsedRecord(
         tx: FinancialTransaction,

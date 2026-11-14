@@ -1,6 +1,5 @@
 package com.baraa.masroof.application.dashboard
 
-import com.baraa.masroof.domain.assembly.BankTransactionTimePolicy
 import com.baraa.masroof.domain.model.FinancialTransaction
 import java.time.LocalDate
 import java.time.ZoneId
@@ -17,7 +16,7 @@ object TransactionLocalDate {
 
     fun storedZoneOrNull(tx: FinancialTransaction): ZoneId? {
         val id = tx.occurredAtZone ?: return null
-        return parsed.getOrPut(id) { java.util.Optional.ofNullable(BankTransactionTimePolicy.storedZoneOrNull(id)) }.orElse(null)
+        return parsed.getOrPut(id) { java.util.Optional.ofNullable(id.takeIf { it.isNotBlank() }?.let { runCatching { ZoneId.of(it) }.getOrNull() }) }.orElse(null)
     }
 
     fun zoneOf(tx: FinancialTransaction, fallback: ZoneId): ZoneId = storedZoneOrNull(tx) ?: fallback

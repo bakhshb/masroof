@@ -77,10 +77,11 @@ check. Existing protection of already linked manual decisions remains in force.
 
 ## Activation and processing
 
-- STC defaults are installed before the container admits work. Opening Settings is
-  not required for intake. User banks, overlapping senders and disabled revisions
-  are preserved. AlJazira defaults are merged by missing id, retaining teaching and
-  disabled revisions. Dynamic routing evaluates every adapter and retains conflicts.
+- Every bundled bank's defaults are installed when the database opens, before the
+  container admits work. Opening Settings is not required for intake. User banks,
+  their senders, overlapping senders and disabled revisions are preserved: a bundled
+  bank whose sender another bank owns is not installed, and an installed bank gains
+  only missing patterns by id, retaining teaching and disabled revisions. Dynamic routing evaluates every adapter and retains conflicts.
 - Explicit account confirmation uses the existing ownership service. Approval
   validates the complete proposed configuration through the production finalizer,
   checks the full prior fingerprint and current ownership under exclusive access,

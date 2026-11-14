@@ -98,7 +98,7 @@ class LedgerWriterScopeTest {
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
             ownershipConfirmationService = OwnershipConfirmationService(accounts, cards, loans),
             effectiveParsedEventProvider = EffectiveParsedEventProvider(parsed, decisions),
-            reviewRepository = RoomReviewRepository(db.reviewItemDao()), userDecisionRepository = decisions, zoneId = zone,
+            reviewRepository = RoomReviewRepository(db.reviewItemDao()), userDecisionRepository = decisions,
             inTransaction = { write -> db.withTransaction { write() } },
         )
 

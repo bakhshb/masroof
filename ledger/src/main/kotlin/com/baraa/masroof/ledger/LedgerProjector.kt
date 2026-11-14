@@ -1,6 +1,5 @@
 package com.baraa.masroof.ledger
 
-import com.baraa.masroof.domain.assembly.BankTransactionTimePolicy
 import com.baraa.masroof.domain.assembly.TransactionAssembler
 import com.baraa.masroof.domain.assembly.TransactionTiming
 import com.baraa.masroof.domain.ids.TransactionIdFactory
@@ -20,7 +19,6 @@ import com.baraa.masroof.domain.rules.InformationalMessagePolicy
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneId
 import java.time.ZoneOffset
 
 /**
@@ -31,25 +29,21 @@ import java.time.ZoneOffset
  * Evidence and stored rows are visited in id order, so the input order never changes the result.
  */
 object LedgerProjector {
-    /**
-     * [decisions] are keyed by raw SMS id (missing = none). [zone] is the fallback zone for a bank with neither a
-     * fixed nor a stored zone.
-     */
+    /** [decisions] are keyed by raw SMS id (missing = none). */
     fun project(
         events: List<LedgerEvidence>,
         decisions: Map<String, EffectiveUserDecisions>,
         registry: OwnershipFacts,
         storedFacts: StoredFacts,
-        zone: ZoneId,
     ): LedgerProjection {
         require(events.distinctBy { it.event.rawSmsId }.size == events.size) { "one evidence per raw SMS" }
         require(storedFacts.rows.flatMap { it.rawSmsIds }.let { it.distinct().size == it.size }) { "one stored row per raw SMS" }
         // Stored rows in id order with sorted links, so neither the caller's order nor sorting changes the result.
         val stored = storedFacts.copy(rows = storedFacts.rows.map { it.copy(rawSmsIds = it.rawSmsIds.sorted()) }.sortedBy { it.transaction.id })
         val sorted = events.sortedBy { it.event.id }
-        val doublePosted = doublePostedLegs(sorted, decisions, registry, stored, zone)
+        val doublePosted = doublePostedLegs(sorted, decisions, registry, stored)
         val kept = if (doublePosted.isEmpty()) stored else stored.copy(rows = stored.rows - doublePosted)
-        return Projection(sorted, decisions, registry, kept, zone).run()
+        return Projection(sorted, decisions, registry, kept).run()
     }
 
     /**
@@ -63,19 +57,17 @@ object LedgerProjector {
         decisions: Map<String, EffectiveUserDecisions>,
         registry: OwnershipFacts,
         stored: StoredFacts,
-        zone: ZoneId,
     ): Set<LedgerRow> {
         val rows = stored.rows.filter { row ->
             row.rawSmsIds.size == 1 && row.transaction.isSingleLegSelfTransfer() && !stored.protects(row.rawSmsIds.single(), decisions)
         }
         if (rows.size < 2) return emptySet() // A release needs a second such row.
-        val zones = stored.rows.flatMap { row -> row.rawSmsIds.map { it to row.transaction.occurredAtZone } }.toMap()
         val candidates = events.mapNotNull { record ->
             val event = record.event
             val decided = decisions[event.rawSmsId] ?: EffectiveUserDecisions.NONE
             val eligible = event.messageFamily.isTransfer() && !decided.isNonFinancial &&
                 TransactionAssembler.isAutomationEligible(event, record.automationConfirmed || decided.confirmsFinancial)
-            if (eligible) event.rawSmsId to record.transferCandidate(registry, zone, zones[event.rawSmsId]) else null
+            if (eligible) event.rawSmsId to record.transferCandidate(registry) else null
         }.toMap()
         val paired = TransactionMatcher.findMutuallyUniquePairs(candidates.values.toList())
             .flatMap { listOf(it.outgoing.event.rawSmsId, it.incoming.event.rawSmsId) }.toSet()
@@ -202,10 +194,10 @@ private fun StoredFacts.protects(rawSmsId: String, decisions: Map<String, Effect
 private fun FinancialTransaction.isSingleLegSelfTransfer() =
     type == FinancialTransactionType.SELF_TRANSFER && linkedParsedEventIds.size == 1
 
-/** This leg as a matching candidate, owned per [facts], its time read in [persistedZone] (else [zone]). */
-private fun LedgerEvidence.transferCandidate(facts: OwnershipFacts, zone: ZoneId, persistedZone: String?) = TransferMatchCandidate(
+/** This leg as a matching candidate, owned per [facts]. */
+private fun LedgerEvidence.transferCandidate(facts: OwnershipFacts) = TransferMatchCandidate(
     event, transactionReference, occurredAtLocal, receivedAt, facts.account(event.sourceAccountRef), facts.account(event.destinationAccountRef),
-    TransactionTiming.effectiveOccurredAt(event, occurredAtLocal, receivedAt, zone, persistedZone),
+    TransactionTiming.effectiveOccurredAt(event, occurredAtLocal, receivedAt),
 )
 
 /** A transfer leg the projector may pair. */
@@ -221,7 +213,6 @@ private class Projection(
     private val decisions: Map<String, EffectiveUserDecisions>,
     private val registry: OwnershipFacts,
     private val stored: StoredFacts,
-    private val zone: ZoneId,
 ) {
     private val byRawSmsId = records.associateBy { it.event.rawSmsId }
     private val byEventId = records.associateBy { it.event.id }
@@ -349,7 +340,7 @@ private class Projection(
 
     /**
      * The stale-link release, leg by leg in event order: a transfer leg of a stored
-     * self-transfer leaves it when its effective time, read in the row's zone, differs from the row's time (by more
+     * self-transfer leaves it when its effective time differs from the row's time (by more
      * than the match window while the row still links two parsed events, the earlier leg's time being the pair's).
      */
     private fun staleLegs(row: LedgerRow): List<String> {
@@ -358,9 +349,7 @@ private class Projection(
         val released = mutableListOf<String>()
         for (record in row.rawSmsIds.mapNotNull(byRawSmsId::get).sortedBy { it.event.id }) {
             if (!record.event.messageFamily.isTransfer() || preserved(record.event.rawSmsId)) continue
-            val expected = TransactionTiming.effectiveOccurredAt(
-                record.event, record.occurredAtLocal, record.receivedAt, zone, row.transaction.occurredAtZone,
-            )
+            val expected = TransactionTiming.effectiveOccurredAt(record.event, record.occurredAtLocal, record.receivedAt)
             val stale = if (linkedEvents != 2) row.transaction.occurredAt != expected
             else Duration.between(row.transaction.occurredAt, expected).abs() > TransactionMatcher.TRANSFER_MATCH_WINDOW
             if (stale) {
@@ -371,13 +360,10 @@ private class Projection(
         return released
     }
 
-    /** The single assembly of [record] and its matching candidate, read with [facts] and the stored zone. */
+    /** The single assembly of [record] and its matching candidate, read with [facts]. */
     private fun single(record: LedgerEvidence, facts: OwnershipFacts): Pair<TransactionAssembler.Outcome, TransferMatchCandidate> {
         val event = record.event
-        val persistedZone = storedByRawSmsId[event.rawSmsId]?.transaction?.occurredAtZone
-        val occurredAt = TransactionTiming.effectiveOccurredAt(
-            event, record.occurredAtLocal, record.receivedAt, zone, persistedZone,
-        )
+        val occurredAt = TransactionTiming.effectiveOccurredAt(event, record.occurredAtLocal, record.receivedAt)
         val sourceOwnership = facts.account(event.sourceAccountRef)
         val destinationOwnership = facts.account(event.destinationAccountRef)
         val outcome = TransactionAssembler.assembleSingle(
@@ -390,7 +376,6 @@ private class Projection(
             loanType = record.loanType,
             transactionOccurredAt = occurredAt,
             userConfirmed = userConfirmed(record),
-            occurredAtZone = TransactionTiming.zoneFor(event.bank, persistedZone, zone),
         )
         return outcome to TransferMatchCandidate(
             event, record.transactionReference, record.occurredAtLocal, record.receivedAt,
@@ -411,7 +396,6 @@ private class Projection(
         val pair = TransactionMatcher.findMutuallyUniquePairs(candidates).singleOrNull() ?: return null
         val outcome = TransactionAssembler.assembleMatchedPair(
             pair, pair.outgoing.sourceOwnership, pair.incoming.destinationOwnership,
-            storedZone(pair.outgoing.event.rawSmsId) ?: storedZone(pair.incoming.event.rawSmsId) ?: zone,
         ) as? TransactionAssembler.Outcome.Assembled ?: return null
         val derived = LedgerRow(outcome.transaction, outcome.rawSmsIds.sorted())
         return derived.takeIf { it.rawSmsIds == row.rawSmsIds && !changesTypeOrAmount(row.transaction, it.transaction) }
@@ -449,7 +433,6 @@ private class Projection(
         for (pair in TransactionMatcher.findMutuallyUniquePairs(open)) {
             val outcome = TransactionAssembler.assembleMatchedPair(
                 pair, pair.outgoing.sourceOwnership, pair.incoming.destinationOwnership,
-                storedZone(pair.outgoing.event.rawSmsId) ?: storedZone(pair.incoming.event.rawSmsId) ?: zone,
             )
             if (outcome !is TransactionAssembler.Outcome.Assembled) continue
             post(outcome.transaction, outcome.rawSmsIds)
@@ -458,9 +441,7 @@ private class Projection(
         val counterparts = open + storedSingleLegCounterparts(open.mapTo(mutableSetOf()) { it.event.rawSmsId })
         for (candidate in open) {
             if (candidate.event.rawSmsId in paired) continue
-            val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(
-                candidate, counterparts, storedZone(candidate.event.rawSmsId) ?: zone,
-            )
+            val outcome = TransactionAssembler.assembleUnmatchedOwnedTransfer(candidate, counterparts)
             if (outcome is TransactionAssembler.Outcome.Assembled) {
                 postAlone(outcome)
             } else {
@@ -483,15 +464,8 @@ private class Projection(
             decided.outcome?.kind == UserDecisionKind.EXTERNAL_TRANSFER ||
             !TransactionAssembler.isAutomationEligible(event, userConfirmed(record))
         ) return@mapNotNull null
-        record.transferCandidate(ownership, zone, row.transaction.occurredAtZone)
+        record.transferCandidate(ownership)
     }
-
-    /**
-     * The zone stored on the row that links [rawSmsId], as the old pass healed a posted leg in it: a bank without a
-     * fixed zone keeps its stored zone when its leg is re-derived (`BankTransactionTimePolicy`).
-     */
-    private fun storedZone(rawSmsId: String): ZoneId? =
-        BankTransactionTimePolicy.storedZoneOrNull(storedByRawSmsId[rawSmsId]?.transaction?.occurredAtZone)
 
     private class Leg(val posted: FinancialTransaction?, val record: LedgerEvidence)
 
@@ -522,7 +496,7 @@ private class Projection(
                 .forEach { add(Leg(null, it)) }
         }
         val byEvent = legs.associateBy { it.record.event.id }
-        val candidates = legs.map { leg -> leg.record.transferCandidate(ownership, zone, leg.posted?.occurredAtZone) }
+        val candidates = legs.map { leg -> leg.record.transferCandidate(ownership) }
         for (pair in TransactionMatcher.findMutuallyUniquePairs(candidates)) {
             val outLeg = byEvent.getValue(pair.outgoing.event.id)
             val inLeg = byEvent.getValue(pair.incoming.event.id)
@@ -530,11 +504,9 @@ private class Projection(
             val hasStaleExternal = outLeg.posted?.type == FinancialTransactionType.EXTERNAL_TRANSFER_OUT ||
                 inLeg.posted?.type == FinancialTransactionType.EXTERNAL_TRANSFER_IN
             if (!hasStaleExternal && postedLegs.none { it.isSingleLegSelfTransfer() }) continue
-            val healZone = postedLegs.firstNotNullOfOrNull { BankTransactionTimePolicy.storedZoneOrNull(it.occurredAtZone) }
-                ?: zone
             val rawSmsIds = listOf(pair.outgoing.event.rawSmsId, pair.incoming.event.rawSmsId).sorted()
             val outcome = TransactionAssembler.assembleMatchedPair(
-                pair, pair.outgoing.sourceOwnership, pair.incoming.destinationOwnership, healZone,
+                pair, pair.outgoing.sourceOwnership, pair.incoming.destinationOwnership,
             )
             if (outcome is TransactionAssembler.Outcome.Assembled) {
                 post(outcome.transaction, outcome.rawSmsIds, replacing = rawSmsIds)
@@ -580,7 +552,7 @@ private class Projection(
             val counterparts = open.filter { it.event.rawSmsId !in links } +
                 storedSingleLegCounterparts(open.mapTo(mutableSetOf()) { it.event.rawSmsId })
             val outcome = candidate?.let {
-                TransactionAssembler.assembleUnmatchedOwnedTransfer(it, counterparts, storedZone(rawSmsId) ?: zone)
+                TransactionAssembler.assembleUnmatchedOwnedTransfer(it, counterparts)
             }
             if (outcome is TransactionAssembler.Outcome.Assembled) postAlone(outcome) else pendingMatch(rawSmsId)
         }

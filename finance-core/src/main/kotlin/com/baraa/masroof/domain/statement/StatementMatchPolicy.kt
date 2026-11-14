@@ -9,7 +9,6 @@ import com.baraa.masroof.domain.model.FinancialTransactionType
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.ZoneId
 
 enum class StatementComparisonStatus {
     MATCHED,
@@ -29,11 +28,8 @@ enum class StatementComparisonStatus {
  * the ledger's bank-local time must fall inside [BOOKING_TIME_WINDOW]. A same-day
  * amount with a clearly different clock is not a match.
  *
- * Zone: [BankTransactionTimePolicy] only. AlJazira is `Asia/Riyadh`. A bank
- * without a fixed zone uses the single distinct `occurredAtZone` already stored
- * on posted rows for that bank. Zero or several stored zones leave the line
- * [com.baraa.masroof.domain.statement.StatementComparisonStatus.UNSUPPORTED].
- * The device zone is not a match key.
+ * Zone: [BankTransactionTimePolicy.RIYADH] for every bank. The device zone is not
+ * a match key.
  *
  * A match requires the same bank, the same qualified account suffix, the same
  * direction, the same currency, and an equal amount. Description never forces a
@@ -55,7 +51,7 @@ object StatementMatchPolicy {
      */
     val BOOKING_TIME_WINDOW: Duration = Duration.ofMinutes(10)
 
-    /** Read superset around civil dates so a non-fixed zone can still be loaded. Not a match window. */
+    /** Read superset around civil dates so the bank-zone offset can still be loaded. Not a match window. */
     const val QUERY_SUPERSET_PADDING_DAYS: Long = 2
 
     enum class AccountEndpoint {
@@ -88,19 +84,6 @@ object StatementMatchPolicy {
         val expected = FinancialContainerIdFactory.accountId(bank, masked)
         if (containerId != expected) return null
         return QualifiedAccount(bank, masked)
-    }
-
-    fun zoneForPostedMovement(bank: Bank, persistedZoneId: String?): ZoneId? =
-        BankTransactionTimePolicy.zoneOrNull(bank, persistedZoneId)
-
-    /**
-     * Zone for statement lines of [bank]. Fixed zones win. Otherwise exactly one
-     * stored zone from the posted rows is required.
-     */
-    fun zoneForStatementBank(bank: Bank, distinctPersistedZones: Set<String?>): ZoneId? {
-        BankTransactionTimePolicy.fixedZone(bank)?.let { return it }
-        val only = distinctPersistedZones.singleOrNull() ?: return null
-        return zoneForPostedMovement(bank, only)
     }
 
     fun datesMatch(statementDate: LocalDate, ledgerDate: LocalDate): Boolean {

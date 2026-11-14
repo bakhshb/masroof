@@ -125,7 +125,7 @@ class DashboardLedgerWorld(
         userDecisionRepository = decisionRepo,
     )
     val ledgerInputLoader = com.baraa.masroof.application.transaction.LedgerInputLoader(
-        rawRepo, ftRepo, reviewRepo, decisionRepo, effectiveEvents, ownershipResolver, zone,
+        rawRepo, ftRepo, reviewRepo, decisionRepo, effectiveEvents, ownershipResolver,
     )
     private val reviewQueueUpdater = ReviewQueueUpdater(reviewRepo, ftRepo, importClock)
 

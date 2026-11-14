@@ -16,6 +16,19 @@ import com.baraa.masroof.testsupport.NoOpAppLog
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class MessagePatternsWorkflowTest {
+    @Test fun everyBundledBankKeepsTheUsersSendersAndYieldsAnOwnedSender() {
+        for (file in listOf("BANK_ALJAZIRA", "BANK_SNB")) {
+            val seed = com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec
+                .decode(java.io.File("src/main/assets/bank-patterns/$file.patterns.json").readText()).banks.single()
+            val edited = seed.copy(senders = listOf(seed.senders.first()))
+            val installed = com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration(banks = listOf(edited))
+            assertNull("$file: a removed bundled sender is not re-added", MessagePatternStore.installation(installed, seed))
+            val other = com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration(
+                banks = listOf(BankMessagePatterns("BANK_USER", listOf(seed.senders.first()))))
+            assertNull("$file: a sender the user's bank owns blocks the bundled bank", MessagePatternStore.installation(other, seed))
+        }
+    }
+
     @Test fun approvedLinksSurviveRestartsAndTravelWithNewerBundledRules() {
         val text = java.io.File("src/main/assets/bank-patterns/BANK_BARQ.patterns.json").readText()
         fun bank(json: String) = com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec.decode(json).banks.single()
@@ -26,9 +39,9 @@ class MessagePatternsWorkflowTest {
             if (it.id != "barq.transfer-in") it else it.copy(revision = 2, factContract = it.factContract!!.copy(version = 2, accountBindings = links))
         })
         val configuration = com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration(banks = listOf(approved))
-        assertNull("Links alone are not a newer bundled rule", MessagePatternStore.installation(configuration, seed, emptySet()))
+        assertNull("Links alone are not a newer bundled rule", MessagePatternStore.installation(configuration, seed))
         val newer = bank(text.replace("\"incoming transfer\"", "\"incoming transfer v2\""))
-        val upgraded = MessagePatternStore.installation(configuration, newer, emptySet())!!.currentPatterns.single { it.id == "barq.transfer-in" }
+        val upgraded = MessagePatternStore.installation(configuration, newer)!!.currentPatterns.single { it.id == "barq.transfer-in" }
         assertEquals(3, upgraded.revision)
         assertEquals(newer.patterns.single { it.id == "barq.transfer-in" }.roleProfile, upgraded.roleProfile)
         assertEquals(links, upgraded.factContract!!.accountBindings)
@@ -85,7 +98,7 @@ class MessagePatternsWorkflowTest {
             val seed = com.baraa.masroof.engine.bank.patterns.SavedMessagePattern.fromChoices("bundled", "BANK_TEST", "Sender",
                 "PURCHASE", body, listOf(com.baraa.masroof.engine.bank.patterns.FieldChoice("amount", 15, body.length)))
             val bank = BankMessagePatterns("BANK_TEST", listOf("Sender"), patterns = listOf(seed))
-            fun workflow() = MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(bank), requiredBundledBankIds = setOf(bank.bankId), appLogService = NoOpAppLog)
+            fun workflow() = MessagePatternsWorkflow(store, DatabaseAccessGate(), bundledBanks = listOf(bank), appLogService = NoOpAppLog)
             val w = workflow()
             val installed = w.load()
             assertTrue(runCatching { w.deletePattern(installed.generation, bank.bankId, seed.id) }.isFailure)

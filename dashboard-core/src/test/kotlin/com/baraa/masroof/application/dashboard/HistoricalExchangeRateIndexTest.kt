@@ -16,7 +16,6 @@ import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneId
 import java.util.TimeZone
 
 class HistoricalExchangeRateIndexTest {
@@ -101,7 +100,7 @@ class HistoricalExchangeRateIndexTest {
     }
 
     @Test
-    fun alJaziraWallClock_usesRiyadhNotTheHandsetOrAStoredZone() {
+    fun everyBankWallClock_usesRiyadhNotTheHandsetZone() {
         val previous = TimeZone.getDefault()
         TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Honolulu"))
         try {
@@ -111,11 +110,11 @@ class HistoricalExchangeRateIndexTest {
                 rate = "4.00",
                 occurredAt = null,
                 occurredAtLocal = LocalDateTime.parse("2026-10-01T10:00"),
+                bank = Bank("BANK_SNB"),
             )
             val index = HistoricalExchangeRateIndex.build(
                 parsedRecords = listOf(record),
                 rawSmsById = mapOf(record.event.rawSmsId to raw(record.event.rawSmsId, Instant.parse("2026-09-01T00:00:00Z"))),
-                persistedZoneIdByEventId = mapOf(record.event.id to "Pacific/Honolulu"),
             )
 
             assertEquals(
@@ -125,35 +124,6 @@ class HistoricalExchangeRateIndexTest {
             assertNull(
                 index.rateForMerchant("TEST_FX_SHOP", Currency.USD, Instant.parse("2026-10-01T06:59:59Z")),
             )
-        } finally {
-            TimeZone.setDefault(previous)
-        }
-    }
-
-    @Test
-    fun otherBank_usesThePersistedZoneNotTheHandsetZone() {
-        val previous = TimeZone.getDefault()
-        TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Honolulu"))
-        try {
-            val record = evidence(
-                id = "pe-tokyo",
-                merchant = "TEST_FX_SHOP",
-                rate = "4.00",
-                occurredAt = null,
-                occurredAtLocal = LocalDateTime.parse("2026-10-01T10:00"),
-                bank = Bank("OTHER"),
-            )
-            val index = HistoricalExchangeRateIndex.build(
-                parsedRecords = listOf(record),
-                rawSmsById = emptyMap(),
-                persistedZoneIdByEventId = mapOf(record.event.id to "Asia/Tokyo"),
-            )
-            val tokyoInstant = LocalDateTime.parse("2026-10-01T10:00")
-                .atZone(ZoneId.of("Asia/Tokyo"))
-                .toInstant()
-
-            assertEquals(BigDecimal("4.00"), index.rateForMerchant("TEST_FX_SHOP", Currency.USD, tokyoInstant))
-            assertNull(index.rateForMerchant("TEST_FX_SHOP", Currency.USD, tokyoInstant.minusSeconds(1)))
         } finally {
             TimeZone.setDefault(previous)
         }

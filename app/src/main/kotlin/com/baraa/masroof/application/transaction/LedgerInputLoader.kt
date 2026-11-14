@@ -20,7 +20,6 @@ import com.baraa.masroof.ledger.StoredFacts
 import com.baraa.masroof.ledger.isTransfer
 import com.baraa.masroof.ledger.loanReference
 import com.baraa.masroof.parsing.repository.ParsedEventRecord
-import java.time.ZoneId
 
 /**
  * The projector's inputs read from the database, with the stored ledger and reviews they are compared with
@@ -31,12 +30,11 @@ data class LedgerInputs(
     val decisions: Map<String, EffectiveUserDecisions>,
     val registry: OwnershipFacts,
     val storedFacts: StoredFacts,
-    val zone: ZoneId,
     val reviews: List<ReviewItem>,
     /** The effective parse behind each of [events], by raw SMS id: the snapshot the write guard compares. */
     val records: Map<String, ParsedEventRecord> = emptyMap(),
 ) {
-    fun project(): LedgerProjection = LedgerProjector.project(events, decisions, registry, storedFacts, zone)
+    fun project(): LedgerProjection = LedgerProjector.project(events, decisions, registry, storedFacts)
 }
 
 /**
@@ -51,7 +49,6 @@ class LedgerInputLoader(
     private val userDecisionRepository: UserDecisionRepository,
     private val effectiveParsedEventProvider: EffectiveParsedEventProvider,
     private val ownershipResolver: OwnershipResolver,
-    private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) {
     suspend fun load(): LedgerInputs {
         val records = effectiveParsedEventProvider.listAllEffective()
@@ -69,7 +66,6 @@ class LedgerInputLoader(
                 rows = rows,
                 correctionClosedRawSmsIds = reviews.filter(ReviewCorrectionClosure::isClosed).map { it.rawSmsId }.toSet(),
             ),
-            zone = zoneId,
             reviews = reviews,
             records = records.filter { it.event.rawSmsId in receivedAt }.associateBy { it.event.rawSmsId },
         )
@@ -126,7 +122,6 @@ class LedgerInputLoader(
                 rows = rows.values.filter { row -> row.rawSmsIds.any { it in scope } }.sortedBy { it.transaction.id },
                 correctionClosedRawSmsIds = reviews.filter(ReviewCorrectionClosure::isClosed).map { it.rawSmsId }.toSet(),
             ),
-            zone = zoneId,
             reviews = reviews,
             records = scopedRecords.filter { it.event.rawSmsId in receivedAt }.associateBy { it.event.rawSmsId },
         )

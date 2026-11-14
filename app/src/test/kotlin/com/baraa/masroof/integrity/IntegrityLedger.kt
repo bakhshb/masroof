@@ -217,7 +217,6 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         ownershipConfirmationService = confirmation,
         reviewRepository = reviews,
         userDecisionRepository = world.decisionRepo,
-        zoneId = world.zone,
         effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
         inTransaction = { write -> linkReplace(write) },
     )
@@ -230,7 +229,6 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         effectiveParsedEventProvider = EffectiveParsedEventProvider(world.parsedRepo, world.decisionRepo),
         reviewRepository = world.reviewRepo,
         userDecisionRepository = world.decisionRepo,
-        zoneId = world.zone,
     )
 
     private val reviewQueue = ReviewQueueUpdater(reviews, posted, clock)
@@ -294,7 +292,6 @@ internal class IntegrityLedger(val world: DashboardLedgerWorld) {
         reviewQueueUpdater = productionReviewQueue,
         manualReviewResolutionRepository = RoomManualReviewResolutionRepository(world.db, world.ftRepo),
         clock = clock,
-        zoneId = world.zone,
         appLogService = NoOpAppLog,
         processingRecovery = noOpProcessingRecovery(),
     )

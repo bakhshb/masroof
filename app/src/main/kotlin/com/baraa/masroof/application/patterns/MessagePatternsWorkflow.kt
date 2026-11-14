@@ -20,7 +20,6 @@ class MessagePatternsWorkflow(
     private val pendingPreview: PendingPatternsWorkflow? = null,
     private val bundledBanks: List<BankMessagePatterns> = emptyList(),
     private val activation: PatternApprovalWorkflow? = null,
-    private val requiredBundledBankIds: Set<String> = emptySet(),
     private val appLogService: com.baraa.masroof.application.logging.AppLog,
 ) {
     /** Pattern screens report caught failures here so they reach the app log. */
@@ -67,9 +66,9 @@ class MessagePatternsWorkflow(
 
     suspend fun load() = withContext(ioDispatcher) {
         val existing = accessGate.withAccess { store.load() }
-        if (bundledBanks.none { MessagePatternStore.installation(existing, it, requiredBundledBankIds) != null }) existing
+        if (bundledBanks.none { MessagePatternStore.installation(existing, it) != null }) existing
         else accessGate.withExclusiveAccess {
-            store.installMissingBanks(bundledBanks, requiredBundledBankIds)
+            store.installMissingBanks(bundledBanks)
         }
     }
 
