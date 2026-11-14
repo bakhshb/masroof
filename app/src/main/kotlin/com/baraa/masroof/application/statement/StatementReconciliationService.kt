@@ -221,8 +221,7 @@ class StatementReconciliationService(
             ledgerOnly = ledgerLines.count { it.status == StatementComparisonStatus.LEDGER_ONLY },
             ambiguous = statementLines.count { it.status == StatementComparisonStatus.AMBIGUOUS } +
                 ledgerLines.count { it.status == StatementComparisonStatus.AMBIGUOUS },
-            unsupported = statementLines.count { it.status == StatementComparisonStatus.UNSUPPORTED } +
-                ledgerLines.count { it.status == StatementComparisonStatus.UNSUPPORTED },
+            unsupported = ledgerLines.count { it.status == StatementComparisonStatus.UNSUPPORTED },
         )
         return StatementReconciliationReport(
             formatVersion = statement.formatVersion,
@@ -270,8 +269,7 @@ class StatementReconciliationService(
                 ledgerOnlyCount = ledgerForKey.count { it.status == StatementComparisonStatus.LEDGER_ONLY },
                 ledgerOnlyDebit = sumLedger(ledgerForKey, StatementComparisonStatus.LEDGER_ONLY, StatementDirection.DEBIT),
                 ledgerOnlyCredit = sumLedger(ledgerForKey, StatementComparisonStatus.LEDGER_ONLY, StatementDirection.CREDIT),
-                unsupportedCount = statementForKey.count { it.status == StatementComparisonStatus.UNSUPPORTED } +
-                    ledgerForKey.count { it.status == StatementComparisonStatus.UNSUPPORTED },
+                unsupportedCount = ledgerForKey.count { it.status == StatementComparisonStatus.UNSUPPORTED },
             )
         }.sortedWith(compareBy({ it.bankId }, { it.accountMasked }, { it.currency.name }))
     }
