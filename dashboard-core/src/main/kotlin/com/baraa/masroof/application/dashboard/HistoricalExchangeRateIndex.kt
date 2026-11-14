@@ -22,11 +22,10 @@ import java.time.Instant
  *
  * Evidence time prefers the SMS wall clock ([com.baraa.masroof.parsing.model.ParsedEventDetails.occurredAtLocal])
  * converted with [TransactionTiming.bankLocalInstant], which follows [com.baraa.masroof.domain.assembly.BankTransactionTimePolicy].
- * AlJazira is `Asia/Riyadh`. The handset zone is not used. When the wall clock is
+ * Every bank is `Asia/Riyadh`. The handset zone is not used. When the wall clock is
  * absent, the event's stored [com.baraa.masroof.domain.model.ParsedEvent.occurredAt] is used.
  * The inbox [RawSms.receivedAt] is only a last resort when both are absent; it is already
- * an instant and is not a reinterpretation of a bank-local clock. A wall clock that
- * cannot be zoned is ineligible rather than converted with the handset zone.
+ * an instant and is not a reinterpretation of a bank-local clock.
  */
 class HistoricalExchangeRateIndex private constructor(
     private val evidenceByMerchant: Map<String, Map<Currency, List<RateEvidence>>>,
@@ -62,7 +61,6 @@ class HistoricalExchangeRateIndex private constructor(
         fun build(
             parsedRecords: List<ParsedEventRecord>,
             rawSmsById: Map<String, RawSms>,
-            persistedZoneIdByEventId: Map<String, String> = emptyMap(),
         ): HistoricalExchangeRateIndex {
             val byMerchant = mutableMapOf<String, MutableMap<Currency, MutableMap<String, RateEvidence>>>()
             for (record in parsedRecords) {
@@ -74,11 +72,7 @@ class HistoricalExchangeRateIndex private constructor(
                     ?: record.details.labeledForeignAmount?.currency?.takeIf { it.convertsToSar() }
                     ?: continue
                 val rate = record.details.exchangeRate ?: continue
-                val at = evidenceInstant(
-                    record = record,
-                    rawSmsById = rawSmsById,
-                    persistedZoneId = persistedZoneIdByEventId[record.event.id],
-                ) ?: continue
+                val at = evidenceInstant(record, rawSmsById) ?: continue
                 val byEvent = byMerchant.getOrPut(merchant) { mutableMapOf() }
                     .getOrPut(currency) { mutableMapOf() }
                 byEvent.putIfAbsent(record.event.id, RateEvidence(rate, at, record.event.id))
@@ -93,13 +87,8 @@ class HistoricalExchangeRateIndex private constructor(
         private fun evidenceInstant(
             record: ParsedEventRecord,
             rawSmsById: Map<String, RawSms>,
-            persistedZoneId: String?,
-        ): Instant? {
-            val local = record.details.occurredAtLocal
-            if (local != null) {
-                return TransactionTiming.bankLocalInstant(record.event.bank, local, persistedZoneId)
-            }
-            return record.event.occurredAt ?: rawSmsById[record.event.rawSmsId]?.receivedAt
-        }
+        ): Instant? =
+            record.details.occurredAtLocal?.let(TransactionTiming::bankLocalInstant)
+                ?: record.event.occurredAt ?: rawSmsById[record.event.rawSmsId]?.receivedAt
     }
 }

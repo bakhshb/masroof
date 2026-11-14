@@ -21,62 +21,32 @@ class BankTransactionTimePolicyTest {
     private val receivedAt = Instant.parse("2026-08-26T19:30:00Z")
 
     @Test
-    fun alJaziraWallClock_ignoresTheDeviceZone() {
-        val tokyo = TransactionTiming.effectiveOccurredAt(
-            event = event(Bank.BANK_ALJAZIRA),
-            occurredAtLocal = local,
-            receivedAt = receivedAt,
-            zoneId = ZoneId.of("Asia/Tokyo"),
-        )
-        val newYork = TransactionTiming.effectiveOccurredAt(
-            event = event(Bank.BANK_ALJAZIRA),
-            occurredAtLocal = local,
-            receivedAt = receivedAt,
-            zoneId = ZoneId.of("America/New_York"),
-        )
-        val riyadhInstant = local.atZone(BankTransactionTimePolicy.ALJAZIRA).toInstant()
-        assertEquals(riyadhInstant, tokyo)
-        assertEquals(tokyo, newYork)
-        assertEquals(LocalDate.of(2026, 8, 26), tokyo.atZone(BankTransactionTimePolicy.ALJAZIRA).toLocalDate())
+    fun everyBankWallClock_isRiyadhTimeWhateverTheDeviceZone() {
+        val previous = java.util.TimeZone.getDefault()
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Tokyo"))
+        try {
+            val riyadhInstant = local.atZone(ZoneId.of("Asia/Riyadh")).toInstant()
+            for (bank in listOf(Bank.BANK_ALJAZIRA, Bank("BANK_SNB"), Bank("BANK_STC"), Bank.UNKNOWN)) {
+                assertEquals(riyadhInstant, TransactionTiming.effectiveOccurredAt(event(bank), local, receivedAt), bank.id)
+            }
+        } finally {
+            java.util.TimeZone.setDefault(previous)
+        }
     }
 
     @Test
-    fun alJaziraEvening_staysInThePeriodBeforeDay27() {
-        val instant = TransactionTiming.effectiveOccurredAt(
-            event = event(Bank.BANK_ALJAZIRA),
-            occurredAtLocal = local,
-            receivedAt = receivedAt,
-            zoneId = ZoneOffset.UTC,
-        )
-        val riyadhDay = instant.atZone(BankTransactionTimePolicy.ALJAZIRA).toLocalDate()
+    fun eveningWallClock_staysInThePeriodBeforeDay27() {
+        val instant = TransactionTiming.effectiveOccurredAt(event(Bank("BANK_SNB")), local, receivedAt)
+        val riyadhDay = instant.atZone(BankTransactionTimePolicy.RIYADH).toLocalDate()
         val period = FinancialPeriodPolicy.periodContaining(riyadhDay)
         assertEquals(LocalDate.of(2026, 7, 27), period.startDate)
         assertEquals(LocalDate.of(2026, 8, 27), period.endDateExclusive)
 
         val ifWallClockWereUtc = local.atZone(ZoneOffset.UTC).toInstant()
-            .atZone(BankTransactionTimePolicy.ALJAZIRA)
+            .atZone(BankTransactionTimePolicy.RIYADH)
             .toLocalDate()
         assertEquals(LocalDate.of(2026, 8, 27), ifWallClockWereUtc)
         assertNotEquals(period, FinancialPeriodPolicy.periodContaining(ifWallClockWereUtc))
-    }
-
-    @Test
-    fun unknownBank_reusesThePersistedZoneInsteadOfTheCurrentDeviceZone() {
-        val first = TransactionTiming.effectiveOccurredAt(
-            event = event(Bank("OTHER")),
-            occurredAtLocal = local,
-            receivedAt = receivedAt,
-            zoneId = ZoneId.of("Asia/Tokyo"),
-        )
-        val again = TransactionTiming.effectiveOccurredAt(
-            event = event(Bank("OTHER")),
-            occurredAtLocal = local,
-            receivedAt = receivedAt,
-            zoneId = ZoneId.of("America/New_York"),
-            persistedZoneId = "Asia/Tokyo",
-        )
-        assertEquals(first, again)
-        assertEquals("Asia/Tokyo", TransactionTiming.zoneFor(Bank("OTHER"), "Asia/Tokyo", ZoneId.of("UTC")).id)
     }
 
     private fun event(bank: Bank) = ParsedEvent(

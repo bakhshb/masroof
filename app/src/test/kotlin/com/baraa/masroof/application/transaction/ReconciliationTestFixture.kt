@@ -75,12 +75,11 @@ abstract class ReconciliationTestFixture {
         db.close()
     }
 
-    protected fun serviceIn(zone: java.time.ZoneId) = TransactionReconciliationService(
+    protected fun service() = TransactionReconciliationService(
         rawSmsRepository = rawRepo,
         financialTransactionRepository = ftRepo,
         ownershipResolver = com.baraa.masroof.domain.ownership.OwnershipResolver(accounts, cards, loans),
         ownershipConfirmationService = confirmation,
-        zoneId = zone,
         effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
         reviewRepository = EmptyReviewRepository(),
         userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,

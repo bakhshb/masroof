@@ -101,7 +101,6 @@ class ReviewWorkflowServiceTest {
         ledger: FinancialTransactionRepository = ftRepo,
         reviewQueueReviews: com.baraa.masroof.domain.repository.ReviewRepository = reviewRepo,
         reconcileWithReviews: Boolean = true,
-        zoneId: java.time.ZoneId = java.time.ZoneId.systemDefault(),
         processingRecovery: ProcessingRecovery = noOpProcessingRecovery(),
     ) = RoomReviewWiring(
         db = db,
@@ -113,7 +112,6 @@ class ReviewWorkflowServiceTest {
         loans = loans,
         reviewQueueReviews = reviewQueueReviews,
         reconcileWithReviews = reconcileWithReviews,
-        zoneId = zoneId,
         processingRecovery = processingRecovery,
     )
 
@@ -937,7 +935,6 @@ class ReviewWorkflowServiceTest {
 
     @Test
     fun manualResolution_matchesAutomaticAlJaziraTimeAroundSalaryBoundary() = runBlocking {
-        val newYork = java.time.ZoneId.of("America/New_York")
         val riyadh = java.time.ZoneId.of("Asia/Riyadh")
         val local = java.time.LocalDateTime.of(2026, 8, 26, 22, 30)
         val receivedAt = Instant.parse("2026-08-27T02:00:00Z")
@@ -946,7 +943,7 @@ class ReviewWorkflowServiceTest {
 
         confirmation.confirmCardOwned(CardReference(Bank.BANK_ALJAZIRA, "7271"))
         confirmation.confirmAccountOwned(AccountReference(Bank.BANK_ALJAZIRA, "3001"))
-        val newYorkWiring = wiring(reconcileWithReviews = false, zoneId = newYork)
+        val newYorkWiring = wiring(reconcileWithReviews = false)
         val auto = newYorkWiring.reconciliation
         val manual = newYorkWiring.workflow
 

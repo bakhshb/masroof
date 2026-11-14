@@ -124,7 +124,6 @@ class IntraBankSelfTransferReconciliationTest {
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
             reviewRepository = reviewRepo,
             userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
-            zoneId = zoneId,
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
         )
@@ -767,7 +766,6 @@ class IntraBankSelfTransferReconciliationTest {
             ownershipResolver = OwnershipResolver(accounts, cards, NoOpLoanRegistryRepository),
             reviewRepository = reviewRepo,
             userDecisionRepository = com.baraa.masroof.data.repository.RoomUserDecisionRepository(db),
-            zoneId = zoneId,
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsedRepo),
             ownershipConfirmationService = noOpOwnershipConfirmation(),
             inTransaction = { write -> db.withTransaction { write() } },
@@ -893,7 +891,6 @@ class IntraBankSelfTransferReconciliationTest {
             event = parsed.event,
             occurredAtLocal = parsed.details.occurredAtLocal,
             receivedAt = receivedAt,
-            zoneId = zoneId,
         )
         ftRepo.save(
             FinancialTransaction(
@@ -926,7 +923,6 @@ class IntraBankSelfTransferReconciliationTest {
             event = parsed.event,
             occurredAtLocal = parsed.details.occurredAtLocal,
             receivedAt = receivedAt,
-            zoneId = zoneId,
         )
         ftRepo.save(
             FinancialTransaction(

@@ -179,7 +179,7 @@ class ReplicaSetupJourneyTest {
             click(R.string.nav_settings)
             screenshot("06-settings")
             click(R.string.settings_banks_title)
-            val bankName = settings.uiState.value.bankCatalog!!.banks.single { it.bankId == com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA.id }.displayName ?: text(R.string.bank_aljazira)
+            val bankName = settings.uiState.value.bankCatalog!!.banks.single { it.bankId == com.baraa.masroof.domain.model.Bank.BANK_ALJAZIRA.id }.displayName!!
             compose.onNodeWithText(bankName).performClick()
             compose.waitForIdle()
             click(R.string.settings_bank_loans_title)

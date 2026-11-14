@@ -91,7 +91,6 @@ class ScopedReconciliationTest {
             financialTransactionRepository = transactions,
             ownershipResolver = OwnershipResolver(accounts, cards, loans),
             ownershipConfirmationService = confirmation,
-            zoneId = zoneId,
             effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
             reviewRepository = EmptyReviewRepository(),
             userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
@@ -169,7 +168,6 @@ class ScopedReconciliationTest {
             ownershipResolver = reconciliationOwnership(),
             ownershipConfirmationService = confirmation,
             effectiveParsedEventProvider = EffectiveParsedEventProvider(parsed, com.baraa.masroof.data.repository.RoomUserDecisionRepository(db)),
-            zoneId = zoneId,
             reviewRepository = EmptyReviewRepository(),
             userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,
         )
@@ -517,7 +515,6 @@ class ScopedReconciliationTest {
                 financialTransactionRepository = countedFinancial,
                 ownershipResolver = OwnershipResolver(accounts, cards, loanRegistry),
                 ownershipConfirmationService = ownership,
-                zoneId = zoneId,
                 effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(countedParsed),
                 reviewRepository = EmptyReviewRepository(),
                 userDecisionRepository = com.baraa.masroof.testsupport.NoOpUserDecisionRepository,

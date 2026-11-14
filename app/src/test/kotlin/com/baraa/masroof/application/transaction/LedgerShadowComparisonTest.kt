@@ -29,7 +29,6 @@ import com.baraa.masroof.ledger.OwnershipFacts
 import com.baraa.masroof.ledger.StoredFacts
 import java.math.BigDecimal
 import java.time.Instant
-import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -64,7 +63,7 @@ class LedgerShadowComparisonTest {
         registry: OwnershipFacts = OwnershipFacts(),
     ) = LedgerInputs(
         events = events.map { LedgerEvidence(it, t0, null, null, null, automationConfirmed = false) },
-        decisions = decisions, registry = registry, storedFacts = StoredFacts(rows = old), zone = ZoneOffset.UTC,
+        decisions = decisions, registry = registry, storedFacts = StoredFacts(rows = old),
         reviews = reviews,
     )
 

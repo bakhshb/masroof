@@ -36,9 +36,9 @@ class MessagePatternStore(
     }
 
     /** Runs when the live database opens (bundled seeding) and under the exclusive access gate (interactive installation). */
-    fun installMissingBanks(bundled: List<BankMessagePatterns>, mergeBankIds: Set<String> = emptySet()): MessagePatternConfiguration = transaction {
+    fun installMissingBanks(bundled: List<BankMessagePatterns>): MessagePatternConfiguration = transaction {
         var current = load()
-        for (bank in bundled) installation(current, bank, mergeBankIds)?.let { current = write(current, it) }
+        for (bank in bundled) installation(current, bank)?.let { current = write(current, it) }
         current
     }
 
@@ -116,12 +116,11 @@ class MessagePatternStore(
         /**
          * The bank to store for one bundled definition, or null when nothing changes. A missing bank installs unless
          * another bank owns its sender; an installed bank gains missing patterns and newer bundled role rules the user
-         * left untouched (deleted, disabled and edited patterns stay the user's decision). [mergeBankIds] also merge senders.
+         * left untouched (deleted, disabled and edited patterns stay the user's decision). Senders stay the user's.
          */
-        fun installation(configuration: MessagePatternConfiguration, seed: BankMessagePatterns,
-            mergeBankIds: Set<String>): BankMessagePatterns? {
+        fun installation(configuration: MessagePatternConfiguration, seed: BankMessagePatterns): BankMessagePatterns? {
             val prior = configuration.banks.singleOrNull { it.bankId == seed.bankId }
-                ?: return seed.takeIf { seed.bankId in mergeBankIds || configuration.banks.none { bank -> seed.senders.any { mine -> bank.senders.any { SenderIdentity.overlap(it, mine) } } } }
+                ?: return seed.takeIf { configuration.banks.none { bank -> seed.senders.any { mine -> bank.senders.any { SenderIdentity.overlap(it, mine) } } } }
             val installed = prior.currentPatterns.associateBy { it.id }
             val updates = seed.patterns.mapNotNull { bundled ->
                 val mine = installed[bundled.id]
@@ -139,11 +138,10 @@ class MessagePatternStore(
                     else -> null
                 }
             }
-            val senders = if (seed.bankId in mergeBankIds) (prior.senders + seed.senders).distinct() else prior.senders
-            if (updates.isEmpty() && senders == prior.senders) return null
+            if (updates.isEmpty()) return null
             // An upgraded role keeps only its new revision, so repeated updates never grow the bounded history.
             val upgraded = updates.map { it.id }.toSet()
-            return prior.copy(senders = senders,
+            return prior.copy(
                 patterns = keepRecent(prior.patterns.filterNot { it.id in upgraded && it.roleProfile != null } + updates))
         }
 

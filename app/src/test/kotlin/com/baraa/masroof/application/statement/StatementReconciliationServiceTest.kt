@@ -262,7 +262,7 @@ class StatementReconciliationServiceTest {
     }
 
     @Test
-    fun conflictingStoredZones_stayUnsupported() = runBlocking {
+    fun everyBankIsReadInRiyadhWhateverTheStoredZone() = runBlocking {
         val entry = BankStatementEntry(
             lineNumber = 1,
             bank = Bank("D360"),
@@ -275,24 +275,16 @@ class StatementReconciliationServiceTest {
             description = "ZONE",
             reference = null,
         )
+        // 01:30 in Riyadh on May 1 is still April 30 in UTC, the zone stored on the row.
         val rows = listOf(
             posted(
-                id = "riyadh",
+                id = "early",
                 type = FinancialTransactionType.EXPENSE,
                 amount = "9.00",
-                at = LocalDateTime.parse("2026-05-01T12:00:00").atZone(ZoneId.of("Asia/Riyadh")).toInstant(),
+                at = LocalDateTime.parse("2026-05-01T01:30:00").atZone(ZoneId.of("Asia/Riyadh")).toInstant(),
                 direction = StatementDirection.DEBIT,
                 bank = Bank("D360"),
-                zoneId = "Asia/Riyadh",
-            ),
-            posted(
-                id = "paris",
-                type = FinancialTransactionType.EXPENSE,
-                amount = "9.00",
-                at = LocalDateTime.parse("2026-05-01T12:00:00").atZone(ZoneId.of("Europe/Paris")).toInstant(),
-                direction = StatementDirection.DEBIT,
-                bank = Bank("D360"),
-                zoneId = "Europe/Paris",
+                zoneId = "UTC",
             ),
         )
         val ledger = RecordingLedger(rows)
@@ -308,9 +300,8 @@ class StatementReconciliationServiceTest {
             ),
         )
         assertEquals(0, ledger.mutations)
-        assertTrue(report.statementLines.all { it.status == StatementComparisonStatus.UNSUPPORTED })
-        assertTrue(report.ledgerLines.all { it.status == StatementComparisonStatus.UNSUPPORTED })
-        assertEquals(0, report.counts.matched)
+        assertEquals(StatementComparisonStatus.MATCHED, report.statementLines.single().status)
+        assertEquals(1, report.counts.matched)
     }
 
     @Test

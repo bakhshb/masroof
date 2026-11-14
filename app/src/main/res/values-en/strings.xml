@@ -276,7 +276,6 @@
     <string name="onboarding_done_counts">Owned accounts: %1$d • owned cards: %2$d • needs review: %3$d</string>
     <string name="onboarding_enter_app">Enter Masroof</string>
     <string name="home_setup_complete">Setup complete</string>
-    <string name="bank_aljazira">AlJazira Bank</string>
     <string name="bank_unknown">Unknown bank</string>
 <string name="dashboard_remaining_title">Net period movement</string>
     <string name="dashboard_hero_remaining_title">Net account movement</string>

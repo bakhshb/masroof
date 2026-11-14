@@ -3,10 +3,10 @@ package com.baraa.masroof.domain.model
 /**
  * Stable identifier for a financial institution.
  *
- * Not a closed enum of every Saudi bank. Known constants cover the current
- * product need ([BANK_ALJAZIRA]) and unresolved detection ([UNKNOWN]). Other
- * institutions are expressible as `Bank("D360")` (etc.) so cross-bank owned
- * transfers can be modeled without multi-bank parsing or expanding a fixed list.
+ * Not a closed enum: every bank is the id of its pattern file in
+ * `app/src/main/assets/bank-patterns/` (or a bank the user added), e.g. `Bank("BANK_SNB")`,
+ * and production code treats every bank the same. [UNKNOWN] marks unresolved detection;
+ * [BANK_ALJAZIRA] is only a shorthand for the id most test fixtures use.
  */
 @JvmInline
 value class Bank(val id: String) {

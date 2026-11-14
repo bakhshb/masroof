@@ -29,7 +29,6 @@ import com.baraa.masroof.data.repository.RoomReviewRepository
 import com.baraa.masroof.data.repository.RoomUserDecisionRepository
 import com.baraa.masroof.data.room.DatabaseAccessGate
 import com.baraa.masroof.data.room.MasroofDatabase
-import com.baraa.masroof.domain.model.Bank
 import com.baraa.masroof.domain.repository.AccountRegistryRepository
 import com.baraa.masroof.domain.repository.CardRegistryRepository
 import com.baraa.masroof.domain.repository.CommitmentRepository
@@ -94,7 +93,7 @@ class StorageContainer(
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         val patterns = MessagePatternStore({ db })
-                        if (installBundledPatterns) patterns.installMissingBanks(bundledPatternBanks, setOf(Bank.BANK_ALJAZIRA.id))
+                        if (installBundledPatterns) patterns.installMissingBanks(bundledPatternBanks)
                     }
                 })
                 .build()

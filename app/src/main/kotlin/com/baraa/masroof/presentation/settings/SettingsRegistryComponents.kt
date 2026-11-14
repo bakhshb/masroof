@@ -137,10 +137,6 @@ internal fun SettingsUpdateFailedText(error: SettingsError? = null) {
 
 @Composable
 fun settingsBankLabel(bank: Bank): String =
-    LocalSettingsBankNames.current[bank.id] ?: if (bank == Bank.BANK_ALJAZIRA) {
-        stringResource(R.string.bank_aljazira)
-    } else if (bank == Bank.UNKNOWN) {
-        stringResource(R.string.bank_unknown)
-    } else bank.id
+    LocalSettingsBankNames.current[bank.id] ?: if (bank == Bank.UNKNOWN) stringResource(R.string.bank_unknown) else bank.id
 
 internal val LocalSettingsBankNames = androidx.compose.runtime.staticCompositionLocalOf<Map<String, String>> { emptyMap() }

@@ -20,12 +20,9 @@ import com.baraa.masroof.domain.model.LoanType
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.ZoneOffset
 
 val AJ = Bank.BANK_ALJAZIRA
 val D360 = Bank("D360")
-val UTC: ZoneId = ZoneOffset.UTC
 val T0: Instant = Instant.parse("2026-08-01T09:00:00Z")
 
 fun account(number: String, bank: Bank = AJ) = AccountReference(bank, number)
@@ -100,5 +97,4 @@ fun project(
     decisions: Map<String, EffectiveUserDecisions> = emptyMap(),
     registry: OwnershipFacts = OwnershipFacts(),
     stored: StoredFacts = StoredFacts(),
-    zone: ZoneId = UTC,
-) = LedgerProjector.project(events, decisions, registry, stored, zone)
+) = LedgerProjector.project(events, decisions, registry, stored)

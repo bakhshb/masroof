@@ -254,7 +254,7 @@ class LedgerProjectorTest {
     }
 
     @Test
-    fun storedZoneAndCompleteExchangeRatePairAreInputs() {
+    fun completeExchangeRatePairIsAnInputAndTheZoneIsAlwaysRiyadh() {
         val d360Card = CardReference(D360, "4444")
         val evidence = evidence(
             event("fx", MessageFamily.PURCHASE, bank = D360, card = d360Card), T0,
@@ -266,13 +266,14 @@ class LedgerProjectorTest {
         )
 
         val row = project(listOf(evidence), registry = registry, stored = stored).rows.single().transaction
-        assertEquals(Instant.parse("2026-08-01T06:00:00Z"), row.occurredAt)
-        assertEquals("Asia/Dubai", row.occurredAtZone)
+        assertEquals(Instant.parse("2026-08-01T07:00:00Z"), row.occurredAt)
+        assertEquals("Asia/Riyadh", row.occurredAtZone)
         assertEquals(BigDecimal("3.75"), row.appliedExchangeRate)
         assertEquals(ExchangeRateSource.SMS, row.exchangeRateSource)
 
         val fresh = project(listOf(evidence), registry = registry).rows.single().transaction
-        assertEquals(Instant.parse("2026-08-01T10:00:00Z"), fresh.occurredAt)
+        assertEquals(Instant.parse("2026-08-01T07:00:00Z"), fresh.occurredAt)
+        assertEquals("Asia/Riyadh", fresh.occurredAtZone)
         assertEquals(null, fresh.appliedExchangeRate)
 
         val half = StoredFacts(rows = listOf(storedRow("fx", zone = "Asia/Dubai", rate = BigDecimal("3.75"))))

@@ -250,8 +250,8 @@ class StatementReconciliationSmokeTest {
         clickText(text(R.string.settings_banks_title))
         val bankName = runBlocking {
             application().container.patterns.messagePatternsWorkflow.catalog().banks
-                .single { it.bankId == Bank.BANK_ALJAZIRA.id }.displayName
-        } ?: text(R.string.bank_aljazira)
+                .single { it.bankId == Bank.BANK_ALJAZIRA.id }.displayName!!
+        }
         clickText(bankName)
         clickText(text(R.string.settings_statement_reconciliation_title))
         awaitTag(STATEMENT_RECONCILIATION_PICK_TAG)

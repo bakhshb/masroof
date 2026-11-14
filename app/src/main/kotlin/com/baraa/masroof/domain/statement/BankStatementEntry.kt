@@ -33,8 +33,8 @@ import java.time.LocalDateTime
  *
  * `bookedAt` is an offset-less ISO-8601 local date (`YYYY-MM-DD`) or local
  * date-time (`YYYY-MM-DDTHH:MM:SS` with optional fraction). It is civil time in
- * [com.baraa.masroof.domain.assembly.BankTransactionTimePolicy]. AlJazira is
- * `Asia/Riyadh`. An offset or `Z` is rejected. A date-only value matches that
+ * [com.baraa.masroof.domain.assembly.BankTransactionTimePolicy] (`Asia/Riyadh` for every
+ * bank). An offset or `Z` is rejected. A date-only value matches that
  * civil date. A date-time also requires the ledger clock to fall inside
  * [StatementMatchPolicy.BOOKING_TIME_WINDOW].
  *

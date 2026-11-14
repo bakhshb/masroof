@@ -8,7 +8,6 @@ import com.baraa.masroof.domain.repository.RawSmsRepository
 import com.baraa.masroof.domain.repository.ReviewRepository
 import com.baraa.masroof.domain.repository.UserDecisionRepository
 import com.baraa.masroof.ledger.LedgerProjector
-import java.time.ZoneId
 
 /**
  * Operational summary of a reconciliation pass.
@@ -37,14 +36,13 @@ class TransactionReconciliationService(
     effectiveParsedEventProvider: EffectiveParsedEventProvider,
     reviewRepository: ReviewRepository,
     userDecisionRepository: UserDecisionRepository,
-    zoneId: ZoneId = ZoneId.systemDefault(),
     automaticWrite: AutomaticWrite? = null,
     inTransaction: suspend (suspend () -> Unit) -> Unit = { it() },
 ) {
     private val writer = LedgerProjectionWriter(
         LedgerInputLoader(
             rawSmsRepository, financialTransactionRepository, reviewRepository, userDecisionRepository,
-            effectiveParsedEventProvider, ownershipResolver, zoneId,
+            effectiveParsedEventProvider, ownershipResolver,
         ),
         financialTransactionRepository, ownershipConfirmationService, automaticWrite, inTransaction,
     )

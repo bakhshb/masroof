@@ -30,7 +30,6 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -457,7 +456,6 @@ class LedgerProjectionWriterTest : ReconciliationTestFixture() {
         effectiveParsedEventProvider = noOpEffectiveParsedEventProvider(parsed),
         reviewRepository = reviews,
         userDecisionRepository = NoOpUserDecisionRepository,
-        zoneId = ZoneId.of("Asia/Riyadh"),
         automaticWrite = guard,
         inTransaction = { write -> onTransaction(); db.withTransaction { write() } },
     )

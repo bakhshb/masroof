@@ -2,7 +2,6 @@ package com.baraa.masroof.domain.statement
 
 import com.baraa.masroof.domain.model.Bank
 import java.time.LocalDateTime
-import java.time.ZoneId
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -26,16 +25,6 @@ class StatementMatchPolicyTest {
         assertFalse(StatementMatchPolicy.referenceSupported("abc", emptySet()))
         assertFalse(StatementMatchPolicy.referenceSupported("abc", setOf("abc", "def")))
         assertTrue(StatementMatchPolicy.referenceSupported(null, emptySet()))
-    }
-
-    @Test
-    fun statementsUseFixedOrUnambiguousPersistedZones() {
-        assertEquals(ZoneId.of("Asia/Riyadh"), StatementMatchPolicy.zoneForStatementBank(Bank.BANK_ALJAZIRA, emptySet()))
-        val bank = Bank("D360")
-        assertEquals(ZoneId.of("Europe/London"), StatementMatchPolicy.zoneForStatementBank(bank, setOf("Europe/London")))
-        assertNull(StatementMatchPolicy.zoneForStatementBank(bank, emptySet()))
-        assertNull(StatementMatchPolicy.zoneForStatementBank(bank, setOf("Europe/London", "Asia/Riyadh")))
-        assertNull(StatementMatchPolicy.zoneForStatementBank(bank, setOf("invalid")))
     }
 
     @Test

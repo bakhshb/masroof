@@ -282,7 +282,6 @@
     <string name="onboarding_done_counts">حسابات مملوكة: %1$d • بطاقات مملوكة: %2$d • حركات تحتاج مراجعة: %3$d</string>
     <string name="onboarding_enter_app">الدخول إلى مصروف</string>
     <string name="home_setup_complete">اكتمل الإعداد</string>
-    <string name="bank_aljazira">بنك الجزيرة</string>
     <string name="bank_unknown">بنك غير معروف</string>
 <string name="dashboard_remaining_title">صافي حركة الفترة</string>
     <string name="dashboard_hero_remaining_title">صافي حركة الحسابات</string>

@@ -48,13 +48,6 @@ class FinancialPolicyCompatibilityTest {
         val friday = FinancialPeriodPolicy.periodContaining(LocalDate.parse("2026-02-27"))
         assertEquals(LocalDate.parse("2026-02-26"), friday.startDate)
         assertEquals(LocalDate.parse("2026-03-26"), friday.endDateExclusive)
-        assertEquals(
-            ZoneId.of("Asia/Riyadh"),
-            BankTransactionTimePolicy.resolve(Bank.BANK_ALJAZIRA, "Europe/London", ZoneId.of("Asia/Tokyo")),
-        )
-        assertEquals(
-            ZoneId.of("Europe/London"),
-            BankTransactionTimePolicy.resolve(Bank("D360"), "Europe/London", ZoneId.of("Asia/Tokyo")),
-        )
+        assertEquals(ZoneId.of("Asia/Riyadh"), BankTransactionTimePolicy.RIYADH)
     }
 }

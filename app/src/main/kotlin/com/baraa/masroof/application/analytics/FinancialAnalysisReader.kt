@@ -79,7 +79,7 @@ internal object FinancialAnalysisReader {
                 val receiptDay = rawSms.receivedAt.atZone(zone).toLocalDate().toEpochDay()
                 val eventDay = record?.let {
                     com.baraa.masroof.domain.assembly.TransactionTiming.effectiveOccurredAt(it.event, it.details.occurredAtLocal,
-                        rawSms.receivedAt, zone).atZone(zone).toLocalDate().toEpochDay()
+                        rawSms.receivedAt).atZone(zone).toLocalDate().toEpochDay()
                 }
                 listOfNotNull(receiptDay, eventDay)
             }.toSet()
