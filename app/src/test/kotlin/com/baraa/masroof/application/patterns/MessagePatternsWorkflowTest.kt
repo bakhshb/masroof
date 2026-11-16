@@ -47,6 +47,24 @@ class MessagePatternsWorkflowTest {
         assertEquals(links, upgraded.factContract!!.accountBindings)
     }
 
+    @Test fun aStoredAlJaziraRefundRuleWithoutReversalWordingGetsTheBundledRuleAndKeepsItsLinks() {
+        val text = java.io.File("src/main/assets/bank-patterns/BANK_ALJAZIRA.patterns.json").readText()
+        fun bank(json: String) = com.baraa.masroof.data.patterns.MessagePatternConfigurationCodec.decode(json).banks.single()
+        val seed = bank(text)
+        val old = bank(text.replace("                  \"عكس عملية شراء\",\n                  \"حوالة عكسية\",\n", ""))
+        assertNotEquals("The old rule lacks the reversal wording", seed, old)
+        val links = listOf(com.baraa.masroof.engine.bank.patterns.PatternAccountBinding(
+            com.baraa.masroof.engine.bank.patterns.PatternAccountRole.CARD, com.baraa.masroof.finance.value.BankId("BANK_ALJAZIRA"), "7271"))
+        val stored = old.copy(patterns = old.patterns.map {
+            if (it.id != "bank.refund") it else it.copy(revision = 2, factContract = it.factContract!!.copy(version = 2, accountBindings = links))
+        })
+        val upgraded = MessagePatternStore.installation(
+            com.baraa.masroof.engine.bank.patterns.MessagePatternConfiguration(banks = listOf(stored)), seed)!!
+            .currentPatterns.single { it.id == "bank.refund" }
+        assertEquals(seed.patterns.single { it.id == "bank.refund" }.roleProfile, upgraded.roleProfile)
+        assertEquals(links, upgraded.factContract!!.accountBindings)
+    }
+
     @Test fun aSenderThatDetectsAsAnotherBanksSenderCannotBeAdded() = runBlocking {
         withPatternDatabase { db ->
             val store = MessagePatternStore(db)

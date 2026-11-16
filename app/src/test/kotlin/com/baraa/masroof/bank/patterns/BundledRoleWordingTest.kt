@@ -35,6 +35,16 @@ class BundledRoleWordingTest {
         assertNull(merchant.facts.destinationAccount)
     }
 
+    @Test fun aljaziraPurchaseReversalIsARefundAndAPurchaseStaysAPurchase() {
+        val reversal = parse("BANK_ALJAZIRA", "AlJazira", "عكس عملية شراء عبر الانترنت\nبطاقة ائتمانية : 7271\nبمبلغ: SAR 30.94\nلدى :UBER\nفي: 2026-11-15 11:24\nالرصيد المتاح : SAR 4686.89\nإجمالي المستحق: SAR 11567.98")
+        assertEquals(MessageFamily.REFUND, reversal.facts.family)
+        assertEquals(0, java.math.BigDecimal("30.94").compareTo(reversal.facts.amount?.amount))
+        assertEquals(com.baraa.masroof.finance.value.Currency.SAR, reversal.facts.amount?.currency)
+        assertEquals("7271", reversal.facts.card?.last4)
+        val purchase = parse("BANK_ALJAZIRA", "AlJazira", "شراء عبر الانترنت\nبطاقة ائتمانية : 7271\nبمبلغ: SAR 30.94\nلدى :UBER\nفي: 2026-11-15 11:24\nالرصيد المتاح : SAR 4686.89")
+        assertEquals(MessageFamily.PURCHASE, purchase.facts.family)
+    }
+
     private fun parse(bank: String, sender: String, body: String): Interpretation {
         val config = bundledPatterns(bank)
         return PatternFactInterpreter(config).interpretRouted(
